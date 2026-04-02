@@ -27,6 +27,7 @@ import { extractAddonActions, approveAddon, declineAddon } from '@/lib/services/
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import crypto from 'crypto';
 
@@ -741,7 +742,7 @@ export async function POST(request: NextRequest) {
               customer_id: quoteCustomerId,
               vehicle_id: vehicleId || undefined,
               items: quoteItems,
-              notes: `Auto-generated via SMS for ${quoteData.vehicle_year || ''} ${quoteData.vehicle_make} ${quoteData.vehicle_model}`.trim(),
+              notes: `Auto-generated via SMS for ${cleanVehicleDescription({ year: quoteData.vehicle_year, make: quoteData.vehicle_make, model: quoteData.vehicle_model })}`.trim(),
               valid_until: validUntil,
             });
 

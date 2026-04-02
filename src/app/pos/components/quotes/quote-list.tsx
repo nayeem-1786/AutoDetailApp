@@ -8,6 +8,7 @@ import { posFetch } from '../../lib/pos-fetch';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { STATUS_BADGE_CONFIG, formatCurrency } from './quote-helpers';
 import type { QuoteStatus } from '../../types';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 interface QuoteItem {
   id: string;
@@ -205,7 +206,7 @@ export function QuoteList({ onSelect, onNewQuote }: QuoteListProps) {
                       ? `${quote.customer.first_name} ${quote.customer.last_name}`
                       : 'No Customer';
                     const vehicleStr = quote.vehicle
-                      ? `${quote.vehicle.year} ${quote.vehicle.make} ${quote.vehicle.model}`
+                      ? cleanVehicleDescription({ year: quote.vehicle.year, make: quote.vehicle.make, model: quote.vehicle.model })
                       : '';
 
                     return (

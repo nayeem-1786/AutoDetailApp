@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { processVoiceCallEnd } from '@/lib/services/voice-post-call';
 import { extractServicesFromTranscript } from '@/lib/utils/service-extraction';
+import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_AGENT_ID = process.env.ELEVENLABS_AGENT_ID;
@@ -198,9 +199,9 @@ export async function GET(request: NextRequest) {
       );
       if (vehicleMatch) {
         vehicleYear = vehicleMatch[1] ? parseInt(vehicleMatch[1], 10) : undefined;
-        vehicleColor = vehicleMatch[2] || undefined;
-        vehicleMake = vehicleMatch[3] || undefined;
-        vehicleModel = vehicleMatch[4]?.trim() || undefined;
+        vehicleColor = sanitizeVehicleField(vehicleMatch[2]) ?? undefined;
+        vehicleMake = sanitizeVehicleField(vehicleMatch[3]) ?? undefined;
+        vehicleModel = sanitizeVehicleField(vehicleMatch[4]?.trim()) ?? undefined;
       }
 
       // Fallback: extract vehicle from transcript summary if customer_summary
@@ -209,10 +210,10 @@ export async function GET(request: NextRequest) {
         const { extractVehicleFromTranscript } = await import('@/lib/services/voice-post-call');
         const extracted = extractVehicleFromTranscript(transcriptSummary);
         if (extracted) {
-          vehicleMake = extracted.vehicleMake;
-          vehicleModel = extracted.vehicleModel;
+          vehicleMake = sanitizeVehicleField(extracted.vehicleMake) ?? undefined;
+          vehicleModel = sanitizeVehicleField(extracted.vehicleModel) ?? undefined;
           vehicleYear = extracted.vehicleYear ? parseInt(extracted.vehicleYear, 10) || undefined : undefined;
-          vehicleColor = extracted.vehicleColor;
+          vehicleColor = sanitizeVehicleField(extracted.vehicleColor) ?? undefined;
         }
       }
 

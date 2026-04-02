@@ -13,6 +13,7 @@ import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
@@ -431,9 +432,9 @@ export async function POST(request: NextRequest) {
       const serviceNames = allServices.join(', ');
       // Build vehicle description for SMS/email — use form data first, query DB if only ID
       let vehicleStr = '';
-      const vehicleFormParts = [data.vehicle?.year, data.vehicle?.make, data.vehicle?.model].filter(Boolean);
-      if (vehicleFormParts.length > 0) {
-        vehicleStr = vehicleFormParts.join(' ');
+      const vehicleFormDesc = cleanVehicleDescription({ year: data.vehicle?.year, make: data.vehicle?.make, model: data.vehicle?.model });
+      if (vehicleFormDesc) {
+        vehicleStr = vehicleFormDesc;
       } else if (vehicleId) {
         const { data: vehRecord } = await supabase
           .from('vehicles')
@@ -441,7 +442,7 @@ export async function POST(request: NextRequest) {
           .eq('id', vehicleId)
           .single();
         if (vehRecord) {
-          vehicleStr = [vehRecord.year, vehRecord.color, vehRecord.make, vehRecord.model].filter(Boolean).join(' ');
+          vehicleStr = cleanVehicleDescription({ year: vehRecord.year, color: vehRecord.color, make: vehRecord.make, model: vehRecord.model });
         }
       }
       const customerName = `${data.customer.first_name} ${data.customer.last_name}`.trim();

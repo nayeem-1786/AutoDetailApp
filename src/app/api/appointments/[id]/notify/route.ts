@@ -6,6 +6,7 @@ import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function POST(
   request: NextRequest,
@@ -55,7 +56,7 @@ export async function POST(
     const vehicle = appointment.vehicle as {
       id: string; year: number; make: string; model: string;
     } | null;
-    const vehicleStr = vehicle ? `${vehicle.year} ${vehicle.make} ${vehicle.model}` : 'N/A';
+    const vehicleStr = vehicle ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || 'N/A' : 'N/A';
 
     const employee = appointment.employee as {
       id: string; first_name: string; last_name: string; phone: string | null;

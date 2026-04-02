@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { formatCurrency } from '@/lib/utils/format';
 import { Spinner } from '@/components/ui/spinner';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 interface TransactionItem {
   id: string;
@@ -74,7 +75,7 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
 
   const vehicle = data.vehicles;
   const vehicleLabel = vehicle
-    ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
+    ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model })
     : null;
 
   return (
@@ -82,7 +83,7 @@ export function TransactionDetail({ transactionId }: TransactionDetailProps) {
       {/* Vehicle */}
       {vehicleLabel && (
         <p className="text-xs text-site-text-faint">
-          Vehicle: {vehicle?.color ? `${vehicle.color} ` : ''}{vehicleLabel}
+          Vehicle: {sanitizeVehicleField(vehicle?.color) ? `${vehicle!.color} ` : ''}{vehicleLabel}
         </p>
       )}
 

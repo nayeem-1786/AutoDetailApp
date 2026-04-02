@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getZoneLabel } from '@/lib/utils/job-zones';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { GalleryClient } from './gallery-client';
 
 interface Props {
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const vehicle = job?.vehicle as unknown as { year: number | null; make: string | null; model: string | null } | null;
   const vehicleDesc = vehicle
-    ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
+    ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || 'Vehicle'
     : 'Vehicle';
 
   return {
@@ -113,9 +114,10 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
   }));
 
   const vehicle = job.vehicle as unknown as { year: number | null; make: string | null; model: string | null; color: string | null } | null;
-  const vehicleParts = [vehicle?.year, vehicle?.make, vehicle?.model].filter(Boolean);
-  const vehicleInfo = vehicleParts.length > 0 ? vehicleParts.join(' ') : 'Vehicle';
-  const vehicleColor = vehicle?.color || null;
+  const vehicleInfo = vehicle
+    ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || 'Vehicle'
+    : 'Vehicle';
+  const vehicleColor = sanitizeVehicleField(vehicle?.color);
   const customerName = (job.customer as unknown as { first_name: string } | null)?.first_name || null;
 
   const services = (job.services as Array<{ name: string; price: number }>) || [];

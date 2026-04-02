@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { formatPhone } from '@/lib/utils/format';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import {
   ArrowLeft,
   User,
@@ -170,9 +171,9 @@ function formatTime(dt: string | null): string {
 
 function formatVehicle(v: JobDetailData['vehicle']): string {
   if (!v) return 'No vehicle';
-  const parts = [v.year, v.make, v.model].filter(Boolean);
-  const desc = parts.length > 0 ? parts.join(' ') : 'Vehicle';
-  return v.color ? `${v.color} ${desc}` : desc;
+  const desc = cleanVehicleDescription({ year: v.year, make: v.make, model: v.model }) || 'Vehicle';
+  const color = sanitizeVehicleField(v.color);
+  return color ? `${color} ${desc}` : desc;
 }
 
 function timeAgo(dt: string | null): string {

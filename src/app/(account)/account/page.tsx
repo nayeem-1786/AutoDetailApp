@@ -8,6 +8,7 @@ import { AppointmentCard } from '@/components/account/appointment-card';
 import { CouponCard } from '@/components/account/coupon-card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { BeforeAfterSlider } from '@/components/before-after-slider';
 import { formatPoints, formatCurrency } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
@@ -198,7 +199,7 @@ export default function AccountDashboardPage() {
               </p>
               <p className="text-sm text-site-text-dim">
                 {lastService.vehicle
-                  ? `${lastService.vehicle.year} ${lastService.vehicle.make} ${lastService.vehicle.model}${lastService.vehicle.color ? ` — ${lastService.vehicle.color}` : ''}`
+                  ? `${cleanVehicleDescription({ year: lastService.vehicle.year, make: lastService.vehicle.make, model: lastService.vehicle.model })}${sanitizeVehicleField(lastService.vehicle.color) ? ` — ${lastService.vehicle.color}` : ''}`
                   : ''}
                 {lastService.vehicle && lastService.services.length > 0 ? ' · ' : ''}
                 {lastService.services.map((s) => s.name).join(', ')}

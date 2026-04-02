@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AppointmentEditDialog } from '@/components/account/appointment-edit-dialog';
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils/format';
 import { APPOINTMENT } from '@/lib/utils/constants';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { toast } from 'sonner';
 import type { AppointmentStatus } from '@/lib/supabase/types';
 
@@ -67,7 +68,7 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
 
   const vehicle = appointment.vehicles;
   const vehicleLabel = vehicle
-    ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
+    ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model })
     : null;
 
   const handleCancel = async () => {

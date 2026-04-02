@@ -13,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { StepPayment } from './step-payment';
 import { InlineAuth, type AuthCustomerData } from './inline-auth';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import {
   Gift,
@@ -421,7 +422,7 @@ export function StepConfirmBook({
 
   // --- Order Summary renderer ---
   const vehicleDescription = vehicleData
-    ? [vehicleData.year, vehicleData.color, vehicleData.make, vehicleData.model].filter(Boolean).join(' ')
+    ? cleanVehicleDescription({ year: vehicleData.year, color: vehicleData.color, make: vehicleData.make, model: vehicleData.model }) || null
     : null;
 
   const renderOrderSummary = () => (

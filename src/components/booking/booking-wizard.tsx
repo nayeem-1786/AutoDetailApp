@@ -13,6 +13,7 @@ import { BookingConfirmation } from './booking-confirmation';
 import { Button } from '@/components/ui/button';
 import type { AuthCustomerData } from './inline-auth';
 import type { BookableCategory, BookableService, BusinessHours, BookingConfig, RebookData } from '@/lib/data/booking';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { MobileZone, VehicleSizeClass, VehicleType, VehicleCategoryRecord, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
 import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
@@ -561,7 +562,7 @@ export function BookingWizard({
         customerEmail={confirmation.customerEmail}
         isPortal={isPortal}
         vehicleDescription={state.vehicleData
-          ? [state.vehicleData.year, state.vehicleData.color, state.vehicleData.make, state.vehicleData.model].filter(Boolean).join(' ') || null
+          ? cleanVehicleDescription({ year: state.vehicleData.year, color: state.vehicleData.color, make: state.vehicleData.make, model: state.vehicleData.model }) || null
           : null}
       />
     );

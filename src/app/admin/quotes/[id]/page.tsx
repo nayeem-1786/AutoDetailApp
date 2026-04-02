@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Car, Mail, MessageSquare, User, Calendar, DollarSign, Award, Clock, ExternalLink, Eye } from 'lucide-react';
 import Link from 'next/link';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -265,7 +266,7 @@ export default function QuoteDetailPage() {
                   <div>
                     <p className="text-xs text-gray-500">Vehicle</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {[quote.vehicle.year, quote.vehicle.make, quote.vehicle.model].filter(Boolean).join(' ')}
+                      {cleanVehicleDescription({ year: quote.vehicle.year, make: quote.vehicle.make, model: quote.vehicle.model })}
                     </p>
                   </div>
                 </div>

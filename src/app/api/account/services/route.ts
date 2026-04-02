@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest) {
       if (v && !vehicleMap.has(v.id)) {
         vehicleMap.set(v.id, {
           id: v.id,
-          label: `${v.year} ${v.make} ${v.model}${v.color ? ` — ${v.color}` : ''}`,
+          label: `${cleanVehicleDescription({ year: v.year, make: v.make, model: v.model })}${v.color ? ` — ${v.color}` : ''}`,
         });
       }
     }

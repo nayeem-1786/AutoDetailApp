@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { toast } from 'sonner';
 import {
   Camera,
@@ -460,7 +461,7 @@ export default function AdminPhotosPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {previewPairs.map((pair, i) => {
             const vehicleStr = pair.vehicle
-              ? `${pair.vehicle.year ? pair.vehicle.year + ' ' : ''}${pair.vehicle.make} ${pair.vehicle.model}`
+              ? cleanVehicleDescription({ year: pair.vehicle.year, make: pair.vehicle.make, model: pair.vehicle.model })
               : '';
             return (
               <Card key={`${pair.job_id}:${pair.zone}:${i}`} className="overflow-hidden">
@@ -914,7 +915,7 @@ function PhotoCard({
     : null;
 
   const vehicleStr = photo.vehicle
-    ? `${photo.vehicle.year} ${photo.vehicle.make} ${photo.vehicle.model}`
+    ? cleanVehicleDescription({ year: photo.vehicle.year, make: photo.vehicle.make, model: photo.vehicle.model }) || null
     : null;
 
   const date = new Date(photo.created_at).toLocaleDateString('en-US', {
@@ -1082,7 +1083,7 @@ function PhotoDetailModal({
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
 
   const vehicleStr = photo.vehicle
-    ? `${photo.vehicle.year} ${photo.vehicle.make} ${photo.vehicle.model}${photo.vehicle.color ? ` (${photo.vehicle.color})` : ''}`
+    ? `${cleanVehicleDescription({ year: photo.vehicle.year, make: photo.vehicle.make, model: photo.vehicle.model })}${sanitizeVehicleField(photo.vehicle.color) ? ` (${photo.vehicle.color})` : ''}`
     : 'N/A';
 
   const date = new Date(photo.created_at).toLocaleString('en-US', {

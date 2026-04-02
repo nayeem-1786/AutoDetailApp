@@ -8,6 +8,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { runAutoEnrollments, checkAllStopConditions, processEnrollments } from '@/lib/email/drip-engine';
 import type { EmailBlock } from '@/lib/email/types';
 
@@ -518,7 +519,7 @@ async function executePending(
             .eq('id', apt.vehicle_id)
             .single();
           if (vehicle) {
-            vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+            vehicleDescription = cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model });
           }
         }
 
@@ -571,7 +572,7 @@ async function executePending(
             .eq('id', tx.vehicle_id)
             .single();
           if (vehicle) {
-            vehicleDescription = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+            vehicleDescription = cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model });
           }
         }
 

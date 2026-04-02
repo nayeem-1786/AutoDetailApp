@@ -6,6 +6,7 @@ import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Camera, ChevronRight, Loader2, ClipboardList } from 'lucide-react';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 interface Visit {
   job_id: string;
@@ -129,7 +130,7 @@ export default function ServiceHistoryPage() {
             {visits.map((visit) => {
               const vehicle = visit.vehicle;
               const vehicleStr = vehicle
-                ? `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.color ? ` — ${vehicle.color}` : ''}`
+                ? `${cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model })}${sanitizeVehicleField(vehicle.color) ? ` — ${vehicle.color}` : ''}`
                 : '';
               const serviceNames = visit.services.map((s) => s.name).join(', ');
               const dateStr = new Date(visit.date).toLocaleDateString('en-US', {

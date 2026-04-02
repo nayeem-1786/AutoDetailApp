@@ -13,6 +13,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
@@ -148,10 +149,8 @@ export function AppointmentDetailDialog({
             <div>
               <dt className="text-xs font-medium text-gray-500">Vehicle</dt>
               <dd className="text-gray-900">
-                {[appointment.vehicle.year, appointment.vehicle.make, appointment.vehicle.model]
-                  .filter(Boolean)
-                  .join(' ')}
-                {appointment.vehicle.color ? ` — ${appointment.vehicle.color}` : ''}
+                {cleanVehicleDescription({ year: appointment.vehicle.year, make: appointment.vehicle.make, model: appointment.vehicle.model })}
+                {sanitizeVehicleField(appointment.vehicle.color) ? ` — ${appointment.vehicle.color}` : ''}
               </dd>
             </div>
           )}

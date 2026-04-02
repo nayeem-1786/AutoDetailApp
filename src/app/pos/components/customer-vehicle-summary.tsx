@@ -4,6 +4,7 @@ import { User, Car, X, ChevronRight, Pencil } from 'lucide-react';
 import { formatPhone } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { VEHICLE_CATEGORY_LABELS } from '@/lib/utils/vehicle-categories';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { CustomerTypeBadge } from './customer-type-badge';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
@@ -43,7 +44,7 @@ export function CustomerVehicleSummary({
   }
 
   const vehicleLabel = vehicle
-    ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') ||
+    ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) ||
       'Vehicle'
     : null;
 

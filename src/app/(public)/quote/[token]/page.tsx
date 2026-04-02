@@ -5,6 +5,7 @@ import { Phone } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { AcceptQuoteButton } from './accept-button';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -170,9 +171,7 @@ export default async function PublicQuotePage({ params }: PageProps) {
             )}
             {quote.vehicle && (
               <p className="mt-1 text-sm text-site-text-muted">
-                {[quote.vehicle.year, quote.vehicle.make, quote.vehicle.model]
-                  .filter(Boolean)
-                  .join(' ')}
+                {cleanVehicleDescription({ year: quote.vehicle.year, make: quote.vehicle.make, model: quote.vehicle.model })}
               </p>
             )}
           </div>

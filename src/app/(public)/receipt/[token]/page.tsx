@@ -4,6 +4,7 @@ import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { PrintButton } from './print-button';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 interface TransactionWithRelations {
   id: string;
@@ -139,7 +140,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
     : allFullyRefunded ? 'full' : 'partial';
 
   const vehicleStr = tx.vehicle
-    ? [tx.vehicle.year, tx.vehicle.make, tx.vehicle.model].filter(Boolean).join(' ')
+    ? cleanVehicleDescription({ year: tx.vehicle.year, make: tx.vehicle.make, model: tx.vehicle.model }) || null
     : null;
   const customerName = tx.customer
     ? `${tx.customer.first_name} ${tx.customer.last_name}`

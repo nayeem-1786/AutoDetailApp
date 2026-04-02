@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createAnonClient } from '@/lib/supabase/anon';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -129,7 +130,7 @@ async function fetchFeaturedBeforeAfter(
 
       const vehicle = job.vehicles;
       const vehicleInfo = vehicle
-        ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+        ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || null
         : null;
 
       const serviceName =

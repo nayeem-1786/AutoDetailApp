@@ -21,6 +21,7 @@ import {
   Brain,
 } from 'lucide-react';
 import { formatPhone, formatCurrency } from '@/lib/utils/format';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Conversation, Message } from '@/lib/supabase/types';
 import { MessageBubble } from './message-bubble';
@@ -372,9 +373,9 @@ function SummaryCard({ summary, phoneDisplay }: { summary: ConversationSummary; 
   const hasCustomerName = customer?.name && customer.name.trim().length > 0;
 
   // Build vehicle string
-  const vehicleParts = [vehicle?.year, vehicle?.make, vehicle?.model, vehicle?.color]
-    .filter(Boolean);
-  const vehicleStr = vehicleParts.length > 0 ? vehicleParts.join(' ') : '';
+  const vehicleStr = vehicle
+    ? cleanVehicleDescription({ year: vehicle.year, color: vehicle.color, make: vehicle.make, model: vehicle.model })
+    : '';
 
   // Build quote status text
   let quoteStatusText = '';

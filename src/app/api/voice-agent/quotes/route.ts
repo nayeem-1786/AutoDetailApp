@@ -5,6 +5,7 @@ import { normalizePhone } from '@/lib/utils/format';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
+import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 interface QuoteServiceInput {
   service_id: string;
@@ -113,10 +114,10 @@ const body = await request.json();
       t = perf.now();
       const vehicleResult = await findOrCreateVehicle(supabase, {
         customerId,
-        make: vehicle_make,
-        model: vehicle_model,
-        year: vehicle_year,
-        color: vehicle_color,
+        make: sanitizeVehicleField(vehicle_make) || vehicle_make,
+        model: sanitizeVehicleField(vehicle_model),
+        year: sanitizeVehicleField(vehicle_year),
+        color: sanitizeVehicleField(vehicle_color),
       });
       perf.mark('query:vehicles_findOrCreate', t);
       if (vehicleResult) vehicleId = vehicleResult.id;

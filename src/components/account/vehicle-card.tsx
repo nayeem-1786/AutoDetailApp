@@ -2,6 +2,7 @@ import { VEHICLE_TYPE_LABELS, VEHICLE_SIZE_LABELS } from '@/lib/utils/constants'
 import { Button } from '@/components/ui/button';
 import type { VehicleType, VehicleSizeClass } from '@/lib/supabase/types';
 import { Pencil, Trash2 } from 'lucide-react';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 interface VehicleCardProps {
   vehicle: {
@@ -18,9 +19,7 @@ interface VehicleCardProps {
 }
 
 export function VehicleCard({ vehicle, onEdit, onDelete }: VehicleCardProps) {
-  const label = [vehicle.year, vehicle.make, vehicle.model]
-    .filter(Boolean)
-    .join(' ');
+  const label = cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model });
 
   return (
     <div className="rounded-lg border border-site-border bg-brand-surface p-5">

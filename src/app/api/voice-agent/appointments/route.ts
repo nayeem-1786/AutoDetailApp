@@ -8,6 +8,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
+import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 // ---------------------------------------------------------------------------
 // GET — Look up upcoming appointments by customer phone
@@ -292,10 +293,10 @@ export async function POST(request: NextRequest) {
       t = perf.now();
       const vehicleResult = await findOrCreateVehicle(supabase, {
         customerId,
-        make: vehicle_make,
-        model: vehicle_model,
-        year: vehicle_year,
-        color: vehicle_color,
+        make: sanitizeVehicleField(vehicle_make) || vehicle_make,
+        model: sanitizeVehicleField(vehicle_model),
+        year: sanitizeVehicleField(vehicle_year),
+        color: sanitizeVehicleField(vehicle_color),
       });
       perf.mark('query:vehicles_findOrCreate', t);
       if (vehicleResult) vehicleId = vehicleResult.id;

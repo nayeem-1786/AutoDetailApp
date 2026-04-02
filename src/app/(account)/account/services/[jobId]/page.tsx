@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { BeforeAfterSlider } from '@/components/before-after-slider';
 import { getZoneLabel } from '@/lib/utils/job-zones';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import {
   ArrowLeft,
   Camera,
@@ -123,7 +124,7 @@ export default function ServiceDetailPage() {
   });
 
   const vehicleStr = job.vehicle
-    ? `${job.vehicle.year} ${job.vehicle.make} ${job.vehicle.model}${job.vehicle.color ? ` — ${job.vehicle.color}` : ''}`
+    ? `${cleanVehicleDescription({ year: job.vehicle.year, make: job.vehicle.make, model: job.vehicle.model })}${sanitizeVehicleField(job.vehicle.color) ? ` — ${job.vehicle.color}` : ''}`
     : null;
 
   const duration = formatDuration(job.timer_seconds);

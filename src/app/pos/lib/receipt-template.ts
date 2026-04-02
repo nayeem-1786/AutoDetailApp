@@ -2,6 +2,7 @@ import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-con
 import { formatPhone } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
 import QRCode from 'qrcode';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 interface ReceiptItem {
   id: string;
@@ -149,7 +150,7 @@ function getVehicleTypeLabel(vehicleType: string | null | undefined): string {
 function buildVehicleDesc(v: ReceiptTransaction['vehicle']): string {
   if (!v) return '';
   const typeLabel = getVehicleTypeLabel(v.vehicle_type);
-  const details = [v.year, v.color, v.make, v.model].filter(Boolean).join(' ');
+  const details = cleanVehicleDescription({ year: v.year, color: v.color, make: v.make, model: v.model });
   if (!details) return typeLabel;
   return `${typeLabel} | ${details}`;
 }

@@ -1393,6 +1393,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260330000003_vehicles_unique_constraint.sql
 20260331000001_email_prompt_dismissed.sql
 20260331000002_email_verification_system.sql
+20260401000001_clean_unknown_vehicle_fields.sql
 ```
 
 ---

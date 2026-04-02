@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatTime } from '@/lib/utils/format';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import type { AppointmentWithRelations } from '../types';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import type { AppointmentStatus } from '@/lib/supabase/types';
 
 const STATUS_BADGE_VARIANT: Record<AppointmentStatus, 'default' | 'secondary' | 'success' | 'warning' | 'destructive' | 'info'> = {
@@ -82,10 +83,8 @@ export function DayAppointmentsList({
                 <p className="truncate text-xs text-gray-500">{services}</p>
                 {appt.vehicle && (
                   <p className="truncate text-xs text-gray-400">
-                    {[appt.vehicle.year, appt.vehicle.make, appt.vehicle.model]
-                      .filter(Boolean)
-                      .join(' ')}
-                    {appt.vehicle.color ? ` (${appt.vehicle.color})` : ''}
+                    {cleanVehicleDescription({ year: appt.vehicle.year, make: appt.vehicle.make, model: appt.vehicle.model })}
+                    {sanitizeVehicleField(appt.vehicle.color) ? ` (${appt.vehicle.color})` : ''}
                   </p>
                 )}
                 {appt.employee && (

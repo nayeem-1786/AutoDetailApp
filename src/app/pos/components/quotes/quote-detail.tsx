@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import { useQuote } from '../../context/quote-context';
@@ -268,7 +269,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
     ? `${quote.customer.first_name} ${quote.customer.last_name}`
     : 'No Customer';
   const vehicleStr = quote.vehicle
-    ? `${quote.vehicle.year} ${quote.vehicle.make} ${quote.vehicle.model}${quote.vehicle.color ? ` (${quote.vehicle.color})` : ''}`
+    ? `${cleanVehicleDescription({ year: quote.vehicle.year, make: quote.vehicle.make, model: quote.vehicle.model })}${sanitizeVehicleField(quote.vehicle.color) ? ` (${quote.vehicle.color})` : ''}`
     : 'No Vehicle';
 
   return (

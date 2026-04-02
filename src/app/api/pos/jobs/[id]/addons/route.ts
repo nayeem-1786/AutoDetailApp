@@ -8,6 +8,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getAnnotatedPhotoUrl } from '@/lib/utils/render-annotations';
 import { getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
 import type { IssueType } from '@/lib/supabase/types';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 /**
  * GET /api/pos/jobs/[id]/addons — List addons for a job
@@ -190,7 +191,7 @@ export async function POST(
     // Build vehicle description (make model only, no year/color for SMS)
     const vehicle = job.vehicle as unknown as { year: number | null; make: string | null; model: string | null; color: string | null } | null;
     const vehicleDesc = vehicle && (vehicle.make || vehicle.model)
-      ? [vehicle.make, vehicle.model].filter(Boolean).join(' ')
+      ? cleanVehicleDescription({ make: vehicle.make, model: vehicle.model }) || 'your vehicle'
       : 'your vehicle';
 
     // Build issue description for SMS

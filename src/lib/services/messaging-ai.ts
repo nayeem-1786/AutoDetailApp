@@ -5,6 +5,7 @@ import { getBusinessHours, isWithinBusinessHours, formatBusinessHoursText } from
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 import { getPendingAddonsForCustomer, buildAddonPromptSection } from '@/lib/services/job-addons';
 import type { Message } from '@/lib/supabase/types';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 
@@ -392,9 +393,9 @@ SYSTEM NOTIFICATION AWARENESS:
 
     const vehicleLines = customerContext.vehicles
       .map((v) => {
-        const parts = [v.year, v.color, v.make, v.model].filter(Boolean);
+        const desc = cleanVehicleDescription({ year: v.year, color: v.color, make: v.make, model: v.model });
         const sizeInfo = v.size_class ? ` (${v.size_class})` : '';
-        return `- ${parts.join(' ') || 'Vehicle'}${sizeInfo}`;
+        return `- ${desc || 'Vehicle'}${sizeInfo}`;
       })
       .join('\n');
 

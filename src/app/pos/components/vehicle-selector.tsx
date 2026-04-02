@@ -8,6 +8,7 @@ import {
   VEHICLE_SIZE_LABELS,
   VEHICLE_TYPE_LABELS,
 } from '@/lib/utils/constants';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { Vehicle } from '@/lib/supabase/types';
 import { posFetch } from '../lib/pos-fetch';
 
@@ -59,7 +60,7 @@ export function VehicleSelector({
 
       {vehicles.map((v) => {
         const label =
-          [v.year, v.make, v.model].filter(Boolean).join(' ') ||
+          cleanVehicleDescription({ year: v.year, make: v.make, model: v.model }) ||
           VEHICLE_TYPE_LABELS[v.vehicle_type] ||
           'Vehicle';
         const isSelected = v.id === selectedVehicleId;

@@ -8,6 +8,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
+import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 /**
  * POST /api/voice-agent/send-quote-sms
@@ -189,10 +190,10 @@ export async function POST(request: NextRequest) {
       t = perf.now();
       const vehicleResult = await findOrCreateVehicle(admin, {
         customerId: customerId!,
-        make: vehicle_make,
-        model: vehicle_model,
-        year: vehicle_year,
-        color: vehicle_color,
+        make: sanitizeVehicleField(vehicle_make) || vehicle_make,
+        model: sanitizeVehicleField(vehicle_model),
+        year: sanitizeVehicleField(vehicle_year),
+        color: sanitizeVehicleField(vehicle_color),
       });
       perf.mark('query:vehicles_findOrCreate', t);
       if (vehicleResult) vehicleId = vehicleResult.id;

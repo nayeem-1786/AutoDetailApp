@@ -4,6 +4,7 @@ import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatTime } from '@/lib/utils/format';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 /**
  * POST /api/voice-agent/initiation
@@ -112,9 +113,9 @@ export async function POST(request: NextRequest) {
     const vehicles = vehiclesRes.data || [];
     if (vehicles.length > 0) {
       const vehicleLines = vehicles.map((v) => {
-        const parts = [v.year, v.color, v.make, v.model].filter(Boolean).join(' ');
+        const desc = cleanVehicleDescription({ year: v.year, color: v.color, make: v.make, model: v.model });
         const size = v.size_class ? ` (${v.size_class})` : '';
-        return `  ${parts}${size}`;
+        return `  ${desc}${size}`;
       });
       sections.push(`VEHICLES:\n${vehicleLines.join('\n')}`);
     }

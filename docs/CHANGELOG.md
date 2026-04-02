@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: "Unknown" vehicle filter safety net + auto-quote window 3min (Session 17B) — 2026-04-01
+
+- **Shared vehicle sanitizers:** `cleanVehicleDescription()` and `sanitizeVehicleField()` in `src/lib/utils/vehicle-helpers.ts` — strips "Unknown" (any case), null, empty from vehicle fields
+- **Storage-time sanitization:** Voice post-call processing and voice-calls-poll cron sanitize all vehicle fields before passing to `findOrCreateVehicle()`, preventing "Unknown" from being stored
+- **Display-time sanitization:** All 43 vehicle description display locations across the app now use `cleanVehicleDescription()` instead of inline concatenation — defense in depth
+- **Voice agent input sanitization:** All 3 voice-agent API routes (send-quote-sms, appointments, quotes) sanitize vehicle fields before storage
+- **Auto-quote duplicate window:** Reduced from 10 minutes to 3 minutes in voice post-call processing
+- **Data cleanup migration:** `20260401000001` sets color/make/model/year to NULL where value was "unknown" (case-insensitive) — cleans dirty data from prior Gemini testing
+
+---
+
 ## feat: email verification system + email consent auto-toggle (Session 17A) — 2026-03-31
 
 - **Email verification via 6-digit code:** Customers must verify email before it's saved. Code sent via Mailgun, 15-minute expiry, max 5 attempts, 60-second resend cooldown.

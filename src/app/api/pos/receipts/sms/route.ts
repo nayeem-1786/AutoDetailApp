@@ -5,6 +5,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,9 +59,7 @@ export async function POST(request: NextRequest) {
     const vehicle = transaction.vehicle as any;
     let summaryLine: string;
     if (vehicle?.year || vehicle?.make || vehicle?.model) {
-      const vehicleStr = [vehicle.year, vehicle.make, vehicle.model]
-        .filter(Boolean)
-        .join(' ');
+      const vehicleStr = cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model });
       summaryLine = `${vehicleStr} — ${total}`;
       // If the full message would exceed 160 chars, truncate vehicle info
       const testMsg = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;

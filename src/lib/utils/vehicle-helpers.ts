@@ -1,6 +1,37 @@
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { resolveVehicleClassification } from '@/lib/utils/vehicle-categories';
 
+/**
+ * Sanitize a single vehicle field value.
+ * Returns null if the value is null, undefined, empty, or any case of "unknown".
+ */
+export function sanitizeVehicleField(value: string | number | null | undefined): string | null {
+  if (value == null) return null;
+  const str = String(value).trim();
+  if (str === '' || str.toLowerCase() === 'unknown') return null;
+  return str;
+}
+
+/**
+ * Build a clean vehicle description string, filtering out "Unknown" and empty values.
+ *
+ * Examples:
+ *   { year: "2020", color: "Unknown", make: "Honda", model: "CRV" } → "2020 Honda CRV"
+ *   { year: "Unknown", color: "", make: "Winnebago", model: "Travato" } → "Winnebago Travato"
+ *   { year: 2025, color: "Black", make: "Chevrolet", model: "Camaro" } → "2025 Black Chevrolet Camaro"
+ */
+export function cleanVehicleDescription(parts: {
+  year?: string | number | null;
+  color?: string | null;
+  make?: string | null;
+  model?: string | null;
+}): string {
+  return [parts.year, parts.color, parts.make, parts.model]
+    .map((v) => sanitizeVehicleField(v))
+    .filter(Boolean)
+    .join(' ');
+}
+
 export interface FindOrCreateVehicleParams {
   customerId: string;
   make: string;

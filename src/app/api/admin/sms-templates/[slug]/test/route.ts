@@ -4,6 +4,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { sendSms } from '@/lib/utils/sms';
 import { SMS_TEMPLATE_VARIABLES } from '@/lib/sms/sms-template-variables';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function POST(
   request: NextRequest,
@@ -64,7 +65,7 @@ export async function POST(
         .maybeSingle();
 
       if (vehicle) {
-        variables.vehicle_description = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ');
+        variables.vehicle_description = cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model });
       }
 
       // Fetch recent appointment

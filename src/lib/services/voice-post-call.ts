@@ -6,6 +6,7 @@ import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
+import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 // ---------------------------------------------------------------------------
 // Shared post-call processing logic
@@ -161,18 +162,24 @@ export async function processVoiceCallEnd(
   }
 
   // Resolve vehicle info — tool params take priority, transcript extraction as fallback
-  let resolvedVehicleMake = params.vehicleMake;
-  let resolvedVehicleModel = params.vehicleModel;
-  let resolvedVehicleYear = params.vehicleYear;
-  let resolvedVehicleColor = params.vehicleColor;
+  // Sanitize all vehicle fields to strip "Unknown" values from LLM output
+  let resolvedVehicleMake = sanitizeVehicleField(params.vehicleMake) ?? undefined;
+  let resolvedVehicleModel = sanitizeVehicleField(params.vehicleModel) ?? undefined;
+  let resolvedVehicleYear: number | undefined = undefined;
+  let resolvedVehicleColor = sanitizeVehicleField(params.vehicleColor) ?? undefined;
+
+  if (params.vehicleYear != null) {
+    const sanitized = sanitizeVehicleField(params.vehicleYear);
+    if (sanitized) resolvedVehicleYear = parseInt(sanitized, 10) || undefined;
+  }
 
   if (!resolvedVehicleMake && !resolvedVehicleModel && params.transcriptSummary) {
     const extracted = extractVehicleFromTranscript(params.transcriptSummary);
     if (extracted) {
-      resolvedVehicleMake = extracted.vehicleMake;
-      resolvedVehicleModel = extracted.vehicleModel;
+      resolvedVehicleMake = sanitizeVehicleField(extracted.vehicleMake) ?? undefined;
+      resolvedVehicleModel = sanitizeVehicleField(extracted.vehicleModel) ?? undefined;
       resolvedVehicleYear = extracted.vehicleYear ? parseInt(extracted.vehicleYear, 10) || undefined : undefined;
-      resolvedVehicleColor = extracted.vehicleColor;
+      resolvedVehicleColor = sanitizeVehicleField(extracted.vehicleColor) ?? undefined;
       console.log(`[VoicePostCall] Extracted vehicle from transcript: ${extracted.vehicleYear || ''} ${extracted.vehicleColor || ''} ${extracted.vehicleMake || ''} ${extracted.vehicleModel || ''}`);
     }
   }
@@ -359,18 +366,18 @@ export async function processVoiceCallEnd(
   } else if (params.skipAutoQuote) {
     console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: skipAutoQuote flag set`);
   } else {
-    // Check for recent quotes sent in the last 10 minutes (dedup with send_quote_sms)
+    // Check for recent quotes sent in the last 3 minutes (dedup with send_quote_sms)
     if (resolvedCustomerId) {
-      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
       const { data: recentQuotes } = await admin
         .from('quotes')
         .select('id')
         .eq('customer_id', resolvedCustomerId)
-        .gte('created_at', tenMinutesAgo)
+        .gte('created_at', threeMinutesAgo)
         .limit(1);
 
       if (recentQuotes && recentQuotes.length > 0) {
-        console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: recent quote exists (last 10min)`);
+        console.log(`[VoicePostCall] Auto-quote decision: skipping — reason: recent quote exists (last 3min)`);
       } else {
         console.log(`[VoicePostCall] Auto-quote decision: sending — reason: services discussed, no recent quote`);
         const createdId = await autoGenerateQuote(

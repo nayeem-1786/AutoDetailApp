@@ -5,6 +5,7 @@ import { BeforeAfterSlider } from '@/components/before-after-slider';
 import { getZoneLabel } from '@/lib/utils/job-zones';
 import { cn } from '@/lib/utils/cn';
 import { X, ChevronDown } from 'lucide-react';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 interface GalleryPair {
   job_id: string;
@@ -244,7 +245,7 @@ export function GalleryClient({ initialPairs, filterOptions, initialTag, total }
         <div className="columns-1 gap-6 sm:columns-2 lg:columns-3">
           {pairs.map((pair, i) => {
             const vehicleStr = pair.vehicle
-              ? `${pair.vehicle.year ? pair.vehicle.year + ' ' : ''}${pair.vehicle.make} ${pair.vehicle.model}`
+              ? cleanVehicleDescription({ year: pair.vehicle.year, make: pair.vehicle.make, model: pair.vehicle.model })
               : '';
             const altText = `Before and after ${pair.service_names[0] || 'detailing'}${vehicleStr ? ` on ${vehicleStr}` : ''}`;
 

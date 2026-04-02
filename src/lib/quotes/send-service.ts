@@ -6,6 +6,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 interface QuoteCustomer {
   id: string;
@@ -125,7 +126,7 @@ export async function sendQuote(
         const customerName = `${customer.first_name} ${customer.last_name}`;
         const vehicle = quote.vehicle as QuoteVehicle | null;
         const vehicleStr = vehicle
-          ? `${vehicle.year} ${vehicle.make} ${vehicle.model}`
+          ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || 'N/A'
           : 'N/A';
 
         // Pre-render items table for template variable

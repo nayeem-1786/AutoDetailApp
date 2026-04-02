@@ -7,6 +7,7 @@ import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { posFetch } from '../../lib/pos-fetch';
 import type { JobStatus } from '@/lib/supabase/types';
+import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
 type FilterType = 'mine' | 'all' | 'unassigned';
 
@@ -47,9 +48,9 @@ const STATUS_PRIORITY: Record<JobStatus, number> = {
 
 function formatVehicle(v: JobListItem['vehicle']): string {
   if (!v) return 'No vehicle';
-  const parts = [v.year, v.make, v.model].filter(Boolean);
-  const desc = parts.length > 0 ? parts.join(' ') : 'Vehicle';
-  return v.color ? `${v.color} ${desc}` : desc;
+  const desc = cleanVehicleDescription({ year: v.year, make: v.make, model: v.model }) || 'Vehicle';
+  const color = sanitizeVehicleField(v.color);
+  return color ? `${color} ${desc}` : desc;
 }
 
 function formatPickupTime(dt: string | null): string {
