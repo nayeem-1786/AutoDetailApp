@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: voice agent products lookup endpoint (Session 17C) — 2026-04-02
+
+- New `GET /api/voice-agent/products` endpoint for voice agent product lookup
+- Bearer token auth via `validateApiKey()` — same pattern as services endpoint
+- Optional `?search=` param filters by name or description (case-insensitive)
+- Returns all active products with: name, description, category, SKU, pricing, stock status, product URL, image
+- Sale pricing conditional — `sale_price` only included when within active sale window and below retail price
+- Uses `getSaleStatus()` for sale window checking, `createPerfTimer()` for `[VOICE-PERF]` logging
+- Includes `product_url` (`/products/{category_slug}/{product_slug}`) for future SMS linking
+- Updated `docs/dev/DB_SCHEMA.md` — added 16 missing columns to `products` table and 2 missing columns to `product_categories` table
+
+---
+
 ## fix: "Unknown" vehicle filter safety net + auto-quote window 3min (Session 17B) — 2026-04-01
 
 - **Shared vehicle sanitizers:** `cleanVehicleDescription()` and `sanitizeVehicleField()` in `src/lib/utils/vehicle-helpers.ts` — strips "Unknown" (any case), null, empty from vehicle fields

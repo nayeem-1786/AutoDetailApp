@@ -112,6 +112,8 @@ idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(mod
 | name | TEXT | UNIQUE, NOT NULL | |
 | slug | TEXT | UNIQUE, NOT NULL | |
 | description | TEXT | | |
+| display_order | INTEGER | NOT NULL, DEFAULT 0 | Sort order in UI |
+| is_active | BOOLEAN | NOT NULL, DEFAULT true | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
@@ -119,18 +121,36 @@ idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(mod
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | id | UUID | PK | |
+| square_item_id | TEXT | | Square catalog item ID |
 | sku | TEXT | UNIQUE | |
 | name | TEXT | NOT NULL | |
+| slug | TEXT | | URL slug for public pages |
 | description | TEXT | | |
+| category_id | UUID | FK → product_categories(id) | |
+| vendor_id | UUID | FK → vendors(id) | |
 | cost_price | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
 | retail_price | DECIMAL(10,2) | | Used as standard price reference |
 | sale_price | DECIMAL(10,2) | DEFAULT NULL | CHECK: sale_price < retail_price. Added via `20260219000009` |
 | sale_starts_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
 | sale_ends_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
 | quantity_on_hand | INTEGER | NOT NULL, DEFAULT 0 | |
+| reorder_threshold | INTEGER | | Low stock alert threshold |
+| min_order_qty | INTEGER | | Minimum order quantity |
+| is_taxable | BOOLEAN | NOT NULL, DEFAULT false | |
+| is_loyalty_eligible | BOOLEAN | NOT NULL, DEFAULT false | Earns loyalty points |
 | image_url | TEXT | | Synced from product_images primary |
+| image_alt | TEXT | | Alt text for image |
 | barcode | TEXT | | UPC/EAN for barcode scanner lookup |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | |
+| show_on_website | BOOLEAN | NOT NULL, DEFAULT false | CMS visibility toggle |
+| is_featured | BOOLEAN | NOT NULL, DEFAULT false | Featured on website |
+| website_sort_order | INTEGER | NOT NULL, DEFAULT 0 | Display order on website |
+| weight | DECIMAL | | Shipping weight |
+| length | DECIMAL | | Shipping dimension |
+| width | DECIMAL | | Shipping dimension |
+| height | DECIMAL | | Shipping dimension |
+| weight_unit | TEXT | | e.g., lb, kg |
+| dimension_unit | TEXT | | e.g., in, cm |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 

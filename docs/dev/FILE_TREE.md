@@ -470,6 +470,7 @@ src/app/api/voice-agent/context/route.ts
 src/app/api/voice-agent/customers/route.ts
 src/app/api/voice-agent/finalize-call/route.ts
 src/app/api/voice-agent/initiation/route.ts
+src/app/api/voice-agent/products/route.ts
 src/app/api/voice-agent/quotes/route.ts
 src/app/api/voice-agent/send-quote-sms/route.ts
 src/app/api/voice-agent/services/route.ts
