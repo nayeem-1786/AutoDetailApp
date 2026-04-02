@@ -89,10 +89,11 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
         perf.mark('query:google_place_id', t);
 
-        const placeId = placeIdSetting?.value as string | undefined;
+        const rawPlaceId = placeIdSetting?.value as string | undefined;
+        const placeId = rawPlaceId ? rawPlaceId.replace(/['"]/g, '').trim() : undefined;
         let mapsUrl: string;
         if (placeId) {
-          mapsUrl = `https://www.google.com/maps/place/?q=place_id:${placeId}`;
+          mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(biz.name)}&query_place_id=${placeId}`;
         } else {
           mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(biz.address)}`;
         }
