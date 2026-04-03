@@ -8,8 +8,8 @@ import type { JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 /**
- * GET /api/pos/jobs — List today's jobs
- * Query params: ?filter=mine|all|unassigned
+ * GET /api/pos/jobs — List jobs for a date
+ * Query params: ?filter=mine|all|unassigned&date=YYYY-MM-DD (defaults to today PST)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -22,43 +22,49 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') || 'mine';
 
-    // Today in PST (YYYY-MM-DD) — same reliable pattern as populate endpoint
-    const todayPst = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Los_Angeles',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(new Date());
+    // Use date param or default to today PST
+    const dateParam = searchParams.get('date');
+    const targetDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+      ? dateParam
+      : new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date());
 
     const jobSelect = `
       *,
       customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),
       vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
       assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
-      addons:job_addons(id, status)
+      addons:job_addons(id, status),
+      appointment:appointments!jobs_appointment_id_fkey(scheduled_start_time),
+      photos:job_photos(id, zone, phase)
     `;
-    const excludeStatuses = ['cancelled', 'closed'];
+    // Only exclude cancelled — include closed for daily summary + list visibility
+    const excludeStatuses = ['cancelled'];
 
-    // Step 1: Get today's appointment IDs
+    // Step 1: Get target date's appointment IDs
     // (Supabase .or() on related tables doesn't work — query appointments first)
-    const { data: todayApts } = await supabase
+    const { data: dateApts } = await supabase
       .from('appointments')
       .select('id')
-      .eq('scheduled_date', todayPst);
-    const todayAptIds = (todayApts ?? []).map((a) => a.id);
+      .eq('scheduled_date', targetDate);
+    const dateAptIds = (dateApts ?? []).map((a) => a.id);
 
-    // Step 2a: Jobs linked to today's appointments
-    let aptJobsQuery = todayAptIds.length > 0
+    // Step 2a: Jobs linked to target date's appointments
+    let aptJobsQuery = dateAptIds.length > 0
       ? supabase
           .from('jobs')
           .select(jobSelect)
-          .in('appointment_id', todayAptIds)
+          .in('appointment_id', dateAptIds)
           .not('status', 'in', `(${excludeStatuses.join(',')})`)
       : null;
 
-    // Step 2b: Walk-in jobs (no appointment) created today in PST
-    const startUtc = dateToPstStartOfDay(todayPst);
-    const endUtc = dateToPstEndOfDay(todayPst);
+    // Step 2b: Walk-in jobs (no appointment) created on target date in PST
+    const startUtc = dateToPstStartOfDay(targetDate);
+    const endUtc = dateToPstEndOfDay(targetDate);
     let walkInQuery = supabase
       .from('jobs')
       .select(jobSelect)

@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: POS Jobs — date navigation, enhanced cards, daily summary bar (Session 19A) — 2026-04-03
+
+- **Date navigation:** Prev/Next day arrows + date display + native date picker + Today button. Date stored in URL params (`?date=YYYY-MM-DD`), persists on refresh. Past dates show "X days ago" indicator, future dates show "Upcoming" indicator.
+- **Enhanced job cards:** Scheduled appointment time (from appointments join), service total, live ticking timer for in_progress jobs, photo zone progress (X/15), overdue pickup warning in red.
+- **Daily summary bar:** Job count, unassigned count (warning color), total revenue, completion progress (X/Y complete). Computed client-side from fetched data.
+- **Closed jobs now visible:** Changed exclude filter from `['cancelled', 'closed']` to `['cancelled']` only. Closed/paid jobs appear at bottom of list with existing "Paid" badge, included in summary stats.
+- **Backend:** Jobs list API + populate endpoint accept dynamic `date` parameter. Jobs list query joins `appointments(scheduled_start_time)` and `job_photos(id, zone, phase)` for card enrichment. No N+1 queries.
+- **Suspense boundary:** `page.tsx` wraps inner component in `<Suspense>` for `useSearchParams()` (same pattern as POS quotes page).
+
+---
+
 ## fix: cancellation notifications — email template vars, SMS on all cancel paths, email fallback (Session 17E) — 2026-04-02
 
 - **DB migration** (`20260402000001`): fixes variable names in `booking_cancellation` email template — replaces `{servicename}` → `{service_name}`, `{appointmentdate}` → `{appointment_date}`, etc. Also replaces any hardcoded "9:00 AM" with `{appointment_time}`. Uses text-level replacement on serialized JSONB to preserve admin UI customizations.

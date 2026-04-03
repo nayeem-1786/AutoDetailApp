@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { JobQueue } from './components/job-queue';
@@ -15,7 +15,7 @@ type View =
   | { mode: 'queue' }
   | { mode: 'detail'; jobId: string };
 
-export default function JobsPage() {
+function JobsPageInner() {
   const router = useRouter();
   const { dispatch } = useTicket();
   const [view, setView] = useState<View>({ mode: 'queue' });
@@ -219,5 +219,13 @@ export default function JobsPage() {
       onSelectJob={(jobId) => setView({ mode: 'detail', jobId })}
       onCheckout={handleCheckout}
     />
+  );
+}
+
+export default function JobsPage() {
+  return (
+    <Suspense>
+      <JobsPageInner />
+    </Suspense>
   );
 }

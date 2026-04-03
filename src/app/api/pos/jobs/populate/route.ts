@@ -18,17 +18,25 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Get today's date in PST (YYYY-MM-DD format for DATE column comparison)
-    const now = new Date();
-    const pstFormatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Los_Angeles',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    const todayPst = pstFormatter.format(now); // e.g., "2026-02-12"
+    // Accept optional date from request body, default to today PST
+    let dateParam: string | undefined;
+    try {
+      const body = await request.json();
+      dateParam = body.date;
+    } catch {
+      // No body or invalid JSON — use today
+    }
 
-    // Get today's confirmed appointments
+    const targetDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+      ? dateParam
+      : new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'America/Los_Angeles',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date());
+
+    // Get target date's confirmed appointments
     const { data: appointments, error: aptError } = await supabase
       .from('appointments')
       .select(`
@@ -40,7 +48,7 @@ export async function POST(request: NextRequest) {
         scheduled_end_time,
         status
       `)
-      .eq('scheduled_date', todayPst)
+      .eq('scheduled_date', targetDate)
       .in('status', ['confirmed', 'in_progress']);
 
     if (aptError) {

@@ -1,11 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, RefreshCw, User, Clock, Calendar, Footprints, ShoppingCart, Check } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import {
+  Plus, RefreshCw, User, Clock, Calendar, Footprints, ShoppingCart, Check,
+  ChevronLeft, ChevronRight, Camera, Timer, DollarSign, AlertTriangle,
+} from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { posFetch } from '../../lib/pos-fetch';
+import { formatCurrency } from '@/lib/utils/format';
 import type { JobStatus } from '@/lib/supabase/types';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 
@@ -19,10 +24,15 @@ interface JobListItem {
   services: { id: string; name: string; price: number }[];
   estimated_pickup_at: string | null;
   created_at: string;
+  timer_seconds: number;
+  work_started_at: string | null;
+  timer_paused_at: string | null;
   customer: { id: string; first_name: string; last_name: string; phone: string | null } | null;
   vehicle: { id: string; year: number | null; make: string | null; model: string | null; color: string | null } | null;
   assigned_staff: { id: string; first_name: string; last_name: string } | null;
   addons: { id: string; status: string }[] | null;
+  appointment: { scheduled_start_time: string } | null;
+  photos: { id: string; zone: string; phase: string }[] | null;
 }
 
 const STATUS_CONFIG: Record<JobStatus, { label: string; color: string }> = {
@@ -35,7 +45,6 @@ const STATUS_CONFIG: Record<JobStatus, { label: string; color: string }> = {
   cancelled: { label: 'Cancelled', color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' },
 };
 
-// Status priority for sorting (lower = higher priority, shown first)
 const STATUS_PRIORITY: Record<JobStatus, number> = {
   in_progress: 0,
   intake: 1,
@@ -46,11 +55,27 @@ const STATUS_PRIORITY: Record<JobStatus, number> = {
   cancelled: 6,
 };
 
+// ─── Helpers ────────────────────────────────────────────────────
+
 function formatVehicle(v: JobListItem['vehicle']): string {
   if (!v) return 'No vehicle';
   const desc = cleanVehicleDescription({ year: v.year, make: v.make, model: v.model }) || 'Vehicle';
   const color = sanitizeVehicleField(v.color);
   return color ? `${color} ${desc}` : desc;
+}
+
+function formatTime12h(timeStr: string | null | undefined): string {
+  if (!timeStr) return '';
+  try {
+    const parts = timeStr.split(':');
+    const h = parseInt(parts[0], 10);
+    const m = parts[1] || '00';
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    return `${hour12}:${m} ${period}`;
+  } catch {
+    return '';
+  }
 }
 
 function formatPickupTime(dt: string | null): string {
@@ -67,31 +92,82 @@ function formatPickupTime(dt: string | null): string {
   }
 }
 
-/**
- * Determine the most relevant addon status for the badge.
- * Priority: pending > approved > declined > null
- */
-function getAddonBadge(addons: { id: string; status: string }[] | null): {
-  label: string;
-  color: string;
-} | null {
-  if (!addons || addons.length === 0) return null;
+function isPickupOverdue(dt: string | null, status: JobStatus): boolean {
+  if (!dt) return false;
+  if (status === 'completed' || status === 'closed' || status === 'cancelled') return false;
+  return new Date(dt).getTime() < Date.now();
+}
 
+function computeElapsedSeconds(job: JobListItem): number {
+  if (job.timer_paused_at || !job.work_started_at) return job.timer_seconds;
+  const started = new Date(job.work_started_at).getTime();
+  const elapsed = Math.floor((Date.now() - started) / 1000);
+  return job.timer_seconds + Math.max(0, elapsed);
+}
+
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function getPhotoProgress(photos: { id: string; zone: string; phase: string }[] | null): { count: number; total: number } | null {
+  if (!photos || photos.length === 0) return null;
+  const uniqueZones = new Set(photos.map((p) => p.zone));
+  return { count: uniqueZones.size, total: 15 }; // 8 exterior + 7 interior
+}
+
+function getAddonBadge(addons: { id: string; status: string }[] | null): { label: string; color: string } | null {
+  if (!addons || addons.length === 0) return null;
   const hasPending = addons.some((a) => a.status === 'pending');
   const hasApproved = addons.some((a) => a.status === 'approved');
   const hasDeclined = addons.some((a) => a.status === 'declined');
-
-  if (hasPending) {
-    return { label: 'Addon Pending', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300' };
-  }
-  if (hasApproved) {
-    return { label: 'Addon Approved', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' };
-  }
-  if (hasDeclined) {
-    return { label: 'Addon Declined', color: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' };
-  }
+  if (hasPending) return { label: 'Addon Pending', color: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300' };
+  if (hasApproved) return { label: 'Addon Approved', color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' };
+  if (hasDeclined) return { label: 'Addon Declined', color: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' };
   return null;
 }
+
+// ─── Date helpers ───────────────────────────────────────────────
+
+function getTodayPst(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(dateStr: string): string {
+  const today = getTodayPst();
+  const tomorrow = addDays(today, 1);
+  const yesterday = addDays(today, -1);
+
+  const d = new Date(dateStr + 'T12:00:00');
+  const formatted = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  if (dateStr === today) return `Today — ${formatted}`;
+  if (dateStr === tomorrow) return `Tomorrow — ${formatted}`;
+  if (dateStr === yesterday) return `Yesterday — ${formatted}`;
+  return formatted;
+}
+
+function daysDiff(dateStr: string): number {
+  const today = getTodayPst();
+  const d1 = new Date(today + 'T12:00:00');
+  const d2 = new Date(dateStr + 'T12:00:00');
+  return Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// ─── Component ──────────────────────────────────────────────────
 
 interface JobQueueProps {
   onNewWalkIn: () => void;
@@ -100,19 +176,51 @@ interface JobQueueProps {
 }
 
 export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { employee } = usePosAuth();
   const { granted: canCreateWalkIn } = usePosPermission('pos.jobs.manage');
   const isBookable = employee?.bookable_for_appointments ?? false;
+
+  // Date from URL or today
+  const today = getTodayPst();
+  const initialDate = searchParams.get('date') || today;
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const isToday = selectedDate === today;
+  const diff = daysDiff(selectedDate);
+
   const [filter, setFilter] = useState<FilterType>(isBookable ? 'mine' : 'all');
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [populating, setPopulating] = useState(false);
-  const populatedRef = useRef(false);
+  const populatedDates = useRef(new Set<string>());
 
-  const fetchJobs = useCallback(async () => {
+  // Live timer tick for in_progress cards
+  const [, setTick] = useState(0);
+  const hasInProgress = jobs.some((j) => j.status === 'in_progress' && j.work_started_at && !j.timer_paused_at);
+  useEffect(() => {
+    if (!hasInProgress) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [hasInProgress]);
+
+  // Sync date to URL
+  const setDate = useCallback((date: string) => {
+    setSelectedDate(date);
+    const params = new URLSearchParams(searchParams.toString());
+    if (date === today) {
+      params.delete('date');
+    } else {
+      params.set('date', date);
+    }
+    const qs = params.toString();
+    router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [router, searchParams, today]);
+
+  const fetchJobs = useCallback(async (date: string) => {
     setLoading(true);
     try {
-      const res = await posFetch(`/api/pos/jobs?filter=${filter}`);
+      const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${date}`);
       if (res.ok) {
         const { data } = await res.json();
         setJobs(data ?? []);
@@ -124,15 +232,20 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     }
   }, [filter]);
 
-  const populateFromAppointments = useCallback(async () => {
+  const populateFromAppointments = useCallback(async (date: string) => {
+    if (populatedDates.current.has(date)) return;
+    populatedDates.current.add(date);
     setPopulating(true);
     try {
-      const res = await posFetch('/api/pos/jobs/populate', { method: 'POST' });
+      const res = await posFetch('/api/pos/jobs/populate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      });
       if (res.ok) {
         const { data } = await res.json();
         if (data.created > 0) {
-          // Refresh the list to include newly created jobs
-          await fetchJobs();
+          await fetchJobs(date);
         }
       }
     } catch (err) {
@@ -142,27 +255,29 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     }
   }, [fetchJobs]);
 
-  // Auto-populate on mount (ref guard prevents React strict mode double-fire)
+  // Init: populate + fetch on mount and when date/filter changes
   useEffect(() => {
-    if (populatedRef.current) return;
-    populatedRef.current = true;
     async function init() {
-      await populateFromAppointments();
-      await fetchJobs();
+      await populateFromAppointments(selectedDate);
+      await fetchJobs(selectedDate);
     }
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Re-fetch when filter changes (but not on mount — init handles that)
-  useEffect(() => {
-    fetchJobs();
-  }, [fetchJobs]);
+  }, [selectedDate, populateFromAppointments, fetchJobs]);
 
   // Sort by status priority
-  const sortedJobs = [...jobs].sort(
-    (a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99)
-  );
+  const sortedJobs = useMemo(() =>
+    [...jobs].sort((a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99)),
+  [jobs]);
+
+  // Daily summary stats
+  const summary = useMemo(() => {
+    const nonCancelled = jobs.filter((j) => j.status !== 'cancelled');
+    const totalJobs = nonCancelled.length;
+    const unassigned = nonCancelled.filter((j) => !j.assigned_staff).length;
+    const totalRevenue = nonCancelled.reduce((sum, j) => sum + j.services.reduce((s, svc) => s + svc.price, 0), 0);
+    const completedCount = nonCancelled.filter((j) => j.status === 'completed' || j.status === 'closed').length;
+    return { totalJobs, unassigned, totalRevenue, completedCount };
+  }, [jobs]);
 
   return (
     <div className="flex h-full flex-col">
@@ -172,8 +287,9 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              populateFromAppointments();
-              fetchJobs();
+              populatedDates.current.delete(selectedDate);
+              populateFromAppointments(selectedDate);
+              fetchJobs(selectedDate);
             }}
             disabled={populating}
             className="flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
@@ -192,6 +308,82 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           )}
         </div>
       </div>
+
+      {/* Date Navigation */}
+      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2">
+        <button
+          onClick={() => setDate(addDays(selectedDate, -1))}
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700"
+          aria-label="Previous day"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+
+        <div className="relative flex-1 text-center">
+          <label className="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">
+            {formatDateLabel(selectedDate)}
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </label>
+        </div>
+
+        <button
+          onClick={() => setDate(addDays(selectedDate, 1))}
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700"
+          aria-label="Next day"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
+
+        {!isToday && (
+          <button
+            onClick={() => setDate(today)}
+            className="rounded-lg bg-blue-600 dark:bg-blue-500 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+          >
+            Today
+          </button>
+        )}
+      </div>
+
+      {/* Past/Future date indicator */}
+      {diff < 0 && (
+        <div className="bg-gray-100 dark:bg-gray-800/60 px-4 py-1.5 text-center text-xs text-gray-500 dark:text-gray-400">
+          Viewing {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} — {Math.abs(diff)} day{Math.abs(diff) !== 1 ? 's' : ''} ago
+        </div>
+      )}
+      {diff > 1 && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-1.5 text-center text-xs text-blue-600 dark:text-blue-400">
+          Upcoming — {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+        </div>
+      )}
+
+      {/* Daily Summary */}
+      {!loading && summary.totalJobs > 0 && (
+        <div className="flex flex-wrap gap-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2">
+          <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+            <Calendar className="h-3.5 w-3.5" />
+            {summary.totalJobs} job{summary.totalJobs !== 1 ? 's' : ''}
+          </span>
+          {summary.unassigned > 0 && (
+            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+              <User className="h-3.5 w-3.5" />
+              {summary.unassigned} unassigned
+            </span>
+          )}
+          <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+            <DollarSign className="h-3.5 w-3.5" />
+            {formatCurrency(summary.totalRevenue)}
+          </span>
+          <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+            <Check className="h-3.5 w-3.5" />
+            {summary.completedCount}/{summary.totalJobs} complete
+          </span>
+        </div>
+      )}
 
       {/* Filter pills */}
       <div className="flex gap-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-2">
@@ -222,13 +414,13 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         ) : sortedJobs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
             <User className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-500" />
-            <p className="text-sm font-medium">No jobs for today</p>
+            <p className="text-sm font-medium">No jobs scheduled for {formatDateLabel(selectedDate).replace(/^(Today|Tomorrow|Yesterday) — /, '')}</p>
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
               {filter === 'mine'
                 ? `No jobs assigned to ${employee?.first_name ?? 'you'}`
                 : filter === 'unassigned'
                   ? 'All jobs have been assigned'
-                  : "Today's schedule is empty"}
+                  : 'No appointments or walk-ins for this date'}
             </p>
           </div>
         ) : (
@@ -237,7 +429,17 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
               const addonBadge = getAddonBadge(job.addons);
               const statusConfig = STATUS_CONFIG[job.status];
               const serviceNames = job.services.map((s) => s.name).join(', ');
+              const serviceTotal = job.services.reduce((sum, s) => sum + s.price, 0);
               const pickupTime = formatPickupTime(job.estimated_pickup_at);
+              const overdue = isPickupOverdue(job.estimated_pickup_at, job.status);
+              const scheduledTime = job.appointment?.scheduled_start_time
+                ? formatTime12h(job.appointment.scheduled_start_time)
+                : null;
+              const photoProgress = ['intake', 'in_progress', 'pending_approval'].includes(job.status)
+                ? getPhotoProgress(job.photos)
+                : null;
+              const showTimer = job.status === 'in_progress' || (job.status === 'completed' && job.timer_seconds > 0) || (job.status === 'closed' && job.timer_seconds > 0);
+              const elapsed = showTimer ? computeElapsedSeconds(job) : 0;
 
               return (
                 <div
@@ -260,40 +462,44 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                         {formatVehicle(job.vehicle)}
                       </p>
 
-                      {/* Services */}
-                      <p className="mt-1 truncate text-xs text-gray-400 dark:text-gray-500">
-                        {serviceNames || 'No services'}
-                      </p>
+                      {/* Services + total */}
+                      <div className="mt-1 flex items-baseline gap-2">
+                        <p className="min-w-0 flex-1 truncate text-xs text-gray-400 dark:text-gray-500">
+                          {serviceNames || 'No services'}
+                        </p>
+                        {serviceTotal > 0 && (
+                          <span className="shrink-0 text-xs font-medium text-gray-600 dark:text-gray-300">
+                            {formatCurrency(serviceTotal)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Right side: source + status + pickup */}
+                    {/* Right side: source + status + scheduled time */}
                     <div className="ml-3 flex flex-col items-end gap-1">
                       <div className="flex flex-wrap items-center justify-end gap-1">
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-                            job.appointment_id
-                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                          )}
-                        >
-                          {job.appointment_id ? (
-                            <><Calendar className="h-3 w-3" />Appt</>
-                          ) : (
-                            <><Footprints className="h-3 w-3" />Walk-In</>
-                          )}
-                        </span>
-                        <span
-                          className={cn(
-                            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                            statusConfig.color
-                          )}
-                        >
+                        {/* Scheduled time or Walk-In badge */}
+                        {scheduledTime ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">
+                            <Clock className="h-3 w-3" />
+                            {scheduledTime}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                            <Footprints className="h-3 w-3" />
+                            Walk-In
+                          </span>
+                        )}
+                        <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', statusConfig.color)}>
                           {statusConfig.label}
                         </span>
                       </div>
                       {pickupTime && (
-                        <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                        <span className={cn(
+                          'flex items-center gap-1 text-xs',
+                          overdue ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'
+                        )}>
+                          {overdue && <AlertTriangle className="h-3 w-3" />}
                           <Clock className="h-3 w-3" />
                           {pickupTime}
                         </span>
@@ -301,13 +507,33 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                     </div>
                   </div>
 
+                  {/* Metadata row: timer + photo progress */}
+                  {(showTimer || photoProgress) && (
+                    <div className="mt-1.5 flex items-center gap-3">
+                      {showTimer && (
+                        <span className={cn(
+                          'flex items-center gap-1 text-xs font-mono',
+                          job.status === 'in_progress' && !job.timer_paused_at
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-gray-500 dark:text-gray-400'
+                        )}>
+                          <Timer className="h-3 w-3" />
+                          {formatDuration(elapsed)}
+                        </span>
+                      )}
+                      {photoProgress && (
+                        <span className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                          <Camera className="h-3 w-3" />
+                          {photoProgress.count}/{photoProgress.total}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* Addon badge */}
                   {addonBadge && (
                     <div className="mt-1.5">
-                      <span className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-                        addonBadge.color
-                      )}>
+                      <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', addonBadge.color)}>
                         {addonBadge.label === 'Addon Pending' && '⚑ '}
                         {addonBadge.label === 'Addon Approved' && '✓ '}
                         {addonBadge.label === 'Addon Declined' && '✗ '}
@@ -323,14 +549,11 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                     </p>
                   )}
 
-                  {/* Checkout action for completed jobs / Paid indicator for closed */}
+                  {/* Checkout / Paid */}
                   {job.status === 'completed' && !job.transaction_id && onCheckout && (
                     <div className="mt-2 flex justify-end">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCheckout(job.id);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); onCheckout(job.id); }}
                         className="flex items-center gap-1.5 rounded-full bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700"
                       >
                         <ShoppingCart className="h-3.5 w-3.5" />
