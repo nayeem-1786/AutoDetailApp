@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: POS Jobs — drag-to-reschedule on timeline (Session 19C) — 2026-04-03
+
+- **Drag-and-drop:** Job blocks on the timeline can be dragged horizontally (reschedule time) and vertically (reassign detailer). Unscheduled cards can be dragged onto the timeline to assign a time + detailer.
+- **15-minute snap:** Time positions snap to 15-minute increments during drag for clean scheduling.
+- **Confirmation dialog:** Every drag-drop shows a confirmation dialog before saving. Shows what's changing (time, detailer, or both) with old → new values, plus job info (customer, service).
+- **Optimistic UI:** Block moves immediately on confirm, rolls back with error toast on API failure.
+- **Draggable statuses:** Only `scheduled` and `intake` jobs are draggable. In-progress, completed, closed, and cancelled jobs are locked. Draggable blocks show a grip handle icon.
+- **Saving state:** Blocks show pulse animation while API call is in flight. Dragging disabled during save.
+- **New API endpoint:** `PATCH /api/pos/jobs/[id]/reschedule` — POS HMAC auth, updates appointment.scheduled_start_time (preserving duration) and/or jobs.assigned_staff_id. Validates only draggable statuses. Audit-logged.
+- **dnd-kit:** Installed `@dnd-kit/core` + `@dnd-kit/utilities` for touch-friendly drag on iPad (PointerSensor + TouchSensor with activation constraints).
+- **Drag overlay:** Semi-transparent ghost block follows cursor/finger during drag.
+
+---
+
 ## feat: POS Jobs — timeline view with detailer swim lanes (Session 19B) — 2026-04-03
 
 - **Timeline view:** Visual schedule showing jobs as positioned blocks on a time axis (8 AM - 6 PM), one row per active detailer + Unassigned lane. Replaces the list view as default.

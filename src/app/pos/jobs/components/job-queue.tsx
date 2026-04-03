@@ -456,6 +456,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           isToday={isToday}
           onSelectJob={onSelectJob}
           onCheckout={onCheckout}
+          onRefresh={() => fetchJobs(selectedDate)}
         />
       ) : (
       <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">

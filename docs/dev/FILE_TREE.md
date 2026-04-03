@@ -367,6 +367,7 @@ src/app/api/pos/jobs/[id]/link-transaction/route.ts
 src/app/api/pos/jobs/[id]/photos/[photoId]/route.ts
 src/app/api/pos/jobs/[id]/photos/route.ts
 src/app/api/pos/jobs/[id]/pickup/route.ts
+src/app/api/pos/jobs/[id]/reschedule/route.ts
 src/app/api/pos/jobs/[id]/route.ts
 src/app/api/pos/jobs/[id]/start-work/route.ts
 src/app/api/pos/jobs/[id]/timer/route.ts
