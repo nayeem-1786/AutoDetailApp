@@ -74,7 +74,7 @@ export function BookingConfirmation({
   useEffect(() => {
     const duration = 10 * 1000;
     const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
+    const defaults = { startVelocity: 15, spread: 360, ticks: 60, zIndex: 0 };
 
     const randomInRange = (min: number, max: number) =>
       Math.random() * (max - min) + min;

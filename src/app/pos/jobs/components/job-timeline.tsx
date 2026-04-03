@@ -17,7 +17,7 @@ const END_HOUR = 18;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60; // 600
 const MIN_BLOCK_MINUTES = 30; // Minimum visual width for tappability
 const LANE_HEIGHT = 72; // px per swim lane
-const LABEL_WIDTH = 80; // px for detailer name column
+const LABEL_WIDTH = 120; // px for detailer name column
 const HOUR_WIDTH = 120; // px per hour on the grid
 
 const TIMELINE_WIDTH = (END_HOUR - START_HOUR) * HOUR_WIDTH; // 1200px
