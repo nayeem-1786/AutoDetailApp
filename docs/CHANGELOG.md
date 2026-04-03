@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: POS Jobs — timeline view with detailer swim lanes (Session 19B) — 2026-04-03
+
+- **Timeline view:** Visual schedule showing jobs as positioned blocks on a time axis (8 AM - 6 PM), one row per active detailer + Unassigned lane. Replaces the list view as default.
+- **View toggle:** List/Timeline toggle with localStorage persistence. Timeline is default, list view preserved as-is.
+- **Job blocks:** Positioned by scheduled_start_time, sized by estimated duration. Color-coded by status. Shows customer name, vehicle, service. Click to open detail.
+- **"Now" line:** Vertical red indicator showing current time (today only). Updates every minute. Auto-scrolls to current hour on load.
+- **Swim lanes:** One row per bookable detailer (from `/api/pos/staff/available`). Initial circle + first name label. Unassigned lane at bottom.
+- **Unscheduled section:** Walk-ins and jobs without scheduled time shown as compact cards below the timeline.
+- **Estimated duration:** Jobs API now computes `estimated_duration_minutes` from services table `base_duration_minutes`. Single query for all service IDs (no N+1). Default 60 min if duration unknown.
+- **Minimum block width:** 30 minutes visual minimum ensures all blocks are tappable on iPad.
+
+---
+
 ## feat: POS Jobs — date navigation, enhanced cards, daily summary bar (Session 19A) — 2026-04-03
 
 - **Date navigation:** Prev/Next day arrows + date display + native date picker + Today button. Date stored in URL params (`?date=YYYY-MM-DD`), persists on refresh. Past dates show "X days ago" indicator, future dates show "Upcoming" indicator.

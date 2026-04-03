@@ -101,7 +101,34 @@ export async function GET(request: NextRequest) {
     const allJobs = [...(aptResult.data ?? []), ...(walkInResult.data ?? [])]
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    return NextResponse.json({ data: allJobs });
+    // Compute estimated_duration_minutes per job from services table
+    // Fetch all active services once — map service ID → duration
+    const allServiceIds = new Set<string>();
+    for (const job of allJobs) {
+      const services = (job.services || []) as { id: string }[];
+      for (const svc of services) {
+        if (svc.id) allServiceIds.add(svc.id);
+      }
+    }
+
+    const durationMap = new Map<string, number>();
+    if (allServiceIds.size > 0) {
+      const { data: svcDurations } = await supabase
+        .from('services')
+        .select('id, base_duration_minutes')
+        .in('id', Array.from(allServiceIds));
+      for (const svc of svcDurations ?? []) {
+        durationMap.set(svc.id, svc.base_duration_minutes || 60);
+      }
+    }
+
+    const enrichedJobs = allJobs.map((job) => {
+      const services = (job.services || []) as { id: string }[];
+      const totalMinutes = services.reduce((sum, svc) => sum + (durationMap.get(svc.id) || 60), 0);
+      return { ...job, estimated_duration_minutes: totalMinutes };
+    });
+
+    return NextResponse.json({ data: enrichedJobs });
   } catch (err) {
     console.error('Jobs list route error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

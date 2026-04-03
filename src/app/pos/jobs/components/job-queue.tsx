@@ -13,10 +13,13 @@ import { posFetch } from '../../lib/pos-fetch';
 import { formatCurrency } from '@/lib/utils/format';
 import type { JobStatus } from '@/lib/supabase/types';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { JobTimeline } from './job-timeline';
+import { List, CalendarDays } from 'lucide-react';
 
 type FilterType = 'mine' | 'all' | 'unassigned';
+type ViewMode = 'list' | 'timeline';
 
-interface JobListItem {
+export interface JobListItem {
   id: string;
   status: JobStatus;
   appointment_id: string | null;
@@ -33,6 +36,7 @@ interface JobListItem {
   addons: { id: string; status: string }[] | null;
   appointment: { scheduled_start_time: string } | null;
   photos: { id: string; zone: string; phase: string }[] | null;
+  estimated_duration_minutes: number;
 }
 
 const STATUS_CONFIG: Record<JobStatus, { label: string; color: string }> = {
@@ -190,6 +194,16 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const diff = daysDiff(selectedDate);
 
   const [filter, setFilter] = useState<FilterType>(isBookable ? 'mine' : 'all');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('pos-jobs-view') as ViewMode) || 'timeline';
+    }
+    return 'timeline';
+  });
+  const handleViewChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('pos-jobs-view', mode);
+  }, []);
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [populating, setPopulating] = useState(false);
@@ -405,7 +419,45 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           ))}
       </div>
 
-      {/* Job list */}
+      {/* View toggle */}
+      <div className="flex items-center justify-center gap-1 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-1.5">
+        <button
+          onClick={() => handleViewChange('list')}
+          className={cn(
+            'flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium transition-colors',
+            viewMode === 'list'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          )}
+        >
+          <List className="h-3.5 w-3.5" />
+          List
+        </button>
+        <button
+          onClick={() => handleViewChange('timeline')}
+          className={cn(
+            'flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium transition-colors',
+            viewMode === 'timeline'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+          )}
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          Timeline
+        </button>
+      </div>
+
+      {/* Content area */}
+      {viewMode === 'timeline' ? (
+        <JobTimeline
+          jobs={sortedJobs}
+          loading={loading}
+          selectedDate={selectedDate}
+          isToday={isToday}
+          onSelectJob={onSelectJob}
+          onCheckout={onCheckout}
+        />
+      ) : (
       <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -575,6 +627,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
