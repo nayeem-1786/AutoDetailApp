@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: cancellation notifications — email template vars, SMS on all cancel paths, email fallback (Session 17E) — 2026-04-02
+
+- **DB migration** (`20260402000001`): fixes variable names in `booking_cancellation` email template — replaces `{servicename}` → `{service_name}`, `{appointmentdate}` → `{appointment_date}`, etc. Also replaces any hardcoded "9:00 AM" with `{appointment_time}`. Uses text-level replacement on serialized JSONB to preserve admin UI customizations.
+- **Expanded `sendCancellationEmail` → `sendCancellationNotifications`** in `src/lib/email/send-cancellation-email.ts`:
+  - Now sends BOTH email and SMS in one call (was email-only)
+  - Email: tries `sendTemplatedEmail('booking_cancellation')`, falls back to hardcoded HTML via `sendEmail()` if template not found/disabled
+  - SMS: uses `renderSmsTemplate('appointment_cancelled')` + `sendSms()` with conversation logging
+  - No longer early-returns on missing email — customers without email still get SMS
+  - Fixed time formatting crash: null/empty `scheduled_start_time` no longer throws TypeError (`undefined.toString()`)
+  - Queries customer `id` and `phone` (were missing from type cast)
+- **Admin cancel route** (`src/app/api/appointments/[id]/cancel/route.ts`): now calls `sendCancellationNotifications()` — gets SMS for free
+- **Customer self-cancel route** (`src/app/api/customer/appointments/[id]/cancel/route.ts`): same update — now sends SMS
+- POS cancel route (`src/app/api/pos/jobs/[id]/cancel/route.ts`) left unchanged — already has its own working email+SMS
+
+---
+
 ## feat: universal send-info-sms voice agent endpoint (Session 17D) — 2026-04-02
 
 - **New endpoint:** `POST /api/voice-agent/send-info-sms` — universal mid-call tool to text callers links and info
