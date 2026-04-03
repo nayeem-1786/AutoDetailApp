@@ -210,7 +210,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const populatedDates = useRef(new Set<string>());
 
   // Polling state
-  const POLL_MS_ACTIVE = 10_000; // 10s for today/future
+  const POLL_MS_ACTIVE = 5_000;  // 5s for today/future
   const POLL_MS_PAST = 60_000;   // 60s for past dates
   const [timelineInteracting, setTimelineInteracting] = useState(false);
   const [highlightedJobs, setHighlightedJobs] = useState<Set<string>>(new Set());
