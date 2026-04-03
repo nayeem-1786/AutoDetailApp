@@ -160,6 +160,9 @@ function DraggableJobBlock({
         left,
         width: Math.max(width, 60),
         height: LANE_HEIGHT - 8,
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
       }}
       onClick={(e) => { if (!isDragging) { e.stopPropagation(); onSelect(); } }}
       title={`${customerName} — ${serviceName}`}
@@ -170,6 +173,8 @@ function DraggableJobBlock({
             {...attributes}
             {...listeners}
             className="shrink-0 pt-0.5 text-white/40 touch-none"
+            style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
+            onTouchStart={(e) => e.preventDefault()}
           >
             <GripVertical className="h-3 w-3" />
           </div>
@@ -225,7 +230,7 @@ function DraggableUnscheduledCard({
         isDraggable && !isSaving && 'cursor-grab active:cursor-grabbing',
         isSaving && 'opacity-60 animate-pulse',
       )}
-      style={{ minWidth: 160 }}
+      style={{ minWidth: 160, WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
       onClick={() => !isDragging && onSelect()}
     >
       {isDraggable && !isSaving && (
@@ -233,6 +238,8 @@ function DraggableUnscheduledCard({
           {...attributes}
           {...listeners}
           className="mb-1 text-white/40 touch-none"
+          style={{ WebkitTouchCallout: 'none', touchAction: 'none' }}
+          onTouchStart={(e) => e.preventDefault()}
         >
           <GripVertical className="h-3 w-3" />
         </div>
@@ -318,7 +325,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
   );
 
   // Fetch staff
@@ -534,7 +541,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div className="flex flex-1 flex-col overflow-hidden bg-gray-50 dark:bg-gray-800">
+        <div className="flex flex-1 flex-col overflow-hidden bg-gray-50 dark:bg-gray-800 select-none" style={{ WebkitUserSelect: 'none' }}>
           {/* Timeline grid */}
           <div className="flex-1 overflow-auto" ref={scrollRef}>
             <div style={{ minWidth: LABEL_WIDTH + TIMELINE_WIDTH + 16 }}>
