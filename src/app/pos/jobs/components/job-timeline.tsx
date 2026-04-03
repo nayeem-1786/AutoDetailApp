@@ -138,6 +138,7 @@ function DraggableJobBlock({
   width,
   isDraggable,
   isSaving,
+  highlighted,
   onSelect,
 }: {
   job: JobListItem;
@@ -145,6 +146,7 @@ function DraggableJobBlock({
   width: number;
   isDraggable: boolean;
   isSaving: boolean;
+  highlighted?: boolean;
   onSelect: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -164,11 +166,12 @@ function DraggableJobBlock({
     <div
       ref={setNodeRef}
       className={cn(
-        'absolute top-1 rounded-md border px-1.5 py-1 text-left transition-all',
+        'absolute top-1 rounded-md border px-1.5 py-1 text-left transition-all duration-300',
         statusColor,
         isDragging && 'opacity-30 border-dashed',
         isDraggable && !isSaving && 'cursor-grab active:cursor-grabbing',
         isSaving && 'opacity-60 animate-pulse',
+        highlighted && 'ring-2 ring-blue-400/60',
       )}
       style={{
         left,
@@ -177,6 +180,7 @@ function DraggableJobBlock({
         WebkitTouchCallout: 'none',
         WebkitUserSelect: 'none',
         userSelect: 'none',
+        transition: 'left 300ms ease, width 300ms ease, box-shadow 300ms ease',
       }}
       onClick={(e) => { if (!isDragging) { e.stopPropagation(); onSelect(); } }}
       title={`${customerName} — ${serviceName}`}
@@ -327,9 +331,12 @@ interface JobTimelineProps {
   onSelectJob: (jobId: string) => void;
   onCheckout?: (jobId: string) => void;
   onRefresh?: () => void;
+  onInteractionChange?: (interacting: boolean) => void;
+  highlightedJobs?: Set<string>;
+  onLocalUpdate?: (jobId: string) => void;
 }
 
-export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob, onCheckout, onRefresh }: JobTimelineProps) {
+export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob, onCheckout, onRefresh, onInteractionChange, highlightedJobs, onLocalUpdate }: JobTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [nowMinutes, setNowMinutes] = useState(getNowMinutes);
@@ -413,15 +420,16 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const data = event.active.data.current as { job: JobListItem } | undefined;
     if (data?.job) setActiveJob(data.job);
-  }, []);
+    onInteractionChange?.(true);
+  }, [onInteractionChange]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     setActiveJob(null);
     const { active, over, delta } = event;
-    if (!over) return;
+    if (!over) { onInteractionChange?.(false); return; }
 
     const data = active.data.current as { job: JobListItem; fromUnscheduled?: boolean } | undefined;
-    if (!data?.job) return;
+    if (!data?.job) { onInteractionChange?.(false); return; }
     const job = data.job;
 
     const overIdStr = String(over.id);
@@ -432,6 +440,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
         // Can't unschedule appointment-based jobs
         toast.error('Cannot unschedule appointment-based jobs');
       }
+      onInteractionChange?.(false);
       return;
     }
 
@@ -462,7 +471,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
       const timeChanged = newTime && newTime !== oldTime?.slice(0, 5);
       const staffChanged = targetStaffId !== oldStaffId;
 
-      if (!timeChanged && !staffChanged) return;
+      if (!timeChanged && !staffChanged) { onInteractionChange?.(false); return; }
 
       const targetLane = laneOrder.find((l) => l.id === targetLaneId);
 
@@ -478,11 +487,12 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
         isUnschedule: false,
       });
     }
-  }, [laneOrder]);
+  }, [laneOrder, onInteractionChange]);
 
   const handleDragCancel = useCallback(() => {
     setActiveJob(null);
-  }, []);
+    onInteractionChange?.(false);
+  }, [onInteractionChange]);
 
   // ─── Confirm/Cancel drop ──────────────────────────────────
 
@@ -512,6 +522,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
         toast.error(err.error || 'Failed to reschedule');
       } else {
         toast.success('Job rescheduled');
+        onLocalUpdate?.(jobId);
         onRefresh?.();
       }
     } catch {
@@ -522,12 +533,14 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
         next.delete(jobId);
         return next;
       });
+      onInteractionChange?.(false);
     }
-  }, [pendingDrop, onRefresh]);
+  }, [pendingDrop, onRefresh, onLocalUpdate, onInteractionChange]);
 
   const cancelDrop = useCallback(() => {
     setPendingDrop(null);
-  }, []);
+    onInteractionChange?.(false);
+  }, [onInteractionChange]);
 
   if (loading) {
     return (
@@ -648,6 +661,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
                             width={width}
                             isDraggable={isDraggable}
                             isSaving={isSaving}
+                            highlighted={highlightedJobs?.has(job.id)}
                             onSelect={() => onSelectJob(job.id)}
                           />
                         );

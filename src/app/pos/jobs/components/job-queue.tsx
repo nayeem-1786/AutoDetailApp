@@ -209,6 +209,17 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const [populating, setPopulating] = useState(false);
   const populatedDates = useRef(new Set<string>());
 
+  // Polling state
+  const POLL_MS_ACTIVE = 10_000; // 10s for today/future
+  const POLL_MS_PAST = 60_000;   // 60s for past dates
+  const [timelineInteracting, setTimelineInteracting] = useState(false);
+  const [highlightedJobs, setHighlightedJobs] = useState<Set<string>>(new Set());
+  const localUpdatesRef = useRef<Map<string, number>>(new Map()); // jobId → timestamp of local action
+  const prevJobsRef = useRef<string>(''); // JSON snapshot for change detection
+  const failCountRef = useRef(0);
+  const [pollStatus, setPollStatus] = useState<'ok' | 'error'>('ok');
+  const [lastPollAt, setLastPollAt] = useState<number>(Date.now());
+
   // Live timer tick for in_progress cards
   const [, setTick] = useState(0);
   const hasInProgress = jobs.some((j) => j.status === 'in_progress' && j.work_started_at && !j.timer_paused_at);
@@ -231,13 +242,22 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
   }, [router, searchParams, today]);
 
+  // Mark a job as locally updated (skip highlight animation on next poll)
+  const markLocalUpdate = useCallback((jobId: string) => {
+    localUpdatesRef.current.set(jobId, Date.now());
+  }, []);
+
   const fetchJobs = useCallback(async (date: string) => {
     setLoading(true);
     try {
       const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${date}`);
       if (res.ok) {
         const { data } = await res.json();
-        setJobs(data ?? []);
+        const newJobs = data ?? [];
+        setJobs(newJobs);
+        // Initialize snapshot for change detection
+        const snapshot = JSON.stringify(newJobs.map((j: JobListItem) => j.id).sort());
+        prevJobsRef.current = snapshot;
       }
     } catch (err) {
       console.error('Failed to fetch jobs:', err);
@@ -245,6 +265,93 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       setLoading(false);
     }
   }, [filter]);
+
+  // Silent poll — no loading spinner, with change detection
+  const pollJobs = useCallback(async () => {
+    if (document.visibilityState !== 'visible') return;
+    if (timelineInteracting) return;
+
+    try {
+      const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${selectedDate}`);
+      if (!res.ok) {
+        failCountRef.current++;
+        if (failCountRef.current >= 3) setPollStatus('error');
+        return;
+      }
+
+      failCountRef.current = 0;
+      setPollStatus('ok');
+      setLastPollAt(Date.now());
+
+      const { data } = await res.json();
+      const newJobs: JobListItem[] = data ?? [];
+
+      // Build a comparable snapshot — sort by ID, include key fields
+      const makeKey = (j: JobListItem) =>
+        `${j.id}|${j.status}|${j.assigned_staff?.id || ''}|${j.appointment?.scheduled_start_time || ''}`;
+      const newSnapshot = JSON.stringify(newJobs.map(makeKey).sort());
+      const oldSnapshot = prevJobsRef.current;
+
+      if (newSnapshot === oldSnapshot) return; // No changes — skip state update
+
+      // Detect which jobs changed for highlight animation
+      const oldMap = new Map<string, string>();
+      // Reconstruct old keys from current jobs state
+      for (const j of jobs) {
+        oldMap.set(j.id, makeKey(j));
+      }
+
+      const now = Date.now();
+      const changed = new Set<string>();
+      for (const j of newJobs) {
+        const oldKey = oldMap.get(j.id);
+        const newKey = makeKey(j);
+        if (!oldKey) {
+          // New job appeared
+          const wasLocal = localUpdatesRef.current.get(j.id);
+          if (!wasLocal || now - wasLocal > 15_000) changed.add(j.id);
+        } else if (oldKey !== newKey) {
+          // Job changed — skip if locally updated recently
+          const wasLocal = localUpdatesRef.current.get(j.id);
+          if (!wasLocal || now - wasLocal > 15_000) changed.add(j.id);
+        }
+      }
+
+      // Clean up stale local update markers (>30s old)
+      for (const [id, ts] of localUpdatesRef.current) {
+        if (now - ts > 30_000) localUpdatesRef.current.delete(id);
+      }
+
+      prevJobsRef.current = newSnapshot;
+      setJobs(newJobs);
+
+      if (changed.size > 0) {
+        setHighlightedJobs(changed);
+        setTimeout(() => setHighlightedJobs(new Set()), 1500);
+      }
+    } catch {
+      failCountRef.current++;
+      if (failCountRef.current >= 3) setPollStatus('error');
+    }
+  }, [filter, selectedDate, timelineInteracting, jobs]);
+
+  // Polling interval
+  useEffect(() => {
+    const interval = diff < 0 ? POLL_MS_PAST : POLL_MS_ACTIVE;
+    const id = setInterval(pollJobs, interval);
+    return () => clearInterval(id);
+  }, [pollJobs, diff]);
+
+  // Fetch immediately when tab becomes visible
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !timelineInteracting) {
+        pollJobs();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [pollJobs, timelineInteracting]);
 
   const populateFromAppointments = useCallback(async (date: string) => {
     if (populatedDates.current.has(date)) return;
@@ -335,6 +442,10 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
         <div className="relative flex-1 text-center">
           <label className="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">
+            <span className={cn(
+              'mr-1.5 inline-block h-1.5 w-1.5 rounded-full',
+              pollStatus === 'ok' ? 'bg-green-500' : 'bg-amber-500'
+            )} />
             {formatDateLabel(selectedDate)}
             <input
               type="date"
@@ -456,7 +567,10 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           isToday={isToday}
           onSelectJob={onSelectJob}
           onCheckout={onCheckout}
-          onRefresh={() => fetchJobs(selectedDate)}
+          onRefresh={() => { markLocalUpdate('__refresh__'); fetchJobs(selectedDate); }}
+          onInteractionChange={setTimelineInteracting}
+          highlightedJobs={highlightedJobs}
+          onLocalUpdate={markLocalUpdate}
         />
       ) : (
       <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
@@ -501,7 +615,12 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                   tabIndex={0}
                   onClick={() => onSelectJob(job.id)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectJob(job.id); } }}
-                  className="w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-shadow hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800"
+                  className={cn(
+                    'w-full cursor-pointer rounded-lg border bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-all hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800',
+                    highlightedJobs.has(job.id)
+                      ? 'border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/50 dark:ring-blue-500/30'
+                      : 'border-gray-200 dark:border-gray-700'
+                  )}
                 >
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">

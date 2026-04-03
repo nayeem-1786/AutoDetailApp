@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: POS Jobs — polling for near-real-time updates (Session 19D) — 2026-04-03
+
+- **Background polling:** Jobs list polls `/api/pos/jobs` every 10 seconds for today/future dates, 60 seconds for past dates. Uses the same `document.visibilityState` pattern as messaging polling.
+- **Change detection:** Compares poll response against previous snapshot by job ID + status + staff + time. Only updates state when data actually changed — no unnecessary re-renders.
+- **Highlight animation:** Externally-changed jobs get a brief blue ring highlight (1.5s) on both list cards and timeline blocks. Local changes (drag-reschedule, etc.) are excluded from highlighting via a 15-second grace window.
+- **Interaction pausing:** Polling pauses when a drag is in progress or the confirmation dialog is open — prevents data updates from yanking blocks mid-interaction. Resumes immediately when interaction ends.
+- **Tab visibility:** Polling skips when browser tab is hidden. Fetches immediately when tab becomes visible again.
+- **Error resilience:** Failed polls logged to console silently. After 3 consecutive failures, status dot turns amber. Resets on next success. No error toasts on individual poll failures.
+- **Polling status indicator:** Small green/amber dot next to the date label shows polling health.
+- **Smooth block repositioning:** Timeline blocks use CSS `transition: left 300ms ease` so externally-rescheduled jobs animate to new positions instead of jumping.
+- **Timeline interaction callbacks:** `onInteractionChange` prop reports drag/dialog state to parent for poll pause. `onLocalUpdate` marks jobs to skip highlight animation.
+
+---
+
 ## feat: POS Jobs — drag-to-reschedule on timeline (Session 19C) — 2026-04-03
 
 - **Drag-and-drop:** Job blocks on the timeline can be dragged horizontally (reschedule time) and vertically (reassign detailer). Unscheduled cards can be dragged onto the timeline to assign a time + detailer.
