@@ -55,7 +55,8 @@ interface PendingDrop {
   jobId: string;
   job: JobListItem;
   newTime: string | null;
-  newStaffId: string | null;
+  /** undefined = no change, null = unassign, string = assign to this detailer */
+  newStaffId: string | null | undefined;
   oldTime: string | null;
   oldStaffId: string | null;
   laneLabel: string;
@@ -448,7 +449,8 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
         jobId: job.id,
         job,
         newTime: timeChanged ? newTime! : null,
-        newStaffId: staffChanged ? targetStaffId : null,
+        // undefined = no change, null = explicitly unassign, string = assign to detailer
+        newStaffId: staffChanged ? targetStaffId : undefined,
         oldTime,
         oldStaffId,
         laneLabel: targetLane?.label || 'Unknown',
@@ -473,10 +475,9 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
     try {
       const payload: Record<string, unknown> = {};
       if (newTime) payload.scheduled_start_time = newTime + ':00';
-      if (newStaffId !== null && newStaffId !== undefined) payload.assigned_staff_id = newStaffId;
-      // If newStaffId is explicitly being set (including to null for unassign)
-      if (pendingDrop.newStaffId !== null || (pendingDrop.newStaffId === null && pendingDrop.oldStaffId !== null)) {
-        payload.assigned_staff_id = newStaffId;
+      // Only send assigned_staff_id when staff actually changed (undefined = no change)
+      if (newStaffId !== undefined) {
+        payload.assigned_staff_id = newStaffId; // string = assign, null = unassign
       }
 
       const res = await posFetch(`/api/pos/jobs/${jobId}/reschedule`, {
@@ -717,7 +718,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
                   <span className="font-medium text-blue-400">{formatTime12h(pendingDrop.newTime)}</span>
                 </div>
               )}
-              {pendingDrop.newStaffId !== null && (
+              {pendingDrop.newStaffId !== undefined && (
                 <div className="flex items-center gap-2 text-sm text-gray-300">
                   <span className="text-gray-500">Detailer:</span>
                   <span>{staff.find((s) => s.id === pendingDrop.oldStaffId)?.first_name || 'Unassigned'}</span>
