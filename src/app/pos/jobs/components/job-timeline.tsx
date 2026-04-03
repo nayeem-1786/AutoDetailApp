@@ -16,7 +16,21 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { posFetch } from '../../lib/pos-fetch';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
-import { Check, GripVertical } from 'lucide-react';
+import { Check } from 'lucide-react';
+
+/** 2×9 dot grid for drag handle — spans full block height */
+function DragDots() {
+  return (
+    <svg width="6" height="52" viewBox="0 0 6 52" fill="currentColor" className="opacity-60">
+      {Array.from({ length: 9 }, (_, i) => (
+        <g key={i}>
+          <circle cx="1.5" cy={2 + i * 6} r="1" />
+          <circle cx="4.5" cy={2 + i * 6} r="1" />
+        </g>
+      ))}
+    </svg>
+  );
+}
 import { toast } from 'sonner';
 import type { JobStatus } from '@/lib/supabase/types';
 import type { JobListItem } from './job-queue';
@@ -167,16 +181,16 @@ function DraggableJobBlock({
       onClick={(e) => { if (!isDragging) { e.stopPropagation(); onSelect(); } }}
       title={`${customerName} — ${serviceName}`}
     >
-      <div className="flex h-full items-start gap-0.5">
+      <div className="flex h-full items-start gap-1">
         {isDraggable && !isSaving && (
           <div
             {...attributes}
             {...listeners}
-            className="shrink-0 pt-0.5 text-white/40 touch-none"
+            className="shrink-0 flex items-center h-full text-white/40 touch-none px-0.5"
             style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
             onTouchStart={(e) => e.preventDefault()}
           >
-            <GripVertical className="h-3 w-3" />
+            <DragDots />
           </div>
         )}
         <div className="min-w-0 flex-1">
@@ -241,7 +255,7 @@ function DraggableUnscheduledCard({
           style={{ WebkitTouchCallout: 'none', touchAction: 'none' }}
           onTouchStart={(e) => e.preventDefault()}
         >
-          <GripVertical className="h-3 w-3" />
+          <DragDots />
         </div>
       )}
       <p className="truncate text-xs font-medium text-white">{customerName}</p>
