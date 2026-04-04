@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
-import { enrichProduct } from '@/lib/services/ai-product-enrichment';
+import {
+  ENRICHMENT_SYSTEM_PROMPT,
+  ENRICHMENT_MODEL,
+  buildEnrichmentUserPrompt,
+} from '@/lib/services/ai-product-enrichment';
 
 /**
  * POST /api/admin/cms/products/ai-enrich
- * Enrich 1-3 products with AI web search. Client manages the batch loop.
- * Body: { productIds: string[] }
+ * Submit products for enrichment via Anthropic Message Batches API.
+ * Body: { mode: "all" | "selected", productIds?: string[] }
  */
 export async function POST(request: NextRequest) {
   const employee = await getEmployeeFromSession(request);
@@ -14,93 +18,138 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await request.json();
-  const { productIds } = body as { productIds: string[] };
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
+  }
 
-  if (!Array.isArray(productIds) || productIds.length === 0 || productIds.length > 3) {
-    return NextResponse.json(
-      { error: 'productIds must be an array of 1-3 UUIDs' },
-      { status: 400 }
-    );
+  const body = await request.json();
+  const { mode, productIds } = body as { mode: 'all' | 'selected'; productIds?: string[] };
+
+  if (mode !== 'all' && mode !== 'selected') {
+    return NextResponse.json({ error: 'mode must be "all" or "selected"' }, { status: 400 });
+  }
+
+  if (mode === 'selected' && (!Array.isArray(productIds) || productIds.length === 0)) {
+    return NextResponse.json({ error: 'productIds required for "selected" mode' }, { status: 400 });
   }
 
   const admin = createAdminClient();
 
-  // Fetch products with vendor and category
-  const { data: products, error: fetchErr } = await admin
+  // Build product query
+  let query = admin
     .from('products')
     .select(`
       id, name, description, variant_label,
       vendors ( name, website ),
       product_categories ( name )
     `)
-    .in('id', productIds)
     .eq('is_active', true);
+
+  if (mode === 'selected') {
+    query = query.in('id', productIds!);
+  }
+
+  const { data: allProducts, error: fetchErr } = await query;
 
   if (fetchErr) {
     return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   }
 
-  const results: Array<{
-    productId: string;
-    draftId: string | null;
-    status: 'success' | 'error';
-    error?: string;
-  }> = [];
+  if (!allProducts || allProducts.length === 0) {
+    return NextResponse.json({ error: 'No active products found' }, { status: 404 });
+  }
 
-  for (const product of products ?? []) {
+  // Skip products that already have applied or pending drafts
+  const { data: existingDrafts } = await admin
+    .from('product_enrichment_drafts')
+    .select('product_id')
+    .in('status', ['applied', 'pending']);
+
+  const skipIds = new Set((existingDrafts ?? []).map((d: { product_id: string }) => d.product_id));
+  const products = allProducts.filter((p) => !skipIds.has(p.id));
+
+  if (products.length === 0) {
+    return NextResponse.json({
+      message: 'All products already enriched or pending review',
+      skipped: skipIds.size,
+      totalProducts: 0,
+    });
+  }
+
+  // Build batch requests array
+  const requests = products.map((product) => {
     const vendor = product.vendors as unknown as { name: string; website: string | null } | null;
     const category = product.product_categories as unknown as { name: string } | null;
 
-    const enrichment = await enrichProduct({
-      productName: product.name,
-      vendorName: vendor?.name ?? 'Unknown',
-      vendorWebsite: vendor?.website,
-      categoryName: category?.name,
-      currentDescription: product.description,
-      variantLabel: product.variant_label,
-    });
+    return {
+      custom_id: product.id,
+      params: {
+        model: ENRICHMENT_MODEL,
+        max_tokens: 2000,
+        tools: [{ type: 'web_search_20250305' as const, name: 'web_search', max_uses: 3 }],
+        system: ENRICHMENT_SYSTEM_PROMPT,
+        messages: [{
+          role: 'user' as const,
+          content: buildEnrichmentUserPrompt({
+            productName: product.name,
+            vendorName: vendor?.name ?? 'Unknown',
+            vendorWebsite: vendor?.website,
+            categoryName: category?.name,
+            currentDescription: product.description,
+            variantLabel: product.variant_label,
+          }),
+        }],
+      },
+    };
+  });
 
-    if (enrichment.error === 'rate_limit') {
-      // Signal rate limit so client can pause and retry
-      return NextResponse.json(
-        { error: 'rate_limit', results, rateLimitedAt: product.id },
-        { status: 429 }
-      );
-    }
+  // Submit to Anthropic Message Batches API
+  const batchResponse = await fetch('https://api.anthropic.com/v1/messages/batches', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({ requests }),
+  });
 
-    // Remove any existing pending drafts for this product (dedup on re-enrich)
-    await admin
-      .from('product_enrichment_drafts')
-      .delete()
-      .eq('product_id', product.id)
-      .eq('status', 'pending');
-
-    // Insert draft
-    const { data: draft, error: insertErr } = await admin
-      .from('product_enrichment_drafts')
-      .insert({
-        product_id: product.id,
-        short_description: enrichment.shortDescription,
-        specs: enrichment.specs,
-        source_url: enrichment.sourceUrl,
-        error_message: enrichment.error || null,
-        status: enrichment.error ? 'pending' : 'pending',
-      })
-      .select('id')
-      .single();
-
-    if (insertErr) {
-      results.push({ productId: product.id, draftId: null, status: 'error', error: insertErr.message });
-    } else {
-      results.push({
-        productId: product.id,
-        draftId: draft.id,
-        status: enrichment.error ? 'error' : 'success',
-        error: enrichment.error || undefined,
-      });
-    }
+  if (!batchResponse.ok) {
+    const errText = await batchResponse.text();
+    console.error('Batch submission failed:', errText);
+    return NextResponse.json(
+      { error: `Batch submission failed: ${errText.slice(0, 300)}` },
+      { status: batchResponse.status }
+    );
   }
 
-  return NextResponse.json({ results });
+  const batchData = await batchResponse.json();
+
+  // Store batch record
+  const { data: batchRecord, error: insertErr } = await admin
+    .from('enrichment_batches')
+    .insert({
+      anthropic_batch_id: batchData.id,
+      status: 'submitted',
+      total_requests: products.length,
+    })
+    .select('id')
+    .single();
+
+  if (insertErr) {
+    console.error('Failed to store batch record:', insertErr);
+    return NextResponse.json(
+      { error: 'Batch submitted to Anthropic but failed to store record locally' },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({
+    batchId: batchRecord.id,
+    anthropicBatchId: batchData.id,
+    totalProducts: products.length,
+    skipped: skipIds.size,
+    message: 'Batch submitted. Poll for results.',
+  });
 }

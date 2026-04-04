@@ -104,6 +104,8 @@ src/app/api/admin/cms/catalog/products/route.ts
 src/app/api/admin/cms/catalog/services/route.ts
 src/app/api/admin/cms/products/ai-enrich/route.ts
 src/app/api/admin/cms/products/ai-enrich/apply/route.ts
+src/app/api/admin/cms/products/ai-enrich/status/route.ts
+src/app/api/admin/cms/products/ai-enrich/results/route.ts
 src/app/api/admin/cms/content/[id]/route.ts
 src/app/api/admin/cms/migrate-data/route.ts
 src/app/api/admin/cms/content/ai-generate/route.ts
@@ -1404,6 +1406,11 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260331000001_email_prompt_dismissed.sql
 20260331000002_email_verification_system.sql
 20260401000001_clean_unknown_vehicle_fields.sql
+20260402000001_fix_cancellation_email_template_vars.sql
+20260403000001_product_specs_and_variant_grouping.sql
+20260404000001_product_enrichment_system.sql
+20260404000002_enrichment_drafts_rls_and_cleanup.sql
+20260404000003_enrichment_batches_table.sql
 ```
 
 ---

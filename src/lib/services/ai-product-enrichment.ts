@@ -1,11 +1,11 @@
 /**
- * AI Product Enrichment — uses Claude with web search to research products
- * on vendor websites and extract structured specs + descriptions.
+ * AI Product Enrichment — prompt builders, response parsers, and citation stripping.
+ * The actual API calls go through the Anthropic Message Batches API in the route handlers.
  */
 
 import { specsSchema } from '@/lib/utils/validation';
 
-const SYSTEM_PROMPT = `You are a product content specialist for a professional auto detailing supply store. You research products from manufacturer websites and create accurate, factual product descriptions and specifications.
+export const ENRICHMENT_SYSTEM_PROMPT = `You are a product content specialist for a professional auto detailing supply store. You research products from manufacturer websites and create accurate, factual product descriptions and specifications.
 
 RESEARCH PROCESS:
 1. Search the web for the exact product by name and manufacturer
@@ -43,6 +43,8 @@ If the product is a tool, pad, towel, or accessory (not a chemical), adapt:
 - size_volume: dimensions or size (e.g. "5 inch", "16x16 inches", "3-pack")
 - application_method: how to use the tool/accessory`;
 
+export const ENRICHMENT_MODEL = 'claude-haiku-4-5-20251001';
+
 export interface EnrichmentInput {
   productName: string;
   vendorName: string;
@@ -59,127 +61,8 @@ export interface EnrichmentResult {
   error?: string;
 }
 
-export async function enrichProduct(input: EnrichmentInput): Promise<EnrichmentResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return { shortDescription: null, specs: null, sourceUrl: null, error: 'ANTHROPIC_API_KEY not configured' };
-  }
-
-  const userPrompt = buildUserPrompt(input);
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 2000,
-          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-          system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userPrompt }],
-        }),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        if (response.status === 429) {
-          throw new Error('rate_limit');
-        }
-        throw new Error(`API error ${response.status}: ${errText.slice(0, 200)}`);
-      }
-
-      const data = await response.json();
-
-      // Extract text from multi-block response (web search returns multiple block types)
-      const textBlocks = (data.content ?? []).filter(
-        (block: { type: string }) => block.type === 'text'
-      );
-      const lastTextBlock = textBlocks[textBlocks.length - 1];
-
-      if (!lastTextBlock?.text) {
-        if (attempt === 0) continue; // retry once
-        return { shortDescription: null, specs: null, sourceUrl: null, error: 'Empty AI response' };
-      }
-
-      const cleanedText = lastTextBlock.text
-        .replace(/```json\s*/g, '')
-        .replace(/```\s*/g, '')
-        .trim();
-
-      // Parse JSON — handle cases where Claude wraps JSON in conversational text
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let parsed: any;
-      try {
-        parsed = JSON.parse(cleanedText);
-      } catch {
-        // Try to extract JSON object from surrounding text
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('Could not parse JSON from AI response');
-        }
-      }
-
-      // Strip <cite index="...">...</cite> tags from web search responses
-      stripCitationsDeep(parsed);
-
-      // Build specs object, stripping empty values
-      const rawSpecs: Record<string, unknown> = {
-        overview: parsed.full_description || undefined,
-        use_case: parsed.use_case || undefined,
-        key_features: parsed.key_features?.length ? parsed.key_features : undefined,
-        application_method: parsed.application_method || undefined,
-        surface_compatibility: parsed.surface_compatibility?.length ? parsed.surface_compatibility : undefined,
-        size_volume: parsed.size_volume || undefined,
-        dilution_ratio: parsed.dilution_ratio || undefined,
-        coverage_yield: parsed.coverage_yield || undefined,
-        scent: parsed.scent || undefined,
-        pro_tips: parsed.pro_tips || undefined,
-      };
-
-      // Strip undefined/null/empty values
-      const cleanSpecs = Object.fromEntries(
-        Object.entries(rawSpecs).filter(([, v]) => v !== undefined && v !== null && v !== '')
-      );
-
-      // Validate against specsSchema
-      const validated = specsSchema.safeParse(cleanSpecs);
-      const finalSpecs = validated.success && validated.data
-        ? Object.keys(validated.data).length > 0 ? validated.data : null
-        : Object.keys(cleanSpecs).length > 0 ? cleanSpecs : null;
-
-      return {
-        shortDescription: parsed.short_description || null,
-        specs: finalSpecs,
-        sourceUrl: parsed.source_url || null,
-      };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-
-      // Rate limit — don't retry, propagate for batch handler
-      if (msg === 'rate_limit') {
-        return { shortDescription: null, specs: null, sourceUrl: null, error: 'rate_limit' };
-      }
-
-      // JSON parse error on first attempt — retry
-      if (attempt === 0 && (msg.includes('JSON') || msg.includes('Unexpected token'))) {
-        continue;
-      }
-
-      return { shortDescription: null, specs: null, sourceUrl: null, error: msg };
-    }
-  }
-
-  return { shortDescription: null, specs: null, sourceUrl: null, error: 'Failed after retries' };
-}
-
-function buildUserPrompt(input: EnrichmentInput): string {
+/** Build the user prompt for a single product enrichment request. */
+export function buildEnrichmentUserPrompt(input: EnrichmentInput): string {
   const parts = [
     'Research this product and provide accurate specifications:',
     '',
@@ -203,7 +86,7 @@ function stripCitations(text: string): string {
 }
 
 /** Recursively strip citation tags from all string values in an object. */
-function stripCitationsDeep(obj: Record<string, unknown>): void {
+export function stripCitationsDeep(obj: Record<string, unknown>): void {
   for (const key of Object.keys(obj)) {
     const val = obj[key];
     if (typeof val === 'string') {
@@ -212,4 +95,77 @@ function stripCitationsDeep(obj: Record<string, unknown>): void {
       obj[key] = val.map((item) => (typeof item === 'string' ? stripCitations(item) : item));
     }
   }
+}
+
+/**
+ * Parse a single enrichment response from Claude's message content blocks.
+ * Used by the batch results processor to parse each individual result.
+ */
+export function parseEnrichmentResponse(
+  contentBlocks: Array<{ type: string; text?: string }>
+): EnrichmentResult {
+  // Extract text from multi-block response (web search returns multiple block types)
+  const textBlocks = contentBlocks.filter((block) => block.type === 'text');
+  const lastTextBlock = textBlocks[textBlocks.length - 1];
+
+  if (!lastTextBlock?.text) {
+    return { shortDescription: null, specs: null, sourceUrl: null, error: 'Empty AI response' };
+  }
+
+  const cleanedText = lastTextBlock.text
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any;
+  try {
+    parsed = JSON.parse(cleanedText);
+  } catch {
+    // Try to extract JSON object from surrounding text
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch {
+        return { shortDescription: null, specs: null, sourceUrl: null, error: 'Could not parse JSON from AI response' };
+      }
+    } else {
+      return { shortDescription: null, specs: null, sourceUrl: null, error: 'Could not parse JSON from AI response' };
+    }
+  }
+
+  // Strip citation tags from web search responses
+  stripCitationsDeep(parsed);
+
+  // Build specs object, stripping empty values
+  const rawSpecs: Record<string, unknown> = {
+    overview: parsed.full_description || undefined,
+    use_case: parsed.use_case || undefined,
+    key_features: parsed.key_features?.length ? parsed.key_features : undefined,
+    application_method: parsed.application_method || undefined,
+    surface_compatibility: parsed.surface_compatibility?.length ? parsed.surface_compatibility : undefined,
+    size_volume: parsed.size_volume || undefined,
+    dilution_ratio: parsed.dilution_ratio || undefined,
+    coverage_yield: parsed.coverage_yield || undefined,
+    scent: parsed.scent || undefined,
+    pro_tips: parsed.pro_tips || undefined,
+  };
+
+  // Strip undefined/null/empty values
+  const cleanSpecs = Object.fromEntries(
+    Object.entries(rawSpecs).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  );
+
+  // Validate against specsSchema
+  const validated = specsSchema.safeParse(cleanSpecs);
+  const finalSpecs = validated.success && validated.data
+    ? Object.keys(validated.data).length > 0 ? validated.data : null
+    : Object.keys(cleanSpecs).length > 0 ? cleanSpecs : null;
+
+  return {
+    shortDescription: parsed.short_description || null,
+    specs: finalSpecs,
+    sourceUrl: parsed.source_url || null,
+  };
 }

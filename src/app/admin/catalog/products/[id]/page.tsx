@@ -974,18 +974,60 @@ export default function ProductDetailPage() {
                   onClick={async () => {
                     setSingleEnriching(true);
                     try {
-                      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+                      // Submit batch of 1 product
+                      const submitRes = await adminFetch('/api/admin/cms/products/ai-enrich', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ productIds: [productId] }),
+                        body: JSON.stringify({ mode: 'selected', productIds: [productId] }),
                       });
-                      if (res.ok) {
-                        const data = await res.json();
-                        const draftId = data.results?.[0]?.draftId;
-                        if (draftId) setPendingDraftId(draftId);
-                        toast.success('Product enriched successfully');
-                      } else {
-                        toast.error('Enrichment failed');
+                      const submitData = await submitRes.json();
+                      if (!submitRes.ok) {
+                        toast.error(submitData.error || 'Enrichment failed');
+                        return;
+                      }
+                      if (submitData.totalProducts === 0) {
+                        toast.info(submitData.message || 'Product already enriched.');
+                        return;
+                      }
+
+                      const batchId = submitData.batchId;
+                      toast.info('Enrichment submitted. Waiting for results...');
+
+                      // Poll every 5 seconds until complete
+                      let attempts = 0;
+                      const maxAttempts = 120; // 10 minutes
+                      while (attempts < maxAttempts) {
+                        await new Promise(r => setTimeout(r, 5_000));
+                        attempts++;
+                        const statusRes = await adminFetch(`/api/admin/cms/products/ai-enrich/status?batchId=${batchId}`);
+                        if (!statusRes.ok) continue;
+                        const statusData = await statusRes.json();
+                        if (statusData.anthropicStatus === 'ended' || statusData.status === 'completed') {
+                          // Process results
+                          const resultsRes = await adminFetch('/api/admin/cms/products/ai-enrich/results', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ batchId }),
+                          });
+                          if (resultsRes.ok) {
+                            // Check for pending draft
+                            const { data: draft } = await supabase
+                              .from('product_enrichment_drafts')
+                              .select('id')
+                              .eq('product_id', productId)
+                              .eq('status', 'pending')
+                              .limit(1)
+                              .maybeSingle();
+                            if (draft) setPendingDraftId(draft.id);
+                            toast.success('Product enriched successfully');
+                          } else {
+                            toast.error('Failed to process enrichment results');
+                          }
+                          break;
+                        }
+                      }
+                      if (attempts >= maxAttempts) {
+                        toast.error('Enrichment timed out. Check the enrichment review page later.');
                       }
                     } catch {
                       toast.error('Enrichment failed');

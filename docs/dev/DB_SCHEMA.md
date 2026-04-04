@@ -173,6 +173,20 @@ idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(mod
 
 **Indexes:** `(product_id, status)`, `(status)`
 
+### enrichment_batches
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| anthropic_batch_id | TEXT | NOT NULL | Anthropic Message Batches API batch ID |
+| status | TEXT | NOT NULL, DEFAULT 'submitted', CHECK (submitted/processing/completed/failed/canceled) | |
+| total_requests | INTEGER | NOT NULL, DEFAULT 0 | Number of products in this batch |
+| succeeded | INTEGER | NOT NULL, DEFAULT 0 | Successfully enriched count |
+| errored | INTEGER | NOT NULL, DEFAULT 0 | Failed enrichment count |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| completed_at | TIMESTAMPTZ | | When results were processed |
+
+**Indexes:** `(status)`, `(created_at DESC)`
+
 ### product_images
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|

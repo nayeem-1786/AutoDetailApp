@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Rewrite product enrichment to Anthropic Message Batches API (Session 21B-v2) — 2026-04-04
+
+- **Replaced entire enrichment pipeline** with Anthropic Message Batches API:
+  - Old: Client-side loop, 1 product per 30s, constant 429 rate limit errors, 3.5+ hours for 432 products
+  - New: Single batch submission, Anthropic handles parallelism/retries internally, ~1 hour for all products
+- **Model change**: Claude Sonnet 4 → Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) — sufficient for spec extraction
+- **Cost reduction**: ~85-90% cheaper (Haiku is ~70% cheaper + 50% batch discount)
+- **DB migration** (`20260404000003`): New `enrichment_batches` table tracks Anthropic batch IDs, status, request counts
+- **API rewrite** (`ai-enrich/route.ts`): Now accepts `{ mode: "all" | "selected" }`, builds batch request array, submits to Anthropic Batches API
+- **New endpoint** (`ai-enrich/status/route.ts`): Polls Anthropic batch status, returns progress counts
+- **New endpoint** (`ai-enrich/results/route.ts`): Downloads JSONL results, parses each response, inserts enrichment drafts
+- **Products list UI**: Removed client-side batch loop (120+ lines), replaced with submit-and-poll pattern. Progress bar shows batch status. "Process Results" button when batch completes.
+- **Product edit page**: Single-product "AI Enrich" now submits batch-of-1, polls every 5s until complete
+- **Service refactor** (`ai-product-enrichment.ts`): Removed `enrichProduct()` direct API call. Exported `ENRICHMENT_SYSTEM_PROMPT`, `buildEnrichmentUserPrompt()`, `parseEnrichmentResponse()`, `stripCitationsDeep()` for use by batch endpoints.
+- **Kept unchanged**: Apply endpoint, enrichment review page, specsSchema validation, draft table
+
 ## feat: AI product enrichment — vendor research with web search, batch processing, review system (Session 21B) — 2026-04-04
 
 - **DB migration** (`20260404000001`):
