@@ -79,6 +79,8 @@ export default function ProductDetailPage() {
 
   // AI Enrichment state (single product)
   const [singleEnriching, setSingleEnriching] = useState(false);
+  const [pendingDraftId, setPendingDraftId] = useState<string | null>(null);
+  const [acceptingEnrichment, setAcceptingEnrichment] = useState(false);
 
   // Specs form state (managed separately from react-hook-form for tag inputs)
   const [specKeyFeatures, setSpecKeyFeatures] = useState<string[]>([]);
@@ -215,6 +217,16 @@ export default function ProductDetailPage() {
           .catch(() => {})
           .finally(() => setVariantsLoading(false));
       }
+
+      // Check for pending enrichment draft
+      supabase
+        .from('product_enrichment_drafts')
+        .select('id')
+        .eq('product_id', productId)
+        .eq('status', 'pending')
+        .limit(1)
+        .maybeSingle()
+        .then(({ data: draft }: { data: { id: string } | null }) => setPendingDraftId(draft?.id ?? null));
 
       // Populate sale pricing
       setSalePrice(p.sale_price ?? '');
@@ -953,39 +965,117 @@ export default function ProductDetailPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Product Specs</CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={singleEnriching}
-                onClick={async () => {
-                  setSingleEnriching(true);
-                  try {
-                    const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ productIds: [productId] }),
-                    });
-                    if (res.ok) {
-                      toast.success('Product enriched!', {
-                        action: {
-                          label: 'Review →',
-                          onClick: () => router.push('/admin/catalog/products/enrichment-review'),
-                        },
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={singleEnriching}
+                  onClick={async () => {
+                    setSingleEnriching(true);
+                    try {
+                      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ productIds: [productId] }),
                       });
-                    } else {
+                      if (res.ok) {
+                        const data = await res.json();
+                        const draftId = data.results?.[0]?.draftId;
+                        if (draftId) setPendingDraftId(draftId);
+                        toast.success('Product enriched successfully');
+                      } else {
+                        toast.error('Enrichment failed');
+                      }
+                    } catch {
                       toast.error('Enrichment failed');
+                    } finally {
+                      setSingleEnriching(false);
                     }
-                  } catch {
-                    toast.error('Enrichment failed');
-                  } finally {
-                    setSingleEnriching(false);
-                  }
-                }}
-              >
-                <Sparkles className="h-4 w-4" />
-                {singleEnriching ? 'Enriching...' : 'AI Enrich'}
-              </Button>
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {singleEnriching ? 'Enriching...' : 'AI Enrich'}
+                </Button>
+                {pendingDraftId && (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={acceptingEnrichment}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={async () => {
+                        setAcceptingEnrichment(true);
+                        try {
+                          const res = await adminFetch('/api/admin/cms/products/ai-enrich/apply', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              actions: [{
+                                draftId: pendingDraftId,
+                                action: 'apply',
+                                applyDescription: true,
+                                applySpecs: true,
+                              }],
+                            }),
+                          });
+                          if (res.ok) {
+                            setPendingDraftId(null);
+                            toast.success('Enrichment applied');
+                            // Reload product data to refresh specs on screen
+                            const { data: refreshed } = await supabase
+                              .from('products')
+                              .select('*, product_categories(id, name), vendors(id, name)')
+                              .eq('id', productId)
+                              .single();
+                            if (refreshed) {
+                              const p = refreshed as ProductWithRelations;
+                              setProduct(p);
+                              reset({
+                                name: p.name,
+                                sku: p.sku || '',
+                                description: p.description || '',
+                                category_id: p.category_id || null,
+                                vendor_id: p.vendor_id || null,
+                                cost_price: p.cost_price,
+                                retail_price: p.retail_price,
+                                quantity_on_hand: p.quantity_on_hand,
+                                reorder_threshold: p.reorder_threshold ?? null,
+                                min_order_qty: p.min_order_qty ?? null,
+                                is_taxable: p.is_taxable,
+                                is_loyalty_eligible: p.is_loyalty_eligible,
+                                is_active: p.is_active,
+                                barcode: p.barcode || '',
+                                variant_label: p.variant_label || '',
+                                specs: (p.specs as Record<string, unknown>) ?? null,
+                              });
+                              const pSpecs = (p.specs as Record<string, unknown>) ?? {};
+                              setSpecKeyFeatures(Array.isArray(pSpecs.key_features) ? pSpecs.key_features as string[] : []);
+                              setSpecSurfaceCompat(Array.isArray(pSpecs.surface_compatibility) ? pSpecs.surface_compatibility as string[] : []);
+                            }
+                          } else {
+                            toast.error('Failed to apply enrichment');
+                          }
+                        } catch {
+                          toast.error('Failed to apply enrichment');
+                        } finally {
+                          setAcceptingEnrichment(false);
+                        }
+                      }}
+                    >
+                      {acceptingEnrichment ? 'Applying...' : 'Accept Enrichment'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push('/admin/catalog/products/enrichment-review')}
+                    >
+                      Enrichment Review
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
