@@ -486,72 +486,88 @@ export default function ProductsPage() {
     let completed = 0;
     let errors = 0;
 
-    for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
-      const batchStart = batchIdx * BATCH_SIZE;
-      const batchIds = activeIds.slice(batchStart, batchStart + BATCH_SIZE);
-      const batchNum = batchIdx + 1;
-      const remainingBatches = totalBatches - batchIdx;
-      const etaMin = Math.ceil((remainingBatches * BATCH_DELAY_MS) / 60_000);
-      setEnrichProgress(`Batch ${batchNum}/${totalBatches} — ${completed}/${activeIds.length} products — ~${etaMin}m remaining`);
+    try {
+      for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+        const batchStart = batchIdx * BATCH_SIZE;
+        const batchIds = activeIds.slice(batchStart, batchStart + BATCH_SIZE);
+        const batchNum = batchIdx + 1;
+        const remainingBatches = totalBatches - batchIdx;
+        const etaMin = Math.ceil((remainingBatches * BATCH_DELAY_MS) / 60_000);
+        setEnrichProgress(`Batch ${batchNum}/${totalBatches} — ${completed}/${activeIds.length} products — ~${etaMin}m remaining`);
 
-      let lastError = '';
-      let success = false;
+        let lastError = '';
+        let success = false;
 
-      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productIds: batchIds }),
-          });
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productIds: batchIds }),
+            });
 
-          if (res.status === 429) {
-            lastError = 'rate_limit';
-            if (attempt < MAX_RETRIES) {
-              setEnrichProgress(`Rate limited — waiting 60s before retry (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`);
+            if (res.status === 429) {
+              lastError = 'rate_limit';
+              if (attempt < MAX_RETRIES) {
+                setEnrichProgress(`Rate limited — waiting 60s before retry (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`);
+                await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
+                continue;
+              }
+              break;
+            }
+
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+              lastError = errBody.error || `HTTP ${res.status}`;
+              if (attempt < MAX_RETRIES) continue;
+              break;
+            }
+
+            const data = await res.json();
+            const batchErrors = (data.results ?? []).filter((r: { status: string }) => r.status === 'error').length;
+            completed += batchIds.length;
+            errors += batchErrors;
+            success = true;
+            break;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : 'Unknown error';
+            if (attempt < MAX_RETRIES && lastError.includes('rate_limit')) {
               await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
               continue;
             }
-            break;
-          }
-
-          if (!res.ok) {
-            const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-            throw new Error(errBody.error || `HTTP ${res.status}`);
-          }
-
-          const data = await res.json();
-          const batchErrors = (data.results ?? []).filter((r: { status: string }) => r.status === 'error').length;
-          completed += batchIds.length;
-          errors += batchErrors;
-          success = true;
-          break;
-        } catch (err) {
-          lastError = err instanceof Error ? err.message : 'Unknown error';
-          if (attempt < MAX_RETRIES && lastError.includes('rate_limit')) {
-            await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
-            continue;
+            // Non-rate-limit error — retry if attempts remain
+            if (attempt < MAX_RETRIES) continue;
           }
         }
-      }
 
-      if (!success) {
-        errors += batchIds.length;
-        completed += batchIds.length;
-      }
+        if (!success) {
+          errors += batchIds.length;
+          completed += batchIds.length;
+          console.error(`Batch ${batchNum} failed: ${lastError}`);
+        }
 
-      setEnrichCompleted(completed);
-      setEnrichErrors(errors);
+        setEnrichCompleted(completed);
+        setEnrichErrors(errors);
 
-      // Delay between batches (skip after last)
-      if (batchIdx < totalBatches - 1) {
-        setEnrichProgress(`Waiting before next batch... ${completed}/${activeIds.length} products done`);
-        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        // Delay between batches (skip after last)
+        if (batchIdx < totalBatches - 1) {
+          setEnrichProgress(`Waiting before next batch... ${completed}/${activeIds.length} products done`);
+          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        }
       }
+    } catch (err) {
+      // Top-level catch — prevents entire batch from crashing on unexpected errors
+      console.error('Batch enrichment crashed:', err);
     }
 
     setEnrichProgress(`Complete! ${completed} products enriched. ${errors} errors.`);
     setEnriching(false);
+    // Refresh pending draft count
+    supabase
+      .from('product_enrichment_drafts')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }: { count: number | null }) => setPendingDraftCount(count ?? 0));
     toast.success(`Enrichment complete. ${errors > 0 ? `${errors} errors.` : ''} Review results in the enrichment review page.`);
   }
 

@@ -106,12 +106,25 @@ export async function enrichProduct(input: EnrichmentInput): Promise<EnrichmentR
         return { shortDescription: null, specs: null, sourceUrl: null, error: 'Empty AI response' };
       }
 
-      const jsonStr = lastTextBlock.text
+      const cleanedText = lastTextBlock.text
         .replace(/```json\s*/g, '')
         .replace(/```\s*/g, '')
         .trim();
 
-      const parsed = JSON.parse(jsonStr);
+      // Parse JSON — handle cases where Claude wraps JSON in conversational text
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleanedText);
+      } catch {
+        // Try to extract JSON object from surrounding text
+        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error('Could not parse JSON from AI response');
+        }
+      }
 
       // Strip <cite index="...">...</cite> tags from web search responses
       stripCitationsDeep(parsed);
