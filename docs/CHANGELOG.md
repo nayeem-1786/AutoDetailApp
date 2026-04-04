@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: product specs JSONB, variant grouping, admin UI (Session 21A) — 2026-04-03
+
+- **DB migration** (`20260403000001`): adds `specs` JSONB, `product_group_id` UUID, `variant_label` TEXT columns to products table + partial index on `product_group_id`
+- **Auto-groups 44 variant groups** (99 products) across volume sizes, pad diameters, pack quantities, colors, and apparel sizes — using vendor + name ILIKE patterns with explicit label assignments and per-group count logging
+- **TypeScript**: added `specs`, `product_group_id`, `variant_label` to Product interface
+- **Zod schemas**: added `specsSchema` for type-safe JSONB validation + `specs` and `variant_label` to `productCreateSchema`/`productUpdateSchema`
+- **Admin product edit page** — 3 new sections:
+  - **Variant Label**: simple text input for variant descriptor (e.g. "16 oz", "Blue")
+  - **Variant Group**: shows grouped siblings with links, remove-from-group button, and create-group modal with product search
+  - **Product Specs**: structured editor with overview, use case, key features (tag input), application method, surface compatibility (tag input), size/volume, dilution ratio, coverage/yield, scent, pro tips
+- **3 new API routes** for variant group management:
+  - `GET /api/admin/products/[id]/variants` — list group siblings
+  - `POST /api/admin/products/group` — create variant group
+  - `DELETE /api/admin/products/[id]/group` — remove from group (preserves `variant_label`, auto-dissolves groups of 1)
+- Specs JSONB strips empty fields before saving — no `"scent": ""` stored
+- `product_group_id` managed by API only, not part of the form schema
+
+---
+
 ## feat: POS Jobs — polling for near-real-time updates (Session 19D) — 2026-04-03
 
 - **Background polling:** Jobs list polls `/api/pos/jobs` every 10 seconds for today/future dates, 60 seconds for past dates. Uses the same `document.visibilityState` pattern as messaging polling.

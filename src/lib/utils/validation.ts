@@ -80,6 +80,19 @@ export const vehicleSchema = z.object({
 });
 
 // Product schemas
+export const specsSchema = z.object({
+  overview: z.string().optional(),
+  use_case: z.string().optional(),
+  key_features: z.array(z.string()).optional(),
+  application_method: z.string().optional(),
+  surface_compatibility: z.array(z.string()).optional(),
+  size_volume: z.string().optional(),
+  dilution_ratio: z.string().optional(),
+  coverage_yield: z.string().optional(),
+  scent: z.string().optional(),
+  pro_tips: z.string().optional(),
+}).optional().nullable();
+
 export const productCreateSchema = z.object({
   name: requiredString,
   sku: optionalString,
@@ -95,6 +108,8 @@ export const productCreateSchema = z.object({
   is_loyalty_eligible: z.boolean().default(true),
   is_active: z.boolean().default(true),
   barcode: optionalString,
+  specs: specsSchema,
+  variant_label: optionalString,
 });
 
 export const productUpdateSchema = productCreateSchema.partial();

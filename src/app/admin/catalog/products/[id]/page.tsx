@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, DollarSign, Trash2, X } from 'lucide-react';
+import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink } from 'lucide-react';
 import { MultiImageUpload } from '@/app/admin/catalog/components/multi-image-upload';
 import {
   getSaleStatus,
@@ -66,6 +66,21 @@ export default function ProductDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
+
+  // Variant group state
+  const [variants, setVariants] = useState<{ id: string; name: string; variant_label: string | null; retail_price: number; quantity_on_hand: number; image_url: string | null }[]>([]);
+  const [variantsLoading, setVariantsLoading] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupSearch, setGroupSearch] = useState('');
+  const [groupSearchResults, setGroupSearchResults] = useState<{ id: string; name: string; retail_price: number; vendor_name: string | null }[]>([]);
+  const [groupSelectedIds, setGroupSelectedIds] = useState<string[]>([]);
+  const [groupCreating, setGroupCreating] = useState(false);
+
+  // Specs form state (managed separately from react-hook-form for tag inputs)
+  const [specKeyFeatures, setSpecKeyFeatures] = useState<string[]>([]);
+  const [specSurfaceCompat, setSpecSurfaceCompat] = useState<string[]>([]);
+  const [newFeature, setNewFeature] = useState('');
+  const [newSurface, setNewSurface] = useState('');
 
   // Sale pricing state
   const [salePrice, setSalePrice] = useState<number | ''>('');
@@ -178,7 +193,24 @@ export default function ProductDetailPage() {
         is_loyalty_eligible: p.is_loyalty_eligible,
         is_active: p.is_active,
         barcode: p.barcode || '',
+        variant_label: p.variant_label || '',
+        specs: (p.specs as Record<string, unknown>) ?? null,
       });
+
+      // Populate specs tag arrays
+      const pSpecs = (p.specs as Record<string, unknown>) ?? {};
+      setSpecKeyFeatures(Array.isArray(pSpecs.key_features) ? pSpecs.key_features as string[] : []);
+      setSpecSurfaceCompat(Array.isArray(pSpecs.surface_compatibility) ? pSpecs.surface_compatibility as string[] : []);
+
+      // Load variant group siblings
+      if (p.product_group_id) {
+        setVariantsLoading(true);
+        fetch(`/api/admin/products/${productId}/variants`)
+          .then(r => r.ok ? r.json() : { variants: [] })
+          .then(d => setVariants(d.variants ?? []))
+          .catch(() => {})
+          .finally(() => setVariantsLoading(false));
+      }
 
       // Populate sale pricing
       setSalePrice(p.sale_price ?? '');
@@ -363,6 +395,19 @@ export default function ProductDetailPage() {
   async function onSubmit(data: ProductCreateInput) {
     setSaving(true);
     try {
+      // Strip empty values from specs JSONB before saving
+      let cleanSpecs: Record<string, unknown> | null = null;
+      if (data.specs && typeof data.specs === 'object') {
+        const filtered = Object.fromEntries(
+          Object.entries(data.specs).filter(([, v]) => {
+            if (v === null || v === undefined || v === '') return false;
+            if (Array.isArray(v) && v.length === 0) return false;
+            return true;
+          })
+        );
+        cleanSpecs = Object.keys(filtered).length > 0 ? filtered : null;
+      }
+
       const { error } = await supabase
         .from('products')
         .update({
@@ -380,6 +425,8 @@ export default function ProductDetailPage() {
           is_loyalty_eligible: data.is_loyalty_eligible,
           is_active: data.is_active,
           barcode: data.barcode || null,
+          variant_label: data.variant_label || null,
+          specs: cleanSpecs,
         })
         .eq('id', productId);
 
@@ -717,6 +764,221 @@ export default function ProductDetailPage() {
           </CardContent>
         </Card>
 
+        {/* ---- Variant Label ---- */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Variant Label</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FormField
+              label="Variant Label"
+              htmlFor="variant_label"
+              description="If this product comes in different sizes, colors, or packs, enter the variant descriptor (e.g. '16 oz', '1 Gallon', '6 inch', 'Blue'). Leave empty for standalone products."
+            >
+              <Input id="variant_label" {...register('variant_label')} placeholder="e.g. 16 oz" />
+            </FormField>
+          </CardContent>
+        </Card>
+
+        {/* ---- Product Specs ---- */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Product Specs</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField label="Overview" htmlFor="specs-overview" description="Detailed product description — what it is and what it does.">
+              <Textarea
+                id="specs-overview"
+                rows={3}
+                defaultValue={(watch('specs') as Record<string, unknown> | null)?.overview as string ?? ''}
+                onBlur={(e) => {
+                  const current = (watch('specs') as Record<string, unknown>) ?? {};
+                  setValue('specs', { ...current, overview: e.target.value.trim() || undefined });
+                }}
+              />
+            </FormField>
+
+            <FormField label="Use Case" htmlFor="specs-use-case" description="What problem does this product solve? Who is it for?">
+              <Textarea
+                id="specs-use-case"
+                rows={2}
+                defaultValue={(watch('specs') as Record<string, unknown> | null)?.use_case as string ?? ''}
+                onBlur={(e) => {
+                  const current = (watch('specs') as Record<string, unknown>) ?? {};
+                  setValue('specs', { ...current, use_case: e.target.value.trim() || undefined });
+                }}
+              />
+            </FormField>
+
+            <FormField label="Key Features" description="Add features one at a time, e.g. 'UV protection', 'Hydrophobic'">
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {specKeyFeatures.map((f, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                    {f}
+                    <button type="button" onClick={() => {
+                      const next = specKeyFeatures.filter((_, idx) => idx !== i);
+                      setSpecKeyFeatures(next);
+                      const current = (watch('specs') as Record<string, unknown>) ?? {};
+                      setValue('specs', { ...current, key_features: next.length > 0 ? next : undefined });
+                    }} className="ml-0.5 text-gray-400 hover:text-red-500">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={newFeature}
+                  onChange={(e) => setNewFeature(e.target.value)}
+                  placeholder="Add a feature..."
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (newFeature.trim()) {
+                        const next = [...specKeyFeatures, newFeature.trim()];
+                        setSpecKeyFeatures(next);
+                        setNewFeature('');
+                        const current = (watch('specs') as Record<string, unknown>) ?? {};
+                        setValue('specs', { ...current, key_features: next });
+                      }
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => {
+                  if (newFeature.trim()) {
+                    const next = [...specKeyFeatures, newFeature.trim()];
+                    setSpecKeyFeatures(next);
+                    setNewFeature('');
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, key_features: next });
+                  }
+                }}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </FormField>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField label="Application Method" htmlFor="specs-app-method" description="e.g. Spray on, wipe off with microfiber towel">
+                <Input
+                  id="specs-app-method"
+                  defaultValue={(watch('specs') as Record<string, unknown> | null)?.application_method as string ?? ''}
+                  onBlur={(e) => {
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, application_method: e.target.value.trim() || undefined });
+                  }}
+                />
+              </FormField>
+
+              <FormField label="Size / Volume" htmlFor="specs-size" description="e.g. 16 oz, 1 Gallon, 250ml, 5 inch">
+                <Input
+                  id="specs-size"
+                  defaultValue={(watch('specs') as Record<string, unknown> | null)?.size_volume as string ?? ''}
+                  onBlur={(e) => {
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, size_volume: e.target.value.trim() || undefined });
+                  }}
+                />
+              </FormField>
+
+              <FormField label="Dilution Ratio" htmlFor="specs-dilution" description="e.g. Ready to use, 10:1, 4:1 for light cleaning">
+                <Input
+                  id="specs-dilution"
+                  defaultValue={(watch('specs') as Record<string, unknown> | null)?.dilution_ratio as string ?? ''}
+                  onBlur={(e) => {
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, dilution_ratio: e.target.value.trim() || undefined });
+                  }}
+                />
+              </FormField>
+
+              <FormField label="Coverage / Yield" htmlFor="specs-coverage" description="e.g. 4-6 applications per bottle">
+                <Input
+                  id="specs-coverage"
+                  defaultValue={(watch('specs') as Record<string, unknown> | null)?.coverage_yield as string ?? ''}
+                  onBlur={(e) => {
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, coverage_yield: e.target.value.trim() || undefined });
+                  }}
+                />
+              </FormField>
+
+              <FormField label="Scent" htmlFor="specs-scent">
+                <Input
+                  id="specs-scent"
+                  defaultValue={(watch('specs') as Record<string, unknown> | null)?.scent as string ?? ''}
+                  onBlur={(e) => {
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, scent: e.target.value.trim() || undefined });
+                  }}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Surface Compatibility" description="Add compatible surfaces, e.g. paint, glass, trim, wheels, leather">
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {specSurfaceCompat.map((s, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                    {s}
+                    <button type="button" onClick={() => {
+                      const next = specSurfaceCompat.filter((_, idx) => idx !== i);
+                      setSpecSurfaceCompat(next);
+                      const current = (watch('specs') as Record<string, unknown>) ?? {};
+                      setValue('specs', { ...current, surface_compatibility: next.length > 0 ? next : undefined });
+                    }} className="ml-0.5 text-blue-400 hover:text-red-500">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={newSurface}
+                  onChange={(e) => setNewSurface(e.target.value)}
+                  placeholder="Add a surface..."
+                  className="text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (newSurface.trim()) {
+                        const next = [...specSurfaceCompat, newSurface.trim()];
+                        setSpecSurfaceCompat(next);
+                        setNewSurface('');
+                        const current = (watch('specs') as Record<string, unknown>) ?? {};
+                        setValue('specs', { ...current, surface_compatibility: next });
+                      }
+                    }
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => {
+                  if (newSurface.trim()) {
+                    const next = [...specSurfaceCompat, newSurface.trim()];
+                    setSpecSurfaceCompat(next);
+                    setNewSurface('');
+                    const current = (watch('specs') as Record<string, unknown>) ?? {};
+                    setValue('specs', { ...current, surface_compatibility: next });
+                  }
+                }}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </FormField>
+
+            <FormField label="Pro Tips" htmlFor="specs-tips" description="e.g. Apply in shade. Work one panel at a time.">
+              <Textarea
+                id="specs-tips"
+                rows={2}
+                defaultValue={(watch('specs') as Record<string, unknown> | null)?.pro_tips as string ?? ''}
+                onBlur={(e) => {
+                  const current = (watch('specs') as Record<string, unknown>) ?? {};
+                  setValue('specs', { ...current, pro_tips: e.target.value.trim() || undefined });
+                }}
+              />
+            </FormField>
+          </CardContent>
+        </Card>
+
         <div className="flex justify-end gap-3">
           <Button
             type="button"
@@ -732,6 +994,172 @@ export default function ProductDetailPage() {
           )}
         </div>
       </form>
+
+      {/* ---- Variant Group Card ---- */}
+      {product && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Link2 className="h-5 w-5" />
+              Variant Group
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {product.product_group_id ? (
+              <div className="space-y-3">
+                {variantsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-500"><Spinner className="h-4 w-4" /> Loading variants...</div>
+                ) : variants.length === 0 ? (
+                  <p className="text-sm text-gray-500">No other variants found in this group.</p>
+                ) : (
+                  <div className="divide-y rounded-lg border">
+                    {variants.map((v) => (
+                      <div key={v.id} className="flex items-center justify-between px-3 py-2.5">
+                        <Link href={`/admin/catalog/products/${v.id}`} className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{v.name}</p>
+                          <div className="flex gap-2 text-xs text-gray-500">
+                            {v.variant_label && <span className="font-medium">{v.variant_label}</span>}
+                            <span>{formatCurrency(v.retail_price)}</span>
+                            <span>{v.quantity_on_hand > 0 ? `${v.quantity_on_hand} in stock` : 'Out of stock'}</span>
+                          </div>
+                        </Link>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-gray-400 hover:text-red-500 flex-shrink-0"
+                          onClick={async () => {
+                            const res = await fetch(`/api/admin/products/${v.id}/group`, { method: 'DELETE' });
+                            if (res.ok) {
+                              setVariants(prev => prev.filter(vv => vv.id !== v.id));
+                              // If we removed the last variant, our group is dissolved too
+                              if (variants.length <= 1) {
+                                setProduct(prev => prev ? { ...prev, product_group_id: null } : prev);
+                              }
+                              toast.success('Variant removed from group');
+                            } else {
+                              toast.error('Failed to remove variant');
+                            }
+                          }}
+                          title="Remove from group"
+                        >
+                          <Unlink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500">This product is not part of a variant group.</p>
+                <Button type="button" variant="outline" size="sm" onClick={() => setShowGroupModal(true)}>
+                  <Link2 className="h-4 w-4" />
+                  Create Variant Group
+                </Button>
+
+                {showGroupModal && (
+                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Search for products to group with this one:</p>
+                    <Input
+                      value={groupSearch}
+                      onChange={async (e) => {
+                        setGroupSearch(e.target.value);
+                        if (e.target.value.trim().length < 2) { setGroupSearchResults([]); return; }
+                        const { data } = await supabase
+                          .from('products')
+                          .select('id, name, retail_price, vendors(name)')
+                          .eq('is_active', true)
+                          .is('product_group_id', null)
+                          .neq('id', productId)
+                          .ilike('name', `%${e.target.value.trim()}%`)
+                          .limit(10);
+                        setGroupSearchResults((data ?? []).map((p: Record<string, unknown>) => ({
+                          id: p.id as string,
+                          name: p.name as string,
+                          retail_price: p.retail_price as number,
+                          vendor_name: (p.vendors as { name: string } | null)?.name ?? null,
+                        })));
+                      }}
+                      placeholder="Search by product name..."
+                      className="text-sm"
+                    />
+                    {groupSearchResults.length > 0 && (
+                      <div className="divide-y rounded-lg border bg-white max-h-48 overflow-auto">
+                        {groupSearchResults.map((r) => {
+                          const selected = groupSelectedIds.includes(r.id);
+                          return (
+                            <button
+                              key={r.id}
+                              type="button"
+                              onClick={() => setGroupSelectedIds(prev =>
+                                selected ? prev.filter(id => id !== r.id) : [...prev, r.id]
+                              )}
+                              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                            >
+                              <div>
+                                <p className="font-medium text-gray-900">{r.name}</p>
+                                <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatCurrency(r.retail_price)}</p>
+                              </div>
+                              {selected && <Badge variant="secondary">Selected</Badge>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={groupSelectedIds.length === 0 || groupCreating}
+                        onClick={async () => {
+                          setGroupCreating(true);
+                          try {
+                            const res = await fetch('/api/admin/products/group', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ productIds: [productId, ...groupSelectedIds] }),
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              setProduct(prev => prev ? { ...prev, product_group_id: data.groupId } : prev);
+                              // Reload variants
+                              const vRes = await fetch(`/api/admin/products/${productId}/variants`);
+                              if (vRes.ok) {
+                                const vData = await vRes.json();
+                                setVariants(vData.variants ?? []);
+                              }
+                              setShowGroupModal(false);
+                              setGroupSearch('');
+                              setGroupSearchResults([]);
+                              setGroupSelectedIds([]);
+                              toast.success(`Variant group created with ${data.count} products`);
+                            } else {
+                              toast.error('Failed to create variant group');
+                            }
+                          } finally {
+                            setGroupCreating(false);
+                          }
+                        }}
+                      >
+                        {groupCreating ? 'Creating...' : `Create Group (${groupSelectedIds.length + 1} products)`}
+                      </Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        setShowGroupModal(false);
+                        setGroupSearch('');
+                        setGroupSearchResults([]);
+                        setGroupSelectedIds([]);
+                      }}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ---- Sale Pricing Card ---- */}
       <ProductSalePricingCard

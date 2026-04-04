@@ -48,6 +48,9 @@ src/app/api/admin/notification-recipients/route.ts
 src/app/api/admin/orders/[id]/refund/route.ts
 src/app/api/admin/orders/[id]/route.ts
 src/app/api/admin/orders/route.ts
+src/app/api/admin/products/[id]/group/route.ts
+src/app/api/admin/products/[id]/variants/route.ts
+src/app/api/admin/products/group/route.ts
 src/app/api/admin/photos/[id]/route.ts
 src/app/api/admin/photos/bulk/route.ts
 src/app/api/admin/photos/route.ts

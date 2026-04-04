@@ -193,6 +193,9 @@ export interface Product {
   sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
+  specs: Record<string, unknown> | null;
+  product_group_id: string | null;
+  variant_label: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations

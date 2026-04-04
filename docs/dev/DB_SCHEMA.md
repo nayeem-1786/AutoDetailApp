@@ -151,10 +151,13 @@ idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(mod
 | height | DECIMAL | | Shipping dimension |
 | weight_unit | TEXT | | e.g., lb, kg |
 | dimension_unit | TEXT | | e.g., in, cm |
+| specs | JSONB | DEFAULT NULL | Structured product specs (overview, use_case, key_features, etc.) |
+| product_group_id | UUID | DEFAULT NULL | Shared ID linking size/color/pack variants of the same base product |
+| variant_label | TEXT | DEFAULT NULL | Variant descriptor (e.g. "16 oz", "1 Gallon", "Blue", "3 inch") |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
-**Indexes:** `idx_products_barcode` on `(barcode)` WHERE `barcode IS NOT NULL`
+**Indexes:** `idx_products_barcode` on `(barcode)` WHERE `barcode IS NOT NULL`, `idx_products_group_id` on `(product_group_id)` WHERE `product_group_id IS NOT NULL`
 
 ### product_images
 | Column | Type | Constraints | Notes |
