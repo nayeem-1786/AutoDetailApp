@@ -967,7 +967,12 @@ export default function ProductDetailPage() {
                       body: JSON.stringify({ productIds: [productId] }),
                     });
                     if (res.ok) {
-                      toast.success('Product enriched! Review in the enrichment review page.');
+                      toast.success('Product enriched!', {
+                        action: {
+                          label: 'Review →',
+                          onClick: () => router.push('/admin/catalog/products/enrichment-review'),
+                        },
+                      });
                     } else {
                       toast.error('Enrichment failed');
                     }

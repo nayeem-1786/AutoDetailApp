@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { z } from 'zod';
@@ -85,6 +86,7 @@ export default function ProductsPage() {
   const [enrichTotal, setEnrichTotal] = useState(0);
   const [enrichErrors, setEnrichErrors] = useState(0);
   const [showEnrichConfirm, setShowEnrichConfirm] = useState(false);
+  const [pendingDraftCount, setPendingDraftCount] = useState(0);
   const [adjusting, setAdjusting] = useState(false);
 
   const {
@@ -152,6 +154,12 @@ export default function ProductsPage() {
 
   useEffect(() => {
     loadProducts();
+    // Load pending enrichment draft count
+    supabase
+      .from('product_enrichment_drafts')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }: { count: number | null }) => setPendingDraftCount(count ?? 0));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleReactivate() {
@@ -578,11 +586,16 @@ export default function ProductsPage() {
         description={`${products.length} products in catalog`}
         action={
           canEditProducts ? (
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => setShowEnrichConfirm(true)} disabled={enriching}>
                 <Sparkles className="h-4 w-4" />
                 {enriching ? 'Enriching...' : 'AI Enrich Products'}
               </Button>
+              {pendingDraftCount > 0 && (
+                <Link href="/admin/catalog/products/enrichment-review" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200 transition-colors">
+                  {pendingDraftCount} pending review{pendingDraftCount !== 1 ? 's' : ''}
+                </Link>
+              )}
               <Button onClick={() => router.push('/admin/catalog/products/new')}>
                 <Plus className="h-4 w-4" />
                 Add Product
