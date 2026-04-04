@@ -82,6 +82,7 @@ export default function ProductsPage() {
   // AI Enrichment batch state
   const [showEnrichConfirm, setShowEnrichConfirm] = useState(false);
   const [pendingDraftCount, setPendingDraftCount] = useState(0);
+  const [totalDraftCount, setTotalDraftCount] = useState(0);
   const [enrichBatchId, setEnrichBatchId] = useState<string | null>(null);
   const [enrichSubmitting, setEnrichSubmitting] = useState(false);
   const [enrichStatus, setEnrichStatus] = useState<string | null>(null); // null | 'submitted' | 'processing' | 'ended' | 'completed'
@@ -155,12 +156,38 @@ export default function ProductsPage() {
 
   useEffect(() => {
     loadProducts();
-    // Load pending enrichment draft count
+
+    // Load enrichment draft counts
     supabase
       .from('product_enrichment_drafts')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .then(({ count }: { count: number | null }) => setPendingDraftCount(count ?? 0));
+      .select('id, status, error_message', { count: 'exact' })
+      .then(({ data, count }: { data: Array<{ status: string; error_message: string | null }> | null; count: number | null }) => {
+        setTotalDraftCount(count ?? 0);
+        const pending = (data ?? []).filter(d => d.status === 'pending' && !d.error_message).length;
+        setPendingDraftCount(pending);
+      });
+
+    // Load active batch from DB for persistent status across page refreshes
+    supabase
+      .from('enrichment_batches')
+      .select('id, status, total_requests, succeeded, errored')
+      .in('status', ['submitted', 'processing'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: activeBatch }: { data: { id: string; status: string; total_requests: number; succeeded: number; errored: number } | null }) => {
+        if (activeBatch) {
+          setEnrichBatchId(activeBatch.id);
+          setEnrichStatus(activeBatch.status);
+          setEnrichCounts({
+            processing: 0,
+            succeeded: activeBatch.succeeded,
+            errored: activeBatch.errored,
+            total: activeBatch.total_requests,
+          });
+          startPolling(activeBatch.id);
+        }
+      });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleReactivate() {
@@ -565,12 +592,15 @@ export default function ProductsPage() {
       setEnrichCounts(prev => ({ ...prev, succeeded: data.succeeded, errored: data.errored }));
       toast.success(`Results processed! ${data.succeeded} enriched, ${data.errored} errors.`);
 
-      // Refresh pending draft count
+      // Refresh draft counts
       supabase
         .from('product_enrichment_drafts')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .then(({ count }: { count: number | null }) => setPendingDraftCount(count ?? 0));
+        .select('id, status, error_message', { count: 'exact' })
+        .then(({ data: draftData, count }: { data: Array<{ status: string; error_message: string | null }> | null; count: number | null }) => {
+          setTotalDraftCount(count ?? 0);
+          const pending = (draftData ?? []).filter(d => d.status === 'pending' && !d.error_message).length;
+          setPendingDraftCount(pending);
+        });
     } catch (err) {
       console.error('Process results error:', err);
       toast.error('Failed to process enrichment results');
@@ -611,13 +641,19 @@ export default function ProductsPage() {
         action={
           canEditProducts ? (
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setShowEnrichConfirm(true)} disabled={enrichSubmitting || (enrichStatus !== null && enrichStatus !== 'completed')}>
+              <Button
+                variant="outline"
+                onClick={() => setShowEnrichConfirm(true)}
+                disabled={enrichSubmitting || (enrichBatchId !== null && enrichStatus !== null && enrichStatus !== 'completed')}
+              >
                 <Sparkles className="h-4 w-4" />
-                {enrichSubmitting ? 'Submitting...' : 'AI Enrich Products'}
+                {enrichBatchId && enrichStatus && enrichStatus !== 'completed' && enrichStatus !== 'ended'
+                  ? `Batch in progress${enrichCounts.total > 0 ? ` — ${enrichCounts.total - enrichCounts.succeeded - enrichCounts.errored} remaining` : ''}`
+                  : enrichSubmitting ? 'Submitting...' : 'AI Enrich Products'}
               </Button>
-              {pendingDraftCount > 0 && (
+              {totalDraftCount > 0 && (
                 <Link href="/admin/catalog/products/enrichment-review" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200 transition-colors">
-                  {pendingDraftCount} pending review{pendingDraftCount !== 1 ? 's' : ''}
+                  Enrichment Review{pendingDraftCount > 0 ? ` (${pendingDraftCount} pending)` : ''}
                 </Link>
               )}
               <Button onClick={() => router.push('/admin/catalog/products/new')}>

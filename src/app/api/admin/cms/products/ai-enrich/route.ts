@@ -36,6 +36,22 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
 
+  // Prevent duplicate batch submissions
+  const { data: activeBatch } = await admin
+    .from('enrichment_batches')
+    .select('id, status, total_requests')
+    .in('status', ['submitted', 'processing'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeBatch) {
+    return NextResponse.json(
+      { error: `A batch is already ${activeBatch.status} (${activeBatch.total_requests} products). Wait for it to complete before submitting another.` },
+      { status: 409 }
+    );
+  }
+
   // Build product query
   let query = admin
     .from('products')

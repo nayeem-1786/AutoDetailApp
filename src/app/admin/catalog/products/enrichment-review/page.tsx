@@ -16,7 +16,7 @@ import { Select } from '@/components/ui/select';
 import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, X, ChevronDown, ChevronUp, ExternalLink, Sparkles } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronUp, ExternalLink, Sparkles, RotateCcw } from 'lucide-react';
 
 interface DraftWithProduct {
   id: string;
@@ -58,6 +58,8 @@ export default function EnrichmentReviewPage() {
   const [drafts, setDrafts] = useState<DraftWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null); // draft ID being retried
+  const [retryingAll, setRetryingAll] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('pending');
@@ -117,9 +119,20 @@ export default function EnrichmentReviewPage() {
     setLoading(false);
   }
 
+  // Counts — errors are pending drafts with error_message set
+  const errorCount = drafts.filter(d => d.status === 'pending' && d.error_message).length;
+  const pendingCount = drafts.filter(d => d.status === 'pending' && !d.error_message).length;
+  const appliedCount = drafts.filter(d => d.status === 'applied').length;
+  const rejectedCount = drafts.filter(d => d.status === 'rejected').length;
+
   // Filter drafts
   const filtered = drafts.filter((d) => {
-    if (statusFilter && d.status !== statusFilter) return false;
+    // Status filter
+    if (statusFilter === 'pending' && !(d.status === 'pending' && !d.error_message)) return false;
+    if (statusFilter === 'error' && !(d.status === 'pending' && d.error_message)) return false;
+    if (statusFilter === 'applied' && d.status !== 'applied') return false;
+    if (statusFilter === 'rejected' && d.status !== 'rejected') return false;
+    // Search filter
     if (search) {
       const q = search.toLowerCase();
       if (!d.product.name.toLowerCase().includes(q) &&
@@ -127,11 +140,6 @@ export default function EnrichmentReviewPage() {
     }
     return true;
   });
-
-  const pendingCount = drafts.filter(d => d.status === 'pending').length;
-  const appliedCount = drafts.filter(d => d.status === 'applied').length;
-  const rejectedCount = drafts.filter(d => d.status === 'rejected').length;
-  const errorCount = drafts.filter(d => d.error_message).length;
 
   async function handleApply(draftId: string) {
     setApplying(true);
@@ -224,6 +232,76 @@ export default function EnrichmentReviewPage() {
     }
   }
 
+  async function handleRetrySingle(draft: DraftWithProduct) {
+    setRetrying(draft.id);
+    try {
+      // Delete the error draft
+      await supabase
+        .from('product_enrichment_drafts')
+        .delete()
+        .eq('id', draft.id);
+
+      // Submit batch of 1
+      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'selected', productIds: [draft.product_id] }),
+      });
+
+      if (res.ok) {
+        setDrafts(prev => prev.filter(d => d.id !== draft.id));
+        toast.success(`Re-enrichment submitted for ${draft.product.name}. Check back in a few minutes.`);
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to submit retry');
+      }
+    } catch {
+      toast.error('Failed to retry enrichment');
+    } finally {
+      setRetrying(null);
+    }
+  }
+
+  async function handleRetryAllErrors() {
+    const errorDrafts = drafts.filter(d => d.status === 'pending' && d.error_message);
+    if (errorDrafts.length === 0) return;
+
+    setRetryingAll(true);
+    try {
+      const productIds = errorDrafts.map(d => d.product_id);
+      const draftIds = errorDrafts.map(d => d.id);
+
+      // Delete all error drafts
+      await supabase
+        .from('product_enrichment_drafts')
+        .delete()
+        .in('id', draftIds);
+
+      // Submit batch for all errored products
+      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'selected', productIds }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setDrafts(prev => prev.filter(d => !draftIds.includes(d.id)));
+        toast.success(`Retry batch submitted for ${data.totalProducts} products. Check back in a few minutes.`);
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to submit retry batch');
+        // Reload since we already deleted drafts
+        await loadDrafts();
+      }
+    } catch {
+      toast.error('Failed to retry errors');
+      await loadDrafts();
+    } finally {
+      setRetryingAll(false);
+    }
+  }
+
   function renderSpecValue(value: unknown): string {
     if (Array.isArray(value)) return value.join(', ');
     if (typeof value === 'string') return value;
@@ -256,21 +334,30 @@ export default function EnrichmentReviewPage() {
         <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-full sm:w-40">
           <option value="">All Statuses</option>
           <option value="pending">Pending ({pendingCount})</option>
+          <option value="error">Error ({errorCount})</option>
           <option value="applied">Applied ({appliedCount})</option>
           <option value="rejected">Rejected ({rejectedCount})</option>
         </Select>
-        {pendingCount > 0 && (
-          <div className="flex gap-2 sm:ml-auto">
-            <Button size="sm" onClick={handleBulkApplyAll} disabled={applying}>
-              <Check className="h-4 w-4" />
-              Apply All Pending ({pendingCount})
+        <div className="flex gap-2 sm:ml-auto">
+          {pendingCount > 0 && (
+            <>
+              <Button size="sm" onClick={handleBulkApplyAll} disabled={applying}>
+                <Check className="h-4 w-4" />
+                Apply All Pending ({pendingCount})
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleBulkRejectAll} disabled={applying}>
+                <X className="h-4 w-4" />
+                Reject All
+              </Button>
+            </>
+          )}
+          {errorCount > 0 && (
+            <Button size="sm" variant="outline" onClick={handleRetryAllErrors} disabled={retryingAll}>
+              <RotateCcw className="h-4 w-4" />
+              {retryingAll ? 'Retrying...' : `Retry All Errors (${errorCount})`}
             </Button>
-            <Button size="sm" variant="outline" onClick={handleBulkRejectAll} disabled={applying}>
-              <X className="h-4 w-4" />
-              Reject All
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Draft list */}
@@ -388,7 +475,7 @@ export default function EnrichmentReviewPage() {
                     )}
 
                     {/* Actions */}
-                    {draft.status === 'pending' && (
+                    {draft.status === 'pending' && !draft.error_message && (
                       <div className="flex gap-2 pt-2 border-t">
                         <Button size="sm" onClick={() => handleApply(draft.id)} disabled={applying}>
                           <Check className="h-4 w-4" />
@@ -397,6 +484,21 @@ export default function EnrichmentReviewPage() {
                         <Button size="sm" variant="outline" onClick={() => handleReject(draft.id)} disabled={applying}>
                           <X className="h-4 w-4" />
                           Reject
+                        </Button>
+                        <Link href={`/admin/catalog/products/${draft.product_id}`} className="ml-auto">
+                          <Button size="sm" variant="ghost">Edit Product</Button>
+                        </Link>
+                      </div>
+                    )}
+                    {draft.status === 'pending' && draft.error_message && (
+                      <div className="flex gap-2 pt-2 border-t">
+                        <Button size="sm" onClick={() => handleRetrySingle(draft)} disabled={retrying === draft.id}>
+                          <RotateCcw className="h-4 w-4" />
+                          {retrying === draft.id ? 'Retrying...' : 'Retry Enrichment'}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleReject(draft.id)} disabled={applying}>
+                          <X className="h-4 w-4" />
+                          Dismiss
                         </Button>
                         <Link href={`/admin/catalog/products/${draft.product_id}`} className="ml-auto">
                           <Button size="sm" variant="ghost">Edit Product</Button>

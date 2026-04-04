@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Enrichment system UX overhaul — persistent status, error filter, retry, duplicate prevention — 2026-04-04
+
+- **Persistent batch status**: Products list page loads active batch from `enrichment_batches` DB on mount. Refreshing the page auto-resumes polling if a batch is in progress. No more lost state.
+- **Duplicate batch prevention**: Server-side 409 check in submit endpoint prevents multiple concurrent batches. Submit button shows "Batch in progress" with remaining count when active.
+- **Error filter on review page**: New "Error" dropdown option filters to drafts with `error_message`. "Pending" now excludes error drafts so they don't mix.
+- **Retry actions**: Per-row "Retry Enrichment" button on error drafts deletes the error and resubmits. "Retry All Errors" bulk button does the same for all failures.
+- **Always-visible review link**: "Enrichment Review" link on products list shows whenever any drafts exist (any status), with pending count badge.
+- **Fix dead ternary**: `results/route.ts` had `status: parsed.error ? 'pending' : 'pending'` — simplified to `'pending'`.
+
 ## refactor: Rewrite product enrichment to Anthropic Message Batches API (Session 21B-v2) — 2026-04-04
 
 - **Replaced entire enrichment pipeline** with Anthropic Message Batches API:

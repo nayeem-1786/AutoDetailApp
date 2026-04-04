@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
           specs: parsed.specs,
           source_url: parsed.sourceUrl,
           error_message: parsed.error || null,
-          status: parsed.error ? 'pending' : 'pending',
+          status: 'pending',
         });
 
       if (parsed.error) {
