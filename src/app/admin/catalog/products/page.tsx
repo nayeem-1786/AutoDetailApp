@@ -30,7 +30,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Plus, Package, ImageOff } from 'lucide-react';
+import { Plus, Package, ImageOff, Sparkles } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { ShieldAlert } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -77,6 +77,14 @@ export default function ProductsPage() {
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<ProductWithRelations | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
+
+  // AI Enrichment state
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState('');
+  const [enrichCompleted, setEnrichCompleted] = useState(0);
+  const [enrichTotal, setEnrichTotal] = useState(0);
+  const [enrichErrors, setEnrichErrors] = useState(0);
+  const [showEnrichConfirm, setShowEnrichConfirm] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
 
   const {
@@ -451,6 +459,94 @@ export default function ProductsPage() {
         },
       ];
 
+  // AI Enrich All — client-side batch loop (mirrors SEO pattern from seo/page.tsx)
+  async function handleEnrichAll() {
+    setShowEnrichConfirm(false);
+    setEnriching(true);
+    setEnrichCompleted(0);
+    setEnrichErrors(0);
+
+    const BATCH_SIZE = 3;
+    const BATCH_DELAY_MS = 15_000;
+    const RATE_LIMIT_RETRY_MS = 60_000;
+    const MAX_RETRIES = 2;
+
+    const activeIds = products.filter(p => p.is_active).map(p => p.id);
+    setEnrichTotal(activeIds.length);
+
+    const totalBatches = Math.ceil(activeIds.length / BATCH_SIZE);
+    let completed = 0;
+    let errors = 0;
+
+    for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+      const batchStart = batchIdx * BATCH_SIZE;
+      const batchIds = activeIds.slice(batchStart, batchStart + BATCH_SIZE);
+      const batchNum = batchIdx + 1;
+      const remainingBatches = totalBatches - batchIdx;
+      const etaMin = Math.ceil((remainingBatches * BATCH_DELAY_MS) / 60_000);
+      setEnrichProgress(`Batch ${batchNum}/${totalBatches} — ${completed}/${activeIds.length} products — ~${etaMin}m remaining`);
+
+      let lastError = '';
+      let success = false;
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productIds: batchIds }),
+          });
+
+          if (res.status === 429) {
+            lastError = 'rate_limit';
+            if (attempt < MAX_RETRIES) {
+              setEnrichProgress(`Rate limited — waiting 60s before retry (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`);
+              await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
+              continue;
+            }
+            break;
+          }
+
+          if (!res.ok) {
+            const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+            throw new Error(errBody.error || `HTTP ${res.status}`);
+          }
+
+          const data = await res.json();
+          const batchErrors = (data.results ?? []).filter((r: { status: string }) => r.status === 'error').length;
+          completed += batchIds.length;
+          errors += batchErrors;
+          success = true;
+          break;
+        } catch (err) {
+          lastError = err instanceof Error ? err.message : 'Unknown error';
+          if (attempt < MAX_RETRIES && lastError.includes('rate_limit')) {
+            await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
+            continue;
+          }
+        }
+      }
+
+      if (!success) {
+        errors += batchIds.length;
+        completed += batchIds.length;
+      }
+
+      setEnrichCompleted(completed);
+      setEnrichErrors(errors);
+
+      // Delay between batches (skip after last)
+      if (batchIdx < totalBatches - 1) {
+        setEnrichProgress(`Waiting before next batch... ${completed}/${activeIds.length} products done`);
+        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+      }
+    }
+
+    setEnrichProgress(`Complete! ${completed} products enriched. ${errors} errors.`);
+    setEnriching(false);
+    toast.success(`Enrichment complete. ${errors > 0 ? `${errors} errors.` : ''} Review results in the enrichment review page.`);
+  }
+
   const columns: ColumnDef<ProductWithRelations, unknown>[] = [
     ...baseColumns,
     ...costColumns,
@@ -482,12 +578,52 @@ export default function ProductsPage() {
         description={`${products.length} products in catalog`}
         action={
           canEditProducts ? (
-            <Button onClick={() => router.push('/admin/catalog/products/new')}>
-              <Plus className="h-4 w-4" />
-              Add Product
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowEnrichConfirm(true)} disabled={enriching}>
+                <Sparkles className="h-4 w-4" />
+                {enriching ? 'Enriching...' : 'AI Enrich Products'}
+              </Button>
+              <Button onClick={() => router.push('/admin/catalog/products/new')}>
+                <Plus className="h-4 w-4" />
+                Add Product
+              </Button>
+            </div>
           ) : undefined
         }
+      />
+
+      {/* AI Enrichment Progress */}
+      {(enriching || enrichCompleted > 0) && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-medium text-gray-700">{enrichProgress}</span>
+            {!enriching && enrichCompleted > 0 && (
+              <Button size="sm" variant="outline" onClick={() => router.push('/admin/catalog/products/enrichment-review')}>
+                Review Results
+              </Button>
+            )}
+          </div>
+          {enrichTotal > 0 && (
+            <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-blue-500 transition-all duration-300"
+                style={{ width: `${Math.round((enrichCompleted / enrichTotal) * 100)}%` }}
+              />
+            </div>
+          )}
+          {enrichErrors > 0 && (
+            <p className="text-xs text-red-500">{enrichErrors} product{enrichErrors > 1 ? 's' : ''} failed enrichment</p>
+          )}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={showEnrichConfirm}
+        onOpenChange={setShowEnrichConfirm}
+        title="AI Enrich Products"
+        description={`This will research all ${products.filter(p => p.is_active).length} active products using AI and web search. Estimated time: ~${Math.ceil((products.filter(p => p.is_active).length / 3) * 15 / 60)} minutes. Results will be saved as drafts for your review.`}
+        confirmLabel="Start Enrichment"
+        onConfirm={handleEnrichAll}
       />
 
       {(() => {

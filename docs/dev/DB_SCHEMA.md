@@ -159,6 +159,20 @@ idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(mod
 
 **Indexes:** `idx_products_barcode` on `(barcode)` WHERE `barcode IS NOT NULL`, `idx_products_group_id` on `(product_group_id)` WHERE `product_group_id IS NOT NULL`
 
+### product_enrichment_drafts
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK | |
+| product_id | UUID | NOT NULL, FK → products(id) ON DELETE CASCADE | |
+| short_description | TEXT | | AI-generated short description |
+| specs | JSONB | | AI-generated specs (overview, use_case, key_features, etc.) |
+| source_url | TEXT | | Vendor page URL the AI researched |
+| error_message | TEXT | | Error details if enrichment failed |
+| status | TEXT | NOT NULL, DEFAULT 'pending', CHECK (pending/applied/rejected) | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:** `(product_id, status)`, `(status)`
+
 ### product_images
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|

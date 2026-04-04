@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: AI product enrichment — vendor research with web search, batch processing, review system (Session 21B) — 2026-04-04
+
+- **DB migration** (`20260404000001`):
+  - Seeded vendor websites for 14 known vendors (Detailer Stop, P&S, MaxShine, Buff & Shine, Autofiber, etc.)
+  - Created `product_enrichment_drafts` table (product_id, short_description, specs, source_url, status, error_message) with RLS
+- **AI enrichment service** (`src/lib/services/ai-product-enrichment.ts`):
+  - Uses Claude Sonnet with `web_search_20250305` tool (NEW — not from SEO system)
+  - Researches products on vendor websites, extracts structured specs
+  - Handles multi-block web search response format (filters text blocks, takes last)
+  - Validates against `specsSchema`, strips empty fields, retries on JSON parse failures
+  - System prompt enforces accuracy: never guess specs, prefer manufacturer website, leave unknown fields empty
+- **Enrichment API** (`src/app/api/admin/cms/products/ai-enrich/route.ts`):
+  - Handles 1-3 products per request (client manages batch loop)
+  - Fetches product + vendor + category, calls enrichProduct(), inserts draft
+  - Returns 429 on rate limit so client can pause and retry
+- **Apply API** (`src/app/api/admin/cms/products/ai-enrich/apply/route.ts`):
+  - Per-draft apply/reject with field-level control (applyDescription, applySpecs, specOverrides)
+  - Validates specs against specsSchema, strips empty fields before saving
+- **Admin products list**: "AI Enrich Products" button with client-side batch loop (3/batch, 15s delay, 60s rate limit pause, 3 retries) — mirrors SEO pattern. Progress bar + error count.
+- **Admin product edit**: "AI Enrich" button on Product Specs section header — single product enrichment
+- **Enrichment review page** (`src/app/admin/catalog/products/enrichment-review/page.tsx`):
+  - Side-by-side current vs AI-generated data with inline editing
+  - Source URL link for admin verification
+  - Per-draft Apply/Reject + bulk Apply All/Reject All
+  - Filter by status/vendor/category, search by name
+
+---
+
 ## fix: apply variant group migration + reorder admin product sections (Session 21A fix) — 2026-04-03
 
 - Applied migration `20260403000001` to live DB via `supabase db push` — columns weren't created because migration hadn't been pushed

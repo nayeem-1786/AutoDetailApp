@@ -25,7 +25,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink } from 'lucide-react';
+import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink, Sparkles } from 'lucide-react';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import { MultiImageUpload } from '@/app/admin/catalog/components/multi-image-upload';
 import {
   getSaleStatus,
@@ -75,6 +76,9 @@ export default function ProductDetailPage() {
   const [groupSearchResults, setGroupSearchResults] = useState<{ id: string; name: string; retail_price: number; vendor_name: string | null }[]>([]);
   const [groupSelectedIds, setGroupSelectedIds] = useState<string[]>([]);
   const [groupCreating, setGroupCreating] = useState(false);
+
+  // AI Enrichment state (single product)
+  const [singleEnriching, setSingleEnriching] = useState(false);
 
   // Specs form state (managed separately from react-hook-form for tag inputs)
   const [specKeyFeatures, setSpecKeyFeatures] = useState<string[]>([]);
@@ -947,7 +951,37 @@ export default function ProductDetailPage() {
         {/* ---- Product Specs ---- */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Product Specs</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Product Specs</CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={singleEnriching}
+                onClick={async () => {
+                  setSingleEnriching(true);
+                  try {
+                    const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ productIds: [productId] }),
+                    });
+                    if (res.ok) {
+                      toast.success('Product enriched! Review in the enrichment review page.');
+                    } else {
+                      toast.error('Enrichment failed');
+                    }
+                  } catch {
+                    toast.error('Enrichment failed');
+                  } finally {
+                    setSingleEnriching(false);
+                  }
+                }}
+              >
+                <Sparkles className="h-4 w-4" />
+                {singleEnriching ? 'Enriching...' : 'AI Enrich'}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField label="Full Description" htmlFor="specs-overview" description="Detailed product description shown on the product detail page. What it is, what it does, and why it's great.">

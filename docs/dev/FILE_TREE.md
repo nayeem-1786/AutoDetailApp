@@ -102,6 +102,8 @@ src/app/api/admin/cms/ads/placements/route.ts
 src/app/api/admin/cms/ads/zones/route.ts
 src/app/api/admin/cms/catalog/products/route.ts
 src/app/api/admin/cms/catalog/services/route.ts
+src/app/api/admin/cms/products/ai-enrich/route.ts
+src/app/api/admin/cms/products/ai-enrich/apply/route.ts
 src/app/api/admin/cms/content/[id]/route.ts
 src/app/api/admin/cms/migrate-data/route.ts
 src/app/api/admin/cms/content/ai-generate/route.ts
@@ -510,6 +512,7 @@ src/app/admin/appointments/waitlist/page.tsx
 ```
 src/app/admin/catalog/categories/page.tsx
 src/app/admin/catalog/products/[id]/page.tsx
+src/app/admin/catalog/products/enrichment-review/page.tsx
 src/app/admin/catalog/products/new/page.tsx
 src/app/admin/catalog/products/page.tsx
 src/app/admin/catalog/services/[id]/page.tsx
@@ -908,6 +911,7 @@ src/lib/seo/page-seo.ts
 ### Services
 ```
 src/lib/services/ai-content-writer.ts
+src/lib/services/ai-product-enrichment.ts
 src/lib/services/ai-seo.ts
 src/lib/services/audit.ts
 src/lib/services/coupon-summary.ts
