@@ -610,7 +610,7 @@ export default function ProductDetailPage() {
               </FormField>
 
               <div className="md:col-span-2">
-                <FormField label="Description" error={errors.description?.message} htmlFor="description">
+                <FormField label="Short Description" error={errors.description?.message} htmlFor="description" description="1-2 sentences shown in product cards, search results, POS catalog, and voice agent quick answers.">
                   <Textarea id="description" {...register('description')} placeholder="Product description..." rows={3} />
                 </FormField>
               </div>
@@ -950,7 +950,7 @@ export default function ProductDetailPage() {
             <CardTitle className="text-base">Product Specs</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <FormField label="Overview" htmlFor="specs-overview" description="Detailed product description — what it is and what it does.">
+            <FormField label="Full Description" htmlFor="specs-overview" description="Detailed product description shown on the product detail page. What it is, what it does, and why it's great.">
               <Textarea
                 id="specs-overview"
                 rows={3}
