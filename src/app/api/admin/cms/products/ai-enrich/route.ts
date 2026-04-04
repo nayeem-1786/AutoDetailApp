@@ -69,6 +69,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Remove any existing pending drafts for this product (dedup on re-enrich)
+    await admin
+      .from('product_enrichment_drafts')
+      .delete()
+      .eq('product_id', product.id)
+      .eq('status', 'pending');
+
     // Insert draft
     const { data: draft, error: insertErr } = await admin
       .from('product_enrichment_drafts')

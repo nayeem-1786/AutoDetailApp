@@ -113,6 +113,9 @@ export async function enrichProduct(input: EnrichmentInput): Promise<EnrichmentR
 
       const parsed = JSON.parse(jsonStr);
 
+      // Strip <cite index="...">...</cite> tags from web search responses
+      stripCitationsDeep(parsed);
+
       // Build specs object, stripping empty values
       const rawSpecs: Record<string, unknown> = {
         overview: parsed.full_description || undefined,
@@ -179,4 +182,21 @@ function buildUserPrompt(input: EnrichmentInput): string {
   parts.push('', 'Find this exact product on the manufacturer\'s website or authorized retailers. Extract factual specifications only.');
 
   return parts.join('\n');
+}
+
+/** Strip <cite index="...">text</cite> tags from web search responses. */
+function stripCitations(text: string): string {
+  return text.replace(/<cite[^>]*>/g, '').replace(/<\/cite>/g, '').trim();
+}
+
+/** Recursively strip citation tags from all string values in an object. */
+function stripCitationsDeep(obj: Record<string, unknown>): void {
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string') {
+      obj[key] = stripCitations(val);
+    } else if (Array.isArray(val)) {
+      obj[key] = val.map((item) => (typeof item === 'string' ? stripCitations(item) : item));
+    }
+  }
 }
