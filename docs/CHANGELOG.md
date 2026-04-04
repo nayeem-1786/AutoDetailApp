@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: apply variant group migration + reorder admin product sections (Session 21A fix) — 2026-04-03
+
+- Applied migration `20260403000001` to live DB via `supabase db push` — columns weren't created because migration hadn't been pushed
+- Migration ran successfully: 105 products grouped across 44 variant groups (all ILIKE patterns matched correctly)
+- Reordered admin product edit page sections: Variant Label → Variant Group → Product Specs (was: Label → Specs → Group)
+
+---
+
 ## feat: product specs JSONB, variant grouping, admin UI (Session 21A) — 2026-04-03
 
 - **DB migration** (`20260403000001`): adds `specs` JSONB, `product_group_id` UUID, `variant_label` TEXT columns to products table + partial index on `product_group_id`

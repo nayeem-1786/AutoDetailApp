@@ -780,6 +780,170 @@ export default function ProductDetailPage() {
           </CardContent>
         </Card>
 
+        {/* ---- Variant Group ---- */}
+        {product && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Link2 className="h-5 w-5" />
+                Variant Group
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {product.product_group_id ? (
+                <div className="space-y-3">
+                  {variantsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500"><Spinner className="h-4 w-4" /> Loading variants...</div>
+                  ) : variants.length === 0 ? (
+                    <p className="text-sm text-gray-500">No other variants found in this group.</p>
+                  ) : (
+                    <div className="divide-y rounded-lg border">
+                      {variants.map((v) => (
+                        <div key={v.id} className="flex items-center justify-between px-3 py-2.5">
+                          <Link href={`/admin/catalog/products/${v.id}`} className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{v.name}</p>
+                            <div className="flex gap-2 text-xs text-gray-500">
+                              {v.variant_label && <span className="font-medium">{v.variant_label}</span>}
+                              <span>{formatCurrency(v.retail_price)}</span>
+                              <span>{v.quantity_on_hand > 0 ? `${v.quantity_on_hand} in stock` : 'Out of stock'}</span>
+                            </div>
+                          </Link>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-red-500 flex-shrink-0"
+                            onClick={async () => {
+                              const res = await fetch(`/api/admin/products/${v.id}/group`, { method: 'DELETE' });
+                              if (res.ok) {
+                                setVariants(prev => prev.filter(vv => vv.id !== v.id));
+                                if (variants.length <= 1) {
+                                  setProduct(prev => prev ? { ...prev, product_group_id: null } : prev);
+                                }
+                                toast.success('Variant removed from group');
+                              } else {
+                                toast.error('Failed to remove variant');
+                              }
+                            }}
+                            title="Remove from group"
+                          >
+                            <Unlink className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-500">This product is not part of a variant group.</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setShowGroupModal(true)}>
+                    <Link2 className="h-4 w-4" />
+                    Create Variant Group
+                  </Button>
+
+                  {showGroupModal && (
+                    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                      <p className="text-sm font-medium text-gray-700">Search for products to group with this one:</p>
+                      <Input
+                        value={groupSearch}
+                        onChange={async (e) => {
+                          setGroupSearch(e.target.value);
+                          if (e.target.value.trim().length < 2) { setGroupSearchResults([]); return; }
+                          const { data } = await supabase
+                            .from('products')
+                            .select('id, name, retail_price, vendors(name)')
+                            .eq('is_active', true)
+                            .is('product_group_id', null)
+                            .neq('id', productId)
+                            .ilike('name', `%${e.target.value.trim()}%`)
+                            .limit(10);
+                          setGroupSearchResults((data ?? []).map((p: Record<string, unknown>) => ({
+                            id: p.id as string,
+                            name: p.name as string,
+                            retail_price: p.retail_price as number,
+                            vendor_name: (p.vendors as { name: string } | null)?.name ?? null,
+                          })));
+                        }}
+                        placeholder="Search by product name..."
+                        className="text-sm"
+                      />
+                      {groupSearchResults.length > 0 && (
+                        <div className="divide-y rounded-lg border bg-white max-h-48 overflow-auto">
+                          {groupSearchResults.map((r) => {
+                            const selected = groupSelectedIds.includes(r.id);
+                            return (
+                              <button
+                                key={r.id}
+                                type="button"
+                                onClick={() => setGroupSelectedIds(prev =>
+                                  selected ? prev.filter(id => id !== r.id) : [...prev, r.id]
+                                )}
+                                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                              >
+                                <div>
+                                  <p className="font-medium text-gray-900">{r.name}</p>
+                                  <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatCurrency(r.retail_price)}</p>
+                                </div>
+                                {selected && <Badge variant="secondary">Selected</Badge>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={groupSelectedIds.length === 0 || groupCreating}
+                          onClick={async () => {
+                            setGroupCreating(true);
+                            try {
+                              const res = await fetch('/api/admin/products/group', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ productIds: [productId, ...groupSelectedIds] }),
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                setProduct(prev => prev ? { ...prev, product_group_id: data.groupId } : prev);
+                                const vRes = await fetch(`/api/admin/products/${productId}/variants`);
+                                if (vRes.ok) {
+                                  const vData = await vRes.json();
+                                  setVariants(vData.variants ?? []);
+                                }
+                                setShowGroupModal(false);
+                                setGroupSearch('');
+                                setGroupSearchResults([]);
+                                setGroupSelectedIds([]);
+                                toast.success(`Variant group created with ${data.count} products`);
+                              } else {
+                                toast.error('Failed to create variant group');
+                              }
+                            } finally {
+                              setGroupCreating(false);
+                            }
+                          }}
+                        >
+                          {groupCreating ? 'Creating...' : `Create Group (${groupSelectedIds.length + 1} products)`}
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => {
+                          setShowGroupModal(false);
+                          setGroupSearch('');
+                          setGroupSearchResults([]);
+                          setGroupSelectedIds([]);
+                        }}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* ---- Product Specs ---- */}
         <Card>
           <CardHeader>
@@ -994,172 +1158,6 @@ export default function ProductDetailPage() {
           )}
         </div>
       </form>
-
-      {/* ---- Variant Group Card ---- */}
-      {product && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Link2 className="h-5 w-5" />
-              Variant Group
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {product.product_group_id ? (
-              <div className="space-y-3">
-                {variantsLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-gray-500"><Spinner className="h-4 w-4" /> Loading variants...</div>
-                ) : variants.length === 0 ? (
-                  <p className="text-sm text-gray-500">No other variants found in this group.</p>
-                ) : (
-                  <div className="divide-y rounded-lg border">
-                    {variants.map((v) => (
-                      <div key={v.id} className="flex items-center justify-between px-3 py-2.5">
-                        <Link href={`/admin/catalog/products/${v.id}`} className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{v.name}</p>
-                          <div className="flex gap-2 text-xs text-gray-500">
-                            {v.variant_label && <span className="font-medium">{v.variant_label}</span>}
-                            <span>{formatCurrency(v.retail_price)}</span>
-                            <span>{v.quantity_on_hand > 0 ? `${v.quantity_on_hand} in stock` : 'Out of stock'}</span>
-                          </div>
-                        </Link>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-gray-400 hover:text-red-500 flex-shrink-0"
-                          onClick={async () => {
-                            const res = await fetch(`/api/admin/products/${v.id}/group`, { method: 'DELETE' });
-                            if (res.ok) {
-                              setVariants(prev => prev.filter(vv => vv.id !== v.id));
-                              // If we removed the last variant, our group is dissolved too
-                              if (variants.length <= 1) {
-                                setProduct(prev => prev ? { ...prev, product_group_id: null } : prev);
-                              }
-                              toast.success('Variant removed from group');
-                            } else {
-                              toast.error('Failed to remove variant');
-                            }
-                          }}
-                          title="Remove from group"
-                        >
-                          <Unlink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-500">This product is not part of a variant group.</p>
-                <Button type="button" variant="outline" size="sm" onClick={() => setShowGroupModal(true)}>
-                  <Link2 className="h-4 w-4" />
-                  Create Variant Group
-                </Button>
-
-                {showGroupModal && (
-                  <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-                    <p className="text-sm font-medium text-gray-700">Search for products to group with this one:</p>
-                    <Input
-                      value={groupSearch}
-                      onChange={async (e) => {
-                        setGroupSearch(e.target.value);
-                        if (e.target.value.trim().length < 2) { setGroupSearchResults([]); return; }
-                        const { data } = await supabase
-                          .from('products')
-                          .select('id, name, retail_price, vendors(name)')
-                          .eq('is_active', true)
-                          .is('product_group_id', null)
-                          .neq('id', productId)
-                          .ilike('name', `%${e.target.value.trim()}%`)
-                          .limit(10);
-                        setGroupSearchResults((data ?? []).map((p: Record<string, unknown>) => ({
-                          id: p.id as string,
-                          name: p.name as string,
-                          retail_price: p.retail_price as number,
-                          vendor_name: (p.vendors as { name: string } | null)?.name ?? null,
-                        })));
-                      }}
-                      placeholder="Search by product name..."
-                      className="text-sm"
-                    />
-                    {groupSearchResults.length > 0 && (
-                      <div className="divide-y rounded-lg border bg-white max-h-48 overflow-auto">
-                        {groupSearchResults.map((r) => {
-                          const selected = groupSelectedIds.includes(r.id);
-                          return (
-                            <button
-                              key={r.id}
-                              type="button"
-                              onClick={() => setGroupSelectedIds(prev =>
-                                selected ? prev.filter(id => id !== r.id) : [...prev, r.id]
-                              )}
-                              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                            >
-                              <div>
-                                <p className="font-medium text-gray-900">{r.name}</p>
-                                <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatCurrency(r.retail_price)}</p>
-                              </div>
-                              {selected && <Badge variant="secondary">Selected</Badge>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={groupSelectedIds.length === 0 || groupCreating}
-                        onClick={async () => {
-                          setGroupCreating(true);
-                          try {
-                            const res = await fetch('/api/admin/products/group', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ productIds: [productId, ...groupSelectedIds] }),
-                            });
-                            if (res.ok) {
-                              const data = await res.json();
-                              setProduct(prev => prev ? { ...prev, product_group_id: data.groupId } : prev);
-                              // Reload variants
-                              const vRes = await fetch(`/api/admin/products/${productId}/variants`);
-                              if (vRes.ok) {
-                                const vData = await vRes.json();
-                                setVariants(vData.variants ?? []);
-                              }
-                              setShowGroupModal(false);
-                              setGroupSearch('');
-                              setGroupSearchResults([]);
-                              setGroupSelectedIds([]);
-                              toast.success(`Variant group created with ${data.count} products`);
-                            } else {
-                              toast.error('Failed to create variant group');
-                            }
-                          } finally {
-                            setGroupCreating(false);
-                          }
-                        }}
-                      >
-                        {groupCreating ? 'Creating...' : `Create Group (${groupSelectedIds.length + 1} products)`}
-                      </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={() => {
-                        setShowGroupModal(false);
-                        setGroupSearch('');
-                        setGroupSearchResults([]);
-                        setGroupSelectedIds([]);
-                      }}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* ---- Sale Pricing Card ---- */}
       <ProductSalePricingCard
