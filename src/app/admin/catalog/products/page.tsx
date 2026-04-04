@@ -479,7 +479,27 @@ export default function ProductsPage() {
     const RATE_LIMIT_RETRY_MS = 60_000;
     const MAX_RETRIES = 2;
 
-    const activeIds = products.filter(p => p.is_active).map(p => p.id);
+    const allActiveIds = products.filter(p => p.is_active).map(p => p.id);
+
+    // Skip products that already have an applied or pending draft
+    const { data: existingDrafts } = await supabase
+      .from('product_enrichment_drafts')
+      .select('product_id')
+      .in('status', ['applied', 'pending']);
+    const skipIds = new Set((existingDrafts ?? []).map((d: { product_id: string }) => d.product_id));
+    const activeIds = allActiveIds.filter(id => !skipIds.has(id));
+
+    if (skipIds.size > 0) {
+      setEnrichProgress(`Skipping ${skipIds.size} already-enriched products. Processing ${activeIds.length} remaining.`);
+    }
+
+    if (activeIds.length === 0) {
+      setEnrichProgress('All products already enriched or pending review.');
+      setEnriching(false);
+      toast.info('All products already enriched or pending review.');
+      return;
+    }
+
     setEnrichTotal(activeIds.length);
 
     const totalBatches = Math.ceil(activeIds.length / BATCH_SIZE);
