@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -87,6 +87,7 @@ export default function ProductsPage() {
   const [enrichErrors, setEnrichErrors] = useState(0);
   const [showEnrichConfirm, setShowEnrichConfirm] = useState(false);
   const [pendingDraftCount, setPendingDraftCount] = useState(0);
+  const enrichCancelledRef = useRef(false);
   const [adjusting, setAdjusting] = useState(false);
 
   const {
@@ -467,17 +468,17 @@ export default function ProductsPage() {
         },
       ];
 
-  // AI Enrich All — client-side batch loop (mirrors SEO pattern from seo/page.tsx)
+  // AI Enrich All — sequential processing, 1 product per 30 seconds
   async function handleEnrichAll() {
     setShowEnrichConfirm(false);
     setEnriching(true);
     setEnrichCompleted(0);
     setEnrichErrors(0);
+    enrichCancelledRef.current = false;
 
-    const BATCH_SIZE = 3;
-    const BATCH_DELAY_MS = 15_000;
-    const RATE_LIMIT_RETRY_MS = 60_000;
-    const MAX_RETRIES = 2;
+    const DELAY_MS = 30_000; // 30s between products
+    const RATE_LIMIT_WAIT_MS = 120_000; // 2min on rate limit
+    const MAX_RATE_LIMIT_RETRIES = 3;
 
     const allActiveIds = products.filter(p => p.is_active).map(p => p.id);
 
@@ -487,100 +488,97 @@ export default function ProductsPage() {
       .select('product_id')
       .in('status', ['applied', 'pending']);
     const skipIds = new Set((existingDrafts ?? []).map((d: { product_id: string }) => d.product_id));
-    const activeIds = allActiveIds.filter(id => !skipIds.has(id));
+    const queue = allActiveIds.filter(id => !skipIds.has(id));
 
     if (skipIds.size > 0) {
-      setEnrichProgress(`Skipping ${skipIds.size} already-enriched products. Processing ${activeIds.length} remaining.`);
+      setEnrichProgress(`Skipping ${skipIds.size} already-enriched products. Processing ${queue.length} remaining.`);
     }
 
-    if (activeIds.length === 0) {
+    if (queue.length === 0) {
       setEnrichProgress('All products already enriched or pending review.');
       setEnriching(false);
       toast.info('All products already enriched or pending review.');
       return;
     }
 
-    setEnrichTotal(activeIds.length);
-
-    const totalBatches = Math.ceil(activeIds.length / BATCH_SIZE);
+    setEnrichTotal(queue.length);
     let completed = 0;
     let errors = 0;
+    let idx = 0;
 
     try {
-      for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
-        const batchStart = batchIdx * BATCH_SIZE;
-        const batchIds = activeIds.slice(batchStart, batchStart + BATCH_SIZE);
-        const batchNum = batchIdx + 1;
-        const remainingBatches = totalBatches - batchIdx;
-        const etaMin = Math.ceil((remainingBatches * BATCH_DELAY_MS) / 60_000);
-        setEnrichProgress(`Batch ${batchNum}/${totalBatches} — ${completed}/${activeIds.length} products — ~${etaMin}m remaining`);
+      while (idx < queue.length) {
+        if (enrichCancelledRef.current) {
+          toast.info(`Enrichment stopped. ${completed} of ${queue.length} products processed.`);
+          break;
+        }
 
-        let lastError = '';
-        let success = false;
+        const productId = queue[idx];
+        const remaining = queue.length - idx;
+        const etaMin = Math.ceil((remaining * DELAY_MS) / 60_000);
+        setEnrichProgress(`Product ${idx + 1}/${queue.length} — ${completed} done — ~${etaMin}m remaining (1 product every 30s)`);
 
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        let rateLimitRetries = 0;
+        let processed = false;
+
+        while (rateLimitRetries <= MAX_RATE_LIMIT_RETRIES) {
           try {
             const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productIds: batchIds }),
+              body: JSON.stringify({ productIds: [productId] }),
             });
 
             if (res.status === 429) {
-              lastError = 'rate_limit';
-              if (attempt < MAX_RETRIES) {
-                setEnrichProgress(`Rate limited — waiting 60s before retry (attempt ${attempt + 2}/${MAX_RETRIES + 1})...`);
-                await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
+              rateLimitRetries++;
+              if (rateLimitRetries <= MAX_RATE_LIMIT_RETRIES) {
+                setEnrichProgress(`Rate limited — waiting 2min before retry (attempt ${rateLimitRetries}/${MAX_RATE_LIMIT_RETRIES})...`);
+                await new Promise(r => setTimeout(r, RATE_LIMIT_WAIT_MS));
                 continue;
               }
+              // Exhausted retries — count as error
+              errors++;
+              console.error(`Product ${productId} failed: rate limited after ${MAX_RATE_LIMIT_RETRIES} retries`);
               break;
             }
 
             if (!res.ok) {
               const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-              lastError = errBody.error || `HTTP ${res.status}`;
-              if (attempt < MAX_RETRIES) continue;
+              console.error(`Product ${productId} failed:`, errBody.error || res.status);
+              errors++;
               break;
             }
 
             const data = await res.json();
-            const batchErrors = (data.results ?? []).filter((r: { status: string }) => r.status === 'error').length;
-            completed += batchIds.length;
-            errors += batchErrors;
-            success = true;
+            const prodErrors = (data.results ?? []).filter((r: { status: string }) => r.status === 'error').length;
+            if (prodErrors > 0) errors += prodErrors;
+            processed = true;
             break;
           } catch (err) {
-            lastError = err instanceof Error ? err.message : 'Unknown error';
-            if (attempt < MAX_RETRIES && lastError.includes('rate_limit')) {
-              await new Promise(r => setTimeout(r, RATE_LIMIT_RETRY_MS));
-              continue;
-            }
-            // Non-rate-limit error — retry if attempts remain
-            if (attempt < MAX_RETRIES) continue;
+            console.error(`Product ${productId} exception:`, err);
+            errors++;
+            break;
           }
         }
 
-        if (!success) {
-          errors += batchIds.length;
-          completed += batchIds.length;
-          console.error(`Batch ${batchNum} failed: ${lastError}`);
-        }
-
+        completed++;
+        idx++;
         setEnrichCompleted(completed);
         setEnrichErrors(errors);
 
-        // Delay between batches (skip after last)
-        if (batchIdx < totalBatches - 1) {
-          setEnrichProgress(`Waiting before next batch... ${completed}/${activeIds.length} products done`);
-          await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+        // Delay before next product (skip after last or if cancelled)
+        if (idx < queue.length && !enrichCancelledRef.current) {
+          await new Promise(r => setTimeout(r, DELAY_MS));
         }
       }
     } catch (err) {
-      // Top-level catch — prevents entire batch from crashing on unexpected errors
       console.error('Batch enrichment crashed:', err);
     }
 
-    setEnrichProgress(`Complete! ${completed} products enriched. ${errors} errors.`);
+    const wasCancelled = enrichCancelledRef.current;
+    setEnrichProgress(wasCancelled
+      ? `Stopped. ${completed} of ${queue.length} products processed. ${errors} errors.`
+      : `Complete! ${completed} products enriched. ${errors} errors.`);
     setEnriching(false);
     // Refresh pending draft count
     supabase
@@ -588,7 +586,9 @@ export default function ProductsPage() {
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
       .then(({ count }: { count: number | null }) => setPendingDraftCount(count ?? 0));
-    toast.success(`Enrichment complete. ${errors > 0 ? `${errors} errors.` : ''} Review results in the enrichment review page.`);
+    if (!wasCancelled) {
+      toast.success(`Enrichment complete. ${errors > 0 ? `${errors} errors.` : ''} Review results in the enrichment review page.`);
+    }
   }
 
   const columns: ColumnDef<ProductWithRelations, unknown>[] = [
@@ -646,11 +646,18 @@ export default function ProductsPage() {
         <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-700">{enrichProgress}</span>
-            {!enriching && enrichCompleted > 0 && (
-              <Button size="sm" variant="outline" onClick={() => router.push('/admin/catalog/products/enrichment-review')}>
-                Review Results
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {enriching && (
+                <Button size="sm" variant="destructive" onClick={() => { enrichCancelledRef.current = true; }}>
+                  Stop Enrichment
+                </Button>
+              )}
+              {!enriching && enrichCompleted > 0 && (
+                <Button size="sm" variant="outline" onClick={() => router.push('/admin/catalog/products/enrichment-review')}>
+                  Review Results
+                </Button>
+              )}
+            </div>
           </div>
           {enrichTotal > 0 && (
             <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
@@ -670,7 +677,7 @@ export default function ProductsPage() {
         open={showEnrichConfirm}
         onOpenChange={setShowEnrichConfirm}
         title="AI Enrich Products"
-        description={`This will research all ${products.filter(p => p.is_active).length} active products using AI and web search. Estimated time: ~${Math.ceil((products.filter(p => p.is_active).length / 3) * 15 / 60)} minutes. Results will be saved as drafts for your review.`}
+        description={`This will research all ${products.filter(p => p.is_active).length} active products using AI and web search (1 product every 30 seconds). Already-enriched products will be skipped. You can stop and resume anytime. Results are saved as drafts for your review.`}
         confirmLabel="Start Enrichment"
         onConfirm={handleEnrichAll}
       />
