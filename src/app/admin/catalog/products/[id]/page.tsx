@@ -37,7 +37,7 @@ import {
 } from '@/lib/utils/sale-pricing';
 
 type ProductWithRelations = Product & {
-  product_categories: Pick<ProductCategory, 'id' | 'name'> | null;
+  product_categories: Pick<ProductCategory, 'id' | 'name' | 'slug'> | null;
   vendors: Pick<Vendor, 'id' | 'name'> | null;
 };
 
@@ -76,6 +76,10 @@ export default function ProductDetailPage() {
   const [groupSearchResults, setGroupSearchResults] = useState<{ id: string; name: string; retail_price: number; vendor_name: string | null }[]>([]);
   const [groupSelectedIds, setGroupSelectedIds] = useState<string[]>([]);
   const [groupCreating, setGroupCreating] = useState(false);
+
+  // Original slug/category for SEO path sync on change
+  const [originalSlug, setOriginalSlug] = useState<string>('');
+  const [originalCategoryId, setOriginalCategoryId] = useState<string | null>(null);
 
   // AI Enrichment state (single product)
   const [singleEnriching, setSingleEnriching] = useState(false);
@@ -124,7 +128,7 @@ export default function ProductDetailPage() {
       const [productRes, categoriesRes, vendorsRes] = await Promise.all([
         supabase
           .from('products')
-          .select('*, product_categories(id, name), vendors(id, name)')
+          .select('*, product_categories(id, name, slug), vendors(id, name)')
           .eq('id', productId)
           .single(),
         supabase
@@ -183,9 +187,14 @@ export default function ProductDetailPage() {
         setCostHistory(history);
       }
 
+      // Store originals for SEO sync
+      setOriginalSlug(p.slug);
+      setOriginalCategoryId(p.category_id);
+
       // Populate form
       reset({
         name: p.name,
+        slug: p.slug,
         sku: p.sku || '',
         description: p.description || '',
         category_id: p.category_id || null,
@@ -411,6 +420,23 @@ export default function ProductDetailPage() {
   async function onSubmit(data: ProductCreateInput) {
     setSaving(true);
     try {
+      const newSlug = data.slug || originalSlug;
+
+      // Check slug uniqueness
+      if (newSlug !== originalSlug) {
+        const { data: existing } = await supabase
+          .from('products')
+          .select('id')
+          .eq('slug', newSlug)
+          .neq('id', productId)
+          .maybeSingle();
+        if (existing) {
+          toast.error(`The slug "${newSlug}" is already in use by another product.`);
+          setSaving(false);
+          return;
+        }
+      }
+
       // Strip empty values from specs JSONB before saving
       let cleanSpecs: Record<string, unknown> | null = null;
       if (data.specs && typeof data.specs === 'object') {
@@ -428,6 +454,7 @@ export default function ProductDetailPage() {
         .from('products')
         .update({
           name: data.name,
+          slug: newSlug,
           sku: data.sku || null,
           description: data.description || null,
           category_id: data.category_id || null,
@@ -447,6 +474,34 @@ export default function ProductDetailPage() {
         .eq('id', productId);
 
       if (error) throw error;
+
+      // SEO path sync: update page_seo.page_path if slug or category changed
+      const slugChanged = newSlug !== originalSlug;
+      const categoryChanged = (data.category_id || null) !== originalCategoryId;
+
+      if (slugChanged || categoryChanged) {
+        const oldCatSlug = originalCategoryId
+          ? categories.find(c => c.id === originalCategoryId)?.slug
+          : null;
+        const newCatSlug = data.category_id
+          ? categories.find(c => c.id === data.category_id)?.slug
+          : null;
+
+        if (oldCatSlug && newCatSlug) {
+          const oldPath = `/products/${oldCatSlug}/${originalSlug}`;
+          const newPath = `/products/${newCatSlug}/${newSlug}`;
+
+          if (oldPath !== newPath) {
+            await supabase
+              .from('page_seo')
+              .update({
+                page_path: newPath,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('page_path', oldPath);
+          }
+        }
+      }
 
       toast.success('Product updated successfully');
       router.push('/admin/catalog/products');
@@ -515,7 +570,7 @@ export default function ProductDetailPage() {
       // Refresh product data
       const { data: updated } = await supabase
         .from('products')
-        .select('*, product_categories(id, name), vendors(id, name)')
+        .select('*, product_categories(id, name, slug), vendors(id, name)')
         .eq('id', productId)
         .single();
       if (updated) {
@@ -624,6 +679,24 @@ export default function ProductDetailPage() {
               <FormField label="SKU" error={errors.sku?.message} htmlFor="sku">
                 <Input id="sku" {...register('sku')} placeholder="e.g. CC-SPRAY-16" />
               </FormField>
+
+              <div className="md:col-span-2">
+                <FormField
+                  label="URL Slug"
+                  error={errors.slug?.message}
+                  htmlFor="slug"
+                  description={(() => {
+                    const s = watch('slug') || '';
+                    const catId = watch('category_id');
+                    const catSlug = catId ? categories.find(c => c.id === catId)?.slug : null;
+                    return catSlug && s
+                      ? `URL: /products/${catSlug}/${s}`
+                      : 'Lowercase, hyphens, no special characters';
+                  })()}
+                >
+                  <Input id="slug" {...register('slug')} placeholder="e.g. ceramic-spray-coating" className="font-mono text-sm" />
+                </FormField>
+              </div>
 
               <div className="md:col-span-2">
                 <FormField label="Short Description" error={errors.description?.message} htmlFor="description" description="1-2 sentences shown in product cards, search results, POS catalog, and voice agent quick answers.">
@@ -1067,7 +1140,7 @@ export default function ProductDetailPage() {
                             // Reload product data to refresh specs on screen
                             const { data: refreshed } = await supabase
                               .from('products')
-                              .select('*, product_categories(id, name), vendors(id, name)')
+                              .select('*, product_categories(id, name, slug), vendors(id, name)')
                               .eq('id', productId)
                               .single();
                             if (refreshed) {

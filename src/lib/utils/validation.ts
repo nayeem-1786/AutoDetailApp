@@ -96,8 +96,14 @@ export const specsSchema = z.object({
 /** Typed shape of the product specs JSONB field. */
 export type ProductSpecs = z.infer<typeof specsSchema>;
 
+export const slugSchema = z.string()
+  .min(1, 'Slug is required')
+  .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, 'Lowercase letters, numbers, and hyphens only. No leading/trailing hyphens.')
+  .refine(s => !s.includes('--'), 'No double hyphens allowed');
+
 export const productCreateSchema = z.object({
   name: requiredString,
+  slug: slugSchema.optional(),
   sku: optionalString,
   description: optionalString,
   category_id: z.string().uuid().optional().nullable(),

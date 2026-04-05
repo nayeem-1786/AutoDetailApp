@@ -46,6 +46,7 @@ export default function NewProductPage() {
     resolver: formResolver(productCreateSchema),
     defaultValues: {
       name: '',
+      slug: '',
       sku: '',
       description: '',
       category_id: null,
@@ -63,6 +64,21 @@ export default function NewProductPage() {
   });
 
   const watchSku = watch('sku');
+  const watchName = watch('name');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  // Auto-generate slug from name (unless manually edited)
+  useEffect(() => {
+    if (!slugManuallyEdited && watchName) {
+      const generated = watchName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      setValue('slug', generated);
+    }
+  }, [watchName, slugManuallyEdited, setValue]);
 
   // Auto-disable loyalty if water SKU
   useEffect(() => {
@@ -119,11 +135,31 @@ export default function NewProductPage() {
   async function onSubmit(data: ProductCreateInput) {
     setSaving(true);
     try {
+      const slug = data.slug || data.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      // Check slug uniqueness
+      const { data: existing } = await supabase
+        .from('products')
+        .select('id')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (existing) {
+        toast.error(`The slug "${slug}" is already in use. Please choose a different one.`);
+        setSaving(false);
+        return;
+      }
+
       // Insert the product first
       const { data: product, error } = await supabase
         .from('products')
         .insert({
           name: data.name,
+          slug,
           sku: data.sku || null,
           description: data.description || null,
           category_id: data.category_id || null,
@@ -220,6 +256,33 @@ export default function NewProductPage() {
               <FormField label="SKU" error={errors.sku?.message} htmlFor="sku">
                 <Input id="sku" {...register('sku')} placeholder="e.g. CC-SPRAY-16" />
               </FormField>
+
+              <div className="md:col-span-2">
+                <FormField
+                  label="URL Slug"
+                  error={errors.slug?.message}
+                  htmlFor="slug"
+                  description={(() => {
+                    const s = watch('slug') || '';
+                    const catId = watch('category_id');
+                    const catSlug = catId ? categories.find(c => c.id === catId)?.slug : null;
+                    return catSlug && s
+                      ? `URL: /products/${catSlug}/${s}`
+                      : 'Auto-generated from name. Edit to customize.';
+                  })()}
+                >
+                  <Input
+                    id="slug"
+                    {...register('slug')}
+                    placeholder="e.g. ceramic-spray-coating"
+                    className="font-mono text-sm"
+                    onChange={(e) => {
+                      setSlugManuallyEdited(true);
+                      register('slug').onChange(e);
+                    }}
+                  />
+                </FormField>
+              </div>
 
               <div className="md:col-span-2">
                 <FormField label="Description" error={errors.description?.message} htmlFor="description">

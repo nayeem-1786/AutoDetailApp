@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Editable product slugs + SEO path sync (Session 22D) — 2026-04-05
+
+- **Slug validation**: Added `slugSchema` to `src/lib/utils/validation.ts` — lowercase alphanumeric + hyphens, no leading/trailing/double hyphens. Added `slug` to `productCreateSchema`.
+- **Product edit page**: Added editable "URL Slug" field with live URL preview (`/products/{catSlug}/{slug}`). Tracks original slug + category_id to detect changes on save. Uniqueness check before saving — friendly error if slug is taken.
+- **SEO path sync**: On product save, if slug or category changed, automatically updates `page_seo.page_path` from old path to new path. Client-side via authenticated Supabase (RLS allows it).
+- **New product page**: Auto-generates slug from product name (lowercase, hyphenated). User can manually override. Uniqueness check on save. Slug included in insert payload.
+- **Type fix**: `ProductWithRelations` now includes `slug` in `product_categories` pick. Select queries updated to fetch category slug.
+- **Follow-up**: Service slug editing uses identical architecture — deferred to a separate session.
+
 ## fix: Remove 5 orphaned page_seo records from old service categories — 2026-04-05
 
 - Deleted 5 page_seo records referencing old category slugs (`precision-express`, `signature-detail`) that were merged into `express-detail-services`. Replacement records already existed under the correct paths. Total: 503 → 498, matching known pages exactly.
