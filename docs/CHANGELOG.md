@@ -4,6 +4,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: SEO page save returning HTML instead of JSON — 2026-04-05
+
+- **Root cause**: `savePage` used `encodeURIComponent(pagePath)` in the URL path (e.g. `/api/admin/cms/seo/pages/%2Fservices%2Fceramic-coatings`). Next.js decodes `%2F` to `/` before routing, breaking the `[encodedPath]` dynamic segment match — returns 404 HTML instead of JSON.
+- **Fix**: Changed client to send page path as a query parameter: `PATCH /api/admin/cms/seo/pages?path=/services/ceramic-coatings`. Added PATCH handler to `src/app/api/admin/cms/seo/pages/route.ts` that reads path from query param. Also fixed `.json()` error handling to gracefully handle non-JSON responses.
+
 ## fix: SEO scoring algorithm + homepage + regenerate 111 underperforming pages (Session 22C) — 2026-04-05
 
 - **Scoring algorithm fix** (`src/app/admin/website/seo/page.tsx`): Added `normalizeForComparison()` that strips all non-alphanumeric chars before FK matching. Fixes false negatives where FK "1 year ceramic shield" failed to match title "1-Year Ceramic Shield" due to punctuation. Applied to all 3 FK checks (title, description, URL) and the live editor indicators.

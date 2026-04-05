@@ -49,6 +49,81 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ data });
 }
 
+export async function PATCH(request: NextRequest) {
+  const employee = await getEmployeeFromSession(request);
+  if (!employee) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const denied = await requirePermission(employee.id, 'cms.seo.manage');
+  if (denied) return denied;
+
+  const pagePath = request.nextUrl.searchParams.get('path');
+  if (!pagePath) {
+    return NextResponse.json({ error: 'path query parameter is required' }, { status: 400 });
+  }
+
+  const body = await request.json();
+
+  const allowedFields = [
+    'seo_title', 'meta_description', 'meta_keywords',
+    'og_title', 'og_description', 'og_image_url',
+    'canonical_url', 'robots_directive', 'structured_data_overrides',
+    'focus_keyword', 'internal_links', 'page_type',
+  ];
+
+  const updates: Record<string, unknown> = {};
+  for (const field of allowedFields) {
+    if (field in body) {
+      updates[field] = body[field];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+  }
+
+  updates.is_auto_generated = false;
+  updates.updated_at = new Date().toISOString();
+
+  const admin = createAdminClient();
+
+  const { data: existing } = await admin
+    .from('page_seo')
+    .select('id')
+    .eq('page_path', pagePath)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await admin
+      .from('page_seo')
+      .update(updates)
+      .eq('page_path', pagePath)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    revalidateTag('cms-seo');
+    return NextResponse.json({ data });
+  } else {
+    const { data, error } = await admin
+      .from('page_seo')
+      .insert({ page_path: pagePath, ...updates })
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    revalidateTag('cms-seo');
+    return NextResponse.json({ data }, { status: 201 });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const employee = await getEmployeeFromSession(request);
   if (!employee) {

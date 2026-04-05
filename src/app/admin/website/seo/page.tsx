@@ -1467,20 +1467,18 @@ export default function SeoDashboardPage() {
   };
 
   const savePage = async (pagePath: string, updates: Partial<PageSeo>) => {
-    const encoded = encodeURIComponent(pagePath);
     try {
-      const res = await adminFetch(`/api/admin/cms/seo/pages/${encoded}`, {
+      const res = await adminFetch(`/api/admin/cms/seo/pages?path=${encodeURIComponent(pagePath)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
+      const json = await res.json().catch(() => ({ error: 'Server returned invalid response' }));
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed');
+        throw new Error(json.error || 'Failed');
       }
-      const { data } = await res.json();
       setPages((prev) =>
-        prev.map((p) => (p.page_path === pagePath ? { ...p, ...data } : p))
+        prev.map((p) => (p.page_path === pagePath ? { ...p, ...json.data } : p))
       );
       setExpandedPath(null);
       toast.success('SEO settings saved');
