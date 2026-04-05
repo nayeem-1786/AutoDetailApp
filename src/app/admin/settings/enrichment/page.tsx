@@ -231,11 +231,17 @@ export default function EnrichmentSettingsPage() {
 
     try {
       // Fetch product IDs with error drafts
-      const { data: errorDrafts } = await supabase
+      const { data: errorDrafts, error: fetchError } = await supabase
         .from('product_enrichment_drafts')
         .select('id, product_id')
         .eq('status', 'pending')
         .not('error_message', 'is', null);
+
+      if (fetchError) {
+        console.error('Failed to fetch error drafts:', fetchError);
+        toast.error('Failed to fetch error drafts');
+        return;
+      }
 
       if (!errorDrafts || errorDrafts.length === 0) {
         toast.info('No error drafts to retry.');
@@ -243,15 +249,18 @@ export default function EnrichmentSettingsPage() {
       }
 
       const productIds = errorDrafts.map((d: { product_id: string }) => d.product_id);
-      const draftIds = errorDrafts.map((d: { id: string }) => d.id);
 
-      // Delete error drafts so they don't block the skip filter
-      for (let i = 0; i < draftIds.length; i += 100) {
-        const chunk = draftIds.slice(i, i + 100);
-        await supabase
-          .from('product_enrichment_drafts')
-          .delete()
-          .in('id', chunk);
+      // Delete error drafts via API (client-side Supabase lacks DELETE RLS)
+      const deleteRes = await adminFetch('/api/admin/cms/products/ai-enrich/delete-errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds }),
+      });
+
+      if (!deleteRes.ok) {
+        const deleteErr = await deleteRes.json();
+        toast.error(deleteErr.error || 'Failed to delete error drafts');
+        return;
       }
 
       // Submit batch with Sonnet model

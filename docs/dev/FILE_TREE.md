@@ -106,6 +106,7 @@ src/app/api/admin/cms/products/ai-enrich/route.ts
 src/app/api/admin/cms/products/ai-enrich/apply/route.ts
 src/app/api/admin/cms/products/ai-enrich/status/route.ts
 src/app/api/admin/cms/products/ai-enrich/results/route.ts
+src/app/api/admin/cms/products/ai-enrich/delete-errors/route.ts
 src/app/api/admin/cms/content/[id]/route.ts
 src/app/api/admin/cms/migrate-data/route.ts
 src/app/api/admin/cms/content/ai-generate/route.ts

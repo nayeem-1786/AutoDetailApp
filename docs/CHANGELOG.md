@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Retry Errors (Sonnet) button not working — 2026-04-04
+
+- **Root cause**: Client-side Supabase `delete()` call silently failed — `product_enrichment_drafts` RLS only grants SELECT to authenticated users, not DELETE. The error drafts were never removed, so the server-side skip filter still saw them as pending and returned 0 products.
+- **Fix**: Replaced client-side delete with `adminFetch` call to new `/api/admin/cms/products/ai-enrich/delete-errors` endpoint that uses `createAdminClient()` (service role) to delete error drafts.
+- Added error handling for the draft fetch and delete steps with toast feedback.
+
 ## fix: Sonnet retry option + JSON repair fallback for failed enrichments — 2026-04-04
 
 - **Model selection**: Batch submission endpoint accepts optional `model` parameter. Default stays Haiku 4.5 for cost efficiency; Sonnet used for retrying failures.
