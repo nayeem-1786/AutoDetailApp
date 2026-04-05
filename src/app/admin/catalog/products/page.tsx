@@ -75,6 +75,7 @@ export default function ProductsPage() {
   const [vendorFilter, setVendorFilter] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>(initialStock);
   const [showInactive, setShowInactive] = useState(false);
+  const [showMissingImages, setShowMissingImages] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<ProductWithRelations | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
@@ -239,6 +240,10 @@ export default function ProductsPage() {
     return products.filter((p) => {
       // Active/inactive filter
       if (!showInactive && !p.is_active) return false;
+      // Missing images filter — only show active products with no image
+      if (showMissingImages) {
+        if (!p.is_active || (p.image_url && p.image_url.length > 0)) return false;
+      }
       // Search filter
       if (search) {
         const q = search.toLowerCase();
@@ -263,7 +268,7 @@ export default function ProductsPage() {
       }
       return true;
     });
-  }, [products, search, categoryFilter, vendorFilter, stockFilter, showInactive]);
+  }, [products, search, categoryFilter, vendorFilter, stockFilter, showInactive, showMissingImages]);
 
   function getStockIcon(product: ProductWithRelations) {
     if (product.quantity_on_hand === 0) return '🔴';
@@ -520,20 +525,29 @@ export default function ProductsPage() {
           <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             <div className="flex items-center gap-2">
               <ImageOff className="h-4 w-4 flex-shrink-0" />
-              <span>{missingCount} active {missingCount === 1 ? 'product' : 'products'} missing images. Products without images won&apos;t display well to customers.</span>
+              {showMissingImages ? (
+                <span>Showing {missingCount} {missingCount === 1 ? 'product' : 'products'} missing images.</span>
+              ) : (
+                <span>{missingCount} active {missingCount === 1 ? 'product' : 'products'} missing images. Products without images won&apos;t display well to customers.</span>
+              )}
             </div>
             <button
               type="button"
               className="ml-4 flex-shrink-0 font-medium text-amber-900 underline hover:text-amber-700"
               onClick={() => {
-                setSearch('');
-                setCategoryFilter('');
-                setVendorFilter('');
-                setStockFilter('all');
-                setShowInactive(false);
+                if (showMissingImages) {
+                  setShowMissingImages(false);
+                } else {
+                  setSearch('');
+                  setCategoryFilter('');
+                  setVendorFilter('');
+                  setStockFilter('all');
+                  setShowInactive(false);
+                  setShowMissingImages(true);
+                }
               }}
             >
-              Show all
+              {showMissingImages ? 'Clear filter' : 'Show all'}
             </button>
           </div>
         );
