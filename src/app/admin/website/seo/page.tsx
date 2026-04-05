@@ -1473,16 +1473,27 @@ export default function SeoDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      const json = await res.json().catch(() => ({ error: 'Server returned invalid response' }));
-      if (!res.ok) {
-        throw new Error(json.error || 'Failed');
+
+      const text = await res.text();
+      let json: { data?: Partial<PageSeo>; error?: string };
+      try {
+        json = JSON.parse(text);
+      } catch {
+        console.error('SEO save: non-JSON response', res.status, text.slice(0, 200));
+        throw new Error(`Server error (${res.status}). Check browser console for details.`);
       }
+
+      if (!res.ok) {
+        throw new Error(json.error || `Failed (${res.status})`);
+      }
+
       setPages((prev) =>
         prev.map((p) => (p.page_path === pagePath ? { ...p, ...json.data } : p))
       );
       setExpandedPath(null);
       toast.success('SEO settings saved');
     } catch (err) {
+      console.error('SEO save error:', err);
       toast.error(
         err instanceof Error ? err.message : 'Failed to save'
       );

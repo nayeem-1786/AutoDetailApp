@@ -4,6 +4,10 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: SEO page save error handling — 2026-04-05
+
+- Improved `savePage` error handling in SEO admin page: reads response as text first, then parses JSON. Logs non-JSON responses (HTML error pages) to browser console with status code and body preview. Shows actionable error message instead of cryptic "Unexpected token" error.
+
 ## fix: Regenerate SEO content on product slug/category change — 2026-04-05
 
 - **Root cause**: Session 22D's SEO sync only updated `page_path` — left `seo_title`, `meta_description`, and `focus_keyword` stale with old product name.
