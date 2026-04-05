@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { mode, productIds, model } = body as { mode: 'all' | 'selected'; productIds?: string[]; model?: string };
+  const { mode, productIds, model, searchMode } = body as { mode: 'all' | 'selected'; productIds?: string[]; model?: string; searchMode?: 'vendor' | 'general' };
 
   if (mode !== 'all' && mode !== 'selected') {
     return NextResponse.json({ error: 'mode must be "all" or "selected"' }, { status: 400 });
@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
             categoryName: category?.name,
             currentDescription: product.description,
             variantLabel: product.variant_label,
+            searchMode: searchMode || 'vendor',
           }),
         }],
       },

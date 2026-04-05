@@ -44,6 +44,7 @@ export default function EnrichmentSettingsPage() {
   const [processing, setProcessing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [retrySonnet, setRetrySonnet] = useState(false);
+  const [retryGeneral, setRetryGeneral] = useState(false);
   const [enrichableCount, setEnrichableCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -306,6 +307,86 @@ export default function EnrichmentSettingsPage() {
     }
   }
 
+  // Retry rejected with general search + Sonnet
+  async function handleRetryGeneral() {
+    setRetryGeneral(true);
+
+    try {
+      // Fetch product IDs with rejected drafts
+      const { data: rejectedDrafts, error: fetchError } = await supabase
+        .from('product_enrichment_drafts')
+        .select('id, product_id')
+        .eq('status', 'rejected');
+
+      if (fetchError) {
+        console.error('Failed to fetch rejected drafts:', fetchError);
+        toast.error('Failed to fetch rejected drafts');
+        return;
+      }
+
+      if (!rejectedDrafts || rejectedDrafts.length === 0) {
+        toast.info('No rejected drafts to retry.');
+        return;
+      }
+
+      const productIds = rejectedDrafts.map((d: { product_id: string }) => d.product_id);
+
+      // Delete rejected drafts via API
+      const deleteRes = await adminFetch('/api/admin/cms/products/ai-enrich/delete-errors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productIds, deleteStatus: 'rejected' }),
+      });
+
+      if (!deleteRes.ok) {
+        const deleteErr = await deleteRes.json();
+        toast.error(deleteErr.error || 'Failed to delete rejected drafts');
+        return;
+      }
+
+      // Submit batch with Sonnet model + general search
+      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'selected', productIds, model: 'claude-sonnet-4-20250514', searchMode: 'general' }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to submit general search batch');
+        return;
+      }
+
+      if (data.totalProducts === 0) {
+        toast.info('No products to retry.');
+        return;
+      }
+
+      const newBatch: BatchRecord = {
+        id: data.batchId,
+        status: 'submitted',
+        total_requests: data.totalProducts,
+        succeeded: 0,
+        errored: 0,
+        created_at: new Date().toISOString(),
+        completed_at: null,
+      };
+
+      setBatch(newBatch);
+      setBatchStatus('submitted');
+      setBatchCounts({ processing: data.totalProducts, succeeded: 0, errored: 0, total: data.totalProducts });
+      toast.success(`Retrying ${data.totalProducts} products with general search`);
+
+      startPolling(data.batchId);
+      await loadDraftCounts();
+    } catch {
+      toast.error('Failed to submit general search retry batch');
+    } finally {
+      setRetryGeneral(false);
+    }
+  }
+
   const isActive = batch && (batch.status === 'submitted' || batch.status === 'processing') && batchStatus !== 'ended';
   const isEnded = batchStatus === 'ended' && batch?.status !== 'completed';
   const isCompleted = batch?.status === 'completed';
@@ -427,10 +508,20 @@ export default function EnrichmentSettingsPage() {
               <Button
                 variant="outline"
                 onClick={handleRetrySonnet}
-                disabled={retrySonnet || submitting}
+                disabled={retrySonnet || submitting || retryGeneral}
               >
                 <RotateCcw className="h-4 w-4" />
                 {retrySonnet ? 'Submitting...' : `Retry ${draftCounts.errors} Errors (Sonnet)`}
+              </Button>
+            )}
+            {draftCounts.rejected > 0 && !isActive && (
+              <Button
+                variant="outline"
+                onClick={handleRetryGeneral}
+                disabled={retryGeneral || submitting || retrySonnet}
+              >
+                <RotateCcw className="h-4 w-4" />
+                {retryGeneral ? 'Submitting...' : `Retry ${draftCounts.rejected} Rejected (General Search)`}
               </Button>
             )}
             {isActive && (

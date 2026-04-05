@@ -90,6 +90,8 @@ export async function repairJsonResponse(rawText: string): Promise<EnrichmentRes
   }
 }
 
+export type SearchMode = 'vendor' | 'general';
+
 export interface EnrichmentInput {
   productName: string;
   vendorName: string;
@@ -97,6 +99,7 @@ export interface EnrichmentInput {
   categoryName?: string | null;
   currentDescription?: string | null;
   variantLabel?: string | null;
+  searchMode?: SearchMode;
 }
 
 export interface EnrichmentResult {
@@ -119,13 +122,20 @@ function isUnknownVendor(vendorName: string): boolean {
 
 /** Build the user prompt for a single product enrichment request. */
 export function buildEnrichmentUserPrompt(input: EnrichmentInput): string {
+  const isGeneral = input.searchMode === 'general';
+
   const parts = [
     'Research this product and provide accurate specifications:',
     '',
     `PRODUCT NAME: ${input.productName}`,
   ];
 
-  if (isOwnBrand(input.vendorName)) {
+  if (isGeneral) {
+    // General search mode: ignore vendor, search broadly
+    if (input.vendorName && !isUnknownVendor(input.vendorName) && !isOwnBrand(input.vendorName)) {
+      parts.push(`MANUFACTURER/VENDOR: ${input.vendorName} (but do NOT limit search to this vendor)`);
+    }
+  } else if (isOwnBrand(input.vendorName)) {
     parts.push('MANUFACTURER/VENDOR: Store Brand (Smart Details Auto Spa) — This is a store-branded/private-label product. Search for this product by name on Google to find general product information, reviews, or similar products. If no specific product page exists, generate a description based on the product name, category, and any available information.');
   } else if (isUnknownVendor(input.vendorName)) {
     parts.push('MANUFACTURER/VENDOR: Unknown — search by product name and category only');
@@ -137,12 +147,15 @@ export function buildEnrichmentUserPrompt(input: EnrichmentInput): string {
   if (input.currentDescription) parts.push(`CURRENT DESCRIPTION: ${input.currentDescription}`);
   if (input.variantLabel) parts.push(`VARIANT: ${input.variantLabel}`);
 
-  // Only include vendor website for known third-party vendors
-  if (input.vendorWebsite && !isOwnBrand(input.vendorName) && !isUnknownVendor(input.vendorName)) {
-    parts.push(`VENDOR WEBSITE: ${input.vendorWebsite} — search this site first`);
+  if (isGeneral) {
+    parts.push('', 'Search Google broadly for this product by name. Do NOT limit your search to a specific vendor website. Look for product listings on Amazon, detailing supply retailers, review sites, or any source that has accurate specs for this product. If the exact product cannot be found, search for similar products with the same name to determine the likely specifications.');
+  } else {
+    // Only include vendor website for known third-party vendors
+    if (input.vendorWebsite && !isOwnBrand(input.vendorName) && !isUnknownVendor(input.vendorName)) {
+      parts.push(`VENDOR WEBSITE: ${input.vendorWebsite} — search this site first`);
+    }
+    parts.push('', 'Find this exact product on the manufacturer\'s website or authorized retailers. Extract factual specifications only.');
   }
-
-  parts.push('', 'Find this exact product on the manufacturer\'s website or authorized retailers. Extract factual specifications only.');
 
   return parts.join('\n');
 }

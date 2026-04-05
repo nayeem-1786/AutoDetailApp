@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: General search retry for rejected products — 2026-04-04
+
+- **Search mode**: Batch submission accepts `searchMode` param (`'vendor'` default or `'general'`). General mode instructs AI to search broadly (Amazon, retailers, review sites) instead of a specific vendor website.
+- **Retry Rejected (General Search) button**: Visible when rejected drafts exist. Deletes rejected drafts, resubmits with Sonnet + general search mode.
+- **Delete-errors endpoint**: Now accepts `deleteStatus` param (`'error'` default or `'rejected'`) to delete either error or rejected drafts.
+- **Prompt changes**: General search mode omits vendor website instruction, replaces with broad Google search instructions.
+
 ## fix: Retry Errors (Sonnet) button not working — 2026-04-04
 
 - **Root cause**: Client-side Supabase `delete()` call silently failed — `product_enrichment_drafts` RLS only grants SELECT to authenticated users, not DELETE. The error drafts were never removed, so the server-side skip filter still saw them as pending and returned 0 products.
