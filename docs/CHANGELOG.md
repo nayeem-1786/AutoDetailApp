@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Regenerate SEO content on product slug/category change — 2026-04-05
+
+- **Root cause**: Session 22D's SEO sync only updated `page_path` — left `seo_title`, `meta_description`, and `focus_keyword` stale with old product name.
+- **Fix**: On slug/category change, after updating `page_path` and `focus_keyword` (mechanical), triggers AI SEO regeneration via `/api/admin/cms/seo/ai-generate` + `/api/admin/cms/seo/ai-apply` for the new path. Regenerates title, description, keywords, OG fields, and internal links.
+- **Stale record fixed**: Regenerated SEO for `/products/paint-correction/5-foam-cutting-pad` (was showing old "HCutting" name).
+
 ## feat: Editable product slugs + SEO path sync (Session 22D) — 2026-04-05
 
 - **Slug validation**: Added `slugSchema` to `src/lib/utils/validation.ts` — lowercase alphanumeric + hyphens, no leading/trailing/double hyphens. Added `slug` to `productCreateSchema`.

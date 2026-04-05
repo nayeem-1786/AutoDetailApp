@@ -475,7 +475,7 @@ export default function ProductDetailPage() {
 
       if (error) throw error;
 
-      // SEO path sync: update page_seo.page_path if slug or category changed
+      // SEO path sync: update page_seo path + regenerate content if slug or category changed
       const slugChanged = newSlug !== originalSlug;
       const categoryChanged = (data.category_id || null) !== originalCategoryId;
 
@@ -492,13 +492,56 @@ export default function ProductDetailPage() {
           const newPath = `/products/${newCatSlug}/${newSlug}`;
 
           if (oldPath !== newPath) {
+            // Step 1: Update page_path + focus_keyword immediately
             await supabase
               .from('page_seo')
               .update({
                 page_path: newPath,
+                focus_keyword: newSlug.replace(/-/g, ' '),
                 updated_at: new Date().toISOString(),
               })
               .eq('page_path', oldPath);
+
+            // Step 2: Trigger AI SEO regeneration for the new path (non-blocking)
+            try {
+              const genRes = await adminFetch('/api/admin/cms/seo/ai-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'single', pagePath: newPath }),
+              });
+
+              if (genRes.ok) {
+                const genData = await genRes.json();
+                const generated = genData.data?.generated;
+                if (generated) {
+                  // Apply the generated SEO content
+                  await adminFetch('/api/admin/cms/seo/ai-apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      pages: [{
+                        pagePath: newPath,
+                        seo_title: generated.seo_title,
+                        meta_description: generated.meta_description,
+                        meta_keywords: generated.meta_keywords,
+                        focus_keyword: generated.focus_keyword,
+                        og_title: generated.og_title,
+                        og_description: generated.og_description,
+                        internal_links: generated.internal_links,
+                      }],
+                    }),
+                  });
+                  toast.success('Product saved. SEO updated for new URL.');
+                  router.push('/admin/catalog/products');
+                  return;
+                }
+              }
+            } catch {
+              // AI regeneration failed — product still saved, SEO may need manual update
+            }
+            toast.success('Product saved. SEO may need manual update.');
+            router.push('/admin/catalog/products');
+            return;
           }
         }
       }
