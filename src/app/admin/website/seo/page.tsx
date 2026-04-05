@@ -44,6 +44,7 @@ interface AiSeoResult {
   focus_keyword: string;
   og_title: string;
   og_description: string;
+  internal_links: Array<{ text: string; url: string }>;
   suggestions: string[];
 }
 
@@ -355,6 +356,7 @@ function PageEditor({
         focus_keyword: gen.focus_keyword || prev.focus_keyword,
         og_title: gen.og_title || prev.og_title,
         og_description: gen.og_description || prev.og_description,
+        internal_links: gen.internal_links && gen.internal_links.length > 0 ? gen.internal_links : prev.internal_links,
       }));
       setAiSuggestions(gen.suggestions || []);
       setAiModified(true);
@@ -1337,7 +1339,7 @@ export default function SeoDashboardPage() {
             if (aiCancelledRef.current) {
               return {
                 pagePath: path,
-                generated: { seo_title: '', meta_description: '', meta_keywords: '', focus_keyword: '', og_title: '', og_description: '', suggestions: [] },
+                generated: { seo_title: '', meta_description: '', meta_keywords: '', focus_keyword: '', og_title: '', og_description: '', internal_links: [], suggestions: [] },
                 current: { seo_title: null, meta_description: null, meta_keywords: null, focus_keyword: null, og_title: null, og_description: null },
                 status: 'error' as const,
                 error: 'Cancelled',
@@ -1382,7 +1384,7 @@ export default function SeoDashboardPage() {
           }
           return {
             pagePath: path,
-            generated: { seo_title: '', meta_description: '', meta_keywords: '', focus_keyword: '', og_title: '', og_description: '', suggestions: [] },
+            generated: { seo_title: '', meta_description: '', meta_keywords: '', focus_keyword: '', og_title: '', og_description: '', internal_links: [], suggestions: [] },
             current: { seo_title: null, meta_description: null, meta_keywords: null, focus_keyword: null, og_title: null, og_description: null },
             status: 'error' as const,
             error: lastError,
@@ -1433,6 +1435,7 @@ export default function SeoDashboardPage() {
       focus_keyword: item.edited?.focus_keyword ?? item.generated.focus_keyword,
       og_title: item.edited?.og_title ?? item.generated.og_title,
       og_description: item.edited?.og_description ?? item.generated.og_description,
+      internal_links: item.edited?.internal_links ?? item.generated.internal_links,
     }));
 
     try {

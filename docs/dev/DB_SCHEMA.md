@@ -997,7 +997,7 @@ idx_refund_items_refund — btree (refund_id)
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 
-**Known keys:** business_name, business_address, business_phone, business_hours, business_email, business_website, business_description, business_latitude, business_longitude, service_area_name, service_area_radius, price_range, tax_rate, tax_products_only, tip_presets, cc_fee_rate, loyalty_earn_rate, loyalty_redeem_rate, loyalty_redeem_minimum, appointment_buffer_minutes, mobile_travel_buffer_minutes, cancellation_window_hours, receipt_email_enabled, receipt_sms_enabled, receipt_config, water_sku, ticker_enabled, ads_enabled, hero_carousel, announcement_tickers, ad_placements, seasonal_themes, homepage_team_heading, homepage_credentials_heading, homepage_differentiators, google_place_id, homepage_cta_before_image, homepage_cta_after_image, sms_daily_cap_per_customer, homepage_hero_tagline, homepage_cta_title, homepage_cta_description, homepage_cta_button_text, homepage_services_description, services_page_description, default_deposit_amount, quote_validity_days
+**Known keys:** business_name, business_address, business_phone, business_hours, business_email, business_website, business_description, business_latitude, business_longitude, service_area_name, service_area_radius, price_range, og_image_url, tax_rate, tax_products_only, tip_presets, cc_fee_rate, loyalty_earn_rate, loyalty_redeem_rate, loyalty_redeem_minimum, appointment_buffer_minutes, mobile_travel_buffer_minutes, cancellation_window_hours, receipt_email_enabled, receipt_sms_enabled, receipt_config, water_sku, ticker_enabled, ads_enabled, hero_carousel, announcement_tickers, ad_placements, seasonal_themes, homepage_team_heading, homepage_credentials_heading, homepage_differentiators, google_place_id, homepage_cta_before_image, homepage_cta_after_image, sms_daily_cap_per_customer, homepage_hero_tagline, homepage_cta_title, homepage_cta_description, homepage_cta_button_text, homepage_services_description, services_page_description, default_deposit_amount, quote_validity_days
 
 ### feature_flags
 | Column | Type | Constraints | Notes |
@@ -1364,6 +1364,30 @@ idx_refund_items_refund — btree (refund_id)
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
 Seeded with 45 common makes. Used in POS, admin, booking, and customer portal vehicle dropdowns. RLS: authenticated read, admin-only write.
+
+### page_seo
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| page_path | TEXT | UNIQUE, NOT NULL | URL path (e.g. /services/ceramic-coatings) |
+| page_type | TEXT | CHECK (homepage, service_category, service_detail, product_category, product_detail, gallery, booking, city_landing, custom) | |
+| seo_title | TEXT | | SEO title tag |
+| meta_description | TEXT | | Meta description |
+| meta_keywords | TEXT | | Comma-separated keywords |
+| og_title | TEXT | | Open Graph title |
+| og_description | TEXT | | Open Graph description |
+| og_image_url | TEXT | | Open Graph image URL |
+| canonical_url | TEXT | | Canonical URL override |
+| robots_directive | TEXT | DEFAULT 'index,follow' | Robots meta directive |
+| structured_data_overrides | JSONB | | JSON-LD overrides |
+| focus_keyword | TEXT | | Primary SEO keyword |
+| internal_links | JSONB | | Array of `{text, url}` objects |
+| is_auto_generated | BOOLEAN | NOT NULL, DEFAULT false | Whether SEO was AI-generated |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+
+**Indexes:** `(page_path)`, `(page_type)`
+**RLS:** Public read, authenticated all.
 
 ---
 

@@ -17,6 +17,7 @@ interface ApplyPage {
   focus_keyword?: string;
   og_title?: string;
   og_description?: string;
+  internal_links?: Array<{ text: string; url: string }>;
 }
 
 interface ApplyRequest {
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
     if (page.focus_keyword !== undefined) updates.focus_keyword = page.focus_keyword || null;
     if (page.og_title !== undefined) updates.og_title = page.og_title || null;
     if (page.og_description !== undefined) updates.og_description = page.og_description || null;
+    if (page.internal_links !== undefined) updates.internal_links = page.internal_links && page.internal_links.length > 0 ? page.internal_links : null;
 
     // Check if row exists
     const { data: existing } = await admin

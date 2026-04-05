@@ -65,6 +65,10 @@ export async function POST(request: NextRequest) {
   const businessName = (s.business_name as string) || 'Smart Detail Auto Spa & Supplies';
   const businessLocation = `${addr.city}, ${addr.state}`;
 
+  // Fetch known pages once — used for path enumeration, type/title info, and AI context
+  const knownPages = await getKnownPages();
+  const knownMap = new Map(knownPages.map(p => [p.path, p]));
+
   // ---------------------------------------------------------------------------
   // SINGLE MODE
   // ---------------------------------------------------------------------------
@@ -96,7 +100,8 @@ export async function POST(request: NextRequest) {
         currentRow?.seo_title || pagePath,
         businessName,
         businessLocation,
-        currentSeo
+        currentSeo,
+        knownPages
       );
 
       return NextResponse.json({
@@ -126,8 +131,6 @@ export async function POST(request: NextRequest) {
   let targetPaths: string[] = [];
 
   if (mode === 'global') {
-    // Get all known pages
-    const knownPages = await getKnownPages();
     const allPaths = knownPages.map(p => p.path);
 
     if (!overwriteExisting) {
@@ -181,10 +184,6 @@ export async function POST(request: NextRequest) {
     (currentRows ?? []).map(r => [r.page_path, r])
   );
 
-  // Fetch known pages for type/title info
-  const knownPages = await getKnownPages();
-  const knownMap = new Map(knownPages.map(p => [p.path, p]));
-
   // Generate SEO for each page sequentially (to avoid rate limits)
   const results: PageResult[] = [];
   const errors: Array<{ pagePath: string; error: string }> = [];
@@ -209,7 +208,8 @@ export async function POST(request: NextRequest) {
         currentRow?.seo_title || knownPage?.title || path,
         businessName,
         businessLocation,
-        overwriteExisting ? currentSeo : undefined
+        overwriteExisting ? currentSeo : undefined,
+        knownPages
       );
 
       results.push({
@@ -237,6 +237,7 @@ export async function POST(request: NextRequest) {
           focus_keyword: '',
           og_title: '',
           og_description: '',
+          internal_links: [],
           suggestions: [],
         },
         current: currentSeo || {

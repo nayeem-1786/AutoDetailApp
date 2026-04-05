@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: SEO AI prompt overhaul — character precision, URL-derived keywords, internal links, OG image fallback — 2026-04-04
+
+- **System prompt rewrite**: New prompt in `ai-seo.ts` engineered to maximize the SEO scoring algorithm. Strict character count rules (50-60 title, 150-160 description), URL-derived focus keyword logic (only uses words from URL path segments), internal link generation instructions, and structured JSON output format.
+- **Internal links pipeline**: Added `internal_links` field to `AiSeoResult` interface (server + client). Threaded through `generateSeoByPath()` → `generateSeoForPage()` → `buildUserPrompt()`. Updated `ai-apply` route to save `internal_links` to `page_seo.internal_links` JSONB column. Updated `handleAiOptimize` and `handleAiApply` in the SEO admin page to pass internal links through.
+- **Available pages context**: `getKnownPages()` fetched once per request and passed to AI for internal link generation. `filterRelevantPages()` selects ~30-40 contextually relevant pages per AI call based on page type and category (inferred from URL path).
+- **Response validation**: Logs warnings for title/description length outside ideal range, focus keyword not in title, focus keyword slug not in URL path. Filters out hallucinated internal links (URLs not in known pages list).
+- **max_tokens increase**: 1000 → 1500 to prevent JSON truncation with internal_links in response.
+- **OG image backfill migration**: `20260404000004_backfill_og_images.sql` — PL/pgSQL DO block that backfills empty `og_image_url` in `page_seo`. Product detail pages get their product's `image_url`; all other pages get the global OG image from `business_settings`. Properly extracts JSONB-wrapped string value. Only fills NULL/empty fields.
+- **Consolidated known pages fetch**: `ai-generate/route.ts` now calls `getKnownPages()` once (was twice in global mode) and reuses for path enumeration, type/title lookup, and AI context.
+- **DB_SCHEMA.md**: Added `page_seo` table documentation. Added `og_image_url` to business_settings known keys.
+
 ## feat: General search retry for rejected products — 2026-04-04
 
 - **Search mode**: Batch submission accepts `searchMode` param (`'vendor'` default or `'general'`). General mode instructs AI to search broadly (Amazon, retailers, review sites) instead of a specific vendor website.

@@ -1413,6 +1413,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260404000001_product_enrichment_system.sql
 20260404000002_enrichment_drafts_rls_and_cleanup.sql
 20260404000003_enrichment_batches_table.sql
+20260404000004_backfill_og_images.sql
 ```
 
 ---
