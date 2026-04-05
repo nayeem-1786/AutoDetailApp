@@ -69,6 +69,11 @@ interface AiPageResult {
 // SEO Score Calculation
 // ---------------------------------------------------------------------------
 
+/** Strip all non-alphanumeric chars and lowercase for fuzzy FK matching. */
+function normalizeForComparison(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function calculateSeoScore(page: PageSeo): number {
   let score = 0;
 
@@ -84,14 +89,16 @@ function calculateSeoScore(page: PageSeo): number {
 
   const fk = (page.focus_keyword ?? '').toLowerCase().trim();
   if (fk) {
-    // Focus keyword in title: +20pts
-    if ((page.seo_title ?? '').toLowerCase().includes(fk)) score += 20;
+    const nfk = normalizeForComparison(fk);
 
-    // Focus keyword in description: +15pts
-    if ((page.meta_description ?? '').toLowerCase().includes(fk)) score += 15;
+    // Focus keyword in title: +20pts (normalized comparison)
+    if (normalizeForComparison(page.seo_title ?? '').includes(nfk)) score += 20;
 
-    // Focus keyword in URL: +10pts
-    if (page.page_path.toLowerCase().includes(fk.replace(/\s+/g, '-'))) score += 10;
+    // Focus keyword in description: +15pts (normalized comparison)
+    if (normalizeForComparison(page.meta_description ?? '').includes(nfk)) score += 15;
+
+    // Focus keyword in URL: +10pts (normalized comparison)
+    if (normalizeForComparison(page.page_path).includes(nfk)) score += 10;
   }
 
   // Has OG image: +10pts
@@ -383,9 +390,10 @@ function PageEditor({
   };
 
   const fk = form.focus_keyword.toLowerCase().trim();
-  const fkInTitle = fk ? form.seo_title.toLowerCase().includes(fk) : false;
-  const fkInDesc = fk ? form.meta_description.toLowerCase().includes(fk) : false;
-  const fkInUrl = fk ? page.page_path.toLowerCase().includes(fk.replace(/\s+/g, '-')) : false;
+  const nfk = normalizeForComparison(fk);
+  const fkInTitle = fk ? normalizeForComparison(form.seo_title).includes(nfk) : false;
+  const fkInDesc = fk ? normalizeForComparison(form.meta_description).includes(nfk) : false;
+  const fkInUrl = fk ? normalizeForComparison(page.page_path).includes(nfk) : false;
 
   // Live SEO score
   const liveScore = useMemo(() => {

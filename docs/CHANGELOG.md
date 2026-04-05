@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: SEO scoring algorithm + homepage + regenerate 111 underperforming pages (Session 22C) — 2026-04-05
+
+- **Scoring algorithm fix** (`src/app/admin/website/seo/page.tsx`): Added `normalizeForComparison()` that strips all non-alphanumeric chars before FK matching. Fixes false negatives where FK "1 year ceramic shield" failed to match title "1-Year Ceramic Shield" due to punctuation. Applied to all 3 FK checks (title, description, URL) and the live editor indicators.
+- **Homepage fix**: FK changed from nonsensical "homepage" to "auto detailing". Title adjusted to 52 chars (was 49). Description adjusted to 155 chars (was 162). Score: 35 → 90.
+- **4 service pages fixed manually**: Added internal links + corrected FKs for `/services/precision-express`, `/services/precision-express/express-exterior-wash`, `/services/signature-detail`, `/services/signature-detail/signature-complete-detail`.
+- **111 pages regenerated** via AI SEO service with existing prompt. All succeeded, 0 failures.
+- **Results**: Pages at 80+ went from 352 (70%) → 420 (83%). Average score 85 → 88. 83 pages remain below 80 — all product detail pages where the AI doesn't consistently hit exact 50-60/150-160 char ranges (diminishing returns on these low-value product pages).
+
 ## feat: SEO AI prompt overhaul — character precision, URL-derived keywords, internal links, OG image fallback — 2026-04-04
 
 - **System prompt rewrite**: New prompt in `ai-seo.ts` engineered to maximize the SEO scoring algorithm. Strict character count rules (50-60 title, 150-160 description), URL-derived focus keyword logic (only uses words from URL path segments), internal link generation instructions, and structured JSON output format.
