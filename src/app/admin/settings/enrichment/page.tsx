@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Sparkles, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Sparkles, ArrowLeft, ExternalLink, RotateCcw } from 'lucide-react';
 
 interface BatchRecord {
   id: string;
@@ -43,6 +43,7 @@ export default function EnrichmentSettingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [retrySonnet, setRetrySonnet] = useState(false);
   const [enrichableCount, setEnrichableCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -224,6 +225,78 @@ export default function EnrichmentSettingsPage() {
     }
   }
 
+  // Retry errors with Sonnet
+  async function handleRetrySonnet() {
+    setRetrySonnet(true);
+
+    try {
+      // Fetch product IDs with error drafts
+      const { data: errorDrafts } = await supabase
+        .from('product_enrichment_drafts')
+        .select('id, product_id')
+        .eq('status', 'pending')
+        .not('error_message', 'is', null);
+
+      if (!errorDrafts || errorDrafts.length === 0) {
+        toast.info('No error drafts to retry.');
+        return;
+      }
+
+      const productIds = errorDrafts.map((d: { product_id: string }) => d.product_id);
+      const draftIds = errorDrafts.map((d: { id: string }) => d.id);
+
+      // Delete error drafts so they don't block the skip filter
+      for (let i = 0; i < draftIds.length; i += 100) {
+        const chunk = draftIds.slice(i, i + 100);
+        await supabase
+          .from('product_enrichment_drafts')
+          .delete()
+          .in('id', chunk);
+      }
+
+      // Submit batch with Sonnet model
+      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'selected', productIds, model: 'claude-sonnet-4-20250514' }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to submit retry batch');
+        return;
+      }
+
+      if (data.totalProducts === 0) {
+        toast.info('No products to retry.');
+        return;
+      }
+
+      const newBatch: BatchRecord = {
+        id: data.batchId,
+        status: 'submitted',
+        total_requests: data.totalProducts,
+        succeeded: 0,
+        errored: 0,
+        created_at: new Date().toISOString(),
+        completed_at: null,
+      };
+
+      setBatch(newBatch);
+      setBatchStatus('submitted');
+      setBatchCounts({ processing: data.totalProducts, succeeded: 0, errored: 0, total: data.totalProducts });
+      toast.success(`Retrying ${data.totalProducts} products with Sonnet model`);
+
+      startPolling(data.batchId);
+      await loadDraftCounts();
+    } catch {
+      toast.error('Failed to submit Sonnet retry batch');
+    } finally {
+      setRetrySonnet(false);
+    }
+  }
+
   const isActive = batch && (batch.status === 'submitted' || batch.status === 'processing') && batchStatus !== 'ended';
   const isEnded = batchStatus === 'ended' && batch?.status !== 'completed';
   const isCompleted = batch?.status === 'completed';
@@ -341,6 +414,16 @@ export default function EnrichmentSettingsPage() {
               <Sparkles className="h-4 w-4" />
               {isActive ? 'Batch in Progress...' : submitting ? 'Submitting...' : 'AI Enrich Products'}
             </Button>
+            {draftCounts.errors > 0 && !isActive && (
+              <Button
+                variant="outline"
+                onClick={handleRetrySonnet}
+                disabled={retrySonnet || submitting}
+              >
+                <RotateCcw className="h-4 w-4" />
+                {retrySonnet ? 'Submitting...' : `Retry ${draftCounts.errors} Errors (Sonnet)`}
+              </Button>
+            )}
             {isActive && (
               <span className="text-xs text-gray-500">Wait for the current batch to finish before submitting another.</span>
             )}

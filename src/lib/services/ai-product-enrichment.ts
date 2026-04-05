@@ -45,6 +45,51 @@ If the product is a tool, pad, towel, or accessory (not a chemical), adapt:
 
 export const ENRICHMENT_MODEL = 'claude-haiku-4-5-20251001';
 
+const JSON_REPAIR_PROMPT = `The following text contains product enrichment data. Extract ONLY the JSON object from this text. Return nothing but valid JSON — no markdown, no explanation, no preamble. If no JSON object exists, create one from the information provided using this exact schema: {"short_description":"","full_description":"","use_case":"","key_features":[],"application_method":"","surface_compatibility":[],"size_volume":"","dilution_ratio":"","coverage_yield":"","scent":"","pro_tips":"","source_url":""}`;
+
+/**
+ * Attempt to repair a failed JSON response by asking Haiku to extract/reconstruct it.
+ * Cheap safety net (~$0.001 per call, no web search).
+ */
+export async function repairJsonResponse(rawText: string): Promise<EnrichmentResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return { shortDescription: null, specs: null, sourceUrl: null, error: 'ANTHROPIC_API_KEY not configured for repair' };
+  }
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: ENRICHMENT_MODEL,
+        max_tokens: 2000,
+        system: JSON_REPAIR_PROMPT,
+        messages: [{ role: 'user', content: rawText }],
+      }),
+    });
+
+    if (!response.ok) {
+      return { shortDescription: null, specs: null, sourceUrl: null, error: 'JSON repair API call failed' };
+    }
+
+    const data = await response.json();
+    const text = data.content?.[0]?.text;
+    if (!text) {
+      return { shortDescription: null, specs: null, sourceUrl: null, error: 'Empty JSON repair response' };
+    }
+
+    // Parse the repair response through the standard parser
+    return parseEnrichmentResponse([{ type: 'text', text }]);
+  } catch {
+    return { shortDescription: null, specs: null, sourceUrl: null, error: 'JSON repair call threw an exception' };
+  }
+}
+
 export interface EnrichmentInput {
   productName: string;
   vendorName: string;

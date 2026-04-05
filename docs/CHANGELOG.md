@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Sonnet retry option + JSON repair fallback for failed enrichments — 2026-04-04
+
+- **Model selection**: Batch submission endpoint accepts optional `model` parameter. Default stays Haiku 4.5 for cost efficiency; Sonnet used for retrying failures.
+- **JSON repair fallback**: Results processor attempts a cheap Haiku API call (no web search) to extract/reconstruct JSON when the initial parse fails. Salvages data from responses where the AI did the research but wrapped JSON in text.
+- **Retry Errors (Sonnet) button**: Enrichment settings page shows a retry button when error drafts exist. Deletes error drafts, resubmits those products with Sonnet model. Only visible when errors > 0 and no batch is active.
+
 ## feat: Frontend product specs display, variant links, voice agent specs — 2026-04-04
 
 - **Product detail page**: New sections for specs data between description and CTA — About This Product (overview), What Problem Does This Solve (use_case), Key Features (pill badges), Specifications table (only populated fields), Pro Tips (lightbulb callout box). All sections conditionally rendered — products without specs show existing layout unchanged.

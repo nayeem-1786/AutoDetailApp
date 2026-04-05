@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
-import { parseEnrichmentResponse } from '@/lib/services/ai-product-enrichment';
+import { parseEnrichmentResponse, repairJsonResponse } from '@/lib/services/ai-product-enrichment';
 
 /**
  * POST /api/admin/cms/products/ai-enrich/results
@@ -97,7 +97,21 @@ export async function POST(request: NextRequest) {
       .eq('status', 'pending');
 
     if (entry.result.type === 'succeeded' && entry.result.message) {
-      const parsed = parseEnrichmentResponse(entry.result.message.content);
+      let parsed = parseEnrichmentResponse(entry.result.message.content);
+
+      // If parsing failed, attempt a cheap JSON repair call
+      if (parsed.error) {
+        const rawText = entry.result.message.content
+          .filter((b: { type: string }) => b.type === 'text')
+          .map((b: { text?: string }) => b.text ?? '')
+          .join('\n');
+        if (rawText.trim()) {
+          const repaired = await repairJsonResponse(rawText);
+          if (!repaired.error) {
+            parsed = repaired;
+          }
+        }
+      }
 
       await admin
         .from('product_enrichment_drafts')

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { mode, productIds } = body as { mode: 'all' | 'selected'; productIds?: string[] };
+  const { mode, productIds, model } = body as { mode: 'all' | 'selected'; productIds?: string[]; model?: string };
 
   if (mode !== 'all' && mode !== 'selected') {
     return NextResponse.json({ error: 'mode must be "all" or "selected"' }, { status: 400 });
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     return {
       custom_id: product.id,
       params: {
-        model: ENRICHMENT_MODEL,
+        model: model || ENRICHMENT_MODEL,
         max_tokens: 2000,
         tools: [{ type: 'web_search_20250305' as const, name: 'web_search', max_uses: 3 }],
         system: ENRICHMENT_SYSTEM_PROMPT,
