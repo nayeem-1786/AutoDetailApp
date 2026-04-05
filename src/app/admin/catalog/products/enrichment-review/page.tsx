@@ -322,9 +322,14 @@ export default function EnrichmentReviewPage() {
         title="Enrichment Review"
         description={`${pendingCount} pending · ${appliedCount} applied · ${rejectedCount} rejected${errorCount > 0 ? ` · ${errorCount} errors` : ''}`}
         action={
-          <Button variant="outline" onClick={() => router.push('/admin/catalog/products')}>
-            Back to Products
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => router.push('/admin/settings/enrichment')}>
+              Enrichment Settings
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/admin/catalog/products')}>
+              Back to Products
+            </Button>
+          </div>
         }
       />
 

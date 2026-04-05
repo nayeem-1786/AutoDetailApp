@@ -511,7 +511,7 @@ export default function EnrichmentSettingsPage() {
                 disabled={retrySonnet || submitting || retryGeneral}
               >
                 <RotateCcw className="h-4 w-4" />
-                {retrySonnet ? 'Submitting...' : `Retry ${draftCounts.errors} Errors (Sonnet)`}
+                {retrySonnet ? 'Submitting...' : `Retry ${draftCounts.errors} Errors`}
               </Button>
             )}
             {draftCounts.rejected > 0 && !isActive && (
