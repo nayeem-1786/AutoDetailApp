@@ -627,6 +627,7 @@ src/app/admin/settings/data-management/page.tsx
 src/app/admin/settings/business-profile/page.tsx
 src/app/admin/settings/card-reader/page.tsx
 src/app/admin/settings/coupon-enforcement/page.tsx
+src/app/admin/settings/enrichment/page.tsx
 src/app/admin/settings/feature-toggles/page.tsx
 src/app/admin/settings/integrations/quickbooks/page.tsx
 src/app/admin/settings/messaging/page.tsx

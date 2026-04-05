@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: AI Product Enrichment settings hub page — 2026-04-04
+
+- **New page**: `src/app/admin/settings/enrichment/page.tsx` — dedicated enrichment management hub
+  - Section A: Batch status with persistent polling (loaded from DB on mount, survives refresh)
+  - Section B: Submit new batch with duplicate prevention (disabled while batch in progress)
+  - Section C: Draft summary with counts by status (pending/error/applied/rejected) + "Review Drafts" button
+- **Settings card**: Added "AI Product Enrichment" under Integrations group in Admin > Settings (alongside QuickBooks)
+- **Products page cleanup**: Removed all batch submit/poll controls (100+ lines). Kept "Enrichment Review" badge for quick access.
+- All enrichment management now accessible from: Admin > Settings > Integrations > AI Product Enrichment
+
 ## fix: Enrichment system UX overhaul — persistent status, error filter, retry, duplicate prevention — 2026-04-04
 
 - **Persistent batch status**: Products list page loads active batch from `enrichment_batches` DB on mount. Refreshing the page auto-resumes polling if a batch is in progress. No more lost state.

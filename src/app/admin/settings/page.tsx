@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug, Bell, Truck, Trash2 } from 'lucide-react';
+import { ToggleLeft, Building2, Receipt, MapPin, Star, Timer, ChevronRight, ClipboardList, Megaphone, Printer, Shield, CreditCard, MessageSquare, StarHalf, Plug, Bell, Truck, Trash2, Sparkles } from 'lucide-react';
 
 interface SettingsItem {
   title: string;
@@ -139,6 +139,13 @@ const settingsGroups: SettingsGroup[] = [
         description: 'Connect to QuickBooks for accounting sync.',
         href: '/admin/settings/integrations/quickbooks',
         icon: Plug,
+        roles: ['super_admin'],
+      },
+      {
+        title: 'AI Product Enrichment',
+        description: 'Enrich product descriptions and specs using AI web research.',
+        href: '/admin/settings/enrichment',
+        icon: Sparkles,
         roles: ['super_admin'],
       },
     ],

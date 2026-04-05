@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -79,16 +79,9 @@ export default function ProductsPage() {
   const [reactivateTarget, setReactivateTarget] = useState<ProductWithRelations | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
 
-  // AI Enrichment batch state
-  const [showEnrichConfirm, setShowEnrichConfirm] = useState(false);
+  // Enrichment draft counts (for review link badge)
   const [pendingDraftCount, setPendingDraftCount] = useState(0);
   const [totalDraftCount, setTotalDraftCount] = useState(0);
-  const [enrichBatchId, setEnrichBatchId] = useState<string | null>(null);
-  const [enrichSubmitting, setEnrichSubmitting] = useState(false);
-  const [enrichStatus, setEnrichStatus] = useState<string | null>(null); // null | 'submitted' | 'processing' | 'ended' | 'completed'
-  const [enrichCounts, setEnrichCounts] = useState<{ processing: number; succeeded: number; errored: number; total: number }>({ processing: 0, succeeded: 0, errored: 0, total: 0 });
-  const [enrichProcessing, setEnrichProcessing] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [adjusting, setAdjusting] = useState(false);
 
   const {
@@ -157,7 +150,7 @@ export default function ProductsPage() {
   useEffect(() => {
     loadProducts();
 
-    // Load enrichment draft counts
+    // Load enrichment draft counts for review link badge
     supabase
       .from('product_enrichment_drafts')
       .select('id, status, error_message', { count: 'exact' })
@@ -165,28 +158,6 @@ export default function ProductsPage() {
         setTotalDraftCount(count ?? 0);
         const pending = (data ?? []).filter(d => d.status === 'pending' && !d.error_message).length;
         setPendingDraftCount(pending);
-      });
-
-    // Load active batch from DB for persistent status across page refreshes
-    supabase
-      .from('enrichment_batches')
-      .select('id, status, total_requests, succeeded, errored')
-      .in('status', ['submitted', 'processing'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-      .then(({ data: activeBatch }: { data: { id: string; status: string; total_requests: number; succeeded: number; errored: number } | null }) => {
-        if (activeBatch) {
-          setEnrichBatchId(activeBatch.id);
-          setEnrichStatus(activeBatch.status);
-          setEnrichCounts({
-            processing: 0,
-            succeeded: activeBatch.succeeded,
-            errored: activeBatch.errored,
-            total: activeBatch.total_requests,
-          });
-          startPolling(activeBatch.id);
-        }
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -495,120 +466,6 @@ export default function ProductsPage() {
         },
       ];
 
-  // Poll batch status every 30 seconds
-  const startPolling = useCallback((batchId: string) => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(async () => {
-      try {
-        const res = await adminFetch(`/api/admin/cms/products/ai-enrich/status?batchId=${batchId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setEnrichStatus(data.anthropicStatus ?? data.status);
-        setEnrichCounts({
-          processing: data.requestCounts?.processing ?? 0,
-          succeeded: data.requestCounts?.succeeded ?? 0,
-          errored: data.requestCounts?.errored ?? 0,
-          total: data.totalRequests ?? 0,
-        });
-
-        // Batch finished — stop polling
-        if (data.anthropicStatus === 'ended' || data.status === 'completed') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          pollRef.current = null;
-          setEnrichStatus('ended');
-        }
-      } catch {
-        // Silently retry on next interval
-      }
-    }, 30_000);
-  }, []);
-
-  // Cleanup poll on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
-
-  // Submit batch to Anthropic Message Batches API
-  async function handleEnrichAll() {
-    setShowEnrichConfirm(false);
-    setEnrichSubmitting(true);
-
-    try {
-      const res = await adminFetch('/api/admin/cms/products/ai-enrich', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'all' }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || 'Failed to submit batch');
-        return;
-      }
-
-      if (data.totalProducts === 0) {
-        toast.info(data.message || 'All products already enriched or pending review.');
-        return;
-      }
-
-      setEnrichBatchId(data.batchId);
-      setEnrichStatus('submitted');
-      setEnrichCounts({ processing: data.totalProducts, succeeded: 0, errored: 0, total: data.totalProducts });
-      toast.success(`Batch submitted! ${data.totalProducts} products queued for enrichment.${data.skipped ? ` ${data.skipped} skipped.` : ''}`);
-
-      // Start polling
-      startPolling(data.batchId);
-    } catch (err) {
-      console.error('Batch submission error:', err);
-      toast.error('Failed to submit enrichment batch');
-    } finally {
-      setEnrichSubmitting(false);
-    }
-  }
-
-  // Process results once batch is complete
-  async function handleProcessResults() {
-    if (!enrichBatchId) return;
-    setEnrichProcessing(true);
-
-    try {
-      const res = await adminFetch('/api/admin/cms/products/ai-enrich/results', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batchId: enrichBatchId }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || 'Failed to process results');
-        return;
-      }
-
-      setEnrichStatus('completed');
-      setEnrichCounts(prev => ({ ...prev, succeeded: data.succeeded, errored: data.errored }));
-      toast.success(`Results processed! ${data.succeeded} enriched, ${data.errored} errors.`);
-
-      // Refresh draft counts
-      supabase
-        .from('product_enrichment_drafts')
-        .select('id, status, error_message', { count: 'exact' })
-        .then(({ data: draftData, count }: { data: Array<{ status: string; error_message: string | null }> | null; count: number | null }) => {
-          setTotalDraftCount(count ?? 0);
-          const pending = (draftData ?? []).filter(d => d.status === 'pending' && !d.error_message).length;
-          setPendingDraftCount(pending);
-        });
-    } catch (err) {
-      console.error('Process results error:', err);
-      toast.error('Failed to process enrichment results');
-    } finally {
-      setEnrichProcessing(false);
-    }
-  }
-
   const columns: ColumnDef<ProductWithRelations, unknown>[] = [
     ...baseColumns,
     ...costColumns,
@@ -641,18 +498,9 @@ export default function ProductsPage() {
         action={
           canEditProducts ? (
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowEnrichConfirm(true)}
-                disabled={enrichSubmitting || (enrichBatchId !== null && enrichStatus !== null && enrichStatus !== 'completed')}
-              >
-                <Sparkles className="h-4 w-4" />
-                {enrichBatchId && enrichStatus && enrichStatus !== 'completed' && enrichStatus !== 'ended'
-                  ? `Batch in progress${enrichCounts.total > 0 ? ` — ${enrichCounts.total - enrichCounts.succeeded - enrichCounts.errored} remaining` : ''}`
-                  : enrichSubmitting ? 'Submitting...' : 'AI Enrich Products'}
-              </Button>
               {totalDraftCount > 0 && (
                 <Link href="/admin/catalog/products/enrichment-review" className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 hover:bg-amber-200 transition-colors">
+                  <Sparkles className="h-3.5 w-3.5" />
                   Enrichment Review{pendingDraftCount > 0 ? ` (${pendingDraftCount} pending)` : ''}
                 </Link>
               )}
@@ -663,68 +511,6 @@ export default function ProductsPage() {
             </div>
           ) : undefined
         }
-      />
-
-      {/* AI Enrichment Batch Status */}
-      {enrichStatus && enrichStatus !== 'completed' && (
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-700">
-              {enrichStatus === 'submitted' && 'Batch submitted. Waiting for processing to start...'}
-              {enrichStatus === 'processing' && `Enrichment in progress... ${enrichCounts.succeeded + enrichCounts.errored}/${enrichCounts.total} complete`}
-              {enrichStatus === 'ended' && `Batch complete! ${enrichCounts.succeeded} succeeded, ${enrichCounts.errored} errors. Ready to process results.`}
-            </span>
-            <div className="flex gap-2">
-              {enrichStatus === 'ended' && (
-                <>
-                  <Button size="sm" onClick={handleProcessResults} disabled={enrichProcessing}>
-                    {enrichProcessing ? 'Processing...' : 'Process Results'}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => router.push('/admin/catalog/products/enrichment-review')}>
-                    Review Drafts
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-          {enrichCounts.total > 0 && (
-            <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-300"
-                style={{ width: `${Math.round(((enrichCounts.succeeded + enrichCounts.errored) / enrichCounts.total) * 100)}%` }}
-              />
-            </div>
-          )}
-          {enrichStatus !== 'ended' && (
-            <p className="text-xs text-gray-500">Polling every 30 seconds. You can close this page and come back later.</p>
-          )}
-        </div>
-      )}
-      {enrichStatus === 'completed' && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-green-700">
-              Enrichment complete! {enrichCounts.succeeded} products enriched{enrichCounts.errored > 0 ? `, ${enrichCounts.errored} errors` : ''}.
-            </span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => router.push('/admin/catalog/products/enrichment-review')}>
-                Review Drafts
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => { setEnrichStatus(null); setEnrichBatchId(null); }}>
-                Dismiss
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <ConfirmDialog
-        open={showEnrichConfirm}
-        onOpenChange={setShowEnrichConfirm}
-        title="AI Enrich Products"
-        description={`Submit all ${products.filter(p => p.is_active).length} active products for AI enrichment? This runs in the background via Anthropic's batch API — you can close this page and come back later. Already-enriched products will be skipped. Results typically ready within 1 hour and are saved as drafts for your review.`}
-        confirmLabel="Submit Batch"
-        onConfirm={handleEnrichAll}
       />
 
       {(() => {
