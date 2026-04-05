@@ -43,7 +43,8 @@ export default function EnrichmentSettingsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [activeProductCount, setActiveProductCount] = useState(0);
+  const [enrichableCount, setEnrichableCount] = useState(0);
+  const [skippedCount, setSkippedCount] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load draft counts
@@ -124,12 +125,15 @@ export default function EnrichmentSettingsPage() {
       // Load draft counts
       await loadDraftCounts();
 
-      // Load active product count for the confirm dialog
-      const { count } = await supabase
-        .from('products')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
-      setActiveProductCount(count ?? 0);
+      // Compute actual enrichable count (active products minus already-enriched)
+      const [activeRes, enrichedRes] = await Promise.all([
+        supabase.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('product_enrichment_drafts').select('product_id').in('status', ['applied', 'pending']),
+      ]);
+      const activeCount = activeRes.count ?? 0;
+      const enrichedIds = new Set((enrichedRes.data ?? []).map((d: { product_id: string }) => d.product_id));
+      setSkippedCount(enrichedIds.size);
+      setEnrichableCount(activeCount - enrichedIds.size);
 
       setLoading(false);
     }
@@ -324,7 +328,16 @@ export default function EnrichmentSettingsPage() {
             Products that already have applied or pending drafts are automatically skipped.
           </p>
           <div className="flex items-center gap-3">
-            <Button onClick={() => setShowConfirm(true)} disabled={submitting || !!isActive}>
+            <Button
+              onClick={() => {
+                if (enrichableCount <= 0) {
+                  toast.info('All products are already enriched or pending review.');
+                  return;
+                }
+                setShowConfirm(true);
+              }}
+              disabled={submitting || !!isActive}
+            >
               <Sparkles className="h-4 w-4" />
               {isActive ? 'Batch in Progress...' : submitting ? 'Submitting...' : 'AI Enrich Products'}
             </Button>
@@ -388,7 +401,7 @@ export default function EnrichmentSettingsPage() {
         open={showConfirm}
         onOpenChange={setShowConfirm}
         title="AI Enrich Products"
-        description={`Submit all ${activeProductCount} active products for AI enrichment? This runs in the background via Anthropic's batch API — you can close this page and come back later. Already-enriched products will be skipped. Results typically ready within 1 hour and are saved as drafts for your review.`}
+        description={`Submit ${enrichableCount} product${enrichableCount !== 1 ? 's' : ''} for AI enrichment?${skippedCount > 0 ? ` (${skippedCount} already enriched will be skipped.)` : ''} This runs in the background via Anthropic's batch API — you can close this page and come back later. Results typically ready within 1 hour and are saved as drafts for your review.`}
         confirmLabel="Submit Batch"
         onConfirm={handleSubmit}
       />
