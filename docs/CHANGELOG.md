@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Enrichment parsing robustness, own-brand handling, no-vendor prompt — 2026-04-04
+
+- **Pre-parse citation stripping**: Strip `<cite>` tags from raw AI response text BEFORE JSON parsing, not just after. Embedded citation tags could break JSON structure and cause parse failures.
+- **Own-brand products**: Detect store-branded products (SD Auto Spa, SDAS, Smart Details) via case-insensitive matching. Prompt instructs AI to search by product name instead of looking for a non-existent vendor page.
+- **No-vendor products**: When vendor is null/empty/Unknown, prompt adjusted to "search by product name and category only" instead of showing "Unknown" as a manufacturer. Vendor website line omitted for both own-brand and unknown vendors.
+
 ## feat: AI Product Enrichment settings hub page — 2026-04-04
 
 - **New page**: `src/app/admin/settings/enrichment/page.tsx` — dedicated enrichment management hub

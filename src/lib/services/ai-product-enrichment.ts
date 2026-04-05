@@ -61,19 +61,41 @@ export interface EnrichmentResult {
   error?: string;
 }
 
+const OWN_BRAND_NAMES = ['sd auto spa', 'sdas', 'smart details auto spa', 'smart details'];
+
+function isOwnBrand(vendorName: string): boolean {
+  return OWN_BRAND_NAMES.includes(vendorName.toLowerCase().trim());
+}
+
+function isUnknownVendor(vendorName: string): boolean {
+  const v = vendorName.toLowerCase().trim();
+  return !v || v === 'unknown';
+}
+
 /** Build the user prompt for a single product enrichment request. */
 export function buildEnrichmentUserPrompt(input: EnrichmentInput): string {
   const parts = [
     'Research this product and provide accurate specifications:',
     '',
     `PRODUCT NAME: ${input.productName}`,
-    `MANUFACTURER/VENDOR: ${input.vendorName}`,
   ];
+
+  if (isOwnBrand(input.vendorName)) {
+    parts.push('MANUFACTURER/VENDOR: Store Brand (Smart Details Auto Spa) — This is a store-branded/private-label product. Search for this product by name on Google to find general product information, reviews, or similar products. If no specific product page exists, generate a description based on the product name, category, and any available information.');
+  } else if (isUnknownVendor(input.vendorName)) {
+    parts.push('MANUFACTURER/VENDOR: Unknown — search by product name and category only');
+  } else {
+    parts.push(`MANUFACTURER/VENDOR: ${input.vendorName}`);
+  }
 
   if (input.categoryName) parts.push(`CATEGORY: ${input.categoryName}`);
   if (input.currentDescription) parts.push(`CURRENT DESCRIPTION: ${input.currentDescription}`);
   if (input.variantLabel) parts.push(`VARIANT: ${input.variantLabel}`);
-  if (input.vendorWebsite) parts.push(`VENDOR WEBSITE: ${input.vendorWebsite} — search this site first`);
+
+  // Only include vendor website for known third-party vendors
+  if (input.vendorWebsite && !isOwnBrand(input.vendorName) && !isUnknownVendor(input.vendorName)) {
+    parts.push(`VENDOR WEBSITE: ${input.vendorWebsite} — search this site first`);
+  }
 
   parts.push('', 'Find this exact product on the manufacturer\'s website or authorized retailers. Extract factual specifications only.');
 
@@ -112,7 +134,12 @@ export function parseEnrichmentResponse(
     return { shortDescription: null, specs: null, sourceUrl: null, error: 'Empty AI response' };
   }
 
-  const cleanedText = lastTextBlock.text
+  // Strip citation tags BEFORE JSON parsing — embedded <cite> tags can break JSON structure
+  const citationStripped = lastTextBlock.text
+    .replace(/<cite[^>]*>/g, '')
+    .replace(/<\/cite>/g, '');
+
+  const cleanedText = citationStripped
     .replace(/```json\s*/g, '')
     .replace(/```\s*/g, '')
     .trim();
