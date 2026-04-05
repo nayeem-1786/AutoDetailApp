@@ -93,6 +93,9 @@ export const specsSchema = z.object({
   pro_tips: z.string().optional(),
 }).optional().nullable();
 
+/** Typed shape of the product specs JSONB field. */
+export type ProductSpecs = z.infer<typeof specsSchema>;
+
 export const productCreateSchema = z.object({
   name: requiredString,
   sku: optionalString,

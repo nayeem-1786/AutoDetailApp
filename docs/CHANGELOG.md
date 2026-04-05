@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Frontend product specs display, variant links, voice agent specs — 2026-04-04
+
+- **Product detail page**: New sections for specs data between description and CTA — About This Product (overview), What Problem Does This Solve (use_case), Key Features (pill badges), Specifications table (only populated fields), Pro Tips (lightbulb callout box). All sections conditionally rendered — products without specs show existing layout unchanged.
+- **Variant links**: "Also Available In" section shows sibling products in the same variant group with label and price. Current variant highlighted, siblings link to their product pages. Only rendered for products in groups with 2+ members.
+- **Voice agent**: Products endpoint now returns all specs fields (overview, use_case, key_features, application_method, surface_compatibility, size_volume, dilution_ratio, coverage_yield, scent, pro_tips) plus variant_label, product_group_id, and variants array grouping sibling products. Backward compatible — all new fields are additive.
+- **JSON-LD**: Product schema enhanced with specs.overview as description (fallback to product.description), additionalProperty for spec fields (size, dilution ratio, coverage, application method, scent), and isSimilarTo linking variant siblings.
+- **Data layer**: New `getProductVariants()` function in products.ts — fetches active, website-visible sibling products excluding current product, ordered by price.
+- **Type safety**: Exported `ProductSpecs` type (`z.infer<typeof specsSchema>`) from validation.ts for typed access to specs JSONB.
+
 ## fix: Enrichment parsing robustness, own-brand handling, no-vendor prompt — 2026-04-04
 
 - **Pre-parse citation stripping**: Strip `<cite>` tags from raw AI response text BEFORE JSON parsing, not just after. Embedded citation tags could break JSON structure and cause parse failures.

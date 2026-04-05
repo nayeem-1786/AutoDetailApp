@@ -2,8 +2,9 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { Package, Clock } from 'lucide-react';
-import { getProductBySlug, getAllProductsForSitemap } from '@/lib/data/products';
+import Link from 'next/link';
+import { Package, Clock, Lightbulb } from 'lucide-react';
+import { getProductBySlug, getProductVariants, getAllProductsForSitemap } from '@/lib/data/products';
 import { getBusinessInfo } from '@/lib/data/business';
 import { generateProductMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
@@ -18,6 +19,7 @@ import { JsonLd } from '@/components/public/json-ld';
 import { AdZone } from '@/components/public/cms/ad-zone';
 import { getCmsToggles } from '@/lib/data/cms';
 import { ProductAddToCart } from '@/components/public/cart/product-add-to-cart';
+import type { ProductSpecs } from '@/lib/utils/validation';
 
 export const revalidate = 300;
 
@@ -60,9 +62,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
   }
 
   const { product, category } = result;
-  const [businessInfo, cmsToggles] = await Promise.all([
+  const specs = product.specs as ProductSpecs | undefined;
+
+  const [businessInfo, cmsToggles, variants] = await Promise.all([
     getBusinessInfo(),
     getCmsToggles(),
+    getProductVariants(product.product_group_id, product.id),
   ]);
 
   const breadcrumbItems = [
@@ -77,9 +82,18 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   const inStock = product.quantity_on_hand > 0;
 
+  // Build spec rows for the specifications table — only include populated fields
+  const specRows: Array<{ label: string; value: string | string[] }> = [];
+  if (specs?.size_volume) specRows.push({ label: 'Size / Volume', value: specs.size_volume });
+  if (specs?.application_method) specRows.push({ label: 'Application Method', value: specs.application_method });
+  if (specs?.dilution_ratio) specRows.push({ label: 'Dilution Ratio', value: specs.dilution_ratio });
+  if (specs?.coverage_yield) specRows.push({ label: 'Coverage / Yield', value: specs.coverage_yield });
+  if (specs?.scent) specRows.push({ label: 'Scent', value: specs.scent });
+  if (specs?.surface_compatibility?.length) specRows.push({ label: 'Surfaces', value: specs.surface_compatibility });
+
   return (
     <>
-      <JsonLd data={generateProductSchema(product, category, businessInfo.name)} />
+      <JsonLd data={generateProductSchema(product, category, businessInfo.name, variants)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
       <article className="bg-brand-dark py-8 sm:py-12">
@@ -197,7 +211,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                 }}
               />
 
-              {/* Description */}
+              {/* Short Description */}
               {product.description && (
                 <div className="mt-8">
                   <h2 className="font-display text-lg font-semibold text-site-text">
@@ -205,6 +219,138 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   </h2>
                   <div className="mt-3 text-site-text-muted leading-relaxed whitespace-pre-line">
                     {product.description}
+                  </div>
+                </div>
+              )}
+
+              {/* Full Description (specs.overview) */}
+              {specs?.overview && (
+                <div className="mt-8">
+                  <h2 className="font-display text-lg font-semibold text-site-text">
+                    About This Product
+                  </h2>
+                  <p className="mt-3 text-site-text-muted leading-relaxed">
+                    {specs.overview}
+                  </p>
+                </div>
+              )}
+
+              {/* Use Case */}
+              {specs?.use_case && (
+                <div className="mt-8">
+                  <h2 className="font-display text-lg font-semibold text-site-text">
+                    What Problem Does This Solve?
+                  </h2>
+                  <p className="mt-3 text-site-text-muted leading-relaxed">
+                    {specs.use_case}
+                  </p>
+                </div>
+              )}
+
+              {/* Key Features */}
+              {specs?.key_features && specs.key_features.length > 0 && (
+                <div className="mt-8">
+                  <h2 className="font-display text-lg font-semibold text-site-text">
+                    Key Features
+                  </h2>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {specs.key_features.map((feature, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center rounded-full bg-brand-surface border border-site-border px-3 py-1 text-sm text-site-text"
+                      >
+                        {feature}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Product Specifications */}
+              {specRows.length > 0 && (
+                <div className="mt-8 rounded-2xl bg-brand-surface border border-site-border p-6">
+                  <h2 className="font-display text-lg font-semibold text-site-text">
+                    Specifications
+                  </h2>
+                  <dl className="mt-4 space-y-3 text-sm">
+                    {specRows.map((row) => (
+                      <div key={row.label} className="flex justify-between gap-4">
+                        <dt className="text-site-text-muted shrink-0">{row.label}</dt>
+                        <dd className="font-medium text-site-text text-right">
+                          {Array.isArray(row.value) ? (
+                            <span className="flex flex-wrap justify-end gap-1.5">
+                              {row.value.map((v, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center rounded-full bg-brand-dark border border-site-border px-2 py-0.5 text-xs text-site-text"
+                                >
+                                  {v}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            row.value
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+
+              {/* Pro Tips */}
+              {specs?.pro_tips && (
+                <div className="mt-8 rounded-2xl border border-amber-800/40 bg-amber-950/30 p-5">
+                  <div className="flex items-start gap-3">
+                    <Lightbulb className="h-5 w-5 shrink-0 text-amber-400 mt-0.5" />
+                    <div>
+                      <h2 className="font-display text-sm font-semibold text-amber-300 uppercase tracking-wider">
+                        Pro Tip
+                      </h2>
+                      <p className="mt-1.5 text-sm text-amber-200/80 leading-relaxed">
+                        {specs.pro_tips}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Also Available In — variant links */}
+              {variants.length > 0 && (
+                <div className="mt-8">
+                  <h2 className="font-display text-lg font-semibold text-site-text">
+                    Also Available In
+                  </h2>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {/* Current variant — solid */}
+                    <span className="inline-flex items-center rounded-lg bg-accent-brand/20 border border-accent-brand px-4 py-2 text-sm font-medium text-accent-brand">
+                      {product.variant_label || product.name}
+                      <span className="ml-2 text-site-text-muted">
+                        {formatCurrency((() => {
+                          const ss = getSaleStatus(product);
+                          const si = getTierSaleInfo(product.retail_price, product.sale_price, ss.isOnSale);
+                          return si?.isDiscounted ? si.currentPrice : product.retail_price;
+                        })())}
+                      </span>
+                    </span>
+                    {/* Sibling variants — outline links */}
+                    {variants.map((v) => {
+                      const vs = getSaleStatus({ sale_starts_at: v.sale_starts_at, sale_ends_at: v.sale_ends_at });
+                      const vi = getTierSaleInfo(v.retail_price, v.sale_price, vs.isOnSale);
+                      const displayPrice = vi?.isDiscounted ? vi.currentPrice : v.retail_price;
+                      return (
+                        <Link
+                          key={v.id}
+                          href={`/products/${v.categorySlug}/${v.slug}`}
+                          className="inline-flex items-center rounded-lg border border-site-border bg-brand-surface px-4 py-2 text-sm font-medium text-site-text hover:border-accent-brand hover:text-accent-brand transition-colors"
+                        >
+                          {v.variant_label || v.name}
+                          <span className="ml-2 text-site-text-muted">
+                            {formatCurrency(displayPrice)}
+                          </span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 </div>
               )}

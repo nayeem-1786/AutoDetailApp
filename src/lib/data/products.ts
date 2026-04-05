@@ -141,6 +141,58 @@ export async function getProductBySlug(
 }
 
 // ---------------------------------------------------------------------------
+// getProductVariants
+// Fetch sibling products in the same variant group, excluding the current product.
+// Only returns active, website-visible products.
+// ---------------------------------------------------------------------------
+
+export interface ProductVariant {
+  id: string;
+  name: string;
+  slug: string;
+  variant_label: string | null;
+  retail_price: number;
+  sale_price: number | null;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
+  image_url: string | null;
+  categorySlug: string;
+}
+
+export async function getProductVariants(
+  productGroupId: string | null,
+  excludeProductId: string
+): Promise<ProductVariant[]> {
+  if (!productGroupId) return [];
+
+  const supabase = await getClient();
+
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, slug, variant_label, retail_price, sale_price, sale_starts_at, sale_ends_at, image_url, product_categories!inner(slug)')
+    .eq('product_group_id', productGroupId)
+    .eq('is_active', true)
+    .eq('show_on_website', true)
+    .neq('id', excludeProductId)
+    .order('retail_price', { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    slug: row.slug as string,
+    variant_label: row.variant_label as string | null,
+    retail_price: Number(row.retail_price),
+    sale_price: row.sale_price != null ? Number(row.sale_price) : null,
+    sale_starts_at: row.sale_starts_at as string | null,
+    sale_ends_at: row.sale_ends_at as string | null,
+    image_url: row.image_url as string | null,
+    categorySlug: (row.product_categories as unknown as { slug: string }).slug,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // getAllProductsForSitemap
 // Minimal data for generating the sitemap: product slug, category slug, and
 // the last-updated timestamp.

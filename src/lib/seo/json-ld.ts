@@ -2,6 +2,8 @@ import { SITE_URL } from '@/lib/utils/constants';
 import { formatCurrency, phoneToE164 } from '@/lib/utils/format';
 import type { BusinessInfo, SeoSettings } from '@/lib/data/business';
 import type { Service, ServiceCategory, Product, ProductCategory, ServicePricing } from '@/lib/supabase/types';
+import type { ProductSpecs } from '@/lib/utils/validation';
+import type { ProductVariant } from '@/lib/data/products';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -187,15 +189,17 @@ function buildServiceOffers(
 export function generateProductSchema(
   product: Product,
   category: ProductCategory,
-  businessName: string
+  businessName: string,
+  variants?: ProductVariant[]
 ) {
   const url = `${SITE_URL}/products/${category.slug}/${product.slug}`;
+  const specs = product.specs as ProductSpecs | undefined;
 
-  return {
+  const schema: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.name,
-    description: product.description ?? `${product.name} available at ${businessName}`,
+    description: specs?.overview || product.description || `${product.name} available at ${businessName}`,
     url,
     image: product.image_url ?? undefined,
     sku: product.sku ?? undefined,
@@ -213,6 +217,28 @@ export function generateProductSchema(
       url,
     },
   };
+
+  // Add spec fields as additionalProperty when populated
+  const properties: Array<{ '@type': string; name: string; value: string }> = [];
+  if (specs?.size_volume) properties.push({ '@type': 'PropertyValue', name: 'Size', value: specs.size_volume });
+  if (specs?.dilution_ratio) properties.push({ '@type': 'PropertyValue', name: 'Dilution Ratio', value: specs.dilution_ratio });
+  if (specs?.coverage_yield) properties.push({ '@type': 'PropertyValue', name: 'Coverage', value: specs.coverage_yield });
+  if (specs?.application_method) properties.push({ '@type': 'PropertyValue', name: 'Application Method', value: specs.application_method });
+  if (specs?.scent) properties.push({ '@type': 'PropertyValue', name: 'Scent', value: specs.scent });
+  if (properties.length > 0) {
+    schema.additionalProperty = properties;
+  }
+
+  // Link variant siblings via isSimilarTo
+  if (variants && variants.length > 0) {
+    schema.isSimilarTo = variants.map((v) => ({
+      '@type': 'Product',
+      name: v.name,
+      url: `${SITE_URL}/products/${v.categorySlug}/${v.slug}`,
+    }));
+  }
+
+  return schema;
 }
 
 // ---------------------------------------------------------------------------
