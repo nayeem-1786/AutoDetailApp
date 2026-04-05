@@ -4,6 +4,10 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Remove 5 orphaned page_seo records from old service categories — 2026-04-05
+
+- Deleted 5 page_seo records referencing old category slugs (`precision-express`, `signature-detail`) that were merged into `express-detail-services`. Replacement records already existed under the correct paths. Total: 503 → 498, matching known pages exactly.
+
 ## fix: SEO page save returning HTML instead of JSON — 2026-04-05
 
 - **Root cause**: `savePage` used `encodeURIComponent(pagePath)` in the URL path (e.g. `/api/admin/cms/seo/pages/%2Fservices%2Fceramic-coatings`). Next.js decodes `%2F` to `/` before routing, breaking the `[encodedPath]` dynamic segment match — returns 404 HTML instead of JSON.
