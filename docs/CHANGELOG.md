@@ -4,15 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## feat: Replace sedan silhouettes with professional Illustrator SVGs — 2026-04-05
+## feat: Replace sedan silhouettes with professional Illustrator SVGs (landscape) — 2026-04-05
 
 - Replaced hand-coded sedan exterior and interior SVG silhouettes in the POS zone picker with professional Adobe Illustrator artwork
-- **Exterior**: detailed top-down view with wheels, headlights, taillights, side mirrors, body panels — viewBox cropped from 2160x2160 to portrait 1360x2060
-- **Interior**: top-down cabin view showing seats, rear bench, trunk, body outline through glass — viewBox cropped to 1160x1560
-- All 8 exterior zones and 7 interior zones mapped to the new artwork with correctly positioned tappable overlays
-- Driver side (LEFT) / passenger side (RIGHT) orientation verified against wheel positions
-- Theme-aware colors using existing Tailwind gray palette (#9ca3af, #d1d5db, #e5e7eb) — consistent with SUV and van silhouettes
-- Photo count badges scaled proportionally for the larger viewBox coordinate space
+- **Landscape orientation**: car rotated 90° CW via `<g transform>` — nose points RIGHT, driver side at TOP, passenger at BOTTOM. Much larger on iPad (max-w-[500px] vs 260px portrait)
+- **Exterior**: viewBox 2100x1430 landscape — all 8 zones mapped to rotated positions: Rear/Trunk/Roof/Hood/Front left-to-right, Driver/Passenger top-to-bottom, Wheels at corners
+- **Interior**: viewBox 1680x920 landscape — all 7 zones mapped: Trunk/Rear/Seats/Console/Carpet/Dashboard left-to-right, Door panels top/bottom
+- Original artwork paths preserved exactly (wrapped in rotation group, not modified)
+- Driver side (TOP) / passenger side (BOTTOM) orientation matches real car layout
+- Theme-aware colors using existing Tailwind gray palette — consistent with SUV and van silhouettes
 - No changes to zone definitions, zone picker logic, or other vehicle silhouettes (SUV, van)
 
 ## fix: Migration wizard skip buttons for zero-record steps — 2026-04-05
