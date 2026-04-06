@@ -2,164 +2,254 @@ import { EXTERIOR_ZONES } from '@/lib/utils/job-zones';
 import { SilhouetteProps, zoneColor, zoneBorder } from './types';
 
 /**
- * Sedan exterior silhouette — top-down view
- * Compact body, defined trunk, lower roofline
+ * Sedan exterior silhouette — professional Illustrator artwork, top-down view
+ * Detailed body with wheels, headlights, taillights, and tappable zone overlays
  */
 export function SedanExterior({ photoCounts, onZoneTap }: SilhouetteProps) {
   const zc = (key: string) => zoneColor(photoCounts, key);
   const zb = (key: string) => zoneBorder(photoCounts, key);
 
   return (
-    <svg viewBox="0 0 300 500" className="mx-auto w-full max-w-[260px]">
-      {/* Vehicle body outline — sedan top-down silhouette */}
-      <path
-        d="M 110 50 Q 110 25 150 15 Q 190 25 190 50
-           L 195 80 L 200 130
-           Q 205 145 205 160
-           L 208 200 L 208 300
-           L 205 340 Q 205 355 200 370
-           L 195 420 L 190 450
-           Q 190 475 150 485 Q 110 475 110 450
-           L 105 420 L 100 370
-           Q 95 355 95 340
-           L 92 300 L 92 200
-           Q 95 145 95 160
-           L 100 130 L 105 80 Z"
-        fill="none"
-        stroke="#9ca3af"
-        strokeWidth="2"
-      />
+    <svg viewBox="400 50 1360 2060" className="mx-auto w-full max-w-[260px]">
+      {/* ─── Background fills ─── */}
+      <g fill="#e5e7eb">
+        <path d="M1587.8,243.8l3,39.1s.8,7.1,8.4,8.5h27.6s7.4-4.2,6.4-9.2l-8.9-33.4-32-2.8-4.5-2.2Z" />
+        <path d="M1485.4,1827.5l-4.3-49-32.5-33.1s-7.7-4-14.2,3.2c0,0-16.3,35.3-14.5,49.4,1.8,14.1,4.8,24.2,15.4,29l50,.5Z" />
+        <path d="M868.3,2085.5s-5.4-32.6,62.7-32.6h304c0,0,56.8-.7,57,32.6l-25.4,4.2h-372.9s-25.4-4.2-25.4-4.2Z" />
+        <path d="M1205.9,1919.8l15.7-33.5,6.7-5.7s51.4-26.8,119.6-12.1c0,0,7.7,3.3,8.5,13.8l-3.6,24.5s-3.3,9.4-17.4,11.3l-126.4,6.7s-2.9-.4-3.1-5Z" />
+        <path d="M950.2,1924.8s5,.3,4-5.3l-14.6-31.5s-4.2-7.2-17.2-11.8c0,0-49-20.9-108.6-8.2,0,0-9.7,3.5-10.1,13.1l3.3,24.7s1.7,9.9,17.6,12.3l125.5,6.7Z" />
+        <path d="M1523.6,251.8l-.5,117.7s-31.9,17.5-46.1-4.5c0,0-.6-72.7,14.3-94.6s26.5-21.4,32.4-18.5Z" />
+        <path d="M1395,1095.6l-99.1,31.8s-.7-168.1,110.5-345.9l-1.5,42.9s-18.3-.4-27.8,14.5c-9.5,14.9-3.7,39.1,24.3,41.8l1.2,4.3-7.6,210.5Z" />
+        <path d="M1395,1154l-99,13.8s-7.8,212.8,67,310l32-21.8v-302Z" />
+        <path d="M943.2,239.6l.5-8.9,26-56.5,12.1-6.6,199.8.2,12.1,7.9,25.4,55.1-1.3,9.9s-157.6,26.1-274.4-1Z" />
+        <path d="M1250,138.3l-11.7-26.2s-.1-7.2,6.7-10l93.5-1.4s10.2,2.2,11.4,11.3l3.5,26.2s-2,9-10.8,9.9l-85.1-5.4s-5.6-.3-7.5-4.5Z" />
+        <path d="M812.9,109.4l-4.1,28.7s-.6,7.6,9.3,9.1l87.3-4.5,7.6-6.2,10.7-24.5s1.2-7.1-7.4-10l-93.1-1.4s-7.9,2-10.3,8.8Z" />
+        <path d="M967.7,130.4l-9.6-17.4s-2.3-5.3,5.4-6.6h235.8s4.6.3,4.9,5.9l-9,17.3s-3,3.5-8,3.5h-214.4c0,0-5-2.7-5-2.7Z" />
+        <path d="M1331.6,722.5s-78-78.7-251.6-77c0,0-155.1-6.6-249,74.6,0,0,37.2,153.1,43,228.4,0,0,178.3-56.6,411.8,0,0,0,27-175.3,45.6-226.1Z" />
+        <path d="M885.8,1419.9s-7.1,98-26.7,160c0,0-9,53.3,34.6,72.1,0,0,179.6,57.5,372.5,0,0,0,41.8-23.4,34.6-72.1,0,0-21.7-105.1-26.7-160,0,0-193.5,56.7-388.3,0Z" />
+      </g>
 
-      {/* Side mirrors */}
-      <ellipse cx="78" cy="175" rx="12" ry="8" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
-      <ellipse cx="222" cy="175" rx="12" ry="8" fill="none" stroke="#9ca3af" strokeWidth="1.5" />
+      {/* ─── Body outline ─── */}
+      <g fill="none" stroke="#9ca3af" strokeWidth={4} strokeMiterlimit={10}>
+        <path d="M1080,249.1s-180.8-13.9-278.6,122.7c-4.9,6.9-7.6,15.2-7.6,23.7v250.5c0,7.3,1.8,14.5,5.2,21l29.4,55.6s130.6,447.7,27,873.2c-2,8.2-2.5,16.8-1.5,25.2l17.8,144.8c.8,6.3,4.1,12,9.2,15.7,20.8,15.3,82.9,51.6,199.1,46.1" />
+        <path d="M1080,645.6s-157.3-8.6-251.6,77" />
+        <path d="M1080,923.3s-102.3-3.1-205.9,25.3" />
+        <path d="M1080,1441s-133.2,2.5-194.2-21.1" />
+        <path d="M860.5,1574.2s-10.7,52.6,28.7,76c0,0,58,27.4,190.9,28.9" />
+        <path d="M1080,1359.2s-19.9,14.4-18.5,60.1c.1,3.8,3.3,6.8,7.1,6.8h11.5" />
+        <path d="M1080,249.1s180.8-13.9,278.6,122.7c4.9,6.9,7.6,15.2,7.6,23.7v250.5c0,7.3-1.8,14.5-5.2,21l-29.4,55.6s-130.6,447.7-27,873.2c2,8.2,2.5,16.8,1.5,25.2l-17.8,144.8c-.8,6.3-4.1,12-9.2,15.7-20.8,15.3-82.9,51.6-199.1,46.1" />
+        <path d="M1080,645.6s157.3-8.6,251.6,77" />
+        <path d="M1080,923.3s102.3-3.1,205.9,25.3" />
+        <path d="M1080,1441s133.2,2.5,194.2-21.1" />
+        <path d="M1299.5,1574.2s10.7,52.6-28.7,76c0,0-58,27.4-190.9,28.9" />
+        <path d="M1080,1359.2s19.9,14.4,18.5,60.1c-.1,3.8-3.3,6.8-7.1,6.8h-11.5" />
+      </g>
 
-      {/* Windshield */}
-      <path
-        d="M 108 135 Q 150 120 192 135 L 190 165 Q 150 155 110 165 Z"
-        fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1"
-      />
+      {/* ─── Detail fills (render over body outline) ─── */}
+      <g fill="#e5e7eb">
+        <path d="M569.4,240.3l-3,39.1s-.8,7.1-8.4,8.5h-27.6s-7.4-4.2-6.4-9.2l8.9-33.4,32-2.8,4.5-2.2Z" />
+        <path d="M671.8,1824l4.3-49,32.5-33.1s7.7-4,14.2,3.2c0,0,16.3,35.3,14.5,49.4s-4.8,24.2-15.4,29l-50,.5Z" />
+        <path d="M633.6,248.3l.5,117.7s31.9,17.5,46.1-4.5c0,0,.6-72.7-14.3-94.6-14.9-21.9-26.5-21.4-32.4-18.5Z" />
+        <path d="M762.2,1092.1l99.1,31.8s.7-168.1-110.5-345.9l1.5,42.9s18.3-.4,27.8,14.5c9.5,14.9,3.7,39.1-24.3,41.8l-1.2,4.3,7.6,210.5Z" />
+        <path d="M762.2,1150.5l99,13.8s7.8,212.8-67,310l-32-21.8v-302Z" />
+      </g>
 
-      {/* Rear window */}
-      <path
-        d="M 110 355 Q 150 345 190 355 L 192 380 Q 150 390 108 380 Z"
-        fill="#e5e7eb" stroke="#d1d5db" strokeWidth="1"
-      />
+      {/* ─── Primary strokes (wheels, body assemblies, headlight/taillight housings) ─── */}
+      <g fill="none" stroke="#9ca3af" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round">
+        {/* Right wheel assembly */}
+        <path d="M1663.2,1661.7c.2-2.1-1.4-4-3.6-3.9-22.9.6-136.8-1.8-166.6-106.9-32.3-113.4,59.5-193,175.5-194.5,3.2,0,5.8-2.7,5.8-5.9v-669.8c0-3.1-2.7-5.6-5.8-5.3-27.6,2.4-146.3,6.5-174.1-98.6-30-113.2,62.5-192.3,166.4-178.8,2.5.3,4.6-1.8,4.4-4.3l-10-94.4-14-62.2c-.4-1.6-2.2-2.4-3.6-1.6l-12.5,7.5c-.6.4-1,1-1.1,1.6l-.3,2.5c-.1,1.2-1.2,2.1-2.4,1.9l-28.4-3.1c-1-.1-1.9-.8-2.1-1.8l-1.1-3.6c-.3-1.1-1.3-1.8-2.4-1.8l-40.3-.9c-.6,0-1.3.2-1.8.6l-2,1.7c-.6.6-1.5.8-2.3.6-13.1-3.4-124.1-18.7-140.1,415.7,0,1.3,0,2.6.2,4l.5,4.5c.4,3.5-.3,7.1-2.1,10.1-29.4,49.5-276,491.2-23.2,976,0,0,11.2,22.6,11.2,51.9l4.1,105.1c0,2.5.7,4.9,1.7,7.1,2.2,4.5,7.2,10.8,18.1,12,.6,0,1.2,0,1.8,0h72.1s14.3,22,38.5,24.7h29.1c.7,0,1.4.2,2.1.5l8.2,4.6c1.1.6,2.4.7,3.5.3l64.6-24.4s11.9-5.1,14.8-21.7l17-149.8Z" />
+        <ellipse cx="1616.9" cy="1508.4" rx="115.9" ry="116.1" />
+        <ellipse cx="1616.9" cy="1508.4" rx="84.9" ry="85.1" />
+        <ellipse cx="1622.4" cy="538.7" rx="115.9" ry="116.1" />
+        <ellipse cx="1622.4" cy="538.7" rx="84.9" ry="85.1" />
+        <path d="M1538.8,429.8v-54.6c0-2.6-2.1-4.8-4.8-4.8h-10.9s-23.6,14.5-42.7-.7c-2.4-1.9-3.9-4.8-4-7.9-.8-21.1-1.6-110.2,45-112.2,1.2,0,2.2.9,2.2,2.2l-.5,118.6" />
+        <path d="M1587.4,239l3.2,42.9c.3,4,2.8,7.4,6.5,8.8,4.7,1.8,13,3.1,27.2,1.6,1.7-.2,3.4-.8,4.9-1.8,2-1.4,4-3.9,3.9-8.3,0-.9-.2-1.8-.4-2.6l-9-32.3" />
+        <path d="M1485.4,1827.5l-3.4-46.2c-.1-1.6-.8-3.1-1.9-4.2l-29-29.8c-2-2.1-4.8-3.3-7.7-3.3h0c-4.2,0-8,2.4-9.8,6.2-8.1,17.3-27.5,65.5,3.1,77.3" />
+        <path d="M1526.8,1610.3l-12.7,125.8c-.4,4.4-2.3,8.5-5.2,11.8l-27.7,30.6" />
+        <path d="M1595.9,1846.6s-1.6-28.4,17.5-46.3l38-34.1" />
+        <line x1="1632.5" y1="1832.6" x2="1639.1" y2="1777.2" />
+        <path d="M1369.8,731.5" />
+        <path d="M1389,749.8" />
+        <line x1="1659.7" y1="1657.8" x2="1664.7" y2="1614.2" />
+        <line x1="1671.7" y1="1406.1" x2="1670.7" y2="1356" />
+        <line x1="1668.6" y1="675.4" x2="1668" y2="645.5" />
+        <line x1="1662.6" y1="429.8" x2="1660.9" y2="398" />
+        {/* Left wheel assembly */}
+        <path d="M494,1658.2c-.2-2.1,1.4-4,3.6-3.9,22.9.6,136.8-1.8,166.6-106.9,32.3-113.4-59.5-193-175.5-194.5-3.2,0-5.8-2.7-5.8-5.9v-669.8c0-3.1,2.7-5.6,5.8-5.3,27.6,2.4,146.3,6.5,174.1-98.6,30-113.2-62.5-192.3-166.4-178.8-2.5.3-4.6-1.8-4.4-4.3l10-94.4,14-62.2c.4-1.6,2.2-2.4,3.6-1.6l12.5,7.5c.6.4,1,1,1.1,1.6l.3,2.5c.1,1.2,1.2,2.1,2.4,1.9l28.4-3.1c1-.1,1.9-.8,2.1-1.8l1.1-3.6c.3-1.1,1.3-1.8,2.4-1.8l40.3-.9c.6,0,1.3.2,1.8.6l2,1.7c.6.6,1.5.8,2.3.6,13.1-3.4,124.1-18.7,140.1,415.7,0,1.3,0,2.6-.2,4l-.5,4.5c-.4,3.5.3,7.1,2.1,10.1,29.4,49.5,276,491.2,23.2,976,0,0-11.2,22.6-11.2,51.9l-4.1,105.1c0,2.5-.7,4.9-1.7,7.1-2.2,4.5-7.2,10.8-18.1,12-.6,0-1.2,0-1.8,0h-72.1s-14.3,22-38.5,24.7h-29.1c-.7,0-1.4.2-2.1.5l-8.2,4.6c-1.1.6-2.4.7-3.5.3l-64.6-24.4s-11.9-5.1-14.8-21.7l-17-149.8Z" />
+        <ellipse cx="540.3" cy="1504.9" rx="115.9" ry="116.1" />
+        <ellipse cx="540.3" cy="1504.9" rx="84.9" ry="85.1" />
+        <ellipse cx="534.8" cy="535.2" rx="115.9" ry="116.1" />
+        <ellipse cx="534.8" cy="535.2" rx="84.9" ry="85.1" />
+        <path d="M618.4,426.3v-54.6c0-2.6,2.1-4.8,4.8-4.8h10.9s23.6,14.5,42.7-.7c2.4-1.9,3.9-4.8,4-7.9.8-21.1,1.6-110.2-45-112.2-1.2,0-2.2.9-2.2,2.2l.5,118.6" />
+        <path d="M569.8,235.5l-3.2,42.9c-.3,4-2.8,7.4-6.5,8.8-4.7,1.8-13,3.1-27.2,1.6-1.7-.2-3.4-.8-4.9-1.8-2-1.4-4-3.9-3.9-8.3s.2-1.8.4-2.6l9-32.3" />
+        <path d="M671.8,1824l3.4-46.2c.1-1.6.8-3.1,1.9-4.2l29-29.8c2-2.1,4.8-3.3,7.7-3.3h0c4.2,0,8,2.4,9.8,6.2,8.1,17.3,27.5,65.5-3.1,77.3" />
+        <path d="M630.4,1606.8l12.7,125.8c.4,4.4,2.3,8.5,5.2,11.8l27.7,30.6" />
+        <path d="M561.3,1843.1s1.6-28.4-17.5-46.3l-38-34.1" />
+        <line x1="524.7" y1="1829.1" x2="518.1" y2="1773.7" />
+        <path d="M787.3,728" />
+        <path d="M768.2,746.3" />
+        <line x1="497.5" y1="1654.3" x2="492.5" y2="1610.7" />
+        <line x1="485.5" y1="1402.6" x2="486.5" y2="1352.5" />
+        <line x1="488.6" y1="671.9" x2="489.2" y2="642" />
+        <line x1="494.6" y1="426.3" x2="496.3" y2="394.5" />
+        {/* Headlight housings */}
+        <path d="M1081.2,248.8s122.1,5.1,137.7-9.2l137.8,18.6c2.4.3,4.9,0,7.2-1l23.7-10.7c5-2.2,8-7.3,7.7-12.7-1.1-21-5.3-76.3-20.1-140.6-1-4.4-4.4-7.9-8.8-9.1l-28-7.1c-1.3-.3-2.6-.4-3.9-.3-16.3,1.2-132.2,9.2-253.4,8.4" />
+        <path d="M1080.9,248.8s-122.1,5.1-137.7-9.2l-137.8,18.6c-2.4.3-4.9,0-7.2-1l-23.7-10.7c-5-2.2-8-7.3-7.7-12.7,1.1-21,5.3-76.3,20.1-140.6s4.4-7.9,8.8-9.1l28-7.1c1.3-.3,2.6-.4,3.9-.3,16.3,1.2,132.2,9.2,253.4,8.4" />
+        {/* Taillight housings */}
+        <path d="M1080,1829.4h264.4c5.5,0,10.6,2.6,13.9,7l23.2,30.9c3.7,4.9,6.5,10.3,8.4,16.1,6.6,20.3,19.5,70.7,6.7,127.8l-20,74.9c-.9,3.5-3.4,6.3-6.8,7.7h0c-3,1.2-6.4,1.2-9.4-.3-10.4-5.1-40.3-15.6-94-3.8h-186" />
+        <path d="M1080.3,1829.4h-264.4c-5.5,0-10.6,2.6-13.9,7l-23.2,30.9c-3.7,4.9-6.5,10.3-8.4,16.1-6.6,20.3-19.5,70.7-6.7,127.8l20,74.9c.9,3.5,3.4,6.3,6.8,7.7h0c3,1.2,6.4,1.2,9.4-.3,10.4-5.1,40.3-15.6,94-3.8h186" />
+      </g>
 
-      {/* Wheel arches */}
-      <ellipse cx="105" cy="105" rx="18" ry="12" fill="none" stroke="#d1d5db" strokeWidth="1" />
-      <ellipse cx="195" cy="105" rx="18" ry="12" fill="none" stroke="#d1d5db" strokeWidth="1" />
-      <ellipse cx="105" cy="400" rx="18" ry="12" fill="none" stroke="#d1d5db" strokeWidth="1" />
-      <ellipse cx="195" cy="400" rx="18" ry="12" fill="none" stroke="#d1d5db" strokeWidth="1" />
+      {/* ─── Medium detail strokes ─── */}
+      <g fill="none" stroke="#d1d5db" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+        {/* Right body details */}
+        <rect x="1397.7" y="1516.5" width="52.6" height="66" rx="11.9" ry="11.9" transform="translate(2848 3099.1) rotate(180)" />
+        <path d="M1401.7,665.2s20.3,22.6,0,63.2c0,0-73.1,118.6-100.1,215.8-.6,2.2-2.9,3.5-5.1,2.9l-2.7-.8" />
+        <path d="M1644.2,676.2v645.4c0,4.7-2.9,9-7.3,10.7-30.9,11.8-153.5,61.9-265.8,155-3.2,2.6-7.7,2.9-11.1.5-17.7-12.1-67-61.6-74-241.2,0,0-25-311,119.2-489.7s8.9-8.4,14.6-10.6c23.5-9,93.6-29.3,224.4-17" />
+        <path d="M1644.2,1107.2s-189-9.6-358.3,41.2" />
+        <path d="M1296,1167.8l99-13.8v302l-32,21.8s-70-67.6-67-310Z" />
+        <path d="M1295.9,1127.4l99.1-31.8,11.4-314.1s-105.6,159.9-110.5,345.9Z" />
+        <path d="M1400,825.1h2.6v55.1h-2.6c-15.2,0-27.6-12.3-27.6-27.6h0c0-15.2,12.3-27.6,27.6-27.6Z" transform="translate(36.1 -56.1) rotate(2.3)" />
+        <rect x="1433.1" y="1014.6" width="17.1" height="68.1" rx="8.5" ry="8.5" />
+        <rect x="1433.1" y="1315.9" width="17.1" height="68.1" rx="8.5" ry="8.5" />
+        {/* Left body details */}
+        <path d="M755.5,661.7s-20.3,22.6,0,63.2c0,0,73.1,118.6,100.1,215.8.6,2.2,2.9,3.5,5.1,2.9l2.7-.8" />
+        <path d="M513,672.7v645.4c0,4.7,2.9,9,7.3,10.7,30.9,11.8,153.5,61.9,265.8,155,3.2,2.6,7.7,2.9,11.1.5,17.7-12.1,67-61.6,74-241.2,0,0,25-311-119.2-489.7-3.8-4.8-8.9-8.4-14.6-10.6-23.5-9-93.6-29.3-224.4-17" />
+        <path d="M513,1103.7s189-9.6,358.3,41.2" />
+        <path d="M861.2,1164.3l-99-13.8v302s32,21.8,32,21.8c0,0,70-67.6,67-310Z" />
+        <path d="M861.3,1123.9l-99.1-31.8-11.4-314.1s105.6,159.9,110.5,345.9Z" />
+        <path d="M782.2,821.6h2.6v55.1h-2.6c-15.2,0-27.6-12.3-27.6-27.6h0c0-15.2,12.3-27.6,27.6-27.6Z" transform="translate(1573.5 1666) rotate(177.7)" />
+        <rect x="707.1" y="1011.1" width="17.1" height="68.1" rx="8.5" ry="8.5" transform="translate(1431.2 2090.4) rotate(-180)" />
+        <rect x="707.1" y="1312.4" width="17.1" height="68.1" rx="8.5" ry="8.5" transform="translate(1431.2 2693) rotate(-180)" />
+        {/* Headlight details */}
+        <path d="M1218.9,239.6v-5.5c0-1.9-.4-3.7-1.2-5.4l-22.6-50.3c-1.7-3.7-4.5-6.8-8.1-8.7h0c-2.7-1.4-5.7-2.2-8.7-2.2h-97" />
+        <path d="M1341.9,256.2s16.2-15.1,7.6-46.9c-.7-2.4-2.9-4.1-5.4-4.1l-116.6,1.4c-1.4,0-2.7.5-3.7,1.4h0c-1.6,1.4-2.3,3.5-1.8,5.6,1.4,6.3,5.5,19.7,16.4,28.6" />
+        <path d="M1257.5,142.8l85.1,5.4c5,.3,9.5-3,10.6-7.8s0-.2,0-.2c.2-1,.2-2.1,0-3.1l-3.4-25c-.4-3.3-2.1-6.3-4.7-8.4h0c-2.4-2-5.5-3.1-8.6-3l-89.4,1.3c-2.1,0-4.2.8-5.8,2.2s-.6.6-.9.9c-2.2,2.6-2.6,6.3-1.2,9.4l10.2,22.9c1.4,3.2,4.5,5.4,8,5.6Z" />
+        <path d="M1081.2,133.2h107.2c2.9,0,5.6-1.6,7.1-4.2l7.9-14.5c1.1-2,.8-4.4-.6-6.1h0c-1-1.2-2.5-1.9-4.1-1.9h-117.5" />
+        <path d="M943.2,239.6v-5.5c0-1.9.4-3.7,1.2-5.4l22.6-50.3c1.7-3.7,4.5-6.8,8.1-8.7h0c2.7-1.4,5.7-2.2,8.7-2.2h97" />
+        <path d="M820.3,256.2s-16.2-15.1-7.6-46.9,2.9-4.1,5.4-4.1l116.6,1.4c1.4,0,2.7.5,3.7,1.4h0c1.6,1.4,2.3,3.5,1.8,5.6-1.4,6.3-5.5,19.7-16.4,28.6" />
+        <path d="M904.6,142.8l-85.1,5.4c-5,.3-9.5-3-10.6-7.8s0-.2,0-.2c-.2-1-.2-2.1,0-3.1l3.4-25c.4-3.3,2.1-6.3,4.7-8.4h0c2.4-2,5.5-3.1,8.6-3l89.4,1.3c2.1,0,4.2.8,5.8,2.2s.6.6.9.9c2.2,2.6,2.6,6.3,1.2,9.4l-10.2,22.9c-1.4,3.2-4.5,5.4-8,5.6Z" />
+        <path d="M1080.9,133.2h-107.2c-2.9,0-5.6-1.6-7.1-4.2l-7.9-14.5c-1.1-2-.8-4.4.6-6.1h0c1-1.2,2.5-1.9,4.1-1.9h117.5" />
+        <ellipse cx="1081.3" cy="214.7" rx="26.4" ry="14.1" />
+      </g>
+
+      {/* ─── Fine detail strokes (taillights) ─── */}
+      <g fill="none" stroke="#d1d5db" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1292,2085.5s6.2-32.2-61.4-32.6h-150" />
+        <path d="M1210.1,1924.8l127.4-6.8c2.6-.1,5.2-.8,7.5-2.1s5.7-4,7.5-8,1-2.9,1.2-4.4l2.7-20.3c.5-3.9-.7-7.9-3.2-10.9h0c-2-2.4-4.8-4-7.9-4.5-16.4-3.1-71.5-10.9-117.6,13.3-3.3,1.7-5.8,4.5-7.4,7.8l-14,30.3c-1.3,2.8.8,5.9,3.9,5.7Z" />
+        <path d="M1266.6,1921.8l-5.6,17.4s-7.8,21.4-33,22.9h-147.4" />
+        <polyline points="1285 1864.9 1287.8 1856.5 1296.5 1829.4" />
+        <path d="M1402.1,1960l-24.3-12.2c-3.4-1.7-6.2-4.2-8.3-7.4l-19.2-29" />
+        <path d="M1266.6,2089.7v-6.1c0-6.2-5-11.2-11.2-11.2h-14.9c-6.2,0-11.2,5-11.2,11.2v6.1" />
+        <path d="M868.3,2085.5s-6.2-32.2,61.4-32.6h150" />
+        <path d="M950.2,1924.8l-127.4-6.8c-2.6-.1-5.2-.8-7.5-2.1-2.6-1.5-5.7-4-7.5-8s-1-2.9-1.2-4.4l-2.7-20.3c-.5-3.9.7-7.9,3.2-10.9h0c2-2.4,4.8-4,7.9-4.5,16.4-3.1,71.5-10.9,117.6,13.3,3.3,1.7,5.8,4.5,7.4,7.8l14,30.3c1.3,2.8-.8,5.9-3.9,5.7Z" />
+        <path d="M1079.7,1962.1h-147.4c-25.1-1.6-33-22.9-33-22.9l-5.7-17.4" />
+        <polyline points="863.8 1829.4 872.5 1856.5 875.3 1864.9" />
+        <path d="M758.2,1960l24.3-12.2c3.4-1.7,6.2-4.2,8.3-7.4l19.2-29" />
+        <path d="M893.7,2089.7v-6.1c0-6.2,5-11.2,11.2-11.2h14.9c6.2,0,11.2,5,11.2,11.2v6.1" />
+      </g>
 
       {/* ─── Tappable Zone Hotspots ─── */}
 
       {/* Front */}
-      <path
-        d="M 115 18 Q 150 10 185 18 L 190 55 L 110 55 Z"
+      <rect x={790} y={60} width={580} height={220} rx={20}
         fill={zc('exterior_front')} stroke={zb('exterior_front')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_front')}
       />
-      <text x="150" y="42" textAnchor="middle" fontSize="10" fill="#374151" fontWeight="500">Front</text>
+      <text x={1080} y={190} textAnchor="middle" fontSize={46} fill="#374151" fontWeight="500">Front</text>
 
       {/* Hood */}
-      <path
-        d="M 110 58 L 190 58 L 198 130 Q 150 120 102 130 Z"
+      <rect x={810} y={285} width={540} height={355} rx={15}
         fill={zc('exterior_hood')} stroke={zb('exterior_hood')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_hood')}
       />
-      <text x="150" y="100" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Hood</text>
+      <text x={1080} y={480} textAnchor="middle" fontSize={48} fill="#374151" fontWeight="500">Hood</text>
 
       {/* Roof */}
-      <path
-        d="M 100 168 Q 150 158 200 168 L 202 260 L 200 335 Q 150 325 100 335 L 98 260 Z"
+      <rect x={840} y={650} width={480} height={790} rx={15}
         fill={zc('exterior_roof')} stroke={zb('exterior_roof')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_roof')}
       />
-      <text x="150" y="255" textAnchor="middle" fontSize="11" fill="#374151" fontWeight="500">Roof</text>
+      <text x={1080} y={1060} textAnchor="middle" fontSize={48} fill="#374151" fontWeight="500">Roof</text>
 
-      {/* Driver Side */}
-      <rect
-        x="35" y="130" width="53" height="240"
-        rx="6" fill={zc('exterior_driver_side')} stroke={zb('exterior_driver_side')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+      {/* Driver Side (LEFT) */}
+      <rect x={420} y={285} width={365} height={1495} rx={25}
+        fill={zc('exterior_driver_side')} stroke={zb('exterior_driver_side')}
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_driver_side')}
       />
-      <text x="61" y="250" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500"
-        transform="rotate(-90, 61, 250)">Driver Side</text>
+      <text x={602} y={1040} textAnchor="middle" fontSize={40} fill="#374151" fontWeight="500"
+        transform="rotate(-90, 602, 1040)">Driver Side</text>
 
-      {/* Passenger Side */}
-      <rect
-        x="212" y="130" width="53" height="240"
-        rx="6" fill={zc('exterior_passenger_side')} stroke={zb('exterior_passenger_side')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+      {/* Passenger Side (RIGHT) */}
+      <rect x={1375} y={285} width={365} height={1495} rx={25}
+        fill={zc('exterior_passenger_side')} stroke={zb('exterior_passenger_side')}
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_passenger_side')}
       />
-      <text x="239" y="250" textAnchor="middle" fontSize="9" fill="#374151" fontWeight="500"
-        transform="rotate(90, 239, 250)">Passenger Side</text>
+      <text x={1558} y={1040} textAnchor="middle" fontSize={40} fill="#374151" fontWeight="500"
+        transform="rotate(90, 1558, 1040)">Passenger Side</text>
 
       {/* Trunk */}
-      <path
-        d="M 102 383 Q 150 393 198 383 L 192 425 L 108 425 Z"
+      <rect x={810} y={1445} width={540} height={385} rx={15}
         fill={zc('exterior_trunk')} stroke={zb('exterior_trunk')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_trunk')}
       />
-      <text x="150" y="410" textAnchor="middle" fontSize="10" fill="#374151" fontWeight="500">Trunk</text>
+      <text x={1080} y={1655} textAnchor="middle" fontSize={46} fill="#374151" fontWeight="500">Trunk</text>
 
       {/* Rear */}
-      <path
-        d="M 108 428 L 192 428 L 188 455 Q 150 480 112 455 Z"
+      <rect x={770} y={1835} width={620} height={255} rx={20}
         fill={zc('exterior_rear')} stroke={zb('exterior_rear')}
-        strokeWidth="1.5" opacity="0.7" cursor="pointer"
+        strokeWidth={7} opacity={0.7} cursor="pointer"
         onClick={() => onZoneTap('exterior_rear')}
       />
-      <text x="150" y="455" textAnchor="middle" fontSize="10" fill="#374151" fontWeight="500">Rear</text>
+      <text x={1080} y={1980} textAnchor="middle" fontSize={46} fill="#374151" fontWeight="500">Rear</text>
 
       {/* Wheels */}
       <g cursor="pointer" onClick={() => onZoneTap('exterior_wheels')}>
-        <ellipse cx="105" cy="105" rx="17" ry="11"
+        <ellipse cx={534.8} cy={535.2} rx={100} ry={100}
           fill={zc('exterior_wheels')} stroke={zb('exterior_wheels')}
-          strokeWidth="1.5" opacity="0.7"
+          strokeWidth={7} opacity={0.7}
         />
-        <ellipse cx="195" cy="105" rx="17" ry="11"
+        <ellipse cx={1622.4} cy={538.7} rx={100} ry={100}
           fill={zc('exterior_wheels')} stroke={zb('exterior_wheels')}
-          strokeWidth="1.5" opacity="0.7"
+          strokeWidth={7} opacity={0.7}
         />
-        <ellipse cx="105" cy="400" rx="17" ry="11"
+        <ellipse cx={540.3} cy={1504.9} rx={100} ry={100}
           fill={zc('exterior_wheels')} stroke={zb('exterior_wheels')}
-          strokeWidth="1.5" opacity="0.7"
+          strokeWidth={7} opacity={0.7}
         />
-        <ellipse cx="195" cy="400" rx="17" ry="11"
+        <ellipse cx={1616.9} cy={1508.4} rx={100} ry={100}
           fill={zc('exterior_wheels')} stroke={zb('exterior_wheels')}
-          strokeWidth="1.5" opacity="0.7"
+          strokeWidth={7} opacity={0.7}
         />
       </g>
-      <text x="150" y="497" textAnchor="middle" fontSize="9" fill="#6b7280" fontWeight="500">Wheels (all 4)</text>
+      <text x={1080} y={2095} textAnchor="middle" fontSize={40} fill="#6b7280" fontWeight="500">Wheels (all 4)</text>
 
       {/* Photo count badges */}
       {EXTERIOR_ZONES.map((z) => {
         const count = photoCounts[z.key] ?? 0;
         if (count === 0) return null;
         const positions: Record<string, { x: number; y: number }> = {
-          exterior_front: { x: 185, y: 22 },
-          exterior_hood: { x: 190, y: 72 },
-          exterior_roof: { x: 195, y: 178 },
-          exterior_driver_side: { x: 73, y: 145 },
-          exterior_passenger_side: { x: 255, y: 145 },
-          exterior_trunk: { x: 190, y: 395 },
-          exterior_rear: { x: 185, y: 440 },
-          exterior_wheels: { x: 195, y: 118 },
+          exterior_front: { x: 1300, y: 120 },
+          exterior_hood: { x: 1280, y: 360 },
+          exterior_roof: { x: 1260, y: 720 },
+          exterior_driver_side: { x: 530, y: 380 },
+          exterior_passenger_side: { x: 1640, y: 380 },
+          exterior_trunk: { x: 1280, y: 1510 },
+          exterior_rear: { x: 1320, y: 1900 },
+          exterior_wheels: { x: 1622, y: 650 },
         };
         const pos = positions[z.key];
         if (!pos) return null;
         return (
           <g key={z.key}>
-            <circle cx={pos.x} cy={pos.y} r="10" fill="#2563eb" />
-            <text x={pos.x} y={pos.y + 4} textAnchor="middle" fontSize="10" fill="white" fontWeight="bold">
+            <circle cx={pos.x} cy={pos.y} r={45} fill="#2563eb" />
+            <text x={pos.x} y={pos.y + 16} textAnchor="middle" fontSize={45} fill="white" fontWeight="bold">
               {count}
             </text>
           </g>
