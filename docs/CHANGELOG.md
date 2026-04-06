@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## chore: Targeted test data purge (Session 22A-v2) — 2026-04-05
+
+- **Phase 1+2: Full purge of 38 dev-generated tables** — 1,907 rows deleted across appointments, jobs, quotes, orders, conversations, campaigns, coupons, messages, drip sequences, SMS/email logs, audit log, stock alerts, print jobs, voice calls, short links, sale history, and all their child tables.
+- **Phase 3: App-generated transactions purge** — deleted 122 transactions with NULL `square_transaction_id` (test POS/booking transactions from Feb–Apr dev period) plus their 197 transaction_items, 122 payments, 13 refunds, 20 refund_items.
+- **Stock reconciliation**: confirmed zero product items in test transactions — no stock adjustment needed.
+- **Preserved**: 6,100 real Square transactions, 1,317 customers, 147 vehicles, 398 loyalty_ledger entries, 432 products, 30 services, 498 page_seo records — all unchanged.
+- **Post-purge state**: All app-generated tables at zero. `transactions.square_transaction_id IS NULL` count = 0. DB backup at `docs/planning/db-bkup-04-05-2026/` (82 tables, 18,756 rows, 13.83 MB).
+
 ## fix: SEO page save error handling — 2026-04-05
 
 - Improved `savePage` error handling in SEO admin page: reads response as text first, then parses JSON. Logs non-JSON responses (HTML error pages) to browser console with status code and body preview. Shows actionable error message instead of cryptic "Unexpected token" error.
