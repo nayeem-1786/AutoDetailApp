@@ -531,22 +531,32 @@ export default function CustomersPage() {
 
   const columns: ColumnDef<Customer, unknown>[] = [
     {
-      id: 'name',
-      header: 'Name',
-      size: 180,
-      accessorFn: (row) => `${row.first_name} ${row.last_name}`,
+      id: 'phone',
+      header: 'Phone',
+      size: 140,
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <button
             className={`text-left font-medium hover:underline ${row.original.deleted_at ? 'text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
             onClick={() => router.push(`/admin/customers/${row.original.id}`)}
           >
-            {row.original.first_name} {row.original.last_name}
+            {row.original.phone ? formatPhone(row.original.phone) : '--'}
           </button>
           {row.original.deleted_at && (
             <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Archived</Badge>
           )}
         </div>
+      ),
+    },
+    {
+      id: 'name',
+      header: 'Name',
+      size: 180,
+      accessorFn: (row) => `${row.first_name} ${row.last_name}`,
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-900">
+          {row.original.first_name} {row.original.last_name}
+        </span>
       ),
     },
     {
@@ -574,16 +584,6 @@ export default function CustomersPage() {
           </button>
         );
       },
-    },
-    {
-      id: 'phone',
-      header: 'Mobile',
-      size: 140,
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-600">
-          {row.original.phone ? formatPhone(row.original.phone) : '--'}
-        </span>
-      ),
     },
     {
       accessorKey: 'email',

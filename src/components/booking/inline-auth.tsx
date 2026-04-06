@@ -1457,7 +1457,7 @@ function SignUpFlow({
 
 // --- Main InlineAuth Component ---
 
-type AuthView = 'buttons' | 'sign-in' | 'sign-up';
+type AuthView = 'buttons' | 'sign-in' | 'sign-up' | 'complete-profile';
 
 export function InlineAuth({
   onAuthComplete,
@@ -1471,6 +1471,14 @@ export function InlineAuth({
   const [fetchingProfile, setFetchingProfile] = useState(false);
   const localAuthRef = useRef<AuthCustomerData | null>(null);
   const [localAuthData, setLocalAuthData] = useState<AuthCustomerData | null>(null);
+
+  // Profile completion state (for existing customers with incomplete data)
+  const [pendingAuthData, setPendingAuthData] = useState<AuthCustomerData | null>(null);
+  const [completeFirstName, setCompleteFirstName] = useState('');
+  const [completeLastName, setCompleteLastName] = useState('');
+  const [completeEmail, setCompleteEmail] = useState('');
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [completeSaving, setCompleteSaving] = useState(false);
 
   // After auth success: fetch customer profile + vehicles
   const handleAuthSuccess = useCallback(async () => {
@@ -1520,6 +1528,20 @@ export function InlineAuth({
       }
 
       const data = { customer, vehicles };
+
+      // Intercept: if profile is incomplete (missing first or last name),
+      // show the profile completion form before proceeding to booking.
+      // This handles voice-agent-created customers who only have a first name.
+      if (!customer.first_name.trim() || !customer.last_name.trim()) {
+        setPendingAuthData(data);
+        setCompleteFirstName(customer.first_name || '');
+        setCompleteLastName(customer.last_name || '');
+        setCompleteEmail(customer.email || '');
+        setCompleteError(null);
+        setView('complete-profile');
+        return;
+      }
+
       localAuthRef.current = data;
       setLocalAuthData(data);
       onAuthComplete(data);
@@ -1565,6 +1587,61 @@ export function InlineAuth({
     setSwitchPhone('');
     setView('sign-up');
   }, []);
+
+  // Handle profile completion submission for existing customers
+  const handleCompleteProfile = useCallback(async () => {
+    if (!pendingAuthData) return;
+    if (!completeFirstName.trim()) {
+      setCompleteError('First name is required');
+      return;
+    }
+    if (!completeLastName.trim()) {
+      setCompleteError('Last name is required');
+      return;
+    }
+
+    setCompleteSaving(true);
+    setCompleteError(null);
+
+    try {
+      const res = await fetch('/api/customer/complete-profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: completeFirstName.trim(),
+          last_name: completeLastName.trim(),
+          email: completeEmail.trim() || '',
+        }),
+      });
+
+      if (!res.ok) {
+        const json = await res.json();
+        setCompleteError(json.error || 'Failed to update profile');
+        return;
+      }
+
+      // Update the pending data with the completed fields
+      const updatedData: AuthCustomerData = {
+        ...pendingAuthData,
+        customer: {
+          ...pendingAuthData.customer,
+          first_name: completeFirstName.trim(),
+          last_name: completeLastName.trim(),
+          email: completeEmail.trim() || pendingAuthData.customer.email,
+        },
+      };
+
+      localAuthRef.current = updatedData;
+      setLocalAuthData(updatedData);
+      setPendingAuthData(null);
+      setView('buttons');
+      onAuthComplete(updatedData);
+    } catch {
+      setCompleteError('Something went wrong. Please try again.');
+    } finally {
+      setCompleteSaving(false);
+    }
+  }, [pendingAuthData, completeFirstName, completeLastName, completeEmail, onAuthComplete]);
 
   // Already authenticated — show compact info line
   const effectiveData = customerData || localAuthData || localAuthRef.current;
@@ -1694,6 +1771,78 @@ export function InlineAuth({
             onSwitchToSignIn={handleSwitchToSignIn}
             businessName={businessName}
           />
+        </div>
+      )}
+
+      {/* STATE 3: Profile Completion — existing customer with incomplete data */}
+      {view === 'complete-profile' && pendingAuthData && (
+        <div className="rounded-xl border border-site-border p-5 sm:p-6">
+          <h3 className="text-lg font-semibold text-site-text mb-2">Complete Your Profile</h3>
+          <p className="text-sm text-site-text-muted mb-5">
+            Phone verified! We just need a couple more details to complete your booking.
+          </p>
+
+          <div className="space-y-4">
+            {pendingAuthData.customer.phone && (
+              <FormField label="Mobile" htmlFor="complete-phone">
+                <Input
+                  id="complete-phone"
+                  value={formatPhone(pendingAuthData.customer.phone)}
+                  readOnly
+                  className="bg-brand-dark text-site-text-muted border-site-border text-base sm:text-sm"
+                />
+              </FormField>
+            )}
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField label="First Name" required htmlFor="complete-first-name">
+                <Input
+                  id="complete-first-name"
+                  placeholder="John"
+                  autoFocus
+                  value={completeFirstName}
+                  onChange={(e) => { setCompleteFirstName(e.target.value); setCompleteError(null); }}
+                  className={inputCls}
+                />
+              </FormField>
+
+              <FormField label="Last Name" required htmlFor="complete-last-name">
+                <Input
+                  id="complete-last-name"
+                  placeholder="Doe"
+                  value={completeLastName}
+                  onChange={(e) => { setCompleteLastName(e.target.value); setCompleteError(null); }}
+                  className={inputCls}
+                />
+              </FormField>
+            </div>
+
+            <FormField label="Email" htmlFor="complete-email">
+              <Input
+                id="complete-email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={completeEmail}
+                onChange={(e) => { setCompleteEmail(e.target.value); setCompleteError(null); }}
+                className={inputCls}
+              />
+              <p className="mt-1 text-xs text-site-text-dim">Optional — for booking confirmation &amp; receipts</p>
+            </FormField>
+
+            {completeError && (
+              <p className="text-sm text-red-500">{completeError}</p>
+            )}
+
+            <Button
+              type="button"
+              disabled={completeSaving}
+              onClick={handleCompleteProfile}
+              className="site-btn-primary w-full py-3 text-sm font-semibold"
+            >
+              {completeSaving ? <Spinner size="sm" /> : 'Continue to Booking'}
+            </Button>
+          </div>
         </div>
       )}
     </div>

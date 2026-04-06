@@ -927,7 +927,18 @@ export default function CustomerProfilePage() {
       <PageHeader
         title={
           <span className="flex items-center gap-2">
-            {customer.first_name} {customer.last_name}
+            {customer.phone && (
+              <span className="text-gray-900">{formatPhone(customer.phone)}</span>
+            )}
+            {(customer.first_name || customer.last_name) && (
+              <>
+                {customer.phone && <span className="text-gray-300">—</span>}
+                <span>{customer.first_name} {customer.last_name}</span>
+              </>
+            )}
+            {!customer.phone && !customer.first_name && !customer.last_name && (
+              <span className="text-gray-400">No name or phone</span>
+            )}
             <CustomerTypeBadge
               customerId={customer.id}
               customerType={customer.customer_type}
@@ -942,12 +953,7 @@ export default function CustomerProfilePage() {
           </span>
         }
         description={
-          [
-            customer.phone ? formatPhone(customer.phone) : null,
-            customer.email,
-          ]
-            .filter(Boolean)
-            .join(' | ') || 'No contact info'
+          customer.email || 'No email'
         }
         action={
           <Button variant="outline" onClick={() => router.push('/admin/customers')}>

@@ -296,6 +296,7 @@ src/app/api/customer/appointments/[id]/cancel/route.ts
 src/app/api/customer/appointments/[id]/route.ts
 src/app/api/customer/check-exists/route.ts
 src/app/api/customer/coupons/route.ts
+src/app/api/customer/complete-profile/route.ts
 src/app/api/customer/link-account/route.ts
 src/app/api/customer/dismiss-email-prompt/route.ts
 src/app/api/customer/email/route.ts
@@ -359,6 +360,7 @@ src/app/api/pos/auth/pin-login/route.ts
 src/app/api/pos/auth/verify-override/route.ts
 src/app/api/pos/card-customer/route.ts
 src/app/api/pos/coupons/validate/route.ts
+src/app/api/pos/customers/[id]/route.ts
 src/app/api/pos/customers/[id]/type/route.ts
 src/app/api/pos/customers/[id]/vehicles/route.ts
 src/app/api/pos/customers/check-duplicate/route.ts
@@ -1191,6 +1193,7 @@ checkout/                   offline-queue-badge.tsx     service-pricing-picker.t
 coupon-input.tsx            manager-pin-dialog.tsx      prerequisite-removal-dialog.tsx
                             pin-screen.tsx              prerequisite-warning-dialog.tsx
                                                         swipeable-cart-item.tsx
+customer-complete-profile-dialog.tsx
 customer-create-dialog.tsx  pin-pad.tsx                 ticket-actions.tsx
 customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         ticket-panel.tsx

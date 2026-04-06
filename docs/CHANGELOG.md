@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Customer identifier + POS complete profile prompt + booking auth profile completion — 2026-04-06
+
+### Admin Customers List
+- **Phone as primary identifier**: Phone column moved to first position, made the blue clickable link navigating to customer detail page. Name column is now plain text (no longer a link). Header renamed from "Mobile" to "Phone".
+- **Customer detail header**: Shows phone first, em-dash, then name. If name is empty, phone alone serves as the title.
+
+### POS Customer Lookup
+- **Phone-first display**: Search results show phone as bold primary text, name as secondary text below. Nameless customers are now identifiable.
+- **Summary bar**: Shows `(310) 489-1376 — Omar` instead of `Omar (310) 489-1376`.
+- **Complete profile prompt**: When selecting a customer missing first name, last name, or customer type, a mandatory profile completion modal intercepts the selection. Fields: first name (required), last name (required), email (optional), customer type toggle (required). No skip — cashier must fill required fields.
+- New API: `PATCH /api/pos/customers/[id]` for POS customer profile updates.
+- New component: `customer-complete-profile-dialog.tsx`.
+
+### Booking Auth — Profile Completion for Existing Customers
+- **Root cause**: Voice-agent-created customers have empty `last_name`. When they sign in to book online, they bypass the new-signup profile form (phone already exists → sign-in path) and hit `bookingSubmitSchema` which requires `last_name` min(1). Error: "Invalid booking data".
+- **Fix**: After successful sign-in, `handleAuthSuccess()` checks if the fetched profile is missing `first_name` or `last_name`. If incomplete, shows an inline profile completion form (first name required, last name required, email optional) before proceeding to booking.
+- Uses dedicated `PATCH /api/customer/complete-profile` — lightweight endpoint that only updates name/email fields. Does NOT use `/api/customer/link-account` (wrong: returns early for already-linked customers) or `/api/customer/profile` PATCH (too heavy: requires sms_consent, email_consent, etc.).
+- Single interception point covers both sign-in paths (returning customer sign-in and existing-phone-detected signup redirect).
+
 ## feat: Replace sedan silhouettes with professional Illustrator SVGs (landscape) — 2026-04-05
 
 - Replaced hand-coded sedan exterior and interior SVG silhouettes in the POS zone picker with professional Adobe Illustrator artwork

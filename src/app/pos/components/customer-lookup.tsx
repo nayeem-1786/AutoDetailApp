@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { CustomerTypeBadge } from './customer-type-badge';
+import { CustomerCompleteProfileDialog } from './customer-complete-profile-dialog';
 import type { Customer } from '@/lib/supabase/types';
 
 interface CustomerLookupProps {
@@ -36,6 +37,7 @@ export function CustomerLookup({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [incompleteCustomer, setIncompleteCustomer] = useState<Customer | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -89,8 +91,13 @@ export function CustomerLookup({
   }
 
   function handleSelectResult(result: SearchResult) {
-    // Fetch full customer to pass up — the search result has enough for now
-    onSelect(result as unknown as Customer);
+    const customer = result as unknown as Customer;
+    // Intercept if missing required profile data
+    if (!result.first_name?.trim() || !result.last_name?.trim() || !result.customer_type) {
+      setIncompleteCustomer(customer);
+      return;
+    }
+    onSelect(customer);
   }
 
   return (
@@ -132,11 +139,11 @@ export function CustomerLookup({
                 className="flex-1 text-left"
               >
                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {r.first_name} {r.last_name}
+                  {r.phone ? formatPhone(r.phone) : 'No phone'}
                 </p>
-                {r.phone && (
+                {(r.first_name || r.last_name) && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {formatPhone(r.phone)}
+                    {r.first_name} {r.last_name}
                   </p>
                 )}
               </button>
@@ -194,6 +201,17 @@ export function CustomerLookup({
           New Customer
         </Button>
       </div>
+
+      {/* Complete profile modal for customers missing name/type */}
+      <CustomerCompleteProfileDialog
+        open={!!incompleteCustomer}
+        customer={incompleteCustomer}
+        onComplete={(updatedCustomer) => {
+          setIncompleteCustomer(null);
+          onSelect(updatedCustomer);
+        }}
+        onClose={() => setIncompleteCustomer(null)}
+      />
     </div>
   );
 }

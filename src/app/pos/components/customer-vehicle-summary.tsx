@@ -66,10 +66,10 @@ export function CustomerVehicleSummary({
             className="flex items-center gap-1.5 text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400"
           >
             <User className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
-            {customer.first_name} {customer.last_name}
-            {customer.phone && (
+            {customer.phone && formatPhone(customer.phone)}
+            {(customer.first_name || customer.last_name) && (
               <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                {formatPhone(customer.phone)}
+                — {customer.first_name} {customer.last_name}
               </span>
             )}
           </button>
