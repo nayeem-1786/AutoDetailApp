@@ -297,15 +297,31 @@ export function VehicleStep({ state, onStateChange, onContinue }: VehicleStepPro
             </p>
             <div className="flex items-center gap-3">
               {importing && <Spinner size="sm" />}
-              {isCompleted ? (
+              {isCompleted || state.steps.vehicles.status === 'skipped' ? (
                 <div className="flex items-center gap-3">
-                  <Badge variant="success">
-                    {state.steps.vehicles.count?.toLocaleString()} created
+                  <Badge variant={state.steps.vehicles.status === 'skipped' ? 'warning' : 'success'}>
+                    {state.steps.vehicles.status === 'skipped'
+                      ? 'Skipped'
+                      : `${state.steps.vehicles.count?.toLocaleString()} created`}
                   </Badge>
                   <Button onClick={onContinue}>Continue to Transactions</Button>
                 </div>
+              ) : inferred.length === 0 ? (
+                <Button
+                  onClick={() => {
+                    const newState = { ...state };
+                    newState.steps = {
+                      ...state.steps,
+                      vehicles: { status: 'skipped', message: '0 vehicles inferred from transaction data' },
+                    };
+                    onStateChange(newState);
+                    onContinue();
+                  }}
+                >
+                  Skip — No Vehicles to Create
+                </Button>
               ) : (
-                <Button onClick={handleImport} disabled={importing || inferred.length === 0}>
+                <Button onClick={handleImport} disabled={importing}>
                   {importing ? 'Creating...' : 'Create Vehicle Records'}
                 </Button>
               )}

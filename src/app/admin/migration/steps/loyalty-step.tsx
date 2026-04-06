@@ -315,13 +315,29 @@ export function LoyaltyStep({ state, onStateChange, onContinue }: LoyaltyStepPro
             </div>
             <div className="flex items-center gap-3">
               {importing && <Spinner size="sm" />}
-              {isCompleted ? (
+              {isCompleted || state.steps.loyalty.status === 'skipped' ? (
                 <div className="flex items-center gap-3">
-                  <Badge variant="success">
-                    {formatPoints(state.steps.loyalty.count || 0)} points awarded
+                  <Badge variant={state.steps.loyalty.status === 'skipped' ? 'warning' : 'success'}>
+                    {state.steps.loyalty.status === 'skipped'
+                      ? 'Skipped'
+                      : `${formatPoints(state.steps.loyalty.count || 0)} points awarded`}
                   </Badge>
                   <Button onClick={onContinue}>Continue to Validation</Button>
                 </div>
+              ) : loyaltyData.length === 0 ? (
+                <Button
+                  onClick={() => {
+                    const newState = { ...state };
+                    newState.steps = {
+                      ...state.steps,
+                      loyalty: { status: 'skipped', message: '0 customers eligible for loyalty points' },
+                    };
+                    onStateChange(newState);
+                    onContinue();
+                  }}
+                >
+                  Skip — No Loyalty Points to Award
+                </Button>
               ) : (
                 <Button onClick={handleImport} disabled={importing}>
                   {importing ? 'Calculating...' : 'Award Loyalty Points'}

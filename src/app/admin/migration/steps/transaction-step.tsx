@@ -351,13 +351,29 @@ export function TransactionStep({ state, onStateChange, onContinue }: Transactio
             </div>
             <div className="flex items-center gap-3">
               {importing && <Spinner size="sm" />}
-              {isCompleted ? (
+              {isCompleted || state.steps.transactions.status === 'skipped' ? (
                 <div className="flex items-center gap-3">
-                  <Badge variant="success">
-                    {state.steps.transactions.count?.toLocaleString()} imported
+                  <Badge variant={state.steps.transactions.status === 'skipped' ? 'warning' : 'success'}>
+                    {state.steps.transactions.status === 'skipped'
+                      ? 'Skipped'
+                      : `${state.steps.transactions.count?.toLocaleString()} imported`}
                   </Badge>
                   <Button onClick={onContinue}>Continue to Loyalty</Button>
                 </div>
+              ) : joined.length === 0 ? (
+                <Button
+                  onClick={() => {
+                    const newState = { ...state };
+                    newState.steps = {
+                      ...state.steps,
+                      transactions: { status: 'skipped', message: '0 transactions matched from CSV data' },
+                    };
+                    onStateChange(newState);
+                    onContinue();
+                  }}
+                >
+                  Skip — No Transactions to Import
+                </Button>
               ) : (
                 <Button onClick={handleImport} disabled={importing}>
                   {importing ? `Importing... ${progress}%` : 'Import Transactions'}

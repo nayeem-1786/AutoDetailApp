@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Migration wizard skip buttons for zero-record steps — 2026-04-05
+
+- **Vehicle step**: When 0 vehicles are inferred from transaction data, shows "Skip — No Vehicles to Create" button instead of a greyed-out "Create Vehicle Records" button.
+- **Transaction step**: When CSV exists but 0 transactions match, shows "Skip — No Transactions to Import" button.
+- **Loyalty step**: When CSV exists but 0 customers are eligible for points, shows "Skip — No Loyalty Points to Award" button.
+- All three steps also show "Continue to [Next]" button after being skipped, with a "Skipped" badge.
+
 ## chore: Targeted test data purge (Session 22A-v2) — 2026-04-05
 
 - **Phase 1+2: Full purge of 38 dev-generated tables** — 1,907 rows deleted across appointments, jobs, quotes, orders, conversations, campaigns, coupons, messages, drip sequences, SMS/email logs, audit log, stock alerts, print jobs, voice calls, short links, sale history, and all their child tables.
