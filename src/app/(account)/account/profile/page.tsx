@@ -7,6 +7,7 @@ import { formResolver } from '@/lib/utils/form';
 import { customerProfileSchema, type CustomerProfileInput } from '@/lib/utils/validation';
 import { formatPhoneInput, formatPhone } from '@/lib/utils/format';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
+import { customerSignOut } from '@/lib/auth/customer-signout';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -293,13 +294,10 @@ export default function AccountProfilePage() {
   const handleSignOutAllDevices = async () => {
     setSigningOut(true);
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut({ scope: 'global' });
       toast.success('Signed out of all devices');
-      router.push('/signin');
+      await customerSignOut({ scope: 'global' });
     } catch {
       toast.error('Failed to sign out');
-    } finally {
       setSigningOut(false);
       setConfirmSignOut(false);
     }

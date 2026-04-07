@@ -4,6 +4,36 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Auth system — logout, profile completion bypass, link-account crash, touch dropdown, error surfacing — 2026-04-07
+
+### Critical: link-account infinite recursion (Fix 1A)
+- `noStoreJson()` in `/api/customer/link-account/route.ts` called itself instead of `NextResponse.json()` — infinite recursion / stack overflow on every request.
+- Added missing `NextResponse` import and fixed the recursive call.
+- Audited other `noStoreJson` definitions in `link-by-phone` and `check-exists` — both were already correct.
+
+### Catch-block bypass in InlineAuth (Fix 1B)
+- When profile fetch threw a network exception after OTP verification, the catch block passed empty fallback data (`first_name: '', last_name: ''`) to `onAuthComplete()`, bypassing the profile completion form and failing Zod validation in `/api/book`.
+- Now shows the profile completion form on error instead of passing empty data downstream.
+- Removed `[AUTH DEBUG]` and `[BOOKING DEBUG]` console.log statements.
+
+### Logout hard redirect (Fix 1C)
+- `signOut()` + `window.location.reload()` raced with cookie deletion — middleware could re-establish session from not-yet-cleared cookie.
+- All customer sign-out paths now use `window.location.href = '/signin'` (hard navigation) instead of reload.
+
+### Touch dropdown on iOS Safari (Fix 1D)
+- "Hi, Name" user dropdown in header used `onMouseEnter`/`onMouseLeave` only — no `onClick` on trigger. Touch devices couldn't open it.
+- Added `onClick` toggle + click-outside listener. Hover still works on desktop.
+
+### Consolidated sign-out utility (Phase 2)
+- New `src/lib/auth/customer-signout.ts` — single function for all customer sign-out call sites.
+- Two modes: default (sign-out + hard redirect to /signin) and booking mode (sign-out + no redirect + callback).
+- Updated 5 call sites: `customer-auth-provider.tsx`, `account-shell.tsx`, `header-client.tsx`, `booking-wizard.tsx`, `mobile-menu.tsx`, `account/profile/page.tsx`.
+- Removed `useRouter` from `account-shell.tsx` (no longer needed).
+
+### Booking validation error surfacing (Phase 3)
+- `/api/book` now returns field-level error details (e.g., "Validation failed — customer.last_name: Required") instead of generic "Invalid booking data".
+- Error message flows through to UI via existing error display in `step-confirm-book.tsx`.
+
 ## fix: Customer identifier + POS complete profile prompt + booking auth profile completion — 2026-04-06
 
 ### Admin Customers List

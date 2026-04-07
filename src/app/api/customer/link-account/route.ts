@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
@@ -6,7 +6,7 @@ import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 
 function noStoreJson(data: unknown, init?: ResponseInit) {
-  return noStoreJson(data, {
+  return NextResponse.json(data, {
     ...init,
     headers: { ...init?.headers, 'Cache-Control': 'no-store' },
   });

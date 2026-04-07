@@ -5,6 +5,7 @@ import { Menu, X, ChevronDown, Phone, MapPin, LayoutDashboard, LogOut } from 'lu
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
+import { customerSignOut } from '@/lib/auth/customer-signout';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
 import { CartIconButton } from './cart/cart-icon-button';
 import { ThemeToggle } from './theme-toggle';
@@ -92,15 +93,29 @@ export function HeaderClient({
     userDropdownTimer.current = setTimeout(() => setUserDropdownOpen(false), 150);
   }, []);
 
+  const toggleUserDropdown = useCallback(() => {
+    setUserDropdownOpen(prev => !prev);
+  }, []);
+
+  // Close user dropdown on click outside
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!userDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [userDropdownOpen]);
+
   const handleSignOut = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error('Sign out error:', err);
-    } finally {
-      window.location.reload();
-    }
+    await customerSignOut();
   }, []);
 
   return (
@@ -213,12 +228,14 @@ export function HeaderClient({
             {/* Account — desktop */}
             {displayName ? (
               <div
+                ref={userDropdownRef}
                 className="relative hidden lg:block"
                 onMouseEnter={openUserDropdown}
                 onMouseLeave={closeUserDropdown}
               >
                 <button
                   type="button"
+                  onClick={toggleUserDropdown}
                   className="inline-flex items-center gap-1 text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
                 >
                   Hi, {displayName}

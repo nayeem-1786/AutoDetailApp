@@ -17,7 +17,7 @@ import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { MobileZone, VehicleSizeClass, VehicleType, VehicleCategoryRecord, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
 import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
-import { createClient } from '@/lib/supabase/client';
+import { customerSignOut } from '@/lib/auth/customer-signout';
 
 interface CustomerDataProp {
   customer: {
@@ -781,24 +781,22 @@ export function BookingWizard({
     }
   }
 
-  // Handle sign out from inline auth
+  // Handle sign out from inline auth — stay on booking page
   async function handleSignOut() {
-    try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-    } catch (err) {
-      console.error('Sign out error:', err);
-    }
-    // ALWAYS reset state, even if signOut fails
-    setAuthCustomerData(null);
-    setIsPortalDynamic(false);
-    setState((prev) => ({
-      ...prev,
-      isExistingCustomer: null,
-      availableCoupons: [],
-      loyaltyPointsBalance: 0,
-      loyaltyPointsToUse: 0,
-    }));
+    await customerSignOut({
+      skipRedirect: true,
+      onSignOut: () => {
+        setAuthCustomerData(null);
+        setIsPortalDynamic(false);
+        setState((prev) => ({
+          ...prev,
+          isExistingCustomer: null,
+          availableCoupons: [],
+          loyaltyPointsBalance: 0,
+          loyaltyPointsToUse: 0,
+        }));
+      },
+    });
   }
 
   function handleCouponApply(coupon: AppliedCoupon | null) {

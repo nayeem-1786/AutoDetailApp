@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils/cn';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
@@ -33,7 +33,6 @@ function formatPhone(phone: string): string {
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
   const { user, customer, loading, signOut } = useCustomerAuth();
-  const router = useRouter();
   const pathname = usePathname();
   const [businessPhone, setBusinessPhone] = useState<string | null>(null);
 
@@ -46,11 +45,11 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Only redirect to signin if not logged in at all
+    // Redirect unauthenticated visitors to signin (signOut redirect handled by provider)
     if (!loading && !user) {
-      router.push('/signin?redirect=' + encodeURIComponent(pathname));
+      window.location.href = '/signin?redirect=' + encodeURIComponent(pathname);
     }
-  }, [loading, user, router, pathname]);
+  }, [loading, user, pathname]);
 
   if (loading) {
     return (

@@ -783,6 +783,7 @@ src/lib/auth/auth-provider.tsx             — Admin auth context provider
 src/lib/auth/check-permission.ts
 src/lib/auth/customer-auth-provider.tsx    — Customer auth context provider
 src/lib/auth/customer-helpers.ts
+src/lib/auth/customer-signout.ts          — Shared customer sign-out utility (all customer sign-out call sites)
 src/lib/auth/get-employee.ts
 src/lib/auth/permission-context.tsx        — Permission context & provider
 src/lib/auth/permissions.ts

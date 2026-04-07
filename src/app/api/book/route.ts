@@ -24,8 +24,17 @@ export async function POST(request: NextRequest) {
     const parsed = bookingSubmitSchema.safeParse(body);
 
     if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      const missingFields = Object.entries(fieldErrors)
+        .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
+        .join('; ');
       return NextResponse.json(
-        { error: 'Invalid booking data', details: parsed.error.flatten() },
+        {
+          error: missingFields
+            ? `Validation failed — ${missingFields}`
+            : 'Invalid booking data',
+          fieldErrors,
+        },
         { status: 400 }
       );
     }

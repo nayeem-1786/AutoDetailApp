@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { customerSignOut } from '@/lib/auth/customer-signout';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Customer } from '@/lib/supabase/types';
 
@@ -148,10 +149,10 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   }, [session, loading]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
     setSession(null);
     setUser(null);
     setCustomer(null);
+    await customerSignOut();
   };
 
   const refreshCustomer = useCallback(async () => {

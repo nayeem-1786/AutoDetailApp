@@ -1545,11 +1545,15 @@ export function InlineAuth({
       localAuthRef.current = data;
       setLocalAuthData(data);
       onAuthComplete(data);
-    } catch {
-      const fallback: AuthCustomerData = { customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] };
-      localAuthRef.current = fallback;
-      setLocalAuthData(fallback);
-      onAuthComplete(fallback);
+    } catch (err) {
+      console.error('Profile fetch failed after auth:', err);
+      // Don't pass empty data downstream — show profile completion form instead
+      setPendingAuthData({ customer: { first_name: '', last_name: '', phone: '', email: '' }, vehicles: [] });
+      setCompleteFirstName('');
+      setCompleteLastName('');
+      setCompleteEmail('');
+      setCompleteError(null);
+      setView('complete-profile');
     } finally {
       setFetchingProfile(false);
     }

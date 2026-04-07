@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { customerSignOut } from '@/lib/auth/customer-signout';
 import type { WebsiteNavItem } from '@/lib/supabase/types';
 
 interface MobileMenuProps {
@@ -24,9 +24,7 @@ export function MobileMenu({ customerName, navItems }: MobileMenuProps) {
 
   const handleSignOut = useCallback(async () => {
     setOpen(false);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    window.location.href = '/';
+    await customerSignOut();
   }, []);
 
   return (
