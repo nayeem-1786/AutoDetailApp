@@ -1,0 +1,839 @@
+[
+  {
+    "id": "28086c10-2a19-4293-8120-399206b34332",
+    "key": "pos.open_close_register",
+    "name": "Open/Close Register",
+    "description": "Open and close the cash register for daily operations",
+    "category": "POS Operations",
+    "sort_order": 100,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "be1b4621-4d73-4fbf-84d0-9dc22c343d77",
+    "key": "pos.create_tickets",
+    "name": "Create Tickets",
+    "description": "Start new sales transactions in the POS",
+    "category": "POS Operations",
+    "sort_order": 101,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "c2fb0f23-7674-4821-9ff4-720a8ed8efdb",
+    "key": "pos.add_items",
+    "name": "Add Items",
+    "description": "Add products and services to a ticket",
+    "category": "POS Operations",
+    "sort_order": 102,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "0ea8ab64-2584-4179-b779-eae4083af2fa",
+    "key": "pos.apply_coupons",
+    "name": "Apply Coupons",
+    "description": "Apply coupon codes to transactions",
+    "category": "POS Operations",
+    "sort_order": 103,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d357d30b-5c62-4de5-8716-7dd6c143ee83",
+    "key": "pos.apply_loyalty",
+    "name": "Apply Loyalty",
+    "description": "Apply loyalty point redemptions",
+    "category": "POS Operations",
+    "sort_order": 104,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "1ccf1ca1-ed9f-4615-9f1d-83a9e46d8c1b",
+    "key": "pos.process_card",
+    "name": "Process Card Payments",
+    "description": "Accept card payments via terminal",
+    "category": "POS Operations",
+    "sort_order": 105,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "99ceb5da-1561-46b3-b3e8-ce8480f98982",
+    "key": "pos.process_cash",
+    "name": "Process Cash Payments",
+    "description": "Accept cash payments",
+    "category": "POS Operations",
+    "sort_order": 106,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "052b0cd0-2dca-4fe7-b6d6-8d1f073f9c6b",
+    "key": "pos.process_split",
+    "name": "Process Split Payments",
+    "description": "Split payments between multiple methods",
+    "category": "POS Operations",
+    "sort_order": 107,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "358b2480-1a53-4c22-a4d5-68dc6d6cabbd",
+    "key": "pos.issue_refunds",
+    "name": "Issue Refunds",
+    "description": "Process refunds on completed transactions",
+    "category": "POS Operations",
+    "sort_order": 110,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "41d985ec-21d0-434a-8e4b-26a5508dd474",
+    "key": "pos.void_transactions",
+    "name": "Void Transactions",
+    "description": "Void entire transactions",
+    "category": "POS Operations",
+    "sort_order": 111,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "0d2462af-8fa0-4dcf-8316-adfe7e77d5b5",
+    "key": "pos.end_of_day",
+    "name": "End of Day",
+    "description": "Perform end-of-day cash count and reconciliation",
+    "category": "POS Operations",
+    "sort_order": 112,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "cdd0167c-7baa-4b90-acd0-70454cdd0a92",
+    "key": "customers.view",
+    "name": "View Customers",
+    "description": "Access customer list and profiles",
+    "category": "Customer Management",
+    "sort_order": 200,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "590d7cea-b798-47d6-8ccf-41b2c7670f3e",
+    "key": "customers.create",
+    "name": "Create Customers",
+    "description": "Add new customer records",
+    "category": "Customer Management",
+    "sort_order": 201,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "4ed36509-d47e-45c8-b78b-70ea12216d18",
+    "key": "customers.edit",
+    "name": "Edit Customers",
+    "description": "Modify customer information",
+    "category": "Customer Management",
+    "sort_order": 202,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "c38b931e-ba31-473b-9107-885a331dfbf4",
+    "key": "customers.delete",
+    "name": "Delete Customers",
+    "description": "Remove customer records",
+    "category": "Customer Management",
+    "sort_order": 203,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "9843f546-b05c-4c43-b086-571e4bfab3cf",
+    "key": "customers.view_history",
+    "name": "View Transaction History",
+    "description": "See customer purchase history",
+    "category": "Customer Management",
+    "sort_order": 204,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "bcc7dee3-c089-48c7-be74-8a984635bf88",
+    "key": "customers.view_loyalty",
+    "name": "View Loyalty",
+    "description": "See customer loyalty points and history",
+    "category": "Customer Management",
+    "sort_order": 205,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "69977864-fcd2-4617-8a36-dd1f459358fc",
+    "key": "customers.adjust_loyalty",
+    "name": "Adjust Loyalty Points",
+    "description": "Manually add or remove loyalty points",
+    "category": "Customer Management",
+    "sort_order": 206,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "f339d669-ccd6-4c68-b033-26c2a1b1183f",
+    "key": "customers.export",
+    "name": "Export Customer Data",
+    "description": "Download customer data as CSV/Excel",
+    "category": "Customer Management",
+    "sort_order": 207,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "3a809442-7be3-442f-b939-b14ba0f26322",
+    "key": "appointments.view_today",
+    "name": "View Today's Schedule",
+    "description": "See today's appointments",
+    "category": "Appointments & Scheduling",
+    "sort_order": 300,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d97936c2-96e1-4d35-9321-7e5bf9b0e3eb",
+    "key": "appointments.view_calendar",
+    "name": "View Full Calendar",
+    "description": "Access the full appointment calendar",
+    "category": "Appointments & Scheduling",
+    "sort_order": 301,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "61177ced-96a8-473f-b87d-a88a19449de0",
+    "key": "appointments.create",
+    "name": "Create Appointments",
+    "description": "Book new appointments",
+    "category": "Appointments & Scheduling",
+    "sort_order": 302,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "9073e376-2ca1-4027-8360-b788ef232350",
+    "key": "appointments.reschedule",
+    "name": "Reschedule Appointments",
+    "description": "Change appointment date/time",
+    "category": "Appointments & Scheduling",
+    "sort_order": 303,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "71cae525-6bf7-402e-8717-9f3628fdbaf1",
+    "key": "appointments.cancel",
+    "name": "Cancel Appointments",
+    "description": "Cancel existing appointments",
+    "category": "Appointments & Scheduling",
+    "sort_order": 304,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "e7974679-bd79-4a2c-8641-a6bb19cabc4c",
+    "key": "appointments.waive_fee",
+    "name": "Waive Cancellation Fee",
+    "description": "Override cancellation fee",
+    "category": "Appointments & Scheduling",
+    "sort_order": 305,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d0629f36-11ab-45ff-a904-6b42064d3f1f",
+    "key": "appointments.update_status",
+    "name": "Update Status",
+    "description": "Change appointment status (confirm, start, complete)",
+    "category": "Appointments & Scheduling",
+    "sort_order": 306,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "e470a193-0c32-48e5-8028-964a14a328dd",
+    "key": "appointments.add_notes",
+    "name": "Add Notes",
+    "description": "Add notes to appointments",
+    "category": "Appointments & Scheduling",
+    "sort_order": 307,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "e7c94cb5-bd09-427c-986a-8204c6802df2",
+    "key": "appointments.manage_schedule",
+    "name": "Manage Staff Schedules",
+    "description": "Edit employee weekly schedules and blocked dates",
+    "category": "Appointments & Scheduling",
+    "sort_order": 308,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "57cc054c-dc98-4d84-9399-66754870fa2e",
+    "key": "products.view",
+    "name": "View Products",
+    "description": "Browse products in catalog",
+    "category": "Catalog",
+    "sort_order": 400,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "b2b55bf3-6342-4963-bb60-338645dd04e6",
+    "key": "products.edit",
+    "name": "Edit Products",
+    "description": "Create and modify products",
+    "category": "Catalog",
+    "sort_order": 401,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "420e24e5-a310-4e5d-8a94-675bd7d1236b",
+    "key": "products.delete",
+    "name": "Delete Products",
+    "description": "Remove products from catalog",
+    "category": "Catalog",
+    "sort_order": 402,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "c743cc36-ca46-4d87-9979-3da6a5245071",
+    "key": "services.view",
+    "name": "View Services",
+    "description": "Browse services in catalog",
+    "category": "Catalog",
+    "sort_order": 403,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "3cf8f616-3ed8-447c-b84f-c9b24abc7594",
+    "key": "services.edit",
+    "name": "Edit Services",
+    "description": "Create and modify services",
+    "category": "Catalog",
+    "sort_order": 404,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "707f107a-0667-4356-9379-0795a4bed95b",
+    "key": "services.delete",
+    "name": "Delete Services",
+    "description": "Remove services from catalog",
+    "category": "Catalog",
+    "sort_order": 405,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "2602e4f5-8e66-4bce-9cd5-ea09c6d8ba92",
+    "key": "services.manage_addons",
+    "name": "Manage Add-ons",
+    "description": "Configure service add-on options",
+    "category": "Catalog",
+    "sort_order": 406,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "3748dfd2-f117-43f6-80d1-4cd935037dc2",
+    "key": "services.set_pricing",
+    "name": "Set Service Pricing",
+    "description": "Modify service pricing tiers",
+    "category": "Catalog",
+    "sort_order": 407,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "ba5b0464-ffb9-4041-afe7-54ae5cbc11af",
+    "key": "inventory.view_stock",
+    "name": "View Stock Levels",
+    "description": "See current inventory quantities",
+    "category": "Inventory",
+    "sort_order": 500,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "5a96a714-c544-4be0-9a00-74e34144fbf3",
+    "key": "inventory.adjust_stock",
+    "name": "Adjust Stock",
+    "description": "Make manual stock adjustments",
+    "category": "Inventory",
+    "sort_order": 501,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "4bc00658-3ae6-4a4d-96d6-ef861fbf29a0",
+    "key": "inventory.manage_po",
+    "name": "Manage Purchase Orders",
+    "description": "Create and manage purchase orders",
+    "category": "Inventory",
+    "sort_order": 502,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "12782139-45b2-40d0-a141-53064be1f7c6",
+    "key": "inventory.receive",
+    "name": "Receive Inventory",
+    "description": "Receive stock against purchase orders",
+    "category": "Inventory",
+    "sort_order": 503,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "20acffc3-9c3c-4c10-b6cb-fdcfdb255392",
+    "key": "inventory.view_costs",
+    "name": "View Cost Prices",
+    "description": "See product cost and margin data",
+    "category": "Inventory",
+    "sort_order": 504,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "34f41970-cb45-4267-bf72-279dc946e9b4",
+    "key": "inventory.view_cost_data",
+    "name": "View Cost Data (Legacy)",
+    "description": "Legacy key — same as view_costs, kept for backward compat",
+    "category": "Inventory",
+    "sort_order": 505,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d17683ad-8aa0-4fa9-85e0-366ea1cc65c6",
+    "key": "inventory.manage_vendors",
+    "name": "Manage Vendors",
+    "description": "Add and edit vendor information",
+    "category": "Inventory",
+    "sort_order": 506,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "a7cbd42b-c84e-4d35-9a82-db5c2f425ad2",
+    "key": "marketing.campaigns",
+    "name": "Manage Campaigns",
+    "description": "Create and send marketing campaigns",
+    "category": "Marketing",
+    "sort_order": 600,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "50af6aed-c5f9-4aa8-bb03-0007f29b34d3",
+    "key": "marketing.coupons",
+    "name": "Manage Coupons",
+    "description": "Create and edit coupon codes",
+    "category": "Marketing",
+    "sort_order": 601,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "67b24580-11fe-4ff6-bedd-3b774c2eaca5",
+    "key": "marketing.analytics",
+    "name": "View Analytics",
+    "description": "Access marketing analytics dashboard",
+    "category": "Marketing",
+    "sort_order": 602,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "b0ea10d5-383a-451b-b479-49ef23276b20",
+    "key": "marketing.lifecycle_rules",
+    "name": "Manage Automations",
+    "description": "Configure lifecycle automation rules",
+    "category": "Marketing",
+    "sort_order": 603,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "a0db74bb-dc7f-4511-a943-a5e4702948af",
+    "key": "marketing.two_way_sms",
+    "name": "Messaging Inbox",
+    "description": "Access the two-way SMS messaging inbox",
+    "category": "Marketing",
+    "sort_order": 604,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "ea8ed0ac-6096-4f82-8e68-20fbb3b1882e",
+    "key": "quotes.create",
+    "name": "Create Quotes",
+    "description": "Create new quotes for customers",
+    "category": "Quotes",
+    "sort_order": 700,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "4918f360-6057-4ffc-a6f5-95a9565d8e43",
+    "key": "quotes.send",
+    "name": "Send Quotes",
+    "description": "Send quotes via SMS or email",
+    "category": "Quotes",
+    "sort_order": 701,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d670d771-410d-4e57-bce1-54d4228df4c0",
+    "key": "quotes.convert",
+    "name": "Convert Quotes",
+    "description": "Convert accepted quotes to transactions",
+    "category": "Quotes",
+    "sort_order": 702,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "cca9503e-7d7a-456b-92c6-510fdf80991b",
+    "key": "photos.upload",
+    "name": "Upload Photos",
+    "description": "Take and upload job photos",
+    "category": "Photos",
+    "sort_order": 800,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "473e3381-8f51-4003-bc78-fdac83ec8632",
+    "key": "photos.view",
+    "name": "View Photos",
+    "description": "View photo documentation",
+    "category": "Photos",
+    "sort_order": 801,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "53688a08-9fa4-4cbd-8114-9dc45f99c6ca",
+    "key": "photos.delete",
+    "name": "Delete Photos",
+    "description": "Remove uploaded photos",
+    "category": "Photos",
+    "sort_order": 802,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d2515288-0dc4-490d-9f0a-5c73f19625b9",
+    "key": "pos.manual_discounts",
+    "name": "Manual Discounts",
+    "description": "Show the Add Discount button in POS tickets and quotes",
+    "category": "POS Operations",
+    "sort_order": 108,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "e49e8557-0864-4bb4-87fc-733dccada13e",
+    "key": "photos.approve_marketing",
+    "name": "Approve for Marketing",
+    "description": "Approve photos for marketing use",
+    "category": "Photos",
+    "sort_order": 803,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "7132d80d-7ead-4ada-8632-e6bfd2d4d1ee",
+    "key": "reports.revenue",
+    "name": "View Revenue Reports",
+    "description": "Access revenue and sales reports",
+    "category": "Reports",
+    "sort_order": 900,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "66dd98c6-96da-423f-967a-99a5687b755e",
+    "key": "reports.financial_detail",
+    "name": "Financial Details",
+    "description": "View detailed financial breakdowns",
+    "category": "Reports",
+    "sort_order": 901,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "5a5119b7-ccfb-4003-aefd-a56b5ceb9743",
+    "key": "reports.cost_margin",
+    "name": "Cost & Margin Reports",
+    "description": "View cost and margin analysis",
+    "category": "Reports",
+    "sort_order": 902,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "5dd87d29-816a-4335-af08-695ecb899b89",
+    "key": "reports.employee_tips",
+    "name": "All Employee Tips",
+    "description": "View tip reports for all employees",
+    "category": "Reports",
+    "sort_order": 903,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "c1a5066e-0142-4df8-8927-0b1d968a0915",
+    "key": "reports.own_tips",
+    "name": "Own Tips",
+    "description": "View your own tip summary",
+    "category": "Reports",
+    "sort_order": 904,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "fd781dbc-97e9-4c5d-8cb1-73fe0a74e2f1",
+    "key": "reports.export",
+    "name": "Export Reports",
+    "description": "Download reports as files",
+    "category": "Reports",
+    "sort_order": 905,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "f5a4ec5a-b90a-42e6-9cc4-0cee57255583",
+    "key": "reports.quickbooks_status",
+    "name": "QuickBooks Status",
+    "description": "View QBO sync status and logs",
+    "category": "Reports",
+    "sort_order": 906,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "f7ca2b0f-661a-4e8f-b87a-f20b56f3c980",
+    "key": "staff.clock_self",
+    "name": "Clock In/Out",
+    "description": "Clock in and out for shifts",
+    "category": "Staff Management",
+    "sort_order": 1000,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "0ea492b9-06cd-49cc-8540-8a6680a36ac5",
+    "key": "staff.view_own_hours",
+    "name": "View Own Hours",
+    "description": "See your own timesheet",
+    "category": "Staff Management",
+    "sort_order": 1001,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "b141d307-855f-44c9-b686-3914d5b90aee",
+    "key": "staff.view_all_hours",
+    "name": "View All Hours",
+    "description": "See all employee timesheets",
+    "category": "Staff Management",
+    "sort_order": 1002,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "d9756ef5-9c79-4d53-9b3e-d538b6534104",
+    "key": "staff.edit_time",
+    "name": "Edit Timesheets",
+    "description": "Modify timesheet entries",
+    "category": "Staff Management",
+    "sort_order": 1003,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "039ffaee-d7bf-4c5d-9e9f-79ee1291fb87",
+    "key": "settings.feature_toggles",
+    "name": "Feature Toggles",
+    "description": "Enable/disable system features",
+    "category": "Settings",
+    "sort_order": 1100,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "3dbc2496-19a2-4108-801f-9a37f7407ea3",
+    "key": "settings.tax_payment",
+    "name": "Tax & Payment Settings",
+    "description": "Configure tax rates and payment methods",
+    "category": "Settings",
+    "sort_order": 1101,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "94ccbc13-bb1f-4ee5-8347-7e130215de73",
+    "key": "settings.manage_users",
+    "name": "Manage Users",
+    "description": "Create, edit, and deactivate staff accounts",
+    "category": "Settings",
+    "sort_order": 1102,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "3d3c5b5f-796b-4433-b861-df75e929e7db",
+    "key": "settings.roles_permissions",
+    "name": "Roles & Permissions",
+    "description": "Manage role definitions and permission defaults",
+    "category": "Settings",
+    "sort_order": 1103,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "886e3df1-1c70-4bff-87f9-98786f8b093d",
+    "key": "settings.business_hours",
+    "name": "Business Hours",
+    "description": "Set business operating hours",
+    "category": "Settings",
+    "sort_order": 1104,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "6985545b-2ed0-4a0c-a8f9-bb127e915774",
+    "key": "settings.audit_log",
+    "name": "View Audit Log",
+    "description": "Access the system audit log",
+    "category": "Settings",
+    "sort_order": 1105,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "5c7631f0-0535-40cb-a2f9-f650ffa28b1e",
+    "key": "settings.api_keys",
+    "name": "API Keys",
+    "description": "Manage API keys and integrations",
+    "category": "Settings",
+    "sort_order": 1106,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "61572c99-8a9f-4396-be77-a3372a7b97c8",
+    "key": "settings.backup_export",
+    "name": "Backup & Export",
+    "description": "Create system backups and data exports",
+    "category": "Settings",
+    "sort_order": 1107,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "eaf8d9bb-06b5-4b34-a23f-2752c1013816",
+    "key": "pos.jobs.view",
+    "name": "View Jobs Tab",
+    "description": "View the Jobs tab and job queue in POS",
+    "category": "POS Operations",
+    "sort_order": 114,
+    "created_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "3cacc7d0-cb1a-4f2c-8ae1-d4265f993424",
+    "key": "pos.jobs.flag_issue",
+    "name": "Flag Issues",
+    "description": "Create mid-service upsell requests",
+    "category": "POS Operations",
+    "sort_order": 116,
+    "created_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "d9d3b7e0-0101-4123-ab83-67c25d0e6e1d",
+    "key": "admin.photos.view",
+    "name": "View Photo Gallery",
+    "description": "View admin photo gallery",
+    "category": "Photos",
+    "sort_order": 800,
+    "created_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "99f769e0-b152-4235-9910-fb1d8e4a5d70",
+    "key": "admin.photos.manage",
+    "name": "Manage Photos",
+    "description": "Toggle featured/internal, bulk actions on photos",
+    "category": "Photos",
+    "sort_order": 801,
+    "created_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "1ea5189d-94bf-4110-8e21-346d42fdbb34",
+    "key": "pos.jobs.cancel",
+    "name": "Cancel Jobs",
+    "description": "Cancel scheduled or intake jobs in POS",
+    "category": "POS Operations",
+    "sort_order": 118,
+    "created_at": "2026-02-13T01:22:59.972012+00:00"
+  },
+  {
+    "id": "c0c81119-1fd0-4bdc-939e-341013efdc05",
+    "key": "pos.jobs.manage",
+    "name": "Manage Jobs",
+    "description": "Create walk-in jobs, start intake, begin work, complete jobs, reassign detailer",
+    "category": "POS Operations",
+    "sort_order": 115,
+    "created_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "157834a3-b205-40e3-a582-9cc05e71f397",
+    "key": "cms.hero.manage",
+    "name": "Manage Hero",
+    "description": "Create, edit, reorder, and delete hero slides",
+    "category": "Website",
+    "sort_order": 1108,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "185a48e9-c6a2-4fb5-baba-a75c11c4af91",
+    "key": "cms.tickers.manage",
+    "name": "Manage Tickers",
+    "description": "Create, edit, and delete announcement tickers",
+    "category": "Website",
+    "sort_order": 1109,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "5cb7fcb7-5875-4982-81b2-15bd6077f7ba",
+    "key": "cms.ads.manage",
+    "name": "Manage Ads",
+    "description": "Create, edit, and delete ad creatives and placements",
+    "category": "Website",
+    "sort_order": 1110,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "a3051353-f9b0-4ef9-b12b-eed3e2d5e2ce",
+    "key": "cms.themes.manage",
+    "name": "Manage Themes",
+    "description": "Create, edit, activate, and deactivate seasonal themes",
+    "category": "Website",
+    "sort_order": 1111,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "47e8e54a-4601-472c-a84c-44be68772bb2",
+    "key": "cms.about.manage",
+    "name": "Manage About & Team",
+    "description": "Edit team members, credentials, and about content",
+    "category": "Website",
+    "sort_order": 1112,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "30eb18bd-896a-4111-894f-e22dd19704da",
+    "key": "cms.catalog_display.manage",
+    "name": "Manage Catalog Display",
+    "description": "Toggle show_on_website, featured, and sort order for services/products",
+    "category": "Website",
+    "sort_order": 1113,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "b12d8bcc-5f0a-4725-bd8c-c6848e946e1b",
+    "key": "cms.seo.manage",
+    "name": "Manage SEO",
+    "description": "Edit per-page SEO config, meta tags, alt tags, city pages",
+    "category": "Website",
+    "sort_order": 1114,
+    "created_at": "2026-02-14T07:29:53.231642+00:00"
+  },
+  {
+    "id": "a2de73f7-13a1-44c1-b1ec-d079f22cb60b",
+    "key": "cms.pages.manage",
+    "name": "Manage Pages & Navigation",
+    "description": "Create, edit, and delete custom pages and navigation links",
+    "category": "CMS",
+    "sort_order": 97,
+    "created_at": "2026-02-16T20:54:37.697567+00:00"
+  },
+  {
+    "id": "a7e1d98b-16bf-433d-b533-3bcd45438b16",
+    "key": "pos.discount_override",
+    "name": "Discount Override",
+    "description": "Allow manual discounts on items that already have special pricing (sale, combo, or coupon)",
+    "category": "POS Operations",
+    "sort_order": 109,
+    "created_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "02775c13-4a95-4c05-a161-d4e44d78e175",
+    "key": "pos.override_prerequisites",
+    "name": "Override Service Prerequisites",
+    "description": "Add services even when prerequisites are not met",
+    "category": "POS Operations",
+    "sort_order": 113,
+    "created_at": "2026-03-15T04:50:11.136715+00:00"
+  },
+  {
+    "id": "f306c2cd-8370-4912-91da-d30cf3bcf41d",
+    "key": "customers.merge",
+    "name": "Merge Customers",
+    "description": "Merge duplicate customer records into one",
+    "category": "Customer Management",
+    "sort_order": 208,
+    "created_at": "2026-03-24T15:48:00.309148+00:00"
+  },
+  {
+    "id": "d9a4c837-f321-4813-8827-5e747d93f710",
+    "key": "reports.view",
+    "name": "View Reports",
+    "description": "Access the reports and analytics dashboard",
+    "category": "Reports",
+    "sort_order": 899,
+    "created_at": "2026-03-24T15:48:00.309148+00:00"
+  }
+]

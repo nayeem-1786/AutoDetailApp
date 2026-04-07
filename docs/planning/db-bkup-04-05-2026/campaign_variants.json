@@ -1,0 +1,62 @@
+[
+  {
+    "id": "9d218985-ced6-4188-91a0-600882feb01a",
+    "campaign_id": "3aa4c465-d94b-4273-bf82-88a07b7b88d2",
+    "variant_label": "A",
+    "message_body": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now: {book_url}",
+    "email_subject": null,
+    "split_percentage": 50,
+    "is_winner": false,
+    "created_at": "2026-02-10T21:43:22.848185+00:00"
+  },
+  {
+    "id": "11591475-1a8b-42c8-b142-353ef4d25067",
+    "campaign_id": "3aa4c465-d94b-4273-bf82-88a07b7b88d2",
+    "variant_label": "B",
+    "message_body": "{first_name}, limited time! Use code {coupon_code} for 20% off your next detail. Schedule here: {book_url}",
+    "email_subject": null,
+    "split_percentage": 50,
+    "is_winner": false,
+    "created_at": "2026-02-10T21:43:22.848185+00:00"
+  },
+  {
+    "id": "1a04e22b-fbfe-49a7-b05a-5cce82a6b9b9",
+    "campaign_id": "3691ed71-9f34-4e20-a0c4-cabdf236f092",
+    "variant_label": "A",
+    "message_body": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now: {book_url}\n\nLeave us a review on Google: {google_review_link}\nOR Yelp:{yelp_review_link}",
+    "email_subject": null,
+    "split_percentage": 50,
+    "is_winner": false,
+    "created_at": "2026-02-11T01:01:09.382311+00:00"
+  },
+  {
+    "id": "5be722f2-aa47-4c70-a89f-91e020a2bc84",
+    "campaign_id": "3691ed71-9f34-4e20-a0c4-cabdf236f092",
+    "variant_label": "B",
+    "message_body": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now you dummy!: {book_url}",
+    "email_subject": null,
+    "split_percentage": 50,
+    "is_winner": false,
+    "created_at": "2026-02-11T01:01:09.382311+00:00"
+  },
+  {
+    "id": "75c8eaef-d2c6-4e3c-a023-52fd82af1f60",
+    "campaign_id": "f5266563-e75a-4a52-9eb3-38c482e8c658",
+    "variant_label": "A",
+    "message_body": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now: {book_url}\n\nLeave us a review on Google: {google_review_link}\nOR Yelp:{yelp_review_link}",
+    "email_subject": null,
+    "split_percentage": 50,
+    "is_winner": false,
+    "created_at": "2026-02-11T03:30:52.647171+00:00"
+  },
+  {
+    "id": "583b7735-a957-4e6c-8d7c-f971d7a8f650",
+    "campaign_id": "f5266563-e75a-4a52-9eb3-38c482e8c658",
+    "variant_label": "B",
+    "message_body": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now you dummy!: {book_url}",
+    "email_subject": null,
+    "split_percentage": 50,
+    "is_winner": false,
+    "created_at": "2026-02-11T03:30:52.647171+00:00"
+  }
+]

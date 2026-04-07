@@ -1,0 +1,62 @@
+[
+  {
+    "id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "name": "super_admin",
+    "display_name": "Super Admin",
+    "description": "Full system access. Cannot be restricted by permissions.",
+    "is_system": true,
+    "is_super": true,
+    "can_access_pos": true,
+    "can_access_admin": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "name": "admin",
+    "display_name": "Admin",
+    "description": "Business management with broad access to dashboard and POS.",
+    "is_system": true,
+    "is_super": false,
+    "can_access_pos": true,
+    "can_access_admin": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e",
+    "name": "cashier",
+    "display_name": "Cashier",
+    "description": "POS operator with customer-facing dashboard access.",
+    "is_system": true,
+    "is_super": false,
+    "can_access_pos": true,
+    "can_access_admin": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00"
+  },
+  {
+    "id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "name": "detailer",
+    "display_name": "Detailer",
+    "description": "Service technician with schedule and messaging access.",
+    "is_system": true,
+    "is_super": false,
+    "can_access_pos": true,
+    "can_access_admin": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:21:10.024+00:00"
+  },
+  {
+    "id": "46fbc203-fd19-494e-b32a-071e83535a1d",
+    "name": "marketing",
+    "display_name": "Marketer",
+    "description": "Marketing Consultant",
+    "is_system": false,
+    "is_super": false,
+    "can_access_pos": true,
+    "can_access_admin": true,
+    "created_at": "2026-02-12T04:02:04.096424+00:00",
+    "updated_at": "2026-02-12T07:33:59.015+00:00"
+  }
+]

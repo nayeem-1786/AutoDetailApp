@@ -1,0 +1,32 @@
+[
+  {
+    "id": "699168ee-669e-475c-9a4f-7b60e81156c4",
+    "name": "Segndo Caldena",
+    "slug": "segndo-caldena",
+    "role": "Senior Detail Specialist",
+    "bio": "With over 20 years of dedicated experience in the automotive detailing industry, Segundo Caldena, has built a reputation for unparalleled precision and excellence. Specializing in high-end paint correction and advanced surface protection, Segundo treats every vehicle with a master’s touch—ensuring a showroom finish that exceeds even the most demanding client expectations. Driven by a lifelong passion for automotive perfection, Segundo continues to set the standard for quality and care in the local community.",
+    "photo_url": "https://www.accutintbellevue.com/wp-content/uploads/2025/12/headshot-08.jpg",
+    "years_of_service": null,
+    "certifications": [],
+    "sort_order": 0,
+    "is_active": true,
+    "created_at": "2026-02-27T20:21:32.437714+00:00",
+    "updated_at": "2026-03-01T04:06:05.254788+00:00",
+    "excerpt": "Nearly 20 years of dedicated experience in the automotive detailing industry."
+  },
+  {
+    "id": "086be700-b7e9-4cbc-be48-6132d090fa9f",
+    "name": "New Member No More",
+    "slug": "new-member-no-more",
+    "role": "Junior Team Member #2",
+    "bio": null,
+    "photo_url": null,
+    "years_of_service": 6,
+    "certifications": [],
+    "sort_order": 1,
+    "is_active": false,
+    "created_at": "2026-02-27T22:50:25.998465+00:00",
+    "updated_at": "2026-02-28T08:09:49.210548+00:00",
+    "excerpt": null
+  }
+]

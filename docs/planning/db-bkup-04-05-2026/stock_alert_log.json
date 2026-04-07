@@ -1,0 +1,3789 @@
+[
+  {
+    "id": "691536fd-fb48-4bcf-9193-8c2529ee8396",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "201b4752-9950-4c82-8444-a69b10a4909f",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "9d080fa0-c612-48d3-85a3-29b04c548e8e",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "2919cef4-4264-44b3-b42d-2a880d9526ff",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "cc9eccfa-22ff-4c47-891b-7de7c1cce541",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "9c9ef341-a48a-412b-945a-01cd7b2e4024",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "a7b454df-7a42-47d0-9c12-7bdfd36a254d",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "eb5fe62e-3472-4599-89cb-7d1a93407121",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "7bb7d5dc-fbfe-43b8-9ff0-8572013aa6d7",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "3024931a-5fb5-41d3-b1af-aa368efd125c",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "d91f4105-668e-4253-85d5-6738918b831f",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "1b251f90-0255-4153-a95a-66b5ff1f9ec0",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "30e6aab5-8a3c-4839-8cab-f371a01c8f8d",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "f93a9f9e-73b0-4a48-89d1-f258f013173b",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "00e70d96-b966-4848-8f8b-1d52c8d689f3",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "0fcc38eb-722d-4835-9b7e-d75b1ee9c288",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "a393faab-e204-4b98-8364-b9047ec7cd22",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "b9c58901-1a40-4e89-93b4-8f183f5b0a04",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "bed66e5b-8b15-4172-9a48-5a11f2547568",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "7df765d9-0feb-47a5-8aed-3b3e6c5d67e9",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "6aff9ee1-c4db-4dd5-934b-563a696b3456",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "3b6ee171-4506-48a2-84e0-604132aa9157",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "d36889b2-0acc-4f30-b7df-9dd2e50d3ac1",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "fecb52cf-5662-4c40-9ab1-6dab5e84ef7b",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "50b8fa5a-5a0c-4715-8d88-00eb70eab590",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "8eaf36f3-a6d2-4b3e-9a70-7bead9f0f8d3",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "2c44fadf-cb2d-4f41-93d0-9508b5a47ca3",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "b4a5ff7f-5094-4ded-b52d-b48963ca9e6f",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "5afc9f1e-8efe-41dd-a97e-01bcd03f459f",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "599981a6-e946-4dc5-8fc3-0e9177bfff29",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "4880d936-28f0-40ab-a16f-232de246acf3",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "c7046c59-caf2-4297-be92-54413b827d4b",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "96bf174d-a78d-4875-9326-2e32dff929d0",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "522872cc-97ef-4c8c-a09e-153ec09044a7",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "b17569be-a3db-4226-be8a-df0848ac03ec",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "072eefd2-c3fd-45cf-bb6c-d3d4bea06e8b",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "96af7ce2-7d5b-41be-b417-8f78c5ca9142",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "963b9f1e-df79-490e-8084-f661a271dba0",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "4398f265-cb6e-459f-b977-411725c26a9c",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "c30f40d5-696f-4523-8681-a2e5612a25a2",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "cc8032f3-ccad-4d26-a153-cbf2b4c4ef29",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "67baa2af-5475-454a-866a-3dd97907f1d5",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "f74a8f4a-5e28-4631-b28d-2a45313d033f",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "abccd065-516d-4354-b36d-01ee490f8761",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "d9d631fc-058b-4620-b930-ae1cba09caf3",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "475b011e-9b92-4eff-a6fb-2b9098c0c96f",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "5b1df2c5-a299-49e9-8013-1ec40b34cdd1",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "4d4c1be5-c5c8-415f-b153-412b14d670c1",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "582b0130-af08-429e-82fe-8b0f58e78716",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "ef5ee10e-9518-48a5-a2df-7481a59cf370",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "23fb9ed0-c47f-4181-b3f6-41d1d52a05aa",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "ca36abbd-44a4-4bfb-a2f2-6fc008add4f0",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "f10e3d70-f9d4-4843-b059-db89b4693e12",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "893c9d23-597b-4442-a63c-cfc2463e615f",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "0d52fc3d-19e7-4869-a338-23dda90e624f",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "1d7e8847-7a04-4e4a-8f99-6bde0e8a2d52",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "f45a8757-2a4a-472f-ab12-fdc249d6ea37",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "6051f857-c309-4742-a877-48fed19c7fa4",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "2f3c4228-ea4f-44a6-9b44-b4d795e2859d",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "30161aeb-ee54-40db-a986-9c55e254557a",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "719cbf38-cb1e-4696-8239-ddba352d0912",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "fc5215b9-66d7-4080-9fff-1434dade9442",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "852691cb-ad79-49b2-aea7-28d1b057102b",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "62809618-c31e-4890-a8d9-896d34ec7bdb",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "ee988902-1a26-47cc-b69a-70cb27eb21f7",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "c4b036fe-56cb-40af-8397-5e503b49e9ad",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "f2152d7f-22b3-4107-a05d-13f98ed2d0d6",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "09ddaf58-57d9-4084-b9c8-7969f91cf872",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "0eb36b96-3a51-4eac-8e67-599437e1d97d",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "2ea7f154-b5d7-4a33-a5f4-478984833ab6",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "8823c18f-6976-473d-aadf-8b20d4674953",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "b7cd7220-d67b-466c-961f-9f07d45d7a23",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "37a1cfd9-2c47-475b-83bc-5d5e8317972c",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-11T11:26:54.359531+00:00"
+  },
+  {
+    "id": "a11a2376-678e-4c69-8075-c8df0b8807b3",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "d97829ab-bb08-43a1-9f73-1209063af99e",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f5d73f05-cfce-4bad-b5ab-d6d66422432d",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "145bbb56-f2ba-4f31-857f-9d5558816f7a",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "adf6123b-3608-43d0-894e-19fa05616668",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "20a80fc5-5502-4178-83cc-037651bbd207",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "a24614fe-7977-4c79-b23f-c2e307c1b3ab",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "c9aa915c-7811-43c9-b591-76a4962698b2",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "75406698-d460-42ef-a843-ad47282988f8",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f4206cb4-ee0c-494e-b72e-4aadbd162185",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "9a28e27f-8a51-4604-adb6-b29940627537",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "accca94a-f094-4e57-b6a0-8ccf97326229",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "c05b491d-0de8-4484-96bf-e5f99f1f9a1c",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "c03e5282-13c8-484e-8ac8-70e93f9e0e61",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f4b1c0a2-9126-4515-85b7-f2a3388265d8",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "434188e8-b028-4599-9db6-4c2d8d859d36",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "9eb6542e-b79a-49ab-a202-e8e6fa58c28f",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "9e9894bf-4f6d-41cc-8ac4-24454c28ba2a",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "783a0a02-33f2-4f92-839f-83660fbc85ed",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "053c20ba-8273-464b-bca0-c66b239bd97e",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "61d6d8ed-d7a6-466d-9803-3bed54726519",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "75a41328-a9ef-47e3-80ba-388c179c03da",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "872954d1-7136-4100-8e8d-4425c0e940f1",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "8542c067-74df-47df-bf79-5a8142d51431",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "a0398179-999f-4e15-aa28-d18a247c7907",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f5783e90-44da-484e-975d-af44feb03665",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "a43133c3-d41c-47e7-9866-643c4655e500",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "d247898e-56e7-41b9-a7d6-5a851ac52849",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "ec5d972d-d434-479c-8575-16ddf8873757",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f4f19a25-095a-40b9-9311-9928b2fae94a",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "2e006d18-2643-46a3-b0d4-666f516f0bc8",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "20a913cf-1da4-458c-8337-e4d9ef272cd4",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "b360dacc-632f-48db-a809-d82652b013f2",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "0d1474bb-921d-400a-b29b-083a7bd5837b",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "5823c961-9045-4a2b-bf27-358c3adb7fd7",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "cbb11715-6b49-40fa-a9ff-7736d9e44a3a",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "d83a8ea4-0328-460c-90b3-a75cec536fdb",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "01c0578d-d543-46b1-ae65-e48050105ebf",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "a963299b-0822-403c-bcc3-fffd4dbf83d5",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "b6ea266b-5beb-4946-a233-48f787bd34f5",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "141aab37-670e-420d-9a26-6aaa9009fe11",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "8620336f-d80c-4093-a608-f735a8890012",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "931a1b94-c955-4de2-916e-560d89afd682",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "b4b0c23d-b324-45cd-b7c0-43f4ad18eda9",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "09a220bb-d4ca-4704-810d-ff3791e03cf5",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "e0616da0-183d-456e-a453-4677a34a698c",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "af4413dc-68f0-434a-b6e5-3136464ca1c4",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "4c19c911-8de6-40f2-aa4a-3aad12b26270",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "0ec8ced5-3e79-460b-a67d-34ae2bb73a4e",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f82047e5-cdf9-4970-abc5-42fdc3e8ab90",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "c879207e-b52a-4d1e-bfd2-a720c6de9fa8",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "817fa213-fbd4-4120-a0f5-ac1554aee84f",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "9ca280cc-4ae3-4383-9b35-6f021776e45f",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "92d02854-ac58-464f-a350-7c62de0f2933",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "2d7e874b-7a8d-4769-af21-59ad4b8e38db",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "9d95ff38-b649-4f3e-9572-87403cfa1963",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "4a770c3f-eed6-4c06-99b3-9202800827d1",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "f2ba1bc1-ada9-45ac-89d0-07d422115881",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "7c028438-44ed-48f0-936c-4906bbbf7772",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "6043c469-aeb5-4a1d-a5ee-732aecfbd56d",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "757ac78c-9633-4b70-ae39-6d2ea7a9ed3d",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "4061c460-4d4b-43f9-abf7-9ebfed5d3e13",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "4afd9c02-4137-4d67-b872-6c7724b779ea",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "28ec5997-8815-4ec3-bc87-aa6bcae928f7",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "0870cade-ba3e-4d80-851d-9aa4f85d4c7c",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "602546a9-3f2b-41b0-a965-5f1f66418322",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "49c9475d-5d4b-4868-bd08-88842bd2894e",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "da5c3857-a347-4e04-a0d1-166fc3ea6eec",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "67c2149c-78b1-45a7-beaf-468a2ac0bca8",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "e7d8aecf-a389-4dc5-9fb1-e88c4b0f8737",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "ea6e2cb6-c4f0-4225-aa72-6417397bca65",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "19191539-2657-4a45-b0d4-4705e6a2e21d",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "6799c6be-4066-4aeb-9a5b-2fdc8b2d7438",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-19T00:00:02.355555+00:00"
+  },
+  {
+    "id": "5a298350-ba63-465f-a260-6b983f690946",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "f1e3540a-e016-4921-880e-7a475d3cc218",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "046800bc-5014-4892-9429-b05fbf442806",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "fac95b1a-817b-441a-9145-d2fcb524f1e0",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "fa96acfd-c9c7-47d3-97b8-e84456ce2ff8",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "c60bc8bb-e9b5-4d68-badf-e8ccedb87c44",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "55f92323-78e8-47ae-b8bd-3894246972b7",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "2b9acbb6-65ba-434e-be13-75d0f4d58fe6",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "09c34281-b789-4136-aa3f-a80682d5586e",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "3dc52ce4-face-4ae0-b8b8-307ddf25be89",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "091104a2-5c49-4134-a304-6d7ff2ab369c",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "8cc882db-9ff9-43e4-a67e-0473e48b2abb",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "fb2286c6-c1aa-42b0-8bb5-78e22bdb8a2c",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "09c2831b-c052-4147-a336-a49c83110ea9",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "16cfddea-3313-4dfd-b415-66b71a2fcef0",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "a591819e-9c19-4279-ad4c-1944c4c24dc1",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "60285d15-77e2-46f2-9780-3369b2c2ef2c",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "b408b43f-0375-4773-a65e-a8bbd55722ca",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "80a9fb20-60f1-4c18-8abb-f0460396a4ad",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "932b392c-7f20-4805-9506-efbe31620e0c",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "d72cae80-558c-42a3-b65a-76651912c9d9",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "84b79e69-6c25-42da-80be-3ce4222ff36a",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "d47992e7-0071-43d5-84c4-a5e991263656",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "95ce887f-db91-41b9-83ce-2b5dd605fdbd",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "917fa0b2-652e-46c8-af6e-58b6e5d09263",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "5e6fbb8a-cf96-49f5-a6bb-bccba3a4cbb7",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "6531ec19-2b22-4df7-af89-f04e1df12e76",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "71f6ae1c-38c9-44f8-90b4-d56bf3b282ef",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "31d4018d-c39d-4445-a5c8-66086f0954cc",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "ff713402-abec-45a8-a1c7-3e7dbc4cb5b7",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "230045c7-c739-41d4-acc5-6250180ad528",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "e0d4eddb-5a48-41a6-a1a5-720892ec62b5",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "abb1b3ef-7e6d-401a-af36-413777d374db",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "f627c2da-47b4-45eb-ad3a-654371f7fce2",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "cd00f9ed-ed7b-4e5f-895a-e1d482296f4b",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "4412dbc1-0ef6-4c13-987a-ed92c3055c82",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "62479c81-e221-45c0-8aac-fb07647f5223",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "5de4b4e1-c819-4a45-806a-acc0de45fcf8",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "89543a43-bb12-414f-a136-17811e624653",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "422cae77-88cf-4918-8fbe-85fc4f7742fb",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "dd67b263-9374-4218-8387-c4f79776db38",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "3572272b-e7d3-4041-bd04-e4089b0db266",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "2639f7a8-50f1-4ebd-be5a-b38a2b96ff3e",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "52d5c548-6122-4d30-98df-5492e2392d34",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "00c71aa6-dc5c-408b-a92e-9776fc7c745e",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "6a0e7b33-05e8-478d-8a24-3ecfbce42d2f",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "45d9493e-ed0c-444e-9a3d-f5a43e1b47d2",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "0322d444-ce6a-4fe5-a2e1-d19ed2b736f4",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "e6b5c14c-9986-4687-8391-4aa45cad7688",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "0b34ce30-0cd3-4797-b2f3-a3bead36ad60",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "ec3195e5-2c65-4c79-8ac9-7a4939b79b43",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "d1266aaf-d9fa-4bc0-9140-1b20b30e59dd",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "d7be2939-d959-404d-b79c-05d04fc0e0c0",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "5acc071f-6c60-4210-bc8c-5dac114b6cf8",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "c3bf466c-e1ce-4feb-93a0-ec93406223cd",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "5962026d-5d74-4b6b-bb50-19c45b8e26aa",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "bcd36860-b928-4154-991e-e51b7797c8f8",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "cbbfdc00-ce89-41e2-a98c-08172a31fb37",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "0182a7a5-1619-4d18-b486-51fd7b9a2329",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "92e795c9-31e6-427d-baed-6c8e6b63a855",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "46c9e674-ca47-429f-b20a-e7381b8a4cce",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "6e653b4b-a4bd-40b8-a234-7692c7e5ff3f",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "53c8e0ad-0bf6-4d6b-ba9d-618b7f6dd4b8",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "1d597a07-da57-4037-a38d-796cc2fc71fe",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "598008ad-f99f-4a83-aeb6-e4ce49f70c01",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "25b416c6-51af-4853-8a1c-7a79a617c7ed",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "069a405b-56c2-4587-9985-91b6c78ef2af",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "3f7dbc1b-ee4b-47b6-9316-76f03181e21b",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "9a00aabd-be87-4a90-98dc-8f23c113cab9",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "ab85b03e-74b6-40a6-9067-f9aca478fcc4",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "48a0ad88-7ca4-42a0-836c-858e70fde2d5",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "2c68d0a2-5681-43c7-aafb-2e392637000c",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "1b3ee143-76ea-4dda-a114-99885d0d91fd",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-27T00:00:03.427416+00:00"
+  },
+  {
+    "id": "03a82a1c-fe9d-4585-8e39-a5b60eac545a",
+    "product_id": "b566c867-4340-4250-a8fe-232f19926ebd",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-28T00:00:01.761068+00:00"
+  },
+  {
+    "id": "442972c1-3e07-44af-a28f-e34c054d7b4b",
+    "product_id": "db11f6a2-c2d4-4196-bc33-eb249edbb61c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-02-28T00:00:01.761068+00:00"
+  },
+  {
+    "id": "7ed983ca-6711-4b60-ac17-cf0bd01fd819",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "61610926-7205-4cb4-901c-6c6217fa9579",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "09c977e5-38ec-4f30-923d-0a79b5200f9b",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "2679d6a3-2593-47f0-b254-2d5ae9ae0c57",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "3f185abc-efd2-4e13-95e4-8c6664882a8a",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "9ebc2725-5354-4e17-be87-7ab63b6e7de7",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "720d2d9f-a41b-420c-a95a-99358939a840",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "e85460bf-ee0e-4b01-86a2-446120758480",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "dd33d0d9-74f6-4718-95b2-4413eb0a2b4c",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "33a6c3cc-a450-4da2-8b4e-5d5820309255",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "e72be94c-ce16-47fc-9fa8-ede510922d17",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "3c64ac4e-b2f8-4ba2-9680-976c849bed49",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "c4bc3ea7-8532-4d7d-af28-98262b4d8071",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "2250d6a0-08e7-45c2-957a-3382a5b4f867",
+    "product_id": "64917d12-8bf3-49cc-a3a7-56dbae4e53b6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "61007451-c1cb-4e43-801b-971de78daad4",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "1ef19786-c19d-4107-a658-6313b6c766ea",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "eebedf9e-4cac-4abc-b7f7-c9906dc3502e",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "a2ad219d-6861-455c-a9c9-90f4aee0c93d",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "3a8ee2fb-1f76-4648-94c1-bda9d8486a05",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "780b2482-b800-444e-bab3-af004dd54cfa",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "f7a8e3fb-e78f-46e8-bde0-ac81ed912afd",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "5f52dd1d-e37c-46fc-b745-ca398ac13e31",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "76ecd3ac-b8bb-4b4c-95ed-506d4cd44b1f",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "333a4534-b07c-4389-9976-b25b9c5e5ba7",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "7fda0c33-95f7-42d5-a62a-2cd50d23fc4b",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "352dddf1-10bd-43cb-a609-08f9805c197e",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "af5aeaea-2ea7-4968-a29f-25e52a2fdb69",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "b0536407-92ca-4a10-8616-2572b17257f5",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "5ee94849-d4d9-40f4-8dc7-413f84e35ad4",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "1d44eb13-ff07-459c-a6e7-dff6ddd4547c",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "df2cde8d-09ce-471e-aa79-67935c2c77ce",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "52ed0c37-1025-4677-b2cb-e9227a77af6c",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "d72bf9ab-1ff4-4a74-a160-59918f1b0b44",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "3afc074b-c316-46c2-b02b-0cf100c30000",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "a0d568c3-2567-4022-a32d-38b645c52b4c",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "580fabcd-813f-4ae7-891b-77203dc89054",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "be65600d-642f-4532-805d-505de2c8af53",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "9431b63d-6e37-48e3-853d-fbb681e38e2e",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "e1367b8f-df2b-4b57-9a24-4d1b59281739",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "60e41034-c3c1-434e-a444-5b225850d8b2",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "afd91074-c033-4e8f-9537-b393f09cceb5",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "ee894171-a88e-4620-8a67-10f47ba91912",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "34eec6e0-04f0-41e9-a939-b330305ea497",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "cbcdb237-877d-4b5e-b731-8976fea1e57c",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "27f5f7ba-6e9c-4bba-85b0-de7ac83be15a",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "4f307e5b-9b61-4a6b-bfc5-d71259b6ca92",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "62bd1f23-1025-410f-a0bd-b2ac30bc3e85",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "df5a25b8-fd69-4b79-9854-094043de25c3",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "67715166-bcec-4cc3-bb3b-c8d38c3f3503",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "404ebc48-3679-413b-9d05-ffb72ebb8f93",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "7a7f385f-1199-4e9e-acc6-2b20490b3b26",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "6a9ae71d-36e8-46cb-8857-635a3ae2e066",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "0ce1cbb3-2133-4850-a274-8f80a683f142",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "699c1a88-33f0-497d-af02-566246044acf",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "9f9e5491-f1e1-4e68-b351-e98eb0bea5db",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "3944cca2-86bc-4fa8-a901-adf17101f560",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "23d84fd3-9c50-4071-96d7-e731afbab281",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "43697251-cb18-444e-971b-289435fde4d5",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "42bb4929-ac38-4d4d-a910-ee51fec7a668",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "e49ec431-24be-4cae-9b69-883d58ddcece",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "d2c13a24-069d-47f1-9c80-61e65438087f",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "2b1df8ec-193f-4cd6-aa58-5773a36a4baf",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "3e111605-cb3c-4f47-8cf4-6b1746e873f4",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "2a39fb3b-78ca-46d0-ac52-ee0d16a45e4c",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "86623036-33d1-4af4-b5c8-7b9297c448e1",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "04986cae-cbd4-4f8e-bbdd-2c4fb248b26a",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "7476f381-3937-4ea3-8408-8ccc9bc8f174",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "9e57b734-1d71-4cdc-af7f-014e544839ba",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "f04149dd-c47c-460c-a778-b10d252fd442",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "02a591e0-0b89-41c8-bf7a-c5c84b4416c7",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "b38777e3-91c9-4395-9a18-69615818d197",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "f4d93c57-e02d-4b49-9bf8-93f2fac796fe",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "aabea41f-5863-4e1c-b170-81de028dbcaa",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "9b07e7e6-e5ec-4ec8-83f6-b42d57e1fce2",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-07T00:00:02.290182+00:00"
+  },
+  {
+    "id": "f611036e-fc55-4cbc-9d42-ac45774ca2ee",
+    "product_id": "b566c867-4340-4250-a8fe-232f19926ebd",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-09T23:00:04.545965+00:00"
+  },
+  {
+    "id": "87bd9d16-593b-4900-a59a-6c3c3762058f",
+    "product_id": "db11f6a2-c2d4-4196-bc33-eb249edbb61c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-09T23:00:04.545965+00:00"
+  },
+  {
+    "id": "a7324c8f-452d-47e1-afea-19f59c716943",
+    "product_id": "c83866d3-59aa-4956-b4e3-7b78f45885af",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-09T23:00:04.545965+00:00"
+  },
+  {
+    "id": "76bf27c4-a61d-4b5d-9818-35e2c9bc3a74",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "73735205-1c62-4283-81b2-80d700ebb512",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "25c02087-51d2-42e3-8b22-b727cd2f6f3e",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2e381ad1-18f4-4d62-acb1-a3ae47f4d754",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "332cb6aa-2f36-4e31-9e11-42930b72b5a7",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "4ffba930-bd2d-4621-8aee-16612e85fbc8",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "14acc83b-9409-4916-a5d0-89c9cbb103ec",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "df1f5f6e-91e6-4572-99b6-63b37cac116d",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "3214b983-67d5-4ccb-8a10-8e42a729e3dc",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "6fe71dd6-919e-4e52-89f7-c68495ba1323",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "d5f25bf8-f317-4654-adf0-d69e5476345f",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2c4e42e3-c8e0-4745-bdbf-de382997f1e9",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2de1b453-bf74-4596-83d8-44d20dcd5883",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "14d418bb-924b-4da6-8cca-5cf810135cc1",
+    "product_id": "64917d12-8bf3-49cc-a3a7-56dbae4e53b6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ea857db8-127b-4eea-b705-e0989137ab8e",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "090cd8c1-eec6-496f-bf69-632f302a7290",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "f5cd508a-3d26-4c06-b42c-cfc28a8ea8c9",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "9c27c583-8f1a-4ac4-b0cc-abed3320a0ab",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2e1d0f37-b5d0-441c-bc51-28bddc335ea1",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2f5d5147-6164-46ed-8ccc-9cc6a68e91a8",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "b928b391-15a6-4250-bfd2-4c30ee367240",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "584894b7-c798-4124-8301-3adf5585077d",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ee5cf982-f843-4e14-a78d-8c6fffdda47a",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "46f50bfb-e18c-48ae-8e71-553fdc6b6544",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "d32b06b6-f78f-44e0-a657-14f5aadc8420",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "b6decb8d-1083-4174-b781-8a759315e02a",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "607cee56-31c6-4958-809b-c9bbff427612",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "c404be35-8099-48ec-9acb-6e04c1fdd7d6",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ed922e5a-53ab-4a8b-9c3f-788bb2d02ca3",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "0aec77a1-0db5-4683-a3c8-f870be622b98",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ff93dfd2-d121-4882-8455-c8628dbe5760",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "dfa9c9b7-69c0-4ed3-8b2d-b48ff9d9dcba",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "49db1d3c-d8ca-4612-9969-9d8ff2ec65e8",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "5dfd3eda-647c-4ad1-804d-34ca7daaebe4",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "7651e0d1-cbf9-4954-9a34-c925fbb44a41",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "47ac640f-e3a5-4c85-9b43-fb151c78f661",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "680f7c50-ec7b-4c6d-a394-d55e00c68cc2",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "eb0ab06f-1509-48f4-b89b-656eb9ec82e9",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "9b068609-f0be-44e3-a43f-046e22ee1c66",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "e48a0cff-c1d9-4d54-9147-a4c6ef9255aa",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "5d47c3e9-1a30-4c7d-a86f-0179b8eefbc9",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "29277ca5-3eeb-4fc0-b15e-219d311013ba",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "4f50d399-0925-4ea3-bca1-f10a22ab89c1",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ea8f4fbf-8da2-459a-a987-c6b0fdef4480",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "fc61a8a0-ce22-464a-8820-4d0c00743a63",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "81fc0f34-78ce-40f8-b305-f782f37288f9",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ac20739a-3dc4-4b9a-80aa-7bbb6e55473b",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "9e6ac037-161b-4bd9-84a2-0044ca087d9b",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "cc11c0fb-8ae0-45ea-982a-815b0aaac264",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "fc726b9f-69e5-4665-9458-8bdeacc17c7e",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "7715cff8-59c0-4f46-b4a6-da34a6c442d5",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ffedfa84-1215-4513-8441-d333cec179c1",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "4c942234-7e6f-471f-8c48-8ab8a55c98af",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "1129de2b-eb3d-4662-9379-dac4fbb98d28",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "1c12e754-f54f-4353-b0b3-a7f3477ab3fd",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "46f428e4-363b-4660-8383-6df5ed07851b",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "a6dcbbf9-1d3c-4b6e-a1ed-11a1afb15ff1",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "379b8888-72e5-45d9-9edc-51bf7a69412f",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "01d77595-c62f-4df9-9470-58e81b6646e4",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "05924486-f6d7-4afa-af9e-61e6f874f3f8",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "07f73168-720a-42dd-a0ef-55aa6746890d",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "ad0c6673-cb00-4c8d-88ff-24fca5c7c9fa",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "1fba58c7-ebe8-4d73-a15a-4b63f4e9bc40",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "24cad432-94d8-42ba-a14b-bbf16bf6dcd6",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2e6312e0-41cf-4cee-b5ff-cfe54259ed7c",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "70b70a0a-2c13-405c-b2bf-ea40a1bdac99",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "b4241a5a-e3a0-466e-b44f-de18c31043f5",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "51e68bc5-c722-473b-a2c1-e9f45d6304fb",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "2dbb88e7-f953-472b-8bba-c1ecef3dd44e",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "4b9d9ccb-0103-4165-b5a9-0a4425d60f42",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "e42fb0fc-5b28-4d74-9000-aa67ba2ec4ca",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "cdcbf44b-1883-4430-88ff-87b840cbeef4",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "da6c8855-826a-42cd-ba8c-277030417b9d",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "b6f44e86-e345-4ff9-b511-411ab2506d3f",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-14T23:00:03.718005+00:00"
+  },
+  {
+    "id": "c5ecbef7-06a5-4a2b-91dc-4d38ffa9ac2d",
+    "product_id": "6f14c878-972d-4234-bdd0-1bc288fab523",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-15T23:00:02.723395+00:00"
+  },
+  {
+    "id": "cea7356b-46b0-48a3-86f1-307b5151cba5",
+    "product_id": "dcbb428d-e3fa-41e1-bcd9-386a65227f68",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-15T23:00:02.723395+00:00"
+  },
+  {
+    "id": "b3a7193e-a378-4f4f-a3a3-d42b10b51f9c",
+    "product_id": "904be4e6-7026-4722-995c-7385bafcea33",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-15T23:00:02.723395+00:00"
+  },
+  {
+    "id": "12e9c760-34e5-49c0-a1d9-beb2f412207f",
+    "product_id": "7a2db413-1f70-448d-8371-d2ffaf66254f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-15T23:00:02.723395+00:00"
+  },
+  {
+    "id": "6519b3f9-53c2-4256-a846-0b0bf0b68c75",
+    "product_id": "b566c867-4340-4250-a8fe-232f19926ebd",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-17T23:00:03.252445+00:00"
+  },
+  {
+    "id": "a6cbf84b-3364-441f-9886-194084b494f1",
+    "product_id": "db11f6a2-c2d4-4196-bc33-eb249edbb61c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-17T23:00:03.252445+00:00"
+  },
+  {
+    "id": "8fd53a2e-5d56-44f0-b30d-2715d7ecf320",
+    "product_id": "c83866d3-59aa-4956-b4e3-7b78f45885af",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-17T23:00:03.252445+00:00"
+  },
+  {
+    "id": "2c79ac5d-7a92-494f-b0f3-ea7e4dd67160",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "936a60ac-e7ef-468a-a7b1-41937b5f90b7",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "e2258b9c-fc60-4767-b764-3952b134c245",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f84338e1-3d2f-4b88-adb8-bd5a4bd96b1e",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "d69a6a92-988c-4875-a29b-a98e16237f2b",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "e38f5e4e-f2df-4c39-bfef-ab71c426b0de",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "63ac84c1-f3cf-4a9a-a9c5-42a8e2de5600",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "26db4b24-dc50-4440-b375-6887ebef8344",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "992159d3-8c93-432b-9d7c-f2b417454cd3",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "bac53f21-b1fe-4be6-9a9e-ebadb380bda3",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "7b880f00-8ff0-456b-958f-12d8db87ac42",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "fde19648-d3cb-4f96-b223-b11a13d5524a",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "4b04589c-a229-450b-8934-b97604b1a9bc",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "e0e26d4f-7f5e-4123-b7c2-449c87e69f50",
+    "product_id": "64917d12-8bf3-49cc-a3a7-56dbae4e53b6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "07315bdc-95d1-48e5-a2b2-28c55c230a92",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "8c3e6d31-57bf-4a91-8720-24be4dbf6b64",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "303fd792-5893-446d-82d4-a3be525ccca0",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "244b098b-dc0a-40b3-93b9-ea0614278bcf",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "d8e578c6-6c53-4645-9f36-1176b2d0e697",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "c5ed7a5c-95e6-4d35-a46f-244bbe0ba2d9",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "a9175b57-26b9-46ac-95c2-5715d64cd8ae",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "24472cc1-6fda-472b-a6e3-c7fb71b409b7",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f9edaaa5-35ef-4dcd-96cc-da775d1e0eff",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "fe0ef3b2-a486-48e2-8dd2-3b96ca9abe92",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "32aa5ba7-51fd-479a-9c76-1fa395a4264b",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "36587a00-5b66-49f6-9df9-3aaa1d51a555",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "c7668048-363a-4259-a1f0-92a56cc423e0",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "fc49b0d7-c96a-4950-9f98-e08c391e2f87",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "ae86c04c-047d-4f11-93b4-97910102b015",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "c001d119-8d09-4583-8c18-c49b310eda25",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "91e3b83d-4728-4bd1-b83c-c81c8e92d395",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "53459fa6-d105-456c-9033-58d6eb1be18e",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "0a9b303e-88d4-42ec-990a-7dbad8d32d4f",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "beac8815-854f-4453-a0b5-7141b2e47702",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "8d1a0f97-7019-42df-8bd0-c8b7dd3765ab",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "34fcad92-dec2-4a4c-929a-074b2616ead5",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "eb03d878-0af3-4178-b88a-4ea3d20a7f6e",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "3d8905a9-b8b5-4dc0-b332-dcfd1bb74093",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "43695ba4-c364-4216-b97b-30e674d2c642",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f82947ef-b193-4b80-bf01-40661514ccbb",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "d8ecfe02-191a-4ba3-b015-ea2f8b1ba2cd",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "883237b2-d3e5-46e9-a924-d8f1b76f17d9",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "963746e7-1819-429f-bcb2-63e195e27148",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f886fe40-49fb-4ba8-9333-437645b2493d",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "1b2fe3a9-7e16-468c-8896-9ca71eb9d0d4",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "d81156d5-9d11-4189-9942-0c008308b416",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f8c3d762-dade-4b1f-857a-f23e1fe68fd0",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "7c200a5f-cad0-47c7-850c-1aaecddd1fea",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "b831b458-1bbd-435d-b1b2-84956b6fbe0e",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "490e9896-3d84-460a-8d06-328507d134b2",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "bb51de1e-3d8d-4961-8dc3-6ac5f0cabcbc",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "c6cabea7-72b3-4632-a5de-d1eb8cbd1692",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "c38817d9-4806-4af6-8eb7-de63e134aadb",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "ba88c2fe-b9a2-47b5-881c-33b93a43c8fa",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "cfafc5ee-3b98-422f-b504-564b82e3d666",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "5e2fc2d6-ab75-4938-bdd9-1683fc2b1467",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "2c8b1b50-1dec-40b4-9688-e3b927882c6e",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "ced77b61-9d03-4722-9777-413f44466bf1",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "6208ec79-3d59-42a7-9cd7-1f8fc1956aaa",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "49aa497d-b4ab-466b-a304-10f81f0660c5",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "9d035e51-3e60-40d5-a706-d32e50b245d0",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "aabbcdfb-4337-447e-a634-acafb9ac8c89",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "eafc291e-1799-4900-8522-3c2bd3d7affd",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "7fd146ce-4926-40bc-a6b3-87604dd69d4f",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "dbe4ee60-94a8-4396-bb13-74e6011d1eee",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "bea1d748-c086-42af-a365-a58fd42954e5",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "dbdd2ad7-be3d-4031-95b6-1e38f9850797",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f1706866-d09e-436f-a8ce-c14ceb06c1bb",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "1ef27e76-2af5-4bf1-8db3-ad7d971cb9b8",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "e9ea954d-759e-4b6a-a1bc-53c35275a777",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "dd148dad-7201-4f14-805b-677f438af643",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "f477c441-abdd-4a87-9804-6380e1132944",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "3ebc1964-8206-4432-b4f5-f05719ccec12",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "081f344a-3811-4297-b328-aaa27c96ae3e",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-22T23:00:03.095814+00:00"
+  },
+  {
+    "id": "11f18f3b-fe64-4afa-89ef-0ff922007aac",
+    "product_id": "6f14c878-972d-4234-bdd0-1bc288fab523",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-23T21:00:02.068547+00:00"
+  },
+  {
+    "id": "ebbfc749-caa3-45fb-82ea-946969ba361f",
+    "product_id": "dcbb428d-e3fa-41e1-bcd9-386a65227f68",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-23T21:00:02.068547+00:00"
+  },
+  {
+    "id": "d523509f-8240-4399-843a-c6fbad7d4150",
+    "product_id": "904be4e6-7026-4722-995c-7385bafcea33",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-23T21:00:02.068547+00:00"
+  },
+  {
+    "id": "117ae606-80f0-4244-bb27-db39057b5a09",
+    "product_id": "7a2db413-1f70-448d-8371-d2ffaf66254f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-23T21:00:02.068547+00:00"
+  },
+  {
+    "id": "05e0875b-fe7f-4132-8c16-9e6a77921ce6",
+    "product_id": "b566c867-4340-4250-a8fe-232f19926ebd",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-25T21:00:01.931294+00:00"
+  },
+  {
+    "id": "b9fe42af-1cfb-4064-9106-cd684ddd7004",
+    "product_id": "db11f6a2-c2d4-4196-bc33-eb249edbb61c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-25T21:00:01.931294+00:00"
+  },
+  {
+    "id": "1ed131b7-74cf-4930-8549-bafcdbd13165",
+    "product_id": "c83866d3-59aa-4956-b4e3-7b78f45885af",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-25T21:00:01.931294+00:00"
+  },
+  {
+    "id": "138de99f-672f-4d39-a9a5-b6a756b32dc8",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "stock_level": 2,
+    "alert_type": "low_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "8fc897ad-5307-4e2d-9131-3a569475965c",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "f1cd8541-14dc-4247-8ed1-e43a7991b8ba",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "24630440-5ab9-476a-86ee-4a63bc131831",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "78e9c1a1-2641-4ab7-9abc-ae211469f0cb",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "27b57efa-18f1-46e1-ba13-7c56e77ffb9f",
+    "product_id": "a1e68e13-e537-4ec6-b6fa-997bc05621aa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "67ccef5c-ab22-4763-b99f-ea6c3efd28ca",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "ef31aac2-a65d-4431-909f-053a0f206826",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "83ce77b7-828c-470c-a92a-ea6b0cacc8a4",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "a363f334-d888-40ba-827a-f2730d538df6",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "2f4cc352-b956-4e5d-9ebf-b3fe9a7789d6",
+    "product_id": "ee61dcae-dc86-415c-9e7a-4cfa6c33663c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "1a154764-24f8-45f9-80d6-34f6703e25b0",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "85e9395c-e6c1-4c48-9933-5993543c695f",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "37aab595-8b71-4d31-b01c-b365e51b308b",
+    "product_id": "64917d12-8bf3-49cc-a3a7-56dbae4e53b6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "4e391e44-a523-4bf3-8e2e-ea53a236ca67",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "c988b8a6-2bb1-4d49-913d-71a893b0483d",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "b70e9ed9-9574-43bb-910c-40cec46cff15",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "5ee64a2a-edd2-487e-be48-0562ecd68dc5",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "80d5c509-2ea0-4289-9e20-7e0ea6b9b696",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "e19c977c-8585-450b-911d-f4c3e3fb62a7",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "37bfe00c-e494-4138-ad2f-58c12c910407",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "efd3c62f-64cf-4f0f-b64a-f4bc40927940",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "ad264580-1022-4779-a076-a6c43ac6a40d",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "e85da9bf-f7f0-438e-8078-449ab928c82d",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "0de1134c-c4ff-4df9-a1fb-5bce01f43b31",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "a65a7446-1a2c-4e10-ac4a-bb3fd4d8c37a",
+    "product_id": "cc5b8536-579d-4199-911a-fc15a056cc8c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "fbcb5f63-4f7f-4f6b-a0ea-a6f52f2cb2ee",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "49051f3b-526d-4d3f-b02c-05895ee4707a",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "074bcf2b-4a79-4a58-8973-9045d56eb772",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "48b489da-81f7-4144-81bf-2c3ffd8bb351",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "823b2a46-9678-4772-a132-1588b3ab1719",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "608f5b92-264e-49aa-94f2-8acb70240c28",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "fd38af92-ea37-4510-a872-c74a11c5f9a0",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "9edcce4d-7b17-4113-84a8-6a3734134be4",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "97c13570-8ebc-4eb5-8ff5-9f1cd09f2068",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "5993b7ec-3147-4fa1-a724-183606c810b4",
+    "product_id": "2c633cbc-30b9-4578-a073-143773ddfd00",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "5bdba87b-6c88-44bc-bfbe-470aaf61e1d2",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "099b2298-e256-43e8-bed6-01a64d43b10c",
+    "product_id": "02ac6ffe-1fa7-4a1a-b373-ad5e1a8bb794",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "2a0bc5de-ad3e-41e3-b62d-e7caacbb9940",
+    "product_id": "008be529-988f-4935-82ed-9da431833135",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "eb788b20-b77a-4329-9110-330f1d3982bb",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "7e51b212-78af-4426-85b6-6a3c8ecda382",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "e830f550-ec02-4634-a3d8-cebb1ce0ef69",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "b917ce7d-6f9b-4d53-aeb6-28893bf40273",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "b6668d69-4741-4e0d-81ae-55d832a60a91",
+    "product_id": "e02f80a5-6890-44a2-af1c-3aab6d72789d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "aadc16c2-2d56-4639-a90b-f301eac18685",
+    "product_id": "df4bc5ce-7998-4cd5-8b6f-855d9eebe427",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "1652c8ee-2576-450f-90dd-4bfef56919b3",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "a840dd31-e654-45b6-a0e7-fadd0014cb09",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "2262df2c-058b-4f19-ac9b-569adab27e8a",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "2ef66863-cdeb-4396-92cb-ecd6c87d5ad8",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "2faa49cb-1220-4873-9b71-33ef91177884",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "de11958c-01e1-4415-9228-ccff51fb7d6c",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "243abf77-c0e0-406f-be99-e822d626ccfb",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "585d9cfe-fdff-40cc-8925-d2d860037a32",
+    "product_id": "f81662af-3fb2-454c-b4f4-94b1816f80ac",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "081674ef-c235-4558-8bdb-7cc942ee6226",
+    "product_id": "d88861a7-d2c2-42f3-a217-35156086aa85",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "8103d735-dfb6-4f97-9816-f03182134973",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "8c1eb125-5449-4624-b1bc-6048cc99a66c",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "8dabaa5c-e69a-44aa-8c37-729b32d7df2a",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "387f02b2-5eba-49e6-aae5-592d82b66694",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "797f8c71-87d5-4be2-bb4c-6dd33c3a0f29",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "61a68fcb-932e-4582-89cc-f02ef0774af0",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "d9870ef9-0857-4221-ae8d-9eef07b9753e",
+    "product_id": "d40074bf-a920-4bfe-90b1-9334add946d3",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "dca8e4ba-cf81-445d-9eae-09fe475b05ea",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "2aac6d43-10d4-4d5a-bc68-c0f1a321026c",
+    "product_id": "f4c29289-54d0-49cd-9edb-2e649f1607fa",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "072d2fa6-200b-4563-90e4-eda47a41950a",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "ad8b5752-e1c0-457c-965a-5857d7bf2ed9",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "0d35ff29-be0a-4c09-9328-a8a56acbff65",
+    "product_id": "55db9b57-d389-461f-9271-b1954fee9de8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "890bfc65-0ad6-4c4e-bd02-0b6011b4ddae",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "3e2ba1e7-d38a-463c-9b4c-07aaa8aa67a9",
+    "product_id": "527d6938-3d29-4354-8feb-7a178821b7b8",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "8945a912-f753-4670-b40e-372d4b176940",
+    "product_id": "7229f841-995e-4d27-bad1-4f53acd7a805",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "b0240753-4cd7-4636-9e2f-e08d24263162",
+    "product_id": "96691e90-d069-4c09-baed-83a3974401a4",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "94bace1d-f0e3-4261-8186-8e23ca56276e",
+    "product_id": "8c350ba4-eb62-451e-9f97-781a13744f29",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "c29503ef-d24b-4ba7-baed-28b04de679a8",
+    "product_id": "ad37da7f-dd79-45d3-ad89-a044f9c7f3d6",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "da6c9965-458f-4ed5-a04b-d59fe3685f71",
+    "product_id": "0602cc52-f033-4cc2-bb2c-d6a64a691fa2",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "6b2b1541-4541-4646-8f48-15978966cedd",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-30T21:00:02.344724+00:00"
+  },
+  {
+    "id": "3f9c56bf-6780-45d0-8f03-b7794155d37a",
+    "product_id": "6f14c878-972d-4234-bdd0-1bc288fab523",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-31T21:00:01.485969+00:00"
+  },
+  {
+    "id": "57700c4a-559d-4a5e-a8a8-a9f3aa19c1fc",
+    "product_id": "dcbb428d-e3fa-41e1-bcd9-386a65227f68",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-31T21:00:01.485969+00:00"
+  },
+  {
+    "id": "f37876e2-beb6-4e29-ba79-8555df492c05",
+    "product_id": "904be4e6-7026-4722-995c-7385bafcea33",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-31T21:00:01.485969+00:00"
+  },
+  {
+    "id": "5c9f76f8-96ff-4645-8e60-4af469888a89",
+    "product_id": "7a2db413-1f70-448d-8371-d2ffaf66254f",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-03-31T21:00:01.485969+00:00"
+  },
+  {
+    "id": "8f1abbac-5eee-4ac9-ac28-e9b8b0e2495d",
+    "product_id": "b566c867-4340-4250-a8fe-232f19926ebd",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-04-02T21:00:01.915242+00:00"
+  },
+  {
+    "id": "2e42630c-faf9-4c63-82b0-5658f0e8112e",
+    "product_id": "db11f6a2-c2d4-4196-bc33-eb249edbb61c",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-04-02T21:00:01.915242+00:00"
+  },
+  {
+    "id": "6d3195a2-b650-427a-831d-119d7a076bee",
+    "product_id": "c83866d3-59aa-4956-b4e3-7b78f45885af",
+    "stock_level": 0,
+    "alert_type": "out_of_stock",
+    "created_at": "2026-04-02T21:00:01.915242+00:00"
+  }
+]

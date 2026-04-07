@@ -1,0 +1,4092 @@
+[
+  {
+    "id": "22304a6c-a6b0-4204-85b8-4023e77f540f",
+    "product_id": "e879acd6-fd25-4ebb-b5a3-a60cffb18db4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e879acd6-fd25-4ebb-b5a3-a60cffb18db4.jpg",
+    "storage_path": "products/e879acd6-fd25-4ebb-b5a3-a60cffb18db4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a6d254c1-f3b3-4804-b2dd-28a138df17f9",
+    "product_id": "db11f6a2-c2d4-4196-bc33-eb249edbb61c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/db11f6a2-c2d4-4196-bc33-eb249edbb61c.jpg",
+    "storage_path": "products/db11f6a2-c2d4-4196-bc33-eb249edbb61c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "80f38d96-e205-4e11-a0d1-a81d054558ac",
+    "product_id": "25bd65e3-f0ff-46fe-876a-7663a4d28a08",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/25bd65e3-f0ff-46fe-876a-7663a4d28a08.jpg",
+    "storage_path": "products/25bd65e3-f0ff-46fe-876a-7663a4d28a08.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d5f8d032-f274-4294-82c8-f45c00169efb",
+    "product_id": "c7fe9b7e-87c7-4018-9179-972fecf021fb",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c7fe9b7e-87c7-4018-9179-972fecf021fb.jpg",
+    "storage_path": "products/c7fe9b7e-87c7-4018-9179-972fecf021fb.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ed14c503-206e-4799-a37b-c9e1c676dce8",
+    "product_id": "8fa7710f-3cd4-4dca-bfe8-9d2d127a205f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8fa7710f-3cd4-4dca-bfe8-9d2d127a205f.jpg",
+    "storage_path": "products/8fa7710f-3cd4-4dca-bfe8-9d2d127a205f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "15e85e37-57a0-4355-bef5-cef22ea5a490",
+    "product_id": "79925a16-0beb-42e9-bdf1-09d9d0726c23",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/79925a16-0beb-42e9-bdf1-09d9d0726c23.jpg",
+    "storage_path": "products/79925a16-0beb-42e9-bdf1-09d9d0726c23.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "584638ab-66eb-4d47-9446-9a87ef92f763",
+    "product_id": "6df3c2da-0d65-4c59-b83e-22bb1bf52973",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6df3c2da-0d65-4c59-b83e-22bb1bf52973.jpg",
+    "storage_path": "products/6df3c2da-0d65-4c59-b83e-22bb1bf52973.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a2e0f0b3-74fe-48c4-8554-8ea80fd198b9",
+    "product_id": "bf48b04c-d96b-4ed8-a4ee-d27953925a4f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/bf48b04c-d96b-4ed8-a4ee-d27953925a4f.jpg",
+    "storage_path": "products/bf48b04c-d96b-4ed8-a4ee-d27953925a4f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "25f668c2-07a0-4462-a4ec-4f37da460685",
+    "product_id": "744ab4c1-9ba2-445b-a451-e68e13f3c05a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/744ab4c1-9ba2-445b-a451-e68e13f3c05a.jpg",
+    "storage_path": "products/744ab4c1-9ba2-445b-a451-e68e13f3c05a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "717a310f-5324-47c4-a6c8-38fb0e1b5a25",
+    "product_id": "8c84c226-88fa-441c-a9bc-deed3a048311",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8c84c226-88fa-441c-a9bc-deed3a048311.jpg",
+    "storage_path": "products/8c84c226-88fa-441c-a9bc-deed3a048311.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5bf75ae0-d6b6-408c-9e99-1a7cf4080c02",
+    "product_id": "368d3e9b-0428-4729-9c62-c3e51fe8ea69",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/368d3e9b-0428-4729-9c62-c3e51fe8ea69.jpg",
+    "storage_path": "products/368d3e9b-0428-4729-9c62-c3e51fe8ea69.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "762d51ee-6d99-44d5-8c64-bcc743af225a",
+    "product_id": "286e37ea-e03a-4aef-ac0c-04707641219b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/286e37ea-e03a-4aef-ac0c-04707641219b.jpg",
+    "storage_path": "products/286e37ea-e03a-4aef-ac0c-04707641219b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3de0f181-a867-49f5-894c-3f2681fd8351",
+    "product_id": "6139cc8f-3c92-4e3b-92be-7abf9823ac90",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6139cc8f-3c92-4e3b-92be-7abf9823ac90.jpg",
+    "storage_path": "products/6139cc8f-3c92-4e3b-92be-7abf9823ac90.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f1c72bd3-f5be-41cf-8382-eeed222e7020",
+    "product_id": "b566c867-4340-4250-a8fe-232f19926ebd",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b566c867-4340-4250-a8fe-232f19926ebd.jpg",
+    "storage_path": "products/b566c867-4340-4250-a8fe-232f19926ebd.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3d2f775d-3cd8-4037-8efe-0ce0c34ab118",
+    "product_id": "dbd6f15c-67ee-4e71-8240-23871bcd4d2c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/dbd6f15c-67ee-4e71-8240-23871bcd4d2c.jpg",
+    "storage_path": "products/dbd6f15c-67ee-4e71-8240-23871bcd4d2c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a5f36869-d248-496e-b3dd-6356eac9ad8b",
+    "product_id": "5b8aa937-de9f-45aa-a874-503ccf478028",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5b8aa937-de9f-45aa-a874-503ccf478028.jpg",
+    "storage_path": "products/5b8aa937-de9f-45aa-a874-503ccf478028.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d627b728-c255-4998-8980-0e6131c79434",
+    "product_id": "7cdc42b2-dbf5-4b56-b6ae-a8f831fb6a7e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7cdc42b2-dbf5-4b56-b6ae-a8f831fb6a7e.jpg",
+    "storage_path": "products/7cdc42b2-dbf5-4b56-b6ae-a8f831fb6a7e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0f6c0620-1984-4841-9562-5e5528c7135d",
+    "product_id": "691e2298-0fe4-41b2-a873-3aded5d8fff9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/691e2298-0fe4-41b2-a873-3aded5d8fff9.jpg",
+    "storage_path": "products/691e2298-0fe4-41b2-a873-3aded5d8fff9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "843180ca-d887-4043-8ae6-941f2e08c47a",
+    "product_id": "343a9d47-7177-4500-8cf6-0c4084e2fc6b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/343a9d47-7177-4500-8cf6-0c4084e2fc6b.jpg",
+    "storage_path": "products/343a9d47-7177-4500-8cf6-0c4084e2fc6b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8d130393-7006-488f-a3bc-140171773d00",
+    "product_id": "99b072e0-bddd-4248-80c0-fe849ad7a98e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/99b072e0-bddd-4248-80c0-fe849ad7a98e.jpg",
+    "storage_path": "products/99b072e0-bddd-4248-80c0-fe849ad7a98e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0e255cae-c509-400e-8309-3bca374d2a7d",
+    "product_id": "b8ae3799-15eb-4489-9368-e5878c772e3d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b8ae3799-15eb-4489-9368-e5878c772e3d.jpg",
+    "storage_path": "products/b8ae3799-15eb-4489-9368-e5878c772e3d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "018725b3-4a85-496a-9ae0-c106bf6a7bd9",
+    "product_id": "622ba0a9-5da2-4668-b87c-7e545c158008",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/622ba0a9-5da2-4668-b87c-7e545c158008.jpg",
+    "storage_path": "products/622ba0a9-5da2-4668-b87c-7e545c158008.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2fa587ea-2f1d-4855-882a-a234e5070fb4",
+    "product_id": "2c83e7ab-a9a2-45e7-a719-78c6d76da8b7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2c83e7ab-a9a2-45e7-a719-78c6d76da8b7.jpg",
+    "storage_path": "products/2c83e7ab-a9a2-45e7-a719-78c6d76da8b7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c6b3d65e-3795-47fb-bb97-d19032eae96d",
+    "product_id": "de99b62c-58fb-48f1-8aea-8ec518857d02",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/de99b62c-58fb-48f1-8aea-8ec518857d02.jpg",
+    "storage_path": "products/de99b62c-58fb-48f1-8aea-8ec518857d02.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ae63f7e4-5504-4092-a3e4-bbd2313f65f7",
+    "product_id": "f77df3d4-b3ae-481f-b240-9cf85c977065",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f77df3d4-b3ae-481f-b240-9cf85c977065.jpg",
+    "storage_path": "products/f77df3d4-b3ae-481f-b240-9cf85c977065.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9053b685-c967-459a-8bac-b49d900bdc98",
+    "product_id": "6076e0f7-0230-4f28-871b-ed3915762fcb",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6076e0f7-0230-4f28-871b-ed3915762fcb.jpg",
+    "storage_path": "products/6076e0f7-0230-4f28-871b-ed3915762fcb.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2e1a5153-374e-4048-a5bd-fdd1e7364e5a",
+    "product_id": "61766344-bef7-4453-82f8-40b3ab7979b5",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/61766344-bef7-4453-82f8-40b3ab7979b5.jpg",
+    "storage_path": "products/61766344-bef7-4453-82f8-40b3ab7979b5.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "828009fd-0080-4041-aa87-d5b8d4abc07b",
+    "product_id": "658db544-8efb-483f-b911-4aa39c73f129",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/658db544-8efb-483f-b911-4aa39c73f129.jpg",
+    "storage_path": "products/658db544-8efb-483f-b911-4aa39c73f129.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9f500c2e-29bf-419f-be8c-bbaaa5d14d5d",
+    "product_id": "ad0078a4-5619-42a7-9270-21687ebf0b3f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ad0078a4-5619-42a7-9270-21687ebf0b3f.jpg",
+    "storage_path": "products/ad0078a4-5619-42a7-9270-21687ebf0b3f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3801684a-2f50-4973-a2e5-80559230df53",
+    "product_id": "df7202e0-ba5f-4748-89ac-aa64460ad721",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/df7202e0-ba5f-4748-89ac-aa64460ad721.jpg",
+    "storage_path": "products/df7202e0-ba5f-4748-89ac-aa64460ad721.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b31c96ed-cb46-4032-915a-25d6ecb8366c",
+    "product_id": "2c742625-2b06-4ed2-82fd-2e642f1ae1f8",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2c742625-2b06-4ed2-82fd-2e642f1ae1f8.jpg",
+    "storage_path": "products/2c742625-2b06-4ed2-82fd-2e642f1ae1f8.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5d732441-5612-4ad9-8305-5dc811e8db0c",
+    "product_id": "49b504f6-a220-412a-b987-c406ae7c7181",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/49b504f6-a220-412a-b987-c406ae7c7181.jpg",
+    "storage_path": "products/49b504f6-a220-412a-b987-c406ae7c7181.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6b79d6ab-6896-42e1-83ae-3cd0c23f0d17",
+    "product_id": "c5d349f2-2b24-4a8b-94ec-66ead3c62aee",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c5d349f2-2b24-4a8b-94ec-66ead3c62aee.jpg",
+    "storage_path": "products/c5d349f2-2b24-4a8b-94ec-66ead3c62aee.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "52368460-d36e-4890-a05c-649b163fc801",
+    "product_id": "8685c046-bfff-465a-9b79-217048eb0f86",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8685c046-bfff-465a-9b79-217048eb0f86.jpg",
+    "storage_path": "products/8685c046-bfff-465a-9b79-217048eb0f86.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f6a2405d-6012-4d6a-a92f-2cf01b8aadff",
+    "product_id": "f529db37-9e40-44eb-aa7a-6cb8fabb3428",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f529db37-9e40-44eb-aa7a-6cb8fabb3428.jpg",
+    "storage_path": "products/f529db37-9e40-44eb-aa7a-6cb8fabb3428.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1712aced-9bb9-4af5-99f5-e6784ea2ad44",
+    "product_id": "e0b7b428-b334-4e3f-86d3-fd6423e43a5c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e0b7b428-b334-4e3f-86d3-fd6423e43a5c.jpg",
+    "storage_path": "products/e0b7b428-b334-4e3f-86d3-fd6423e43a5c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "219d3adc-e71d-4bf3-8ff4-2a6bc608634a",
+    "product_id": "0fa09f9a-2226-4bef-b197-17f840d83709",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0fa09f9a-2226-4bef-b197-17f840d83709.jpg",
+    "storage_path": "products/0fa09f9a-2226-4bef-b197-17f840d83709.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c0ab0e54-7bee-4177-bbf0-a223e8ac5247",
+    "product_id": "25fa6e38-a11e-4f10-9bce-34084f21d87e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/25fa6e38-a11e-4f10-9bce-34084f21d87e.jpg",
+    "storage_path": "products/25fa6e38-a11e-4f10-9bce-34084f21d87e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "59317087-c196-43fd-9f28-96ea4ae80b0e",
+    "product_id": "685192d8-b8c5-4118-88e0-990b660acd0a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/685192d8-b8c5-4118-88e0-990b660acd0a.jpg",
+    "storage_path": "products/685192d8-b8c5-4118-88e0-990b660acd0a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9647e3ec-048c-4d95-947b-14c1d9c18652",
+    "product_id": "ca1f3186-671f-40ea-9a9f-907ef0195d31",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ca1f3186-671f-40ea-9a9f-907ef0195d31.jpg",
+    "storage_path": "products/ca1f3186-671f-40ea-9a9f-907ef0195d31.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b4eb15c4-6994-4e66-93b5-f65c2ca58799",
+    "product_id": "99b89c76-dfb8-42ac-9410-e694d66bfb76",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/99b89c76-dfb8-42ac-9410-e694d66bfb76.jpg",
+    "storage_path": "products/99b89c76-dfb8-42ac-9410-e694d66bfb76.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "433ce693-e132-4b1b-a9ae-22825a688c69",
+    "product_id": "59efb660-1293-47c9-b142-67503d109d58",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/59efb660-1293-47c9-b142-67503d109d58.jpg",
+    "storage_path": "products/59efb660-1293-47c9-b142-67503d109d58.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "063036e7-c427-4148-9e75-0f4c57bdbe3f",
+    "product_id": "4b0e6110-9da1-4632-856d-0a794b131124",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4b0e6110-9da1-4632-856d-0a794b131124.jpg",
+    "storage_path": "products/4b0e6110-9da1-4632-856d-0a794b131124.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0125773e-34fd-4ede-8329-109dcfe581be",
+    "product_id": "273afe7c-de2f-4dcb-80d3-3d2fb6a65417",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/273afe7c-de2f-4dcb-80d3-3d2fb6a65417.jpg",
+    "storage_path": "products/273afe7c-de2f-4dcb-80d3-3d2fb6a65417.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "db239d8a-5206-4efe-aa27-96814cdb68a7",
+    "product_id": "2572a4cd-8a1a-4a5f-af3b-733ab7ce2d0b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2572a4cd-8a1a-4a5f-af3b-733ab7ce2d0b.jpg",
+    "storage_path": "products/2572a4cd-8a1a-4a5f-af3b-733ab7ce2d0b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e7ca8764-1353-494f-9bc9-dad09f9fb87c",
+    "product_id": "27a26093-37a4-4bd1-be3c-c8045e4a51c3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/27a26093-37a4-4bd1-be3c-c8045e4a51c3.jpg",
+    "storage_path": "products/27a26093-37a4-4bd1-be3c-c8045e4a51c3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "100953b3-ba79-4a98-acac-b682169615e5",
+    "product_id": "a90edd10-c2c6-46bd-9170-bb54ebfad3a0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a90edd10-c2c6-46bd-9170-bb54ebfad3a0.jpg",
+    "storage_path": "products/a90edd10-c2c6-46bd-9170-bb54ebfad3a0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a026f990-8dea-4885-bf07-0a290dc71ee0",
+    "product_id": "3d7f0891-f082-4dcb-a0ef-3fa074373d07",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3d7f0891-f082-4dcb-a0ef-3fa074373d07.jpg",
+    "storage_path": "products/3d7f0891-f082-4dcb-a0ef-3fa074373d07.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "77a41786-890a-4d1c-8690-84d69ad254fa",
+    "product_id": "b8afa3a1-a1d3-4d0f-a5c4-43fcf78eceb2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b8afa3a1-a1d3-4d0f-a5c4-43fcf78eceb2.jpg",
+    "storage_path": "products/b8afa3a1-a1d3-4d0f-a5c4-43fcf78eceb2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c908f621-84c4-4d93-8ae5-a6e35d6b3fc4",
+    "product_id": "92c6b64b-ae48-422e-8fcf-101e6f69f956",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/92c6b64b-ae48-422e-8fcf-101e6f69f956.jpg",
+    "storage_path": "products/92c6b64b-ae48-422e-8fcf-101e6f69f956.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "51268061-59b6-4750-9e52-eb67db3e8f4a",
+    "product_id": "e7818849-9f3c-4070-bd64-8947bd2f169d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e7818849-9f3c-4070-bd64-8947bd2f169d.jpg",
+    "storage_path": "products/e7818849-9f3c-4070-bd64-8947bd2f169d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "081aa62c-23b0-4103-82f4-814aca2a4407",
+    "product_id": "c3a7beaf-0b93-46b8-bfb4-1a24cd8f6f66",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c3a7beaf-0b93-46b8-bfb4-1a24cd8f6f66.jpg",
+    "storage_path": "products/c3a7beaf-0b93-46b8-bfb4-1a24cd8f6f66.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "276c792d-f55c-42a6-8964-8286bc818598",
+    "product_id": "85f82d81-15d2-4214-85a5-05d06ecb7c62",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/85f82d81-15d2-4214-85a5-05d06ecb7c62.jpg",
+    "storage_path": "products/85f82d81-15d2-4214-85a5-05d06ecb7c62.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c4b1afc1-4dba-45c2-b9a1-9cca16d6db7d",
+    "product_id": "fd0ef0a4-312b-46f8-b6b7-f68e60912d13",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fd0ef0a4-312b-46f8-b6b7-f68e60912d13.jpg",
+    "storage_path": "products/fd0ef0a4-312b-46f8-b6b7-f68e60912d13.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e38d1840-9ef3-4f36-8b2e-7c794f6be5be",
+    "product_id": "a2829a75-e54e-43a2-a2b3-883e6304dd6e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a2829a75-e54e-43a2-a2b3-883e6304dd6e.jpg",
+    "storage_path": "products/a2829a75-e54e-43a2-a2b3-883e6304dd6e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "52dbc51b-262c-4b9e-80b5-f204ae0e138d",
+    "product_id": "206bfe57-bf29-4639-ae24-4c6d923b7e14",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/206bfe57-bf29-4639-ae24-4c6d923b7e14.jpg",
+    "storage_path": "products/206bfe57-bf29-4639-ae24-4c6d923b7e14.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9c20e2c8-f199-46f1-a8e7-72c537131421",
+    "product_id": "9f709a1b-e4d1-49d2-ad87-a24267233525",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9f709a1b-e4d1-49d2-ad87-a24267233525.jpg",
+    "storage_path": "products/9f709a1b-e4d1-49d2-ad87-a24267233525.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9c6c3996-86d1-4cd4-b34f-0e58725c7bff",
+    "product_id": "e60d7d1c-22ac-4d99-9a67-0977e8af6b00",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e60d7d1c-22ac-4d99-9a67-0977e8af6b00.jpg",
+    "storage_path": "products/e60d7d1c-22ac-4d99-9a67-0977e8af6b00.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "55e8c192-55bc-4efd-a2e8-dd6cc8f88689",
+    "product_id": "e449ad9c-ccf1-4202-ae28-9b916e19478d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e449ad9c-ccf1-4202-ae28-9b916e19478d.jpg",
+    "storage_path": "products/e449ad9c-ccf1-4202-ae28-9b916e19478d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0199860f-30c1-4dea-810a-6d84fb6c4362",
+    "product_id": "a565f0ad-e2db-47b0-a491-eb27138610c7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a565f0ad-e2db-47b0-a491-eb27138610c7.jpg",
+    "storage_path": "products/a565f0ad-e2db-47b0-a491-eb27138610c7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b3ae98ea-7870-4589-b6b1-571092376644",
+    "product_id": "4ebcbf36-e698-4ced-adc3-56a0653d9bc9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4ebcbf36-e698-4ced-adc3-56a0653d9bc9.jpg",
+    "storage_path": "products/4ebcbf36-e698-4ced-adc3-56a0653d9bc9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "41750bbd-1a03-41a6-b7e8-fcb20d149089",
+    "product_id": "64917d12-8bf3-49cc-a3a7-56dbae4e53b6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/64917d12-8bf3-49cc-a3a7-56dbae4e53b6.jpg",
+    "storage_path": "products/64917d12-8bf3-49cc-a3a7-56dbae4e53b6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "93c822c6-d46d-450f-bfc2-615c83015af1",
+    "product_id": "9f1e9fbd-c0f3-40f6-825f-0f95f48482a4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9f1e9fbd-c0f3-40f6-825f-0f95f48482a4.jpg",
+    "storage_path": "products/9f1e9fbd-c0f3-40f6-825f-0f95f48482a4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e82138cb-dc9f-4ca8-9814-c4a02dc7ddc1",
+    "product_id": "98a7ce26-2f4d-4e37-9fe0-ad9e4c6e7070",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/98a7ce26-2f4d-4e37-9fe0-ad9e4c6e7070.jpg",
+    "storage_path": "products/98a7ce26-2f4d-4e37-9fe0-ad9e4c6e7070.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a52536cc-bd37-451a-8c49-ffc1e7e34a5e",
+    "product_id": "5f9fff1e-fbe5-4625-a76a-92818c6639c9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5f9fff1e-fbe5-4625-a76a-92818c6639c9.jpg",
+    "storage_path": "products/5f9fff1e-fbe5-4625-a76a-92818c6639c9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c57a7430-a8b7-4145-bbc8-dc2de45ae947",
+    "product_id": "503df166-9a53-48d4-afe9-2a289d9397b1",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/503df166-9a53-48d4-afe9-2a289d9397b1.jpg",
+    "storage_path": "products/503df166-9a53-48d4-afe9-2a289d9397b1.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d1ee7e43-eedd-45ed-9ceb-7eaac292f93a",
+    "product_id": "811e74e6-80d8-4d50-af62-25b59b88310b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/811e74e6-80d8-4d50-af62-25b59b88310b.jpg",
+    "storage_path": "products/811e74e6-80d8-4d50-af62-25b59b88310b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9cf8e3d6-5cfc-403f-93bd-b91171b0c7e9",
+    "product_id": "c2759e84-ce0f-4abc-ad07-47227903919a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c2759e84-ce0f-4abc-ad07-47227903919a.jpg",
+    "storage_path": "products/c2759e84-ce0f-4abc-ad07-47227903919a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f676e5f0-6c46-40a4-a3de-59e96922880b",
+    "product_id": "05fc7d62-207a-4a58-be1f-2dbc8b117493",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/05fc7d62-207a-4a58-be1f-2dbc8b117493.jpg",
+    "storage_path": "products/05fc7d62-207a-4a58-be1f-2dbc8b117493.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "93021172-e69f-4efd-a8d9-4c0f42d7adb3",
+    "product_id": "ce65a410-ad4a-4e34-b87a-2316afe34d5a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ce65a410-ad4a-4e34-b87a-2316afe34d5a.jpg",
+    "storage_path": "products/ce65a410-ad4a-4e34-b87a-2316afe34d5a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "cfea5567-dccc-42d2-8153-2714a0c58c73",
+    "product_id": "cb73d2cc-bd6a-4c73-8454-261b5d16caae",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cb73d2cc-bd6a-4c73-8454-261b5d16caae.jpg",
+    "storage_path": "products/cb73d2cc-bd6a-4c73-8454-261b5d16caae.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b9510d75-cd72-43b1-ac0d-b4a557b09d5b",
+    "product_id": "6dc1d69e-2088-460c-8fe9-11a44186ba4a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6dc1d69e-2088-460c-8fe9-11a44186ba4a.jpg",
+    "storage_path": "products/6dc1d69e-2088-460c-8fe9-11a44186ba4a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "341d3aac-45c7-4313-b2ea-55df22ea6b84",
+    "product_id": "1b11ec3b-d507-4122-b196-d1db3c5380c8",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1b11ec3b-d507-4122-b196-d1db3c5380c8.jpg",
+    "storage_path": "products/1b11ec3b-d507-4122-b196-d1db3c5380c8.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "47d94239-eb1c-4657-8b3b-414183cf47b2",
+    "product_id": "409e09ea-8684-40f4-9d77-9d6c93427745",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/409e09ea-8684-40f4-9d77-9d6c93427745.jpg",
+    "storage_path": "products/409e09ea-8684-40f4-9d77-9d6c93427745.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c5f73243-d0e7-46c6-8911-048d35665700",
+    "product_id": "b24868ed-beb6-491d-93a9-1bfece8f0158",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b24868ed-beb6-491d-93a9-1bfece8f0158.jpg",
+    "storage_path": "products/b24868ed-beb6-491d-93a9-1bfece8f0158.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4f6a3dbd-4d2c-4197-91fd-c7671436b23f",
+    "product_id": "5a871a5d-1de0-41ba-9e64-6dd4393049d7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5a871a5d-1de0-41ba-9e64-6dd4393049d7.jpg",
+    "storage_path": "products/5a871a5d-1de0-41ba-9e64-6dd4393049d7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "feacbcc9-6467-4cdc-8e95-574751b0b96f",
+    "product_id": "6cfc6a07-38cb-4750-9a20-1f9b5cc5d593",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6cfc6a07-38cb-4750-9a20-1f9b5cc5d593.jpg",
+    "storage_path": "products/6cfc6a07-38cb-4750-9a20-1f9b5cc5d593.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "beb5059c-052e-4082-a183-b6d60b3ecd88",
+    "product_id": "e8d062c1-e925-43d3-8db1-b8870ae8557a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e8d062c1-e925-43d3-8db1-b8870ae8557a.jpg",
+    "storage_path": "products/e8d062c1-e925-43d3-8db1-b8870ae8557a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8f542480-2e1c-4e8a-af43-5a81a03e2437",
+    "product_id": "c5b96121-34fd-49ec-8c65-ba8634132494",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c5b96121-34fd-49ec-8c65-ba8634132494.jpg",
+    "storage_path": "products/c5b96121-34fd-49ec-8c65-ba8634132494.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "76d7a8f8-4c72-4b3a-9050-a3e9b7706536",
+    "product_id": "972cfa81-638c-4f19-b436-e384fc9fc15a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/972cfa81-638c-4f19-b436-e384fc9fc15a.jpg",
+    "storage_path": "products/972cfa81-638c-4f19-b436-e384fc9fc15a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "15cc22da-4ed6-4b57-9e27-807c317ec0c0",
+    "product_id": "f64ddb04-39ef-4215-b219-047ef4d3abd9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f64ddb04-39ef-4215-b219-047ef4d3abd9.jpg",
+    "storage_path": "products/f64ddb04-39ef-4215-b219-047ef4d3abd9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0f81af0b-cfa5-4888-ab3e-d70827f6108e",
+    "product_id": "cda2ff71-02d2-4629-b643-18c35473f016",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cda2ff71-02d2-4629-b643-18c35473f016.jpg",
+    "storage_path": "products/cda2ff71-02d2-4629-b643-18c35473f016.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e9f922fd-0f2a-4398-8ff4-8437435d659c",
+    "product_id": "6ebf20a2-b4d2-4f58-b612-d016c6926314",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6ebf20a2-b4d2-4f58-b612-d016c6926314.jpg",
+    "storage_path": "products/6ebf20a2-b4d2-4f58-b612-d016c6926314.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "44efcbf5-74bf-4d0e-b1bd-4de14d1d45bb",
+    "product_id": "d00c2a24-9d72-4080-8eac-ca120569eb18",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d00c2a24-9d72-4080-8eac-ca120569eb18.jpg",
+    "storage_path": "products/d00c2a24-9d72-4080-8eac-ca120569eb18.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c298d724-b052-4e72-9d38-e7cdba16c179",
+    "product_id": "8392f887-229e-4695-97b6-f3532a29a2e9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8392f887-229e-4695-97b6-f3532a29a2e9.jpg",
+    "storage_path": "products/8392f887-229e-4695-97b6-f3532a29a2e9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8491a63e-987b-4112-a36a-e3746302f4f0",
+    "product_id": "1dfe41e9-6a15-4760-a4ab-eb882519741e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1dfe41e9-6a15-4760-a4ab-eb882519741e.jpg",
+    "storage_path": "products/1dfe41e9-6a15-4760-a4ab-eb882519741e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "60db51a1-ebbc-41e8-a3f2-5a3b50b9a0dd",
+    "product_id": "fc1b61c3-b722-4080-b8f5-97d58d5b32c5",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fc1b61c3-b722-4080-b8f5-97d58d5b32c5.jpg",
+    "storage_path": "products/fc1b61c3-b722-4080-b8f5-97d58d5b32c5.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "26d95ccd-2ad5-4df0-86be-fff46134f819",
+    "product_id": "2dc174cb-2dbf-45db-8b27-beed6718d041",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2dc174cb-2dbf-45db-8b27-beed6718d041.jpg",
+    "storage_path": "products/2dc174cb-2dbf-45db-8b27-beed6718d041.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "70255dd0-cbe9-491f-a9f5-47f79cd10bdd",
+    "product_id": "c83866d3-59aa-4956-b4e3-7b78f45885af",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c83866d3-59aa-4956-b4e3-7b78f45885af.jpg",
+    "storage_path": "products/c83866d3-59aa-4956-b4e3-7b78f45885af.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2054e574-0893-4ae9-bb42-4758de663187",
+    "product_id": "ee4d9edc-2e1b-4e6d-a156-e54c091b19de",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ee4d9edc-2e1b-4e6d-a156-e54c091b19de.jpg",
+    "storage_path": "products/ee4d9edc-2e1b-4e6d-a156-e54c091b19de.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "16c604df-fe46-4fbd-8706-244dc9589752",
+    "product_id": "8d9870b7-1aae-47cc-8de9-495fe43715ee",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8d9870b7-1aae-47cc-8de9-495fe43715ee.jpg",
+    "storage_path": "products/8d9870b7-1aae-47cc-8de9-495fe43715ee.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ac6bc6d0-2da6-4943-8fec-1e94b1fbba02",
+    "product_id": "e12f1748-fb3f-4996-ac75-b2e84fe0dfa3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e12f1748-fb3f-4996-ac75-b2e84fe0dfa3.jpg",
+    "storage_path": "products/e12f1748-fb3f-4996-ac75-b2e84fe0dfa3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ec22aa70-c242-4428-8783-d2690439dec5",
+    "product_id": "4e909935-ec1f-4005-a45f-bdcb7177611f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4e909935-ec1f-4005-a45f-bdcb7177611f.jpg",
+    "storage_path": "products/4e909935-ec1f-4005-a45f-bdcb7177611f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6985a5da-1b8b-476f-b311-b7b6f592df74",
+    "product_id": "f2c87274-5d0a-4be8-9403-1a9191b079b6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f2c87274-5d0a-4be8-9403-1a9191b079b6.jpg",
+    "storage_path": "products/f2c87274-5d0a-4be8-9403-1a9191b079b6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "66844a0e-1813-4b2d-8b83-33c32bb2f5d0",
+    "product_id": "d23bf251-de83-4a33-8789-56101c866728",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d23bf251-de83-4a33-8789-56101c866728.jpg",
+    "storage_path": "products/d23bf251-de83-4a33-8789-56101c866728.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e963f5e6-8b71-47db-a3e7-6d1d94d5bbce",
+    "product_id": "b0622358-5e0b-47a8-a35b-c2f1344ef60d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b0622358-5e0b-47a8-a35b-c2f1344ef60d.jpg",
+    "storage_path": "products/b0622358-5e0b-47a8-a35b-c2f1344ef60d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "bdf5d265-a6ba-4418-8294-8ffa78f11925",
+    "product_id": "26025b52-1f08-4ae2-86d7-20eb45ba9899",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/26025b52-1f08-4ae2-86d7-20eb45ba9899.jpg",
+    "storage_path": "products/26025b52-1f08-4ae2-86d7-20eb45ba9899.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "36c3024c-3a04-496c-8750-c82a395639fc",
+    "product_id": "4aee2128-ee3c-423c-bb0c-578925d94cd9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4aee2128-ee3c-423c-bb0c-578925d94cd9.jpg",
+    "storage_path": "products/4aee2128-ee3c-423c-bb0c-578925d94cd9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "cd4e3304-57c4-4959-bbcc-27ff47251694",
+    "product_id": "b28f6aa6-967d-4c55-bd35-66d70cb91e2f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b28f6aa6-967d-4c55-bd35-66d70cb91e2f.jpg",
+    "storage_path": "products/b28f6aa6-967d-4c55-bd35-66d70cb91e2f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "449422b5-f9fe-4f4e-bc23-4cccbc5f2a1f",
+    "product_id": "8474e581-80e5-478d-9c6a-d20058d597c6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8474e581-80e5-478d-9c6a-d20058d597c6.jpg",
+    "storage_path": "products/8474e581-80e5-478d-9c6a-d20058d597c6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3018bbd4-1598-4593-87bd-7d62213550a4",
+    "product_id": "2d2507c0-968e-4512-92a8-d5956218a22c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2d2507c0-968e-4512-92a8-d5956218a22c.jpg",
+    "storage_path": "products/2d2507c0-968e-4512-92a8-d5956218a22c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "25240277-eee0-444c-b032-90d96df44263",
+    "product_id": "ad99fbd0-b012-4659-8e75-e26eed67258f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ad99fbd0-b012-4659-8e75-e26eed67258f.jpg",
+    "storage_path": "products/ad99fbd0-b012-4659-8e75-e26eed67258f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "563faed8-006e-4b9a-8dec-0c6009fedf70",
+    "product_id": "4de81438-0c90-48c8-b070-d86d3a9777ea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4de81438-0c90-48c8-b070-d86d3a9777ea.jpg",
+    "storage_path": "products/4de81438-0c90-48c8-b070-d86d3a9777ea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e8c0d3de-f0b9-49c2-9fca-7ea2522fc7ed",
+    "product_id": "2c5fed81-84ab-4921-a9a2-d6ea1a3f12e9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2c5fed81-84ab-4921-a9a2-d6ea1a3f12e9.jpg",
+    "storage_path": "products/2c5fed81-84ab-4921-a9a2-d6ea1a3f12e9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "921093a3-c1c4-42ac-a6ee-776bca4069f8",
+    "product_id": "fdc5b5c2-a006-48b8-973b-3dc6568b8e57",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fdc5b5c2-a006-48b8-973b-3dc6568b8e57.jpg",
+    "storage_path": "products/fdc5b5c2-a006-48b8-973b-3dc6568b8e57.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "644652c9-c03d-4c81-ab8f-6c952e70b471",
+    "product_id": "da17ffe2-2b28-4000-8073-3f4de38aa7dc",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/da17ffe2-2b28-4000-8073-3f4de38aa7dc.jpg",
+    "storage_path": "products/da17ffe2-2b28-4000-8073-3f4de38aa7dc.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "50d75d36-8c9b-4085-afd3-ee7a6ff9722f",
+    "product_id": "ecaa3641-1020-4220-a880-035a82e74f17",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ecaa3641-1020-4220-a880-035a82e74f17.jpg",
+    "storage_path": "products/ecaa3641-1020-4220-a880-035a82e74f17.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9b90b376-96aa-44e9-b9ee-39fa2fafecdc",
+    "product_id": "e59d6cc1-e260-47cc-a9b1-8eba826b591b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e59d6cc1-e260-47cc-a9b1-8eba826b591b.jpg",
+    "storage_path": "products/e59d6cc1-e260-47cc-a9b1-8eba826b591b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4dda811b-9720-4071-a90f-a81a0a44ff21",
+    "product_id": "76635a19-45e8-46c8-8c1b-e64038b24d46",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/76635a19-45e8-46c8-8c1b-e64038b24d46.jpg",
+    "storage_path": "products/76635a19-45e8-46c8-8c1b-e64038b24d46.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d6c634e7-9cff-4410-82a9-6d659c3975d6",
+    "product_id": "6ea0e323-90dc-42b6-ab09-81531a14af37",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6ea0e323-90dc-42b6-ab09-81531a14af37.jpg",
+    "storage_path": "products/6ea0e323-90dc-42b6-ab09-81531a14af37.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "cbf3b7f8-96ef-4892-ba7e-c14701a9c012",
+    "product_id": "001a3756-eb71-4472-b7b2-acaa41b13bae",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/001a3756-eb71-4472-b7b2-acaa41b13bae.jpg",
+    "storage_path": "products/001a3756-eb71-4472-b7b2-acaa41b13bae.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8c49b296-eeb8-4ce4-a444-368abd49dc9d",
+    "product_id": "7241bca6-4bcb-4116-a18f-c671dd561601",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7241bca6-4bcb-4116-a18f-c671dd561601.jpg",
+    "storage_path": "products/7241bca6-4bcb-4116-a18f-c671dd561601.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0ba2df9d-0a3e-436b-929a-4c3a26adaa02",
+    "product_id": "c43e5011-a70a-4d33-9b5e-a90b9ebc0b0a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c43e5011-a70a-4d33-9b5e-a90b9ebc0b0a.jpg",
+    "storage_path": "products/c43e5011-a70a-4d33-9b5e-a90b9ebc0b0a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8cac61b6-40d5-4e55-ad61-b494519715d8",
+    "product_id": "764fef2a-943c-4880-8933-190f28b54dcf",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/764fef2a-943c-4880-8933-190f28b54dcf.jpg",
+    "storage_path": "products/764fef2a-943c-4880-8933-190f28b54dcf.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5585d11a-db94-4e25-995a-5c8812428de7",
+    "product_id": "a63a1e29-f6c2-4f9e-bcef-efc891ec2c0e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a63a1e29-f6c2-4f9e-bcef-efc891ec2c0e.jpg",
+    "storage_path": "products/a63a1e29-f6c2-4f9e-bcef-efc891ec2c0e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c89a098b-061d-4b7b-a1f3-1049a0aab6e9",
+    "product_id": "a18b17e4-a2cb-423e-a05f-ca4619e6033e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a18b17e4-a2cb-423e-a05f-ca4619e6033e.jpg",
+    "storage_path": "products/a18b17e4-a2cb-423e-a05f-ca4619e6033e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "acd0fdb2-702b-4fca-87ed-d1d61d807d28",
+    "product_id": "d5c087df-0647-4f63-ba84-83dbe4bca8c0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d5c087df-0647-4f63-ba84-83dbe4bca8c0.jpg",
+    "storage_path": "products/d5c087df-0647-4f63-ba84-83dbe4bca8c0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f7c028db-4530-42b2-bade-7323943b4a99",
+    "product_id": "c6f29c99-ea50-4812-b241-294dbc0a50a5",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c6f29c99-ea50-4812-b241-294dbc0a50a5.jpg",
+    "storage_path": "products/c6f29c99-ea50-4812-b241-294dbc0a50a5.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "67164578-e2a6-49b8-bc1e-74a9f9a8084c",
+    "product_id": "38d47a2e-535e-4911-b584-7f5186636579",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/38d47a2e-535e-4911-b584-7f5186636579.jpg",
+    "storage_path": "products/38d47a2e-535e-4911-b584-7f5186636579.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "734a0349-bb50-4cb3-835a-c98be1512704",
+    "product_id": "a2c9160a-7eac-445b-88bb-32e138842cf1",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a2c9160a-7eac-445b-88bb-32e138842cf1.jpg",
+    "storage_path": "products/a2c9160a-7eac-445b-88bb-32e138842cf1.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e212b564-bd11-45f9-94a0-f44e2f16f69e",
+    "product_id": "74f7754f-3baa-4b1f-996a-5568be9b9aec",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/74f7754f-3baa-4b1f-996a-5568be9b9aec.jpg",
+    "storage_path": "products/74f7754f-3baa-4b1f-996a-5568be9b9aec.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1586f211-fb85-4e7d-9240-dbadca78e541",
+    "product_id": "12e561cb-6be2-4660-a9b0-6c69a138f406",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/12e561cb-6be2-4660-a9b0-6c69a138f406.jpg",
+    "storage_path": "products/12e561cb-6be2-4660-a9b0-6c69a138f406.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ba3fe032-beba-4c06-869f-5796782bd616",
+    "product_id": "31de703f-2b98-4c2f-afc7-d90955b61264",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/31de703f-2b98-4c2f-afc7-d90955b61264.jpg",
+    "storage_path": "products/31de703f-2b98-4c2f-afc7-d90955b61264.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "be23ca14-a74e-42e5-a5ce-af3c7f395e0e",
+    "product_id": "b2721d58-f2e8-4550-9df3-939e8eab0f4b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b2721d58-f2e8-4550-9df3-939e8eab0f4b.jpg",
+    "storage_path": "products/b2721d58-f2e8-4550-9df3-939e8eab0f4b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2c8c8cd8-850d-48a3-b47c-ac7fdd693981",
+    "product_id": "a338633a-ec45-42d2-ae4e-b4247913aedf",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a338633a-ec45-42d2-ae4e-b4247913aedf.jpg",
+    "storage_path": "products/a338633a-ec45-42d2-ae4e-b4247913aedf.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "44f75fb9-cd82-43c0-a165-9d5237d211d3",
+    "product_id": "55d2d287-6398-4cd5-87b1-5b5e1fa04f2e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/55d2d287-6398-4cd5-87b1-5b5e1fa04f2e.jpg",
+    "storage_path": "products/55d2d287-6398-4cd5-87b1-5b5e1fa04f2e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "91f5a56d-f460-4b68-958f-2265da6259a6",
+    "product_id": "4ffee0e9-6f4f-4eaa-891f-1e26b35a407a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4ffee0e9-6f4f-4eaa-891f-1e26b35a407a.jpg",
+    "storage_path": "products/4ffee0e9-6f4f-4eaa-891f-1e26b35a407a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "460e5ab9-a93d-4362-9370-3dfd81302802",
+    "product_id": "922ee09f-0675-4463-bc53-8ae2ca89ce4c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/922ee09f-0675-4463-bc53-8ae2ca89ce4c.jpg",
+    "storage_path": "products/922ee09f-0675-4463-bc53-8ae2ca89ce4c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "958f00d5-80b2-4ac1-8f7a-509f61b5d876",
+    "product_id": "a11ab168-ac4f-41d3-9df9-16ab9fc241e5",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a11ab168-ac4f-41d3-9df9-16ab9fc241e5.jpg",
+    "storage_path": "products/a11ab168-ac4f-41d3-9df9-16ab9fc241e5.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "253b22a0-f408-4f44-b584-c7899bcd8ff8",
+    "product_id": "6fe9f6af-0e6a-4521-83aa-e2c2522e231c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6fe9f6af-0e6a-4521-83aa-e2c2522e231c.jpg",
+    "storage_path": "products/6fe9f6af-0e6a-4521-83aa-e2c2522e231c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a8f20fd5-bd04-4d14-b154-3296d40ac096",
+    "product_id": "d7d1414c-f8be-4953-9104-fb8c0f50d08c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d7d1414c-f8be-4953-9104-fb8c0f50d08c.jpg",
+    "storage_path": "products/d7d1414c-f8be-4953-9104-fb8c0f50d08c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "339bd527-e77f-44a5-b957-22fc1a6cc98a",
+    "product_id": "4aa7c9cb-5278-4f1e-89a4-8248009524a0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4aa7c9cb-5278-4f1e-89a4-8248009524a0.jpg",
+    "storage_path": "products/4aa7c9cb-5278-4f1e-89a4-8248009524a0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f31ee9e2-3534-4bcb-8bff-e71c88ed1865",
+    "product_id": "49c8dd37-0f69-4938-9b5a-f131ae967783",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/49c8dd37-0f69-4938-9b5a-f131ae967783.jpg",
+    "storage_path": "products/49c8dd37-0f69-4938-9b5a-f131ae967783.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c72e2a67-a4d1-4f49-b410-d548a223f316",
+    "product_id": "5281475f-ad06-4a10-bc48-998418264d40",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5281475f-ad06-4a10-bc48-998418264d40.jpg",
+    "storage_path": "products/5281475f-ad06-4a10-bc48-998418264d40.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "cfb64571-8e9c-43ff-986d-e6cbc4190bfb",
+    "product_id": "23a4089b-fd90-4f08-95fb-39434258a8f5",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/23a4089b-fd90-4f08-95fb-39434258a8f5.jpg",
+    "storage_path": "products/23a4089b-fd90-4f08-95fb-39434258a8f5.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6c6dfb11-6c6e-4163-ac8b-cfb98ba47ce7",
+    "product_id": "0e7da731-b50b-4cc3-8139-dd1004ad572a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0e7da731-b50b-4cc3-8139-dd1004ad572a.jpg",
+    "storage_path": "products/0e7da731-b50b-4cc3-8139-dd1004ad572a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "decbf388-3150-4709-9f7a-fe55ecdb2548",
+    "product_id": "bad4633c-7857-465a-96ec-904437aeb537",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/bad4633c-7857-465a-96ec-904437aeb537.jpg",
+    "storage_path": "products/bad4633c-7857-465a-96ec-904437aeb537.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f835f38a-236f-4a5f-bb86-09be8f2fd9dd",
+    "product_id": "32105531-71bf-401b-98af-191a807042bc",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/32105531-71bf-401b-98af-191a807042bc.jpg",
+    "storage_path": "products/32105531-71bf-401b-98af-191a807042bc.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e73d1c5a-0599-45ef-821a-d4266398ba46",
+    "product_id": "e7960c15-186c-4a52-b882-5113ba7633b0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e7960c15-186c-4a52-b882-5113ba7633b0.jpg",
+    "storage_path": "products/e7960c15-186c-4a52-b882-5113ba7633b0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9920920f-4dda-433a-a6d9-e767581c88cf",
+    "product_id": "5c42d23f-83b9-4991-81c6-6e2522eeb3b2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5c42d23f-83b9-4991-81c6-6e2522eeb3b2.jpg",
+    "storage_path": "products/5c42d23f-83b9-4991-81c6-6e2522eeb3b2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "149c7929-27ff-489b-839d-33556293dc96",
+    "product_id": "3f5c2f24-a58f-4412-b628-378812d72a0e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3f5c2f24-a58f-4412-b628-378812d72a0e.jpg",
+    "storage_path": "products/3f5c2f24-a58f-4412-b628-378812d72a0e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8ab3c0f5-f922-4bf4-be6e-5e18756b73f8",
+    "product_id": "525848b2-a50f-4a6f-a0e0-8a661e65801e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/525848b2-a50f-4a6f-a0e0-8a661e65801e.jpg",
+    "storage_path": "products/525848b2-a50f-4a6f-a0e0-8a661e65801e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e8c27ad8-2f03-4b50-b743-293d21618cb5",
+    "product_id": "be7bc8b0-b11c-4d18-aa47-b282dd06def0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/be7bc8b0-b11c-4d18-aa47-b282dd06def0.jpg",
+    "storage_path": "products/be7bc8b0-b11c-4d18-aa47-b282dd06def0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f5ef69eb-3c20-4a92-9c19-d80c3fe30239",
+    "product_id": "325af9ed-0c61-417a-a8ed-c1ab21d63575",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/325af9ed-0c61-417a-a8ed-c1ab21d63575.jpg",
+    "storage_path": "products/325af9ed-0c61-417a-a8ed-c1ab21d63575.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5d27de27-6dd4-42bd-adbf-bacf82f98269",
+    "product_id": "ce604790-4bd0-4911-be79-91df27c65678",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ce604790-4bd0-4911-be79-91df27c65678.jpg",
+    "storage_path": "products/ce604790-4bd0-4911-be79-91df27c65678.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3cd2fabb-cdb1-4ff7-9d88-23428dc0bd1e",
+    "product_id": "9de66354-1a2d-4054-8770-25fd34ca0274",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9de66354-1a2d-4054-8770-25fd34ca0274.jpg",
+    "storage_path": "products/9de66354-1a2d-4054-8770-25fd34ca0274.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4bb9d535-d8b3-430d-9149-e4edad8afe30",
+    "product_id": "0dbfd2d0-4b48-41bf-81c4-482dc89c1956",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0dbfd2d0-4b48-41bf-81c4-482dc89c1956.jpg",
+    "storage_path": "products/0dbfd2d0-4b48-41bf-81c4-482dc89c1956.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "80f9fea0-3670-47cf-8cf9-a41dc3091c2b",
+    "product_id": "4e568fd7-4ecf-4dce-af81-81eb9c71e8b3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4e568fd7-4ecf-4dce-af81-81eb9c71e8b3.jpg",
+    "storage_path": "products/4e568fd7-4ecf-4dce-af81-81eb9c71e8b3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0d31d13e-7a98-4d76-a4aa-1d77e401eabd",
+    "product_id": "c0d3fc05-cc6d-4d59-ad05-ead09ee6eb7a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c0d3fc05-cc6d-4d59-ad05-ead09ee6eb7a.jpg",
+    "storage_path": "products/c0d3fc05-cc6d-4d59-ad05-ead09ee6eb7a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "05e225ed-dceb-4ac0-b8ca-4ed19f9385ee",
+    "product_id": "afa544af-452f-44d9-a29f-c4fb91c53e8d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/afa544af-452f-44d9-a29f-c4fb91c53e8d.jpg",
+    "storage_path": "products/afa544af-452f-44d9-a29f-c4fb91c53e8d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "248dadaf-1450-42a8-b13e-dbfe27c9cd75",
+    "product_id": "0dd00b2f-e750-4d4f-a7fa-9f2c7c5d5603",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0dd00b2f-e750-4d4f-a7fa-9f2c7c5d5603.jpg",
+    "storage_path": "products/0dd00b2f-e750-4d4f-a7fa-9f2c7c5d5603.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5b017884-1b61-4319-a769-52d616392137",
+    "product_id": "94f9521f-471e-4a4a-a2dc-2cd1436ccbcf",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/94f9521f-471e-4a4a-a2dc-2cd1436ccbcf.jpg",
+    "storage_path": "products/94f9521f-471e-4a4a-a2dc-2cd1436ccbcf.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "cf0ad482-1c3e-4a0f-8f62-8a0d06ae8196",
+    "product_id": "7e92d68d-0556-436e-9179-79dd446cd600",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7e92d68d-0556-436e-9179-79dd446cd600.jpg",
+    "storage_path": "products/7e92d68d-0556-436e-9179-79dd446cd600.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "32539a85-f54e-49b2-a8b3-cc6af3a2adcb",
+    "product_id": "aa1e9705-1cc7-4a57-afe6-65f0dffbe4a8",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/aa1e9705-1cc7-4a57-afe6-65f0dffbe4a8.jpg",
+    "storage_path": "products/aa1e9705-1cc7-4a57-afe6-65f0dffbe4a8.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4e8ee8b0-6a36-4355-b06a-6804087a3544",
+    "product_id": "c6383c00-e8f5-4bc7-b1af-73dce4307075",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c6383c00-e8f5-4bc7-b1af-73dce4307075.jpg",
+    "storage_path": "products/c6383c00-e8f5-4bc7-b1af-73dce4307075.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "134ec5ff-69fe-41ba-8bc8-7926f1f5a091",
+    "product_id": "746cea8d-67d8-4898-b5ce-8ab202028e92",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/746cea8d-67d8-4898-b5ce-8ab202028e92.jpg",
+    "storage_path": "products/746cea8d-67d8-4898-b5ce-8ab202028e92.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "028e02c0-59bb-4ce9-ae19-58b9ec9c56fc",
+    "product_id": "61cca0e9-4460-4b47-b2c4-74774b9d88c7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/61cca0e9-4460-4b47-b2c4-74774b9d88c7.jpg",
+    "storage_path": "products/61cca0e9-4460-4b47-b2c4-74774b9d88c7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ce2fd49f-4043-47cc-9015-def35a012dac",
+    "product_id": "167beb2a-0bf1-4e59-93be-89f529289073",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/167beb2a-0bf1-4e59-93be-89f529289073.jpg",
+    "storage_path": "products/167beb2a-0bf1-4e59-93be-89f529289073.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0cfe8f38-e195-4041-8732-04d58ab9f9bc",
+    "product_id": "00ca2722-7fad-4c76-8111-2cfe2dab0044",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/00ca2722-7fad-4c76-8111-2cfe2dab0044.jpg",
+    "storage_path": "products/00ca2722-7fad-4c76-8111-2cfe2dab0044.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "20ef115f-7c5c-4ddf-922c-f600028681de",
+    "product_id": "295e255f-dde4-4757-a716-f52431ea8551",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/295e255f-dde4-4757-a716-f52431ea8551.jpg",
+    "storage_path": "products/295e255f-dde4-4757-a716-f52431ea8551.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2716309a-1466-4b47-bbe0-2c9747a8667f",
+    "product_id": "92db5a66-c431-4bbf-9631-47768de03b88",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/92db5a66-c431-4bbf-9631-47768de03b88.jpg",
+    "storage_path": "products/92db5a66-c431-4bbf-9631-47768de03b88.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "64398475-4fc5-4fad-ac76-686cf55f6b2e",
+    "product_id": "bba0015c-602a-460a-85de-8d26f042536b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/bba0015c-602a-460a-85de-8d26f042536b.jpg",
+    "storage_path": "products/bba0015c-602a-460a-85de-8d26f042536b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d0c3164c-7b9e-443b-8cba-64e0cef5eebe",
+    "product_id": "7de9ee2f-d992-4834-a12f-ace4ea947c69",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7de9ee2f-d992-4834-a12f-ace4ea947c69.jpg",
+    "storage_path": "products/7de9ee2f-d992-4834-a12f-ace4ea947c69.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "95af26af-f2be-44d2-886f-1bb40b2372e1",
+    "product_id": "75041488-5dbe-4b2a-adbf-60d1b5d4d207",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/75041488-5dbe-4b2a-adbf-60d1b5d4d207.jpg",
+    "storage_path": "products/75041488-5dbe-4b2a-adbf-60d1b5d4d207.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a0af86ec-4f87-4460-b5c2-29f1dee4a282",
+    "product_id": "60109d1b-7e05-4f3e-a80e-b405046dbb0c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/60109d1b-7e05-4f3e-a80e-b405046dbb0c.jpg",
+    "storage_path": "products/60109d1b-7e05-4f3e-a80e-b405046dbb0c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "090f2cc6-c965-4908-baf4-094f31d09886",
+    "product_id": "c68ec852-5eec-45ba-b065-3c99355857e3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c68ec852-5eec-45ba-b065-3c99355857e3.jpg",
+    "storage_path": "products/c68ec852-5eec-45ba-b065-3c99355857e3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5515f66d-6a04-4130-8a19-9c8dc2fe5bff",
+    "product_id": "6a6a8037-12a5-4a2b-ae02-78a37bbf8f7b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6a6a8037-12a5-4a2b-ae02-78a37bbf8f7b.jpg",
+    "storage_path": "products/6a6a8037-12a5-4a2b-ae02-78a37bbf8f7b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5724ec5e-993c-465e-9c51-c5878385c37f",
+    "product_id": "04830e40-f732-4d62-bf21-98a9cef8b876",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/04830e40-f732-4d62-bf21-98a9cef8b876.jpg",
+    "storage_path": "products/04830e40-f732-4d62-bf21-98a9cef8b876.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "149a5920-2d18-4b23-b950-5dbb299096b2",
+    "product_id": "9b8958fb-48ad-44c6-b4ce-a230af62f066",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9b8958fb-48ad-44c6-b4ce-a230af62f066.jpg",
+    "storage_path": "products/9b8958fb-48ad-44c6-b4ce-a230af62f066.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2378325e-c981-4d03-bcbb-7dbca146bbde",
+    "product_id": "e0a584b2-d7cb-4aad-8181-44401145f51a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e0a584b2-d7cb-4aad-8181-44401145f51a.jpg",
+    "storage_path": "products/e0a584b2-d7cb-4aad-8181-44401145f51a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4a248a4a-b070-4c47-bf95-32f235189e10",
+    "product_id": "2ad65419-9cb6-496a-bad9-a563a1c7fcf2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2ad65419-9cb6-496a-bad9-a563a1c7fcf2.jpg",
+    "storage_path": "products/2ad65419-9cb6-496a-bad9-a563a1c7fcf2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b473068a-8eac-42cf-898b-f05671bf89b1",
+    "product_id": "b911495b-edb6-416e-b0ff-ebc5f8435f1c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b911495b-edb6-416e-b0ff-ebc5f8435f1c.jpg",
+    "storage_path": "products/b911495b-edb6-416e-b0ff-ebc5f8435f1c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "91b4d629-25d8-4b29-ae35-ca5f22d606ea",
+    "product_id": "520f8e62-14b8-49cf-91f7-922e33ed0c3e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/520f8e62-14b8-49cf-91f7-922e33ed0c3e.jpg",
+    "storage_path": "products/520f8e62-14b8-49cf-91f7-922e33ed0c3e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "95be6b30-4f0d-495f-ab0b-5a991d5996ff",
+    "product_id": "c811844b-4988-4f21-af38-919c289dabad",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c811844b-4988-4f21-af38-919c289dabad.jpg",
+    "storage_path": "products/c811844b-4988-4f21-af38-919c289dabad.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5891ada0-5798-4222-bc87-173fad01e628",
+    "product_id": "c3be8ea8-d2d2-4b83-b885-76ff278958d1",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c3be8ea8-d2d2-4b83-b885-76ff278958d1.jpg",
+    "storage_path": "products/c3be8ea8-d2d2-4b83-b885-76ff278958d1.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f8d24f5e-7e5e-4e45-a00f-064a676236e2",
+    "product_id": "d71dba8d-e443-423f-a6d1-1fee10e289eb",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d71dba8d-e443-423f-a6d1-1fee10e289eb.jpg",
+    "storage_path": "products/d71dba8d-e443-423f-a6d1-1fee10e289eb.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "670b02f8-1f66-4e3e-a9be-09f853483a4c",
+    "product_id": "c48da816-327d-4f49-9ba4-cb4963e8ff7b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c48da816-327d-4f49-9ba4-cb4963e8ff7b.jpg",
+    "storage_path": "products/c48da816-327d-4f49-9ba4-cb4963e8ff7b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a850e04b-ac69-4a2d-b655-3bbfc767b2c7",
+    "product_id": "6aec9871-dab6-429b-b01d-f8383a58cb89",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6aec9871-dab6-429b-b01d-f8383a58cb89.jpg",
+    "storage_path": "products/6aec9871-dab6-429b-b01d-f8383a58cb89.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "245ec5a7-1626-4866-bba7-97bb833ac8f7",
+    "product_id": "cd6c9264-63a0-42e5-8ed8-3ad9ab000060",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cd6c9264-63a0-42e5-8ed8-3ad9ab000060.jpg",
+    "storage_path": "products/cd6c9264-63a0-42e5-8ed8-3ad9ab000060.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "800e1dcd-9a06-46e9-a7ca-438ab6e13fcc",
+    "product_id": "904be4e6-7026-4722-995c-7385bafcea33",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/904be4e6-7026-4722-995c-7385bafcea33.jpg",
+    "storage_path": "products/904be4e6-7026-4722-995c-7385bafcea33.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "502cc9dc-a625-4245-b9fe-dcad5d09cd31",
+    "product_id": "9a9fae63-3c7b-4291-aa23-e81421793b0f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9a9fae63-3c7b-4291-aa23-e81421793b0f.jpg",
+    "storage_path": "products/9a9fae63-3c7b-4291-aa23-e81421793b0f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4ad096af-62e6-417a-a358-7d7e0237a8a0",
+    "product_id": "039a2fee-aeef-4925-9cc8-ee33260abe92",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/039a2fee-aeef-4925-9cc8-ee33260abe92.jpg",
+    "storage_path": "products/039a2fee-aeef-4925-9cc8-ee33260abe92.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "64caa463-e417-40d6-92e5-2a0ee9a55998",
+    "product_id": "4544363e-a671-4e76-b93e-9be1272319bf",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4544363e-a671-4e76-b93e-9be1272319bf.jpg",
+    "storage_path": "products/4544363e-a671-4e76-b93e-9be1272319bf.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c79f6b3b-3eed-4fd8-b4a8-5454ef3dc1ae",
+    "product_id": "2cde8838-fec8-4097-960f-12032b4dab09",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2cde8838-fec8-4097-960f-12032b4dab09.jpg",
+    "storage_path": "products/2cde8838-fec8-4097-960f-12032b4dab09.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e4d97bef-2351-411d-af4e-fefe4e9805d2",
+    "product_id": "33a2ef23-f43c-4eb4-b267-92481f9b170b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/33a2ef23-f43c-4eb4-b267-92481f9b170b.jpg",
+    "storage_path": "products/33a2ef23-f43c-4eb4-b267-92481f9b170b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "58a6e75d-de75-456a-9cf1-af1d82f73cda",
+    "product_id": "fdc2698f-e092-44f9-9e98-06a5b28f5e64",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fdc2698f-e092-44f9-9e98-06a5b28f5e64.jpg",
+    "storage_path": "products/fdc2698f-e092-44f9-9e98-06a5b28f5e64.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1e7f464b-1e8f-4147-b362-bcd3e393e660",
+    "product_id": "54b76a2d-3883-416b-b0bd-aac2168bca7e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/54b76a2d-3883-416b-b0bd-aac2168bca7e.jpg",
+    "storage_path": "products/54b76a2d-3883-416b-b0bd-aac2168bca7e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "dfbfb63c-4af4-484c-8ff8-9fdeaa9fafcc",
+    "product_id": "4216d306-bdbf-40dd-828c-dc01ff84b63e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4216d306-bdbf-40dd-828c-dc01ff84b63e.jpg",
+    "storage_path": "products/4216d306-bdbf-40dd-828c-dc01ff84b63e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e272a3de-64c2-4dd7-a508-67fd93724c6b",
+    "product_id": "1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f.jpg",
+    "storage_path": "products/1cd4dde1-1b04-45f1-9e80-eebcd2ef7e0f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d991dadc-94d6-453a-862b-806f79e3259d",
+    "product_id": "7a2db413-1f70-448d-8371-d2ffaf66254f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7a2db413-1f70-448d-8371-d2ffaf66254f.jpg",
+    "storage_path": "products/7a2db413-1f70-448d-8371-d2ffaf66254f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c8e848eb-e131-4b9b-9aa5-d40551cdfad1",
+    "product_id": "aa3e7d5b-45c9-4bc0-b302-4d42d2325915",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/aa3e7d5b-45c9-4bc0-b302-4d42d2325915.jpg",
+    "storage_path": "products/aa3e7d5b-45c9-4bc0-b302-4d42d2325915.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "361adfcf-4a19-4903-b3fd-a550a995aaea",
+    "product_id": "6a575bbf-885a-4faf-abf4-9334ddca4808",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6a575bbf-885a-4faf-abf4-9334ddca4808.jpg",
+    "storage_path": "products/6a575bbf-885a-4faf-abf4-9334ddca4808.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d0735237-fccc-41b2-a422-7e005cce6d43",
+    "product_id": "3e58582c-f182-47ae-b468-409a80d9c8e3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3e58582c-f182-47ae-b468-409a80d9c8e3.jpg",
+    "storage_path": "products/3e58582c-f182-47ae-b468-409a80d9c8e3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "fa58aead-9a33-4296-8aee-4fd56ec6ecc8",
+    "product_id": "d14fe70b-9107-4a80-bdf2-dcfbb5cff8fa",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d14fe70b-9107-4a80-bdf2-dcfbb5cff8fa.jpg",
+    "storage_path": "products/d14fe70b-9107-4a80-bdf2-dcfbb5cff8fa.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b5825fac-0a60-430c-b46a-d9aa7b9df569",
+    "product_id": "30e3c13b-c76d-4d30-af31-ffc69644a570",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/30e3c13b-c76d-4d30-af31-ffc69644a570.jpg",
+    "storage_path": "products/30e3c13b-c76d-4d30-af31-ffc69644a570.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5d0e5274-bab9-4f73-a0fb-5218dbff042f",
+    "product_id": "1f8d687b-71b6-470d-a8c8-c179362575ce",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1f8d687b-71b6-470d-a8c8-c179362575ce.jpg",
+    "storage_path": "products/1f8d687b-71b6-470d-a8c8-c179362575ce.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "116c8012-a7b3-46ca-ad53-bf474f324dd6",
+    "product_id": "f267f269-04e5-47ed-a61b-17b4431b241d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f267f269-04e5-47ed-a61b-17b4431b241d.jpg",
+    "storage_path": "products/f267f269-04e5-47ed-a61b-17b4431b241d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5bda3d50-e446-4efb-a51d-1055335f8c65",
+    "product_id": "a4d81b59-fafc-49ad-9dd4-bac0a2d64893",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a4d81b59-fafc-49ad-9dd4-bac0a2d64893.jpg",
+    "storage_path": "products/a4d81b59-fafc-49ad-9dd4-bac0a2d64893.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ea47c224-385f-4cf8-8c90-dbc32f21846b",
+    "product_id": "63dc7f04-0209-4a2d-9ed0-f9213322929b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/63dc7f04-0209-4a2d-9ed0-f9213322929b.jpg",
+    "storage_path": "products/63dc7f04-0209-4a2d-9ed0-f9213322929b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "38d61c31-6e48-4dc6-b906-0764a76ae7d6",
+    "product_id": "75339e04-8a8c-4bb7-9891-6833eab5f938",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/75339e04-8a8c-4bb7-9891-6833eab5f938.jpg",
+    "storage_path": "products/75339e04-8a8c-4bb7-9891-6833eab5f938.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "feb89ab4-214d-4953-8258-c59cfb22a6c2",
+    "product_id": "ccab5031-36be-46e3-983c-89ce783291a0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ccab5031-36be-46e3-983c-89ce783291a0.jpg",
+    "storage_path": "products/ccab5031-36be-46e3-983c-89ce783291a0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f35f06ca-a8c7-4f51-ba61-a941b4c6b91a",
+    "product_id": "49bbec43-3cb7-4f74-803e-e54e39a082f3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/49bbec43-3cb7-4f74-803e-e54e39a082f3.jpg",
+    "storage_path": "products/49bbec43-3cb7-4f74-803e-e54e39a082f3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a7c0ca60-a5d2-4a40-b243-bbab88a4e9ae",
+    "product_id": "cb7aef8a-2fce-44c7-81f6-01b7444c4e25",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cb7aef8a-2fce-44c7-81f6-01b7444c4e25.jpg",
+    "storage_path": "products/cb7aef8a-2fce-44c7-81f6-01b7444c4e25.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "83e2b9a3-9c46-4380-9dbe-34edca72eedf",
+    "product_id": "a717a0b9-bd29-411c-b5a4-cc33391c4d0d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a717a0b9-bd29-411c-b5a4-cc33391c4d0d.jpg",
+    "storage_path": "products/a717a0b9-bd29-411c-b5a4-cc33391c4d0d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5cd1c8e7-06a6-4dfa-9eae-0097267c6052",
+    "product_id": "b5358f0f-5982-4513-b5ae-0d39144f41ce",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b5358f0f-5982-4513-b5ae-0d39144f41ce.jpg",
+    "storage_path": "products/b5358f0f-5982-4513-b5ae-0d39144f41ce.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d7fba958-cc8a-44bf-a1a6-b93209f75434",
+    "product_id": "3be825d5-9c39-41ce-8dd7-c8cdbf8b0e70",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3be825d5-9c39-41ce-8dd7-c8cdbf8b0e70.jpg",
+    "storage_path": "products/3be825d5-9c39-41ce-8dd7-c8cdbf8b0e70.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7e4ff8cb-baad-49a8-a529-0d2c52fb2786",
+    "product_id": "95ff20c9-1457-4b04-9816-461fbb7bb57e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/95ff20c9-1457-4b04-9816-461fbb7bb57e.jpg",
+    "storage_path": "products/95ff20c9-1457-4b04-9816-461fbb7bb57e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c979f840-82a7-4557-b3fc-cdc67e9fa6aa",
+    "product_id": "a955b951-dfd3-4b4b-9e65-af6dfbc37ded",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a955b951-dfd3-4b4b-9e65-af6dfbc37ded.jpg",
+    "storage_path": "products/a955b951-dfd3-4b4b-9e65-af6dfbc37ded.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "70a64ca5-e372-4a56-9ba0-f025d1e2657a",
+    "product_id": "e220ff09-b3ba-4412-b9af-da3e73f7341f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e220ff09-b3ba-4412-b9af-da3e73f7341f.jpg",
+    "storage_path": "products/e220ff09-b3ba-4412-b9af-da3e73f7341f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "46e9aaa1-4fcf-4583-b926-08909938c3ec",
+    "product_id": "3e46302b-7fd0-4857-8d13-1381c06fb58f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3e46302b-7fd0-4857-8d13-1381c06fb58f.jpg",
+    "storage_path": "products/3e46302b-7fd0-4857-8d13-1381c06fb58f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1bec5e8b-6f15-4413-96c6-1b467da89845",
+    "product_id": "65dcd8db-2745-4030-b47c-c2046b25bac2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/65dcd8db-2745-4030-b47c-c2046b25bac2.jpg",
+    "storage_path": "products/65dcd8db-2745-4030-b47c-c2046b25bac2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "67b40042-9e46-470e-af04-92e896dd496e",
+    "product_id": "01642f73-9259-430c-a5f5-f694ad669949",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/01642f73-9259-430c-a5f5-f694ad669949.jpg",
+    "storage_path": "products/01642f73-9259-430c-a5f5-f694ad669949.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "053811c7-d46c-4e71-b336-82fc8d916137",
+    "product_id": "c05f3414-edd1-4846-ab81-c814fde32097",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c05f3414-edd1-4846-ab81-c814fde32097.jpg",
+    "storage_path": "products/c05f3414-edd1-4846-ab81-c814fde32097.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e864579f-ed8c-4926-9e2c-152bc9926f76",
+    "product_id": "3872d879-93c7-4cfa-b2ca-23cb38964218",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3872d879-93c7-4cfa-b2ca-23cb38964218.jpg",
+    "storage_path": "products/3872d879-93c7-4cfa-b2ca-23cb38964218.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1506b873-786f-4844-919c-013c8f67a093",
+    "product_id": "d0dd3f01-57d6-4dac-bf12-b46455ddb909",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d0dd3f01-57d6-4dac-bf12-b46455ddb909.jpg",
+    "storage_path": "products/d0dd3f01-57d6-4dac-bf12-b46455ddb909.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "744eac72-7157-4fda-9ddd-d5902cd65c18",
+    "product_id": "07dc2890-3cec-4b88-ba65-21b9d04f3ff4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/07dc2890-3cec-4b88-ba65-21b9d04f3ff4.jpg",
+    "storage_path": "products/07dc2890-3cec-4b88-ba65-21b9d04f3ff4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6523d1d3-9ae2-4133-b316-02b359961942",
+    "product_id": "c8a9ba25-4c13-40cd-b6fa-5c65f61cb37c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c8a9ba25-4c13-40cd-b6fa-5c65f61cb37c.jpg",
+    "storage_path": "products/c8a9ba25-4c13-40cd-b6fa-5c65f61cb37c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2374ff7c-1b56-4ea1-b95e-a6aff6dadf18",
+    "product_id": "402d9d4b-40c9-4ef9-80da-96719312c12a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/402d9d4b-40c9-4ef9-80da-96719312c12a.jpg",
+    "storage_path": "products/402d9d4b-40c9-4ef9-80da-96719312c12a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "538c6e62-b8dc-44ea-99f3-59452ab0ee7f",
+    "product_id": "0aa182a6-1191-4c0f-be47-b072d8d8d048",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0aa182a6-1191-4c0f-be47-b072d8d8d048.jpg",
+    "storage_path": "products/0aa182a6-1191-4c0f-be47-b072d8d8d048.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3713a887-cf11-47bd-bda7-a4d04cbdc3f5",
+    "product_id": "ee6cf034-9a80-4138-ac96-58602b3bd590",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ee6cf034-9a80-4138-ac96-58602b3bd590.jpg",
+    "storage_path": "products/ee6cf034-9a80-4138-ac96-58602b3bd590.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "24ea9d30-2262-4f45-abd9-8b02f6215fe2",
+    "product_id": "2adb5d11-74c2-437f-a214-6f1f6a99453c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2adb5d11-74c2-437f-a214-6f1f6a99453c.jpg",
+    "storage_path": "products/2adb5d11-74c2-437f-a214-6f1f6a99453c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "68bef6a0-7ef3-4bca-8ca5-66a06c69b845",
+    "product_id": "572ad85e-3001-4649-9708-67caee12de33",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/572ad85e-3001-4649-9708-67caee12de33.jpg",
+    "storage_path": "products/572ad85e-3001-4649-9708-67caee12de33.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7e07ce88-edc3-4d7f-be2e-78b6e6b52e9b",
+    "product_id": "21aabd0e-8af7-44a6-95fd-18acfb252b14",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/21aabd0e-8af7-44a6-95fd-18acfb252b14.jpg",
+    "storage_path": "products/21aabd0e-8af7-44a6-95fd-18acfb252b14.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "23a8a383-1cfc-4bd4-a275-0a3585e5f635",
+    "product_id": "e1179f83-4a1d-4730-86cb-acfa7400ca89",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e1179f83-4a1d-4730-86cb-acfa7400ca89.jpg",
+    "storage_path": "products/e1179f83-4a1d-4730-86cb-acfa7400ca89.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5e0d8cbe-6bc5-4463-ac28-11c5edd53839",
+    "product_id": "eacaf274-5b95-4ea2-a75f-835d7888d55a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/eacaf274-5b95-4ea2-a75f-835d7888d55a.jpg",
+    "storage_path": "products/eacaf274-5b95-4ea2-a75f-835d7888d55a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6023f144-7902-48e1-85d1-25324e3c6deb",
+    "product_id": "abf97833-3d44-4e89-8eda-f2e286cd3faa",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/abf97833-3d44-4e89-8eda-f2e286cd3faa.jpg",
+    "storage_path": "products/abf97833-3d44-4e89-8eda-f2e286cd3faa.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b4d56344-d54d-445d-894b-429ddde6f89e",
+    "product_id": "c381e39a-424b-4bb1-919e-edaad5b154c7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c381e39a-424b-4bb1-919e-edaad5b154c7.jpg",
+    "storage_path": "products/c381e39a-424b-4bb1-919e-edaad5b154c7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a73117c9-703b-4cd3-a611-a97594b5f638",
+    "product_id": "682b0214-2d9c-4306-89a0-db2dceaaa1e3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/682b0214-2d9c-4306-89a0-db2dceaaa1e3.jpg",
+    "storage_path": "products/682b0214-2d9c-4306-89a0-db2dceaaa1e3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2480b4eb-0079-4008-ab53-ad9415ec00e6",
+    "product_id": "dd2cfca5-a349-4eea-afc2-7204e9ddb040",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/dd2cfca5-a349-4eea-afc2-7204e9ddb040.jpg",
+    "storage_path": "products/dd2cfca5-a349-4eea-afc2-7204e9ddb040.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "dba38121-1045-4ec1-804f-21d21c0ee297",
+    "product_id": "9987d294-bafc-46e4-a55f-64fbffa13096",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9987d294-bafc-46e4-a55f-64fbffa13096.jpg",
+    "storage_path": "products/9987d294-bafc-46e4-a55f-64fbffa13096.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "13d1e68d-d6ce-4fbf-b480-f86841b3bae6",
+    "product_id": "a7335071-b8b5-4de4-a407-5798044bf2d9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a7335071-b8b5-4de4-a407-5798044bf2d9.jpg",
+    "storage_path": "products/a7335071-b8b5-4de4-a407-5798044bf2d9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "91ae1434-197e-4083-81ef-e025571310ab",
+    "product_id": "67c7f151-4820-4fb6-ade4-26718a813235",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/67c7f151-4820-4fb6-ade4-26718a813235.jpg",
+    "storage_path": "products/67c7f151-4820-4fb6-ade4-26718a813235.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8056009b-b8a7-4e4c-ac2d-f7ab11da88a9",
+    "product_id": "92c32d75-75f0-4450-aa1a-593d96c65b69",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/92c32d75-75f0-4450-aa1a-593d96c65b69.jpg",
+    "storage_path": "products/92c32d75-75f0-4450-aa1a-593d96c65b69.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "21bd2ada-272e-43cf-836f-eb8ed1cc90ba",
+    "product_id": "16aafe12-3674-42e4-8b4b-e80edd670e14",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/16aafe12-3674-42e4-8b4b-e80edd670e14.jpg",
+    "storage_path": "products/16aafe12-3674-42e4-8b4b-e80edd670e14.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "141815f0-bd6c-4f55-99be-6f753104eff4",
+    "product_id": "d63b5102-5c37-4a74-8463-03b2a9cccedd",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d63b5102-5c37-4a74-8463-03b2a9cccedd.jpg",
+    "storage_path": "products/d63b5102-5c37-4a74-8463-03b2a9cccedd.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "33631ec3-43b4-4660-8be8-0d6016e5eeba",
+    "product_id": "980fb953-e578-4686-8642-f9bde91333b8",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/980fb953-e578-4686-8642-f9bde91333b8.jpg",
+    "storage_path": "products/980fb953-e578-4686-8642-f9bde91333b8.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "94394f41-cb4a-430f-9c46-21e2d8b7ba74",
+    "product_id": "f6dce8af-5182-45c9-b247-fea2b4e42da3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f6dce8af-5182-45c9-b247-fea2b4e42da3.jpg",
+    "storage_path": "products/f6dce8af-5182-45c9-b247-fea2b4e42da3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c632cfda-649a-4ead-9fe8-350456b7b8fe",
+    "product_id": "c9a64e16-d4f8-4c3a-b2fe-17af8002c1d3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c9a64e16-d4f8-4c3a-b2fe-17af8002c1d3.jpg",
+    "storage_path": "products/c9a64e16-d4f8-4c3a-b2fe-17af8002c1d3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6b29f886-9dd6-4a19-aca9-d0534142d709",
+    "product_id": "a2aa17a6-d57c-44e9-bfca-e4f26c6fc9ea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a2aa17a6-d57c-44e9-bfca-e4f26c6fc9ea.jpg",
+    "storage_path": "products/a2aa17a6-d57c-44e9-bfca-e4f26c6fc9ea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9c99573a-c0ff-4180-bf26-d362aed7ee7a",
+    "product_id": "20ff49d8-380d-47c8-b6ed-240b84afb6fa",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/20ff49d8-380d-47c8-b6ed-240b84afb6fa.jpg",
+    "storage_path": "products/20ff49d8-380d-47c8-b6ed-240b84afb6fa.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8e9af36d-ab25-4027-af11-e69d4d8ba6eb",
+    "product_id": "19e80026-2a28-4f3b-86c7-e209d7070047",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/19e80026-2a28-4f3b-86c7-e209d7070047.jpg",
+    "storage_path": "products/19e80026-2a28-4f3b-86c7-e209d7070047.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c0876ec0-8fb2-4b57-a1d8-402e6d0a331c",
+    "product_id": "6ce8c07e-1c8a-41cd-a604-9b2141b66aea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6ce8c07e-1c8a-41cd-a604-9b2141b66aea.jpg",
+    "storage_path": "products/6ce8c07e-1c8a-41cd-a604-9b2141b66aea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1b81da59-706c-4b20-90e6-c4535ba8fed2",
+    "product_id": "358a4d91-49f7-4679-a8b9-3c12cf4d263f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/358a4d91-49f7-4679-a8b9-3c12cf4d263f.jpg",
+    "storage_path": "products/358a4d91-49f7-4679-a8b9-3c12cf4d263f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1100f973-198e-4737-9bf2-a13dc774c2c2",
+    "product_id": "367c11f6-99bf-4629-8b63-2648e2616f6e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/367c11f6-99bf-4629-8b63-2648e2616f6e.jpg",
+    "storage_path": "products/367c11f6-99bf-4629-8b63-2648e2616f6e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "91df6939-e762-4f46-a0dc-d2dfe4559f75",
+    "product_id": "887461fe-c61f-4be1-8461-8626b716c599",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/887461fe-c61f-4be1-8461-8626b716c599.jpg",
+    "storage_path": "products/887461fe-c61f-4be1-8461-8626b716c599.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "070f511f-94f0-48c0-8301-fafb3c0d62cb",
+    "product_id": "da039a7b-afe4-4d3d-b841-97939413c058",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/da039a7b-afe4-4d3d-b841-97939413c058.jpg",
+    "storage_path": "products/da039a7b-afe4-4d3d-b841-97939413c058.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "88e8d8d4-3add-413f-b2c2-cec3216b218a",
+    "product_id": "6edbf13f-9998-44ec-9e64-5f7ba42367f4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6edbf13f-9998-44ec-9e64-5f7ba42367f4.jpg",
+    "storage_path": "products/6edbf13f-9998-44ec-9e64-5f7ba42367f4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "abf683ed-80f5-43ee-8078-c432b8fd4c5a",
+    "product_id": "94ca5b96-8e75-4744-8631-53b6b944fd08",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/94ca5b96-8e75-4744-8631-53b6b944fd08.jpg",
+    "storage_path": "products/94ca5b96-8e75-4744-8631-53b6b944fd08.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d7a322cf-7f3c-4f1d-8be9-e8dc00aa988b",
+    "product_id": "99d8addc-f40c-4526-88bd-6e7d589dc98f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/99d8addc-f40c-4526-88bd-6e7d589dc98f.jpg",
+    "storage_path": "products/99d8addc-f40c-4526-88bd-6e7d589dc98f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a58228ae-1457-4d7e-9a40-06323b1155be",
+    "product_id": "f65533d9-8ecc-4fa0-90c3-31a3844675ea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f65533d9-8ecc-4fa0-90c3-31a3844675ea.jpg",
+    "storage_path": "products/f65533d9-8ecc-4fa0-90c3-31a3844675ea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "98b12364-ff0a-414e-8ea5-d8c40dd99256",
+    "product_id": "1d391631-704f-4357-a711-b778dd977207",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1d391631-704f-4357-a711-b778dd977207.jpg",
+    "storage_path": "products/1d391631-704f-4357-a711-b778dd977207.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e0509d06-e41d-4db8-8e93-14a626b1075f",
+    "product_id": "3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b.jpg",
+    "storage_path": "products/3d12fc5e-50f1-4f78-b203-46b4bdbb7f5b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "90b39f1d-0e82-4c63-b839-2020a5ed6677",
+    "product_id": "b7caff48-5612-4d8d-a2f4-47f7fb7e1b81",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b7caff48-5612-4d8d-a2f4-47f7fb7e1b81.jpg",
+    "storage_path": "products/b7caff48-5612-4d8d-a2f4-47f7fb7e1b81.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "77461271-d50d-4a1d-bd4f-44f516e3750d",
+    "product_id": "cbaeba62-33cf-4ca4-9e00-46e0d7591baa",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cbaeba62-33cf-4ca4-9e00-46e0d7591baa.jpg",
+    "storage_path": "products/cbaeba62-33cf-4ca4-9e00-46e0d7591baa.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "504b2cb0-e823-4060-8625-752db15ea87e",
+    "product_id": "985bc605-f5d6-4d63-a2c9-750d0e830bb4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/985bc605-f5d6-4d63-a2c9-750d0e830bb4.jpg",
+    "storage_path": "products/985bc605-f5d6-4d63-a2c9-750d0e830bb4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "03b09fae-5c69-4cda-a0ac-9191605034a3",
+    "product_id": "3d8499ec-58c3-41dd-a413-b4da39a81afc",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3d8499ec-58c3-41dd-a413-b4da39a81afc.jpg",
+    "storage_path": "products/3d8499ec-58c3-41dd-a413-b4da39a81afc.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "28428cb8-31bb-433e-8a35-14416d3656c9",
+    "product_id": "047d2231-0fcb-4f28-a53a-2faccffea51e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/047d2231-0fcb-4f28-a53a-2faccffea51e.jpg",
+    "storage_path": "products/047d2231-0fcb-4f28-a53a-2faccffea51e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e80dff5f-9a99-4bf5-82a9-b4f45487a23b",
+    "product_id": "0895e52f-a935-4f91-b6a7-663df3e20b63",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0895e52f-a935-4f91-b6a7-663df3e20b63.jpg",
+    "storage_path": "products/0895e52f-a935-4f91-b6a7-663df3e20b63.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6cfdda29-4e88-482a-9c52-5b22b1dcb9b7",
+    "product_id": "b667106f-5468-4a62-b229-df4beea53dab",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b667106f-5468-4a62-b229-df4beea53dab.jpg",
+    "storage_path": "products/b667106f-5468-4a62-b229-df4beea53dab.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "77a2331b-abe3-4d17-b093-d91355b6a730",
+    "product_id": "081d0415-0616-490d-9b26-e5ec43ba38fd",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/081d0415-0616-490d-9b26-e5ec43ba38fd.jpg",
+    "storage_path": "products/081d0415-0616-490d-9b26-e5ec43ba38fd.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "bd3bb66e-3431-45dc-8d30-d07753620e46",
+    "product_id": "f9dc0db9-d800-4bb2-8378-7c5598669fdb",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f9dc0db9-d800-4bb2-8378-7c5598669fdb.jpg",
+    "storage_path": "products/f9dc0db9-d800-4bb2-8378-7c5598669fdb.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b6753ffe-840e-478c-b7a7-6c7829a37dc3",
+    "product_id": "6ed96f7c-10fc-482d-aee2-8855a4fdccb4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6ed96f7c-10fc-482d-aee2-8855a4fdccb4.jpg",
+    "storage_path": "products/6ed96f7c-10fc-482d-aee2-8855a4fdccb4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e4f14418-861f-427d-b791-0c63512934c4",
+    "product_id": "23922a27-8c77-422e-9f4d-6731059268f2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/23922a27-8c77-422e-9f4d-6731059268f2.jpg",
+    "storage_path": "products/23922a27-8c77-422e-9f4d-6731059268f2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3ab4769a-6d0e-4694-818b-c89ffeae4767",
+    "product_id": "a2c00dd1-a716-4a69-b5c5-7a9271723313",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a2c00dd1-a716-4a69-b5c5-7a9271723313.jpg",
+    "storage_path": "products/a2c00dd1-a716-4a69-b5c5-7a9271723313.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "60ef2ab5-983e-4240-a525-129dd65fe026",
+    "product_id": "782b057e-bbc4-4c24-a894-2018b2d413bd",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/782b057e-bbc4-4c24-a894-2018b2d413bd.jpg",
+    "storage_path": "products/782b057e-bbc4-4c24-a894-2018b2d413bd.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "59507d0c-f2f6-474f-9e80-cb409c2af6b1",
+    "product_id": "c5b7de2d-346e-4c3d-a5f8-dbe81ed4d053",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c5b7de2d-346e-4c3d-a5f8-dbe81ed4d053.jpg",
+    "storage_path": "products/c5b7de2d-346e-4c3d-a5f8-dbe81ed4d053.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "070939d8-ab18-4570-a121-bcb12d47066c",
+    "product_id": "9c4022b0-2d49-4e65-a73b-7f3c23cf7897",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9c4022b0-2d49-4e65-a73b-7f3c23cf7897.jpg",
+    "storage_path": "products/9c4022b0-2d49-4e65-a73b-7f3c23cf7897.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "64709393-f7b9-4500-a440-bba026f6c7c2",
+    "product_id": "7d752b8c-0401-4b8f-81bd-a19ed24e3722",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7d752b8c-0401-4b8f-81bd-a19ed24e3722.jpg",
+    "storage_path": "products/7d752b8c-0401-4b8f-81bd-a19ed24e3722.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ae22f8c3-42b5-4716-9850-c47f0b5bb0a8",
+    "product_id": "1108fe6c-12da-468e-9c05-62f264120a46",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1108fe6c-12da-468e-9c05-62f264120a46.jpg",
+    "storage_path": "products/1108fe6c-12da-468e-9c05-62f264120a46.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ef60e4f3-eef5-4d98-b398-aba825031c8d",
+    "product_id": "41c2adc9-2ff9-4dcc-af5b-cf3cfe319ba6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/41c2adc9-2ff9-4dcc-af5b-cf3cfe319ba6.jpg",
+    "storage_path": "products/41c2adc9-2ff9-4dcc-af5b-cf3cfe319ba6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "84c4c499-c6f1-4cd4-8012-b67d137914d9",
+    "product_id": "c29e0af2-bcd4-4a3a-b2aa-e2f5afc20b7a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c29e0af2-bcd4-4a3a-b2aa-e2f5afc20b7a.jpg",
+    "storage_path": "products/c29e0af2-bcd4-4a3a-b2aa-e2f5afc20b7a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d2dc988b-b98e-432a-b71b-1ee37fd54dde",
+    "product_id": "66c11458-4c9c-42da-9727-050db4ddd750",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/66c11458-4c9c-42da-9727-050db4ddd750.jpg",
+    "storage_path": "products/66c11458-4c9c-42da-9727-050db4ddd750.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c15b6c45-6529-4c5b-9576-6da2f0cd43e4",
+    "product_id": "cc5c51ad-8228-426f-ad4d-58354ccb1af1",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cc5c51ad-8228-426f-ad4d-58354ccb1af1.jpg",
+    "storage_path": "products/cc5c51ad-8228-426f-ad4d-58354ccb1af1.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3f860010-4f3a-4508-98ba-71d26ef7ad28",
+    "product_id": "d5d122fb-1088-4d43-9daa-653ad746b3af",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d5d122fb-1088-4d43-9daa-653ad746b3af.jpg",
+    "storage_path": "products/d5d122fb-1088-4d43-9daa-653ad746b3af.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "63ea4f3b-94b4-49b3-a0a4-01539d5614ab",
+    "product_id": "8e8b1be1-1de4-46ea-b38b-668959511521",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8e8b1be1-1de4-46ea-b38b-668959511521.jpg",
+    "storage_path": "products/8e8b1be1-1de4-46ea-b38b-668959511521.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8bbd51d8-e306-44f6-86d1-3cfe257aae1f",
+    "product_id": "40a11601-36b6-4605-9ea3-23fa1d09040d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/40a11601-36b6-4605-9ea3-23fa1d09040d.jpg",
+    "storage_path": "products/40a11601-36b6-4605-9ea3-23fa1d09040d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3486872d-ed51-4f76-aa2f-7156e2b48c60",
+    "product_id": "9f6c72d1-329e-41c9-91c4-1748a1447084",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9f6c72d1-329e-41c9-91c4-1748a1447084.jpg",
+    "storage_path": "products/9f6c72d1-329e-41c9-91c4-1748a1447084.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a5698d88-26d6-43db-9dcc-8c62803df145",
+    "product_id": "38ed6658-9fbe-4345-8052-3b0b569eee19",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/38ed6658-9fbe-4345-8052-3b0b569eee19.jpg",
+    "storage_path": "products/38ed6658-9fbe-4345-8052-3b0b569eee19.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0b649b03-3dc9-4dc6-8934-d60ff58f48d6",
+    "product_id": "1de46afc-653f-491f-8f3c-00565ac8e9bd",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1de46afc-653f-491f-8f3c-00565ac8e9bd.jpg",
+    "storage_path": "products/1de46afc-653f-491f-8f3c-00565ac8e9bd.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "18ea268e-8b51-4f78-93ca-13cf48b46b9f",
+    "product_id": "3de3842f-dee6-408b-9925-2f0af74e3609",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3de3842f-dee6-408b-9925-2f0af74e3609.jpg",
+    "storage_path": "products/3de3842f-dee6-408b-9925-2f0af74e3609.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7b007ecf-24b6-4a63-aabc-6325e76c1346",
+    "product_id": "5d78f7aa-93fe-4821-9d49-f7ad08433884",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5d78f7aa-93fe-4821-9d49-f7ad08433884.jpg",
+    "storage_path": "products/5d78f7aa-93fe-4821-9d49-f7ad08433884.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "465d159e-655c-4a3f-918a-15f2ba9cc870",
+    "product_id": "336a773a-c10e-4b66-80a2-8dd4ca717e89",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/336a773a-c10e-4b66-80a2-8dd4ca717e89.jpg",
+    "storage_path": "products/336a773a-c10e-4b66-80a2-8dd4ca717e89.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9a9f6821-03fb-4c1b-8c26-172128c98e59",
+    "product_id": "37a86170-8ea8-4981-aee2-eeb3981f5cc0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/37a86170-8ea8-4981-aee2-eeb3981f5cc0.jpg",
+    "storage_path": "products/37a86170-8ea8-4981-aee2-eeb3981f5cc0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d3407fa3-0c7b-4bab-b346-a81b7b6b77fe",
+    "product_id": "bf7caed0-d399-4f97-9c9c-f9daac7a65a2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/bf7caed0-d399-4f97-9c9c-f9daac7a65a2.jpg",
+    "storage_path": "products/bf7caed0-d399-4f97-9c9c-f9daac7a65a2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "28ecc8a8-594f-4afd-8c34-fa3f93fa042c",
+    "product_id": "fe5500e5-c0b7-418e-8bcb-73c722e1c3df",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fe5500e5-c0b7-418e-8bcb-73c722e1c3df.jpg",
+    "storage_path": "products/fe5500e5-c0b7-418e-8bcb-73c722e1c3df.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e4f6fc1b-3cf7-475a-92ac-e5adb4e8e025",
+    "product_id": "6591be72-44d0-4011-8f39-25d584f29e79",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6591be72-44d0-4011-8f39-25d584f29e79.png",
+    "storage_path": "products/6591be72-44d0-4011-8f39-25d584f29e79.png",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a91b88bf-b617-4c7a-b7b1-fa71bc6338d1",
+    "product_id": "a5c74528-17d4-4db0-a07b-efe5f779b41e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a5c74528-17d4-4db0-a07b-efe5f779b41e.jpg",
+    "storage_path": "products/a5c74528-17d4-4db0-a07b-efe5f779b41e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "086a1842-d872-4120-bae9-b4d464fd62e3",
+    "product_id": "d552b73a-1a29-4c69-96d9-86a797feb74c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d552b73a-1a29-4c69-96d9-86a797feb74c.jpg",
+    "storage_path": "products/d552b73a-1a29-4c69-96d9-86a797feb74c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a7cbe12d-270f-465e-b11d-40d424f351d2",
+    "product_id": "613d5970-e467-4a2b-89c4-d952459b9d6f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/613d5970-e467-4a2b-89c4-d952459b9d6f.jpg",
+    "storage_path": "products/613d5970-e467-4a2b-89c4-d952459b9d6f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "045c6404-5e4b-425a-a720-bd90dec555a8",
+    "product_id": "10abf4c6-f0f3-4a4d-a503-ebea9883d57e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/10abf4c6-f0f3-4a4d-a503-ebea9883d57e.jpg",
+    "storage_path": "products/10abf4c6-f0f3-4a4d-a503-ebea9883d57e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3ba51fad-152e-47c9-95ef-4ee77b94d04c",
+    "product_id": "5ae2c34f-6eeb-4a1d-995d-36048813d8ea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5ae2c34f-6eeb-4a1d-995d-36048813d8ea.jpg",
+    "storage_path": "products/5ae2c34f-6eeb-4a1d-995d-36048813d8ea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4eaf2e3b-41c9-497c-b02d-3dbbd9961cd0",
+    "product_id": "b9ba23ff-470b-42fd-a1a1-a235e3637ebe",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b9ba23ff-470b-42fd-a1a1-a235e3637ebe.jpg",
+    "storage_path": "products/b9ba23ff-470b-42fd-a1a1-a235e3637ebe.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "49a02b74-0c5a-4985-b5b8-cacbef0f724e",
+    "product_id": "f6cc2efb-afc0-4edf-9835-cb76f38fddc6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f6cc2efb-afc0-4edf-9835-cb76f38fddc6.jpg",
+    "storage_path": "products/f6cc2efb-afc0-4edf-9835-cb76f38fddc6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8d7c6c13-cc36-4698-9bd3-21542d34ecfb",
+    "product_id": "cd50d5a3-03dc-4c72-9456-66b55bc989c6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cd50d5a3-03dc-4c72-9456-66b55bc989c6.jpg",
+    "storage_path": "products/cd50d5a3-03dc-4c72-9456-66b55bc989c6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "bfa19b26-0b42-4c22-b04e-308e96812216",
+    "product_id": "1e0b7add-5509-47f1-8075-c9400a659963",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1e0b7add-5509-47f1-8075-c9400a659963.jpg",
+    "storage_path": "products/1e0b7add-5509-47f1-8075-c9400a659963.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "519b3aec-51d0-4c5d-9d51-a40a77b7c79f",
+    "product_id": "633510ff-154e-4595-9628-348815b1dcf6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/633510ff-154e-4595-9628-348815b1dcf6.jpg",
+    "storage_path": "products/633510ff-154e-4595-9628-348815b1dcf6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "661884e8-e632-4705-b62e-eed23ab895ca",
+    "product_id": "d750888c-9591-4bb6-9298-18dc711894fe",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d750888c-9591-4bb6-9298-18dc711894fe.jpg",
+    "storage_path": "products/d750888c-9591-4bb6-9298-18dc711894fe.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5d17cf4e-6b6a-4c17-90b9-c334ff0a1908",
+    "product_id": "193c5ba1-a675-4e10-a028-f8acca33cfd2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/193c5ba1-a675-4e10-a028-f8acca33cfd2.jpg",
+    "storage_path": "products/193c5ba1-a675-4e10-a028-f8acca33cfd2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5b283bb5-beba-40dc-a3f6-8ff8c1315db1",
+    "product_id": "190d4a5c-bb66-4d50-addb-044bbb10c1e8",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/190d4a5c-bb66-4d50-addb-044bbb10c1e8.jpg",
+    "storage_path": "products/190d4a5c-bb66-4d50-addb-044bbb10c1e8.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "40312a8c-82d9-4665-8231-997c1efc8752",
+    "product_id": "2f85d713-ad64-492a-b3c7-a1ae9181e38d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2f85d713-ad64-492a-b3c7-a1ae9181e38d.jpg",
+    "storage_path": "products/2f85d713-ad64-492a-b3c7-a1ae9181e38d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2a758a65-a7c8-40da-880a-f2a898ce65d6",
+    "product_id": "30b00836-2c7b-4c2b-af3f-6e4095997cd2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/30b00836-2c7b-4c2b-af3f-6e4095997cd2.jpg",
+    "storage_path": "products/30b00836-2c7b-4c2b-af3f-6e4095997cd2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7c8a388b-f483-4e2f-8e3d-b65dd606d1c6",
+    "product_id": "1ab6177f-e479-4c21-a1ee-08dafed097dc",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1ab6177f-e479-4c21-a1ee-08dafed097dc.jpg",
+    "storage_path": "products/1ab6177f-e479-4c21-a1ee-08dafed097dc.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e813d566-bca7-44f1-b031-19f7605da127",
+    "product_id": "06285aa7-a666-472c-977a-5bbfb46c6867",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/06285aa7-a666-472c-977a-5bbfb46c6867.jpg",
+    "storage_path": "products/06285aa7-a666-472c-977a-5bbfb46c6867.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5ffb50bd-5e87-449c-86e9-762c57c74756",
+    "product_id": "e121c887-063a-4236-a0e5-e84591602594",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e121c887-063a-4236-a0e5-e84591602594.jpg",
+    "storage_path": "products/e121c887-063a-4236-a0e5-e84591602594.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "fc15ca79-e0b3-4538-8795-474a588c48f9",
+    "product_id": "35ee37eb-83c4-4418-b71a-7b2b4038c1cc",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/35ee37eb-83c4-4418-b71a-7b2b4038c1cc.jpg",
+    "storage_path": "products/35ee37eb-83c4-4418-b71a-7b2b4038c1cc.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5e6de8d1-38e8-4014-8b30-6ca629e8f8d5",
+    "product_id": "ba8dd5f8-052a-48d9-8b86-bd4df5907acc",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ba8dd5f8-052a-48d9-8b86-bd4df5907acc.jpg",
+    "storage_path": "products/ba8dd5f8-052a-48d9-8b86-bd4df5907acc.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d337e182-3be0-4482-baed-de14d3398890",
+    "product_id": "047d8dd9-9bf3-49fb-b5af-15e236d3f541",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/047d8dd9-9bf3-49fb-b5af-15e236d3f541.jpg",
+    "storage_path": "products/047d8dd9-9bf3-49fb-b5af-15e236d3f541.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ad08776a-537d-471f-9bc7-eb8ec0047dd0",
+    "product_id": "87a13583-fa03-4a17-a262-447cea40ec26",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/87a13583-fa03-4a17-a262-447cea40ec26.jpg",
+    "storage_path": "products/87a13583-fa03-4a17-a262-447cea40ec26.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "cd575c12-d67d-4db4-8aa3-331e7487ec43",
+    "product_id": "c34d3011-0470-4707-9817-cfddf7f0e7af",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c34d3011-0470-4707-9817-cfddf7f0e7af.jpg",
+    "storage_path": "products/c34d3011-0470-4707-9817-cfddf7f0e7af.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7f9c82e8-e483-4b7c-8cdc-e3243c2ac62c",
+    "product_id": "371041a5-2efc-43e0-8531-237b4f507941",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/371041a5-2efc-43e0-8531-237b4f507941.jpg",
+    "storage_path": "products/371041a5-2efc-43e0-8531-237b4f507941.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "968135dd-3ac4-4912-9ec9-a58ec8b38fd7",
+    "product_id": "3cd65340-a1b1-45eb-b0f0-2c7f23b68a81",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3cd65340-a1b1-45eb-b0f0-2c7f23b68a81.jpg",
+    "storage_path": "products/3cd65340-a1b1-45eb-b0f0-2c7f23b68a81.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c6092bfa-63a4-4015-9408-07b3aaca8491",
+    "product_id": "35c1a131-1390-4dc4-a97b-917e1788ca3f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/35c1a131-1390-4dc4-a97b-917e1788ca3f.jpg",
+    "storage_path": "products/35c1a131-1390-4dc4-a97b-917e1788ca3f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e0ba020e-ad3d-4f4c-aedf-3f71852f298f",
+    "product_id": "39a9c11a-7dfe-4a99-97ee-502e98527b3d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/39a9c11a-7dfe-4a99-97ee-502e98527b3d.jpg",
+    "storage_path": "products/39a9c11a-7dfe-4a99-97ee-502e98527b3d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2d7072db-db57-4218-b578-8091127d4630",
+    "product_id": "5edc45bc-faea-4d49-a285-19346d1a8b4e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5edc45bc-faea-4d49-a285-19346d1a8b4e.jpg",
+    "storage_path": "products/5edc45bc-faea-4d49-a285-19346d1a8b4e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "444d9b1a-2d41-4293-b4ba-7b9b383ec495",
+    "product_id": "5a47a3fb-7268-4b1b-bb7f-1f3607e5871b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5a47a3fb-7268-4b1b-bb7f-1f3607e5871b.jpg",
+    "storage_path": "products/5a47a3fb-7268-4b1b-bb7f-1f3607e5871b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1c742c01-0f04-4038-9bf5-ea6e6f842e5b",
+    "product_id": "8e0790a2-6501-4ef2-afb8-7b5cc7d16492",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8e0790a2-6501-4ef2-afb8-7b5cc7d16492.jpg",
+    "storage_path": "products/8e0790a2-6501-4ef2-afb8-7b5cc7d16492.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ac477044-aab7-437a-a561-6c22036226bd",
+    "product_id": "f247fbdd-5563-49c4-a9af-4784940539d7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f247fbdd-5563-49c4-a9af-4784940539d7.jpg",
+    "storage_path": "products/f247fbdd-5563-49c4-a9af-4784940539d7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a4e081d3-7ce5-4a2b-bcf9-4724b0268f77",
+    "product_id": "fe5b9a50-023d-427f-9b45-760be242ddea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fe5b9a50-023d-427f-9b45-760be242ddea.jpg",
+    "storage_path": "products/fe5b9a50-023d-427f-9b45-760be242ddea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1bb63814-59f7-47db-87fe-517ab269f6ef",
+    "product_id": "c81483f5-7b71-4198-80ec-2bb2bdca1d92",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c81483f5-7b71-4198-80ec-2bb2bdca1d92.jpg",
+    "storage_path": "products/c81483f5-7b71-4198-80ec-2bb2bdca1d92.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8726e1f1-a825-46f1-812e-273401182169",
+    "product_id": "51f57bc9-8dd0-4bfa-a2e4-83dff201332c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/51f57bc9-8dd0-4bfa-a2e4-83dff201332c.jpg",
+    "storage_path": "products/51f57bc9-8dd0-4bfa-a2e4-83dff201332c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "deeac04d-825a-4085-8d43-f66563702843",
+    "product_id": "ee3cba59-0bec-48d3-8c80-5ea88e24d418",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ee3cba59-0bec-48d3-8c80-5ea88e24d418.jpg",
+    "storage_path": "products/ee3cba59-0bec-48d3-8c80-5ea88e24d418.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e5eaf71b-a7aa-4c99-b932-49af42980203",
+    "product_id": "351debc9-517a-41b3-a874-971ba90b52f4",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/351debc9-517a-41b3-a874-971ba90b52f4.jpg",
+    "storage_path": "products/351debc9-517a-41b3-a874-971ba90b52f4.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b50ec37c-2a55-4acb-be9f-bed672832445",
+    "product_id": "dbc73d1c-db4a-431d-bd16-e63696d7e03c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/dbc73d1c-db4a-431d-bd16-e63696d7e03c.jpg",
+    "storage_path": "products/dbc73d1c-db4a-431d-bd16-e63696d7e03c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2a8ac02a-70ee-4902-9200-b9c47a3e69a7",
+    "product_id": "478bb298-30a7-4007-8b21-71825b3b11c9",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/478bb298-30a7-4007-8b21-71825b3b11c9.jpg",
+    "storage_path": "products/478bb298-30a7-4007-8b21-71825b3b11c9.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "df9c1d44-540a-4b08-9e8f-294135f9ded5",
+    "product_id": "fe82e652-01ea-4023-8bbb-267498d2cc48",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/fe82e652-01ea-4023-8bbb-267498d2cc48.jpg",
+    "storage_path": "products/fe82e652-01ea-4023-8bbb-267498d2cc48.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a2462bcd-d6c9-4072-a213-a5b3364925c2",
+    "product_id": "a4738b16-f4e1-4cc9-9d7c-f10a1af9e99d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a4738b16-f4e1-4cc9-9d7c-f10a1af9e99d.jpg",
+    "storage_path": "products/a4738b16-f4e1-4cc9-9d7c-f10a1af9e99d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9217d411-947d-423f-8b01-ea6ce98f859b",
+    "product_id": "bb7b5f1e-de5d-4932-a892-f42cf85c8a33",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/bb7b5f1e-de5d-4932-a892-f42cf85c8a33.jpg",
+    "storage_path": "products/bb7b5f1e-de5d-4932-a892-f42cf85c8a33.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ac681284-8135-4e97-a2a3-9224eaa083ad",
+    "product_id": "b7ccea12-6a8d-4fa4-ada7-30289099c584",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b7ccea12-6a8d-4fa4-ada7-30289099c584.jpg",
+    "storage_path": "products/b7ccea12-6a8d-4fa4-ada7-30289099c584.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "fe2cb5de-f460-4c5e-bf69-e4e62b1da4e2",
+    "product_id": "104c7b20-c49c-473a-a8d3-40e2007ed8ea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/104c7b20-c49c-473a-a8d3-40e2007ed8ea.jpg",
+    "storage_path": "products/104c7b20-c49c-473a-a8d3-40e2007ed8ea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7118f445-cfd1-4521-98ee-55f2090dfd4c",
+    "product_id": "3aff10bd-f4a4-44b7-8060-12c393fd6138",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3aff10bd-f4a4-44b7-8060-12c393fd6138.jpg",
+    "storage_path": "products/3aff10bd-f4a4-44b7-8060-12c393fd6138.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "81ffb5b1-e67e-4358-836a-9f49b54a1d22",
+    "product_id": "f0918ca2-fe8d-484f-a8d1-e21a139c4ec7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f0918ca2-fe8d-484f-a8d1-e21a139c4ec7.jpg",
+    "storage_path": "products/f0918ca2-fe8d-484f-a8d1-e21a139c4ec7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f514bcfa-aa84-4c49-96a8-ece16677b1c5",
+    "product_id": "697405e5-ba6c-4252-a5e8-28cc7751b12b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/697405e5-ba6c-4252-a5e8-28cc7751b12b.jpg",
+    "storage_path": "products/697405e5-ba6c-4252-a5e8-28cc7751b12b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b5077f2c-b128-4497-91cb-77e571ddd36e",
+    "product_id": "b46cb5ee-3afe-4435-b85b-ffdb91834213",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b46cb5ee-3afe-4435-b85b-ffdb91834213.jpg",
+    "storage_path": "products/b46cb5ee-3afe-4435-b85b-ffdb91834213.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5874a356-d3e7-4116-b4a5-2aaabd8c2540",
+    "product_id": "3cd83fdf-9d56-42ed-9689-afd7d8a03684",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3cd83fdf-9d56-42ed-9689-afd7d8a03684.jpg",
+    "storage_path": "products/3cd83fdf-9d56-42ed-9689-afd7d8a03684.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8378355d-4e77-470d-835d-d7495f4ff936",
+    "product_id": "034c38c4-e721-4123-adc4-b1011bf8d04d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/034c38c4-e721-4123-adc4-b1011bf8d04d.jpg",
+    "storage_path": "products/034c38c4-e721-4123-adc4-b1011bf8d04d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "316c3bab-00ea-4d3f-82c1-40854193f185",
+    "product_id": "1f2913d7-3429-4fb4-98a1-789946b25d0f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/1f2913d7-3429-4fb4-98a1-789946b25d0f.jpg",
+    "storage_path": "products/1f2913d7-3429-4fb4-98a1-789946b25d0f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e8c3661e-7505-4261-b3ff-7387711aa3d8",
+    "product_id": "c784e159-5d1a-4b46-812f-09b6c048ebf3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c784e159-5d1a-4b46-812f-09b6c048ebf3.jpg",
+    "storage_path": "products/c784e159-5d1a-4b46-812f-09b6c048ebf3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c157e551-ddc5-48a1-be8b-5162e7d4fac5",
+    "product_id": "a458c4c0-16f2-4cd7-a6f0-a0e5713ccf0b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/a458c4c0-16f2-4cd7-a6f0-a0e5713ccf0b.jpg",
+    "storage_path": "products/a458c4c0-16f2-4cd7-a6f0-a0e5713ccf0b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4045991b-336f-4bb9-ab5d-9b3f17c9599e",
+    "product_id": "bfa9d549-d4ac-437a-9c4e-e85536491443",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/bfa9d549-d4ac-437a-9c4e-e85536491443.jpg",
+    "storage_path": "products/bfa9d549-d4ac-437a-9c4e-e85536491443.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2c9747e6-51be-4213-92de-4e931656d9c0",
+    "product_id": "cc8dfb7b-5df3-451e-b26c-e051834793ea",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cc8dfb7b-5df3-451e-b26c-e051834793ea.jpg",
+    "storage_path": "products/cc8dfb7b-5df3-451e-b26c-e051834793ea.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2bb04da9-fb0a-40aa-9bee-66b539f4db8c",
+    "product_id": "dcbb428d-e3fa-41e1-bcd9-386a65227f68",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/dcbb428d-e3fa-41e1-bcd9-386a65227f68.jpg",
+    "storage_path": "products/dcbb428d-e3fa-41e1-bcd9-386a65227f68.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6fa0a8ab-5c02-4bc1-a9cd-146b28b0d6e8",
+    "product_id": "c4352781-491c-4519-acbf-a0d181743d47",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c4352781-491c-4519-acbf-a0d181743d47.jpg",
+    "storage_path": "products/c4352781-491c-4519-acbf-a0d181743d47.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b827ed77-b9cc-40a1-921b-65f95deb7466",
+    "product_id": "186c66f4-9082-45f2-b2e5-7b96ec6e753c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/186c66f4-9082-45f2-b2e5-7b96ec6e753c.jpg",
+    "storage_path": "products/186c66f4-9082-45f2-b2e5-7b96ec6e753c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9b8c63fa-17fa-4603-8d44-f450e864f7b3",
+    "product_id": "3a711a12-5ca3-44cc-b7b6-cb2085b9450a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3a711a12-5ca3-44cc-b7b6-cb2085b9450a.jpg",
+    "storage_path": "products/3a711a12-5ca3-44cc-b7b6-cb2085b9450a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6ed20179-f63b-4637-81d0-cab08e09200c",
+    "product_id": "79b7b349-e0e7-4db5-99e7-4b8dae59a4d7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/79b7b349-e0e7-4db5-99e7-4b8dae59a4d7.jpg",
+    "storage_path": "products/79b7b349-e0e7-4db5-99e7-4b8dae59a4d7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7062f7b8-7fe3-497d-ad58-440e01edaa59",
+    "product_id": "9208a65f-731f-41a5-bdc3-5fa38b22150f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/9208a65f-731f-41a5-bdc3-5fa38b22150f.jpg",
+    "storage_path": "products/9208a65f-731f-41a5-bdc3-5fa38b22150f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1dd0c338-98c5-4657-9d85-9f20192ad263",
+    "product_id": "2e10ecc3-8cef-4829-b3d1-928a7407c045",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2e10ecc3-8cef-4829-b3d1-928a7407c045.jpg",
+    "storage_path": "products/2e10ecc3-8cef-4829-b3d1-928a7407c045.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "27a2a734-e7d0-4686-9ccb-9953618bdb84",
+    "product_id": "58068527-6ab8-4226-9ad9-e80322b516cb",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/58068527-6ab8-4226-9ad9-e80322b516cb.jpg",
+    "storage_path": "products/58068527-6ab8-4226-9ad9-e80322b516cb.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "e5671e08-5bff-47b7-8167-21ea0c8f8b40",
+    "product_id": "426d084c-54b6-49a3-ae9a-eb1fc5e48600",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/426d084c-54b6-49a3-ae9a-eb1fc5e48600.jpg",
+    "storage_path": "products/426d084c-54b6-49a3-ae9a-eb1fc5e48600.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "48abc86f-a5db-4071-95f3-14866e0a2972",
+    "product_id": "4cf7352e-b17c-45b4-b3fe-263be437f192",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4cf7352e-b17c-45b4-b3fe-263be437f192.jpg",
+    "storage_path": "products/4cf7352e-b17c-45b4-b3fe-263be437f192.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9b773835-fe32-4f31-bc98-f5a71103055b",
+    "product_id": "cf965c8c-4880-4713-b880-d900de0b7eff",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/cf965c8c-4880-4713-b880-d900de0b7eff.jpg",
+    "storage_path": "products/cf965c8c-4880-4713-b880-d900de0b7eff.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6035d280-f503-4fd5-ac25-21d6edfb327c",
+    "product_id": "536cccf9-c563-4190-b0df-fdf32844e17b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/536cccf9-c563-4190-b0df-fdf32844e17b.jpg",
+    "storage_path": "products/536cccf9-c563-4190-b0df-fdf32844e17b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "28cb1b38-5b15-4673-9604-eb85ef58cbf3",
+    "product_id": "2fab8969-0cca-4d88-b6b2-707ecc25e320",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2fab8969-0cca-4d88-b6b2-707ecc25e320.jpg",
+    "storage_path": "products/2fab8969-0cca-4d88-b6b2-707ecc25e320.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7f412590-af17-4193-bf70-7e63f2630334",
+    "product_id": "54481fab-0028-4a0d-9725-cc2032498940",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/54481fab-0028-4a0d-9725-cc2032498940.jpg",
+    "storage_path": "products/54481fab-0028-4a0d-9725-cc2032498940.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9821b319-82f1-4b5e-aa58-966aabd780bd",
+    "product_id": "8eeadfaf-d774-4b72-ab48-f324d0e05186",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8eeadfaf-d774-4b72-ab48-f324d0e05186.jpg",
+    "storage_path": "products/8eeadfaf-d774-4b72-ab48-f324d0e05186.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "db39b0b6-adc5-44a1-8561-b3d7af6a5bda",
+    "product_id": "45ce0a87-0b58-4626-9222-f4d2f8c54a88",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/45ce0a87-0b58-4626-9222-f4d2f8c54a88.jpg",
+    "storage_path": "products/45ce0a87-0b58-4626-9222-f4d2f8c54a88.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a1ec91d4-695e-4cc5-9aaf-7dac4ecf0f47",
+    "product_id": "512133e1-40f9-4e07-b665-220c47d6a0af",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/512133e1-40f9-4e07-b665-220c47d6a0af.jpg",
+    "storage_path": "products/512133e1-40f9-4e07-b665-220c47d6a0af.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "56c80508-bfb3-40ce-b974-cc9dbb5ba17e",
+    "product_id": "30fc37fd-3269-49be-ae86-9bdac1b24740",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/30fc37fd-3269-49be-ae86-9bdac1b24740.jpg",
+    "storage_path": "products/30fc37fd-3269-49be-ae86-9bdac1b24740.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c03d21cb-efe7-4697-be32-6c9b81644710",
+    "product_id": "13977dc5-9806-4d54-8f33-dd4b59a284d6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/13977dc5-9806-4d54-8f33-dd4b59a284d6.jpg",
+    "storage_path": "products/13977dc5-9806-4d54-8f33-dd4b59a284d6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "238f861c-4bf1-4a2c-b917-45de15b1bc2a",
+    "product_id": "36060d86-d268-46fe-81e5-75343c1b7cc7",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/36060d86-d268-46fe-81e5-75343c1b7cc7.jpg",
+    "storage_path": "products/36060d86-d268-46fe-81e5-75343c1b7cc7.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "92fe83da-8af1-43d9-9011-bf6ce7252fd2",
+    "product_id": "516ba5e5-ea5d-40ce-b12a-0293918a5bbe",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/516ba5e5-ea5d-40ce-b12a-0293918a5bbe.jpg",
+    "storage_path": "products/516ba5e5-ea5d-40ce-b12a-0293918a5bbe.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0d7c42ce-a7cd-4e6d-bef6-e8e6f9ad694d",
+    "product_id": "015d5e2d-0fab-4dca-95b7-816b5123b875",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/015d5e2d-0fab-4dca-95b7-816b5123b875.jpg",
+    "storage_path": "products/015d5e2d-0fab-4dca-95b7-816b5123b875.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "bfc3e4e5-0359-4972-8b1b-866f694e91c2",
+    "product_id": "acff6ac9-a14b-44c3-90e4-5af12da4c83d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/acff6ac9-a14b-44c3-90e4-5af12da4c83d.jpg",
+    "storage_path": "products/acff6ac9-a14b-44c3-90e4-5af12da4c83d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c2ee7b87-f8fd-4f89-bb11-f7703c70a4b1",
+    "product_id": "3f8b8873-e34e-4950-a12e-3ca7491ffa31",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3f8b8873-e34e-4950-a12e-3ca7491ffa31.jpg",
+    "storage_path": "products/3f8b8873-e34e-4950-a12e-3ca7491ffa31.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c046991e-e1a5-4a8d-9f56-acb8dca86668",
+    "product_id": "c0a0e064-dcbc-45f4-bf02-110e5e266ec2",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c0a0e064-dcbc-45f4-bf02-110e5e266ec2.jpg",
+    "storage_path": "products/c0a0e064-dcbc-45f4-bf02-110e5e266ec2.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "866aa8e9-afac-4404-ada5-ca671941de30",
+    "product_id": "ad0babb9-0748-4303-9e41-cf510bdb6e50",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ad0babb9-0748-4303-9e41-cf510bdb6e50.jpg",
+    "storage_path": "products/ad0babb9-0748-4303-9e41-cf510bdb6e50.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8428c69a-bbac-41bd-b725-2ff65d9d2769",
+    "product_id": "8e1b76b2-59fb-4a62-b47d-b8c62054140e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/8e1b76b2-59fb-4a62-b47d-b8c62054140e.jpg",
+    "storage_path": "products/8e1b76b2-59fb-4a62-b47d-b8c62054140e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "db1cd7e4-31a4-4275-9a71-c286caf52d06",
+    "product_id": "3661d69f-4171-4790-b05b-fedf072781e5",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3661d69f-4171-4790-b05b-fedf072781e5.jpg",
+    "storage_path": "products/3661d69f-4171-4790-b05b-fedf072781e5.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "9cd56965-ee0b-47bf-a943-f4131f95203b",
+    "product_id": "c9c404b3-824a-41ee-bf1d-d90e408ac718",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c9c404b3-824a-41ee-bf1d-d90e408ac718.jpg",
+    "storage_path": "products/c9c404b3-824a-41ee-bf1d-d90e408ac718.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "f78c4f68-c936-45d1-9be4-7e220f9f87c7",
+    "product_id": "f843045a-571b-4045-861e-0b23bd405a66",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f843045a-571b-4045-861e-0b23bd405a66.jpg",
+    "storage_path": "products/f843045a-571b-4045-861e-0b23bd405a66.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a4265919-90ab-4315-b12b-5f30fd968106",
+    "product_id": "38de5adf-6125-47d0-97db-77e884775bb3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/38de5adf-6125-47d0-97db-77e884775bb3.jpg",
+    "storage_path": "products/38de5adf-6125-47d0-97db-77e884775bb3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "d22c9a7d-45cf-470e-b65f-c37841476da4",
+    "product_id": "dd70935f-b7f5-4962-986a-f370833b6157",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/dd70935f-b7f5-4962-986a-f370833b6157.jpg",
+    "storage_path": "products/dd70935f-b7f5-4962-986a-f370833b6157.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c008a572-b6a8-433a-9df2-dc03f2fa92ad",
+    "product_id": "863e7b4a-b645-4c1d-9d05-2c60744602c6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/863e7b4a-b645-4c1d-9d05-2c60744602c6.jpg",
+    "storage_path": "products/863e7b4a-b645-4c1d-9d05-2c60744602c6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "17efdd7c-72a1-49b8-9603-49b04ff13739",
+    "product_id": "b3c2dffb-34df-4931-ae90-9a840cd31d67",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b3c2dffb-34df-4931-ae90-9a840cd31d67.jpg",
+    "storage_path": "products/b3c2dffb-34df-4931-ae90-9a840cd31d67.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "542b9fdd-718e-40a4-8d33-0b08666bfc60",
+    "product_id": "0482a98d-bd07-43cc-ac19-02c6012e5d29",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/0482a98d-bd07-43cc-ac19-02c6012e5d29.jpg",
+    "storage_path": "products/0482a98d-bd07-43cc-ac19-02c6012e5d29.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b6b8518c-f1c1-4f76-b024-eca91a5cda3f",
+    "product_id": "86a53004-73da-45e2-855b-af02ed1a87de",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/86a53004-73da-45e2-855b-af02ed1a87de.jpg",
+    "storage_path": "products/86a53004-73da-45e2-855b-af02ed1a87de.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "2d7e3cf0-0f83-4555-a1b9-a40a3e926ca3",
+    "product_id": "973f13bb-5502-4b5c-9fa4-ff9b55dbc83c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/973f13bb-5502-4b5c-9fa4-ff9b55dbc83c.jpg",
+    "storage_path": "products/973f13bb-5502-4b5c-9fa4-ff9b55dbc83c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "18bfa715-71d9-44d0-8f9c-d354251a8a0f",
+    "product_id": "f519443e-0e89-4738-8f5a-322b7b3a1c0c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/f519443e-0e89-4738-8f5a-322b7b3a1c0c.jpg",
+    "storage_path": "products/f519443e-0e89-4738-8f5a-322b7b3a1c0c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "ec2b0640-4815-4e13-8370-95bd614fd61c",
+    "product_id": "7acddecf-f010-444c-b84c-e74b68dbbc6b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7acddecf-f010-444c-b84c-e74b68dbbc6b.jpg",
+    "storage_path": "products/7acddecf-f010-444c-b84c-e74b68dbbc6b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "19ad6b43-74d2-4ff7-aa8c-d2c2135280e6",
+    "product_id": "813332e8-dcf5-484b-bbfe-d0f870fedd08",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/813332e8-dcf5-484b-bbfe-d0f870fedd08.jpg",
+    "storage_path": "products/813332e8-dcf5-484b-bbfe-d0f870fedd08.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b67eca82-69fb-4e62-a0aa-f5254dc88e97",
+    "product_id": "5e6bba4c-e25b-42ba-bf1b-9e1a810de07d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5e6bba4c-e25b-42ba-bf1b-9e1a810de07d.jpg",
+    "storage_path": "products/5e6bba4c-e25b-42ba-bf1b-9e1a810de07d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "a68d351f-e571-4ca5-88dc-00532bc757d1",
+    "product_id": "4a00399e-5975-4335-84de-743ec431b6a6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4a00399e-5975-4335-84de-743ec431b6a6.jpg",
+    "storage_path": "products/4a00399e-5975-4335-84de-743ec431b6a6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "1b7f9b22-3974-42a7-aaa8-1322604fb4fa",
+    "product_id": "edb3142a-dba2-4176-a58c-4ec53fa44ec3",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/edb3142a-dba2-4176-a58c-4ec53fa44ec3.jpg",
+    "storage_path": "products/edb3142a-dba2-4176-a58c-4ec53fa44ec3.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "5438bef4-8211-4a94-916e-7a87328fd1e2",
+    "product_id": "16c8f4eb-537f-4cf2-a4ab-f5feba6e595d",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/16c8f4eb-537f-4cf2-a4ab-f5feba6e595d.jpg",
+    "storage_path": "products/16c8f4eb-537f-4cf2-a4ab-f5feba6e595d.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "6f6c958b-ef4c-4fdc-9390-1d02b8e853ff",
+    "product_id": "5b738cfa-a2c1-4376-a663-b6479c27f772",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/5b738cfa-a2c1-4376-a663-b6479c27f772.jpg",
+    "storage_path": "products/5b738cfa-a2c1-4376-a663-b6479c27f772.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "af8dd96f-fa16-46c6-bc66-8713e7867861",
+    "product_id": "629af162-ebcb-4004-9e86-74e6b21c9d64",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/629af162-ebcb-4004-9e86-74e6b21c9d64.jpg",
+    "storage_path": "products/629af162-ebcb-4004-9e86-74e6b21c9d64.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "91fc2418-04f7-4b96-a9f3-52b29bba7d0c",
+    "product_id": "581c9f45-c0eb-4889-8105-e4fab431af6f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/581c9f45-c0eb-4889-8105-e4fab431af6f.jpg",
+    "storage_path": "products/581c9f45-c0eb-4889-8105-e4fab431af6f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "4272b84e-9ad3-4bcd-b542-9b4fa346cd0f",
+    "product_id": "76d94d0f-5c72-4f0a-a451-b4d561a5b374",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/76d94d0f-5c72-4f0a-a451-b4d561a5b374.jpg",
+    "storage_path": "products/76d94d0f-5c72-4f0a-a451-b4d561a5b374.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "faa664dd-35c1-41c5-819d-2faa4830a3fe",
+    "product_id": "6f14c878-972d-4234-bdd0-1bc288fab523",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/6f14c878-972d-4234-bdd0-1bc288fab523.jpg",
+    "storage_path": "products/6f14c878-972d-4234-bdd0-1bc288fab523.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "902aaf0e-c35c-461c-b142-e60148f16c8d",
+    "product_id": "c8a47d37-c9d2-49e4-ade0-0206282a96ee",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/c8a47d37-c9d2-49e4-ade0-0206282a96ee.jpg",
+    "storage_path": "products/c8a47d37-c9d2-49e4-ade0-0206282a96ee.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "33720319-7d8b-4fb6-bc45-d326ed725235",
+    "product_id": "438bca30-5ebd-4f23-9823-b82ba123e247",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/438bca30-5ebd-4f23-9823-b82ba123e247.jpg",
+    "storage_path": "products/438bca30-5ebd-4f23-9823-b82ba123e247.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "8a49cf1b-a4a9-4258-b2a1-697c17cac2c8",
+    "product_id": "7a91e0ac-ad94-4004-8820-bd30dd05a6e8",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7a91e0ac-ad94-4004-8820-bd30dd05a6e8.jpg",
+    "storage_path": "products/7a91e0ac-ad94-4004-8820-bd30dd05a6e8.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "22c8da96-20d5-44e6-a839-b3f20b456115",
+    "product_id": "e1d5d788-a71a-463d-bf0f-99d8dd583245",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/e1d5d788-a71a-463d-bf0f-99d8dd583245.jpg",
+    "storage_path": "products/e1d5d788-a71a-463d-bf0f-99d8dd583245.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "fbbfa61a-4899-4091-a4eb-0e8baf5ce5a6",
+    "product_id": "b7f035d5-2c6f-4bbd-9de9-770287a7d3a6",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/b7f035d5-2c6f-4bbd-9de9-770287a7d3a6.jpg",
+    "storage_path": "products/b7f035d5-2c6f-4bbd-9de9-770287a7d3a6.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "15963028-44c5-4413-b2ee-78a14f44628b",
+    "product_id": "4f0b17f8-84ed-4799-86eb-85f8313b3764",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4f0b17f8-84ed-4799-86eb-85f8313b3764.jpg",
+    "storage_path": "products/4f0b17f8-84ed-4799-86eb-85f8313b3764.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "18243520-c257-4124-b6c5-46fe60d1815d",
+    "product_id": "3fc96aef-acbc-462e-bd67-abb84aa1823e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3fc96aef-acbc-462e-bd67-abb84aa1823e.jpg",
+    "storage_path": "products/3fc96aef-acbc-462e-bd67-abb84aa1823e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "0eb50c7b-0628-410b-bd8d-84431ee1501a",
+    "product_id": "7e8312f7-7956-4ff5-a6fd-a2df22c9f3b0",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7e8312f7-7956-4ff5-a6fd-a2df22c9f3b0.jpg",
+    "storage_path": "products/7e8312f7-7956-4ff5-a6fd-a2df22c9f3b0.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "beef2549-bf7a-489e-ba7d-a8960a227c5d",
+    "product_id": "be15ac8a-fa60-43dd-8bfb-92ff8d21e34b",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/be15ac8a-fa60-43dd-8bfb-92ff8d21e34b.jpg",
+    "storage_path": "products/be15ac8a-fa60-43dd-8bfb-92ff8d21e34b.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b04ee6e3-1e6a-414d-b317-e6a88943fae9",
+    "product_id": "15114c97-9c52-42ac-bed4-623a209f9511",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/15114c97-9c52-42ac-bed4-623a209f9511.jpg",
+    "storage_path": "products/15114c97-9c52-42ac-bed4-623a209f9511.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3e1de570-007b-4738-b312-e51beff12cc0",
+    "product_id": "befe15c8-55fb-40b6-a689-389e681c37ce",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/befe15c8-55fb-40b6-a689-389e681c37ce.jpg",
+    "storage_path": "products/befe15c8-55fb-40b6-a689-389e681c37ce.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "afcd8e28-7cc1-4b90-9084-57cee5a1ed21",
+    "product_id": "ba8a6c1b-f67a-465b-aa33-83d544e8fadb",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/ba8a6c1b-f67a-465b-aa33-83d544e8fadb.jpg",
+    "storage_path": "products/ba8a6c1b-f67a-465b-aa33-83d544e8fadb.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "39ff39a0-0678-48cd-b903-4e0e6f27fa3a",
+    "product_id": "eaa5abc3-15c4-410e-b65d-5ed69f184f37",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/eaa5abc3-15c4-410e-b65d-5ed69f184f37.jpg",
+    "storage_path": "products/eaa5abc3-15c4-410e-b65d-5ed69f184f37.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "fe758761-3f62-45f9-a7ad-f76944c70d70",
+    "product_id": "49cbceb6-6ef8-4988-bdd7-42b2300ac52c",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/49cbceb6-6ef8-4988-bdd7-42b2300ac52c.jpg",
+    "storage_path": "products/49cbceb6-6ef8-4988-bdd7-42b2300ac52c.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7e55ed9f-77fb-4224-8459-9b73c8071988",
+    "product_id": "3e000333-563c-420f-9be0-e05c3b1a676f",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3e000333-563c-420f-9be0-e05c3b1a676f.jpg",
+    "storage_path": "products/3e000333-563c-420f-9be0-e05c3b1a676f.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "b083c4c2-2a05-4749-92c7-36f5871a26c0",
+    "product_id": "4c062860-dedd-44e2-a55a-23703511686a",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/4c062860-dedd-44e2-a55a-23703511686a.jpg",
+    "storage_path": "products/4c062860-dedd-44e2-a55a-23703511686a.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "7c7079b7-fd5c-453b-854d-7bc96c96ec3e",
+    "product_id": "3fe74ba4-d7ab-4685-a45e-15540eedb82e",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/3fe74ba4-d7ab-4685-a45e-15540eedb82e.jpg",
+    "storage_path": "products/3fe74ba4-d7ab-4685-a45e-15540eedb82e.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "3e210be2-379a-45fb-b268-b5b770e15735",
+    "product_id": "d78298f8-0f24-4cd8-889b-f42128dfab03",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d78298f8-0f24-4cd8-889b-f42128dfab03.jpg",
+    "storage_path": "products/d78298f8-0f24-4cd8-889b-f42128dfab03.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "98fe39f4-fbfe-4753-a3da-e135026a96bb",
+    "product_id": "053257b9-ccf1-4f87-adcf-22cd88a14c85",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/053257b9-ccf1-4f87-adcf-22cd88a14c85.jpg",
+    "storage_path": "products/053257b9-ccf1-4f87-adcf-22cd88a14c85.jpg",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  },
+  {
+    "id": "c07578d2-87da-4c13-9dc5-805bc8e308d3",
+    "product_id": "7488b949-b0e4-43ed-8a03-2bb3fd56efae",
+    "image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/7488b949-b0e4-43ed-8a03-2bb3fd56efae.avif",
+    "storage_path": "products/7488b949-b0e4-43ed-8a03-2bb3fd56efae.avif",
+    "sort_order": 0,
+    "is_primary": true,
+    "created_at": "2026-02-12T07:54:08.813792+00:00",
+    "alt_text": null
+  }
+]

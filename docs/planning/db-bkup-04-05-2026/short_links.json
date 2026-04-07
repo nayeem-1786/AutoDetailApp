@@ -1,0 +1,970 @@
+[
+  {
+    "id": "b75daadc-23dd-4cf9-9cf0-a43538d69bed",
+    "code": "NyHG6X",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/24acbfed-3161-457a-973f-7f2ac1951503",
+    "click_count": 1,
+    "created_at": "2026-03-18T22:02:17.06532+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "ad0d9657-095e-4cc9-833c-6618d19f9a61",
+    "code": "z37Hvc",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/Og8lfm",
+    "click_count": 2,
+    "created_at": "2026-02-09T05:31:43.868035+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "ce05d1fa-6a46-4fbe-b8d8-e6c867446a3c",
+    "code": "bLJtr5",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/JEQ5rT",
+    "click_count": 2,
+    "created_at": "2026-02-28T23:06:07.037085+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b0e4ccf2-8fc2-450a-9768-451ecd8b0db6",
+    "code": "ud2JVP",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/JSofkF",
+    "click_count": 1,
+    "created_at": "2026-03-07T22:37:13.010149+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b89d48d6-c44c-4d51-8714-32dfe6e53c30",
+    "code": "bUVI0g",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/r4x66S",
+    "click_count": 4,
+    "created_at": "2026-02-10T02:55:39.652507+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "4ea08d47-ccd6-4003-a314-e53cdde213bd",
+    "code": "dX8ORF",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/018d096a-c343-45e6-9dfd-cee5a89ce33f",
+    "click_count": 2,
+    "created_at": "2026-03-15T03:38:48.07104+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "cc833e2b-196a-42ef-b3c9-decdb9fdeb93",
+    "code": "AuBRlg",
+    "target_url": "https://search.google.com/local/writereview?placeid=ChIJf7qNDhW1woAROX-FX8CScGE",
+    "click_count": 3,
+    "created_at": "2026-02-10T08:01:46.082244+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "53955d47-0510-47ad-b147-40845b121bba",
+    "code": "nVwu8a",
+    "target_url": "https://www.yelp.com/writeareview/biz/N0pumxDDdjbCk2-_jPxDSw?review_origin=review-feed-war-widget",
+    "click_count": 1,
+    "created_at": "2026-02-10T08:01:46.225145+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "c1b5a5cf-414b-4ab1-84fe-7cae13c677e7",
+    "code": "pGdTTG",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/VJbtwJ",
+    "click_count": 0,
+    "created_at": "2026-02-10T08:30:01.516093+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "fdaf2250-d011-4dd0-9663-9a54276ace9f",
+    "code": "mLzHrk",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/VJbtwJ",
+    "click_count": 0,
+    "created_at": "2026-02-10T08:30:01.51788+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "051542c9-cb64-4b8c-b960-7a6f7ff68c3f",
+    "code": "jdIkX9",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/Og8lfm",
+    "click_count": 1,
+    "created_at": "2026-02-10T18:28:28.206926+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "3138ad12-c68f-470a-bb44-3e90f6641d08",
+    "code": "QDqM60",
+    "target_url": "https://search.google.com/local/writereview?placeid=ChIJf7qNDhW1woAROX-FX8CScGE",
+    "click_count": 1,
+    "created_at": "2026-02-10T20:30:01.385882+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "c048c864-01eb-4962-8b07-ff44b90c380c",
+    "code": "nGeEWn",
+    "target_url": "https://www.yelp.com/writeareview/biz/N0pumxDDdjbCk2-_jPxDSw?review_origin=review-feed-war-widget",
+    "click_count": 1,
+    "created_at": "2026-02-10T20:30:01.494702+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "2d413fd8-705e-4323-8334-32fdaf6022b3",
+    "code": "bbgVTX",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/0b957aca-c88f-4ae5-b8d6-dc2af16e2f62/photos",
+    "click_count": 1,
+    "created_at": "2026-02-13T00:35:05.68386+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "c170c35e-9ccb-4ac9-866a-afb054163f44",
+    "code": "4nXYg1",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/uIeJGd",
+    "click_count": 1,
+    "created_at": "2026-02-13T01:18:20.720139+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "19ad0f2c-fdac-4edd-af24-02182b08c634",
+    "code": "1TxlfD",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/b6d00bca-dd1e-4a0b-901a-41bb00a38cfd/photos",
+    "click_count": 1,
+    "created_at": "2026-02-13T06:02:02.53413+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "00638d2f-6f78-45cf-a165-7b41b2d02873",
+    "code": "GIqCzA",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/b6451747-a944-48e4-8576-643d13aa3cc8/photos",
+    "click_count": 2,
+    "created_at": "2026-02-13T03:14:54.28991+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b12113f1-8875-46e4-a655-4f976fe8d41b",
+    "code": "GZ46Hp",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/XluwI7",
+    "click_count": 1,
+    "created_at": "2026-03-15T03:44:34.248093+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f793003c-3b95-4546-99fe-fafab50d0c0c",
+    "code": "sacsBC",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/Caff8C",
+    "click_count": 5,
+    "created_at": "2026-03-09T20:36:56.723284+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "4136f1f5-f752-4f0e-95a0-32aa1395e60b",
+    "code": "8ofw1a",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/JnLwIK",
+    "click_count": 5,
+    "created_at": "2026-02-18T19:46:53.124315+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "075c3b81-376f-4477-8b5e-ace7ff504dd5",
+    "code": "1KN9S8",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/IRGW9h",
+    "click_count": 1,
+    "created_at": "2026-02-21T02:23:42.088188+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "85133f9b-0202-4246-9aa0-8497c2cb244f",
+    "code": "gwspPr",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/0e89c8c2-f148-45d0-8e8f-73b2b61cac4b/photos",
+    "click_count": 1,
+    "created_at": "2026-02-21T02:36:03.680494+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "1f62c88b-c7aa-439e-a949-ed1061674782",
+    "code": "PTtFmS",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/8b90af1c-e156-437b-8208-f7e036390033/photos",
+    "click_count": 0,
+    "created_at": "2026-02-21T05:19:51.809734+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "bb59db80-f9fc-46c0-ad4d-faf165c09652",
+    "code": "zT20AG",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/CN0zy0",
+    "click_count": 1,
+    "created_at": "2026-02-27T17:15:27.433558+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f8c80859-9a77-4869-bb4c-2bb85c0693df",
+    "code": "vOYh2z",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/XluwI7",
+    "click_count": 1,
+    "created_at": "2026-03-15T03:50:19.629234+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "5bd53cbd-967f-4c64-9d94-1c0bed65e004",
+    "code": "5CMIPX",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/BIPcsb",
+    "click_count": 1,
+    "created_at": "2026-02-28T03:31:09.874087+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "bcb87c8d-4558-4298-b99d-dfada4bcee2a",
+    "code": "zk6r9S",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/1d9e76a6-cf47-43a9-bb70-fdf0673ff4d5",
+    "click_count": 1,
+    "created_at": "2026-03-15T04:30:14.447478+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f4b0dfa2-ea32-4395-b1b4-7df1ccadba74",
+    "code": "U2OULP",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/JSofkF",
+    "click_count": 1,
+    "created_at": "2026-03-12T04:43:02.357001+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "78099d34-7f68-4b26-9af7-e69e1bc268aa",
+    "code": "2p1hCg",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/2c989168-b4d9-4a2b-ac9f-784f6e25f4d4",
+    "click_count": 1,
+    "created_at": "2026-03-12T06:08:17.627266+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "7332e1ea-e298-44fc-b7c6-753d3ca7f267",
+    "code": "0JUNC2",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/eed00c04-59d2-4801-9132-fe982d5365de",
+    "click_count": 0,
+    "created_at": "2026-03-12T06:20:53.068203+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f1101f35-044e-4092-878d-c304ba488e76",
+    "code": "2fFEn7",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/6d9bf996-07e1-4d81-8ba9-05d1f1da9b51",
+    "click_count": 0,
+    "created_at": "2026-03-12T06:21:58.871093+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "ce85d3e2-1376-4b43-8a94-469577e715db",
+    "code": "GfewKn",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/1d9e76a6-cf47-43a9-bb70-fdf0673ff4d5",
+    "click_count": 0,
+    "created_at": "2026-03-15T04:31:28.623513+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "a3571fc7-fc8c-49a2-88fe-f9fa7aee9138",
+    "code": "EOp2uO",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/05647121-7e12-484d-9676-1a77ea71b391",
+    "click_count": 2,
+    "created_at": "2026-03-12T06:23:01.89672+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "e370a16e-8262-449c-a1c4-4ca56bbd40e1",
+    "code": "a7ZRho",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/quote/JSofkF",
+    "click_count": 2,
+    "created_at": "2026-02-28T22:31:07.130287+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "d7c3e239-5957-45d7-8c02-57f697bcfdf1",
+    "code": "CqvlHT",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/5089ed45-adac-44a4-8c31-d7b31ed29b61/photos",
+    "click_count": 3,
+    "created_at": "2026-02-27T17:28:36.38047+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "8f060c50-ec91-443b-9ca1-2a1a68e5568e",
+    "code": "lE6jHD",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/84cb9479-0ef4-4fd6-91e9-bf315b5641d1",
+    "click_count": 1,
+    "created_at": "2026-03-15T00:33:20.510122+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "95120e20-afc6-47c7-8654-6179dabbb906",
+    "code": "mJ2Jlh",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/fe31f218-657f-466f-8798-7cc440229bc0",
+    "click_count": 0,
+    "created_at": "2026-03-15T03:13:32.680054+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "01d7a91a-9f4a-4c6e-96fb-3adb171bd03e",
+    "code": "qCld8h",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/9d44f177-de9d-43c9-813a-65d8af5c4fc7",
+    "click_count": 1,
+    "created_at": "2026-03-15T03:15:51.263665+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "ba937bec-11e8-45b2-9dd5-6ed6e700c42b",
+    "code": "objgnq",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/e41a50cb-b9b4-4549-8f21-fe312a8379c8",
+    "click_count": 1,
+    "created_at": "2026-03-16T19:31:37.06589+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "3fc825e2-cf62-40be-a1ae-17ed1e2a30d4",
+    "code": "fHCCAK",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/31551f99-282d-4745-9579-4ec58b776ec4",
+    "click_count": 1,
+    "created_at": "2026-03-18T18:33:22.884155+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "bec5c6d6-776a-4b7d-8a22-f920b7748b78",
+    "code": "D917P4",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/579a2ffb-b8af-4382-a895-991d1ec9b97e",
+    "click_count": 0,
+    "created_at": "2026-03-18T21:52:29.921301+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "386a2528-0b64-4084-afb8-0c11a10e577e",
+    "code": "yoGEKx",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/jobs/71767f28-7fb9-4446-8cfc-a068e0f225ec/photos",
+    "click_count": 1,
+    "created_at": "2026-03-19T17:21:41.800332+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "aa498b45-215f-467d-9244-1a6da9a28257",
+    "code": "XiQlVj",
+    "target_url": "https://frederic-intratelluric-rosalyn.ngrok-free.dev/receipt/ecf9a303-f0b5-406a-87f3-77271d13105a",
+    "click_count": 1,
+    "created_at": "2026-03-20T17:36:14.489881+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "62ee2af8-9fff-402d-bd6b-a6845ccaeca0",
+    "code": "KzOavX",
+    "target_url": "http://localhost:3000/receipt/39c299b6-4f89-444e-a7f8-a1ccab6d6a7c",
+    "click_count": 0,
+    "created_at": "2026-03-23T18:09:41.711502+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "be1acb74-1446-4082-b57b-f636030dc5f7",
+    "code": "1Rv7qF",
+    "target_url": "https://smartdetailsautospa.com/receipt/39c299b6-4f89-444e-a7f8-a1ccab6d6a7c",
+    "click_count": 0,
+    "created_at": "2026-03-23T18:20:35.595564+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "8bf7b44c-8eb4-468f-83dd-57bd131999da",
+    "code": "2dyMfn",
+    "target_url": "https://smartdetailsautospa.com/receipt/39c299b6-4f89-444e-a7f8-a1ccab6d6a7c",
+    "click_count": 0,
+    "created_at": "2026-03-24T00:01:39.256747+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "da3015e8-c582-435b-a21e-5be0af05d487",
+    "code": "xuM8GB",
+    "target_url": "https://smartdetailsautospa.com/quote/QdFALi",
+    "click_count": 0,
+    "created_at": "2026-03-26T20:35:30.135001+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "2edec4fb-7bc1-459d-9584-bf4e4415b86e",
+    "code": "BGEZFa",
+    "target_url": "https://smartdetailsautospa.com/quote/BOtBSN",
+    "click_count": 0,
+    "created_at": "2026-03-26T21:01:44.740912+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "25645cbc-b79c-4b27-b2f4-46c6990eee23",
+    "code": "ns4iog",
+    "target_url": "https://smartdetailsautospa.com/quote/zx8lEt",
+    "click_count": 0,
+    "created_at": "2026-03-26T21:08:33.912228+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f0dc60da-540c-4c96-9842-853ed4e1c024",
+    "code": "xK4sB5",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/CBWl8o",
+    "click_count": 1,
+    "created_at": "2026-03-26T21:17:23.373369+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "350697e9-bc0b-4cff-85da-ccd36f211227",
+    "code": "9xknVk",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/FDTp5Q",
+    "click_count": 1,
+    "created_at": "2026-03-27T03:40:01.258859+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "5caedea9-fe1c-4822-a352-8e5b39dd8556",
+    "code": "a0XXuk",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/UA63kO",
+    "click_count": 2,
+    "created_at": "2026-03-26T21:39:13.204033+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "61c0f3a1-63a1-49a0-a726-c0888de1377d",
+    "code": "rRjKnj",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/MFV8WK",
+    "click_count": 0,
+    "created_at": "2026-03-27T03:36:49.740744+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "7754f296-f7e1-4d34-8d7d-d639ca6d614e",
+    "code": "QhCnOs",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/XEnoYx",
+    "click_count": 1,
+    "created_at": "2026-03-27T06:10:46.525507+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "0463065a-a559-4487-8163-382a97ed7789",
+    "code": "U8zpDh",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/QIdGj1",
+    "click_count": 1,
+    "created_at": "2026-03-27T06:32:36.800245+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "a80b97e5-8282-4763-b39a-e01804e438f3",
+    "code": "CiaT6S",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/iR1YqF",
+    "click_count": 1,
+    "created_at": "2026-03-27T06:44:29.974902+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "9dcf257f-57d6-4eb3-bd99-ed18fb4c5586",
+    "code": "Qop12G",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/xM4ADB",
+    "click_count": 1,
+    "created_at": "2026-03-27T06:37:34.565245+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "9db20169-7471-47ea-80d4-69953de9f54e",
+    "code": "Stnxog",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/TOMnlY",
+    "click_count": 1,
+    "created_at": "2026-03-27T06:57:39.667762+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b29cc435-f26c-49c6-bb0b-e45434b76e3c",
+    "code": "d7BPKk",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/s0Q5cy",
+    "click_count": 1,
+    "created_at": "2026-03-27T07:13:54.499925+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "507e6d4f-0682-4622-9c4a-dd7aacb710bc",
+    "code": "ICT39Y",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/6tlr8I",
+    "click_count": 0,
+    "created_at": "2026-03-27T07:36:35.067546+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "53829fdc-fe89-4cf4-874a-aaf3ea07c9ff",
+    "code": "ISoXzU",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/rgqEME",
+    "click_count": 1,
+    "created_at": "2026-03-27T08:18:02.723606+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "ab972d5a-4f8d-4839-aa39-01798ecab881",
+    "code": "pUDifj",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/qrO7Mu",
+    "click_count": 0,
+    "created_at": "2026-03-27T08:24:14.724+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b0b23a39-38bd-4c8e-b304-427a27583bc6",
+    "code": "wVuIJr",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/aG4Gjm",
+    "click_count": 1,
+    "created_at": "2026-03-30T20:33:16.769823+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "8a09e5fa-47f1-4102-b2ac-0edbdd353d08",
+    "code": "uky6L1",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/mgjRFe",
+    "click_count": 2,
+    "created_at": "2026-03-27T08:39:41.856521+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "dc92719d-1c2d-422f-a3e1-dc20b2e6e6c9",
+    "code": "Bq66wJ",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/YAM8Ox",
+    "click_count": 1,
+    "created_at": "2026-03-27T09:02:40.575407+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "36e969a6-1667-4297-8d64-0b1edf172caf",
+    "code": "lJTLq9",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/smywHP",
+    "click_count": 1,
+    "created_at": "2026-03-27T18:46:52.112774+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "bbab8469-24b9-4d22-8959-336d068a6b81",
+    "code": "JR0C06",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/aecNXi",
+    "click_count": 1,
+    "created_at": "2026-03-27T19:36:00.146118+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "6f00b0f9-2dc3-4aa4-9699-ca460d0165f9",
+    "code": "cYZMdU",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/QdFALi",
+    "click_count": 1,
+    "created_at": "2026-03-27T21:30:01.240464+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b42168d3-4542-49d4-873d-5a04b576fb9f",
+    "code": "SyFkfa",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/XT7aqX",
+    "click_count": 1,
+    "created_at": "2026-03-27T22:08:25.581598+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "52e9cff1-cdc5-471b-a73e-c5f954729d8c",
+    "code": "6Clc7Z",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/XT7aqX",
+    "click_count": 1,
+    "created_at": "2026-03-27T22:09:40.65552+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "34892923-40ee-41a9-a8ff-26c02e61b560",
+    "code": "CMcajf",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/Og8lfm",
+    "click_count": 0,
+    "created_at": "2026-03-28T02:30:00.619743+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "5d937846-dbf2-47fb-b535-1778a71514d7",
+    "code": "iMEQW7",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/IQf6tz",
+    "click_count": 0,
+    "created_at": "2026-03-28T02:30:01.670512+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "64ac9da0-1c07-4c01-921d-1fe2af3e09e1",
+    "code": "cXsUH6",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/JSofkF",
+    "click_count": 0,
+    "created_at": "2026-03-28T02:30:02.837338+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "05c12b04-0cc5-4ea0-a84b-7ad3b92abc9d",
+    "code": "Zpp3My",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/FRNXJu",
+    "click_count": 1,
+    "created_at": "2026-03-28T05:07:07.281856+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "9210fba8-57ee-47ba-abea-9d54eba1cd66",
+    "code": "8pB44q",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/FRNXJu",
+    "click_count": 2,
+    "created_at": "2026-03-28T16:38:40.913626+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "ad082554-3c3a-4133-9f0a-2ac13c9fd17e",
+    "code": "6Y1ONK",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/smywHP",
+    "click_count": 0,
+    "created_at": "2026-03-29T19:30:01.34798+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "98f60836-3824-4352-bd51-25dd5d4be835",
+    "code": "blFpW9",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/aecNXi",
+    "click_count": 0,
+    "created_at": "2026-03-29T20:30:01.779655+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "11db5d5f-06ef-4aba-a35b-4cb3915caebd",
+    "code": "eZaASE",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/ZQUYdc",
+    "click_count": 1,
+    "created_at": "2026-03-30T23:14:09.37631+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "7de2fc9e-3421-45f4-a5d4-457e77698417",
+    "code": "fk8nRW",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/uFzGPm",
+    "click_count": 2,
+    "created_at": "2026-03-29T21:48:23.935745+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "1ca44ce2-b1ac-4c95-837c-704bc378f338",
+    "code": "hJJn3n",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/GqAxO0",
+    "click_count": 1,
+    "created_at": "2026-03-29T22:05:41.44564+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "fa818b32-46d3-49a7-9551-60826b606f8f",
+    "code": "MAJaZH",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/QdFALi",
+    "click_count": 0,
+    "created_at": "2026-03-29T22:30:00.717473+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "1e22469f-aeca-4fd6-a9f7-0bac04ca5cc4",
+    "code": "cGw5PY",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/YqCqiJ",
+    "click_count": 0,
+    "created_at": "2026-03-30T00:29:52.016332+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "c704e4bf-aa66-4f00-8431-3ede790de1a3",
+    "code": "MOFnyW",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/O2VBuD",
+    "click_count": 1,
+    "created_at": "2026-03-30T01:03:31.858011+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "056c6bab-814c-4460-96c8-60a01ea53615",
+    "code": "7E7KTd",
+    "target_url": "https://staging.smartdetailsautospa.com/receipt/3284ff26-51f6-47c4-976b-90d7fbcf5226",
+    "click_count": 1,
+    "created_at": "2026-03-30T02:43:18.65115+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "2417cad8-c4c1-4c51-91dc-dd4a64a40ae3",
+    "code": "3jmnog",
+    "target_url": "https://staging.smartdetailsautospa.com/jobs/c2462682-eca6-4e01-b77c-ac8a9b5a9cfc/photos",
+    "click_count": 1,
+    "created_at": "2026-03-30T02:40:06.807739+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "a92d3d63-1040-4967-ad32-d3b9f99b3070",
+    "code": "bwLH8B",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/XHiymB",
+    "click_count": 1,
+    "created_at": "2026-03-30T03:01:17.520702+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b0b21c21-fb46-4985-8afe-e75737a3639a",
+    "code": "PLWACI",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/zC4ZAx",
+    "click_count": 0,
+    "created_at": "2026-03-30T18:27:18.495126+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "5f025dc4-377b-4146-903f-b93f152eadbb",
+    "code": "TwjGqY",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/AB1RgM",
+    "click_count": 1,
+    "created_at": "2026-03-30T18:31:01.252705+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "422ed034-9b2f-40bb-8259-b87eea63506d",
+    "code": "EHDxCo",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/6jBlO7",
+    "click_count": 0,
+    "created_at": "2026-03-30T19:09:46.203805+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "defa4cc8-32c7-4f8b-bcc3-056ce4a9f915",
+    "code": "c7YCFK",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/3V9UGv",
+    "click_count": 2,
+    "created_at": "2026-03-30T19:13:10.715794+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "c1d978b5-b12a-48f1-a228-2935ca7098f8",
+    "code": "JhpVHG",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/tEom5g",
+    "click_count": 1,
+    "created_at": "2026-03-30T19:55:00.776611+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b5e680a1-779e-4a4b-a006-1b44e0d05ad1",
+    "code": "CBg890",
+    "target_url": "https://staging.smartdetailsautospa.com/products/brushes",
+    "click_count": 1,
+    "created_at": "2026-04-02T23:45:14.713421+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "d1060ee9-268c-44bd-873d-83c4aa9d9e46",
+    "code": "jHKFaS",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/pRTqrq",
+    "click_count": 2,
+    "created_at": "2026-03-31T00:27:22.832146+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f21db59d-3241-4cf0-991d-fafd7b77d926",
+    "code": "0FQcTo",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/i9sSfQ",
+    "click_count": 1,
+    "created_at": "2026-03-31T02:32:28.477382+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "45e652f2-5dc3-4d83-9f01-3887660bb6fe",
+    "code": "UnZGts",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/K6DIyz",
+    "click_count": 1,
+    "created_at": "2026-03-31T04:48:32.379689+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "d717bbf7-6975-4686-b0b2-fb53a1dae262",
+    "code": "ZpFzOP",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/Qf20ft",
+    "click_count": 1,
+    "created_at": "2026-03-31T07:16:03.42961+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "e768b71e-2dfe-47f5-a992-36def39ca727",
+    "code": "UOfbtF",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/TUWsrU",
+    "click_count": 1,
+    "created_at": "2026-03-31T15:51:40.313323+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "551fc0e1-c46c-4d63-8de7-1fde981a9227",
+    "code": "MzM9Sb",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/zC4ZAx",
+    "click_count": 0,
+    "created_at": "2026-03-31T18:30:00.68296+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f965fab4-3cf2-4cdb-82a7-1c41e80828a1",
+    "code": "Bm2odV",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/3KPmcl",
+    "click_count": 0,
+    "created_at": "2026-04-01T00:40:46.356334+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "6ae19632-f276-440f-bfb2-0a84260c57dd",
+    "code": "Gk6EMc",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/ZXVuty",
+    "click_count": 1,
+    "created_at": "2026-04-01T03:36:18.417207+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "8f19e4d3-f1a6-4ed8-9a05-ad6d445e45d6",
+    "code": "LUupcp",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/7tAgpU",
+    "click_count": 2,
+    "created_at": "2026-04-01T04:06:59.668776+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "a95894a1-b495-4c3d-bfed-a0e82d4fe9c9",
+    "code": "Jjuy3A",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/yc60kg",
+    "click_count": 1,
+    "created_at": "2026-04-01T04:10:44.793982+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "c20e693b-e1d1-4f10-9a41-d5f4cca7b5a0",
+    "code": "WYnmcR",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/ZgxPhp",
+    "click_count": 1,
+    "created_at": "2026-04-01T04:24:58.852653+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "dbfaceba-ea88-46f0-9cb3-2717c1200452",
+    "code": "FveFOU",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/3V9UGv",
+    "click_count": 0,
+    "created_at": "2026-04-01T19:30:00.722122+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "f5169169-357c-4452-b05a-bfaeb4ab748c",
+    "code": "ZYSGVr",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/3KPmcl",
+    "click_count": 0,
+    "created_at": "2026-04-02T01:30:00.693021+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b23fe29d-605d-4049-8ab4-5a3f871f10ae",
+    "code": "6y8Kl4",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/S7EQgT",
+    "click_count": 0,
+    "created_at": "2026-04-02T03:42:15.498386+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "7b46c8e1-11ff-4836-ac9c-285e17f2dc6c",
+    "code": "FKzmFR",
+    "target_url": "https://staging.smartdetailsautospa.com/products/interior-care/pvandl-16oz",
+    "click_count": 1,
+    "created_at": "2026-04-02T23:29:03.264826+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "fd47fb53-9d2f-4557-b82d-ea4054f494a8",
+    "code": "pqHAfh",
+    "target_url": "https://www.google.com/maps/place/?q=place_id:\"ChIJf7qNDhW1woAROX-FX8CScGE\"",
+    "click_count": 3,
+    "created_at": "2026-04-02T23:27:05.926843+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "d694f2d3-e3d3-4cfd-9442-9b29165bcf54",
+    "code": "R29htL",
+    "target_url": "https://www.google.com/maps/search/?api=1&query=Smart%20Details%20Auto%20Spa&query_place_id=ChIJf7qNDhW1woAROX-FX8CScGE",
+    "click_count": 1,
+    "created_at": "2026-04-02T23:43:31.909236+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "294a8123-9da3-44b6-94f9-e03ef44e740c",
+    "code": "jCtxAA",
+    "target_url": "https://www.google.com/maps/search/?api=1&query=Smart%20Details%20Auto%20Spa&query_place_id=ChIJf7qNDhW1woAROX-FX8CScGE",
+    "click_count": 1,
+    "created_at": "2026-04-02T23:57:35.822855+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "0f60a298-0ffa-4199-b0b3-f112de0dc1a8",
+    "code": "JdF6wa",
+    "target_url": "https://staging.smartdetailsautospa.com/products/interior-care",
+    "click_count": 1,
+    "created_at": "2026-04-02T23:58:27.919267+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b1e16638-9b6a-47d4-b318-5c5a87d3f2e9",
+    "code": "Vy2Y3X",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/ZQUYdc",
+    "click_count": 1,
+    "created_at": "2026-04-01T23:30:00.674186+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "5a5c4134-645b-4960-9478-da416ae01ba9",
+    "code": "HYiJ6U",
+    "target_url": "https://www.google.com/maps/search/?api=1&query=Smart%20Details%20Auto%20Spa&query_place_id=ChIJf7qNDhW1woAROX-FX8CScGE",
+    "click_count": 1,
+    "created_at": "2026-04-03T00:32:36.135797+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "e180d536-1623-4b92-a3e5-69fd2f1af41a",
+    "code": "Pv6vYX",
+    "target_url": "https://staging.smartdetailsautospa.com/products/interior-care/matt-dash-100ml",
+    "click_count": 1,
+    "created_at": "2026-04-03T00:33:35.160677+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "95bcba4d-1535-4643-8ad4-1c826045f41b",
+    "code": "jL8you",
+    "target_url": "https://staging.smartdetailsautospa.com/products/microfibers",
+    "click_count": 1,
+    "created_at": "2026-04-03T00:34:20.436237+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "b9fe4dfd-6a80-4edc-844a-4e75de5174fd",
+    "code": "A0vFhT",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/S7EQgT",
+    "click_count": 0,
+    "created_at": "2026-04-03T04:30:01.528385+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "57b670cf-1b38-4975-bda8-c16feb2843bd",
+    "code": "HCKgin",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/7tAgpU",
+    "click_count": 0,
+    "created_at": "2026-04-03T04:30:03.427695+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "5ed4b3f5-44b8-4e2f-93c9-2dd10efe9e18",
+    "code": "ah5ntI",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/ZgxPhp",
+    "click_count": 0,
+    "created_at": "2026-04-03T04:30:04.327007+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "a99106ae-8c03-4078-ba84-99bf6c96a385",
+    "code": "FD3rZG",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/ZXVuty",
+    "click_count": 0,
+    "created_at": "2026-04-03T04:30:05.23715+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "db65bb6c-9018-451a-b18b-a5eda98ccc98",
+    "code": "iRtPN8",
+    "target_url": "https://staging.smartdetailsautospa.com/quote/yc60kg",
+    "click_count": 0,
+    "created_at": "2026-04-03T04:30:06.06092+00:00",
+    "expires_at": null
+  },
+  {
+    "id": "7ee40c51-bac6-4bb2-9e77-dabac101fa28",
+    "code": "WvH7kH",
+    "target_url": "https://staging.smartdetailsautospa.com/products/soaps-shampoos/wash-and-wax-16oz",
+    "click_count": 1,
+    "created_at": "2026-04-05T02:06:13.11864+00:00",
+    "expires_at": null
+  }
+]

@@ -1,0 +1,140 @@
+[
+  {
+    "id": "a6129437-2f36-440f-9c20-b978427fc927",
+    "appointment_id": "20e4be51-ed9d-47df-a271-b16cb4f8d3d2",
+    "transaction_id": null,
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "vehicle_id": "0d721105-a1d9-4b59-a2e3-03c25d0c523e",
+    "assigned_staff_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "status": "scheduled",
+    "services": [
+      {
+        "id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+        "name": "Express Exterior Wash",
+        "price": 90
+      }
+    ],
+    "work_started_at": null,
+    "work_completed_at": null,
+    "timer_seconds": 0,
+    "timer_paused_at": null,
+    "intake_started_at": null,
+    "intake_completed_at": null,
+    "intake_notes": null,
+    "estimated_pickup_at": "2026-04-04T17:15:00+00:00",
+    "actual_pickup_at": null,
+    "pickup_notes": null,
+    "created_at": "2026-04-03T09:31:49.067225+00:00",
+    "updated_at": "2026-04-03T09:31:49.067225+00:00",
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "gallery_token": null,
+    "cancellation_reason": null,
+    "cancelled_at": null,
+    "cancelled_by": null,
+    "quote_id": null
+  },
+  {
+    "id": "12abe162-0ef2-436e-8cf2-d0c8e8d4127b",
+    "appointment_id": "d0f6a010-181b-4e71-b56c-55fc8adc9a00",
+    "transaction_id": null,
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "vehicle_id": "d0511c62-9e2b-46fe-b6b6-a95661976eec",
+    "assigned_staff_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "status": "scheduled",
+    "services": [
+      {
+        "id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+        "name": "Express Exterior Wash",
+        "price": 75
+      }
+    ],
+    "work_started_at": null,
+    "work_completed_at": null,
+    "timer_seconds": 0,
+    "timer_paused_at": null,
+    "intake_started_at": null,
+    "intake_completed_at": null,
+    "intake_notes": null,
+    "estimated_pickup_at": "2026-04-04T20:15:00+00:00",
+    "actual_pickup_at": null,
+    "pickup_notes": null,
+    "created_at": "2026-04-03T09:31:49.067225+00:00",
+    "updated_at": "2026-04-03T19:08:37.655+00:00",
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "gallery_token": null,
+    "cancellation_reason": null,
+    "cancelled_at": null,
+    "cancelled_by": null,
+    "quote_id": null
+  },
+  {
+    "id": "c883d984-ff42-4aaa-afb4-f78f40297e6c",
+    "appointment_id": "9551d4e1-d900-4ce6-8f42-1eb1290059ae",
+    "transaction_id": null,
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "vehicle_id": "d0511c62-9e2b-46fe-b6b6-a95661976eec",
+    "assigned_staff_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "status": "scheduled",
+    "services": [
+      {
+        "id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+        "name": "Express Exterior Wash",
+        "price": 75
+      }
+    ],
+    "work_started_at": null,
+    "work_completed_at": null,
+    "timer_seconds": 0,
+    "timer_paused_at": null,
+    "intake_started_at": null,
+    "intake_completed_at": null,
+    "intake_notes": null,
+    "estimated_pickup_at": "2026-04-04T18:45:00+00:00",
+    "actual_pickup_at": null,
+    "pickup_notes": null,
+    "created_at": "2026-04-03T09:31:49.067225+00:00",
+    "updated_at": "2026-04-03T21:58:58.682+00:00",
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "gallery_token": null,
+    "cancellation_reason": null,
+    "cancelled_at": null,
+    "cancelled_by": null,
+    "quote_id": null
+  },
+  {
+    "id": "7a7fbf16-ca6e-4c2e-ad63-a279edd50689",
+    "appointment_id": null,
+    "transaction_id": null,
+    "customer_id": "998421cb-1516-47b2-9717-edf31ff779cc",
+    "vehicle_id": "367e4e9f-c091-4d3d-bd2c-00d761f9c366",
+    "assigned_staff_id": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "status": "cancelled",
+    "services": [
+      {
+        "id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+        "name": "Express Exterior Wash",
+        "price": 75,
+        "quantity": 1,
+        "tier_name": "Sedan"
+      }
+    ],
+    "work_started_at": null,
+    "work_completed_at": null,
+    "timer_seconds": 0,
+    "timer_paused_at": null,
+    "intake_started_at": "2026-02-28T03:39:40.787+00:00",
+    "intake_completed_at": null,
+    "intake_notes": null,
+    "estimated_pickup_at": null,
+    "actual_pickup_at": null,
+    "pickup_notes": null,
+    "created_at": "2026-02-28T03:35:42.399451+00:00",
+    "updated_at": "2026-02-28T03:36:27.215+00:00",
+    "created_by": "2fededd7-acf8-49e2-9af0-a369b122b8f7",
+    "gallery_token": null,
+    "cancellation_reason": "Created by mistake",
+    "cancelled_at": "2026-02-28T03:36:27.215+00:00",
+    "cancelled_by": "2fededd7-acf8-49e2-9af0-a369b122b8f7",
+    "quote_id": "adce020d-6b2f-4c39-b5d1-ebeb9ab4d544"
+  }
+]

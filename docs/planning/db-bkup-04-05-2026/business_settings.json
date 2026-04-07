@@ -1,0 +1,1195 @@
+[
+  {
+    "id": "1167a35c-8ad7-4112-a82e-8223c215c853",
+    "key": "tip_presets",
+    "value": "[15, 20, 25]",
+    "description": "Tip percentage presets for POS",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "e7c55b89-bb8b-49c5-8c9e-67ee570391b1",
+    "key": "cc_fee_rate",
+    "value": "0.05",
+    "description": "Credit card fee rate deducted from tips (5%)",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "0441fe83-6b28-4f05-9184-b24c6b0ef952",
+    "key": "loyalty_earn_rate",
+    "value": "1",
+    "description": "Points earned per $1 spent",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "879519e0-f273-4545-abae-a04c4c37d300",
+    "key": "loyalty_redeem_rate",
+    "value": "0.05",
+    "description": "Dollar value per point ($5 per 100 points = $0.05/point)",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "17b1c253-280f-4f9e-8399-182a98debcbf",
+    "key": "loyalty_redeem_minimum",
+    "value": "100",
+    "description": "Minimum points to redeem",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "5fd44638-d8e3-4836-9820-2c11c3d271c4",
+    "key": "appointment_buffer_minutes",
+    "value": "30",
+    "description": "Buffer time between appointments",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "34b249a7-94ef-413f-979a-36689341bba4",
+    "key": "mobile_travel_buffer_minutes",
+    "value": "30",
+    "description": "Travel buffer for mobile appointments",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "21a9777e-e013-41cc-a7f3-bb7a36d501a9",
+    "key": "cancellation_window_hours",
+    "value": "24",
+    "description": "Free cancellation window in hours",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "b24d159f-f0a1-4ad7-97bf-9cb009d1a13f",
+    "key": "receipt_email_enabled",
+    "value": "true",
+    "description": "Send receipts via email",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "fa58d98f-61dc-4466-9dec-b983e304f4a3",
+    "key": "receipt_sms_enabled",
+    "value": "true",
+    "description": "Send receipts via SMS",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "d62d7de1-af88-4488-a2a3-c6ebe068d9dd",
+    "key": "water_sku",
+    "value": "\"0000001\"",
+    "description": "SKU for water product (excluded from loyalty)",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:08:45.644144+00:00"
+  },
+  {
+    "id": "f6d806d3-0870-41d8-9fa0-9b1648cfa9fa",
+    "key": "tax_rate",
+    "value": 0.1025,
+    "description": "CA sales tax rate (10.25%)",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:49:45.688798+00:00"
+  },
+  {
+    "id": "ca8661ae-ebd3-43a0-a9c7-1ed31a3c7b71",
+    "key": "tax_products_only",
+    "value": true,
+    "description": "Only charge tax on products, not services",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T05:49:45.874272+00:00"
+  },
+  {
+    "id": "edde573e-8a40-42ad-9b6b-2b04a7b90c9f",
+    "key": "business_hours",
+    "value": {
+      "friday": {
+        "open": "09:00",
+        "close": "17:00"
+      },
+      "monday": {
+        "open": "09:00",
+        "close": "17:00"
+      },
+      "sunday": null,
+      "tuesday": {
+        "open": "09:00",
+        "close": "17:00"
+      },
+      "saturday": {
+        "open": "09:00",
+        "close": "17:00"
+      },
+      "thursday": {
+        "open": "09:00",
+        "close": "17:00"
+      },
+      "wednesday": {
+        "open": "09:00",
+        "close": "17:00"
+      }
+    },
+    "description": "Store operating hours",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-02T08:48:01.45114+00:00"
+  },
+  {
+    "id": "48295cde-801b-4e46-81ee-5937b3007b27",
+    "key": "booking_config",
+    "value": {
+      "advance_days_max": 30,
+      "advance_days_min": 1,
+      "slot_interval_minutes": 30
+    },
+    "description": "Online booking configuration",
+    "updated_by": null,
+    "created_at": "2026-02-02T08:48:08.478194+00:00",
+    "updated_at": "2026-02-02T08:48:08.478194+00:00"
+  },
+  {
+    "id": "f94cfa4c-4c37-40b4-8904-368cb9b9dec1",
+    "key": "n8n_webhook_urls",
+    "value": {
+      "quote_sent": null,
+      "quote_created": null,
+      "quote_accepted": null,
+      "booking_created": null,
+      "appointment_cancelled": null,
+      "appointment_completed": null,
+      "appointment_confirmed": null,
+      "booking_status_changed": null,
+      "appointment_rescheduled": null
+    },
+    "description": "n8n webhook URLs for workflow automation. Set via admin or directly in DB.",
+    "updated_by": null,
+    "created_at": "2026-02-03T03:33:22.221332+00:00",
+    "updated_at": "2026-02-03T23:58:39.200585+00:00"
+  },
+  {
+    "id": "58e6306c-45bf-4426-8114-88d218135a67",
+    "key": "google_review_count",
+    "value": "37",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-16T22:00:02.233722+00:00",
+    "updated_at": "2026-02-27T22:00:01.417048+00:00"
+  },
+  {
+    "id": "4b902508-ab52-4bb5-b9f4-bd565edd48d9",
+    "key": "google_reviews_data",
+    "value": [
+      {
+        "text": "brought my car in with some scratches from scraping along some MDF baseboard trim, David cleaned it up with a 3-stage paint correction and blended it out, color-sanding to fill the scratches that went very deep - hardly noticeable now unless in just the right light and looking closely.  Also got a vinyl coating to protect from future abrasion for 6 months, feels smooth as glass!",
+        "author": "William Chenoweth",
+        "rating": 5,
+        "relativeTime": "3 years ago"
+      },
+      {
+        "text": "Detail shops are everywhere in the South Bay, and they even come to you now days — but they don’t have Dave and Segundo. I purchased the car of my dreams and didn’t know who to trust with my new baby, but after two phone calls with David, I’m so glad I chose Smart Details for my new car paint needs. David was incredibly patient and explained the full process of paint decontamination, polishing, the need to knows of ceramic coating, and much more. His expertise and passion for this type of work is unmatched and you couldn’t find a nicer place to work with. My new vehicle had full ceramic coating, paint correction and such, providing great protection from the elements. My car was done all in one day, with a through explanation of what to expect in the future. I’m super stoked to go back and purchase more supplies to upkeep my vehicle and will have all my detailing needs done here in the future without any hesitation ever. Thanks Smart Details, you rock!!!",
+        "author": "Dusty Kramer",
+        "rating": 5,
+        "relativeTime": "3 years ago"
+      },
+      {
+        "text": "Brought my track car in after a dusty season with a few offs, they did a great job getting the rubber marks and brake dust off 🌠. Didn't upsell me on anything, if anything I could've been convinced to spend more! Just means I'll come back sooner ;)",
+        "author": "Jonathan Geisinger",
+        "rating": 5,
+        "relativeTime": "2 years ago"
+      },
+      {
+        "text": "My car was nasty when I told David about it and I needed it asap. He said \"Give me your car keys and we'll take care of it\". OMG! When I got my car back, it was like I have never seen it before 🤩. My car was amazingly clean ✅. Thank you guys! Very professional car treatment and friendly service. 👍🏻",
+        "author": "Reyna Ramirez",
+        "rating": 5,
+        "relativeTime": "3 years ago"
+      },
+      {
+        "text": "I had an amazing experience with this interior detailing service! David was professional and friendly, the staff did an amazing job with the interior cleaning of my car. Every inch of my car's interior was meticulously cleaned and restored to perfection! I highly recommend their services for a flawless interior detail. Five stars all the way!",
+        "author": "Kevin Martinez",
+        "rating": 5,
+        "relativeTime": "2 years ago"
+      }
+    ],
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-16T22:00:02.398073+00:00",
+    "updated_at": "2026-02-27T22:00:01.488782+00:00"
+  },
+  {
+    "id": "be0e6a44-1776-4bea-b597-01f1e7654d01",
+    "key": "pos_idle_timeout_minutes",
+    "value": 10,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-03T01:13:46.820637+00:00",
+    "updated_at": "2026-02-22T04:12:36.85838+00:00"
+  },
+  {
+    "id": "31ee23d7-dbe0-44f3-a484-cadb097ddf6d",
+    "key": "homepage_cta_before_image",
+    "value": "\"/images/before-after-old.webp\"",
+    "description": "Before image URL for homepage CTA",
+    "updated_by": null,
+    "created_at": "2026-02-28T08:27:27.974927+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "9b2546db-4f9e-48e0-8028-f9a9c85b15ee",
+    "key": "services_page_description",
+    "value": "\"From express washes to multi-year ceramic coating packages, our trained technicians deliver results you can see and feel.\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "d0f258b7-32ea-490b-9a53-4b8fd6d2590e",
+    "key": "ticker_top_bar_options",
+    "value": {
+      "text_entry": "rtl",
+      "message_gap": 50,
+      "bg_transition": "crossfade",
+      "hold_duration": 10
+    },
+    "description": null,
+    "updated_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-20T01:29:38.75216+00:00",
+    "updated_at": "2026-03-02T00:45:12.983455+00:00"
+  },
+  {
+    "id": "9cc9677b-1cc2-4b29-bbc5-0da285fc0f66",
+    "key": "business_name",
+    "value": "Smart Details Auto Spa",
+    "description": "Business display name",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-23T07:32:50.013114+00:00"
+  },
+  {
+    "id": "7412c69e-e2b9-4ef9-bec4-3228d07fe07a",
+    "key": "business_phone",
+    "value": "(424) 237-0913",
+    "description": "Business phone number",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-23T07:32:50.114888+00:00"
+  },
+  {
+    "id": "2edda657-b9b6-4bbe-9207-2c127f7812e0",
+    "key": "business_address",
+    "value": {
+      "zip": "90717",
+      "city": "Lomita",
+      "line1": "2021 Lomita Blvd.",
+      "state": "CA"
+    },
+    "description": "Business address",
+    "updated_by": null,
+    "created_at": "2026-02-02T05:08:45.644144+00:00",
+    "updated_at": "2026-02-23T07:32:50.255891+00:00"
+  },
+  {
+    "id": "e5ae0b9d-7752-4429-9d14-8708f39e3260",
+    "key": "pos_allowed_ips",
+    "value": [
+      {
+        "ip": "104.172.197.27",
+        "name": "NAK MBP Office"
+      },
+      {
+        "ip": "172.249.105.229",
+        "name": "SDAS"
+      },
+      {
+        "ip": "104.28.49.59",
+        "name": ""
+      },
+      {
+        "ip": "146.75.146.83",
+        "name": "NAK 17 PRO"
+      },
+      {
+        "ip": "104.172.208.19",
+        "name": "Home"
+      },
+      {
+        "ip": "107.15.226.187",
+        "name": "Khala's House NC"
+      },
+      {
+        "ip": "104.172.204.202",
+        "name": "NAK MBP Office (After pfSense port change to igb3)"
+      },
+      {
+        "ip": "104.172.199.61",
+        "name": "NEW IP for Lomita Print & SD Auto Spa effective 03/08/2026"
+      },
+      {
+        "ip": "104.172.198.250",
+        "name": "NEW IP for Lomita Print & SD Auto Spa effective 03/22/2026"
+      }
+    ],
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-05T20:52:41.050626+00:00",
+    "updated_at": "2026-03-23T02:29:09.8216+00:00"
+  },
+  {
+    "id": "84e779ed-0695-47f8-a7ed-8b0e872575d7",
+    "key": "pos_ip_whitelist_enabled",
+    "value": false,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-05T21:37:08.813005+00:00",
+    "updated_at": "2026-03-23T02:29:09.902304+00:00"
+  },
+  {
+    "id": "869e53d0-5279-411c-85c1-0ef6015264ba",
+    "key": "business_email",
+    "value": "sdautospa2020@gmail.com",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-05T01:23:32.30409+00:00",
+    "updated_at": "2026-02-23T07:32:50.372969+00:00"
+  },
+  {
+    "id": "94f39755-43bd-4782-8982-98fe49eabcbf",
+    "key": "coupon_type_enforcement",
+    "value": "\"soft\"",
+    "description": "Controls how customer type restrictions on coupons are enforced. \"soft\" shows a warning but allows the coupon. \"hard\" blocks the coupon entirely.",
+    "updated_by": null,
+    "created_at": "2026-02-04T20:26:30.5662+00:00",
+    "updated_at": "2026-02-11T05:10:58.304892+00:00"
+  },
+  {
+    "id": "1c93620d-84ec-4115-a09d-5ac3a4c59d55",
+    "key": "business_website",
+    "value": "https://smartdetailsautospa.com/",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-05T01:23:32.396784+00:00",
+    "updated_at": "2026-02-23T07:32:50.547943+00:00"
+  },
+  {
+    "id": "4298b04b-7aa9-4783-bdd8-71e2c47c5b95",
+    "key": "voice_agent_api_key",
+    "value": "va_5NnQoh9ajRYuNu2G64XuJePjUhuQ3g6lWMnm7",
+    "description": "API key for 11 Labs Voice Agent integration",
+    "updated_by": null,
+    "created_at": "2026-02-03T23:58:39.131172+00:00",
+    "updated_at": "2026-03-25T04:57:27.22208+00:00"
+  },
+  {
+    "id": "bb7bd9db-f875-4c2e-b5e1-3eb253a796c6",
+    "key": "og_image_url",
+    "value": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/cms-assets/content-images/og/1775373180874-zvx7e0.png",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-03-01T05:14:23.289828+00:00",
+    "updated_at": "2026-04-05T07:13:07.9692+00:00"
+  },
+  {
+    "id": "bd1701ed-39bf-43f4-9ef8-116c23723349",
+    "key": "hero_carousel_config",
+    "value": {
+      "mode": "carousel",
+      "transition": "fade",
+      "interval_ms": 5000,
+      "pause_on_hover": true
+    },
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-14T07:28:29.342446+00:00",
+    "updated_at": "2026-02-16T21:06:04.167838+00:00"
+  },
+  {
+    "id": "7585a3ec-79e3-4183-adce-a5e16ed61a44",
+    "key": "homepage_cta_after_image",
+    "value": "\"/images/before-after-new.webp\"",
+    "description": "After image URL for homepage CTA",
+    "updated_by": null,
+    "created_at": "2026-02-28T08:27:28.058458+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "a179e726-4555-4412-9681-67c60559e6a2",
+    "key": "homepage_team_heading",
+    "value": "\"Experience Matters\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T07:40:44.485136+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "b9bf177c-92d0-4527-83b2-5da9960b21f2",
+    "key": "homepage_credentials_heading",
+    "value": "\"Credentials & Awards\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T07:40:44.485136+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "f33b2442-4ee0-47b3-80fc-44a9c83e84ba",
+    "key": "ads_enabled",
+    "value": false,
+    "description": null,
+    "updated_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-14T07:28:29.839751+00:00",
+    "updated_at": "2026-03-01T21:06:14.371944+00:00"
+  },
+  {
+    "id": "41247a6a-a72f-43e5-82eb-392bd810f39e",
+    "key": "ticker_enabled",
+    "value": true,
+    "description": null,
+    "updated_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-14T07:28:29.629692+00:00",
+    "updated_at": "2026-03-01T21:33:45.707179+00:00"
+  },
+  {
+    "id": "473af857-c68c-47c9-a36b-28522336bbb7",
+    "key": "ai_txt_content",
+    "value": "User-agent: GPTBot\nAllow: /\nAllow: /services/\nAllow: /products/\nAllow: /areas/\nDisallow: /admin/\nDisallow: /api/\nDisallow: /pos/\nDisallow: /account/\nDisallow: /login\n\nUser-agent: Google-Extended\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n\nUser-agent: CCBot\nAllow: /\nDisallow: /admin/\nDisallow: /api/\n\nUser-agent: anthropic-ai\nAllow: /\nDisallow: /admin/\nDisallow: /api/",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-14T07:29:53.459506+00:00",
+    "updated_at": "2026-02-14T07:29:53.459506+00:00"
+  },
+  {
+    "id": "ff918fe6-5215-4b67-9945-9703ad86a4e6",
+    "key": "messaging_after_hours_enabled",
+    "value": "false",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-09T23:45:32.992244+00:00",
+    "updated_at": "2026-02-10T01:43:37.531248+00:00"
+  },
+  {
+    "id": "0446cf2f-3782-45e1-aeb0-527aa1875e18",
+    "key": "messaging_after_hours_message",
+    "value": "Thanks for reaching out to {business_name}! We are currently closed. Our hours are {business_hours}. We will get back to you when we reopen. Book online: {booking_url}",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-09T23:45:32.992244+00:00",
+    "updated_at": "2026-02-10T01:43:37.623531+00:00"
+  },
+  {
+    "id": "2a5cb797-6155-4d5a-aaae-464caa543212",
+    "key": "stale_quote_days",
+    "value": 3,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-08T00:18:14.225959+00:00",
+    "updated_at": "2026-02-08T00:18:14.225959+00:00"
+  },
+  {
+    "id": "bfb0f6af-3b35-4420-acc0-6a3dad05743b",
+    "key": "messaging_ai_system_prompt_extra",
+    "value": "",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-09T23:45:32.992244+00:00",
+    "updated_at": "2026-02-09T23:45:32.992244+00:00"
+  },
+  {
+    "id": "f6963999-5c80-4885-aec7-6b3d457f8b75",
+    "key": "google_reviews_updated_at",
+    "value": "2026-02-27T22:00:01.236Z",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-16T22:00:02.51953+00:00",
+    "updated_at": "2026-02-27T22:00:01.627835+00:00"
+  },
+  {
+    "id": "9c558bef-367b-4a8d-a047-5b7db90351b7",
+    "key": "google_review_url",
+    "value": "https://search.google.com/local/writereview?placeid=ChIJf7qNDhW1woAROX-FX8CScGE",
+    "description": "Direct Google review link sent to customers",
+    "updated_by": null,
+    "created_at": "2026-02-10T06:50:57.001118+00:00",
+    "updated_at": "2026-03-07T22:40:04.62342+00:00"
+  },
+  {
+    "id": "49879775-de19-4311-81b3-f77d5f5fa08b",
+    "key": "yelp_review_url",
+    "value": "https://www.yelp.com/writeareview/biz/N0pumxDDdjbCk2-_jPxDSw?review_origin=review-feed-war-widget",
+    "description": "Direct Yelp review link sent to customers",
+    "updated_by": null,
+    "created_at": "2026-02-10T06:50:57.001118+00:00",
+    "updated_at": "2026-03-07T22:40:04.757729+00:00"
+  },
+  {
+    "id": "ccc35e68-324c-4724-a111-16f72ab7ddd8",
+    "key": "business_description",
+    "value": "Professional auto detailing, ceramic coatings, and car care supplies in Lomita, CA. Mobile detailing available in the South Bay area.",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:09:36.416779+00:00",
+    "updated_at": "2026-02-28T20:14:24.741228+00:00"
+  },
+  {
+    "id": "94780e76-6f60-49c9-9395-38645f29c015",
+    "key": "business_latitude",
+    "value": 33.7922,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:09:36.416779+00:00",
+    "updated_at": "2026-02-28T20:14:24.941962+00:00"
+  },
+  {
+    "id": "691b474d-7c62-47f0-b545-1580a911890b",
+    "key": "business_longitude",
+    "value": -118.3151,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:09:36.416779+00:00",
+    "updated_at": "2026-02-28T20:14:25.072371+00:00"
+  },
+  {
+    "id": "a2a5b059-45e3-49bb-9ab8-2d44ac968edb",
+    "key": "service_area_name",
+    "value": "South Bay, Los Angeles",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:09:36.416779+00:00",
+    "updated_at": "2026-02-28T20:14:25.175251+00:00"
+  },
+  {
+    "id": "f6e2ab4e-43fc-4054-a8ad-328cdddfdbce",
+    "key": "service_area_radius",
+    "value": "5 mi",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:09:36.416779+00:00",
+    "updated_at": "2026-02-28T20:14:25.268535+00:00"
+  },
+  {
+    "id": "1a91157c-fbc3-4eb2-9068-b25808c7a039",
+    "key": "price_range",
+    "value": "$$",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:09:36.416779+00:00",
+    "updated_at": "2026-02-28T20:14:25.364628+00:00"
+  },
+  {
+    "id": "4f063b1b-a809-4596-b496-25c9fcda2913",
+    "key": "homepage_differentiators",
+    "value": "[{\"icon\":\"Truck\",\"title\":\"Mobile Service\",\"description\":\"We come to your home or office throughout the South Bay area.\"},{\"icon\":\"Shield\",\"title\":\"Ceramic Pro Certified\",\"description\":\"Professional-grade coatings for lasting protection.\"},{\"icon\":\"Leaf\",\"title\":\"Eco-Friendly Products\",\"description\":\"Premium products that are safe for your vehicle and the environment.\"}]",
+    "description": "Homepage Why Choose Us differentiators",
+    "updated_by": null,
+    "created_at": "2026-02-28T08:27:27.727841+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "021ce358-59eb-435d-848c-6c6a35bfd1dd",
+    "key": "email_brand_primary_color",
+    "value": "#1a1a2e",
+    "description": "Email brand: header background & primary buttons",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "98d2a4bc-e6df-4501-81f8-8228935d2abf",
+    "key": "email_brand_accent_color",
+    "value": "#CCFF00",
+    "description": "Email brand: secondary buttons & link highlights",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "5aacf891-1f6d-4ebb-8f4f-fec946fd227d",
+    "key": "email_brand_text_color",
+    "value": "#333333",
+    "description": "Email brand: body text color",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "0ed9205d-eecc-423e-b0e8-774642cfa0d7",
+    "key": "email_brand_bg_color",
+    "value": "#f5f5f5",
+    "description": "Email brand: outer background color",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "f16b453f-faef-4c44-969b-54562171a2bb",
+    "key": "email_brand_font_family",
+    "value": "Arial, Helvetica, sans-serif",
+    "description": "Email brand: font family (email-safe)",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "f4f0a1a5-b7da-4da6-9868-33147f07faf6",
+    "key": "email_brand_logo_url",
+    "value": "",
+    "description": "Email brand: logo URL (empty = use receipt_config logo)",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "c3dd6771-e311-4a4f-960f-64d43907e691",
+    "key": "email_brand_logo_width",
+    "value": 200,
+    "description": "Email brand: logo width in pixels",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "d1082e76-fc0f-48b2-a055-335fb3967df5",
+    "key": "email_brand_social_google",
+    "value": "",
+    "description": "Email brand: Google Business URL",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "124c0a2a-3800-46e4-8bd7-66834bd822b8",
+    "key": "email_brand_social_yelp",
+    "value": "",
+    "description": "Email brand: Yelp page URL",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "4d6bee1f-fbdc-4f4b-b200-96b4dce08337",
+    "key": "email_brand_social_instagram",
+    "value": "",
+    "description": "Email brand: Instagram URL",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "b9f111d9-405f-4496-b2ca-c77268f5a8fc",
+    "key": "messaging_ai_unknown_enabled",
+    "value": "true",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-10T01:03:37.694157+00:00",
+    "updated_at": "2026-03-28T17:22:52.533986+00:00"
+  },
+  {
+    "id": "9fba011c-647d-4600-ad01-08da8b7def10",
+    "key": "messaging_ai_customers_enabled",
+    "value": "true",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-10T01:03:37.694157+00:00",
+    "updated_at": "2026-03-28T17:22:52.763529+00:00"
+  },
+  {
+    "id": "905bc3d4-6cc4-42b2-9082-64ab9776c3cb",
+    "key": "messaging_ai_instructions",
+    "value": "You are a friendly SMS assistant. You help customers get quotes and book detailing services.\n\nRULES:\n- Keep messages SHORT — under 160 characters ideal. Longer messages will be split into multiple texts automatically.\n- Ask only 1-2 questions per message. NEVER ask for make, model, color, type, AND service all at once.\n- DO NOT list all services or dump the full menu. Only quote the specific service the customer asks about.\n- Use casual, friendly tone — like a real person texting, not a corporate bot.\n- You have access to the FULL conversation thread including phone call summaries, auto-generated quotes, and system messages. USE this info naturally — the customer expects phone and text to feel like one conversation. Don't ask for info that's already in the thread.\n- NEVER invent or embellish details beyond what's explicitly stated in call summaries or system messages.\n- NEVER make up pricing or services not in the catalog.\n- NEVER invent scenarios or assume details about the customer's situation (like accidents, damage, or urgency) unless they explicitly told you.\n- NEVER offer custom discounts or deals not in the catalog.\n- If unsure about something, offer to have a team member follow up.\n- If you learn their name, use it naturally.\n- End quotes with the booking link.\n- If the customer says something vague like \"detail my car\", ask what kind (express, standard/signature, premium).\n- If product information is provided in your context, use it to answer product questions with specific names, prices, and descriptions.\n- For product purchases, share the catalog link so customers can browse online, or let them know they can visit in-store.\n- If active promotions are provided in your context, you should:\n  1. When a customer asks about deals, discounts, sales, or specials — share all relevant active promotions\n  2. When a customer is discussing a specific service or product that has a targeted coupon — mention it naturally\n  3. When a customer is about to book or has received a quote — mention applicable promos\n  4. Never mention promos in your first message or force them into unrelated conversation\n\nRE-ENGAGEMENT:\n- If conversation history exists and the customer already provided vehicle info (make, model, type, color), DO NOT ask for it again.\n- If a previous quote was given, reference it: \"Still interested in that [service] for your [vehicle]?\"\n- Returning customers are likely ready to book — steer toward booking.\n- If they ask a new question, answer it using the vehicle info already collected.\n- Only ask for vehicle info again if they mention a DIFFERENT vehicle.\n\nCONVERSATION FLOW:\nFor NEW conversations (no history):\n1. Welcome them warmly. Ask if they need products or detailing services.\n2. Collect vehicle info: vehicle type (sedan, SUV/truck, van, coupe), make, model, and color — ask 1-2 questions at a time, not all at once.\n3. Ask what service they want. If they say something vague like \"detail my car\", ask what kind (express, standard/signature, premium).\n4. Provide targeted quote: Once you know vehicle type + service, calculate the correct price from the pricing data and give a clear quote for ONLY that service. Never list other services unless asked.\n5. Once quoted, provide the booking link.\n\nFor RETURNING conversations (history exists):\n1. Welcome them back warmly.\n2. Reference what was previously discussed if relevant.\n3. Ask if they're ready to book or need something else.\n4. If booking: provide the booking link immediately.\n5. If new service: use already-collected vehicle info to quote.\n\nAFTER HOURS:\n- If the business is currently closed, acknowledge it warmly: \"We're currently closed, but I can definitely help you with a quote!\"\n- Still collect info and provide pricing — don't just deflect or tell them to call back.\n- Mention business hours and when they'll reopen.\n- Offer the booking link so they can schedule online anytime.\n\nVEHICLE SIZE MAPPING (for pricing lookup):\n- Sedan/Coupe/Hatchback/Compact = \"Sedan\" tier pricing\n- Truck, SUV, Crossover (2-row) = \"Truck/SUV\" tier pricing\n- 3-row SUV, Van, Minivan, Full-size SUV = \"SUV 3-Row/Van\" tier pricing\n\nMOBILE VS IN-STORE:\n- ALWAYS assume the customer wants in-store service. Never suggest or promote mobile detailing.\n- Only discuss mobile service if the CUSTOMER specifically asks about it (e.g., \"can you come to me\", \"do you do mobile\", \"at my house\").\n- If they ask about mobile: inform them there is an additional mobile/travel fee ($40-$60) on top of the service price, and offer in-store as the standard option.\n- Never position mobile as the default or recommended option.\n\nQUOTE GENERATION:\nWhen you have collected ALL of the following from the customer:\n1. Their name (first and last)\n2. Vehicle details (make, model, and color)\n3. At least one specific service they want\n4. The customer has AGREED to pricing or asked for a quote\n\nThen output a quote request block at the END of your message using this EXACT format:\n\n[GENERATE_QUOTE]\ncustomer_name: John Smith\ncustomer_phone: {phone}\nvehicle_year: 2020\nvehicle_make: Honda\nvehicle_model: Accord\nvehicle_color: Silver\nvehicle_type: sedan\nservices: Express Exterior Wash\ntier: sedan\n[/GENERATE_QUOTE]\n\nIMPORTANT — Name requirement:\n- You MUST have the customer's first AND last name before generating a quote.\n- If they only give a first name, ask: \"And your last name?\"\n- Never generate a quote with only a first name.\n\nRules for the quote block:\n- {phone} is a placeholder — it will be automatically replaced with the customer's actual phone number. Always use {phone} exactly as shown.\n- vehicle_type must be one of: sedan, truck_suv, suv_van\n- tier must match vehicle_type: sedan, truck_suv, suv_van\n- services: use the EXACT service name from the pricing data. For multiple services, put each on its own line prefixed with \"services: \"\n- vehicle_year: include if the customer mentioned it, otherwise omit the line\n- vehicle_color: include if mentioned, otherwise omit the line\n- Only generate a quote block when the customer has AGREED to the service/pricing\n- Do NOT generate a quote block if you are still collecting information\n- Before generating, confirm: \"I'll put together a quote for [service] on your [vehicle]. One moment!\"\n- Your message text (outside the block) should be SHORT — the quote link will be appended automatically\n- NEVER include the quote block in the middle of your message — always at the END",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-10T01:43:37.704305+00:00",
+    "updated_at": "2026-03-28T17:22:52.892539+00:00"
+  },
+  {
+    "id": "ff40aeb9-f4a9-4d8a-a865-9d47a81dae49",
+    "key": "messaging_auto_close_hours",
+    "value": "72",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-10T00:52:07.899025+00:00",
+    "updated_at": "2026-03-28T17:22:53.058866+00:00"
+  },
+  {
+    "id": "9db853c0-0f44-4ebb-8a55-38f217df04fa",
+    "key": "messaging_auto_archive_days",
+    "value": "14",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-10T00:52:07.899025+00:00",
+    "updated_at": "2026-03-28T17:22:53.180972+00:00"
+  },
+  {
+    "id": "7e3d6eff-ebbc-47cf-8f56-5fa6db3845b4",
+    "key": "qbo_income_account_id",
+    "value": "\"85\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-02-11T07:48:40.288304+00:00"
+  },
+  {
+    "id": "37ee687b-9013-4693-b052-e61eb592bb02",
+    "key": "google_place_id",
+    "value": "\"ChIJf7qNDhW1woAROX-FX8CScGE\"",
+    "description": "Google Place ID for reviews widget",
+    "updated_by": null,
+    "created_at": "2026-02-28T08:27:27.885834+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "861b7f88-a3df-4456-a71a-b2539cdcddd9",
+    "key": "homepage_hero_tagline",
+    "value": "\"Expert ceramic coatings, paint correction, and premium detailing. We bring showroom results directly to your doorstep.\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "2a54558a-9318-49ed-9e84-fbdcd12b3cce",
+    "key": "qbo_default_payment_method_id",
+    "value": "\"35\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-02-11T07:48:40.37153+00:00"
+  },
+  {
+    "id": "a1cced76-8877-41cf-983b-78547106b8e3",
+    "key": "pos_favorites",
+    "value": [
+      {
+        "id": "ba5ea191-c67b-4534-b602-f2d5a06aa66a",
+        "type": "service",
+        "color": "purple",
+        "label": "Express EXTERIOR",
+        "darkColor": "purple",
+        "colorShade": 10,
+        "referenceId": "50715d89-e6b4-4307-9b5a-def51d45c205",
+        "darkColorShade": 60
+      },
+      {
+        "id": "c4208f2d-68f3-4af0-9896-644ca463e079",
+        "type": "service",
+        "color": "purple",
+        "label": "Express INTERIOR",
+        "darkColor": "purple",
+        "colorShade": 10,
+        "referenceId": "666b8a89-40ec-4e1e-8728-93d660293553",
+        "darkColorShade": 60
+      },
+      {
+        "id": "3379ce60-c14b-4841-af71-35a60fdd1004",
+        "type": "service",
+        "color": "orange",
+        "label": "PRO DETAIL",
+        "darkColor": "orange",
+        "colorShade": 10,
+        "referenceId": "bd3079db-0484-4fed-87b7-770d03aca2ae",
+        "darkColorShade": 60
+      },
+      {
+        "id": "11ff2697-d605-4b24-a0cb-cf58d6b26a8e",
+        "type": "discount",
+        "color": "red",
+        "label": "10% Discount",
+        "darkColor": "pink",
+        "colorShade": 10,
+        "referenceId": null,
+        "darkColorShade": 60
+      },
+      {
+        "id": "e7836f35-b58d-4fec-b441-5cecb54d6c15",
+        "type": "product",
+        "color": "cyan",
+        "label": "WATER",
+        "darkColor": "cyan",
+        "colorShade": 10,
+        "referenceId": "6591be72-44d0-4011-8f39-25d584f29e79",
+        "darkColorShade": 60
+      },
+      {
+        "id": "f95da62f-5302-4416-abcc-5699776dda24",
+        "type": "surcharge",
+        "color": "red",
+        "label": "CC Fees",
+        "darkColor": "red",
+        "colorShade": 10,
+        "percentage": 5,
+        "referenceId": null,
+        "darkColorShade": 60
+      },
+      {
+        "id": "0797691b-48a2-442f-8d33-6b26055454e8",
+        "type": "customer_lookup",
+        "color": "slate",
+        "label": "Customer Lookup",
+        "colorShade": 40,
+        "referenceId": null
+      },
+      {
+        "id": "bc93b671-2c05-4f3c-82b6-9a3195f05052",
+        "type": "custom_amount",
+        "color": "slate",
+        "label": "Custom Amount",
+        "colorShade": 40,
+        "referenceId": null
+      },
+      {
+        "id": "277bb3fe-8595-438a-876d-4d15356581db",
+        "type": "product",
+        "color": "blue",
+        "label": "3\" Wool Pad",
+        "darkColor": "blue",
+        "colorShade": 10,
+        "referenceId": "3a711a12-5ca3-44cc-b7b6-cb2085b9450a",
+        "darkColorShade": 60
+      },
+      {
+        "id": "b6692a57-d937-4650-bdbb-827b71bcce80",
+        "type": "product",
+        "color": "blue",
+        "label": "Carnauba Paste Wax / 19 oz",
+        "darkColor": "blue",
+        "colorShade": 10,
+        "referenceId": "64917d12-8bf3-49cc-a3a7-56dbae4e53b6",
+        "darkColorShade": 60
+      },
+      {
+        "id": "2175a339-cb46-4d67-aeb1-f270d87074f8",
+        "type": "product",
+        "color": "blue",
+        "label": "Dirty Towel Separator 32 Gallon Tcan / 1ct",
+        "darkColor": "blue",
+        "colorShade": 10,
+        "referenceId": "c83866d3-59aa-4956-b4e3-7b78f45885af",
+        "darkColorShade": 60
+      },
+      {
+        "id": "db7e02b6-ced3-4e61-b4e1-001092bbc4e3",
+        "type": "service",
+        "color": "fuchsia",
+        "label": "Engine Bay Detail",
+        "darkColor": "purple",
+        "colorShade": 10,
+        "referenceId": "3ace824f-6372-421a-9ada-6b669e722bb6",
+        "darkColorShade": 60
+      }
+    ],
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-03T00:31:36.376248+00:00",
+    "updated_at": "2026-02-21T22:41:53.412307+00:00"
+  },
+  {
+    "id": "ae88af1d-3e3e-43f5-8307-13eb3d4f60ea",
+    "key": "qbo_auto_sync_transactions",
+    "value": "true",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-02-11T07:10:44.906646+00:00"
+  },
+  {
+    "id": "5d30dfcd-7ee5-4e2f-9dab-cd5474d5c676",
+    "key": "qbo_auto_sync_customers",
+    "value": "true",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-02-11T07:10:44.906646+00:00"
+  },
+  {
+    "id": "85773ef8-264a-4278-a0fe-3e14507612e3",
+    "key": "qbo_auto_sync_catalog",
+    "value": "true",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-02-11T07:10:44.906646+00:00"
+  },
+  {
+    "id": "2719c2b4-cf99-4f2f-b212-62ddfe5ef0b5",
+    "key": "qbo_environment",
+    "value": "\"sandbox\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-02-11T07:28:43.601523+00:00"
+  },
+  {
+    "id": "521cb6d1-07d4-4aa3-ad4f-d7ecd8a9a4e4",
+    "key": "qbo_access_token",
+    "value": "\"\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-03-08T00:57:29.4314+00:00"
+  },
+  {
+    "id": "45da9174-8c05-4bd3-a3b0-a53439cd0ba7",
+    "key": "homepage_cta_title",
+    "value": "\"Ready to Transform Your Vehicle?\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "ee2b335c-6008-4aea-aede-b9e75fafafa7",
+    "key": "qbo_oauth_state",
+    "value": "\"e8ee51e1-1345-4435-9d78-e029a67de5ed\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:28:46.783226+00:00",
+    "updated_at": "2026-03-24T03:58:39.116277+00:00"
+  },
+  {
+    "id": "415c8d42-fbda-4ccc-9cf6-6033c9139a48",
+    "key": "email_brand_social_facebook",
+    "value": "",
+    "description": "Email brand: Facebook URL",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "166fb048-d279-4457-9ace-ee1a9186c98a",
+    "key": "homepage_cta_description",
+    "value": "\"Book your appointment today and experience the difference professional detailing makes.\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "de205be2-5475-4a01-aa15-8a2f86354d29",
+    "key": "google_review_rating",
+    "value": "5",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-16T22:00:02.053627+00:00",
+    "updated_at": "2026-02-27T22:00:01.306014+00:00"
+  },
+  {
+    "id": "4aa31769-66cc-4a6c-aca6-34d63c9593a4",
+    "key": "homepage_cta_button_text",
+    "value": "\"Book Your Detail\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "aa9518af-941c-40e3-a438-cce957bca407",
+    "key": "qbo_auto_sync_interval",
+    "value": "30",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.30357+00:00",
+    "updated_at": "2026-02-12T19:12:49.30357+00:00"
+  },
+  {
+    "id": "e3e968db-6e32-4493-b7d6-c2acb1eb610e",
+    "key": "qbo_realtime_sync",
+    "value": "true",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.465824+00:00",
+    "updated_at": "2026-02-12T19:12:49.465824+00:00"
+  },
+  {
+    "id": "162e26df-6c1c-4e69-8a45-1fa71c6f08a7",
+    "key": "addon_auth_expiration_minutes",
+    "value": "30",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "98e3c0e5-48ff-455b-a651-acd9516c315f",
+    "key": "min_intake_photos_exterior",
+    "value": "4",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "b7da6f78-88d8-488d-ab51-c802aa4659c7",
+    "key": "min_intake_photos_interior",
+    "value": "2",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "822c91c0-894d-41d0-a8ba-96bd4f14b015",
+    "key": "min_completion_photos_exterior",
+    "value": "4",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "6f03d823-ea50-481e-b851-03e3c75424cd",
+    "key": "min_completion_photos_interior",
+    "value": "2",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00"
+  },
+  {
+    "id": "fe0e7987-0320-4828-bc13-9ae97cbf1d12",
+    "key": "email_brand_footer_text",
+    "value": "",
+    "description": "Email brand: optional custom footer line",
+    "updated_by": null,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "8f1c130d-702a-46ed-88aa-7feddd7fe377",
+    "key": "homepage_services_description",
+    "value": "\"From express washes to multi-year ceramic coating packages, we offer comprehensive auto detailing tailored to your vehicle's needs.\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T04:08:16.043385+00:00"
+  },
+  {
+    "id": "d2c8529c-5b9d-4a74-bfd7-7bd050b9c03a",
+    "key": "default_deposit_amount",
+    "value": 50,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T00:07:23.513474+00:00"
+  },
+  {
+    "id": "56b221e5-d82f-43fd-9c95-5cd6e6697000",
+    "key": "qbo_last_sync_at",
+    "value": "\"2026-03-04T00:55:12.385Z\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-03-04T00:55:12.454477+00:00"
+  },
+  {
+    "id": "6db6d22a-1607-40a4-9826-08e402eef468",
+    "key": "quote_validity_days",
+    "value": 7,
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-28T19:25:04.095573+00:00",
+    "updated_at": "2026-03-01T00:07:23.670239+00:00"
+  },
+  {
+    "id": "f8c70711-6da4-4948-ba55-295af1c64e9a",
+    "key": "qbo_refresh_token",
+    "value": "\"RT1-202-H0-1781657849zec2rceu4oe4o5uetsd5\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-03-08T00:57:29.540695+00:00"
+  },
+  {
+    "id": "af65dedf-3b38-40ce-abfa-8eff85934f56",
+    "key": "qbo_realm_id",
+    "value": "\"\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-03-08T00:57:29.567783+00:00"
+  },
+  {
+    "id": "8a25cfaa-068b-4e60-827d-c291316a355f",
+    "key": "qbo_token_expires_at",
+    "value": "\"\"",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T07:10:44.906646+00:00",
+    "updated_at": "2026-03-08T00:57:29.637354+00:00"
+  },
+  {
+    "id": "adc9d943-a8d5-4ae2-af4a-e181a581456e",
+    "key": "sms_business_phone_override",
+    "value": "",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-03-28T04:21:06.036297+00:00",
+    "updated_at": "2026-03-28T17:22:53.319662+00:00"
+  },
+  {
+    "id": "d47c3e4b-aabe-46c9-aa6c-ef56839f36fc",
+    "key": "sms_test_phone_number",
+    "value": "13107564789",
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-03-28T04:21:06.130585+00:00",
+    "updated_at": "2026-03-28T17:22:53.442029+00:00"
+  },
+  {
+    "id": "593f90d6-6a05-462e-82b8-b7179e85bbeb",
+    "key": "receipt_config",
+    "value": {
+      "logo_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/receipt-assets/receipt-logo.png?t=1770254915337",
+      "logo_width": 150,
+      "printer_ip": "http://192.168.1.174:8080",
+      "custom_text": "-------------------------------------------\nProudly Serving the South Bay Since 2019!\n**Tell Others About Your Recent Visit **\n{qr_google} {qr_yelp}\n\nQuality Promise: We will gladly issue store\ncredit for any product that is unopened and\nunused within 14 days of purchase.\n-------------------------------------------\n{barcode_receipt}",
+      "override_name": null,
+      "logo_alignment": "center",
+      "logo_placement": "above_name",
+      "override_email": "SDautoSpa2020@Gmail.com",
+      "override_phone": "(424) 237-0913 [Mon-Sat 9am-5pm]",
+      "override_address": null,
+      "override_website": "SmartDetailsAutoSpa.com",
+      "print_server_url": "http://192.168.1.81:8080",
+      "custom_text_zones": [
+        {
+          "id": "migrated-1",
+          "content": "{barcode_receipt}\n",
+          "enabled": false,
+          "placement": "below_footer"
+        },
+        {
+          "id": "zone-1771908727325",
+          "content": "",
+          "enabled": true,
+          "placement": "below_header"
+        },
+        {
+          "id": "zone-1771908735525",
+          "content": "-------------------------------------------\nProudly Serving the South Bay Since 2019!\n**Tell Others About Your Recent Visit **\n{qr_google} {qr_yelp}\n\nQuality Promise: We will gladly issue store\ncredit for any product that is unopened and\nunused within 14 days of purchase.\n-------------------------------------------\n{barcode_receipt}",
+          "enabled": true,
+          "placement": "below_footer"
+        }
+      ],
+      "custom_text_placement": "below_footer"
+    },
+    "description": null,
+    "updated_by": null,
+    "created_at": "2026-02-05T01:29:36.767569+00:00",
+    "updated_at": "2026-03-07T04:41:31.622328+00:00"
+  }
+]

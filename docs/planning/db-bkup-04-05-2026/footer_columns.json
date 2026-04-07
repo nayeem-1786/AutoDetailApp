@@ -1,0 +1,79 @@
+[
+  {
+    "id": "2a6d3c9c-24db-4677-ba8f-3802dc6ca2a4",
+    "section_id": "d8841ebc-706b-43c5-bfc9-5d0df84ee787",
+    "title": "Contact",
+    "content_type": "business_info",
+    "html_content": "",
+    "sort_order": 3,
+    "is_enabled": false,
+    "created_at": "2026-02-19T20:47:01.109038+00:00",
+    "updated_at": "2026-02-28T09:33:22.939307+00:00",
+    "config": {
+      "col_span": 3
+    }
+  },
+  {
+    "id": "f5be1992-5bb0-47a8-bb97-e918ddcf8cbf",
+    "section_id": "d8841ebc-706b-43c5-bfc9-5d0df84ee787",
+    "title": "Top Products",
+    "content_type": "links",
+    "html_content": "",
+    "sort_order": 0,
+    "is_enabled": true,
+    "created_at": "2026-02-19T23:11:21.22312+00:00",
+    "updated_at": "2026-02-28T09:33:22.949042+00:00",
+    "config": {
+      "col_span": 2
+    }
+  },
+  {
+    "id": "867b3129-7bc5-4719-a304-e50309bc7926",
+    "section_id": "d8841ebc-706b-43c5-bfc9-5d0df84ee787",
+    "title": "",
+    "content_type": "brand",
+    "html_content": "",
+    "sort_order": 2,
+    "is_enabled": true,
+    "created_at": "2026-02-19T23:06:39.484168+00:00",
+    "updated_at": "2026-02-28T09:33:22.948461+00:00",
+    "config": {
+      "tagline": "Professional auto detailing and ceramic coating specialists serving the South Bay area. We bring premium car care directly to you.",
+      "col_span": 5,
+      "show_logo": true,
+      "logo_width": 125,
+      "show_email": false,
+      "show_phone": false,
+      "show_address": false,
+      "show_reviews": true
+    }
+  },
+  {
+    "id": "2ba5810d-d23e-4c6a-affa-308390511b53",
+    "section_id": "d8841ebc-706b-43c5-bfc9-5d0df84ee787",
+    "title": "Services",
+    "content_type": "links",
+    "html_content": "",
+    "sort_order": 1,
+    "is_enabled": true,
+    "created_at": "2026-02-19T20:47:01.109038+00:00",
+    "updated_at": "2026-02-28T09:33:22.954496+00:00",
+    "config": {
+      "col_span": 2
+    }
+  },
+  {
+    "id": "8d89f128-1ecf-4b62-b1b5-5002c14790c1",
+    "section_id": "d8841ebc-706b-43c5-bfc9-5d0df84ee787",
+    "title": "Contact Details",
+    "content_type": "html",
+    "html_content": "<svg style=\"display:inline-block;vertical-align:middle;color:var(--site-icon-accent)\" xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-phone\" aria-hidden=\"true\"><path d=\"M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384\"></path></svg> (424) 237-0913 <br/>\n<svg style=\"display:inline-block;vertical-align:middle;color:var(--site-icon-accent)\" xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-mail\" aria-hidden=\"true\"><path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\"></path><rect x=\"2\" y=\"4\" width=\"16\" height=\"16\" rx=\"2\"></rect></svg> SDAutoSpa2020@Gmail.com <br/>\n<svg style=\"display:inline-block;vertical-align:middle;color:var(--site-icon-accent)\" xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-map-pin\" aria-hidden=\"true\"><path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\"></path><circle cx=\"12\" cy=\"10\" r=\"3\"></circle></svg> 2021 Lomita Blvd., Lomita, CA 90717 <br/>",
+    "sort_order": 4,
+    "is_enabled": true,
+    "created_at": "2026-02-20T02:32:11.822413+00:00",
+    "updated_at": "2026-02-28T09:33:22.936278+00:00",
+    "config": {
+      "col_span": 3
+    }
+  }
+]

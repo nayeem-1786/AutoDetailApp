@@ -1,0 +1,110 @@
+[
+  {
+    "id": "470ef922-063e-4a65-ab1a-faf9d20251ab",
+    "trigger_key": "order_ready_pickup",
+    "template_id": "364d891b-58e8-4f0f-9d36-bb1e1c0476e1",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "a7950743-31ca-45a2-9b09-6354a5ea0b3e",
+    "trigger_key": "order_shipped",
+    "template_id": "58b19865-c5d8-4510-a042-581540e9d812",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "ac74afad-eb14-41da-abc6-f2d9bdcb4224",
+    "trigger_key": "order_delivered",
+    "template_id": "ab50a032-33fe-4f1f-9d8d-c688e6d82467",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "1d8a7132-8b34-4bd7-9aa5-afb94232611d",
+    "trigger_key": "order_refund",
+    "template_id": "d821b99e-865a-4f30-9bf0-53db7cba56f7",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "96ea3761-ecbb-472a-90b7-d2efee3590cf",
+    "trigger_key": "stock_alert",
+    "template_id": "02618f52-d3a9-477f-b5cc-f40e4591a6c1",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "03d73536-7477-4c0b-8313-5de2b840cff5",
+    "trigger_key": "appointment_confirmed",
+    "template_id": "b2d43250-2893-4ee9-a7b5-5a878c94c850",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "f4238d83-bd7e-43f7-a933-17d9e0567d35",
+    "trigger_key": "quote_sent",
+    "template_id": "bfb9179a-51a2-4a5d-9a84-8d484a1211cd",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "e78609d3-1ad7-4573-a542-ea0037c9d3a8",
+    "trigger_key": "job_complete",
+    "template_id": "376537ba-340a-4578-bf94-bdddd7d55243",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-04T07:57:52.745641+00:00"
+  },
+  {
+    "id": "fe56c6d2-0031-456b-80bd-e7e1d2450a8f",
+    "trigger_key": "booking_reminder",
+    "template_id": "588e641e-d796-4bc3-9076-4e8e54c081a6",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-21T03:21:18.871638+00:00"
+  },
+  {
+    "id": "7bd4cefd-18fc-4254-a09e-1e871d0d0155",
+    "trigger_key": "booking_cancellation",
+    "template_id": "2c16a06b-be4d-46e4-8357-4b6b0307884e",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-21T03:21:18.871638+00:00"
+  },
+  {
+    "id": "b3d7283c-68f9-43d8-bdef-873a362fdaf5",
+    "trigger_key": "review_request",
+    "template_id": "4f5842aa-4957-45be-81c4-1f46406f365d",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-21T03:30:22.255064+00:00"
+  },
+  {
+    "id": "36c41e56-6ccd-4442-b2a3-03f74acce49d",
+    "trigger_key": "welcome_email",
+    "template_id": "d8a92941-0753-4e46-80ce-af73c595a824",
+    "segment_filter": null,
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-03-21T07:05:49.180519+00:00"
+  }
+]

@@ -1,0 +1,576 @@
+[
+  {
+    "id": "cd613eee-012e-45a8-b734-41b60edbaa46",
+    "slug": "appointment_confirmed_postcall",
+    "name": "Post-Call Confirmation",
+    "category": "booking",
+    "body_template": "Thanks for calling {business_name}, {first_name}! Your appointment is confirmed. Questions? Call {business_phone}",
+    "default_body": "Thanks for calling {business_name}, {first_name}! Your appointment is confirmed. Questions? Call {business_phone}",
+    "variables": [
+      {
+        "key": "business_name",
+        "required": true,
+        "description": "Business name"
+      },
+      {
+        "key": "business_phone",
+        "required": true,
+        "description": "Business phone number"
+      },
+      {
+        "key": "first_name",
+        "required": false,
+        "description": "Customer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-28T04:19:56.893255+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "0fc12920-808a-4ffb-adbc-009339ce51e7",
+    "slug": "quote_accepted_single",
+    "name": "Quote Accepted (Single Item)",
+    "category": "quote",
+    "body_template": "Thanks {first_name}! Your quote for {item_name} has been accepted. Our team will reach out shortly to schedule your appointment.",
+    "default_body": "Thanks {first_name}! Your quote for {item_name} has been accepted. Our team will reach out shortly to schedule your appointment.",
+    "variables": [
+      {
+        "key": "first_name",
+        "required": true,
+        "description": "Customer first name"
+      },
+      {
+        "key": "item_name",
+        "required": true,
+        "description": "Service/item name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-28T04:19:56.893255+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "28287ac0-33f2-4ce5-8346-92d58941fccd",
+    "slug": "quote_accepted_multi",
+    "name": "Quote Accepted (Multiple Items)",
+    "category": "quote",
+    "body_template": "Thanks {first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.",
+    "default_body": "Thanks {first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.",
+    "variables": [
+      {
+        "key": "first_name",
+        "required": true,
+        "description": "Customer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-28T04:19:56.893255+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "bf6b4338-de49-4c51-a6ac-86fb2a1e4508",
+    "slug": "quote_reminder",
+    "name": "Quote Reminder (Unviewed)",
+    "category": "reminder",
+    "body_template": "Hey {first_name}! Just checking if you had a chance to look at your quote: {short_url}",
+    "default_body": "Hey {first_name}! Just checking if you had a chance to look at your quote: {short_url}",
+    "variables": [
+      {
+        "key": "first_name",
+        "required": true,
+        "description": "Customer first name"
+      },
+      {
+        "key": "short_url",
+        "required": true,
+        "description": "Short link to quote"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-28T04:19:56.893255+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "7d608e01-2e5b-49ef-8a4a-27272dd7c365",
+    "slug": "quote_viewed_followup",
+    "name": "Quote Follow-Up (Viewed)",
+    "category": "reminder",
+    "body_template": "Hi {first_name}! You checked out your estimate — ready to book? Any questions, just reply here or call us. {short_url}",
+    "default_body": "Hi {first_name}! You checked out your estimate — ready to book? Any questions, just reply here or call us. {short_url}",
+    "variables": [
+      {
+        "key": "first_name",
+        "required": true,
+        "description": "Customer first name"
+      },
+      {
+        "key": "short_url",
+        "required": true,
+        "description": "Short link to quote"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-28T04:19:56.893255+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "3817e978-ac52-40ed-940e-95a38bddf3b9",
+    "slug": "appointment_cancelled",
+    "name": "Appointment Cancelled",
+    "category": "booking",
+    "body_template": "Hi {first_name}, your {services} appointment on {appointment_date} at {appointment_time} has been cancelled. Please contact us to reschedule. - {business_name} {business_phone}",
+    "default_body": "Hi {first_name}, your {services} appointment on {appointment_date} at {appointment_time} has been cancelled. Please contact us to reschedule. - {business_name} {business_phone}",
+    "variables": [
+      {
+        "key": "first_name",
+        "required": true,
+        "description": "Customer first name"
+      },
+      {
+        "key": "services",
+        "required": true,
+        "description": "Service names"
+      },
+      {
+        "key": "appointment_date",
+        "required": true,
+        "description": "Appointment date"
+      },
+      {
+        "key": "appointment_time",
+        "required": true,
+        "description": "Appointment time"
+      },
+      {
+        "key": "business_name",
+        "required": true,
+        "description": "Business name"
+      },
+      {
+        "key": "business_phone",
+        "required": true,
+        "description": "Business phone number"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-28T17:25:30.864578+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f"
+  },
+  {
+    "id": "ef53c0a1-e92f-4b0d-9a7c-929b7859415c",
+    "slug": "quote_accepted_staff_notify",
+    "name": "Staff: Quote Accepted",
+    "category": "system",
+    "body_template": "Quote {quote_number} has been accepted by {customer_name} for {services} - {service_total}.\n\nCall customer to schedule appointment date & time in POS.",
+    "default_body": "Quote accepted! {customer_name} — Q-{quote_number} for {service_total}. Services: {services}. Schedule in POS.",
+    "variables": [
+      {
+        "key": "customer_name",
+        "required": true,
+        "description": "Customer full name"
+      },
+      {
+        "key": "quote_number",
+        "required": true,
+        "description": "Quote number"
+      },
+      {
+        "key": "service_total",
+        "required": true,
+        "description": "Quote total amount"
+      },
+      {
+        "key": "services",
+        "required": true,
+        "description": "Service names"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "staff",
+    "recipient_phones": [
+      "+14243637450"
+    ],
+    "updated_at": "2026-03-29T22:01:16.934085+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f"
+  },
+  {
+    "id": "8018da16-a32d-4c39-832c-d29299a31d7d",
+    "slug": "booking_staff_notify",
+    "name": "Staff: New Booking",
+    "category": "system",
+    "body_template": "New online booking! {customer_name} — {services} on {appointment_date} at {appointment_time}. {deposit_info}",
+    "default_body": "New online booking! {customer_name} — {services} on {appointment_date} at {appointment_time}. {deposit_info}",
+    "variables": [
+      {
+        "key": "customer_name",
+        "required": true,
+        "description": "Customer full name"
+      },
+      {
+        "key": "services",
+        "required": true,
+        "description": "Service names"
+      },
+      {
+        "key": "appointment_date",
+        "required": true,
+        "description": "Appointment date"
+      },
+      {
+        "key": "appointment_time",
+        "required": true,
+        "description": "Appointment time"
+      },
+      {
+        "key": "deposit_info",
+        "required": true,
+        "description": "Deposit status (e.g. Deposit paid. or Pay on site.)"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "staff",
+    "recipient_phones": [
+      "+14243637450"
+    ],
+    "updated_at": "2026-03-28T17:49:16.571162+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f"
+  },
+  {
+    "id": "d8805a13-6278-4aef-b2cb-a47cc6ae3842",
+    "slug": "job_complete",
+    "name": "Job Complete",
+    "category": "transactional",
+    "body_template": "Hi {first_name}, your {vehicle_description} is looking great and ready for pickup! 🎉\nView your before & after photos: {gallery_link}\n{business_name}\n{business_address}\n{business_phone}\n{hours_line}",
+    "default_body": "Hi {first_name}, your {vehicle_description} is looking great and ready for pickup! 🎉\nView your before & after photos: {gallery_link}\n{business_name}\n{business_address}\n{business_phone}\n{hours_line}",
+    "variables": [
+      {
+        "key": "first_name",
+        "required": true,
+        "description": "Customer first name"
+      },
+      {
+        "key": "vehicle_description",
+        "required": true,
+        "description": "Vehicle make/model"
+      },
+      {
+        "key": "gallery_link",
+        "required": true,
+        "description": "Photo gallery link"
+      },
+      {
+        "key": "business_name",
+        "required": true,
+        "description": "Business name"
+      },
+      {
+        "key": "business_address",
+        "required": false,
+        "description": "Business address"
+      },
+      {
+        "key": "business_phone",
+        "required": false,
+        "description": "Business phone number"
+      },
+      {
+        "key": "hours_line",
+        "required": false,
+        "description": "Today's business hours"
+      },
+      {
+        "key": "detailer_first_name",
+        "required": false,
+        "description": "Assigned detailer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-29T19:16:37.705877+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "eb2d2d24-8619-43d6-9102-5a24089d8e6e",
+    "slug": "detailer_job_assigned",
+    "name": "Detailer Job Assignment",
+    "category": "system",
+    "body_template": "New job assigned: {services} – {vehicle_description}\n{appointment_date} at {appointment_time}\n{address}\nTotal: {service_total}",
+    "default_body": "New job assigned: {services} – {vehicle_description}\n{appointment_date} at {appointment_time}\n{address}\nTotal: {service_total}",
+    "variables": [
+      {
+        "key": "services",
+        "required": true,
+        "description": "Service names"
+      },
+      {
+        "key": "vehicle_description",
+        "required": false,
+        "description": "Vehicle year/make/model"
+      },
+      {
+        "key": "appointment_date",
+        "required": true,
+        "description": "Appointment date"
+      },
+      {
+        "key": "appointment_time",
+        "required": true,
+        "description": "Appointment time"
+      },
+      {
+        "key": "address",
+        "required": false,
+        "description": "Mobile service address"
+      },
+      {
+        "key": "service_total",
+        "required": false,
+        "description": "Total amount"
+      },
+      {
+        "key": "detailer_first_name",
+        "required": false,
+        "description": "Assigned detailer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "detailer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-29T19:16:37.705877+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "53f2318d-2df9-4339-a4ac-b1b1b28ef9e6",
+    "slug": "booking_reminder",
+    "name": "Booking Reminder",
+    "category": "reminder",
+    "body_template": "Reminder: Your {service_name} appointment at {business_name} is tomorrow at {appointment_time}. Need to reschedule? Call us at {business_phone}",
+    "default_body": "Reminder: Your {service_name} appointment at {business_name} is tomorrow at {appointment_time}. Need to reschedule? Call us at {business_phone}",
+    "variables": [
+      {
+        "key": "service_name",
+        "required": true,
+        "description": "Primary service name"
+      },
+      {
+        "key": "business_name",
+        "required": true,
+        "description": "Business name"
+      },
+      {
+        "key": "appointment_time",
+        "required": true,
+        "description": "Appointment time"
+      },
+      {
+        "key": "business_phone",
+        "required": true,
+        "description": "Business phone number"
+      },
+      {
+        "key": "first_name",
+        "required": false,
+        "description": "Customer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-29T19:16:37.705877+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f"
+  },
+  {
+    "id": "69ddb4a8-d976-41d5-996c-db3c5ff74c61",
+    "slug": "addon_approved",
+    "name": "Add-on Approved",
+    "category": "transactional",
+    "body_template": "Great! Your add-on ({service_name}) has been approved. We'll get started right away!",
+    "default_body": "Great! Your add-on ({service_name}) has been approved. We'll get started right away!",
+    "variables": [
+      {
+        "key": "service_name",
+        "required": true,
+        "description": "Add-on service/product name"
+      },
+      {
+        "key": "first_name",
+        "required": false,
+        "description": "Customer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-29T19:16:37.705877+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "94726d91-df44-4087-af2f-62e5669f9c5a",
+    "slug": "addon_declined",
+    "name": "Add-on Declined",
+    "category": "transactional",
+    "body_template": "No problem! We've noted {service_name} as a recommendation for your next visit.",
+    "default_body": "No problem! We've noted {service_name} as a recommendation for your next visit.",
+    "variables": [
+      {
+        "key": "service_name",
+        "required": true,
+        "description": "Add-on service/product name"
+      },
+      {
+        "key": "first_name",
+        "required": false,
+        "description": "Customer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": true,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-03-29T19:16:37.705877+00:00",
+    "updated_by": null
+  },
+  {
+    "id": "769b2430-8f97-4400-a0ba-92479253c1c5",
+    "slug": "appointment_confirmed",
+    "name": "Appointment Confirmed",
+    "category": "booking",
+    "body_template": "{business_name} — Appointment Confirmed:\n\n{service_name}\n{appointment_date}\nat {appointment_time} - {service_total}\n\nNeed to make a change?\nCall {business_phone}\n\n\n",
+    "default_body": "{business_name} — Appointment Confirmed\n\nHi {first_name}, your appointment is scheduled:\n{service_name}\n{appointment_date} at {appointment_time}\nTotal: {service_total}\n\nQuestions? Call {business_phone}",
+    "variables": [
+      {
+        "key": "business_name",
+        "required": true,
+        "description": "Business name"
+      },
+      {
+        "key": "business_phone",
+        "required": true,
+        "description": "Business phone number"
+      },
+      {
+        "key": "appointment_date",
+        "required": true,
+        "description": "Appointment date (e.g. Monday, March 28, 2026)"
+      },
+      {
+        "key": "appointment_time",
+        "required": true,
+        "description": "Appointment time (e.g. 10:30 AM)"
+      },
+      {
+        "key": "service_name",
+        "required": false,
+        "description": "Service name"
+      },
+      {
+        "key": "first_name",
+        "required": false,
+        "description": "Customer first name"
+      },
+      {
+        "key": "service_total",
+        "required": false,
+        "description": "Service total amount"
+      },
+      {
+        "key": "detailer_first_name",
+        "required": false,
+        "description": "Assigned detailer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-04-03T06:52:12.18169+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f"
+  },
+  {
+    "id": "3cea04e6-7ca4-48fb-9196-a62f95bf0152",
+    "slug": "booking_confirmed",
+    "name": "Online Booking Confirmed",
+    "category": "booking",
+    "body_template": "{business_name} — Online Appointment Confirmed:\n\n{service_name}\n{appointment_date}\nat {appointment_time} - {service_total}\n\nNeed to make a change?\nCall {business_phone}\n\n{services}",
+    "default_body": "{business_name} — Booking Confirmed!\n\n{appointment_date}\n{appointment_time}\n{services}\nVehicle: {vehicle_description}\nTotal: {service_total}\n\nQuestions? Call {business_phone}",
+    "variables": [
+      {
+        "key": "business_name",
+        "required": true,
+        "description": "Business name"
+      },
+      {
+        "key": "business_phone",
+        "required": true,
+        "description": "Business phone number"
+      },
+      {
+        "key": "appointment_date",
+        "required": true,
+        "description": "Appointment date"
+      },
+      {
+        "key": "appointment_time",
+        "required": true,
+        "description": "Appointment time"
+      },
+      {
+        "key": "services",
+        "required": true,
+        "description": "Comma-separated service names"
+      },
+      {
+        "key": "vehicle_description",
+        "required": false,
+        "description": "Vehicle year/make/model"
+      },
+      {
+        "key": "service_total",
+        "required": true,
+        "description": "Total amount"
+      },
+      {
+        "key": "first_name",
+        "required": false,
+        "description": "Customer first name"
+      },
+      {
+        "key": "detailer_first_name",
+        "required": false,
+        "description": "Assigned detailer first name"
+      }
+    ],
+    "is_active": true,
+    "can_silence": false,
+    "recipient_type": "customer",
+    "recipient_phones": null,
+    "updated_at": "2026-04-03T06:53:28.810127+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f"
+  }
+]

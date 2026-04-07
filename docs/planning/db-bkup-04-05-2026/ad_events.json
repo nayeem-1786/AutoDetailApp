@@ -1,0 +1,1042 @@
+[
+  {
+    "id": "79904234-f045-41bf-a838-f9e110631fa5",
+    "ad_creative_id": "1909c93f-da31-424e-b699-7f7a4a1d30b3",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T08:08:14.474998+00:00"
+  },
+  {
+    "id": "d308fe0e-067e-47ca-920d-c5a32fb2a50b",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T08:10:27.756581+00:00"
+  },
+  {
+    "id": "b8136c43-209b-4356-bdf2-2b63eb99a7ee",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/signature-detail/signature-complete-detail",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T08:45:37.191627+00:00"
+  },
+  {
+    "id": "421fb101-f9b7-4039-ab94-8c407c8aa600",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "click",
+    "page_path": "/services/signature-detail/signature-complete-detail",
+    "zone_id": "sidebar",
+    "ip_hash": null,
+    "created_at": "2026-02-20T08:48:53.269384+00:00"
+  },
+  {
+    "id": "679f30e9-50c9-4a58-a5dd-12e32c2ed105",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T09:05:12.507395+00:00"
+  },
+  {
+    "id": "67f95d4e-ce4e-4956-8f27-245a675792c6",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "click",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": null,
+    "created_at": "2026-02-20T09:05:35.879142+00:00"
+  },
+  {
+    "id": "89a28dca-e21a-4813-8cd9-12d0353edbaa",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "c8440242-c893-4b2a-b4c4-1637a7575343",
+    "event_type": "impression",
+    "page_path": "/services/precision-express",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T09:16:10.824556+00:00"
+  },
+  {
+    "id": "2316891c-20b7-462d-ad59-46c0836e909a",
+    "ad_creative_id": "1909c93f-da31-424e-b699-7f7a4a1d30b3",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T09:16:42.268803+00:00"
+  },
+  {
+    "id": "8911de4f-580a-4d28-b131-a44f2a5daada",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "c131e4af55cb823ec876d3b681943e05de1d242d54900cf5a6665bc2ea9cfe14",
+    "created_at": "2026-02-20T09:18:09.580472+00:00"
+  },
+  {
+    "id": "3c665c0e-8a00-434d-a844-630542199acb",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "c131e4af55cb823ec876d3b681943e05de1d242d54900cf5a6665bc2ea9cfe14",
+    "created_at": "2026-02-20T09:18:11.826178+00:00"
+  },
+  {
+    "id": "c204f818-0fd0-45ad-b9a9-46d993a48bd6",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T10:25:44.523769+00:00"
+  },
+  {
+    "id": "c4c1eaa6-9a45-468d-9755-32a98ae1f2f2",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T11:21:53.087566+00:00"
+  },
+  {
+    "id": "c559ad4d-5627-41ae-b81a-6f0f3cf6ee66",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/precision-express/express-exterior-wash",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T11:26:26.144481+00:00"
+  },
+  {
+    "id": "9e976ae1-606b-45f1-8a0c-65bfd79d71bd",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T11:26:31.404587+00:00"
+  },
+  {
+    "id": "49ea59c6-d295-48c8-a8fa-4bbb7e19dfb8",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T16:54:46.305838+00:00"
+  },
+  {
+    "id": "108c1e7b-f32b-4542-a58d-e28f05db7d82",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-20T18:34:05.906393+00:00"
+  },
+  {
+    "id": "db0a97ca-b76d-4515-b0be-fc642faf55b7",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-21T00:24:15.364985+00:00"
+  },
+  {
+    "id": "86341526-d567-42bd-a44b-63c1421208b7",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-21T00:31:10.584851+00:00"
+  },
+  {
+    "id": "0b1599b2-2923-486e-b74f-3ce28ff39e29",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-21T02:04:33.374762+00:00"
+  },
+  {
+    "id": "c098974e-3efe-4e36-b93f-31be9ed489ec",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-21T02:06:32.062937+00:00"
+  },
+  {
+    "id": "fc0a637c-f004-45af-b27e-117e60e0038c",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/signature-detail/signature-complete-detail",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-21T02:06:39.598978+00:00"
+  },
+  {
+    "id": "e9129c8a-76a5-433d-b89f-be8960736a3d",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-22T22:09:11.103651+00:00"
+  },
+  {
+    "id": "13bef2c5-450c-4e54-acdf-11ae4fb11031",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-22T22:09:11.102548+00:00"
+  },
+  {
+    "id": "2096358c-ad2a-416c-a162-c7f5c75c028a",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/precision-express/express-exterior-wash",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-22T22:21:47.811127+00:00"
+  },
+  {
+    "id": "477f7c5e-bc75-407b-885d-68d2e27c186c",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/signature-detail/signature-complete-detail",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-23T17:03:17.359033+00:00"
+  },
+  {
+    "id": "9dee0306-ba5a-4b92-b6d2-d2bcb74f5212",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-24T20:16:39.266459+00:00"
+  },
+  {
+    "id": "0e4b07bd-b3cb-4516-ac9c-675234b9de5a",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-24T22:53:53.864372+00:00"
+  },
+  {
+    "id": "4dd59384-af1e-40b0-86d1-6f941c6b6450",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T00:15:57.657851+00:00"
+  },
+  {
+    "id": "4c4a70d3-e453-4e01-840c-abda8265d802",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T01:54:35.90366+00:00"
+  },
+  {
+    "id": "a0f4c6b0-f380-45ac-8116-2f7660f5f0fd",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T02:10:46.551826+00:00"
+  },
+  {
+    "id": "89baedee-2a99-4726-8d51-e922e3acad29",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T03:21:13.956953+00:00"
+  },
+  {
+    "id": "b9b78045-fd8c-4b8d-936b-707e6145067c",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T08:49:37.859016+00:00"
+  },
+  {
+    "id": "b421bcff-c473-4588-82d3-bee81bc94875",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "43db30d5465716b13de3bdabab3acc3d362fb3481273eb434f77f60ededde8ed",
+    "created_at": "2026-02-25T18:31:58.975082+00:00"
+  },
+  {
+    "id": "bb90784c-d049-4a66-bdd0-6b69ac81c25c",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "7a4406202d4f474c9b6b0c402871dd914c5df205ae89d05305945d16bbadaf15",
+    "created_at": "2026-02-25T18:41:27.700161+00:00"
+  },
+  {
+    "id": "5de352dd-4a35-484c-aaa5-b626eb5dfc9f",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T18:44:32.02683+00:00"
+  },
+  {
+    "id": "a49d4ffd-c580-4fe6-9f54-159c1cd94dbe",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "2e3da50f28b7b0ef3eff1bf13f34e15366c60c7245d9bb3cfc86168dfc681f44",
+    "created_at": "2026-02-25T19:05:25.199937+00:00"
+  },
+  {
+    "id": "cee4b2a0-9663-476f-b1bb-992f07d8d91d",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "ae4e5070883da902f176f07c09ffdac1838cd352afcb87708f5cf22b5aba54da",
+    "created_at": "2026-02-25T19:39:33.291988+00:00"
+  },
+  {
+    "id": "1003778e-4421-4c40-a197-32fd2337cb1b",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "dee420f737dd208d30d4c0522b50906eb63580f14853177c314e38d6bc96cde4",
+    "created_at": "2026-02-25T19:46:03.760633+00:00"
+  },
+  {
+    "id": "8d034a33-01e7-4a6c-bacc-7f858fe3b11e",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T19:54:44.830548+00:00"
+  },
+  {
+    "id": "7b587b3a-e61d-46fc-943c-b4bbb9c91832",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "cb9b94123cb223dbf6506e9848ddec47dc827869cdfc23ae4cd25d3c80beec11",
+    "created_at": "2026-02-25T20:55:27.867585+00:00"
+  },
+  {
+    "id": "518587b8-6da0-4022-adb6-57fb116ef1b4",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "0d460487dca08e9d971c4a818c9e32ccd387c00fa5822c4ca0c7a9d322ad896b",
+    "created_at": "2026-02-25T21:46:07.748727+00:00"
+  },
+  {
+    "id": "581bc66e-4ae8-485c-b02a-42ed2eae5633",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "14428e721f8702a2bf0d628a5f5bf9fdc0048e7ec7621cb139c331c66502b7e5",
+    "created_at": "2026-02-25T22:25:32.619346+00:00"
+  },
+  {
+    "id": "190ce55c-df1b-4a2b-9ee3-fad829747f2c",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "d9444115a99b2046af558db24cc93184f357eb7354f3e23acb495a5f869a5087",
+    "created_at": "2026-02-25T23:37:04.170782+00:00"
+  },
+  {
+    "id": "0390907b-358e-4267-bc28-395b5cf553ba",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-25T23:37:46.601411+00:00"
+  },
+  {
+    "id": "2cbd2036-cb38-4e4a-91c0-2137d7700752",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "8ebe497d14be87ca72594131fe94d913f3b1f7de9b59de1f599f7923b771e45f",
+    "created_at": "2026-02-26T00:34:30.658124+00:00"
+  },
+  {
+    "id": "09fc671a-1d0e-41d1-92d1-6039deed65e4",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T00:58:24.461577+00:00"
+  },
+  {
+    "id": "624933c4-e6d9-438f-af62-d397a7f17022",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "4a8d8835c763e268b889879f71fc02c1ccbb6d737f8367129cc327aa4505b139",
+    "created_at": "2026-02-26T01:01:21.23165+00:00"
+  },
+  {
+    "id": "6954d44a-7d84-41fd-a1c3-8e07f7a51358",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "446b9d9f2a996ea40ebea6220d67d646607c92b8483eba84143882ab391183cc",
+    "created_at": "2026-02-26T01:08:38.128911+00:00"
+  },
+  {
+    "id": "b9eee297-ac8d-46a4-9cd1-4e0a9dfd311d",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "610165799d4d66743cb5e8882990d70860282abae256c39acc840be193f2421e",
+    "created_at": "2026-02-26T01:18:17.851633+00:00"
+  },
+  {
+    "id": "cc5035a5-900f-4f7e-b78e-4b2f6a683f81",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "bf2518490e6135fcb3a7255b515997450c5f7aa76cd55b44737bdc36bf847dc0",
+    "created_at": "2026-02-26T02:01:36.881501+00:00"
+  },
+  {
+    "id": "1077f2a9-255e-4fb2-bf4e-4202e1888ac6",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T02:06:04.169121+00:00"
+  },
+  {
+    "id": "7096434d-3f91-40e7-aeaf-6804331afcad",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "b8a48f005dc4a9421dc9530f7ec6dda2d61364c025fd8673d5b40f69067e547f",
+    "created_at": "2026-02-26T02:07:34.123436+00:00"
+  },
+  {
+    "id": "e0000b8d-08db-4e70-ab5f-5107a56d96c9",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "b38ba53afab22066980a058b1e65297a487350dcbb3786a5f6702418b3aad792",
+    "created_at": "2026-02-26T02:39:21.550888+00:00"
+  },
+  {
+    "id": "1403f588-f689-4fca-b813-26de32f403ee",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "3bc489f65bc27dcb7a4525a6f2c797ae589bda90de0d10eaeec8086bee990202",
+    "created_at": "2026-02-26T03:33:17.673093+00:00"
+  },
+  {
+    "id": "4dbafade-6c55-4e0d-aa16-10982c4a0698",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "57ecd17cb44f21680fedd606a79173c3c0c775404f5ea3cc23d9b7ee56f54199",
+    "created_at": "2026-02-26T03:43:22.677797+00:00"
+  },
+  {
+    "id": "2bc8eb7f-bb98-4096-b0ea-accddf22856c",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T03:44:35.388044+00:00"
+  },
+  {
+    "id": "abdf01de-dfff-4af4-b064-54ebd37239e0",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T04:52:51.571621+00:00"
+  },
+  {
+    "id": "0c39bfbf-4d17-438e-b134-27d8290ddf75",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "6ba838410600efaf366fe15045c934e68bbb4b7c4c9331d31f3f105e28a02057",
+    "created_at": "2026-02-26T05:06:20.383667+00:00"
+  },
+  {
+    "id": "4a966634-3450-4e1e-9f24-cde555f404da",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "1afe4e6dd31b25fbc7c1ffdad4bd8a7d5489d4183d10ab8543d82ead4b895fff",
+    "created_at": "2026-02-26T05:15:47.635984+00:00"
+  },
+  {
+    "id": "e28c7a5a-bb92-416c-883e-3f69d8c1539f",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "152901bac6727322a37ff2fe15972aa5065cc82ce3f278d91854caa8a8b0077c",
+    "created_at": "2026-02-26T05:18:06.839592+00:00"
+  },
+  {
+    "id": "4cd8e660-5438-4b35-a09c-82da8710df01",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "15e4bb9ff749b6b33a6ad84d5503dd656d5463b8cca0615224e241706b4efe6d",
+    "created_at": "2026-02-26T05:23:24.741248+00:00"
+  },
+  {
+    "id": "e3918424-5a94-4b62-b143-53b2630031af",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "f030ae68da001d219984743e270748ebd249fa01933f257d07feafc5cadc5487",
+    "created_at": "2026-02-26T05:25:23.481022+00:00"
+  },
+  {
+    "id": "2d92c62c-6201-4183-ad8d-105fe1fdb2dc",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T05:31:11.329671+00:00"
+  },
+  {
+    "id": "1c1787b0-ae32-4e41-884e-f4aeb5b5ceb0",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "c4555a50b6c56a4d4dc2428ed37cd8adc78d2f7e4b60bc7d00dbd402bc743e7f",
+    "created_at": "2026-02-26T17:19:30.297261+00:00"
+  },
+  {
+    "id": "81e48cbc-6075-4d7d-bc0b-0a372ec097d3",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T17:19:55.853878+00:00"
+  },
+  {
+    "id": "b125fa82-f0c2-4cf5-a8a9-734008d68994",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/ceramic-coatings/1-year-ceramic-shield",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T17:20:38.359887+00:00"
+  },
+  {
+    "id": "df48b2a0-1835-4ed9-bde7-389a737774fc",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T17:20:43.492508+00:00"
+  },
+  {
+    "id": "6a893f9f-a74d-4d5b-8fef-1cce8a5c77ed",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T21:25:54.025503+00:00"
+  },
+  {
+    "id": "ac921eff-4fe4-477a-9546-966f9f0e9a59",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/paint-correction-restoration/3-stage-paint-correction",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T21:26:30.129524+00:00"
+  },
+  {
+    "id": "4ad54add-5d7f-49e1-93b3-f085c6c74ea8",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-26T21:54:50.735656+00:00"
+  },
+  {
+    "id": "2ae90b7f-dadd-43c5-8abd-4632d61a6885",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T02:19:33.969955+00:00"
+  },
+  {
+    "id": "8af35714-84a1-49e3-9430-3289a7097506",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T02:19:35.807049+00:00"
+  },
+  {
+    "id": "5c1a5807-bfa0-43b3-ae85-0f165e2e8c09",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/express-detail-services/express-exterior-wash",
+    "zone_id": "sidebar",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T02:23:22.628937+00:00"
+  },
+  {
+    "id": "d2a023f2-7879-4d3a-a6ba-091339b558e7",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/interior-enhancements/hot-shampoo-extraction",
+    "zone_id": "sidebar",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T03:49:47.44169+00:00"
+  },
+  {
+    "id": "1ef1cbc4-fee8-4a03-9e78-2517b65c3237",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T03:50:17.301646+00:00"
+  },
+  {
+    "id": "102448d1-f895-49e3-ac0f-b4b2e9799eb5",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T17:04:39.637356+00:00"
+  },
+  {
+    "id": "6ec3163a-caac-4f3e-861f-a316dd36764a",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T17:38:09.873747+00:00"
+  },
+  {
+    "id": "a9533a1c-9ce9-48cf-a2dc-06f30b50b7b8",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-27T22:03:37.398402+00:00"
+  },
+  {
+    "id": "bc4a1471-38be-498b-8b1c-ade74b6281a5",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-27T22:49:55.651873+00:00"
+  },
+  {
+    "id": "fcb3a4fc-b791-4d2f-81ab-2381f742655e",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T22:50:29.465402+00:00"
+  },
+  {
+    "id": "a9c2fed3-a39d-4e6d-be2b-733a8ea4b4e1",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T22:52:55.677289+00:00"
+  },
+  {
+    "id": "00ff4115-e080-486a-8810-93b07f638c66",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/exterior-enhancements/headlight-restoration",
+    "zone_id": "sidebar",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-27T22:56:35.48384+00:00"
+  },
+  {
+    "id": "e4762624-782c-48b7-9a16-215de41a763b",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-27T23:09:50.57369+00:00"
+  },
+  {
+    "id": "4b70ca48-2887-4e55-a5f2-51d1142bc01a",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "click",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": null,
+    "created_at": "2026-02-27T23:28:00.532006+00:00"
+  },
+  {
+    "id": "8762d70a-92bf-4eef-af35-5dfa356dbe37",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/express-detail-services/express-exterior-wash",
+    "zone_id": "sidebar",
+    "ip_hash": "4138e4c416a0812bab6d5a97298145e8d599d23e6359aa84d2c88b1025efb35e",
+    "created_at": "2026-02-28T00:14:24.516123+00:00"
+  },
+  {
+    "id": "0f0db5d4-9c0f-48be-9b99-dac97dcdb5a6",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T01:57:38.054777+00:00"
+  },
+  {
+    "id": "82d90dfe-fd86-4a80-8352-d61e8bcc6420",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T01:59:09.354+00:00"
+  },
+  {
+    "id": "8ad56fe6-7a60-492e-9ebb-eccb002332ba",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T05:30:35.761765+00:00"
+  },
+  {
+    "id": "5f83092b-38a0-4127-b15a-02aaa25a86f6",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T07:47:08.50531+00:00"
+  },
+  {
+    "id": "5b1191af-289d-443f-ae77-3ef734ba68d5",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T08:01:52.231174+00:00"
+  },
+  {
+    "id": "1a4db062-3a41-414f-be2a-e095c8447ef1",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T09:26:50.009122+00:00"
+  },
+  {
+    "id": "f2d211e4-874e-474b-b46e-bf6ed8f4797b",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T10:08:10.415331+00:00"
+  },
+  {
+    "id": "f35420d6-fbe1-441e-b0e9-50ea0926f344",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "ad_placement_id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "event_type": "impression",
+    "page_path": "/services/express-detail-services/express-exterior-wash",
+    "zone_id": "sidebar",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T10:08:19.544236+00:00"
+  },
+  {
+    "id": "06a9b649-56c6-4057-bb5b-af1c18e1aeb0",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T19:38:35.428959+00:00"
+  },
+  {
+    "id": "e568cd3b-034f-4f49-8323-ed53a3e93c0d",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T20:10:38.454118+00:00"
+  },
+  {
+    "id": "f43a29dd-f710-48cb-8292-bc8e4d8e3dac",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "event_type": "impression",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-02-28T22:08:23.014406+00:00"
+  },
+  {
+    "id": "90516199-5498-4e6c-b651-321e72ceb925",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T03:13:57.084332+00:00"
+  },
+  {
+    "id": "5aed92d0-ac79-47b2-81e2-23af7df6562d",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T03:15:07.506729+00:00"
+  },
+  {
+    "id": "c7731ee0-895f-4838-8920-67913a91e661",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T06:20:13.028328+00:00"
+  },
+  {
+    "id": "65a3b472-f1a2-4ab4-bd1f-2f4b8fe5749f",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T06:20:17.106078+00:00"
+  },
+  {
+    "id": "9fb8e14e-8e07-4ddb-aed8-7f340d5003d8",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T09:51:05.96398+00:00"
+  },
+  {
+    "id": "bf6d42c3-766b-431a-bff3-361bd5df14f6",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T09:57:18.481797+00:00"
+  },
+  {
+    "id": "d3a11b0b-6a76-4aac-9eb7-1df6fcf9557a",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "ad_placement_id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "event_type": "impression",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T20:49:54.478921+00:00"
+  },
+  {
+    "id": "8194b26a-eee1-4f8d-bd0c-d5db3a08888b",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "ad_placement_id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "event_type": "impression",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "ip_hash": "eff8e7ca506627fe15dda5e0e512fcaad70b6d520f37cc76597fdb4f2d83a1a3",
+    "created_at": "2026-03-01T20:56:15.263649+00:00"
+  }
+]

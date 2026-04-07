@@ -1,0 +1,698 @@
+[
+  {
+    "id": "cb629099-2bab-4793-8bb3-bbb559b64e62",
+    "name": "Acura",
+    "is_active": true,
+    "sort_order": 1,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "c1341dfa-422f-465e-81c5-babe3ef2cd3d",
+    "name": "Alfa Romeo",
+    "is_active": true,
+    "sort_order": 2,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "a1e8f44b-735f-4d96-9c20-8165dbf8c21d",
+    "name": "Aston Martin",
+    "is_active": true,
+    "sort_order": 3,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "3b2f4a5a-4f70-449f-9c6c-f24d0fb7906f",
+    "name": "Audi",
+    "is_active": true,
+    "sort_order": 4,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "8a090d65-3076-4282-9f7e-4903029cd0dc",
+    "name": "Bentley",
+    "is_active": true,
+    "sort_order": 5,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "56a0114e-6b0f-4ee3-93e6-d1a76b4afaea",
+    "name": "BMW",
+    "is_active": true,
+    "sort_order": 6,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "ab0337e6-4558-4e8a-bb06-afafe6120996",
+    "name": "Buick",
+    "is_active": true,
+    "sort_order": 7,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "69b57ce2-e7f4-4ada-b6a6-7536614d7089",
+    "name": "Cadillac",
+    "is_active": true,
+    "sort_order": 8,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "d9e9e766-a6f3-43c4-b817-cab99852495a",
+    "name": "Chevrolet",
+    "is_active": true,
+    "sort_order": 9,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "9b865619-d44a-4ec5-8f30-64b2fd370588",
+    "name": "Chrysler",
+    "is_active": true,
+    "sort_order": 10,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "a51abc39-098c-4b2e-9da2-8f8bf8234781",
+    "name": "Dodge",
+    "is_active": true,
+    "sort_order": 11,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "8a8a178a-5316-409c-9fd6-c514d4e98dec",
+    "name": "Ferrari",
+    "is_active": true,
+    "sort_order": 12,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "ba99fbc1-2cea-4ccc-acb7-585d9d683453",
+    "name": "Fiat",
+    "is_active": true,
+    "sort_order": 13,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "00bc5c9e-1ff1-4327-ac82-0c4ff4e35e26",
+    "name": "Ford",
+    "is_active": true,
+    "sort_order": 14,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "48665e1c-cb63-43e3-adb0-6bbb6abe1742",
+    "name": "Genesis",
+    "is_active": true,
+    "sort_order": 15,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "0f35ab19-b4b7-44d8-b170-b970d7c1684b",
+    "name": "GMC",
+    "is_active": true,
+    "sort_order": 16,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "ece6c7d8-4836-4c40-9ccf-d333cdb9b0b9",
+    "name": "Honda",
+    "is_active": true,
+    "sort_order": 17,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "79461580-5928-452b-832b-6938a3c863b5",
+    "name": "Hyundai",
+    "is_active": true,
+    "sort_order": 18,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "8d73e109-6de9-4c80-a61e-d29e1fc23fa7",
+    "name": "Infiniti",
+    "is_active": true,
+    "sort_order": 19,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "c697b9ff-5b8e-4d61-a83a-988a73ecfde8",
+    "name": "Jaguar",
+    "is_active": true,
+    "sort_order": 20,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "c9f29110-1003-4080-89be-95c4d7771fce",
+    "name": "Jeep",
+    "is_active": true,
+    "sort_order": 21,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "04ea8582-3500-47e8-842d-dfa9460956a8",
+    "name": "Kia",
+    "is_active": true,
+    "sort_order": 22,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "f3168267-2130-440c-bacf-a1155db19e44",
+    "name": "Lamborghini",
+    "is_active": true,
+    "sort_order": 23,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "86bf517a-08d8-4930-ac64-ed787d45a289",
+    "name": "Land Rover",
+    "is_active": true,
+    "sort_order": 24,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "8e60eee8-ab7b-4982-94c5-0e07b80f1d99",
+    "name": "Lexus",
+    "is_active": true,
+    "sort_order": 25,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "fea57a0d-220d-41c5-9c8f-8e71b768f09c",
+    "name": "Lincoln",
+    "is_active": true,
+    "sort_order": 26,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "9ffb272d-4197-4f58-8fda-81b92245f444",
+    "name": "Lotus",
+    "is_active": true,
+    "sort_order": 27,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "f359e422-a684-4fb2-9696-5bd56399df97",
+    "name": "Lucid",
+    "is_active": true,
+    "sort_order": 28,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "48311736-2fa2-471e-a39b-f114eec20da8",
+    "name": "Maserati",
+    "is_active": true,
+    "sort_order": 29,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "d3608a67-4af9-4cf2-94fe-3e9a297cedbe",
+    "name": "Mazda",
+    "is_active": true,
+    "sort_order": 30,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "17006839-2644-44d3-9767-5af7b6268d48",
+    "name": "McLaren",
+    "is_active": true,
+    "sort_order": 31,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "2cff2704-9d5c-40cd-93b5-f5414c6c7cb5",
+    "name": "Mercedes-Benz",
+    "is_active": true,
+    "sort_order": 32,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "06726a2e-a7b1-4915-b486-ffb90503e6f4",
+    "name": "Mini",
+    "is_active": true,
+    "sort_order": 33,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "4cf65642-7d20-4395-bb4b-b3979f28fb37",
+    "name": "Mitsubishi",
+    "is_active": true,
+    "sort_order": 34,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "5bcd8c3d-bb05-4460-b967-bb31d414d0be",
+    "name": "Nissan",
+    "is_active": true,
+    "sort_order": 35,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "8126c24d-bfd9-4d06-87de-c12795932610",
+    "name": "Polestar",
+    "is_active": true,
+    "sort_order": 36,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "e431aa24-001f-4c2f-972e-d633553cbf88",
+    "name": "Porsche",
+    "is_active": true,
+    "sort_order": 37,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "56bdd8e6-502a-4972-8269-c674e49f40ba",
+    "name": "RAM",
+    "is_active": true,
+    "sort_order": 38,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "6bcdcc66-313a-403c-8cd3-58e89d2fbb79",
+    "name": "Rivian",
+    "is_active": true,
+    "sort_order": 39,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "b623e061-0bff-4fd9-b63a-5086b110026a",
+    "name": "Rolls-Royce",
+    "is_active": true,
+    "sort_order": 40,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "0b96c974-a8a1-48bc-aa8c-22551d1b3530",
+    "name": "Subaru",
+    "is_active": true,
+    "sort_order": 41,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "60fa7266-35af-4e53-ae69-ed6dfc4b135b",
+    "name": "Tesla",
+    "is_active": true,
+    "sort_order": 42,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "a509593a-1931-44ea-98ed-2e436c9130bf",
+    "name": "Toyota",
+    "is_active": true,
+    "sort_order": 43,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "e4a22c03-16c5-460a-9d81-194b78ebcf63",
+    "name": "Volkswagen",
+    "is_active": true,
+    "sort_order": 44,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "1b49983b-4cdf-4a17-b3dc-e27a4f5af852",
+    "name": "Volvo",
+    "is_active": true,
+    "sort_order": 45,
+    "created_at": "2026-02-24T06:19:43.307849+00:00",
+    "category": "automobile"
+  },
+  {
+    "id": "ea25a281-6775-4c75-a186-20634aa940b4",
+    "name": "Harley-Davidson",
+    "is_active": true,
+    "sort_order": 101,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "2f2dd12c-ddb4-4da8-8ec5-a2d9d4c8abd2",
+    "name": "Honda",
+    "is_active": true,
+    "sort_order": 102,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "8a1668e2-0dcc-486c-8df6-0bebbfaaac9a",
+    "name": "Yamaha",
+    "is_active": true,
+    "sort_order": 103,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "7356d804-c298-4c2e-8c3d-00e15b9b33f7",
+    "name": "Kawasaki",
+    "is_active": true,
+    "sort_order": 104,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "db7255ad-c356-454e-953e-09b1d53c5e4e",
+    "name": "Ducati",
+    "is_active": true,
+    "sort_order": 105,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "dbb674ef-d887-4ae2-bdba-0d534657c586",
+    "name": "BMW",
+    "is_active": true,
+    "sort_order": 106,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "8cc0ebc8-e5f7-4874-ba72-d4e618602b03",
+    "name": "Triumph",
+    "is_active": true,
+    "sort_order": 107,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "22d6a57e-65ba-4954-bd67-e8268312abc8",
+    "name": "Indian",
+    "is_active": true,
+    "sort_order": 108,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "7f887825-64ec-4bbe-a4e7-8850c47fe074",
+    "name": "Suzuki",
+    "is_active": true,
+    "sort_order": 109,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "20bd4aac-fe69-4c76-9ac4-bfdb30f1e4d2",
+    "name": "KTM",
+    "is_active": true,
+    "sort_order": 110,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "68cefad1-e9ad-4c01-bef9-c9611e83863e",
+    "name": "Aprilia",
+    "is_active": true,
+    "sort_order": 111,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "445eda44-bd92-45dc-b648-4e4f7ae68540",
+    "name": "Royal Enfield",
+    "is_active": true,
+    "sort_order": 112,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "motorcycle"
+  },
+  {
+    "id": "ece3086b-6ea8-4c73-9ab9-38c419a69af0",
+    "name": "Winnebago",
+    "is_active": true,
+    "sort_order": 201,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "560210d8-4566-4ee0-af3f-8be503ff646f",
+    "name": "Airstream",
+    "is_active": true,
+    "sort_order": 202,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "5ba8ef95-42df-40d5-aaa1-1ee1405759eb",
+    "name": "Thor",
+    "is_active": true,
+    "sort_order": 203,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "afa9d759-5178-4ca7-8e94-072a54656792",
+    "name": "Jayco",
+    "is_active": true,
+    "sort_order": 204,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "b7a78f9e-730c-48fe-a8fa-8f3d03827707",
+    "name": "Coachmen",
+    "is_active": true,
+    "sort_order": 205,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "b8d97abc-e775-4263-b43d-461ceb789922",
+    "name": "Fleetwood",
+    "is_active": true,
+    "sort_order": 206,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "ffc6d1a4-ff19-414c-b445-ce87e0bc576b",
+    "name": "Forest River",
+    "is_active": true,
+    "sort_order": 207,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "54d9026c-8927-4ee9-82e3-05a56b3ef5d4",
+    "name": "Tiffin",
+    "is_active": true,
+    "sort_order": 208,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "f2bf8a8f-567f-437a-bc1f-1f653d31004b",
+    "name": "Newmar",
+    "is_active": true,
+    "sort_order": 209,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "5e5d0c0e-6d69-4eca-ab62-ca37aaadb6d6",
+    "name": "Entegra",
+    "is_active": true,
+    "sort_order": 210,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "rv"
+  },
+  {
+    "id": "94554f25-1db1-426c-9403-3f837ba19add",
+    "name": "Boston Whaler",
+    "is_active": true,
+    "sort_order": 301,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "3b1ed73b-d6fc-4586-af21-c6c613a70090",
+    "name": "Sea Ray",
+    "is_active": true,
+    "sort_order": 302,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "b344cca9-c86d-43d8-8422-11acebc7e9e2",
+    "name": "Bayliner",
+    "is_active": true,
+    "sort_order": 303,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "7753f652-063b-42fc-8f5b-8ce722bb1740",
+    "name": "Yamaha",
+    "is_active": true,
+    "sort_order": 304,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "956c4455-ccc9-4e62-923d-fc0f14508113",
+    "name": "MasterCraft",
+    "is_active": true,
+    "sort_order": 305,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "ec7de62c-26b6-4098-9cb9-d43c0ee6eece",
+    "name": "Malibu",
+    "is_active": true,
+    "sort_order": 306,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "8562d326-67a0-4276-964d-3749e02978e4",
+    "name": "Chaparral",
+    "is_active": true,
+    "sort_order": 307,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "e26ebf6e-d21d-49e4-b19c-3be75aa48c19",
+    "name": "Grady-White",
+    "is_active": true,
+    "sort_order": 308,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "3f7c29b3-2b1c-4da7-8bca-a47866dbcf0b",
+    "name": "Tracker",
+    "is_active": true,
+    "sort_order": 309,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "630f2516-e636-4f65-9d0d-383de8f4c560",
+    "name": "Ranger",
+    "is_active": true,
+    "sort_order": 310,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "boat"
+  },
+  {
+    "id": "f5fa6566-b7b8-436d-8fa6-62055839b6b7",
+    "name": "Cessna",
+    "is_active": true,
+    "sort_order": 401,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "89fa7782-ff78-4cd5-9183-f59698d6144d",
+    "name": "Piper",
+    "is_active": true,
+    "sort_order": 402,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "6f57d79e-c521-4d44-8553-72361e0d3bb1",
+    "name": "Beechcraft",
+    "is_active": true,
+    "sort_order": 403,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "3e79fb21-5d56-4848-a045-81e728def8f3",
+    "name": "Cirrus",
+    "is_active": true,
+    "sort_order": 404,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "e0ef6f7a-a758-4312-8da5-5e295d90e085",
+    "name": "Mooney",
+    "is_active": true,
+    "sort_order": 405,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "b111a493-f165-48ed-ba5f-59d45a3d0f92",
+    "name": "Diamond",
+    "is_active": true,
+    "sort_order": 406,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "296fde01-8b59-46be-ab55-cfa247dcb789",
+    "name": "Bombardier",
+    "is_active": true,
+    "sort_order": 407,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "b4b5ac89-17d8-475f-a33d-74eb4e663154",
+    "name": "Gulfstream",
+    "is_active": true,
+    "sort_order": 408,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "62eaf4ac-2541-4219-a95a-75316f89678d",
+    "name": "Pilatus",
+    "is_active": true,
+    "sort_order": 409,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  },
+  {
+    "id": "c778edab-6333-43e0-9af9-6703c365a580",
+    "name": "Embraer",
+    "is_active": true,
+    "sort_order": 410,
+    "created_at": "2026-02-24T08:21:36.130191+00:00",
+    "category": "aircraft"
+  }
+]

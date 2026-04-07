@@ -1,0 +1,52 @@
+[
+  {
+    "id": "4c233a07-b9ab-432a-98fc-59e7c7a2c957",
+    "anthropic_batch_id": "msgbatch_01FwUkmzf6j1usMEHr8Xk8v3",
+    "status": "completed",
+    "total_requests": 424,
+    "succeeded": 241,
+    "errored": 183,
+    "created_at": "2026-04-04T20:59:09.897094+00:00",
+    "completed_at": "2026-04-04T23:23:34.372+00:00"
+  },
+  {
+    "id": "3b8ac00c-1ade-42ed-95c4-5c0a54c95bbb",
+    "anthropic_batch_id": "msgbatch_01D2c6KzfMUSCegJHRe8ZERm",
+    "status": "completed",
+    "total_requests": 183,
+    "succeeded": 41,
+    "errored": 142,
+    "created_at": "2026-04-05T01:31:37.734655+00:00",
+    "completed_at": "2026-04-05T02:34:54.033+00:00"
+  },
+  {
+    "id": "c9402cb2-4290-4c14-b948-220f5adb05bd",
+    "anthropic_batch_id": "msgbatch_01WohBgUhFNKey27k1u1Z5a4",
+    "status": "completed",
+    "total_requests": 142,
+    "succeeded": 142,
+    "errored": 0,
+    "created_at": "2026-04-05T02:51:50.646538+00:00",
+    "completed_at": "2026-04-05T03:57:19.743+00:00"
+  },
+  {
+    "id": "dc35c0f5-d927-4312-8a2f-68c85f183443",
+    "anthropic_batch_id": "msgbatch_015n3Mxq7NCamuNqGWgpTe7d",
+    "status": "completed",
+    "total_requests": 95,
+    "succeeded": 94,
+    "errored": 1,
+    "created_at": "2026-04-05T04:41:18.969638+00:00",
+    "completed_at": "2026-04-05T05:12:01.892+00:00"
+  },
+  {
+    "id": "fa0dd0f6-1d32-4903-8942-f6054c059aa0",
+    "anthropic_batch_id": "msgbatch_0152ajreksG6P1mzAp3HVjrC",
+    "status": "completed",
+    "total_requests": 1,
+    "succeeded": 1,
+    "errored": 0,
+    "created_at": "2026-04-05T05:50:06.948551+00:00",
+    "completed_at": "2026-04-05T05:58:04.576+00:00"
+  }
+]

@@ -1,0 +1,90 @@
+[
+  {
+    "id": "56313ed9-f724-4b7b-94c9-e5eae899fad7",
+    "customer_id": "afb62a9f-5c36-48d3-8d35-b3ad64d0ada1",
+    "channel": "sms",
+    "action": "opt_in",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-03-30T18:53:37.505638+00:00"
+  },
+  {
+    "id": "d3aac1dd-9d41-45eb-abff-20fd90623c40",
+    "customer_id": "998421cb-1516-47b2-9717-edf31ff779cc",
+    "channel": "sms",
+    "action": "opt_out",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-03-30T23:15:08.286447+00:00"
+  },
+  {
+    "id": "82d8ab27-f628-4fdf-9532-ecc3547cefc1",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "channel": "sms",
+    "action": "opt_in",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-04-01T01:43:41.155202+00:00"
+  },
+  {
+    "id": "b427505e-44f6-49a0-86db-f9fa93e90ed4",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "channel": "email",
+    "action": "opt_in",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-04-01T01:43:41.296842+00:00"
+  },
+  {
+    "id": "71a9a0be-6258-415a-b8b4-e662d1f261d6",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "channel": "sms",
+    "action": "opt_out",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-04-01T02:05:43.299212+00:00"
+  },
+  {
+    "id": "2f0a0468-f7e0-41a5-a044-788ac59d2c9c",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "channel": "email",
+    "action": "opt_out",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-04-01T02:05:43.506162+00:00"
+  },
+  {
+    "id": "a71a656f-a57c-4c56-b968-9fb485e558f4",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "channel": "email",
+    "action": "opt_out",
+    "source": "portal",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-04-01T03:22:29.072189+00:00"
+  },
+  {
+    "id": "0f957310-90c3-47d7-be5a-4aecc0c7b3eb",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "channel": "email",
+    "action": "opt_out",
+    "source": "manual",
+    "ip_address": null,
+    "user_agent": null,
+    "recorded_by": null,
+    "created_at": "2026-04-03T06:22:55.533694+00:00"
+  }
+]

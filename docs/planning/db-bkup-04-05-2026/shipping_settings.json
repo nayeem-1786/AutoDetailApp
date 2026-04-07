@@ -1,0 +1,48 @@
+[
+  {
+    "id": "fed1dc31-8417-431a-98ca-a77ad40475b5",
+    "shippo_api_key_live": "",
+    "shippo_api_key_test": "[REDACTED]",
+    "shippo_mode": "test",
+    "ship_from_name": "Smart Details Auto Spa",
+    "ship_from_company": "",
+    "ship_from_street1": "2021 Lomita Blvd.",
+    "ship_from_street2": "",
+    "ship_from_city": "Lomita",
+    "ship_from_state": "CA",
+    "ship_from_zip": "90717",
+    "ship_from_country": "US",
+    "ship_from_phone": "",
+    "ship_from_email": "",
+    "default_parcel_length": 8,
+    "default_parcel_width": 8,
+    "default_parcel_height": 8,
+    "default_parcel_distance_unit": "in",
+    "default_parcel_weight": 4,
+    "default_parcel_mass_unit": "lb",
+    "offer_free_shipping": false,
+    "free_shipping_threshold": 0,
+    "flat_rate_enabled": false,
+    "flat_rate_amount": 0,
+    "enabled_carriers": [
+      "fedex",
+      "ups",
+      "usps"
+    ],
+    "enabled_service_levels": [
+      "usps_priority",
+      "ups_ground",
+      "ups_next_day_air_saver"
+    ],
+    "handling_fee_type": "flat",
+    "handling_fee_amount": 250,
+    "show_estimated_delivery": true,
+    "show_carrier_logo": true,
+    "sort_rates_by": "price",
+    "local_pickup_enabled": true,
+    "local_pickup_address": "2021 Lomita Blvd., Lomita, CA 90717",
+    "local_pickup_instructions": "Available Mon-Sat 9am-5pm. Please bring your order confirmation.",
+    "created_at": "2026-02-17T18:13:10.648753+00:00",
+    "updated_at": "2026-02-17T21:56:26.988786+00:00"
+  }
+]

@@ -1,0 +1,63 @@
+[
+  {
+    "id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "name": "Standard",
+    "slug": "standard",
+    "description": "Professional layout with centered logo header, white content area, and full footer with social links. Best for transactional emails, review requests, and general communications.",
+    "structure_html": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:o=\"urn:schemas-microsoft-com:office:office\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"color-scheme\" content=\"light dark\">\n<meta name=\"supported-color-schemes\" content=\"light dark\">\n<title>{{BUSINESS_NAME}}</title>\n<!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->\n</head>\n<body style=\"margin:0;padding:0;background-color:{{BG_COLOR}};font-family:{{FONT_FAMILY}};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:{{BG_COLOR}};\">\n<tr><td align=\"center\" style=\"padding:24px 16px;\">\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;\">\n    <!-- Header -->\n    <tr><td align=\"center\" style=\"background-color:{{PRIMARY_COLOR}};padding:24px 32px;border-radius:8px 8px 0 0;\">\n      {{LOGO_HTML}}\n    </td></tr>\n    <!-- Body -->\n    <tr><td style=\"background-color:#ffffff;padding:32px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;\">\n      {{BODY_CONTENT}}\n    </td></tr>\n    <!-- Footer -->\n    <tr><td style=\"background-color:#f9fafb;padding:24px 32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;border-top:none;\">\n      {{SOCIAL_LINKS_HTML}}\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr><td align=\"center\" style=\"padding-top:16px;font-size:12px;color:#6b7280;line-height:18px;\">\n          {{FOOTER_CONTENT}}\n        </td></tr>\n      </table>\n      {{UNSUBSCRIBE_LINK}}\n    </td></tr>\n  </table>\n</td></tr>\n</table>\n</body>\n</html>",
+    "color_overrides": {},
+    "header_config": {
+      "show_logo": true,
+      "show_title": false,
+      "logo_position": "center"
+    },
+    "footer_config": {
+      "compact": false,
+      "show_social": true
+    },
+    "is_default": true,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "fd7d8cb7-a426-4963-95c2-6f3839fdeb4b",
+    "name": "Minimal",
+    "slug": "minimal",
+    "description": "Clean, borderless layout with small top-left logo and compact footer. Best for booking confirmations, stock alerts, and internal notifications.",
+    "structure_html": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:o=\"urn:schemas-microsoft-com:office:office\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"color-scheme\" content=\"light dark\">\n<meta name=\"supported-color-schemes\" content=\"light dark\">\n<title>{{BUSINESS_NAME}}</title>\n<!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->\n</head>\n<body style=\"margin:0;padding:0;background-color:{{BG_COLOR}};font-family:{{FONT_FAMILY}};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:{{BG_COLOR}};\">\n<tr><td align=\"center\" style=\"padding:24px 16px;\">\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e5e7eb;border-radius:8px;\">\n    <!-- Header -->\n    <tr><td style=\"padding:24px 32px 0;\">\n      {{LOGO_HTML}}\n    </td></tr>\n    <!-- Body -->\n    <tr><td style=\"padding:24px 32px;\">\n      {{BODY_CONTENT}}\n    </td></tr>\n    <!-- Footer -->\n    <tr><td style=\"padding:16px 32px 24px;font-size:12px;color:#6b7280;line-height:18px;border-top:1px solid #e5e7eb;\">\n      {{FOOTER_CONTENT}}\n      {{UNSUBSCRIBE_LINK}}\n    </td></tr>\n  </table>\n</td></tr>\n</table>\n</body>\n</html>",
+    "color_overrides": {},
+    "header_config": {
+      "show_logo": true,
+      "show_title": false,
+      "logo_position": "left"
+    },
+    "footer_config": {
+      "compact": true,
+      "show_social": false
+    },
+    "is_default": false,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  },
+  {
+    "id": "150357fa-f828-4d46-b255-ce2aa5e6a3f4",
+    "name": "Promotional",
+    "slug": "promotional",
+    "description": "Bold marketing layout with full-width hero area, prominent CTA styling, and large footer with social grid. Best for campaigns, win-back, seasonal, and drip sequences.",
+    "structure_html": "<!DOCTYPE html>\n<html lang=\"en\" xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:v=\"urn:schemas-microsoft-com:vml\" xmlns:o=\"urn:schemas-microsoft-com:office:office\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<meta name=\"color-scheme\" content=\"light dark\">\n<meta name=\"supported-color-schemes\" content=\"light dark\">\n<title>{{BUSINESS_NAME}}</title>\n<!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->\n</head>\n<body style=\"margin:0;padding:0;background-color:{{BG_COLOR}};font-family:{{FONT_FAMILY}};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;\">\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:{{BG_COLOR}};\">\n<tr><td align=\"center\" style=\"padding:24px 16px;\">\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"max-width:600px;width:100%;\">\n    <!-- Header -->\n    <tr><td align=\"center\" style=\"background-color:{{PRIMARY_COLOR}};padding:32px;border-radius:8px 8px 0 0;\">\n      {{LOGO_HTML}}\n      {{HEADER_CONTENT}}\n    </td></tr>\n    <!-- Body -->\n    <tr><td style=\"background-color:#ffffff;padding:40px 32px;\">\n      {{BODY_CONTENT}}\n    </td></tr>\n    <!-- Footer -->\n    <tr><td style=\"background-color:{{PRIMARY_COLOR}};padding:32px;border-radius:0 0 8px 8px;\">\n      {{SOCIAL_LINKS_HTML}}\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr><td align=\"center\" style=\"padding-top:16px;font-size:12px;color:#ffffff;line-height:18px;opacity:0.8;\">\n          {{FOOTER_CONTENT}}\n        </td></tr>\n      </table>\n      {{UNSUBSCRIBE_LINK}}\n    </td></tr>\n  </table>\n</td></tr>\n</table>\n</body>\n</html>",
+    "color_overrides": {},
+    "header_config": {
+      "show_logo": true,
+      "show_title": true,
+      "title_style": "bold",
+      "logo_position": "center"
+    },
+    "footer_config": {
+      "compact": false,
+      "show_social": true
+    },
+    "is_default": false,
+    "created_at": "2026-03-04T06:44:11.180851+00:00",
+    "updated_at": "2026-03-04T06:44:11.180851+00:00"
+  }
+]

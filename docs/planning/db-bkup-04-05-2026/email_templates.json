@@ -1,0 +1,1064 @@
+[
+  {
+    "id": "364d891b-58e8-4f0f-9d36-bb1e1c0476e1",
+    "template_key": "order_ready_pickup",
+    "category": "transactional",
+    "name": "Order Ready for Pickup",
+    "subject": "Your Order {order_number} is Ready for Pickup",
+    "preview_text": "Your order is ready! Come pick it up.",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "orp-1",
+        "data": {
+          "text": "Your Order is Ready for Pickup!",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "orp-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nGreat news! Your order **{order_number}** is ready for pickup at our location.\n\n**Pickup Location:**\n{business_address}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "orp-3",
+        "data": {
+          "align": "left",
+          "content": "{items_table}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "orp-4",
+        "data": {
+          "align": "left",
+          "content": "If you have any questions, give us a call at {business_phone}.\n\nThank you for your order!"
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "order_number",
+      "items_table",
+      "business_address",
+      "business_phone"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "58b19865-c5d8-4510-a042-581540e9d812",
+    "template_key": "order_shipped",
+    "category": "transactional",
+    "name": "Order Shipped",
+    "subject": "Your Order {order_number} Has Shipped",
+    "preview_text": "Your order is on its way!",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "os-1",
+        "data": {
+          "text": "Your Order Has Shipped!",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "os-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nYour order **{order_number}** is on its way! You can track your package using the button below."
+        },
+        "type": "text"
+      },
+      {
+        "id": "os-3",
+        "data": {
+          "url": "{tracking_url}",
+          "text": "Track Your Package",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "os-4",
+        "data": {
+          "align": "left",
+          "content": "**Carrier:** {shipping_carrier}\n**Tracking #:** {tracking_number}\n\nIf you have any questions, contact us at {business_phone}."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "order_number",
+      "tracking_url",
+      "tracking_number",
+      "shipping_carrier",
+      "business_phone"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "ab50a032-33fe-4f1f-9d8d-c688e6d82467",
+    "template_key": "order_delivered",
+    "category": "transactional",
+    "name": "Order Delivered",
+    "subject": "Your Order {order_number} Has Been Delivered",
+    "preview_text": "Your order has been delivered!",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "od-1",
+        "data": {
+          "text": "Your Order Has Been Delivered!",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "od-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nYour order **{order_number}** has been delivered. We hope you enjoy your purchase!"
+        },
+        "type": "text"
+      },
+      {
+        "id": "od-3",
+        "data": {
+          "align": "left",
+          "content": "If you have any questions or concerns about your order, don't hesitate to reach out to us at {business_phone} or {business_email}.\n\nThank you for shopping with {business_name}!"
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "order_number",
+      "business_phone",
+      "business_email",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "d821b99e-865a-4f30-9bf0-53db7cba56f7",
+    "template_key": "order_refund",
+    "category": "transactional",
+    "name": "Order Refund Processed",
+    "subject": "Refund Processed — {order_number}",
+    "preview_text": "Your refund has been processed.",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "or-1",
+        "data": {
+          "text": "Refund Processed",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "or-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nA **{refund_type} refund** of **{refund_amount}** has been processed for your order **{order_number}**."
+        },
+        "type": "text"
+      },
+      {
+        "id": "or-3",
+        "data": {
+          "align": "left",
+          "content": "The refund should appear in your account within **5–10 business days**, depending on your payment provider.\n\nIf you have any questions, please contact us at {business_phone}.\n\nThank you for your patience."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "refund_type",
+      "refund_amount",
+      "order_number",
+      "business_phone"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "02618f52-d3a9-477f-b5cc-f40e4591a6c1",
+    "template_key": "stock_alert",
+    "category": "notification",
+    "name": "Stock Alert",
+    "subject": "Stock Alert — {total_count} products need attention",
+    "preview_text": "{out_of_stock_count} out of stock, {low_stock_count} low stock",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "sa-1",
+        "data": {
+          "text": "Stock Alert",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "sa-2",
+        "data": {
+          "align": "left",
+          "content": "**{out_of_stock_count}** products are out of stock and **{low_stock_count}** are running low on inventory."
+        },
+        "type": "text"
+      },
+      {
+        "id": "sa-3",
+        "data": {
+          "align": "left",
+          "content": "{products_table}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "sa-4",
+        "data": {
+          "url": "{admin_products_url}",
+          "text": "View Products",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "sa-5",
+        "data": {
+          "align": "left",
+          "content": "Products are only re-alerted when stock levels change or after 7 days."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "out_of_stock_count",
+      "low_stock_count",
+      "total_count",
+      "products_table",
+      "admin_products_url"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "b2d43250-2893-4ee9-a7b5-5a878c94c850",
+    "template_key": "appointment_confirmed",
+    "category": "transactional",
+    "name": "Appointment Confirmed",
+    "subject": "Appointment Confirmed — {appointment_date} at {appointment_time}",
+    "preview_text": "Your appointment is confirmed!",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "ac-1",
+        "data": {
+          "text": "Appointment Confirmed",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "ac-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name}, your appointment is confirmed!"
+        },
+        "type": "text"
+      },
+      {
+        "id": "ac-3",
+        "data": {
+          "align": "left",
+          "content": "**Date:** {appointment_date}\n**Time:** {appointment_time}\n**Vehicle:** {vehicle_info}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "ac-4",
+        "data": {
+          "align": "left",
+          "content": "{items_table}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "ac-5",
+        "data": {
+          "align": "left",
+          "content": "**Total: {appointment_total}**\n\nNeed to reschedule? Call us at {business_phone}."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "appointment_date",
+      "appointment_time",
+      "vehicle_info",
+      "items_table",
+      "appointment_total",
+      "business_phone"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "bfb9179a-51a2-4a5d-9a84-8d484a1211cd",
+    "template_key": "quote_sent",
+    "category": "transactional",
+    "name": "Estimate Sent",
+    "subject": "Estimate {quote_number} from {business_name}",
+    "preview_text": "Your estimate is ready to view.",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "qs-1",
+        "data": {
+          "text": "Estimate {quote_number}",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "qs-2",
+        "data": {
+          "align": "left",
+          "content": "**Date:** {quote_date}\n**Customer:** {customer_name}\n**Vehicle:** {vehicle_info}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "qs-3",
+        "data": {
+          "align": "left",
+          "content": "{items_table}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "qs-4",
+        "data": {
+          "align": "left",
+          "content": "**Subtotal:** {quote_subtotal}\n**Tax:** {quote_tax}\n**Total: {quote_total}**"
+        },
+        "type": "text"
+      },
+      {
+        "id": "qs-5",
+        "data": {
+          "url": "{quote_link}",
+          "text": "View Your Estimate",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "qs-6",
+        "data": {
+          "align": "left",
+          "content": "This estimate is valid for {validity_days} days. Questions? Call us at {business_phone}."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "quote_number",
+      "quote_date",
+      "customer_name",
+      "vehicle_info",
+      "items_table",
+      "quote_subtotal",
+      "quote_tax",
+      "quote_total",
+      "quote_link",
+      "validity_days",
+      "business_phone",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "376537ba-340a-4578-bf94-bdddd7d55243",
+    "template_key": "job_complete",
+    "category": "transactional",
+    "name": "Job Complete — Vehicle Ready",
+    "subject": "Your Vehicle is Ready!",
+    "preview_text": "Your vehicle is looking great and ready for pickup.",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "jc-1",
+        "data": {
+          "text": "Your Vehicle is Ready!",
+          "align": "center",
+          "level": 1
+        },
+        "type": "heading"
+      },
+      {
+        "id": "jc-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name}! Great news — your **{vehicle_info}** is looking great and ready for pickup."
+        },
+        "type": "text"
+      },
+      {
+        "id": "jc-3",
+        "data": {
+          "mode": "dynamic",
+          "limit": 4,
+          "gallery_link": true,
+          "service_match": true
+        },
+        "type": "photo_gallery"
+      },
+      {
+        "id": "jc-4",
+        "data": {
+          "align": "left",
+          "content": "**Services:** {services_list}\n**Total Time:** {timer_display}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "jc-5",
+        "data": {
+          "align": "left",
+          "content": "{items_table}"
+        },
+        "type": "text"
+      },
+      {
+        "id": "jc-6",
+        "data": {
+          "url": "{gallery_url}",
+          "text": "View All Photos",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "jc-7",
+        "data": {
+          "align": "left",
+          "content": "Thank you for choosing {business_name}! We hope to see you again soon."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "vehicle_info",
+      "services_list",
+      "timer_display",
+      "items_table",
+      "gallery_url",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "ed1a3c40-631a-431e-8459-a520f23c2bda",
+    "template_key": "drip_winback_1",
+    "category": "marketing",
+    "name": "Win-Back: We Miss You!",
+    "subject": "We Miss You, {first_name}!",
+    "preview_text": "It's been a while — your vehicle deserves some love.",
+    "layout_id": "150357fa-f828-4d46-b255-ce2aa5e6a3f4",
+    "body_blocks": [
+      {
+        "id": "dw1-1",
+        "data": {
+          "text": "We Miss You!",
+          "align": "center",
+          "level": 1
+        },
+        "type": "heading"
+      },
+      {
+        "id": "dw1-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nIt's been {days_since_last_visit} days since your last visit. Your vehicle deserves some love!\n\nWhether it's a quick wash or a full detail, we're here to make your ride shine."
+        },
+        "type": "text"
+      },
+      {
+        "id": "dw1-3",
+        "data": {
+          "url": "{booking_url}",
+          "text": "Book Now",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "dw1-4",
+        "data": {
+          "align": "left",
+          "content": "We look forward to seeing you again!\n\n— The {business_name} Team"
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "days_since_last_visit",
+      "booking_url",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": false,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "a9536560-2efa-4275-bf74-5e584c21dbc8",
+    "template_key": "drip_winback_3",
+    "category": "marketing",
+    "name": "Win-Back: Last Chance Offer",
+    "subject": "Last Chance — Special Offer Inside",
+    "preview_text": "Don't miss your exclusive discount!",
+    "layout_id": "150357fa-f828-4d46-b255-ce2aa5e6a3f4",
+    "body_blocks": [
+      {
+        "id": "dw3-1",
+        "data": {
+          "text": "Last Chance!",
+          "align": "center",
+          "level": 1
+        },
+        "type": "heading"
+      },
+      {
+        "id": "dw3-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nWe really want to welcome you back! Here's a special offer just for you:"
+        },
+        "type": "text"
+      },
+      {
+        "id": "dw3-3",
+        "data": {
+          "style": "card",
+          "heading": "Welcome Back Discount",
+          "description": "Use this code on your next booking",
+          "code_variable": "coupon_code"
+        },
+        "type": "coupon"
+      },
+      {
+        "id": "dw3-4",
+        "data": {
+          "url": "{booking_url}",
+          "text": "Book Now",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "dw3-5",
+        "data": {
+          "align": "left",
+          "content": "This offer expires soon — don't miss out!\n\n— The {business_name} Team"
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "coupon_code",
+      "booking_url",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": false,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "3f2f2602-d2b8-4e1d-b644-bd81eae20fac",
+    "template_key": "drip_welcome_2",
+    "category": "marketing",
+    "name": "Welcome: Ready to Book?",
+    "subject": "Ready to Book, {first_name}?",
+    "preview_text": "Schedule your first appointment — we come to you!",
+    "layout_id": "150357fa-f828-4d46-b255-ce2aa5e6a3f4",
+    "body_blocks": [
+      {
+        "id": "wl2-1",
+        "data": {
+          "text": "Ready to Book?",
+          "align": "center",
+          "level": 1
+        },
+        "type": "heading"
+      },
+      {
+        "id": "wl2-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nJust a friendly reminder that we're here whenever your vehicle needs attention.\n\n**Why choose us?**\n- We come to your home or office\n- Professional-grade products\n- Fully insured & experienced\n- Satisfaction guaranteed"
+        },
+        "type": "text"
+      },
+      {
+        "id": "wl2-3",
+        "data": {
+          "url": "{booking_url}",
+          "text": "Schedule Now",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "wl2-4",
+        "data": {
+          "align": "left",
+          "content": "We look forward to making your ride shine!\n\n— The {business_name} Team"
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "booking_url",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": false,
+    "is_customized": false,
+    "version": 1,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "588e641e-d796-4bc3-9076-4e8e54c081a6",
+    "template_key": "booking_reminder",
+    "category": "transactional",
+    "name": "Booking Reminder",
+    "subject": "Your appointment is coming up — {service_name} on {appointment_date}",
+    "preview_text": "Don't forget your upcoming appointment",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "br-1",
+        "data": {
+          "text": "Appointment Reminder",
+          "align": "center",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "br-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nThis is a friendly reminder that your **{service_name}** appointment is scheduled for **{appointment_date}** at **{appointment_time}**.\n\nIf you need to reschedule or cancel, please contact us as soon as possible."
+        },
+        "type": "text"
+      },
+      {
+        "id": "br-3",
+        "data": {
+          "url": "{booking_url}",
+          "text": "View My Appointments",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "customer_name",
+      "service_name",
+      "appointment_date",
+      "appointment_time",
+      "business_name",
+      "business_phone",
+      "booking_url"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": true,
+    "version": 1,
+    "created_at": "2026-03-21T03:21:18.871638+00:00",
+    "updated_at": "2026-03-21T03:21:18.871638+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "2c16a06b-be4d-46e4-8357-4b6b0307884e",
+    "template_key": "booking_cancellation",
+    "category": "transactional",
+    "name": "Booking Cancellation",
+    "subject": "Your appointment has been cancelled — {service_name}",
+    "preview_text": "Your appointment has been cancelled",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "bc-1",
+        "data": {
+          "text": "Appointment Cancelled",
+          "align": "center",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "bc-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nYour **{service_name}** appointment originally scheduled for **{appointment_date}** at **{appointment_time}** has been cancelled.\n\nIf you'd like to rebook, you can schedule a new appointment anytime."
+        },
+        "type": "text"
+      },
+      {
+        "id": "bc-3",
+        "data": {
+          "url": "{booking_url}",
+          "text": "Book Again",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "customer_name",
+      "service_name",
+      "appointment_date",
+      "appointment_time",
+      "cancellation_reason",
+      "business_name",
+      "business_phone",
+      "booking_url"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": true,
+    "version": 1,
+    "created_at": "2026-03-21T03:21:18.871638+00:00",
+    "updated_at": "2026-04-04T06:38:55.487222+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "4f5842aa-4957-45be-81c4-1f46406f365d",
+    "template_key": "review_request",
+    "category": "review",
+    "name": "Review Request",
+    "subject": "How was your {service_name} experience, {first_name}?",
+    "preview_text": "We'd love your feedback — it only takes a minute",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "rr-1",
+        "data": {
+          "text": "Thank You, {first_name}!",
+          "align": "center",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "rr-2",
+        "data": {
+          "align": "left",
+          "content": "We hope you loved your recent **{service_name}** service. Your feedback helps us improve and helps other customers find us.\n\nWould you take a moment to share your experience?"
+        },
+        "type": "text"
+      },
+      {
+        "id": "rr-3",
+        "data": {
+          "url": "{google_review_link}",
+          "text": "Leave a Google Review",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "rr-4",
+        "data": {
+          "align": "left",
+          "content": "Thank you for choosing **{business_name}** — we appreciate your support!\n\nIf you have any concerns, please reach out to us directly at {business_phone} so we can make it right."
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "customer_name",
+      "service_name",
+      "google_review_link",
+      "yelp_review_link",
+      "business_name",
+      "business_phone",
+      "business_email",
+      "booking_url",
+      "loyalty_points",
+      "visit_count"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": true,
+    "version": 1,
+    "created_at": "2026-03-21T03:30:22.255064+00:00",
+    "updated_at": "2026-03-21T03:30:22.255064+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "d8a92941-0753-4e46-80ce-af73c595a824",
+    "template_key": "welcome_email",
+    "category": "transactional",
+    "name": "Welcome Email",
+    "subject": "Welcome to {business_name}!",
+    "preview_text": "Welcome aboard — we're glad to have you",
+    "layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "body_blocks": [
+      {
+        "id": "we-1",
+        "data": {
+          "text": "Welcome to {business_name}!",
+          "align": "center",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "we-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nThanks for joining us! We're excited to have you as a customer.\n\nAs a welcome gift, use the code below on your next visit."
+        },
+        "type": "text"
+      },
+      {
+        "id": "we-3",
+        "data": {
+          "style": "card",
+          "heading": "Your Welcome Offer",
+          "description": "Use this code on your next visit",
+          "code_variable": "coupon_code"
+        },
+        "type": "coupon"
+      },
+      {
+        "id": "we-4",
+        "data": {
+          "url": "{business_website}/book",
+          "text": "Book Now",
+          "align": "center",
+          "color": "primary"
+        },
+        "type": "button"
+      },
+      {
+        "id": "we-5",
+        "data": {
+          "align": "left",
+          "content": "We look forward to seeing you soon!\n\n— The {business_name} Team"
+        },
+        "type": "text"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "customer_name",
+      "business_name",
+      "business_phone",
+      "business_website",
+      "coupon_code"
+    ],
+    "segment_tag": null,
+    "is_system": true,
+    "is_customized": true,
+    "version": 1,
+    "created_at": "2026-03-21T07:05:49.180519+00:00",
+    "updated_at": "2026-03-21T07:05:49.180519+00:00",
+    "updated_by": null,
+    "coupon_id": null
+  },
+  {
+    "id": "355906fc-f958-41e6-a29d-5f034e979036",
+    "template_key": "drip_welcome_1",
+    "category": "marketing",
+    "name": "Welcome: Introduction",
+    "subject": "Welcome to {business_name}!",
+    "preview_text": "Thanks for joining — here's what we offer.",
+    "layout_id": "150357fa-f828-4d46-b255-ce2aa5e6a3f4",
+    "body_blocks": [
+      {
+        "id": "wl1-1",
+        "data": {
+          "text": "Welcome to {business_name}!",
+          "align": "center",
+          "level": 1
+        },
+        "type": "heading"
+      },
+      {
+        "id": "blk_mmzzio7i_h38ln",
+        "data": {
+          "style": "banner",
+          "heading": "Save 15% OFF your First Detail Service!",
+          "description": "",
+          "code_variable": "{coupon_code}"
+        },
+        "type": "coupon"
+      },
+      {
+        "id": "wl1-2",
+        "data": {
+          "align": "left",
+          "content": "Hi {first_name},\n\nThank you for choosing us! We're a mobile auto detailing company that comes to you.\n\nHere's what we offer:\n- **Express Wash** — Quick exterior clean\n- **Interior Detail** — Deep clean your cabin\n- **Full Detail** — Complete interior + exterior\n- **Ceramic Coating** — Long-lasting paint protection\n- **Paint Correction** — Remove swirls and scratches"
+        },
+        "type": "text"
+      },
+      {
+        "id": "blk_mn0ntzjx_7ss0f",
+        "data": {
+          "alt": "Hot Shampoo Extraction & Leather Treatment",
+          "src": "https://res.cloudinary.com/tint-world/image/upload/v1650034499/custom-assets/ADS-hero_kgg2kh.png",
+          "width": 560
+        },
+        "type": "image"
+      },
+      {
+        "id": "wl1-3",
+        "data": {
+          "url": "{booking_url}",
+          "text": "Book Your First Appointment",
+          "align": "center",
+          "color": "accent"
+        },
+        "type": "button"
+      }
+    ],
+    "body_html": null,
+    "variables": [
+      "first_name",
+      "booking_url",
+      "business_phone",
+      "business_name"
+    ],
+    "segment_tag": null,
+    "is_system": false,
+    "is_customized": false,
+    "version": 29,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-21T19:24:17.053593+00:00",
+    "updated_by": "57906e6c-ecae-4b64-a943-2e4f2950710f",
+    "coupon_id": "5511c8ac-317a-4004-a256-a9f374103158"
+  }
+]

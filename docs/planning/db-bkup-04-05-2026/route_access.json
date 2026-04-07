@@ -1,0 +1,218 @@
+[
+  {
+    "id": "6f4d98f1-929e-4a45-b7a3-adab682eaa89",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "d812611b-c7a1-4806-9432-eca11a0000ed",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/appointments",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "f254b3d0-4360-4633-899e-9fcfbc0c3ded",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/customers",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "c500db4c-7ed3-4401-b4aa-d4a0d9664edd",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/messaging",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "429fb6a5-0e19-4ebd-8fcb-a178dfff3c80",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/transactions",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "0d5bdda4-9b0a-4beb-b5f0-c4d7d71baa08",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/quotes",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "cec3871f-16f8-4f2e-84d1-d93a28c7caba",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/catalog/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "c34b09d1-6ad4-4894-a2a5-845c32b1774c",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/inventory/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "88a7e159-247e-4c76-a301-0bda81fcd05b",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/marketing/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "56b5b9eb-d573-4fbd-a1b6-85a34a354f48",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/staff",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "2c100ebc-c770-4f7f-b6d3-605331c4b155",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/staff/roles",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "418f038f-ef3a-4d5a-b56c-d9f7a9e4184f",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/settings/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "504434ba-acd1-4000-9316-9ca19ec7d606",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/admin/migration",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "60f53aba-2b90-4d29-b751-536194c88569",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c",
+    "route_pattern": "/pos",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "5769b135-4dd6-4764-a5ab-b261bd24d400",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "6e39798f-b92e-44ae-87c2-1ba08f754718",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/appointments",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "642d15a6-cc7c-4f55-97f4-84bc2fab0ddc",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/customers",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "246556c7-4b6b-4ea6-a75b-82c24b1f3a24",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/messaging",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "3557a956-2436-497a-acff-dcb273f05762",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/transactions",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "27746c52-4528-4653-b1e0-84d215554e15",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/quotes",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "7275c38c-424d-4b32-a5fe-69dc02ac67d5",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/catalog/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "7bcb7a97-5dcb-4fe2-bdf5-9bcbf60b33d9",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/inventory/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "6f975ae6-96a8-44d2-a0d3-9916c67d29ae",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/admin/marketing/*",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "c6c63a50-4e09-4860-b667-3f6c9e24efb3",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1",
+    "route_pattern": "/pos",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "cae8af81-22d1-4b4c-9515-3585918134f9",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e",
+    "route_pattern": "/admin",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "84c2a917-f2e8-41e7-8790-f858822f5553",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e",
+    "route_pattern": "/admin/appointments",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "513a6277-840e-4794-a850-a9ab5d85ceb3",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e",
+    "route_pattern": "/admin/customers",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "06bbf6fb-0597-4439-b739-4fa88ac580b1",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e",
+    "route_pattern": "/admin/messaging",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "f6242d5c-c4ad-4bdc-bdfd-23faa0faa9e5",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e",
+    "route_pattern": "/pos",
+    "created_at": "2026-02-12T04:26:48.697002+00:00"
+  },
+  {
+    "id": "2078c0e0-4c5e-4126-8784-fb81432117cf",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  },
+  {
+    "id": "076b2cad-a050-4266-9d98-5dea93639d6a",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin/appointments",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  },
+  {
+    "id": "34b42d24-f212-41ab-8752-c41f680fece7",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin/messaging",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  },
+  {
+    "id": "a037b64a-dda5-41d2-8caf-7d1e06d2fb94",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin/quotes",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  },
+  {
+    "id": "1f1a098f-5bac-4208-b6e1-07b26f3363fe",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin/customers",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  },
+  {
+    "id": "f72ab2bb-a856-4b01-909e-b82f3bd02f10",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin/catalog/*",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  },
+  {
+    "id": "93c8c9b3-8f8f-4575-abb8-f3a3f38a36e2",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc",
+    "route_pattern": "/admin/inventory/*",
+    "created_at": "2026-02-12T05:21:57.164736+00:00"
+  }
+]

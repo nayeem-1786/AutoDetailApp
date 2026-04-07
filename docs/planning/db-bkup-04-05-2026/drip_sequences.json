@@ -1,0 +1,42 @@
+[
+  {
+    "id": "192f0138-867b-49b9-8fff-7a98fb1c066a",
+    "name": "30-Day Win-Back",
+    "description": "Re-engage customers who haven't visited in 30+ days. Sends a friendly reminder, then an SMS nudge, then a special offer with coupon.",
+    "trigger_condition": "no_visit_days",
+    "trigger_value": {
+      "days": 30
+    },
+    "stop_conditions": {
+      "on_reply": false,
+      "on_booking": true,
+      "on_purchase": true
+    },
+    "nurture_sequence_id": null,
+    "is_active": false,
+    "audience_filters": null,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T20:44:35.58026+00:00",
+    "created_by": null
+  },
+  {
+    "id": "49fc9c1e-dc00-40e6-acf7-cf3d81488bc6",
+    "name": "Welcome Series",
+    "description": "Onboard new customers with a welcome email introducing services, followed by a booking reminder.",
+    "trigger_condition": "new_customer",
+    "trigger_value": {
+      "days": 1
+    },
+    "stop_conditions": {
+      "on_reply": false,
+      "on_booking": true,
+      "on_purchase": false
+    },
+    "nurture_sequence_id": null,
+    "is_active": false,
+    "audience_filters": null,
+    "created_at": "2026-03-04T07:57:52.745641+00:00",
+    "updated_at": "2026-03-04T20:45:06.906452+00:00",
+    "created_by": null
+  }
+]

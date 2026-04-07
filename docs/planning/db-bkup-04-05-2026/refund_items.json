@@ -1,0 +1,182 @@
+[
+  {
+    "id": "ffe3bd6c-f845-489e-b604-a3e17cd88fde",
+    "refund_id": "72de8364-438d-4b37-815f-358b7dc671e7",
+    "transaction_item_id": "0a1c014e-60e2-4c83-97aa-01913ae782cd",
+    "quantity": 1,
+    "amount": 1,
+    "restock": false,
+    "created_at": "2026-02-23T18:03:32.679382+00:00"
+  },
+  {
+    "id": "f9170c23-0412-44c3-be46-7c463f932a14",
+    "refund_id": "8497f879-3240-4a84-a102-3500b4b73d55",
+    "transaction_item_id": "fe411c08-835d-4dc3-9e3d-e410aab07af6",
+    "quantity": 1,
+    "amount": 1,
+    "restock": false,
+    "created_at": "2026-02-23T18:04:16.546883+00:00"
+  },
+  {
+    "id": "540db126-33b2-4a08-a195-c41e76e1a303",
+    "refund_id": "4896a1ce-b22b-4d8f-9164-2e021830f786",
+    "transaction_item_id": "2847be5c-37d1-4461-8872-a08379f7822d",
+    "quantity": 1,
+    "amount": 340,
+    "restock": false,
+    "created_at": "2026-03-15T00:52:19.634437+00:00"
+  },
+  {
+    "id": "3cf8661f-760e-4f56-838b-517a530caffb",
+    "refund_id": "4896a1ce-b22b-4d8f-9164-2e021830f786",
+    "transaction_item_id": "5914e222-f0f7-4c01-86b1-705145ae2739",
+    "quantity": 1,
+    "amount": 100,
+    "restock": false,
+    "created_at": "2026-03-15T00:52:19.634437+00:00"
+  },
+  {
+    "id": "d2363aa6-35a7-4446-bf39-2f4438befb32",
+    "refund_id": "4896a1ce-b22b-4d8f-9164-2e021830f786",
+    "transaction_item_id": "a49f37f3-f38a-4b05-835d-9ccfcb0040a1",
+    "quantity": 1,
+    "amount": 140,
+    "restock": false,
+    "created_at": "2026-03-15T00:52:19.634437+00:00"
+  },
+  {
+    "id": "61045187-1445-4164-8d9d-8ad1a719c710",
+    "refund_id": "4896a1ce-b22b-4d8f-9164-2e021830f786",
+    "transaction_item_id": "68eebc69-21da-4280-bdc4-9e177c484073",
+    "quantity": 1,
+    "amount": 100,
+    "restock": false,
+    "created_at": "2026-03-15T00:52:19.634437+00:00"
+  },
+  {
+    "id": "9c9fa113-13d6-4f41-95c9-37626f282b95",
+    "refund_id": "6e2e29fc-6df6-4e6e-b812-92d58c671947",
+    "transaction_item_id": "596eca4f-5c41-4365-968f-8b0dae0fb03e",
+    "quantity": 1,
+    "amount": 100,
+    "restock": false,
+    "created_at": "2026-03-15T01:13:43.277543+00:00"
+  },
+  {
+    "id": "ab356ec9-0805-4dbe-b58c-852fc7a4000d",
+    "refund_id": "6e2e29fc-6df6-4e6e-b812-92d58c671947",
+    "transaction_item_id": "2cc7359d-d234-4e50-bad0-690e9dbfcd01",
+    "quantity": 1,
+    "amount": 300,
+    "restock": false,
+    "created_at": "2026-03-15T01:13:43.277543+00:00"
+  },
+  {
+    "id": "6599c368-8b17-4886-bef4-797918a7aa8d",
+    "refund_id": "6e2e29fc-6df6-4e6e-b812-92d58c671947",
+    "transaction_item_id": "a1c7fa76-a686-493d-b420-15b715dfa2c2",
+    "quantity": 1,
+    "amount": 340,
+    "restock": false,
+    "created_at": "2026-03-15T01:13:43.277543+00:00"
+  },
+  {
+    "id": "20ccfbd0-a48c-4228-abbb-9aebfcb045e4",
+    "refund_id": "582ecce2-01a1-4aec-a866-00522a929b50",
+    "transaction_item_id": "c1ec2a73-d05c-4025-ae50-007fd6f0530a",
+    "quantity": 1,
+    "amount": 85,
+    "restock": false,
+    "created_at": "2026-03-15T04:23:08.356384+00:00"
+  },
+  {
+    "id": "58613c89-1d2b-41ee-98f5-f5af75b87175",
+    "refund_id": "540ed218-9d84-456d-9b74-fb7c42d14290",
+    "transaction_item_id": "20643b13-235c-4332-b915-cf509c805c29",
+    "quantity": 1,
+    "amount": 39.99,
+    "restock": false,
+    "created_at": "2026-03-15T04:30:04.63875+00:00"
+  },
+  {
+    "id": "19fcfa11-291c-4a25-9d6f-27d6ba29c298",
+    "refund_id": "ce729458-91f2-42d3-af62-6cff71269ed1",
+    "transaction_item_id": "f0f7d701-4293-4c1f-8148-0ad5ac8f709a",
+    "quantity": 1,
+    "amount": 450,
+    "restock": false,
+    "created_at": "2026-03-15T06:55:15.532069+00:00"
+  },
+  {
+    "id": "73fee765-7858-42a7-9e58-fec0acb51f65",
+    "refund_id": "ba46b255-8b13-4671-8655-b4109da3604d",
+    "transaction_item_id": "7743c92d-b236-4d29-99e2-270fa5d29b8f",
+    "quantity": 1,
+    "amount": 450,
+    "restock": false,
+    "created_at": "2026-03-15T07:17:06.528437+00:00"
+  },
+  {
+    "id": "6b0382a7-6a20-4982-bfe9-3cba627bcfa9",
+    "refund_id": "09e402cc-1088-4b88-a975-33d2eb0999a4",
+    "transaction_item_id": "c39c2c4d-b04b-4c17-a6c0-cb01795affda",
+    "quantity": 1,
+    "amount": 1.25,
+    "restock": false,
+    "created_at": "2026-03-18T21:53:05.657983+00:00"
+  },
+  {
+    "id": "5660a69d-6531-4cd4-880b-9c2508364aec",
+    "refund_id": "09e402cc-1088-4b88-a975-33d2eb0999a4",
+    "transaction_item_id": "7f1df772-388a-4fbb-bbdc-3c240c2c48c0",
+    "quantity": 1,
+    "amount": 1.25,
+    "restock": false,
+    "created_at": "2026-03-18T21:53:05.657983+00:00"
+  },
+  {
+    "id": "99786a2f-fa3d-431b-bd5a-3fcb7f240c8a",
+    "refund_id": "2d6aeaa9-c47b-4b09-9426-f98a291fd261",
+    "transaction_item_id": "a7a6db2c-9858-4b56-8c78-c36c2f8a1a24",
+    "quantity": 1,
+    "amount": 1.75,
+    "restock": false,
+    "created_at": "2026-03-18T21:53:29.938536+00:00"
+  },
+  {
+    "id": "11d01935-f0ee-4a0b-8881-07e2a96e173d",
+    "refund_id": "2d6aeaa9-c47b-4b09-9426-f98a291fd261",
+    "transaction_item_id": "2f39695b-b859-4b07-ae85-c529861caaee",
+    "quantity": 1,
+    "amount": 1.25,
+    "restock": false,
+    "created_at": "2026-03-18T21:53:29.938536+00:00"
+  },
+  {
+    "id": "dfef9dfd-2efe-477a-94fb-0d4f677d2230",
+    "refund_id": "4751232f-03fc-4539-a0b6-75e911995726",
+    "transaction_item_id": "eb6be4fe-0ee1-45ab-9dc4-0661c8399001",
+    "quantity": 1,
+    "amount": 100,
+    "restock": false,
+    "created_at": "2026-03-18T22:02:04.821958+00:00"
+  },
+  {
+    "id": "6a46e3be-ec80-49e3-bd88-52c99f45b384",
+    "refund_id": "bebaaf74-0e6c-4381-ad3e-1caaaa461666",
+    "transaction_item_id": "62a337c8-1736-4c3a-9369-b09f2af9cb9a",
+    "quantity": 1,
+    "amount": 85,
+    "restock": false,
+    "created_at": "2026-03-18T23:48:36.075402+00:00"
+  },
+  {
+    "id": "209b8541-9802-4416-9b06-fcf574a7bfda",
+    "refund_id": "9f53d876-b5c2-40c3-a1e2-dd226c02def8",
+    "transaction_item_id": "1a8b89c0-8152-4582-bcb1-0dd478a99941",
+    "quantity": 1,
+    "amount": 0.75,
+    "restock": false,
+    "created_at": "2026-03-20T22:35:51.693829+00:00"
+  }
+]

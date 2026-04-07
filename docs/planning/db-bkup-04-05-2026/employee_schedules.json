@@ -1,0 +1,142 @@
+[
+  {
+    "id": "d08d9e7a-693a-45f6-8623-ec2c5ac8497f",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 1,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "2d8ffa5b-a62c-42f3-a33b-62ef42437582",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 2,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "4183887b-8a15-4386-8851-588d3f2962e6",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 3,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "d6875e12-adcd-4948-9799-e54e78b9bdc2",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 4,
+    "start_time": "09:00:00",
+    "end_time": "21:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "236a8080-6e84-4fe6-a502-a367632f0947",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 5,
+    "start_time": "09:00:00",
+    "end_time": "23:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "98c5717b-da7f-41c1-a6e4-971814d69102",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 6,
+    "start_time": "09:00:00",
+    "end_time": "23:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "5bdcc19e-d5d4-4aba-8281-50b12301af26",
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "day_of_week": 0,
+    "start_time": "09:00:00",
+    "end_time": "23:00:00",
+    "is_available": true,
+    "created_at": "2026-03-30T01:11:12.861824+00:00",
+    "updated_at": "2026-03-30T01:11:12.861824+00:00"
+  },
+  {
+    "id": "8561ca9e-94bb-4592-a7bc-4b480630b810",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 1,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": false,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  },
+  {
+    "id": "1aa86301-4f0c-4040-b663-a431a5d5c6db",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 2,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": false,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  },
+  {
+    "id": "a8c168ec-8c23-4e36-822c-c2fea0e10595",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 3,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": false,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  },
+  {
+    "id": "ac004038-b898-4a9d-9de5-9a66f389de8e",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 4,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": false,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  },
+  {
+    "id": "85952b6f-c7e0-49cd-9c72-00a4a0a8e80d",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 5,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": true,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  },
+  {
+    "id": "b73942f6-1a7b-4919-b923-fb6cb240be6a",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 6,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": true,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  },
+  {
+    "id": "b04e016a-93c3-4445-b8ca-2ddcfa3362f4",
+    "employee_id": "065c60b2-01cb-442d-8d04-7a3503eb2777",
+    "day_of_week": 0,
+    "start_time": "09:00:00",
+    "end_time": "17:00:00",
+    "is_available": true,
+    "created_at": "2026-02-13T00:50:31.181391+00:00",
+    "updated_at": "2026-02-13T00:50:31.181391+00:00"
+  }
+]

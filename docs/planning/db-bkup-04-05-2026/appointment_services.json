@@ -1,0 +1,82 @@
+[
+  {
+    "id": "bcd44527-afb3-42c5-988e-883bdd8a44f0",
+    "appointment_id": "c9a82156-dac4-4889-b10a-29e99c0a1fef",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 75,
+    "tier_name": "sedan",
+    "created_at": "2026-04-01T00:46:39.769276+00:00"
+  },
+  {
+    "id": "cdc4f125-cc6c-4200-9a7e-ff4c3600f71f",
+    "appointment_id": "7932368e-2643-47dd-94cc-a800fd97f583",
+    "service_id": "a7921866-1311-428d-b6e5-bec516b6c312",
+    "price_at_booking": 0,
+    "tier_name": null,
+    "created_at": "2026-04-01T04:54:22.880407+00:00"
+  },
+  {
+    "id": "2982355b-fe84-4d12-956d-3f37deff0a8d",
+    "appointment_id": "9d69c697-e48a-4a9e-bec0-6314021124ea",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 75,
+    "tier_name": "sedan",
+    "created_at": "2026-04-03T06:17:28.5572+00:00"
+  },
+  {
+    "id": "74f5487c-2788-4d27-9961-eebeac3b58e5",
+    "appointment_id": "0f773637-fcfd-462d-8d15-8bc08aa92971",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 75,
+    "tier_name": "sedan",
+    "created_at": "2026-04-03T06:18:54.961587+00:00"
+  },
+  {
+    "id": "d34b044a-8e14-4490-9078-633f149a335f",
+    "appointment_id": "8ad8f9c0-7919-4c96-8884-e448cc1bf7e5",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 90,
+    "tier_name": "truck_suv_2row",
+    "created_at": "2026-04-03T06:27:27.252258+00:00"
+  },
+  {
+    "id": "b5336f51-d149-423d-baa3-48ba04dcf9bd",
+    "appointment_id": "20e4be51-ed9d-47df-a271-b16cb4f8d3d2",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 90,
+    "tier_name": "truck_suv_2row",
+    "created_at": "2026-04-03T09:20:23.474838+00:00"
+  },
+  {
+    "id": "8f5ed8bc-2a25-4512-93ed-924d217614bf",
+    "appointment_id": "9551d4e1-d900-4ce6-8f42-1eb1290059ae",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 75,
+    "tier_name": "sedan",
+    "created_at": "2026-04-03T09:24:12.226944+00:00"
+  },
+  {
+    "id": "fc78601c-5986-4517-beee-329ed2444ce7",
+    "appointment_id": "d0f6a010-181b-4e71-b56c-55fc8adc9a00",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "price_at_booking": 75,
+    "tier_name": "sedan",
+    "created_at": "2026-04-03T09:29:32.69846+00:00"
+  },
+  {
+    "id": "663a197a-c0c9-4d7f-a082-4869f152f131",
+    "appointment_id": "2f86ea04-2d94-419b-944e-38abca514602",
+    "service_id": "853b9812-7ec7-4c59-8827-279973960cbc",
+    "price_at_booking": 125,
+    "tier_name": "default",
+    "created_at": "2026-02-28T03:32:59.17698+00:00"
+  },
+  {
+    "id": "eeb9900e-c032-4393-b035-f522a5064908",
+    "appointment_id": "2e1f7d13-9020-4c07-a276-788bda0e861c",
+    "service_id": "bd3079db-0484-4fed-87b7-770d03aca2ae",
+    "price_at_booking": 210,
+    "tier_name": "Sedan",
+    "created_at": "2026-03-15T03:51:16.294346+00:00"
+  }
+]

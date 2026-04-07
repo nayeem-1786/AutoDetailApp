@@ -1,0 +1,429 @@
+[
+  {
+    "id": "3aa4c465-d94b-4273-bf82-88a07b7b88d2",
+    "name": "Analytics Test Campaign - 2",
+    "description": null,
+    "channel": "sms",
+    "status": "sent",
+    "audience_filters": {},
+    "sms_template": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now: {book_url}",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "scheduled_at": null,
+    "sent_at": "2026-02-10T21:43:26.577+00:00",
+    "recipient_count": 2,
+    "delivered_count": 2,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-10T21:40:37.048613+00:00",
+    "updated_at": "2026-02-10T21:43:26.645787+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "f5266563-e75a-4a52-9eb3-38c482e8c658",
+    "name": "Analytics Test Campaign - 3 (Copy)",
+    "description": null,
+    "channel": "sms",
+    "status": "draft",
+    "audience_filters": {},
+    "sms_template": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now: {book_url}\n\nLeave us a review on Google: {google_review_link}\nOR Yelp:{yelp_review_link}",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "scheduled_at": null,
+    "sent_at": null,
+    "recipient_count": 0,
+    "delivered_count": 0,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-11T02:15:47.821604+00:00",
+    "updated_at": "2026-02-11T03:30:52.467687+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "45660e28-3182-4620-9488-4179c4de379d",
+    "name": "Test Campaign - Analytics Check",
+    "description": null,
+    "channel": "sms",
+    "status": "draft",
+    "audience_filters": {
+      "customer_type": "enthusiast"
+    },
+    "sms_template": "Hey! Smart Details is running a special. Check it out: https://smartdetailsautospa.com/services",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "scheduled_at": null,
+    "sent_at": null,
+    "recipient_count": 0,
+    "delivered_count": 0,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-10T20:30:06.382538+00:00",
+    "updated_at": "2026-02-10T21:14:53.249303+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "eeb01fbd-ef0b-45c2-98b4-f2f0d65b6dec",
+    "name": "Test SMS",
+    "description": null,
+    "channel": "sms",
+    "status": "sent",
+    "audience_filters": {},
+    "sms_template": "Hi {first_name}, this is Jenny with Smart Details Auto Spa.\nWe are offering 30% off all services for the first 5 booked appointments!\nUse {coupon_code} when booking online at {booking_url}\nThanks and see you soon!",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": null,
+    "scheduled_at": null,
+    "sent_at": "2026-02-04T06:19:17.821+00:00",
+    "recipient_count": 2,
+    "delivered_count": 2,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-03T19:42:40.225074+00:00",
+    "updated_at": "2026-02-06T07:41:14.165699+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "714368e5-7440-4aca-b4c6-31785c817b1c",
+    "name": "Test Email Campaign",
+    "description": null,
+    "channel": "email",
+    "status": "sent",
+    "audience_filters": {},
+    "sms_template": null,
+    "email_subject": "{first_name}, your car needs your love!",
+    "email_template": "Hi {first_name}, this is Jenny with Smart Details Auto Spa.\n\nWe are offering 30% off the Express Wash for the first 5 booked appointments.\n\nUse {coupon_code} when booking online at https://smartdetailsautospa.com/booking\n\nThanks and see you soon!\n\nSmart Details Auto Spa,\ncall us, fool!",
+    "coupon_id": null,
+    "scheduled_at": null,
+    "sent_at": "2026-02-04T06:46:31.384+00:00",
+    "recipient_count": 2,
+    "delivered_count": 2,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-04T04:04:59.723801+00:00",
+    "updated_at": "2026-02-06T07:41:18.399467+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "75fc015a-cdaa-4921-85cb-380f77535cd9",
+    "name": "Test Booking Email",
+    "description": null,
+    "channel": "email",
+    "status": "sent",
+    "audience_filters": {},
+    "sms_template": null,
+    "email_subject": "Special offer just for you, {first_name}!",
+    "email_template": "Hi {first_name}, we wanted to reach out with a special offer.\n\nWe are offering {coupon_code} which will give you 30% off Ceramic for your vehicle!\n{first_name} {last_name}\n{coupon_code} {service_name}\n{vehicle_description} \n{booking_url} {book_now_url}\n\nThanks,\n{business_name}",
+    "coupon_id": null,
+    "scheduled_at": null,
+    "sent_at": "2026-02-04T07:40:00.562+00:00",
+    "recipient_count": 2,
+    "delivered_count": 2,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-04T07:29:08.02452+00:00",
+    "updated_at": "2026-02-06T07:41:25.644149+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "5eb892e1-2373-4516-8a09-2dd361fadf13",
+    "name": "Store Discount",
+    "description": null,
+    "channel": "sms",
+    "status": "draft",
+    "audience_filters": {},
+    "sms_template": "Hi {first_name}, all products in-store 40% OFF today only!\n\n",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": null,
+    "scheduled_at": null,
+    "sent_at": null,
+    "recipient_count": 0,
+    "delivered_count": 0,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-04T17:04:57.520173+00:00",
+    "updated_at": "2026-02-08T07:12:52.379839+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "3691ed71-9f34-4e20-a0c4-cabdf236f092",
+    "name": "Analytics Test Campaign - 3",
+    "description": null,
+    "channel": "sms",
+    "status": "sent",
+    "audience_filters": {},
+    "sms_template": "Hey {first_name}! Smart Details is running a special — 20% off with code {coupon_code}. Book now: {book_url}\n\nLeave us a review on Google: {google_review_link}\nOR Yelp:{yelp_review_link}",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "scheduled_at": null,
+    "sent_at": "2026-02-11T01:01:13.07+00:00",
+    "recipient_count": 2,
+    "delivered_count": 2,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-02-11T00:58:04.32618+00:00",
+    "updated_at": "2026-02-11T01:01:13.118848+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "c0abb5c7-07b9-45c1-a050-68d698c5fa8a",
+    "name": "Express Exterior Wash",
+    "description": null,
+    "channel": "email",
+    "status": "draft",
+    "audience_filters": {
+      "last_service": "666b8a89-40ec-4e1e-8728-93d660293553",
+      "customer_type": "enthusiast",
+      "days_since_visit_max": 30,
+      "days_since_visit_min": 1
+    },
+    "sms_template": "{first_name}",
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": null,
+    "scheduled_at": null,
+    "sent_at": null,
+    "recipient_count": 0,
+    "delivered_count": 0,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-15T03:17:53.060551+00:00",
+    "updated_at": "2026-03-15T03:20:56.856846+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": null,
+    "email_layout_id": null,
+    "email_preview_text": null
+  },
+  {
+    "id": "2447c647-3994-4f81-bf7b-5751ca7a537c",
+    "name": "Test Campaign",
+    "description": null,
+    "channel": "both",
+    "status": "draft",
+    "audience_filters": {
+      "customer_type": "enthusiast",
+      "days_since_visit_max": 60,
+      "days_since_visit_min": 14
+    },
+    "sms_template": null,
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "scheduled_at": null,
+    "sent_at": null,
+    "recipient_count": 0,
+    "delivered_count": 0,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-21T03:05:43.35618+00:00",
+    "updated_at": "2026-03-21T03:05:43.35618+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": [
+      {
+        "id": "blk_mmzquqcw_p349j",
+        "data": {
+          "text": "",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "blk_mmzqumak_q4k7i",
+        "data": {
+          "color": "#cccccc",
+          "style": "solid"
+        },
+        "type": "divider"
+      },
+      {
+        "id": "blk_mmzquvlu_z83nf",
+        "data": {
+          "alt": "",
+          "src": "",
+          "width": 560
+        },
+        "type": "image"
+      },
+      {
+        "id": "blk_mmzqv33o_3yna5",
+        "data": {
+          "text": "",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "blk_mmzqv4lw_ffmk7",
+        "data": {
+          "align": "left",
+          "content": ""
+        },
+        "type": "text"
+      },
+      {
+        "id": "blk_mmzqvdzs_mekon",
+        "data": {
+          "left": [],
+          "right": []
+        },
+        "type": "two_column"
+      }
+    ],
+    "email_layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "email_preview_text": null
+  },
+  {
+    "id": "172df204-4cf8-4158-8526-8dd3f1983887",
+    "name": "Test Campaign",
+    "description": null,
+    "channel": "both",
+    "status": "draft",
+    "audience_filters": {
+      "customer_type": "enthusiast",
+      "days_since_visit_max": 60,
+      "days_since_visit_min": 14
+    },
+    "sms_template": null,
+    "email_subject": null,
+    "email_template": null,
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "scheduled_at": null,
+    "sent_at": null,
+    "recipient_count": 0,
+    "delivered_count": 0,
+    "opened_count": 0,
+    "clicked_count": 0,
+    "redeemed_count": 0,
+    "revenue_attributed": 0,
+    "created_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-21T03:05:43.869197+00:00",
+    "updated_at": "2026-03-21T03:05:43.869197+00:00",
+    "auto_select_winner": false,
+    "auto_select_after_hours": null,
+    "email_body_blocks": [
+      {
+        "id": "blk_mmzquqcw_p349j",
+        "data": {
+          "text": "",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "blk_mmzqumak_q4k7i",
+        "data": {
+          "color": "#cccccc",
+          "style": "solid"
+        },
+        "type": "divider"
+      },
+      {
+        "id": "blk_mmzquvlu_z83nf",
+        "data": {
+          "alt": "",
+          "src": "",
+          "width": 560
+        },
+        "type": "image"
+      },
+      {
+        "id": "blk_mmzqv33o_3yna5",
+        "data": {
+          "text": "",
+          "align": "left",
+          "level": 2
+        },
+        "type": "heading"
+      },
+      {
+        "id": "blk_mmzqv4lw_ffmk7",
+        "data": {
+          "align": "left",
+          "content": ""
+        },
+        "type": "text"
+      },
+      {
+        "id": "blk_mmzqvdzs_mekon",
+        "data": {
+          "left": [],
+          "right": []
+        },
+        "type": "two_column"
+      }
+    ],
+    "email_layout_id": "e43f8d0f-ed75-4ce4-a77e-6988d41d8da6",
+    "email_preview_text": null
+  }
+]

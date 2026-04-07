@@ -1,0 +1,86 @@
+[
+  {
+    "id": "513792f9-735c-486e-8a94-4d2a228eaddf",
+    "customer_id": "998421cb-1516-47b2-9717-edf31ff779cc",
+    "phone": "+14243396994",
+    "action": "opt_in",
+    "keyword": "opt_in",
+    "source": "customer_portal",
+    "previous_value": false,
+    "new_value": true,
+    "notes": null,
+    "created_at": "2026-02-27T23:06:16.409108+00:00"
+  },
+  {
+    "id": "a04424c3-0e08-4a8f-be5e-97a23d16bf6b",
+    "customer_id": "afb62a9f-5c36-48d3-8d35-b3ad64d0ada1",
+    "phone": "+13237348411",
+    "action": "opt_in",
+    "keyword": "opt_in",
+    "source": "admin_manual",
+    "previous_value": false,
+    "new_value": true,
+    "notes": null,
+    "created_at": "2026-03-30T18:53:37.653461+00:00"
+  },
+  {
+    "id": "56edd56c-65f5-45a1-96af-56de567aec2c",
+    "customer_id": "998421cb-1516-47b2-9717-edf31ff779cc",
+    "phone": "+14243396994",
+    "action": "opt_out",
+    "keyword": "opt_out",
+    "source": "admin_manual",
+    "previous_value": true,
+    "new_value": false,
+    "notes": null,
+    "created_at": "2026-03-30T23:15:08.356558+00:00"
+  },
+  {
+    "id": "8b5e1202-ee63-4f48-948b-353ce5ce086e",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "phone": "+13102476682",
+    "action": "opt_out",
+    "keyword": "opt_out",
+    "source": "customer_portal",
+    "previous_value": true,
+    "new_value": false,
+    "notes": null,
+    "created_at": "2026-04-01T01:43:28.781399+00:00"
+  },
+  {
+    "id": "0c9f0a5d-edb2-4a76-a51e-65bb0276ef2d",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "phone": "+13102476682",
+    "action": "opt_in",
+    "keyword": "opt_in",
+    "source": "admin_manual",
+    "previous_value": false,
+    "new_value": true,
+    "notes": null,
+    "created_at": "2026-04-01T01:43:41.237032+00:00"
+  },
+  {
+    "id": "53b72066-e00c-44e9-9911-58360987ff4b",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "phone": "+13102476682",
+    "action": "opt_out",
+    "keyword": "opt_out",
+    "source": "admin_manual",
+    "previous_value": true,
+    "new_value": false,
+    "notes": null,
+    "created_at": "2026-04-01T02:05:43.411027+00:00"
+  },
+  {
+    "id": "9a9bcaa3-f25c-4142-a742-4a54e5d899a4",
+    "customer_id": "8510e75f-47d7-4e57-998a-fd309bd8bd9c",
+    "phone": "+13102476682",
+    "action": "opt_in",
+    "keyword": "opt_in",
+    "source": "customer_portal",
+    "previous_value": false,
+    "new_value": true,
+    "notes": null,
+    "created_at": "2026-04-01T02:06:07.025504+00:00"
+  }
+]

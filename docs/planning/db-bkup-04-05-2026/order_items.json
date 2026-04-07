@@ -1,0 +1,30 @@
+[
+  {
+    "id": "99e1eb3c-bbb1-48f6-bd55-15634ac9a2f6",
+    "order_id": "c2f90a8e-315c-4140-8539-a497bf7e5b7d",
+    "product_id": "2c5fed81-84ab-4921-a9a2-d6ea1a3f12e9",
+    "product_name": "Envy jewel polish",
+    "product_slug": "envy-jewel-polish",
+    "category_slug": "paint-correction",
+    "product_image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/2c5fed81-84ab-4921-a9a2-d6ea1a3f12e9.jpg",
+    "unit_price": 7895,
+    "quantity": 2,
+    "line_total": 15790,
+    "discount_amount": 0,
+    "created_at": "2026-02-17T10:07:57.054363+00:00"
+  },
+  {
+    "id": "4d4300da-02c7-4c19-abaf-4d7bafb8e96f",
+    "order_id": "c28a3d7d-dea2-4a31-a722-7de8e48778e4",
+    "product_id": "d00c2a24-9d72-4080-8eac-ca120569eb18",
+    "product_name": "D/A Random Orbital Polisher / 3inch",
+    "product_slug": "d-a-random-orbital-polisher-3inch",
+    "category_slug": "tools",
+    "product_image_url": "https://zwvahzymzardmxixyfim.supabase.co/storage/v1/object/public/product-images/products/d00c2a24-9d72-4080-8eac-ca120569eb18.jpg",
+    "unit_price": 18999,
+    "quantity": 1,
+    "line_total": 18999,
+    "discount_amount": 0,
+    "created_at": "2026-02-28T00:23:55.594665+00:00"
+  }
+]

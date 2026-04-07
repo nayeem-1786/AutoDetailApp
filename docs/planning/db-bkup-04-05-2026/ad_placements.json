@@ -1,0 +1,90 @@
+[
+  {
+    "id": "8949d19f-1a3e-4303-a759-0dbcf3970065",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "page_path": "/",
+    "zone_id": "above_cta",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:09:41.112641+00:00",
+    "updated_at": "2026-02-20T08:09:41.112641+00:00"
+  },
+  {
+    "id": "61cf4392-f6f0-4e2a-bf4e-1b6c6bb93a40",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "page_path": "/services/:categorySlug/:serviceSlug",
+    "zone_id": "sidebar",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:16:33.856457+00:00",
+    "updated_at": "2026-02-20T08:16:33.856457+00:00"
+  },
+  {
+    "id": "eae6bbfd-5d5d-407c-824b-cc581e6b33ef",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "page_path": "/products/:categorySlug/:productSlug",
+    "zone_id": "sidebar",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:16:46.167051+00:00",
+    "updated_at": "2026-02-20T08:16:46.167051+00:00"
+  },
+  {
+    "id": "69e82664-bd4e-4d97-b2d9-c77fb6914843",
+    "ad_creative_id": "6fb0df87-7713-471e-b8bc-119997bc2806",
+    "page_path": "/book",
+    "zone_id": "sidebar",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:33:05.922581+00:00",
+    "updated_at": "2026-02-20T08:33:05.922581+00:00"
+  },
+  {
+    "id": "304619f8-bbea-48b5-a264-17635aceeb2e",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "page_path": "/book",
+    "zone_id": "below_form",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:58:31.062179+00:00",
+    "updated_at": "2026-02-20T08:58:31.062179+00:00"
+  },
+  {
+    "id": "67d0eb7c-1e06-47e0-986e-be63811cdb0f",
+    "ad_creative_id": "dac1e79d-0536-43a9-ba52-1f04bb346cac",
+    "page_path": "/",
+    "zone_id": "between_sections_1",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:00:29.711511+00:00",
+    "updated_at": "2026-02-20T08:00:29.711511+00:00"
+  },
+  {
+    "id": "ef147aa9-06ee-47ed-8145-5a7f72474137",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "page_path": "/services",
+    "zone_id": "above_cta",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:09:50.533397+00:00",
+    "updated_at": "2026-02-20T08:09:50.533397+00:00"
+  },
+  {
+    "id": "c8440242-c893-4b2a-b4c4-1637a7575343",
+    "ad_creative_id": "e8d2c299-2426-4800-a309-7948be1a20fa",
+    "page_path": "/services/:categorySlug",
+    "zone_id": "above_cta",
+    "device": "all",
+    "priority": 0,
+    "is_active": true,
+    "created_at": "2026-02-20T08:09:57.756227+00:00",
+    "updated_at": "2026-02-20T08:09:57.756227+00:00"
+  }
+]

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "a8d7f89f-73d4-455a-b645-cc20b15337bc",
+    "message": "Happy Easter - <u>FREE SHIPPING</u> on any product of $50 or more! <u>Use Coupon Code: <b><span style=\"color: red;\">EASTER50</span></b> at checkout!</u>",
+    "link_url": null,
+    "link_text": null,
+    "placement": "top_bar",
+    "section_position": null,
+    "bg_color": "#fffb80",
+    "text_color": "#000000",
+    "scroll_speed": "normal",
+    "font_size": "base",
+    "target_pages": [
+      "products",
+      "cart",
+      "checkout"
+    ],
+    "starts_at": null,
+    "ends_at": null,
+    "is_active": false,
+    "sort_order": 1,
+    "created_at": "2026-02-19T20:54:17.023119+00:00",
+    "updated_at": "2026-02-19T20:54:17.023119+00:00",
+    "scroll_speed_value": 30,
+    "message_gap": 5
+  },
+  {
+    "id": "794ed162-a6d2-4ea4-88e8-d44f1f5132df",
+    "message": "Express Exterior Wash - $75.00",
+    "link_url": "/services/precision-express/express-exterior-wash",
+    "link_text": "Click to BOOK NOW!",
+    "placement": "top_bar",
+    "section_position": null,
+    "bg_color": "#1e3a5f",
+    "text_color": "#ffffff",
+    "scroll_speed": "normal",
+    "font_size": "base",
+    "target_pages": [
+      "home"
+    ],
+    "starts_at": null,
+    "ends_at": null,
+    "is_active": false,
+    "sort_order": 3,
+    "created_at": "2026-02-19T20:18:03.473565+00:00",
+    "updated_at": "2026-02-19T20:18:03.473565+00:00",
+    "scroll_speed_value": 14,
+    "message_gap": 5
+  },
+  {
+    "id": "bae41a3f-7f2c-4e78-bfd8-7d84f427715b",
+    "message": "Valentine's Day - FREE shipping with any purchase of $50 or more! Use Coupon Code: <span style=\"color: red;\">MYLOVE10</span>",
+    "link_url": "/products",
+    "link_text": "Learn More",
+    "placement": "top_bar",
+    "section_position": "before_footer",
+    "bg_color": "#CCFF00",
+    "text_color": "#545454",
+    "scroll_speed": "slow",
+    "font_size": "base",
+    "target_pages": [
+      "services"
+    ],
+    "starts_at": null,
+    "ends_at": null,
+    "is_active": false,
+    "sort_order": 2,
+    "created_at": "2026-02-19T18:25:40.557567+00:00",
+    "updated_at": "2026-02-19T18:25:40.557567+00:00",
+    "scroll_speed_value": 9,
+    "message_gap": 5
+  },
+  {
+    "id": "c6474b57-ec27-4c46-9736-777f4e208c65",
+    "message": "This deal is no joke — 20% off any service ends March 31st. — Don't be the fool who misses out! — Use code <span style=\"color:red;\">MARCH20</span> at checkout.",
+    "link_url": null,
+    "link_text": null,
+    "placement": "top_bar",
+    "section_position": null,
+    "bg_color": "#CCFF00",
+    "text_color": "#545454",
+    "scroll_speed": "normal",
+    "font_size": "base",
+    "target_pages": [
+      "home",
+      "services",
+      "cms_pages"
+    ],
+    "starts_at": "2026-03-01T08:00:00+00:00",
+    "ends_at": "2026-04-01T06:59:00+00:00",
+    "is_active": true,
+    "sort_order": 0,
+    "created_at": "2026-03-01T08:31:20.401658+00:00",
+    "updated_at": "2026-03-01T08:31:20.401658+00:00",
+    "scroll_speed_value": 30,
+    "message_gap": 50
+  }
+]

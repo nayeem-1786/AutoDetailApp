@@ -1,0 +1,3822 @@
+[
+  {
+    "id": "1ba6f6ba-2761-4edd-9017-68ffa4957076",
+    "permission_key": "cms.hero.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "3d1f09da-90f6-46fa-bcbb-ac267ad42431",
+    "permission_key": "customers.delete",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:03.993398+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "278ea30e-5451-4a8c-9b34-0b2f0a2a2d61",
+    "permission_key": "cms.hero.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "ed41546b-f309-4200-8c92-68daceddf0c5",
+    "permission_key": "cms.hero.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "5fb12e17-90ab-43ea-91c5-90e544d0c1a6",
+    "permission_key": "cms.hero.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "3625fa83-b974-4c44-90f3-fbbe63189001",
+    "permission_key": "cms.tickers.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "8cd2f7a7-4dbe-4ef5-a792-a7ba0138bdaf",
+    "permission_key": "cms.tickers.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "398b975a-4ec1-4948-9ca4-6b6d1e1bfa2e",
+    "permission_key": "cms.tickers.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "431fab79-af75-43ae-a076-f568125ce954",
+    "permission_key": "cms.tickers.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "592ccbbd-1b43-4c8e-b222-43ddb01a9429",
+    "permission_key": "cms.ads.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "9f98577c-547e-4763-b9a1-1e3f19b39119",
+    "permission_key": "cms.ads.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "bf2143a1-179f-44f6-a6c2-4a4fe80187ac",
+    "permission_key": "cms.ads.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "1ac8a0e8-d2cd-4ae2-b1fa-c42a4870b86e",
+    "permission_key": "cms.ads.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "eacc8793-b72f-4ae0-9998-dd7a5e33d5bc",
+    "permission_key": "cms.themes.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "1c6cabd3-8c2e-4172-bd95-28aa56ca65a9",
+    "permission_key": "cms.themes.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "03256940-0740-4634-9cc5-961fdaa2f1d2",
+    "permission_key": "cms.themes.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "07ac1d61-751a-4c07-a891-dcf5ca76df0e",
+    "permission_key": "cms.themes.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "33722b29-364e-409a-b3cf-cb81b9862ecb",
+    "permission_key": "cms.about.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "4274020a-efca-420c-b3a2-d6b46fe98d65",
+    "permission_key": "cms.about.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "aa4810ba-3068-442d-97c0-04d3511f3d54",
+    "permission_key": "cms.about.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "785ec3a9-b76f-4518-9383-dc986ab7bca8",
+    "permission_key": "cms.about.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1406e6a5-4bf3-4a6b-900f-256aa9685a9d",
+    "permission_key": "cms.catalog_display.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "a0fb6385-0ddc-494c-8fba-1beb298e0b25",
+    "permission_key": "cms.catalog_display.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "1c1b51cc-6e28-4323-b6e6-f76a43250a81",
+    "permission_key": "cms.catalog_display.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "9bfc723b-524e-4bb1-8dab-8c48a0bcbcb7",
+    "permission_key": "cms.catalog_display.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "eff627ea-5c47-49a0-b3db-56b28f72b5a3",
+    "permission_key": "cms.seo.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "54df081f-e8a1-4f6a-b67c-3d9ce0c0ae51",
+    "permission_key": "cms.seo.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "aa9ad506-5d14-4175-b42a-adf1b6653b4c",
+    "permission_key": "cms.seo.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "a930ecac-1e4c-4e33-b424-81358566ccfa",
+    "permission_key": "cms.seo.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-14T07:29:53.231642+00:00",
+    "updated_at": "2026-02-14T07:29:53.231642+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "966087fe-59c7-40c9-81ad-01fc5669b418",
+    "permission_key": "services.edit",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:14.226432+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "e5fbe5e5-2bb1-4d7d-8eea-263fc1fef2d6",
+    "permission_key": "cms.pages.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-16T20:54:37.697567+00:00",
+    "updated_at": "2026-02-16T20:54:37.697567+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "4cee96b3-6b44-42ea-9255-145a54e577b6",
+    "permission_key": "cms.pages.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-16T20:54:37.697567+00:00",
+    "updated_at": "2026-02-16T20:54:37.697567+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "d1ca17f1-53e0-440a-bf86-469973632e6f",
+    "permission_key": "cms.pages.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-16T20:54:37.697567+00:00",
+    "updated_at": "2026-02-16T20:54:37.697567+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "3a0bdb6c-52ea-4daf-a919-bf85f70a7bd6",
+    "permission_key": "cms.pages.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-16T20:54:37.697567+00:00",
+    "updated_at": "2026-02-16T20:54:37.697567+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "da0c0a89-a3c5-4fce-a586-c450849c4a85",
+    "permission_key": "pos.jobs.cancel",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-13T01:22:59.972012+00:00",
+    "updated_at": "2026-03-15T01:12:40.594954+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "3b0abc42-1495-4a2f-862d-ba326bced782",
+    "permission_key": "pos.jobs.cancel",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-13T01:22:59.972012+00:00",
+    "updated_at": "2026-02-13T01:22:59.972012+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "05a5be30-0ed0-4263-afcb-f742a9f7d6bc",
+    "permission_key": "pos.jobs.cancel",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-13T01:22:59.972012+00:00",
+    "updated_at": "2026-02-13T01:22:59.972012+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a6e49ec0-c54f-43b4-8f57-3545197d0fbe",
+    "permission_key": "pos.jobs.cancel",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-13T01:22:59.972012+00:00",
+    "updated_at": "2026-02-13T01:35:22.974398+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "1c6210b5-9cdb-4c81-9dc0-13ec68775ca2",
+    "permission_key": "inventory.adjust_stock",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:15.869996+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "75dc9b02-4dca-42b5-83dd-05dff16374da",
+    "permission_key": "orders.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "40b1b2ff-1888-45b5-b54d-794529e419a8",
+    "permission_key": "orders.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "79511e1a-10f1-431c-b6b8-485c0301c76d",
+    "permission_key": "orders.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "bedd4f60-11d3-49eb-b3e5-c213b6589ceb",
+    "permission_key": "orders.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "6ab637b9-fbf5-46cc-b9db-ba3370103ee5",
+    "permission_key": "orders.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "37eee119-dc7e-49b5-af25-3a45af4ddbfd",
+    "permission_key": "orders.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "7aa26a1c-ee4b-4f3a-b84e-54e80cdbfffc",
+    "permission_key": "orders.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "40b7192e-05c5-4dff-a641-7f3c51b8ac23",
+    "permission_key": "orders.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-17T18:50:13.813546+00:00",
+    "updated_at": "2026-02-17T18:50:13.813546+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "642df440-ad84-4f1d-ba44-6acd8977ad73",
+    "permission_key": "photos.upload",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:32.57259+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "488feed7-068e-4e2e-b0a3-0fed7b32d887",
+    "permission_key": "settings.roles_permissions",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:26.103048+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "a0c5a102-d536-4836-8e02-6b03bd4c7b83",
+    "permission_key": "pos.jobs.cancel",
+    "role": null,
+    "employee_id": "122f1bf6-1dba-45ad-b875-8b4c74b082d8",
+    "granted": false,
+    "created_at": "2026-02-21T02:46:39.618214+00:00",
+    "updated_at": "2026-02-21T02:46:46.109568+00:00",
+    "role_id": null
+  },
+  {
+    "id": "a4c2d8a7-b602-4148-9353-ce7bf8f60c7d",
+    "permission_key": "pos.override_prerequisites",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-03-15T04:50:11.136715+00:00",
+    "updated_at": "2026-03-15T04:50:11.136715+00:00",
+    "role_id": null
+  },
+  {
+    "id": "2caa4fa8-9ce2-45f5-92b6-5b79fd73ee2d",
+    "permission_key": "pos.override_prerequisites",
+    "role": "admin",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-15T04:50:11.136715+00:00",
+    "updated_at": "2026-03-15T04:50:11.136715+00:00",
+    "role_id": null
+  },
+  {
+    "id": "ab154dce-a9cf-4d5b-85b7-21738eece330",
+    "permission_key": "pos.override_prerequisites",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-15T04:50:11.136715+00:00",
+    "updated_at": "2026-03-15T04:50:11.136715+00:00",
+    "role_id": null
+  },
+  {
+    "id": "5d84e8f6-909b-4f33-8d3c-98bf2304b496",
+    "permission_key": "pos.override_prerequisites",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-15T04:50:11.136715+00:00",
+    "updated_at": "2026-03-15T04:50:11.136715+00:00",
+    "role_id": null
+  },
+  {
+    "id": "86ddcffa-f302-46e6-a441-8adb094d2ce7",
+    "permission_key": "customers.merge",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "158a08eb-b8b1-420f-bf4d-4eda299bb3ec",
+    "permission_key": "customers.merge",
+    "role": "admin",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "69e37817-f450-4a3a-be74-f68d5698b3ad",
+    "permission_key": "customers.merge",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "79e882c0-d061-450c-84a6-31029e9a9e71",
+    "permission_key": "customers.merge",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "219bde2b-3f18-4c49-877b-7e917e3c476d",
+    "permission_key": "reports.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "23e4d372-b4b1-477c-8272-823a7fb35262",
+    "permission_key": "reports.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a57730ce-9614-44f5-a6fa-4333475d1272",
+    "permission_key": "reports.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "e506cf17-4dd0-4511-b07e-9a64757728b8",
+    "permission_key": "reports.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-03-24T15:48:00.309148+00:00",
+    "updated_at": "2026-03-24T15:48:00.309148+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "43dc898b-ccc3-456c-8791-50a180f4e5bb",
+    "permission_key": "marketing.two_way_sms",
+    "role": null,
+    "employee_id": "4d82326f-d180-4df6-ba5f-df9d2fae2074",
+    "granted": true,
+    "created_at": "2026-02-12T07:24:23.675262+00:00",
+    "updated_at": "2026-02-13T01:35:17.642591+00:00",
+    "role_id": null
+  },
+  {
+    "id": "57ea3522-7f8b-4720-859b-f5491dc657c0",
+    "permission_key": "admin.photos.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-03-14T22:44:03.423322+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "0571cb11-d7ba-4d21-a16c-836db99fb6c8",
+    "permission_key": "customers.adjust_loyalty",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.25106+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "fab79c82-bab1-4aa1-9a5d-6546fba83423",
+    "permission_key": "admin.photos.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "6560cb06-783f-4ab4-bcdb-7ac7ac22d15c",
+    "permission_key": "admin.photos.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d7945978-ad75-436f-9395-7d30f1f80ebc",
+    "permission_key": "admin.photos.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "841e4821-9ce2-44c9-8bbb-86938eeb9c0b",
+    "permission_key": "admin.photos.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "73c8da18-1f99-4c38-97fc-6129ceba7898",
+    "permission_key": "admin.photos.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "81feda00-cac9-4538-9519-bb61f2b43a92",
+    "permission_key": "admin.photos.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "ee3895cb-b55a-4f2d-a588-d05322de5eed",
+    "permission_key": "admin.photos.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "fdfdbbff-3558-4258-bcd8-c8e150cc26ae",
+    "permission_key": "pos.jobs.flag_issue",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "83376094-e668-48e6-b349-033d267b7487",
+    "permission_key": "pos.jobs.flag_issue",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "f5a98d63-0733-49f1-954b-ea23fa5ccf32",
+    "permission_key": "pos.jobs.flag_issue",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "64d21cae-cea1-4d00-9afa-f225dbeb6015",
+    "permission_key": "pos.jobs.manage",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "c9b0d1e6-113f-49cd-bf16-8a3598f4df67",
+    "permission_key": "pos.jobs.manage",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "3f8e6fb3-8c2e-42cd-bb86-d754b03ffc99",
+    "permission_key": "pos.jobs.manage",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "41058596-d064-4c53-8e65-04eff8289a76",
+    "permission_key": "pos.jobs.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "b7bce7d7-7a14-4e42-9b26-0d489f7b2e85",
+    "permission_key": "pos.jobs.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "d8ec9a0c-424f-4566-8fd1-d7473436062c",
+    "permission_key": "pos.jobs.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "e59acd6a-bce3-480a-b61a-8ae91362f374",
+    "permission_key": "pos.jobs.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-12T19:12:49.541089+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "44b8ed30-eba2-4d73-a6b1-63e71cf9937a",
+    "permission_key": "pos.jobs.flag_issue",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-13T01:35:23.301761+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d6a05635-67bd-4f3f-a4b0-ef6fdfd861a6",
+    "permission_key": "pos.jobs.manage",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T19:12:49.541089+00:00",
+    "updated_at": "2026-02-13T01:35:26.222781+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "f108b939-1a49-477e-b215-8aaf61dd7ef3",
+    "permission_key": "pos.void_transactions",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T08:29:08.950413+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "ccbb4f32-6960-4f5c-8334-b9cc72468615",
+    "permission_key": "pos.end_of_day",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T08:29:09.263926+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "a68e2c30-420a-4a64-b0db-2310e14110c0",
+    "permission_key": "pos.issue_refunds",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-15T01:11:41.120162+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "0e928191-7521-44d6-9716-864da8f403a3",
+    "permission_key": "pos.apply_coupons",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:35.009721+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "a2b8373c-00db-466e-bde4-8d396d5f2c15",
+    "permission_key": "pos.open_close_register",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T08:29:07.126786+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d630d443-66b2-4258-96e9-58bfdbfc2566",
+    "permission_key": "pos.apply_coupons",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T08:29:07.707715+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "9f238577-1123-4d95-97bf-27aff5d6eae3",
+    "permission_key": "pos.open_close_register",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:34.547779+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "b3a5aba0-eab8-42c0-8116-bd2f6bca7102",
+    "permission_key": "pos.create_tickets",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:34.675246+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1ad2c39d-edf3-46d4-8cbe-8f2830592e00",
+    "permission_key": "pos.apply_loyalty",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:35.140772+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "608d45ef-0b6f-4c26-940e-8d06e0f65eba",
+    "permission_key": "pos.add_items",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:34.801843+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1d0087b6-af1f-4060-ab1f-b1c8c95c4b39",
+    "permission_key": "customers.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:03.570648+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "7702fb8d-1018-4afd-b165-5130ecc490ec",
+    "permission_key": "customers.create",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:03.730486+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "c12e7722-c37a-4932-8d9c-0018f1cf651d",
+    "permission_key": "customers.edit",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:03.861509+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "7c0f8f81-1d76-4146-a944-95bb38153929",
+    "permission_key": "pos.process_card",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:35.273868+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "31531927-129a-485e-8b26-f1111dc607f8",
+    "permission_key": "pos.process_cash",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:35.470331+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "968d7e8d-004d-4086-8dbf-03a2e1a85f0c",
+    "permission_key": "pos.process_split",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:35.601047+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "eefc3105-e36e-48f7-8cfa-5b1472424c24",
+    "permission_key": "pos.open_close_register",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "e0f4489c-9895-4ecb-bf78-56fc46afcca7",
+    "permission_key": "pos.create_tickets",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "9735e595-d4e3-42b3-844d-20133ee1f91d",
+    "permission_key": "pos.add_items",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "1db3d324-6ec8-4e71-a304-babce773bf53",
+    "permission_key": "pos.apply_coupons",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "148fd45e-1a38-442d-9b29-26d57a68d3c1",
+    "permission_key": "pos.apply_loyalty",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "b6337ee6-3d23-4366-950f-1187f80848ee",
+    "permission_key": "pos.process_card",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "e836614f-d1c2-43f9-bf95-b518e9a327df",
+    "permission_key": "pos.process_cash",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "c184be65-0f5f-49df-a9dc-63dc6c47d896",
+    "permission_key": "pos.process_split",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "443b0c3b-6dbb-4c47-8e7b-d47b2ed18c20",
+    "permission_key": "pos.issue_refunds",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "f281bb06-db4b-4509-bf05-864acf92f64b",
+    "permission_key": "pos.void_transactions",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "5e6d5413-fd05-4cca-a438-ed7618958944",
+    "permission_key": "pos.manual_discounts",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "3ca86ec9-4270-47bc-abe7-b50e77b7a50d",
+    "permission_key": "pos.end_of_day",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "741df058-3b9e-41ef-a899-963c928c50e9",
+    "permission_key": "customers.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "0b9f7385-904f-4ffa-b156-b5bac74ebb2f",
+    "permission_key": "customers.create",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "97163ff7-163f-4459-aa51-18021797d0d1",
+    "permission_key": "customers.edit",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "5b9182d1-f06f-44dd-8519-6d0f7d9c2a8c",
+    "permission_key": "pos.process_cash",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:21.553612+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a30fa65f-c4e4-48d0-850e-3bec37248eea",
+    "permission_key": "pos.discount_override",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-14T22:43:52.31314+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "528cd689-5e54-47b8-8399-41c0384d337d",
+    "permission_key": "pos.add_items",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:38:23.181766+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "63db36ec-7fe4-4d10-bde0-bf598d0482fe",
+    "permission_key": "pos.process_split",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:21.693714+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "76f75e8e-37f0-4245-92f1-cc1a43e42988",
+    "permission_key": "pos.manual_discounts",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:21.823927+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "4a752e40-f7b3-4c52-8c27-5dc2178f4924",
+    "permission_key": "pos.manual_discounts",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-14T22:47:08.695789+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "ba199a59-9281-461a-9785-99d8027977ec",
+    "permission_key": "pos.create_tickets",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:37:29.395218+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "f92de2f1-62af-4aed-a95e-07c7ca539feb",
+    "permission_key": "pos.process_card",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:38:52.758655+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "af16fa6d-f032-489f-a5cd-41d22fb50442",
+    "permission_key": "pos.end_of_day",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:36.337914+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "d27847e9-94ea-4b0c-9cc6-fb18dfd2cf4e",
+    "permission_key": "customers.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:39.257406+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "0b74dcd9-1e22-485b-a22c-00af534d8fca",
+    "permission_key": "pos.apply_loyalty",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T08:29:07.845544+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "f15b7d4f-6d95-4ebd-948a-0a59e7fa309d",
+    "permission_key": "pos.process_split",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:38:55.865648+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "4ef8b9a5-ca21-4051-a1c9-a3f2eaefa6ec",
+    "permission_key": "pos.process_cash",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:38:44.189464+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "3cfc98be-9f92-4a37-af22-a367dedfeaa6",
+    "permission_key": "pos.issue_refunds",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:22.135981+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "35f30b11-6077-451c-9f22-53e2efade980",
+    "permission_key": "customers.create",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:39.39049+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "fe8ada14-f073-41cf-8d4a-120917a803e7",
+    "permission_key": "marketing.lifecycle_rules",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:52.203803+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "feef9c1a-8981-4e8b-b2e2-9c81c3f5717c",
+    "permission_key": "pos.manual_discounts",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:41:20.962811+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "0c632b8d-40ef-4f59-8093-b4ea22899fa1",
+    "permission_key": "pos.void_transactions",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:22.275976+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "26ab7ae4-1200-4457-b737-cfd7603f5258",
+    "permission_key": "pos.end_of_day",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:22.432081+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "5ba09e1b-d37f-4e81-a268-2dd4e3c857d2",
+    "permission_key": "pos.apply_coupons",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:35.510025+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "1a5df3c1-4d12-4503-94a2-6b2779715639",
+    "permission_key": "customers.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.171942+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "2490b10a-9a60-4808-81ea-986e20c15960",
+    "permission_key": "customers.create",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.298143+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "96bbee58-4aac-4d7c-a8f0-5bba67a11bd0",
+    "permission_key": "pos.open_close_register",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:20.644896+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "763c0430-f9c3-438d-99e4-90719a1f66e7",
+    "permission_key": "pos.create_tickets",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:20.784439+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "e821c955-d002-42e9-bf89-c2a34ac67d5c",
+    "permission_key": "pos.add_items",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:20.912404+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a3fb62dc-94e5-4c10-9b19-d46cd67b03f1",
+    "permission_key": "customers.edit",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.433322+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "82663b35-bf32-403d-becb-5b4bd617e93b",
+    "permission_key": "pos.apply_loyalty",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:21.234783+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "335bd3b7-a947-4e5e-b7a2-6db35285e35c",
+    "permission_key": "pos.process_card",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:21.373359+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "be632eb9-a431-4918-a36f-e9f7475dae66",
+    "permission_key": "pos.discount_override",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-14T22:42:23.72303+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "f9046c69-e6f2-4448-9e0c-239a03b729cc",
+    "permission_key": "pos.void_transactions",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-15T01:11:59.09544+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "6aaec92e-e60a-49ec-967c-ea25012d77c2",
+    "permission_key": "pos.issue_refunds",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-15T01:13:13.353504+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "03ef0490-1b58-4c1e-a37c-5b2062dbe12d",
+    "permission_key": "pos.discount_override",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-14T22:42:23.72303+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "308cd568-f342-4c0d-a884-523ebcd93f15",
+    "permission_key": "pos.discount_override",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-14T22:42:23.72303+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "370556b8-b9ed-4f77-b872-1f10659e5f40",
+    "permission_key": "customers.delete",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "28229903-b498-4ecc-8947-807a1f5d42b4",
+    "permission_key": "customers.view_history",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "9c86c2c2-7ad9-4adb-9af9-23676321284f",
+    "permission_key": "customers.view_loyalty",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "8417defe-a862-416f-bd69-5af158797f4a",
+    "permission_key": "customers.adjust_loyalty",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "4f73c957-6f2a-4424-8c1f-871b3dc438bd",
+    "permission_key": "customers.export",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "8ac079a7-5f79-4c3f-ab82-64a785914f9e",
+    "permission_key": "appointments.view_today",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "6b37c227-97c4-4d64-81e7-f71497c9ceae",
+    "permission_key": "appointments.view_today",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "1df1c8f1-be71-4584-bc38-46fadd55569f",
+    "permission_key": "appointments.view_calendar",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "17954082-dfec-4200-9468-8ed88d6b9c63",
+    "permission_key": "appointments.view_calendar",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "17880d1e-ce16-413c-a7b3-1b03c6058c3a",
+    "permission_key": "appointments.create",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "7409f993-356f-4d38-868f-4fc13e0efe43",
+    "permission_key": "appointments.create",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "ea856898-5990-46b0-9983-41cf8538d5c6",
+    "permission_key": "appointments.reschedule",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "5e2f54af-5f5a-41de-825d-feffbf8bc214",
+    "permission_key": "appointments.reschedule",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a2807798-63fa-4370-88ba-e4ed6f5b1d73",
+    "permission_key": "appointments.cancel",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "70bf36e5-eaa6-4a0c-a506-bbb37af6ae7d",
+    "permission_key": "appointments.cancel",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "39d39c04-300d-4138-900d-804c88b0d62f",
+    "permission_key": "appointments.waive_fee",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "142e9410-4922-4ced-bcb1-fa7969ccddcb",
+    "permission_key": "appointments.waive_fee",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "6271bd6e-c6bc-4ed0-aa46-fac49078be1f",
+    "permission_key": "appointments.update_status",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "cc65d46e-d5b4-4a7f-a6ca-5b0fcb6b058d",
+    "permission_key": "appointments.update_status",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "02dc9749-5d78-42bc-9380-4203f8cd897d",
+    "permission_key": "appointments.add_notes",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "71263828-2685-43cd-a94b-eb761dbf6ab3",
+    "permission_key": "appointments.add_notes",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "393729df-600f-4deb-9884-ac5cb79624e9",
+    "permission_key": "appointments.manage_schedule",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "2add6e19-89ee-47ee-9f56-d2f087a02a56",
+    "permission_key": "appointments.manage_schedule",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "71096c48-3d8a-4027-92d3-cdef3c6e3f0d",
+    "permission_key": "products.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "e91e86df-8cd4-4c31-a736-7ad7846e1987",
+    "permission_key": "products.edit",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "64233886-16eb-46d9-be9f-03c83ff4109c",
+    "permission_key": "products.delete",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "fcdf31c4-e206-400a-b6ff-b56410ee42a6",
+    "permission_key": "services.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "dcb2d125-76a7-47bf-9973-54fa20514d05",
+    "permission_key": "services.edit",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "bd80a9d0-7e4a-4a25-8f57-fbc436fe0e93",
+    "permission_key": "customers.adjust_loyalty",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:04.491292+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d088bd09-9508-47c8-a160-79fdc2fe180c",
+    "permission_key": "customers.export",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:04.629457+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "b9cf3801-be5c-46d0-9ade-73bce70fb7d4",
+    "permission_key": "appointments.view_today",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.021971+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "fc921669-5459-4b2a-91fd-f341fbabdd30",
+    "permission_key": "customers.view_history",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:04.120438+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "dbe40378-be15-4d24-9561-e43dc6641db7",
+    "permission_key": "customers.view_loyalty",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:04.34918+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "df04deec-acb0-4b01-80c7-dc5133f46d92",
+    "permission_key": "appointments.view_calendar",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.165123+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "ffb21cfe-ecf1-4cd8-aa7c-17c24ba4165f",
+    "permission_key": "appointments.create",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.293946+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "afcdf943-2ea1-4f11-8ac3-f0b3b27d6fc9",
+    "permission_key": "appointments.reschedule",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.45794+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "cc6a8e81-ef05-4ab8-b9bc-e8aed9c18feb",
+    "permission_key": "appointments.cancel",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.582991+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "501ab741-db75-4ff0-8d41-697cd6474a69",
+    "permission_key": "appointments.waive_fee",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.723443+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "252beb88-1c75-47dc-b632-0484dcd399e0",
+    "permission_key": "appointments.update_status",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:08.873635+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "77635b12-f3a7-4c33-ba7b-854b79df1485",
+    "permission_key": "appointments.add_notes",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:09.053529+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "35a2f1c1-7157-4e50-bfee-cbcd9ec6c70b",
+    "permission_key": "appointments.manage_schedule",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:09.197094+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "6cbe1cea-41fa-403b-b8f7-7ac60c7d73e9",
+    "permission_key": "products.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:13.606856+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "f1e457eb-b9e7-4698-bbb0-d2ce7c8c40a1",
+    "permission_key": "products.edit",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:13.751475+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "4996d152-9b52-44c6-b168-7ce23443bbf6",
+    "permission_key": "products.delete",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:13.877564+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "37e6aecd-5b0f-420f-8666-2b9800e66c3f",
+    "permission_key": "services.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:14.009529+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d85aed8f-844f-4708-ae54-eb1513ba3ca1",
+    "permission_key": "customers.view_loyalty",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.076095+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "89c3899d-5dda-4c40-8b2c-4de1bf3bda84",
+    "permission_key": "appointments.view_today",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.23674+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "f01a4c9a-1595-42ec-a6c0-e7b5abfab621",
+    "permission_key": "appointments.create",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.511798+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "28af618f-f0b5-4431-8672-595f01ff335f",
+    "permission_key": "appointments.view_calendar",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.382068+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "a335a020-40a6-40a1-ab1d-0847c34eba9b",
+    "permission_key": "customers.export",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.434781+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "719f10f5-6349-4c1f-83d2-3c035511529d",
+    "permission_key": "appointments.reschedule",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.717019+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "de8fd885-d75b-4300-9747-b3f0df0f3932",
+    "permission_key": "appointments.cancel",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.839229+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "afc314be-207e-4333-bc69-c31da5f78be5",
+    "permission_key": "appointments.waive_fee",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:40.958147+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "de4b7368-5c6b-4ea5-9c7e-706639048cf2",
+    "permission_key": "appointments.update_status",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:41.077464+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "595cab17-f3b6-4fb4-b68c-77bc2005bd9b",
+    "permission_key": "appointments.add_notes",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:41.241849+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "40ca9293-085b-4642-bf60-a3fec48afa00",
+    "permission_key": "appointments.manage_schedule",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:41.361387+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1a701c82-5d96-4112-abba-b81fd8a23732",
+    "permission_key": "products.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:43.343078+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "3482b8f2-3b49-4ce7-8f26-f0afec4c6cce",
+    "permission_key": "products.edit",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:43.483132+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "db5d8f34-bb2a-47c5-8988-9556d9bd590d",
+    "permission_key": "products.delete",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:43.607309+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "0b3e887d-6a97-4ee3-a24e-3dcd3c844d7f",
+    "permission_key": "services.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:43.73463+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "7c110b63-2a0b-43f6-ab7d-e652ef344fec",
+    "permission_key": "customers.delete",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.624563+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "0d8cb7dc-67a2-41ca-b2e0-ea4c71bb10e6",
+    "permission_key": "customers.delete",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:39.752922+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "b531c67d-86a6-4565-9f5f-75fa3e54522a",
+    "permission_key": "customers.view_history",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:39.883559+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "f30037c2-c879-4884-9dc9-b030e6c2ac1f",
+    "permission_key": "customers.view_history",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.748238+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "6d181526-37ca-4282-856c-0ada34374f13",
+    "permission_key": "customers.view_loyalty",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.87458+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "7ba0253f-d3a0-4d34-842d-0fba11d79623",
+    "permission_key": "products.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:43.980649+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "23ee1ecd-9d3f-4d46-8146-ac0c8f06d089",
+    "permission_key": "customers.adjust_loyalty",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.076749+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "cbb7e983-b530-48db-b640-adddfaa21686",
+    "permission_key": "products.edit",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.139551+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "e54480f1-8d73-4299-9673-a2ef182bbffd",
+    "permission_key": "customers.export",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.198872+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "664bb9b5-e074-414a-b450-e10f056622d6",
+    "permission_key": "products.delete",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.328466+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "c4e77d68-8454-458b-bdb5-ccf80b963dd9",
+    "permission_key": "services.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.453402+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "c7d71d08-8db0-4486-aefa-ac2157ea75ca",
+    "permission_key": "services.edit",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.609198+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "7ba76f04-5abf-45c1-a0f2-302878bc6b01",
+    "permission_key": "customers.edit",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:39.525346+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "072d9eff-a189-446d-88c0-26820b743892",
+    "permission_key": "quotes.send",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:40:49.089891+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "22184838-986a-4bca-bc93-496395fe3042",
+    "permission_key": "services.delete",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "8c4838fb-7475-4998-b392-6486c66ae740",
+    "permission_key": "services.manage_addons",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "5f183d51-95d2-4845-bd64-298a044e1840",
+    "permission_key": "services.set_pricing",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "633786f9-d279-464e-a7d5-26519c770ab4",
+    "permission_key": "inventory.view_stock",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "bd70fa23-9cc0-414e-88d6-bfeee73fce64",
+    "permission_key": "inventory.view_stock",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "4607e7d2-7052-452e-9236-af764b679394",
+    "permission_key": "inventory.adjust_stock",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "7b92b1af-f971-40af-bebf-a7b0ea2d71ca",
+    "permission_key": "inventory.adjust_stock",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "47492e5a-5f1d-454e-b133-8adf1edf1233",
+    "permission_key": "quotes.create",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-23T00:40:46.988473+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d6e7bc62-1d25-4e7f-8b9a-4f458d5f957d",
+    "permission_key": "inventory.manage_po",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "0b58e72c-768d-4c55-9f97-06641ce2526a",
+    "permission_key": "inventory.manage_po",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "693eb0c7-018d-4626-91b8-b9a50390af56",
+    "permission_key": "inventory.receive",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "68aada98-7c9f-4391-963f-56a6ca03c1fa",
+    "permission_key": "inventory.receive",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "44f65da2-183c-4951-9892-daa127a712b6",
+    "permission_key": "inventory.view_costs",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "fbf6a306-f6c4-4573-b593-ac328edf3ec5",
+    "permission_key": "inventory.view_costs",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "e6abc788-354d-45d7-8d52-17cb9682118b",
+    "permission_key": "inventory.view_cost_data",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "34dc6574-9e22-4c12-9145-7ecc8e7528d1",
+    "permission_key": "inventory.view_cost_data",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "6bb63248-67a3-41c5-a126-287b8dc7dcfa",
+    "permission_key": "inventory.manage_vendors",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "90e4f7fa-8b1a-400f-8670-6533c8fba771",
+    "permission_key": "inventory.manage_vendors",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "efe095e8-30ca-41a3-846b-b4f4e10c6c90",
+    "permission_key": "marketing.campaigns",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "f00162ce-8c1a-44d6-bfc8-7e2edd9b63f8",
+    "permission_key": "marketing.coupons",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "5dbcb5c1-7620-44d8-b5e3-3a1fa950dd54",
+    "permission_key": "marketing.analytics",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "d0f8e2f5-b84c-463b-854c-970c0715ef71",
+    "permission_key": "marketing.lifecycle_rules",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "04011b58-3926-45f9-a72c-b78e797252fa",
+    "permission_key": "marketing.two_way_sms",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "9d12c10e-5b54-41ce-acfc-c87b2819a505",
+    "permission_key": "quotes.create",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "6502db43-443f-481e-a991-7fa9d630815c",
+    "permission_key": "quotes.create",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a56ff770-0016-4173-b267-0522581ff01d",
+    "permission_key": "quotes.send",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "f689ee64-170d-4344-8502-aa34b462e3ef",
+    "permission_key": "quotes.send",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "7027c06e-5086-46cb-9486-30b2f76cc849",
+    "permission_key": "quotes.convert",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "bcb0b2b6-82c8-4f1e-bd5c-f35f8cf8a8a6",
+    "permission_key": "quotes.convert",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "e14b1611-ef59-42a5-9487-ca1c3bd71060",
+    "permission_key": "quotes.convert",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "5c2d4cf1-d1fc-4561-b9b0-e41b18195bc6",
+    "permission_key": "photos.upload",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "9494f5fd-a489-494c-9c14-ad864b2a2aea",
+    "permission_key": "photos.upload",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "8bad6712-89bb-4708-9bbb-da7b870f3969",
+    "permission_key": "services.delete",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:14.366041+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "0f170061-0ae7-47cb-b72b-05fd36334934",
+    "permission_key": "services.manage_addons",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:14.502586+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "204fd221-4054-45d8-b69e-5ea71601b230",
+    "permission_key": "services.set_pricing",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:14.643185+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "c57ca4e4-95aa-47c5-9f43-97714b155921",
+    "permission_key": "inventory.view_stock",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:15.659361+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "df1b21c7-5f48-4f1a-a7db-f925285dbb5d",
+    "permission_key": "inventory.manage_po",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:16.004179+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "283c22ba-6755-4447-801e-3e6b21d515a1",
+    "permission_key": "inventory.receive",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:16.127784+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "edde522b-2874-481a-add3-60a21b23afc5",
+    "permission_key": "inventory.view_costs",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:33:43.608963+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "28d23060-924c-435a-a519-b13eb7b1bd89",
+    "permission_key": "marketing.coupons",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:27.945247+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "0b6363fa-3817-4d90-9114-06b799214426",
+    "permission_key": "inventory.manage_vendors",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:16.591706+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "44b4c96d-0861-41f6-819a-6df117094260",
+    "permission_key": "marketing.analytics",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:28.078841+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "3bf070e3-1ba3-40b7-ae37-f8f11ac25ff2",
+    "permission_key": "marketing.lifecycle_rules",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:28.198643+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "04efd605-894e-4e48-b834-c3f6583e2bf0",
+    "permission_key": "marketing.two_way_sms",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:28.343623+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "056419c5-4931-4b68-ba35-ce7882a98be9",
+    "permission_key": "marketing.campaigns",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:22.253131+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "32e033ad-0816-46b9-b45e-8f0d001818b8",
+    "permission_key": "services.edit",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:44.039824+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "6c8e4552-c42b-4ffd-8c39-8919f8b33104",
+    "permission_key": "services.set_pricing",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:44.447152+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "05b60922-d834-474c-ac38-1b87dfb0fa64",
+    "permission_key": "inventory.view_stock",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:45.518402+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "7c9ed428-8b41-4153-ae20-ac28b717455d",
+    "permission_key": "inventory.adjust_stock",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:45.677867+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1eff2e82-e330-4fc7-83d2-7e7ff1145adb",
+    "permission_key": "inventory.manage_po",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:45.803293+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "b6dc1f08-fe09-46d2-a291-6980c1af1daf",
+    "permission_key": "inventory.receive",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:46.031245+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "62aed057-d122-4fd0-8a91-934b9ccf0573",
+    "permission_key": "inventory.view_costs",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:33:23.276593+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "db176207-6b4b-4a2c-8a7f-0cadbf88cfad",
+    "permission_key": "inventory.view_cost_data",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:46.294882+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "45f55894-10a5-424c-8cce-ff08b188af47",
+    "permission_key": "inventory.manage_vendors",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:46.480175+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "2b1d6622-37bc-46b5-b60b-a2d9e502cc0c",
+    "permission_key": "quotes.create",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:49.225536+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "dbcaaf45-bf45-4322-a18b-88aad1a2513a",
+    "permission_key": "marketing.campaigns",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:51.721787+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "147e3bf3-d757-4399-9ba0-779588dc4fa2",
+    "permission_key": "marketing.coupons",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:51.866807+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "ed34f102-bc9b-4776-a480-10d55d475718",
+    "permission_key": "marketing.analytics",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:52.058784+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "dbcf9e8e-7770-4fa1-801e-d117d1408480",
+    "permission_key": "marketing.two_way_sms",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:52.340228+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "4dd1c8b6-0c26-49a3-9378-af97c52fb657",
+    "permission_key": "quotes.send",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:49.35124+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "3d54b52e-6d99-423c-96b8-1ecebac69a14",
+    "permission_key": "quotes.convert",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:49.477256+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "287f7fc0-a674-4772-a7ad-a8b7531d23b8",
+    "permission_key": "inventory.view_cost_data",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:33:41.087954+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "bd2981e8-329c-44e9-abf8-8f33987f1b41",
+    "permission_key": "services.delete",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.726973+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a99acbf7-c0f9-4bc8-8455-5d146b64d165",
+    "permission_key": "services.delete",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:44.164658+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "f5e77879-c4f4-41c7-bd4f-57c91de4f38f",
+    "permission_key": "services.manage_addons",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:44.282761+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "ee870403-72d6-4e5b-80dd-ad70749b5011",
+    "permission_key": "services.manage_addons",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.870904+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "0cadedce-1357-43e3-b422-ba01a7a27803",
+    "permission_key": "services.set_pricing",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:44.995853+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "bc40a7c8-75c0-4bbe-bbe1-82e413e9b7b6",
+    "permission_key": "marketing.coupons",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:22.388749+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a1f6cc1e-d363-475c-94ba-a54d74d8fd34",
+    "permission_key": "marketing.analytics",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:22.525522+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "88cf20c1-c658-4b04-9b11-16bb9fe26adc",
+    "permission_key": "marketing.lifecycle_rules",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:22.708773+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "23c93ea9-3ccc-475d-988d-b1bbb76022fa",
+    "permission_key": "marketing.two_way_sms",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:22.845175+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "06911f9c-9808-4efe-99fd-99c33cdf5886",
+    "permission_key": "marketing.campaigns",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T07:21:27.745649+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "623a2243-8ae5-46e7-9c25-518d3f1c199a",
+    "permission_key": "photos.view",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "36224909-a324-42b5-8230-6bfd16929460",
+    "permission_key": "photos.view",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "024b1197-0846-435f-8866-10250129fb60",
+    "permission_key": "photos.delete",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "e4f47ff1-c5b5-49ab-8fff-e9d1761bef1e",
+    "permission_key": "photos.delete",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "a5a71f97-167e-4f40-81e7-d9af39d0c69c",
+    "permission_key": "photos.approve_marketing",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "2622b07b-4f09-45de-ad99-e6b973b5eab6",
+    "permission_key": "photos.approve_marketing",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "e3c24cba-ce22-4818-a57e-40500520d680",
+    "permission_key": "reports.revenue",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "e1181879-606a-4e9c-b54c-4925f53e0041",
+    "permission_key": "reports.financial_detail",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "007ba9ef-d3c1-4b47-b511-7da0ed61cd48",
+    "permission_key": "reports.cost_margin",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "b3935917-c58b-4748-acee-2accf104600c",
+    "permission_key": "reports.employee_tips",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "065c3aef-f5bb-440c-abe1-85cf3ded99a9",
+    "permission_key": "reports.own_tips",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "6cd866e5-8293-422e-b606-23ea9caa75ea",
+    "permission_key": "reports.export",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "c8a99f78-cd8d-4945-91c1-167905bb9693",
+    "permission_key": "reports.quickbooks_status",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "06dd1e2d-9fbc-4996-9000-af457293151d",
+    "permission_key": "staff.clock_self",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "d1f5a82d-c0f0-435f-afc3-eef8eab40369",
+    "permission_key": "staff.view_own_hours",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "885e9ec3-dbc2-498a-956c-894a6aaab305",
+    "permission_key": "staff.view_all_hours",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "3856809e-6982-46a9-b9d7-87ca5dd466bd",
+    "permission_key": "staff.edit_time",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "f37fd733-0bf7-4283-9eb9-37eb4820b177",
+    "permission_key": "settings.feature_toggles",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "72ed0850-2220-42bb-89a4-3bc117b87964",
+    "permission_key": "settings.tax_payment",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "49316063-dd12-48b3-a185-67cdbb94945b",
+    "permission_key": "settings.manage_users",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "79f7ce97-dcd4-4dc0-8613-46cdd5ffc3eb",
+    "permission_key": "settings.roles_permissions",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "b57f0623-a8b2-4d32-99fc-13c1841c22be",
+    "permission_key": "settings.business_hours",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "360a9766-2dfd-4960-a9d5-7ad733763e14",
+    "permission_key": "photos.view",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:32.706032+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "a4a9d313-10fa-4323-88fc-1e09af30fe11",
+    "permission_key": "photos.delete",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:33.10202+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "52ef2942-94bc-4f87-946d-21e95d756254",
+    "permission_key": "photos.approve_marketing",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T03:56:33.237245+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "1a9b04ae-e1fa-4294-bf11-bec92b611476",
+    "permission_key": "reports.financial_detail",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:21.649044+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "f1013488-6c65-4b49-af9f-7ac916950d88",
+    "permission_key": "reports.cost_margin",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:21.841048+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "bb64d5e2-f49c-4cae-88f5-cd9d1c8e857b",
+    "permission_key": "reports.employee_tips",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:21.987409+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "f6378572-6b33-470d-8856-a73f07c8875c",
+    "permission_key": "reports.own_tips",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:22.224581+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "7b93ac1c-58f0-4212-9980-7cb680d2108d",
+    "permission_key": "reports.export",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:22.453933+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "04d00024-2b83-4dc6-804f-a2dbd782da55",
+    "permission_key": "staff.clock_self",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:22.502367+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "ba2b4a28-8b5a-41cb-8ec4-489f9be90df8",
+    "permission_key": "staff.view_own_hours",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:22.766657+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "8a852031-d142-4479-9116-6a37cebbdf27",
+    "permission_key": "reports.quickbooks_status",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:22.584138+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "8cddd5c4-8a9a-4e9b-9d3b-1b4766745231",
+    "permission_key": "staff.view_all_hours",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:22.961912+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "c6e0c003-d860-4935-be27-3903fa008b1e",
+    "permission_key": "staff.edit_time",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:23.106434+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "3a5a6a75-8c91-4df7-9ecd-1931efa8eee8",
+    "permission_key": "settings.tax_payment",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:25.789426+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "12956715-7c4b-428a-afde-4806d4f57f5b",
+    "permission_key": "settings.manage_users",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:25.909636+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "acbaacc4-4bfd-4a64-b3d0-f14b9c921667",
+    "permission_key": "photos.upload",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:50.741606+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "44b6fb1b-aa2a-4f48-95bb-31c763c2136c",
+    "permission_key": "settings.feature_toggles",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:25.669768+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "6429226f-f7d3-48dd-8603-2e7d26f0c01b",
+    "permission_key": "photos.approve_marketing",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:51.201529+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "52791856-532b-42bb-9ea5-27fd69ec4ead",
+    "permission_key": "reports.revenue",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:52.039742+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "6269be4b-4230-4e4d-bdba-ba338cf01696",
+    "permission_key": "reports.financial_detail",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:52.246562+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1066279e-291c-4584-803f-0329ef832f9c",
+    "permission_key": "reports.cost_margin",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:52.388674+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "f7e7cb6a-42fd-4717-a07f-f79483ff0d05",
+    "permission_key": "reports.employee_tips",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:52.519948+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "4e4fc908-df7e-405b-8352-a95dc60550c4",
+    "permission_key": "reports.own_tips",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:52.976125+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "c6aef6e4-f211-4555-8e49-70b6c61b4134",
+    "permission_key": "staff.clock_self",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:53.027622+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "8f38fe21-3349-479b-80e3-5cc0a20cd1c0",
+    "permission_key": "staff.view_own_hours",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:53.174924+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "08c02996-7f6f-4ddd-b718-4282371ff8be",
+    "permission_key": "staff.view_all_hours",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:53.358986+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "873c497e-7811-4d2c-89fb-768fac19beb9",
+    "permission_key": "reports.export",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:53.108318+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "61a460aa-5a19-4b75-b3d6-3dbcc06c8257",
+    "permission_key": "reports.quickbooks_status",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:53.295424+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "ff111c83-ae26-45cd-88b5-b5c26740dfdf",
+    "permission_key": "staff.edit_time",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:53.483033+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "e31d5673-395c-4f24-a63f-255a383c7709",
+    "permission_key": "settings.feature_toggles",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:55.786007+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "d684f7f6-4b35-4898-aea7-098c7e345863",
+    "permission_key": "settings.tax_payment",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:55.950735+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "c2fd106c-4e2b-4b64-ad96-092a50e12bbd",
+    "permission_key": "settings.manage_users",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:56.172128+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "2646e6f5-431d-41ff-8c58-334d48ec6ff3",
+    "permission_key": "settings.roles_permissions",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:56.367647+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "b04249d2-8c95-485d-9c69-a05b5b77a35b",
+    "permission_key": "staff.clock_self",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:46.186376+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "88f4c5e8-2e61-43c6-8134-fdba60d69a1d",
+    "permission_key": "photos.view",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:50.868641+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "eabee794-327a-4f35-8c80-9b95247f9c5c",
+    "permission_key": "photos.delete",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:51.002206+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "f01f9e7c-9ec6-4927-b0cb-90310199136a",
+    "permission_key": "staff.view_own_hours",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:46.326314+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "350c5c0f-75fb-488f-bb74-5aad6ddd727b",
+    "permission_key": "staff.view_all_hours",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:46.460431+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "011e679c-3369-4b83-9ebe-de1f1fc62bfd",
+    "permission_key": "staff.edit_time",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:46.593066+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "c1c4d019-3a19-4b57-9cc2-f100ec9ebfc2",
+    "permission_key": "settings.tax_payment",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.997342+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "34dc8059-6064-4d04-974f-8ee50878d814",
+    "permission_key": "settings.manage_users",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:49.118147+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "d715b735-235c-40bd-8009-f11267a06bfb",
+    "permission_key": "settings.roles_permissions",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:49.326345+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "d07c4789-9f42-4809-bdb9-7304e552e431",
+    "permission_key": "reports.revenue",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:21.520617+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "5d1d9c75-e12c-4038-b211-295ace37b11c",
+    "permission_key": "reports.revenue",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:47.746372+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "fb3e2aa2-268d-40d5-b70b-5decc75d5ae6",
+    "permission_key": "reports.cost_margin",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.004987+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "b7c4e449-c899-46e4-9494-380b2fbb7267",
+    "permission_key": "reports.employee_tips",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.132536+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "f26507d1-f67b-4053-a542-a7a534f7a361",
+    "permission_key": "reports.own_tips",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.345149+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "0f832a95-24dc-4c55-a810-33159944934f",
+    "permission_key": "reports.export",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.471993+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "1848c85a-aed7-4926-866c-e17bba4b07ed",
+    "permission_key": "reports.quickbooks_status",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.599452+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "8bf32a78-d831-4fab-b69d-69c75f7d2a3a",
+    "permission_key": "settings.feature_toggles",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:48.865404+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "3c55835a-8920-408b-908c-18dfa864b3fd",
+    "permission_key": "settings.audit_log",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "dbc85f50-9983-4eea-a862-740928541435",
+    "permission_key": "settings.api_keys",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "824a826f-13c0-409d-a753-c0daf48b04c1",
+    "permission_key": "settings.backup_export",
+    "role": "super_admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T02:18:50.710574+00:00",
+    "role_id": "2b59c7ac-3c5f-4bf6-aaa5-ef9fbf7d077c"
+  },
+  {
+    "id": "63ce35da-6515-422d-8221-4821bc833b80",
+    "permission_key": "settings.business_hours",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-03-14T22:46:25.050952+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "d078f90f-cfdf-4dab-9922-55cbb5dae6fb",
+    "permission_key": "settings.business_hours",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:56.556993+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1d50b3b4-aadb-4dcf-a09a-ba3a8f47dd9c",
+    "permission_key": "settings.audit_log",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:56.793844+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "e94f48d8-3217-4dfb-a403-89ec81aec08d",
+    "permission_key": "settings.api_keys",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:56.960426+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "6ab648a6-b0cd-40a5-8361-54c68cd00b63",
+    "permission_key": "settings.backup_export",
+    "role": "detailer",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T05:20:57.119093+00:00",
+    "role_id": "2fe5f955-27b1-4a8d-995e-540ab25c81dc"
+  },
+  {
+    "id": "1e74e5ae-f18c-455e-ae43-ad8657e53737",
+    "permission_key": "reports.financial_detail",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:47.877204+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "1d2f6380-d654-43ec-8aeb-1d1e46af0fa8",
+    "permission_key": "settings.business_hours",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:49.517958+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "ba91bf15-00d4-4288-a569-88992f062b35",
+    "permission_key": "settings.audit_log",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:49.649369+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "bf4ab761-1e46-4e15-8ce3-b127d69adcdc",
+    "permission_key": "settings.api_keys",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:49.979914+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "ec06173d-1fed-4857-9ecf-e01678a0c07b",
+    "permission_key": "settings.backup_export",
+    "role": "admin",
+    "employee_id": null,
+    "granted": true,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:52:50.106456+00:00",
+    "role_id": "dae47c11-b590-47fc-9aec-6a5bd46c88d1"
+  },
+  {
+    "id": "71dee51d-3ee5-4d44-9e49-6f8e19242846",
+    "permission_key": "settings.audit_log",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:26.360249+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "ff99da72-4c3e-4fe3-829c-46539172e3b5",
+    "permission_key": "settings.api_keys",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:26.583707+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  },
+  {
+    "id": "afbacf9c-2db9-416b-a8ca-bb226338307f",
+    "permission_key": "settings.backup_export",
+    "role": "cashier",
+    "employee_id": null,
+    "granted": false,
+    "created_at": "2026-02-12T02:18:50.710574+00:00",
+    "updated_at": "2026-02-12T06:53:26.740381+00:00",
+    "role_id": "9e9430a8-2e27-4b79-9478-a61c98c1ae6e"
+  }
+]

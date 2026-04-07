@@ -1,0 +1,93 @@
+[
+  {
+    "id": "f2276297-cab8-4e26-b229-84e9f07d228f",
+    "coupon_id": "632622c0-ebe7-4800-9a62-debee89438f4",
+    "applies_to": "order",
+    "discount_type": "percentage",
+    "discount_value": 40,
+    "max_discount": 100,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-02-22T10:46:17.174+00:00"
+  },
+  {
+    "id": "f847d669-eff9-47cb-a985-417f124f1168",
+    "coupon_id": "f95b87a1-1d5c-426f-afa0-a7ae3032045b",
+    "applies_to": "order",
+    "discount_type": "flat",
+    "discount_value": 20,
+    "max_discount": null,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-02-22T10:47:48.872612+00:00"
+  },
+  {
+    "id": "c1e71aac-a633-435e-9e57-04957709cd62",
+    "coupon_id": "5511c8ac-317a-4004-a256-a9f374103158",
+    "applies_to": "order",
+    "discount_type": "percentage",
+    "discount_value": 15,
+    "max_discount": 100,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-03-21T07:19:30.204686+00:00"
+  },
+  {
+    "id": "70d54682-a62b-4979-b558-293cc3465285",
+    "coupon_id": "ac188f25-ea4b-48e1-a78a-b57073a12d7b",
+    "applies_to": "order",
+    "discount_type": "percentage",
+    "discount_value": 99.99,
+    "max_discount": null,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-04-01T02:23:09.154743+00:00"
+  },
+  {
+    "id": "89223c8d-087b-4376-a92e-a95bc857ac0e",
+    "coupon_id": "6c441820-271a-4de8-82b3-4d9266664a7f",
+    "applies_to": "order",
+    "discount_type": "percentage",
+    "discount_value": 20,
+    "max_discount": null,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-04-01T02:24:42.152613+00:00"
+  },
+  {
+    "id": "c35ddcae-0917-4aa3-9011-ea387375e0df",
+    "coupon_id": "84db1068-87de-4b8a-916f-728d7445057e",
+    "applies_to": "order",
+    "discount_type": "percentage",
+    "discount_value": 10,
+    "max_discount": 100,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-02-21T07:28:52.401274+00:00"
+  },
+  {
+    "id": "b1499d2c-8f34-4c1c-a226-e0319c522cf2",
+    "coupon_id": "be01b2fe-7c5d-4798-bebd-0549001aea01",
+    "applies_to": "order",
+    "discount_type": "percentage",
+    "discount_value": 30,
+    "max_discount": 200,
+    "target_product_id": null,
+    "target_service_id": null,
+    "target_product_category_id": null,
+    "target_service_category_id": null,
+    "created_at": "2026-02-04T07:40:00.221592+00:00"
+  }
+]

@@ -1,0 +1,132 @@
+[
+  {
+    "id": "cd7c747e-a769-4a33-9a8f-c1a0ea459025",
+    "name": "Accessories",
+    "slug": "accessories",
+    "description": null,
+    "display_order": 1,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "ffdb4138-e885-42cb-a5a8-8e80af5503d5",
+    "name": "Paint Correction",
+    "slug": "paint-correction",
+    "description": null,
+    "display_order": 2,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "3d81b65c-3594-404a-9869-ae8c64fbb421",
+    "name": "Brushes",
+    "slug": "brushes",
+    "description": null,
+    "display_order": 3,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "3e5f1469-7c1c-45d0-8fab-69f21a8dc703",
+    "name": "Microfibers",
+    "slug": "microfibers",
+    "description": null,
+    "display_order": 4,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "03bdf7a6-2479-420b-8f38-fe0a0f324ed6",
+    "name": "Paint Protection",
+    "slug": "paint-protection",
+    "description": null,
+    "display_order": 5,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "9560f3e5-0e4a-43ad-a8ba-4f1a3ff524a6",
+    "name": "Cleaners",
+    "slug": "cleaners",
+    "description": null,
+    "display_order": 6,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "e79267e3-6354-4a01-a32f-ee750ea52af5",
+    "name": "Tires & Trims",
+    "slug": "tires-trims",
+    "description": null,
+    "display_order": 7,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "b2936b18-0473-4831-bd0c-8fd508a71689",
+    "name": "Interior Care",
+    "slug": "interior-care",
+    "description": null,
+    "display_order": 8,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "76c25b2a-e007-436b-8034-2b835fc87a58",
+    "name": "Scents & Deodorizers",
+    "slug": "scents-deodorizers",
+    "description": null,
+    "display_order": 9,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "f748c110-da97-48b5-80c2-629b80b0ba26",
+    "name": "Soaps & Shampoos",
+    "slug": "soaps-shampoos",
+    "description": null,
+    "display_order": 10,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "8de3e274-6a34-4aaf-b236-5c87bbd06c02",
+    "name": "Tools",
+    "slug": "tools",
+    "description": null,
+    "display_order": 11,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "de60e1ec-d9e0-496b-85a8-61cae9b937ef",
+    "name": "Water",
+    "slug": "water",
+    "description": null,
+    "display_order": 12,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  },
+  {
+    "id": "f680c3ad-f47b-4f6b-b61a-0e75cab8c825",
+    "name": "Uncategorized",
+    "slug": "uncategorized",
+    "description": null,
+    "display_order": 13,
+    "is_active": true,
+    "created_at": "2026-02-02T05:08:44.985633+00:00",
+    "updated_at": "2026-02-02T05:08:44.985633+00:00"
+  }
+]

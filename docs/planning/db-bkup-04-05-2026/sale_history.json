@@ -1,0 +1,307 @@
+[
+  {
+    "id": "8c46a841-6ccd-44b6-babf-f5fc0ff1852f",
+    "service_id": "3af5fa9f-63ac-451d-b9a3-1c8272dde685",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": {
+      "base_price": 125,
+      "sale_price": 100
+    },
+    "pricing_model": "flat",
+    "sale_starts_at": "2026-03-16T07:00:00+00:00",
+    "sale_ends_at": "2026-03-19T06:59:59+00:00",
+    "ended_at": "2026-03-18T07:35:32.951553+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T07:35:32.951553+00:00"
+  },
+  {
+    "id": "52398842-fc28-4a45-97f8-61a6e585026c",
+    "service_id": "50715d89-e6b4-4307-9b5a-def51d45c205",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "sedan",
+        "base_price": 75,
+        "sale_price": 50,
+        "tier_label": "Sedan"
+      },
+      {
+        "tier_name": "truck_suv_2row",
+        "base_price": 90,
+        "sale_price": 65,
+        "tier_label": "Truck/SUV (2-Row)"
+      },
+      {
+        "tier_name": "suv_3row_van",
+        "base_price": 110,
+        "sale_price": 85,
+        "tier_label": "SUV (3-Row) / Van"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": "2026-03-17T07:00:00+00:00",
+    "sale_ends_at": "2026-03-19T06:59:59+00:00",
+    "ended_at": "2026-03-18T07:38:15.397706+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T07:38:15.397706+00:00"
+  },
+  {
+    "id": "f6780342-6750-48f0-995b-6501828c7f9a",
+    "service_id": "3ace824f-6372-421a-9ada-6b669e722bb6",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": {
+      "base_price": 175,
+      "sale_price": 157.5
+    },
+    "pricing_model": "flat",
+    "sale_starts_at": "2026-03-17T07:00:00+00:00",
+    "sale_ends_at": "2026-03-19T06:59:59+00:00",
+    "ended_at": "2026-03-18T07:39:13.889063+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T07:39:13.889063+00:00"
+  },
+  {
+    "id": "b6d90b34-7708-4df2-9dd5-21262a618697",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "sedan",
+        "base_price": 425,
+        "sale_price": 340,
+        "tier_label": "Sedan"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": null,
+    "sale_ends_at": null,
+    "ended_at": "2026-03-18T07:44:14.752023+00:00",
+    "ended_reason": "overwritten",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T07:44:14.752023+00:00"
+  },
+  {
+    "id": "ccd8402d-4fee-4c71-8890-31144b850d4a",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "sedan",
+        "base_price": 425,
+        "sale_price": 340,
+        "tier_label": "Sedan"
+      },
+      {
+        "tier_name": "truck_suv_2row",
+        "base_price": 525,
+        "sale_price": 420,
+        "tier_label": "Truck/SUV (2-Row)"
+      },
+      {
+        "tier_name": "suv_3row_van",
+        "base_price": 625,
+        "sale_price": 500,
+        "tier_label": "SUV (3-Row) / Van"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": null,
+    "sale_ends_at": null,
+    "ended_at": "2026-03-18T08:15:32.950576+00:00",
+    "ended_reason": "overwritten",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T08:15:32.950576+00:00"
+  },
+  {
+    "id": "6a0564ad-8d1f-4820-9b30-d8ad89246393",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "suv_3row_van",
+        "base_price": 625,
+        "sale_price": 500,
+        "tier_label": "SUV (3-Row) / Van"
+      },
+      {
+        "tier_name": "sedan",
+        "base_price": 425,
+        "sale_price": 340,
+        "tier_label": "Sedan"
+      },
+      {
+        "tier_name": "truck_suv_2row",
+        "base_price": 525,
+        "sale_price": 420,
+        "tier_label": "Truck/SUV (2-Row)"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": "2026-03-19T07:00:00+00:00",
+    "sale_ends_at": "2026-03-21T06:59:59+00:00",
+    "ended_at": "2026-03-18T08:16:01.776406+00:00",
+    "ended_reason": "overwritten",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T08:16:01.776406+00:00"
+  },
+  {
+    "id": "7ed63275-aac5-41ee-9cb7-d10db5d0faa9",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "sedan",
+        "base_price": 425,
+        "sale_price": 318.75,
+        "tier_label": "Sedan"
+      },
+      {
+        "tier_name": "truck_suv_2row",
+        "base_price": 525,
+        "sale_price": 393.75,
+        "tier_label": "Truck/SUV (2-Row)"
+      },
+      {
+        "tier_name": "suv_3row_van",
+        "base_price": 625,
+        "sale_price": 468.75,
+        "tier_label": "SUV (3-Row) / Van"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": "2026-03-18T07:00:00+00:00",
+    "sale_ends_at": "2026-03-22T06:59:59+00:00",
+    "ended_at": "2026-03-18T15:33:57.40102+00:00",
+    "ended_reason": "overwritten",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T15:33:57.40102+00:00"
+  },
+  {
+    "id": "3982f975-9e25-4871-aaf2-dda9135dc5cf",
+    "service_id": null,
+    "product_id": "7e8312f7-7956-4ff5-a6fd-a2df22c9f3b0",
+    "sale_name": null,
+    "pricing_snapshot": {
+      "sale_price": 20.19,
+      "retail_price": 23.75
+    },
+    "pricing_model": null,
+    "sale_starts_at": null,
+    "sale_ends_at": null,
+    "ended_at": "2026-03-18T15:34:29.466691+00:00",
+    "ended_reason": "overwritten",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T15:34:29.466691+00:00"
+  },
+  {
+    "id": "cfa07bf9-3ae0-45ec-81ab-ac07a2858daa",
+    "service_id": "853b9812-7ec7-4c59-8827-279973960cbc",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": {
+      "base_price": 125,
+      "sale_price": 99
+    },
+    "pricing_model": "flat",
+    "sale_starts_at": "2026-03-17T08:00:00+00:00",
+    "sale_ends_at": "2026-03-19T07:59:59+00:00",
+    "ended_at": "2026-03-18T15:48:07.297627+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T15:48:07.297627+00:00"
+  },
+  {
+    "id": "a857cb0a-b028-4360-944c-0f60b5b1e053",
+    "service_id": "115272a6-05d8-4c2b-9857-0826fd223a72",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": {
+      "base_price": 150,
+      "sale_price": 120,
+      "per_unit_label": "panel"
+    },
+    "pricing_model": "per_unit",
+    "sale_starts_at": "2026-03-17T07:00:00+00:00",
+    "sale_ends_at": "2026-03-19T06:59:59+00:00",
+    "ended_at": "2026-03-18T17:09:10.963238+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T17:09:10.963238+00:00"
+  },
+  {
+    "id": "6e9cac51-d827-43fd-a5f2-e7b42241fac7",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "sedan",
+        "base_price": 425,
+        "sale_price": 212.5,
+        "tier_label": "Sedan"
+      },
+      {
+        "tier_name": "truck_suv_2row",
+        "base_price": 525,
+        "sale_price": 262.5,
+        "tier_label": "Truck/SUV (2-Row)"
+      },
+      {
+        "tier_name": "suv_3row_van",
+        "base_price": 625,
+        "sale_price": 312.5,
+        "tier_label": "SUV (3-Row) / Van"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": "2026-03-18T07:00:00+00:00",
+    "sale_ends_at": "2026-03-21T06:59:59+00:00",
+    "ended_at": "2026-03-18T17:09:14.256214+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T17:09:14.256214+00:00"
+  },
+  {
+    "id": "a51d5657-74bf-454f-b604-e936b9068cf5",
+    "service_id": "788f12ce-2a36-479f-902e-46968269296f",
+    "product_id": null,
+    "sale_name": null,
+    "pricing_snapshot": [
+      {
+        "tier_name": "sedan",
+        "base_price": 825,
+        "sale_price": 660,
+        "tier_label": "Sedan"
+      },
+      {
+        "tier_name": "truck_suv_2row",
+        "base_price": 950,
+        "sale_price": 760,
+        "tier_label": "Truck/SUV (2-Row)"
+      },
+      {
+        "tier_name": "suv_3row_van",
+        "base_price": 1075,
+        "sale_price": 860,
+        "tier_label": "SUV (3-Row) / Van"
+      }
+    ],
+    "pricing_model": "vehicle_size",
+    "sale_starts_at": "2026-03-17T08:00:00+00:00",
+    "sale_ends_at": "2026-03-19T07:59:59+00:00",
+    "ended_at": "2026-03-18T17:09:24.698884+00:00",
+    "ended_reason": "manual",
+    "ended_by": "a1266816-e26d-4bc2-98d5-7331cc499e14",
+    "created_at": "2026-03-18T17:09:24.698884+00:00"
+  }
+]

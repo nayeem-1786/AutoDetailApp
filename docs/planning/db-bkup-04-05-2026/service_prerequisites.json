@@ -1,0 +1,56 @@
+[
+  {
+    "id": "6da96497-83ad-4540-89fe-77e09725a7cd",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "prerequisite_service_id": "f1bda6de-50de-47c5-aca3-98158ba29cd8",
+    "enforcement": "required_history",
+    "history_window_days": 30,
+    "warning_message": "Paint correction is required before ceramic coating application. Add Single-Stage Polish or 3-Stage Paint Correction to this ticket?",
+    "created_at": "2026-02-02T06:52:15.281534+00:00"
+  },
+  {
+    "id": "d173523f-9a3c-4f68-9d0b-810f0c825382",
+    "service_id": "82c626d7-6aa8-4405-9ed1-8ab6191f0e71",
+    "prerequisite_service_id": "faac34d7-c08e-41dc-b966-f935db40833d",
+    "enforcement": "required_history",
+    "history_window_days": 30,
+    "warning_message": "Paint correction is required before ceramic coating application. Add Single-Stage Polish or 3-Stage Paint Correction to this ticket?",
+    "created_at": "2026-02-02T06:52:15.281534+00:00"
+  },
+  {
+    "id": "69923d50-a736-4f98-9498-0c56248d5a7b",
+    "service_id": "5faea31b-ab21-49c9-8e58-1c76516841bb",
+    "prerequisite_service_id": "f1bda6de-50de-47c5-aca3-98158ba29cd8",
+    "enforcement": "required_history",
+    "history_window_days": 30,
+    "warning_message": "Paint correction is required before ceramic coating application. Add Single-Stage Polish or 3-Stage Paint Correction to this ticket?",
+    "created_at": "2026-02-02T06:52:15.281534+00:00"
+  },
+  {
+    "id": "1debcd15-f94e-4293-bd0f-684074e36bfc",
+    "service_id": "5faea31b-ab21-49c9-8e58-1c76516841bb",
+    "prerequisite_service_id": "faac34d7-c08e-41dc-b966-f935db40833d",
+    "enforcement": "required_history",
+    "history_window_days": 30,
+    "warning_message": "Paint correction is required before ceramic coating application. Add Single-Stage Polish or 3-Stage Paint Correction to this ticket?",
+    "created_at": "2026-02-02T06:52:15.281534+00:00"
+  },
+  {
+    "id": "cf0c2db9-70aa-4752-9caa-dd3451f4eca6",
+    "service_id": "788f12ce-2a36-479f-902e-46968269296f",
+    "prerequisite_service_id": "f1bda6de-50de-47c5-aca3-98158ba29cd8",
+    "enforcement": "required_history",
+    "history_window_days": 30,
+    "warning_message": "Paint correction is required before ceramic coating application. Add Single-Stage Polish or 3-Stage Paint Correction to this ticket?",
+    "created_at": "2026-02-02T06:52:15.281534+00:00"
+  },
+  {
+    "id": "e4429295-946a-4a00-ac75-479d2d5ac274",
+    "service_id": "788f12ce-2a36-479f-902e-46968269296f",
+    "prerequisite_service_id": "faac34d7-c08e-41dc-b966-f935db40833d",
+    "enforcement": "required_history",
+    "history_window_days": 30,
+    "warning_message": "Paint correction is required before ceramic coating application. Add Single-Stage Polish or 3-Stage Paint Correction to this ticket?",
+    "created_at": "2026-02-02T06:52:15.281534+00:00"
+  }
+]
