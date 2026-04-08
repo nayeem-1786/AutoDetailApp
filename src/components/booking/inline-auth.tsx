@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
-import { LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 import { z } from 'zod';
 
 // --- Types ---
@@ -49,7 +48,6 @@ export interface InlineAuthProps {
   isAuthenticated: boolean;
   customerData: AuthCustomerData | null;
   onSignOut: () => void | Promise<void>;
-  businessName: string;
 }
 
 // Post-OTP profile completion schema — email is optional for phone-first signup
@@ -64,58 +62,89 @@ type OtpProfileInput = z.infer<typeof otpProfileSchema>;
 // --- Shared input class ---
 const inputCls = 'border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui text-base sm:text-sm';
 
-// --- Sign In Flow ---
+// --- Main InlineAuth Component ---
 
-type SignInMode = 'phone' | 'otp';
+type AuthView = 'phone' | 'otp' | 'profile' | 'complete-profile';
 
-function SignInFlow({
-  initialPhone,
-  onSuccess,
-  onSwitchToSignUp,
-}: {
-  initialPhone?: string;
-  onSuccess: () => void;
-  onSwitchToSignUp: () => void;
-  businessName: string;
-}) {
-  const [mode, setMode] = useState<SignInMode>('phone');
+export function InlineAuth({
+  onAuthComplete,
+  isAuthenticated,
+  customerData,
+  onSignOut,
+}: InlineAuthProps) {
+  const [view, setView] = useState<AuthView>('phone');
   const [jsxError, setJsxError] = useState<ReactNode | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [fetchingProfile, setFetchingProfile] = useState(false);
+  const localAuthRef = useRef<AuthCustomerData | null>(null);
+  const [localAuthData, setLocalAuthData] = useState<AuthCustomerData | null>(null);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  const { checkExists } = useCustomerLink();
+  // Profile completion state (for existing customers with incomplete data)
+  const [pendingAuthData, setPendingAuthData] = useState<AuthCustomerData | null>(null);
+  const [completeFirstName, setCompleteFirstName] = useState('');
+  const [completeLastName, setCompleteLastName] = useState('');
+  const [completeEmail, setCompleteEmail] = useState('');
+  const [completeError, setCompleteError] = useState<string | null>(null);
+  const [completeSaving, setCompleteSaving] = useState(false);
 
-  // --- Phone OTP hook ---
+  const { checkExists, linkAccount } = useCustomerLink();
+
+  // --- Phone OTP hook (unified: handles both new and returning customers) ---
   const otp = usePhoneOtp({
     mode: 'sign-in',
     onBeforeSend: async (phone) => {
       const check = await checkExists({ phone });
-      if (!check.exists) return { abort: true, error: AUTH_ERRORS.PHONE_NOT_FOUND };
+      if (check.exists) {
+        setIsNewUser(false);
+      } else {
+        setIsNewUser(true);
+      }
+      // Never abort — always send OTP regardless of whether customer exists
       return { abort: false };
     },
     onVerified: async () => {
-      await onSuccess();
+      // Existing customer linked — fetch profile and proceed
+      await handleAuthSuccess();
     },
     onNoCustomerFound: () => {
-      onSwitchToSignUp();
+      // New customer — show profile form to collect name
+      setIsNewUser(true);
+      setView('profile');
     },
   });
 
+  // Forms
+  const phoneForm = useForm<PhoneOtpSendInput>({
+    resolver: formResolver(phoneOtpSendSchema),
+  });
+
+  const otpForm = useForm<PhoneOtpVerifyInput>({
+    resolver: formResolver(phoneOtpVerifySchema),
+    defaultValues: { phone: '', code: '' },
+  });
+
+  const profileForm = useForm<OtpProfileInput>({
+    resolver: formResolver(otpProfileSchema),
+  });
+
+  // Sync OTP phase → view
+  useEffect(() => {
+    if (otp.phase === 'otp' && view === 'phone') setView('otp');
+  }, [otp.phase, view]);
+
   // Auto-focus OTP input — aggressive strategy for iOS Safari
   useEffect(() => {
-    if (mode === 'otp') {
+    if (view === 'otp') {
       const tryFocus = () => otpInputRef.current?.focus();
       requestAnimationFrame(() => { tryFocus(); requestAnimationFrame(tryFocus); });
       const timer = setTimeout(tryFocus, 300);
       return () => clearTimeout(timer);
     }
-  }, [mode]);
+  }, [view]);
 
-  // Sync OTP phase → mode
-  useEffect(() => {
-    if (otp.phase === 'otp' && mode !== 'otp') setMode('otp');
-  }, [otp.phase, mode]);
-
-  // Map hook error strings → JSX
+  // Error rendering
   const renderError = (): ReactNode => {
     if (jsxError) return jsxError;
 
@@ -123,20 +152,6 @@ function SignInFlow({
     if (!err) return null;
 
     switch (err) {
-      case AUTH_ERRORS.PHONE_NOT_FOUND:
-        return (
-          <>
-            We couldn&apos;t find an account with that phone number.{' '}
-            <button
-              type="button"
-              onClick={onSwitchToSignUp}
-              className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
-            >
-              Create a new account
-            </button>{' '}
-            to get started.
-          </>
-        );
       case AUTH_ERRORS.STAFF_PHONE:
         return 'This phone number is linked to a staff account. Please use a different number.';
       case AUTH_ERRORS.PHONE_ALREADY_LINKED:
@@ -146,18 +161,9 @@ function SignInFlow({
     }
   };
 
-  const isLoading = otp.loading;
   const currentError = renderError();
 
-  const phoneForm = useForm<PhoneOtpSendInput>({
-    resolver: formResolver(phoneOtpSendSchema),
-    defaultValues: { phone: initialPhone || '' },
-  });
-
-  const otpForm = useForm<PhoneOtpVerifyInput>({
-    resolver: formResolver(phoneOtpVerifySchema),
-    defaultValues: { phone: '', code: '' },
-  });
+  // --- Handlers ---
 
   const handleSendOtp = async (data: PhoneOtpSendInput) => {
     setJsxError(null);
@@ -176,260 +182,8 @@ function SignInFlow({
     await otp.resendOtp();
   };
 
-  const { ref: otpCodeRef, ...otpCodeField } = otpForm.register('code');
-
-  return (
-    <div className="space-y-5">
-      {currentError && (
-        <div className="rounded-md bg-red-950 p-3 text-sm text-red-300">
-          {currentError}
-        </div>
-      )}
-
-      {/* Phone Input */}
-      {mode === 'phone' && (
-        <form
-          autoComplete="off"
-          data-form-type="other"
-          onSubmit={(e) => { e.preventDefault(); phoneForm.handleSubmit(handleSendOtp)(); }}
-          className="space-y-5"
-        >
-          <FormField
-            label="Mobile"
-            required
-            error={phoneForm.formState.errors.phone?.message}
-            htmlFor="inline-phone"
-          >
-            <Input
-              id="inline-phone"
-              type="tel"
-              autoComplete="tel"
-              inputMode="tel"
-              autoFocus
-              placeholder="(310) 555-1234"
-              className={inputCls}
-              data-form-type="other"
-              data-1p-ignore
-              data-lpignore="true"
-              {...phoneForm.register('phone', {
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                  const formatted = formatPhoneInput(e.target.value);
-                  phoneForm.setValue('phone', formatted, {
-                    shouldDirty: true,
-                    shouldValidate: false,
-                  });
-                },
-              })}
-            />
-          </FormField>
-
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="site-btn-primary w-full py-3 text-sm font-semibold"
-          >
-            {isLoading ? <Spinner size="sm" /> : 'Continue'}
-          </Button>
-        </form>
-      )}
-
-      {/* Phone OTP Verification */}
-      {mode === 'otp' && (
-        <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
-          <div className="text-center">
-            <p className="text-sm text-site-text-muted">
-              We sent a 6-digit code to <span className="font-medium text-site-text">{formatPhone(otp.otpPhone)}</span>
-            </p>
-          </div>
-
-          <FormField
-            label="Verification code"
-            required
-            error={otpForm.formState.errors.code?.message}
-            htmlFor="inline-signin-otp"
-          >
-            <Input
-              id="inline-signin-otp"
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              autoFocus
-              maxLength={6}
-              placeholder="000000"
-              className={`text-center text-lg tracking-[0.3em] ${inputCls}`}
-              {...otpCodeField}
-              ref={(el) => {
-                otpCodeRef(el);
-                otpInputRef.current = el;
-              }}
-            />
-          </FormField>
-
-          <Button
-            type="submit"
-            disabled={isLoading}
-            className="site-btn-primary w-full py-3 text-sm font-semibold"
-          >
-            {isLoading ? <Spinner size="sm" /> : 'Verify'}
-          </Button>
-
-          <div className="flex items-center justify-between text-sm">
-            <button
-              type="button"
-              onClick={() => { setMode('phone'); setJsxError(null); otp.resetToPhone(); otpForm.reset(); }}
-              className="text-site-text-muted hover:text-site-text"
-            >
-              Change number
-            </button>
-            <button
-              type="button"
-              onClick={handleResendOtp}
-              disabled={otp.cooldown > 0}
-              className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
-            >
-              {otp.cooldown > 0 ? `Resend in ${otp.cooldown}s` : 'Resend code'}
-            </button>
-          </div>
-        </form>
-      )}
-
-    </div>
-  );
-}
-
-// --- Sign Up Flow ---
-
-type SignUpMode = 'phone' | 'otp' | 'profile';
-
-function SignUpFlow({
-  onSuccess,
-  onSwitchToSignIn,
-}: {
-  onSuccess: () => void;
-  onSwitchToSignIn: (phone?: string) => void;
-  businessName: string;
-}) {
-  const [mode, setMode] = useState<SignUpMode>('phone');
-  const [jsxError, setJsxError] = useState<ReactNode | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [phoneExists, setPhoneExists] = useState(false);
-  const otpInputRef = useRef<HTMLInputElement>(null);
-
-  const { checkExists, linkAccount } = useCustomerLink();
-
-  // --- Phone OTP hook ---
-  const otp = usePhoneOtp({
-    mode: 'sign-up',
-    onBeforeSend: async (phone) => {
-      const phoneCheck = await checkExists({ phone });
-      if (phoneCheck.exists) {
-        if (phoneCheck.hasAuthAccount) {
-          setPhoneExists(true);
-          return { abort: true, error: AUTH_ERRORS.PHONE_ALREADY_LINKED };
-        }
-        // Voice-agent customer (exists without auth) — proceed to OTP
-        return { abort: false };
-      }
-      return { abort: false };
-    },
-    onVerified: async (result) => {
-      // Sign-in-instead path: existing account was verified
-      if (phoneExists) {
-        await onSuccess();
-        return;
-      }
-      // New signup: show profile form
-      if (result.isNewOtpSignup) {
-        setMode('profile');
-      } else {
-        // Customer already linked (rare but possible)
-        await onSuccess();
-      }
-    },
-  });
-
-  // Auto-focus OTP input — aggressive strategy for iOS Safari
-  useEffect(() => {
-    if (mode === 'otp') {
-      const tryFocus = () => otpInputRef.current?.focus();
-
-      requestAnimationFrame(() => {
-        tryFocus();
-        requestAnimationFrame(() => {
-          tryFocus();
-        });
-      });
-
-      // Final fallback with delay — catches edge cases on slow iOS devices
-      const timer = setTimeout(tryFocus, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [mode]);
-
-  // Sync OTP phase → mode
-  useEffect(() => {
-    if (otp.phase === 'otp' && mode === 'phone') setMode('otp');
-  }, [otp.phase, mode]);
-
-  // Map hook errors → JSX
-  const renderError = (): ReactNode => {
-    if (jsxError) return jsxError;
-
-    const err = otp.error;
-    if (!err) return null;
-
-    // PHONE_ALREADY_LINKED is shown as inline text (button changes to "Sign In Instead")
-    if (err === AUTH_ERRORS.PHONE_ALREADY_LINKED && phoneExists) {
-      return 'This phone number is already linked to an account.';
-    }
-
-    return err;
-  };
-
-  const currentError = renderError();
-  const isOtpLoading = otp.loading;
-
-  const phoneForm = useForm<PhoneOtpSendInput>({
-    resolver: formResolver(phoneOtpSendSchema),
-  });
-
-  const otpVerifyForm = useForm<PhoneOtpVerifyInput>({
-    resolver: formResolver(phoneOtpVerifySchema),
-    defaultValues: { phone: '', code: '' },
-  });
-
-  const otpProfileForm = useForm<OtpProfileInput>({
-    resolver: formResolver(otpProfileSchema),
-  });
-
-  const handleSendOtp = async (data: PhoneOtpSendInput) => {
-    setJsxError(null);
-    await otp.sendOtp(data.phone);
-    otpVerifyForm.setValue('phone', data.phone);
-  };
-
-  const handleVerifyOtp = async (data: PhoneOtpVerifyInput) => {
-    setJsxError(null);
-    await otp.verifyOtp(data.phone, data.code);
-  };
-
-  const handleResendOtp = async () => {
-    setJsxError(null);
-    otpVerifyForm.setValue('code', '');
-    await otp.resendOtp();
-  };
-
-  // Sign In Instead: send OTP directly and skip to verification
-  const handleSignInInstead = async () => {
-    const phone = phoneForm.getValues('phone');
-    setJsxError(null);
-    await otp.sendOtp(phone);
-    otpVerifyForm.setValue('phone', phone);
-  };
-
-  // Post-OTP profile completion
-  const onOtpProfileSubmit = async (data: OtpProfileInput) => {
-    setLoading(true);
+  const handleProfileSubmit = async (data: OtpProfileInput) => {
+    setProfileLoading(true);
     setJsxError(null);
 
     try {
@@ -443,6 +197,8 @@ function SignUpFlow({
       if (!result.success) {
         if (result.error === 'SESSION_EXPIRED') {
           setJsxError('Your session has expired. Please try again.');
+          setView('phone');
+          otp.resetToPhone();
         } else if (result.error === 'STAFF_ACCOUNT') {
           setJsxError('This email is used for a staff account. Please use a different email.');
         } else {
@@ -451,250 +207,17 @@ function SignUpFlow({
         return;
       }
 
-      await onSuccess();
+      await handleAuthSuccess();
     } catch {
       setJsxError('Something went wrong creating your account. Please try again.');
     } finally {
-      setLoading(false);
+      setProfileLoading(false);
     }
   };
 
-  const { ref: signupOtpCodeRef, ...signupOtpCodeField } = otpVerifyForm.register('code');
-
-  return (
-    <div className="space-y-5">
-      {currentError && (
-        <div className="rounded-md bg-red-950 p-3 text-sm text-red-300">
-          {currentError}
-        </div>
-      )}
-
-      {/* Phone Entry */}
-      {mode === 'phone' && (
-        <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-5">
-          <FormField
-            label="Mobile"
-            required
-            error={phoneForm.formState.errors.phone?.message}
-            htmlFor="inline-signup-phone"
-          >
-            <Input
-              id="inline-signup-phone"
-              type="tel"
-              autoComplete="tel"
-              autoFocus
-              placeholder="(310) 555-1234"
-              className={inputCls}
-              {...phoneForm.register('phone', {
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                  const formatted = formatPhoneInput(e.target.value);
-                  phoneForm.setValue('phone', formatted, {
-                    shouldDirty: true,
-                    shouldValidate: false,
-                  });
-                  if (phoneExists) {
-                    setPhoneExists(false);
-                    setJsxError(null);
-                    otp.resetError();
-                  }
-                },
-              })}
-            />
-          </FormField>
-
-          <Button
-            type={phoneExists ? 'button' : 'submit'}
-            onClick={phoneExists ? handleSignInInstead : undefined}
-            disabled={isOtpLoading}
-            className="site-btn-primary w-full py-3 text-sm font-semibold"
-          >
-            {isOtpLoading ? <Spinner size="sm" /> : phoneExists ? 'Sign In Instead' : 'Continue'}
-          </Button>
-
-          {phoneExists && (
-            <>
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-site-border" />
-                <span className="text-xs font-medium text-site-text-dim">OR</span>
-                <div className="h-px flex-1 bg-site-border" />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onSwitchToSignIn()}
-                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
-              >
-                Sign in with email
-              </button>
-            </>
-          )}
-        </form>
-      )}
-
-      {/* OTP Verification */}
-      {mode === 'otp' && (
-        <form onSubmit={otpVerifyForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
-          <div className="text-center">
-            <p className="text-sm text-site-text-muted">
-              We sent a 6-digit code to <span className="font-medium text-site-text">{formatPhone(otp.otpPhone)}</span>
-            </p>
-          </div>
-
-          <FormField
-            label="Verification code"
-            required
-            error={otpVerifyForm.formState.errors.code?.message}
-            htmlFor="inline-signup-otp"
-          >
-            <Input
-              id="inline-signup-otp"
-              autoFocus
-              type="text"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="000000"
-              className={`text-center text-lg tracking-[0.3em] ${inputCls}`}
-              {...signupOtpCodeField}
-              ref={(el) => {
-                signupOtpCodeRef(el);
-                otpInputRef.current = el;
-              }}
-            />
-          </FormField>
-
-          <Button
-            type="submit"
-            disabled={isOtpLoading}
-            className="site-btn-primary w-full py-3 text-sm font-semibold"
-          >
-            {isOtpLoading ? <Spinner size="sm" /> : 'Verify'}
-          </Button>
-
-          <div className="flex items-center justify-between text-sm">
-            <button
-              type="button"
-              onClick={() => { setMode('phone'); setJsxError(null); setPhoneExists(false); otp.resetToPhone(); otpVerifyForm.reset(); }}
-              className="text-site-text-muted hover:text-site-text"
-            >
-              Change number
-            </button>
-            <button
-              type="button"
-              onClick={handleResendOtp}
-              disabled={otp.cooldown > 0}
-              className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
-            >
-              {otp.cooldown > 0 ? `Resend in ${otp.cooldown}s` : 'Resend code'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Post-OTP Profile Completion */}
-      {mode === 'profile' && (
-        <form onSubmit={otpProfileForm.handleSubmit(onOtpProfileSubmit)} className="space-y-5">
-          <p className="text-sm text-site-text-muted">
-            Phone verified! Complete your profile to finish signing up.
-          </p>
-
-          <FormField label="Mobile" htmlFor="inline-otp-phone">
-            <Input
-              id="inline-otp-phone"
-              value={formatPhone(otp.otpPhone)}
-              readOnly
-              className="bg-brand-dark text-site-text-muted border-site-border text-base sm:text-sm"
-            />
-          </FormField>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              label="First Name"
-              required
-              error={otpProfileForm.formState.errors.first_name?.message}
-              htmlFor="inline-otp-first-name"
-            >
-              <Input
-                id="inline-otp-first-name"
-                placeholder="John"
-                autoFocus
-                className={inputCls}
-                {...otpProfileForm.register('first_name')}
-              />
-            </FormField>
-
-            <FormField
-              label="Last Name"
-              required
-              error={otpProfileForm.formState.errors.last_name?.message}
-              htmlFor="inline-otp-last-name"
-            >
-              <Input
-                id="inline-otp-last-name"
-                placeholder="Doe"
-                className={inputCls}
-                {...otpProfileForm.register('last_name')}
-              />
-            </FormField>
-          </div>
-
-          <FormField
-            label="Email"
-            error={otpProfileForm.formState.errors.email?.message}
-            htmlFor="inline-otp-email"
-          >
-            <Input
-              id="inline-otp-email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              className={inputCls}
-              {...otpProfileForm.register('email')}
-            />
-          </FormField>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="site-btn-primary w-full py-3 text-sm font-semibold"
-          >
-            {loading ? <Spinner size="sm" /> : 'Complete Sign Up'}
-          </Button>
-        </form>
-      )}
-    </div>
-  );
-}
-
-// --- Main InlineAuth Component ---
-
-type AuthView = 'buttons' | 'sign-in' | 'sign-up' | 'complete-profile';
-
-export function InlineAuth({
-  onAuthComplete,
-  isAuthenticated,
-  customerData,
-  onSignOut,
-  businessName,
-}: InlineAuthProps) {
-  const [view, setView] = useState<AuthView>('buttons');
-  const [switchPhone, setSwitchPhone] = useState('');
-  const [fetchingProfile, setFetchingProfile] = useState(false);
-  const localAuthRef = useRef<AuthCustomerData | null>(null);
-  const [localAuthData, setLocalAuthData] = useState<AuthCustomerData | null>(null);
-
-  // Profile completion state (for existing customers with incomplete data)
-  const [pendingAuthData, setPendingAuthData] = useState<AuthCustomerData | null>(null);
-  const [completeFirstName, setCompleteFirstName] = useState('');
-  const [completeLastName, setCompleteLastName] = useState('');
-  const [completeEmail, setCompleteEmail] = useState('');
-  const [completeError, setCompleteError] = useState<string | null>(null);
-  const [completeSaving, setCompleteSaving] = useState(false);
-
   // After auth success: fetch customer profile + vehicles
   const handleAuthSuccess = useCallback(async () => {
-    setView('buttons');
-    setSwitchPhone('');
+    setView('phone');
     setFetchingProfile(true);
     try {
       // Small delay to ensure Supabase session cookie is fully set
@@ -774,9 +297,7 @@ export function InlineAuth({
   const handleNotYouClick = useCallback(() => {
     localAuthRef.current = null;
     setLocalAuthData(null);
-    setSwitchPhone('');
-    setView('buttons');
-    // Do NOT call onSignOut — user stays authenticated site-wide
+    setView('phone');
   }, []);
 
   // "Sign out" — full sign-out: clear booking auth AND Supabase session
@@ -784,24 +305,11 @@ export function InlineAuth({
     // Clear local state immediately (synchronous — prevents iOS touch event cancellation)
     localAuthRef.current = null;
     setLocalAuthData(null);
-    setSwitchPhone('');
-    setView('buttons');
+    setView('phone');
 
     // Fire sign-out asynchronously — don't block the UI
     Promise.resolve(onSignOut()).catch((err: unknown) => console.error('Sign out error:', err));
   }, [onSignOut]);
-
-  // Switch to sign-in from sign-up (with optional phone pre-fill)
-  const handleSwitchToSignIn = useCallback((phone?: string) => {
-    setSwitchPhone(phone || '');
-    setView('sign-in');
-  }, []);
-
-  // Switch to sign-up from sign-in
-  const handleSwitchToSignUp = useCallback(() => {
-    setSwitchPhone('');
-    setView('sign-up');
-  }, []);
 
   // Handle profile completion submission for existing customers
   const handleCompleteProfile = useCallback(async () => {
@@ -849,7 +357,7 @@ export function InlineAuth({
       localAuthRef.current = updatedData;
       setLocalAuthData(updatedData);
       setPendingAuthData(null);
-      setView('buttons');
+      setView('phone');
       onAuthComplete(updatedData);
     } catch {
       setCompleteError('Something went wrong. Please try again.');
@@ -882,7 +390,6 @@ export function InlineAuth({
     return (
       <div className="rounded-lg border border-accent-brand/30 bg-accent-brand/5 p-4 booking-auth-card">
         <div className="flex items-start justify-between gap-4">
-          {/* Left: Customer info */}
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-site-text">
               Booking as: {first_name} {last_name}
@@ -891,8 +398,6 @@ export function InlineAuth({
               {phone ? <span>{formatPhone(phone)}</span> : ''}{phone && email ? ' · ' : ''}{email}
             </p>
           </div>
-
-          {/* Right: Actions stacked */}
           <div className="flex flex-col items-end gap-1 shrink-0">
             <button
               type="button"
@@ -924,159 +429,274 @@ export function InlineAuth({
     );
   }
 
-  // Not authenticated — show inline auth based on view
+  // OTP code ref merge for auto-focus
+  const { ref: otpCodeRef, ...otpCodeField } = otpForm.register('code');
+
+  // Not authenticated — show unified phone auth flow
   return (
     <div className="transition-all duration-200">
-      {/* STATE 1: Two buttons — Returning Customer? / New Here? */}
-      {view === 'buttons' && (
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={() => setView('sign-in')}
-            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-accent-ui/50 hover:bg-accent-ui/5"
+      <div className="rounded-xl border border-site-border p-5 sm:p-6">
+        {currentError && (
+          <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
+            {currentError}
+          </div>
+        )}
+
+        {/* ===== PHONE ENTRY ===== */}
+        {view === 'phone' && (
+          <form
+            autoComplete="off"
+            data-form-type="other"
+            onSubmit={(e) => { e.preventDefault(); phoneForm.handleSubmit(handleSendOtp)(); }}
+            className="space-y-5"
           >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-brand/10 text-accent-brand">
-                <LogIn className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-site-text">Returning Customer?</p>
-                <p className="text-xs text-site-text-muted">Sign in with your phone or email</p>
-              </div>
+            <p className="text-sm text-site-text-muted">Enter your phone number to continue</p>
+
+            <FormField
+              label="Mobile"
+              required
+              error={phoneForm.formState.errors.phone?.message}
+              htmlFor="inline-phone"
+            >
+              <Input
+                id="inline-phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                autoFocus
+                placeholder="(310) 555-1234"
+                className={inputCls}
+                data-form-type="other"
+                data-1p-ignore
+                data-lpignore="true"
+                {...phoneForm.register('phone', {
+                  onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                    const formatted = formatPhoneInput(e.target.value);
+                    phoneForm.setValue('phone', formatted, {
+                      shouldDirty: true,
+                      shouldValidate: false,
+                    });
+                  },
+                })}
+              />
+            </FormField>
+
+            <Button
+              type="submit"
+              disabled={otp.loading}
+              className="site-btn-primary w-full py-3 text-sm font-semibold"
+            >
+              {otp.loading ? <Spinner size="sm" /> : 'Continue'}
+            </Button>
+          </form>
+        )}
+
+        {/* ===== OTP VERIFICATION ===== */}
+        {view === 'otp' && (
+          <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
+            <div className="text-center">
+              <p className="text-sm font-medium text-accent-brand">
+                {isNewUser ? 'Let\u2019s create your account!' : 'Welcome back!'}
+              </p>
+              <p className="mt-1 text-sm text-site-text-muted">
+                We sent a 6-digit code to <span className="font-medium text-site-text">{formatPhone(otp.otpPhone)}</span>
+              </p>
             </div>
-          </button>
 
-          <button
-            type="button"
-            onClick={() => setView('sign-up')}
-            className="w-full rounded-lg border border-site-border bg-brand-surface p-4 text-left transition-colors hover:border-accent-ui/50 hover:bg-accent-ui/5"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent-brand/10 text-accent-brand">
-                <UserPlus className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-site-text">New here?</p>
-                <p className="text-xs text-site-text-muted">Create an account to get started</p>
-              </div>
+            <FormField
+              label="Verification code"
+              required
+              error={otpForm.formState.errors.code?.message}
+              htmlFor="inline-otp"
+            >
+              <Input
+                id="inline-otp"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                maxLength={6}
+                placeholder="000000"
+                className={`text-center text-lg tracking-[0.3em] ${inputCls}`}
+                {...otpCodeField}
+                ref={(el) => {
+                  otpCodeRef(el);
+                  otpInputRef.current = el;
+                }}
+              />
+            </FormField>
+
+            <Button
+              type="submit"
+              disabled={otp.loading}
+              className="site-btn-primary w-full py-3 text-sm font-semibold"
+            >
+              {otp.loading ? <Spinner size="sm" /> : 'Verify'}
+            </Button>
+
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                onClick={() => { setView('phone'); setJsxError(null); otp.resetToPhone(); otpForm.reset(); }}
+                className="text-site-text-muted hover:text-site-text"
+              >
+                Change number
+              </button>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={otp.cooldown > 0}
+                className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
+              >
+                {otp.cooldown > 0 ? `Resend in ${otp.cooldown}s` : 'Resend code'}
+              </button>
             </div>
-          </button>
-        </div>
-      )}
+          </form>
+        )}
 
-      {/* STATE 2A: Sign In — inline expanded section */}
-      {view === 'sign-in' && (
-        <div className="rounded-xl border border-site-border p-5 sm:p-6">
-          <button
-            type="button"
-            onClick={() => { setView('buttons'); setSwitchPhone(''); }}
-            className="flex items-center gap-1.5 text-sm text-site-text-dim hover:text-site-text transition-colors mb-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <h3 className="text-lg font-semibold text-site-text mb-5">Enter your details</h3>
-          <SignInFlow
-            key={`signin-${switchPhone}`}
-            initialPhone={switchPhone}
-            onSuccess={handleAuthSuccess}
-            onSwitchToSignUp={handleSwitchToSignUp}
-            businessName={businessName}
-          />
-        </div>
-      )}
+        {/* ===== PROFILE COMPLETION (new customers after OTP) ===== */}
+        {view === 'profile' && (
+          <form onSubmit={profileForm.handleSubmit(handleProfileSubmit)} className="space-y-5">
+            <p className="text-sm text-site-text-muted">
+              Phone verified! Complete your profile to finish signing up.
+            </p>
 
-      {/* STATE 2B: Sign Up — inline expanded section */}
-      {view === 'sign-up' && (
-        <div className="rounded-xl border border-site-border p-5 sm:p-6">
-          <button
-            type="button"
-            onClick={() => { setView('buttons'); setSwitchPhone(''); }}
-            className="flex items-center gap-1.5 text-sm text-site-text-dim hover:text-site-text transition-colors mb-4"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <h3 className="text-lg font-semibold text-site-text mb-5">Create Account</h3>
-          <SignUpFlow
-            onSuccess={handleAuthSuccess}
-            onSwitchToSignIn={handleSwitchToSignIn}
-            businessName={businessName}
-          />
-        </div>
-      )}
-
-      {/* STATE 3: Profile Completion — existing customer with incomplete data */}
-      {view === 'complete-profile' && pendingAuthData && (
-        <div className="rounded-xl border border-site-border p-5 sm:p-6">
-          <h3 className="text-lg font-semibold text-site-text mb-2">Complete Your Profile</h3>
-          <p className="text-sm text-site-text-muted mb-5">
-            Phone verified! We just need a couple more details to complete your booking.
-          </p>
-
-          <div className="space-y-4">
-            {pendingAuthData.customer.phone && (
-              <FormField label="Mobile" htmlFor="complete-phone">
-                <Input
-                  id="complete-phone"
-                  value={formatPhone(pendingAuthData.customer.phone)}
-                  readOnly
-                  className="bg-brand-dark text-site-text-muted border-site-border text-base sm:text-sm"
-                />
-              </FormField>
-            )}
+            <FormField label="Mobile" htmlFor="inline-profile-phone">
+              <Input
+                id="inline-profile-phone"
+                value={formatPhone(otp.otpPhone)}
+                readOnly
+                className="bg-brand-dark text-site-text-muted border-site-border text-base sm:text-sm"
+              />
+            </FormField>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="First Name" required htmlFor="complete-first-name">
+              <FormField
+                label="First Name"
+                required
+                error={profileForm.formState.errors.first_name?.message}
+                htmlFor="inline-profile-first-name"
+              >
                 <Input
-                  id="complete-first-name"
+                  id="inline-profile-first-name"
                   placeholder="John"
                   autoFocus
-                  value={completeFirstName}
-                  onChange={(e) => { setCompleteFirstName(e.target.value); setCompleteError(null); }}
                   className={inputCls}
+                  {...profileForm.register('first_name')}
                 />
               </FormField>
 
-              <FormField label="Last Name" required htmlFor="complete-last-name">
+              <FormField
+                label="Last Name"
+                required
+                error={profileForm.formState.errors.last_name?.message}
+                htmlFor="inline-profile-last-name"
+              >
                 <Input
-                  id="complete-last-name"
+                  id="inline-profile-last-name"
                   placeholder="Doe"
-                  value={completeLastName}
-                  onChange={(e) => { setCompleteLastName(e.target.value); setCompleteError(null); }}
                   className={inputCls}
+                  {...profileForm.register('last_name')}
                 />
               </FormField>
             </div>
 
-            <FormField label="Email" htmlFor="complete-email">
+            <FormField
+              label="Email"
+              error={profileForm.formState.errors.email?.message}
+              htmlFor="inline-profile-email"
+            >
               <Input
-                id="complete-email"
+                id="inline-profile-email"
                 type="email"
                 autoComplete="email"
                 placeholder="you@example.com"
-                value={completeEmail}
-                onChange={(e) => { setCompleteEmail(e.target.value); setCompleteError(null); }}
                 className={inputCls}
+                {...profileForm.register('email')}
               />
-              <p className="mt-1 text-xs text-site-text-dim">Optional — for booking confirmation &amp; receipts</p>
             </FormField>
 
-            {completeError && (
-              <p className="text-sm text-red-500">{completeError}</p>
-            )}
-
             <Button
-              type="button"
-              disabled={completeSaving}
-              onClick={handleCompleteProfile}
+              type="submit"
+              disabled={profileLoading}
               className="site-btn-primary w-full py-3 text-sm font-semibold"
             >
-              {completeSaving ? <Spinner size="sm" /> : 'Continue to Booking'}
+              {profileLoading ? <Spinner size="sm" /> : 'Complete Sign Up'}
             </Button>
-          </div>
-        </div>
-      )}
+          </form>
+        )}
+
+        {/* ===== PROFILE COMPLETION (existing customer with incomplete data) ===== */}
+        {view === 'complete-profile' && pendingAuthData && (
+          <>
+            <h3 className="text-lg font-semibold text-site-text mb-2">Complete Your Profile</h3>
+            <p className="text-sm text-site-text-muted mb-5">
+              We just need a couple more details to complete your booking.
+            </p>
+
+            <div className="space-y-4">
+              {pendingAuthData.customer.phone && (
+                <FormField label="Mobile" htmlFor="complete-phone">
+                  <Input
+                    id="complete-phone"
+                    value={formatPhone(pendingAuthData.customer.phone)}
+                    readOnly
+                    className="bg-brand-dark text-site-text-muted border-site-border text-base sm:text-sm"
+                  />
+                </FormField>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField label="First Name" required htmlFor="complete-first-name">
+                  <Input
+                    id="complete-first-name"
+                    placeholder="John"
+                    autoFocus
+                    value={completeFirstName}
+                    onChange={(e) => { setCompleteFirstName(e.target.value); setCompleteError(null); }}
+                    className={inputCls}
+                  />
+                </FormField>
+
+                <FormField label="Last Name" required htmlFor="complete-last-name">
+                  <Input
+                    id="complete-last-name"
+                    placeholder="Doe"
+                    value={completeLastName}
+                    onChange={(e) => { setCompleteLastName(e.target.value); setCompleteError(null); }}
+                    className={inputCls}
+                  />
+                </FormField>
+              </div>
+
+              <FormField label="Email" htmlFor="complete-email">
+                <Input
+                  id="complete-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={completeEmail}
+                  onChange={(e) => { setCompleteEmail(e.target.value); setCompleteError(null); }}
+                  className={inputCls}
+                />
+              </FormField>
+
+              {completeError && (
+                <p className="text-sm text-red-500">{completeError}</p>
+              )}
+
+              <Button
+                type="button"
+                disabled={completeSaving}
+                onClick={handleCompleteProfile}
+                className="site-btn-primary w-full py-3 text-sm font-semibold"
+              >
+                {completeSaving ? <Spinner size="sm" /> : 'Continue to Booking'}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

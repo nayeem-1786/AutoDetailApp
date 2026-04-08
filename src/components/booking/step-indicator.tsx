@@ -21,8 +21,8 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
 
   return (
     <nav aria-label="Booking progress" className="mb-8">
-      {/* Desktop: full stepper with labels */}
-      <ol className="hidden sm:flex items-center justify-between">
+      {/* Desktop: full stepper with labels — centered with max-width */}
+      <ol className="hidden sm:flex items-center justify-between max-w-lg mx-auto">
         {STEPS.map((step, index) => {
           const stepNum = index + 1;
           const isCompleted = currentStep > stepNum;

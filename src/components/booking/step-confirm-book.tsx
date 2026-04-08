@@ -547,7 +547,6 @@ export function StepConfirmBook({
                 isAuthenticated={isAuthenticated}
                 customerData={customerData}
                 onSignOut={onSignOut}
-                businessName={businessName}
               />
             </div>
           </div>

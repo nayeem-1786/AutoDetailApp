@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Unify booking InlineAuth to single phone flow + center step indicator — 2026-04-08
+
+- **Replaced two-flow pattern** (SignInFlow + SignUpFlow + "Returning Customer?"/"New here?" buttons) with a single unified phone flow using `usePhoneOtp(mode: 'sign-in')` + `useCustomerLink`.
+- Flow: phone input → OTP → "Welcome back!" (returning) or "Let's create your account!" (new) → profile form if new → "Booking as: Name" compact card.
+- **Removed:** "Returning Customer?"/"New here?" buttons, "Sign In Instead" loop, "Sign in with email" link, OR dividers, `SignInFlow` component, `SignUpFlow` component, `businessName` prop.
+- **Kept:** "Booking as" compact card, "Not you?"/"Sign out", profile completion for incomplete profiles (Journey E), `handleAuthSuccess`, `handleCompleteProfile`, all existing callbacks.
+- **Step indicator centered:** Added `max-w-lg mx-auto` to desktop stepper so circles stay compact and centered regardless of parent width changes between steps.
+- Files: `inline-auth.tsx`, `step-confirm-book.tsx`, `step-indicator.tsx`
+
+---
+
 ## fix: Require all vehicle fields + always show size picker with auto-detection — 2026-04-08
 
 - Make, Model, Year, Color are now **all required** in the booking vehicle step.
