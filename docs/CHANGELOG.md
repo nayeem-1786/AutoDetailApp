@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Booking vehicle step — placeholder text + make combobox clearing — 2026-04-08
+
+- Year dropdown placeholder changed from "Optional" to "Select year"
+- Color input placeholder changed from "Optional" to "e.g., Silver"
+- Make combobox: users can now clear a selected make by backspacing to empty. Previously, clearing the input and clicking away would revert to the old value.
+- Files: `step-vehicle.tsx`, `vehicle-make-combobox.tsx`
+
+---
+
 ## fix: Logout redirects to homepage instead of signin — 2026-04-08
 
 - **Root cause:** `AccountShell` has a useEffect that redirects unauthenticated users to `/signin`. When `signOut()` cleared the user state, this useEffect fired and overwrote the `customerSignOut()` navigation to `/` — racing it to `/signin`.

@@ -107,6 +107,11 @@ export function VehicleMakeCombobox({
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
         if (!isOtherMode) {
+          // If user cleared the field, commit the clear
+          if (!search.trim()) {
+            onChange('');
+            return;
+          }
           // If user typed something not in the list, revert to current value
           const match = makes.find((m) => m.name.toLowerCase() === search.toLowerCase());
           if (!match) {
@@ -117,7 +122,7 @@ export function VehicleMakeCombobox({
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [makes, search, value, isOtherMode]);
+  }, [makes, search, value, isOtherMode, onChange]);
 
   const filtered = search
     ? makes.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
@@ -146,12 +151,17 @@ export function VehicleMakeCombobox({
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setSearch(e.target.value);
+    const newValue = e.target.value;
+    setSearch(newValue);
     if (isOtherMode) {
       // In "Other" mode, directly set the value
-      onChange(e.target.value);
+      onChange(newValue);
     } else {
       if (!open) setOpen(true);
+      // If user clears the input, clear the selection
+      if (!newValue) {
+        onChange('');
+      }
     }
   }
 
@@ -164,8 +174,11 @@ export function VehicleMakeCombobox({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') {
       setOpen(false);
-      if (!isOtherMode) {
+      // If user cleared input, commit the clear; otherwise revert to value
+      if (!isOtherMode && search.trim()) {
         setSearch(value || '');
+      } else if (!search.trim()) {
+        onChange('');
       }
       inputRef.current?.blur();
     }

@@ -405,7 +405,7 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
               value={year?.toString() ?? ''}
               onChange={(e) => setYear(e.target.value ? parseInt(e.target.value, 10) : null)}
             >
-              <option value="">Optional</option>
+              <option value="">Select year</option>
               {yearOptions.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
@@ -416,7 +416,7 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
               id="vehicle-color"
               value={color}
               onChange={(e) => setColor(titleCaseField(e.target.value))}
-              placeholder="Optional"
+              placeholder="e.g., Silver"
               className="text-base sm:text-sm"
             />
           </FormField>
