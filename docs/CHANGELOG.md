@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Require all vehicle fields + always show size picker with auto-detection — 2026-04-08
+
+- Make, Model, Year, Color are now **all required** in the booking vehicle step.
+- Vehicle size picker is **always visible** for automobiles. Auto-detection from Make/Model pre-selects the best match, but the customer can override.
+- Specialty tier picker is always visible for non-automobile categories (motorcycle, RV, boat, aircraft).
+- Removed dead "no make entered" code path (category-only with manual size selection).
+- Removed "Entering your make and model above will auto-detect the size" hint — replaced by "Vehicle size affects service pricing."
+- Removed the separate "Detected: Automobile · Sedan" indicator — the pre-selected size button itself serves as confirmation.
+- Validation errors now shown inline on each required field.
+- Files: `step-vehicle.tsx`
+
+---
+
 ## fix: Booking vehicle step — placeholder text + make combobox clearing — 2026-04-08
 
 - Year dropdown placeholder changed from "Optional" to "Select year"

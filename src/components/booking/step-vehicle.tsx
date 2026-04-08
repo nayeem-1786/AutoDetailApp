@@ -147,23 +147,41 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     setErrors({});
   }
 
+  // Effective size class: manual override takes priority, then auto-detected
+  const effectiveSizeClass = manualSizeClass ?? classification?.size_class ?? null;
+
+  // Effective specialty tier: manual override takes priority, then auto-detected
+  const effectiveSpecialtyTier = manualSpecialtyTier ?? classification?.specialty_tier ?? null;
+
+  // Auto-sync: when classification changes, pre-select the detected size/tier
+  // (only if user hasn't manually overridden yet)
+  useEffect(() => {
+    if (classification?.size_class && !manualSizeClass) {
+      // Auto-detected — will be used via effectiveSizeClass
+    }
+    if (classification?.specialty_tier && !manualSpecialtyTier) {
+      // Auto-detected — will be used via effectiveSpecialtyTier
+    }
+  }, [classification, manualSizeClass, manualSpecialtyTier]);
+
   // --- Determine if Continue is enabled ---
   function isValid(): boolean {
     if (mode === 'saved') {
       return !!selectedVehicleId;
     }
 
-    // Manual mode: need category
+    // Manual mode: all fields required
     if (!category) return false;
+    if (!make.trim()) return false;
+    if (!model.trim()) return false;
+    if (!year) return false;
+    if (!color.trim()) return false;
 
-    // If no make entered: need size class (auto) or specialty tier (specialty)
-    if (!make.trim()) {
-      if (category === 'automobile') return !!manualSizeClass;
-      if (isSpecialtyCategory(category)) return !!manualSpecialtyTier;
-      return false;
-    }
+    // Need size class (auto) or specialty tier for pricing
+    if (category === 'automobile' && !effectiveSizeClass) return false;
+    if (isSpecialtyCategory(category) && !effectiveSpecialtyTier) return false;
 
-    // If make entered but still classifying, wait
+    // If still classifying, wait
     if (classifying) return false;
 
     return true;
@@ -187,63 +205,32 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       };
     }
 
-    // Manual entry
-    const trimmedMake = make.trim();
-    const trimmedModel = model.trim();
-
-    if (trimmedMake && classification) {
-      // Have classification from make/model
-      return {
-        vehicle_category: classification.vehicle_category,
-        vehicle_type: classification.vehicle_type,
-        size_class: classification.size_class,
-        specialty_tier: classification.specialty_tier,
-        make: trimmedMake,
-        model: trimmedModel || null,
-        year: year,
-        color: color.trim() || null,
-      };
-    }
-
-    // No make — category-only with manual size/tier
-    if (category === 'automobile') {
-      return {
-        vehicle_category: 'automobile',
-        vehicle_type: 'standard',
-        size_class: manualSizeClass,
-        specialty_tier: null,
-        make: null,
-        model: null,
-        year: null,
-        color: null,
-      };
-    }
-
-    // Specialty category without make
+    // Manual entry — all fields required
+    const effectiveCat = classification?.vehicle_category ?? category;
     return {
-      vehicle_category: category,
-      vehicle_type: category,
-      size_class: null,
-      specialty_tier: manualSpecialtyTier,
-      make: null,
-      model: null,
-      year: null,
-      color: null,
+      vehicle_category: effectiveCat,
+      vehicle_type: classification?.vehicle_type ?? (effectiveCat === 'automobile' ? 'standard' : effectiveCat),
+      size_class: effectiveSizeClass,
+      specialty_tier: effectiveSpecialtyTier,
+      make: make.trim(),
+      model: model.trim(),
+      year: year,
+      color: color.trim(),
     };
   }
 
   function handleContinue() {
-    const selection = buildSelection();
-    if (!selection) return;
-
-    // Validate
+    // Validate required fields
     const newErrors: Record<string, string> = {};
-    if (mode === 'manual' && !make.trim()) {
-      // Category-only: need size class or specialty tier
-      if (category === 'automobile' && !manualSizeClass) {
+    if (mode === 'manual') {
+      if (!make.trim()) newErrors.make = 'Required';
+      if (!model.trim()) newErrors.model = 'Required';
+      if (!year) newErrors.year = 'Required';
+      if (!color.trim()) newErrors.color = 'Required';
+      if (category === 'automobile' && !effectiveSizeClass) {
         newErrors.size_class = 'Please select a vehicle size';
       }
-      if (isSpecialtyCategory(category) && !manualSpecialtyTier) {
+      if (isSpecialtyCategory(category) && !effectiveSpecialtyTier) {
         newErrors.specialty_tier = 'Please select a size/type';
       }
     }
@@ -251,6 +238,9 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       setErrors(newErrors);
       return;
     }
+
+    const selection = buildSelection();
+    if (!selection) return;
 
     setErrors({});
     onContinue(selection);
@@ -336,9 +326,6 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   // --- Manual Entry Form ---
   function renderManualForm() {
     const isSpecialty = isSpecialtyCategory(category);
-    const showSizeClassPicker = category === 'automobile' && !make.trim();
-    const showSpecialtyTierPicker = isSpecialty && !make.trim();
-    const showClassificationResult = !!make.trim() && classification && !classifying;
 
     return (
       <div className="space-y-4 rounded-xl border border-site-border bg-brand-card p-4 sm:p-6">
@@ -373,25 +360,25 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
         </FormField>
 
         {/* Make */}
-        <FormField label="Make" htmlFor="vehicle-make">
+        <FormField label="Make" required htmlFor="vehicle-make" error={errors.make}>
           <VehicleMakeCombobox
             id="vehicle-make"
             value={make}
             onChange={(val) => {
               setMake(val);
-              // Reset model when make changes
               if (val !== make) setModel('');
+              setErrors((prev) => ({ ...prev, make: '' }));
             }}
             category={category}
           />
         </FormField>
 
         {/* Model */}
-        <FormField label="Model" htmlFor="vehicle-model">
+        <FormField label="Model" required htmlFor="vehicle-model" error={errors.model}>
           <Input
             id="vehicle-model"
             value={model}
-            onChange={(e) => setModel(titleCaseField(e.target.value))}
+            onChange={(e) => { setModel(titleCaseField(e.target.value)); setErrors((prev) => ({ ...prev, model: '' })); }}
             placeholder={category === 'automobile' ? 'e.g., Camry' : 'e.g., Sportster'}
             className="text-base sm:text-sm"
           />
@@ -399,11 +386,11 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
 
         {/* Year + Color row */}
         <div className="grid grid-cols-2 gap-3">
-          <FormField label="Year" htmlFor="vehicle-year">
+          <FormField label="Year" required htmlFor="vehicle-year" error={errors.year}>
             <Select
               id="vehicle-year"
               value={year?.toString() ?? ''}
-              onChange={(e) => setYear(e.target.value ? parseInt(e.target.value, 10) : null)}
+              onChange={(e) => { setYear(e.target.value ? parseInt(e.target.value, 10) : null); setErrors((prev) => ({ ...prev, year: '' })); }}
             >
               <option value="">Select year</option>
               {yearOptions.map((y) => (
@@ -411,18 +398,18 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
               ))}
             </Select>
           </FormField>
-          <FormField label="Color" htmlFor="vehicle-color">
+          <FormField label="Color" required htmlFor="vehicle-color" error={errors.color}>
             <Input
               id="vehicle-color"
               value={color}
-              onChange={(e) => setColor(titleCaseField(e.target.value))}
+              onChange={(e) => { setColor(titleCaseField(e.target.value)); setErrors((prev) => ({ ...prev, color: '' })); }}
               placeholder="e.g., Silver"
               className="text-base sm:text-sm"
             />
           </FormField>
         </div>
 
-        {/* Classification indicator */}
+        {/* Classification spinner */}
         {classifying && (
           <div className="flex items-center gap-2 text-sm text-site-text-secondary">
             <Spinner className="h-4 w-4" />
@@ -430,27 +417,12 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
           </div>
         )}
 
-        {showClassificationResult && (
-          <div className="flex items-center gap-2 rounded-lg bg-brand-surface p-3 text-sm">
-            <Check className="h-4 w-4 text-green-500 shrink-0" />
-            <span className="text-site-text">
-              Detected: <strong>{VEHICLE_CATEGORY_LABELS[classification.vehicle_category]}</strong>
-              {classification.size_class && (
-                <> &middot; {VEHICLE_SIZE_LABELS[classification.size_class] ?? classification.size_class}</>
-              )}
-              {classification.specialty_tier && (
-                <> &middot; {classification.specialty_tier}</>
-              )}
-            </span>
-          </div>
-        )}
-
-        {/* Size class picker (automobiles, no make entered) */}
-        {showSizeClassPicker && (
+        {/* Vehicle size picker — always visible for automobiles, auto-detection pre-selects */}
+        {category === 'automobile' && (
           <FormField label="Vehicle Size" required error={errors.size_class}>
             <div className="grid grid-cols-3 gap-2">
               {Object.entries(VEHICLE_SIZE_LABELS).map(([key, label]) => {
-                const isSelected = manualSizeClass === key;
+                const isSelected = effectiveSizeClass === key;
                 return (
                   <button
                     key={key}
@@ -469,17 +441,17 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
               })}
             </div>
             <p className="text-xs text-site-text-muted mt-1">
-              Entering your make and model above will auto-detect the size.
+              Vehicle size affects service pricing.
             </p>
           </FormField>
         )}
 
-        {/* Specialty tier picker (non-automobile, no make entered) */}
-        {showSpecialtyTierPicker && (
+        {/* Specialty tier picker — always visible for specialty categories */}
+        {isSpecialty && (
           <FormField label="Size / Type" required error={errors.specialty_tier}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {SPECIALTY_TIERS[category as Exclude<VehicleCategory, 'automobile'>]?.map((tier) => {
-                const isSelected = manualSpecialtyTier === tier.key;
+                const isSelected = effectiveSpecialtyTier === tier.key;
                 return (
                   <button
                     key={tier.key}
