@@ -53,19 +53,6 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   );
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session: s } }: { data: { session: Session | null } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) {
-        loadCustomerData(s.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    }).catch((error: unknown) => {
-      console.warn('[customer-auth] getSession error:', error instanceof Error ? error.message : error);
-      setLoading(false);
-    });
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: string, s: Session | null) => {

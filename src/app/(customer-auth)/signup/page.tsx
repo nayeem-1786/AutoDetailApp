@@ -70,8 +70,8 @@ export default function CustomerSignUpPage() {
     if (signedOutRef.current) return;
     signedOutRef.current = true;
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
-      if (session) supabase.auth.signOut();
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
+      if (user) supabase.auth.signOut();
     }).catch(() => {});
   }, []);
 

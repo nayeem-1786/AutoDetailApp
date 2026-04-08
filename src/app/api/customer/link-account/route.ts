@@ -33,13 +33,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize email for case-insensitive matching (DB unique index is on lower(email))
+    const normalizedEmail = email.toLowerCase().trim();
+
     const admin = createAdminClient();
 
     // Guard: reject if this email belongs to an employee
     const { data: emp } = await admin
       .from('employees')
       .select('id')
-      .eq('email', email)
+      .eq('email', normalizedEmail)
       .limit(1)
       .single();
 
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest) {
         };
         if (!existingByPhone.first_name && first_name) updates.first_name = first_name;
         if (!existingByPhone.last_name && last_name) updates.last_name = last_name;
-        if (!existingByPhone.email && email) updates.email = email;
+        if (!existingByPhone.email && normalizedEmail) updates.email = normalizedEmail;
 
         await admin.from('customers').update(updates).eq('id', existingByPhone.id);
 
@@ -107,7 +110,7 @@ export async function POST(request: NextRequest) {
     const { data: existingByEmail } = await admin
       .from('customers')
       .select('id, first_name, last_name, phone')
-      .eq('email', email)
+      .eq('email', normalizedEmail)
       .is('auth_user_id', null)
       .is('deleted_at', null)
       .limit(1)
@@ -139,14 +142,54 @@ export async function POST(request: NextRequest) {
       return noStoreJson({ success: true, customer_id: existingByEmail.id });
     }
 
-    // (4) No existing customer found — create a new one
+    // (4) Conflict check: see if phone/email is already linked to a DIFFERENT auth user
+    // Steps 2-3 only search WHERE auth_user_id IS NULL, so they miss this case
+    const conflictChecks = [];
+    if (e164Phone) {
+      conflictChecks.push(
+        admin
+          .from('customers')
+          .select('id, auth_user_id')
+          .eq('phone', e164Phone)
+          .not('auth_user_id', 'is', null)
+          .neq('auth_user_id', user.id)
+          .is('deleted_at', null)
+          .limit(1)
+          .single()
+          .then(({ data }) => ({ type: 'phone' as const, data }))
+      );
+    }
+    conflictChecks.push(
+      admin
+        .from('customers')
+        .select('id, auth_user_id')
+        .eq('email', normalizedEmail)
+        .not('auth_user_id', 'is', null)
+        .neq('auth_user_id', user.id)
+        .is('deleted_at', null)
+        .limit(1)
+        .single()
+        .then(({ data }) => ({ type: 'email' as const, data }))
+    );
+
+    const conflictResults = await Promise.all(conflictChecks);
+    const conflict = conflictResults.find(r => r.data);
+    if (conflict) {
+      const field = conflict.type === 'phone' ? 'phone number' : 'email';
+      return noStoreJson(
+        { error: `This ${field} is already linked to another account.` },
+        { status: 409 }
+      );
+    }
+
+    // (5) No existing customer found — create a new one
     const { data: newCustomer, error: custErr } = await admin
       .from('customers')
       .insert({
         auth_user_id: user.id,
         first_name,
         last_name,
-        email,
+        email: normalizedEmail,
         phone: e164Phone,
       })
       .select('id')
@@ -161,7 +204,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send welcome email (non-blocking)
-    sendWelcomeEmail({ email, first_name, last_name }).catch(err =>
+    sendWelcomeEmail({ email: normalizedEmail, first_name, last_name }).catch(err =>
       console.error('Welcome email failed (non-blocking):', err)
     );
 

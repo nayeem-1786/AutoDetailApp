@@ -1515,7 +1515,7 @@ export function InlineAuth({
       }
 
       // If profile returned empty data, retry once after a longer delay (auth timing issue)
-      if (!customer.first_name && !customer.phone && !profileRes.ok) {
+      if ((!customer.first_name && !customer.phone) || !profileRes.ok || profileRes.status === 401) {
         await new Promise(resolve => setTimeout(resolve, 500));
         const retryRes = await fetch('/api/customer/profile');
         if (retryRes.ok) {
