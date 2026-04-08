@@ -188,7 +188,7 @@ export function ProfileCompletionBanner() {
     description = 'Add your name to finish setting up your account.';
   } else {
     // Email only
-    heading = 'Add your email';
+    heading = 'Complete Your Profile \u2014 Email Address Missing';
     description = 'Add your email for booking confirmations, digital receipts, and easy account recovery.';
   }
 
@@ -261,9 +261,6 @@ export function ProfileCompletionBanner() {
               onChange={(e) => { setEmail(e.target.value); setError(null); }}
               className="text-base sm:text-sm"
             />
-            {!missingName && (
-              <p className="mt-1 text-xs text-site-text-dim">Optional — for booking confirmations &amp; receipts</p>
-            )}
           </FormField>
         )}
 
