@@ -23,7 +23,7 @@ export interface UseCustomerLinkReturn {
   linkAccount: (data: {
     first_name: string;
     last_name: string;
-    email: string;
+    email?: string;
     phone: string;
   }) => Promise<LinkResult>;
   resetError: () => void;
@@ -90,7 +90,7 @@ export function useCustomerLink(): UseCustomerLinkReturn {
     async (data: {
       first_name: string;
       last_name: string;
-      email: string;
+      email?: string;
       phone: string;
     }): Promise<LinkResult> => {
       setLoading(true);

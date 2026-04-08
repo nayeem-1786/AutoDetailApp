@@ -26,31 +26,34 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { first_name, last_name, email, phone } = body;
 
-    if (!first_name || !last_name || !email) {
+    if (!first_name || !last_name) {
       return noStoreJson(
-        { error: 'First name, last name, and email are required' },
+        { error: 'First name and last name are required' },
         { status: 400 }
       );
     }
 
     // Normalize email for case-insensitive matching (DB unique index is on lower(email))
-    const normalizedEmail = email.toLowerCase().trim();
+    // Email is optional — phone-OTP signup may not provide one
+    const normalizedEmail = email ? email.toLowerCase().trim() : null;
 
     const admin = createAdminClient();
 
     // Guard: reject if this email belongs to an employee
-    const { data: emp } = await admin
-      .from('employees')
-      .select('id')
-      .eq('email', normalizedEmail)
-      .limit(1)
-      .single();
+    if (normalizedEmail) {
+      const { data: emp } = await admin
+        .from('employees')
+        .select('id')
+        .eq('email', normalizedEmail)
+        .limit(1)
+        .single();
 
-    if (emp) {
-      return noStoreJson(
-        { error: 'This email is used for a staff account and can\'t be used for customer registration.' },
-        { status: 403 }
-      );
+      if (emp) {
+        return noStoreJson(
+          { error: 'This email is used for a staff account and can\'t be used for customer registration.' },
+          { status: 403 }
+        );
+      }
     }
 
     // (1) Check if a customer record already has this auth_user_id
@@ -92,7 +95,7 @@ export async function POST(request: NextRequest) {
 
         logAudit({
           userId: user.id,
-          userEmail: user.email || email,
+          userEmail: user.email || normalizedEmail || 'no-email',
           action: 'update',
           entityType: 'customer',
           entityId: existingByPhone.id,
@@ -107,39 +110,41 @@ export async function POST(request: NextRequest) {
     }
 
     // (3) Try to find existing customer by email where auth_user_id is null
-    const { data: existingByEmail } = await admin
-      .from('customers')
-      .select('id, first_name, last_name, phone')
-      .eq('email', normalizedEmail)
-      .is('auth_user_id', null)
-      .is('deleted_at', null)
-      .limit(1)
-      .single();
+    if (normalizedEmail) {
+      const { data: existingByEmail } = await admin
+        .from('customers')
+        .select('id, first_name, last_name, phone')
+        .eq('email', normalizedEmail)
+        .is('auth_user_id', null)
+        .is('deleted_at', null)
+        .limit(1)
+        .single();
 
-    if (existingByEmail) {
-      const updates: Record<string, unknown> = {
-        auth_user_id: user.id,
-        updated_at: new Date().toISOString(),
-      };
-      if (!existingByEmail.first_name && first_name) updates.first_name = first_name;
-      if (!existingByEmail.last_name && last_name) updates.last_name = last_name;
-      if (!existingByEmail.phone && e164Phone) updates.phone = e164Phone;
+      if (existingByEmail) {
+        const updates: Record<string, unknown> = {
+          auth_user_id: user.id,
+          updated_at: new Date().toISOString(),
+        };
+        if (!existingByEmail.first_name && first_name) updates.first_name = first_name;
+        if (!existingByEmail.last_name && last_name) updates.last_name = last_name;
+        if (!existingByEmail.phone && e164Phone) updates.phone = e164Phone;
 
-      await admin.from('customers').update(updates).eq('id', existingByEmail.id);
+        await admin.from('customers').update(updates).eq('id', existingByEmail.id);
 
-      logAudit({
-        userId: user.id,
-        userEmail: user.email || email,
-        action: 'update',
-        entityType: 'customer',
-        entityId: existingByEmail.id,
-        entityLabel: `${first_name} ${last_name}`.trim(),
-        details: { linked_auth: true, match: 'email' },
-        ipAddress: getRequestIp(request),
-        source: 'customer_portal',
-      });
+        logAudit({
+          userId: user.id,
+          userEmail: user.email || normalizedEmail || 'no-email',
+          action: 'update',
+          entityType: 'customer',
+          entityId: existingByEmail.id,
+          entityLabel: `${first_name} ${last_name}`.trim(),
+          details: { linked_auth: true, match: 'email' },
+          ipAddress: getRequestIp(request),
+          source: 'customer_portal',
+        });
 
-      return noStoreJson({ success: true, customer_id: existingByEmail.id });
+        return noStoreJson({ success: true, customer_id: existingByEmail.id });
+      }
     }
 
     // (4) Conflict check: see if phone/email is already linked to a DIFFERENT auth user
@@ -159,27 +164,31 @@ export async function POST(request: NextRequest) {
           .then(({ data }) => ({ type: 'phone' as const, data }))
       );
     }
-    conflictChecks.push(
-      admin
-        .from('customers')
-        .select('id, auth_user_id')
-        .eq('email', normalizedEmail)
-        .not('auth_user_id', 'is', null)
-        .neq('auth_user_id', user.id)
-        .is('deleted_at', null)
-        .limit(1)
-        .single()
-        .then(({ data }) => ({ type: 'email' as const, data }))
-    );
-
-    const conflictResults = await Promise.all(conflictChecks);
-    const conflict = conflictResults.find(r => r.data);
-    if (conflict) {
-      const field = conflict.type === 'phone' ? 'phone number' : 'email';
-      return noStoreJson(
-        { error: `This ${field} is already linked to another account.` },
-        { status: 409 }
+    if (normalizedEmail) {
+      conflictChecks.push(
+        admin
+          .from('customers')
+          .select('id, auth_user_id')
+          .eq('email', normalizedEmail)
+          .not('auth_user_id', 'is', null)
+          .neq('auth_user_id', user.id)
+          .is('deleted_at', null)
+          .limit(1)
+          .single()
+          .then(({ data }) => ({ type: 'email' as const, data }))
       );
+    }
+
+    if (conflictChecks.length > 0) {
+      const conflictResults = await Promise.all(conflictChecks);
+      const conflict = conflictResults.find(r => r.data);
+      if (conflict) {
+        const field = conflict.type === 'phone' ? 'phone number' : 'email';
+        return noStoreJson(
+          { error: `This ${field} is already linked to another account.` },
+          { status: 409 }
+        );
+      }
     }
 
     // (5) No existing customer found — create a new one
@@ -203,14 +212,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send welcome email (non-blocking)
-    sendWelcomeEmail({ email: normalizedEmail, first_name, last_name }).catch(err =>
-      console.error('Welcome email failed (non-blocking):', err)
-    );
+    // Send welcome email (non-blocking) — only if email was provided
+    if (normalizedEmail) {
+      sendWelcomeEmail({ email: normalizedEmail, first_name, last_name }).catch(err =>
+        console.error('Welcome email failed (non-blocking):', err)
+      );
+    }
 
     logAudit({
       userId: user.id,
-      userEmail: user.email || email,
+      userEmail: user.email || normalizedEmail || 'no-email',
       action: 'create',
       entityType: 'customer',
       entityId: newCustomer.id,

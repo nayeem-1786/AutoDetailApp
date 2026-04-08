@@ -4,6 +4,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Phone-first signup redesign — 2026-04-07
+
+### Problem
+Email/password signup was broken: Supabase has email confirmation enabled, so `signUp()` returns no session → subsequent `link-account` API call gets 401. Rather than disabling email confirmation, redesigned signup to be phone-OTP-only.
+
+### Changes
+- **Signup page**: Removed email/password signup entirely. New 3-step flow: phone entry → OTP verification → profile completion (first name, last name, email optional)
+- **Inline-auth (booking)**: Same change — SignUpFlow now phone-only, removed full registration form
+- **link-account API**: Email is now optional. Skips email-based lookups, employee guard, conflict checks, and welcome email when no email provided. Null email stored in Postgres.
+- **useCustomerLink hook**: `linkAccount()` now accepts optional email
+- **Voice-agent customers**: Phone exists without auth account now proceeds through OTP (was incorrectly blocked before). Existing customer record gets linked via Step 2 in link-account.
+- **Email/password signin**: Kept for existing users who registered that way
+- **Debug logging**: Removed all temporary `[link-account]`, `[useCustomerLink]`, `[signup]` console logs from prior debug session
+
+---
+
 ## fix+refactor: Auth root causes + shared hooks — 2026-04-07
 
 ### Phase A: Infrastructure root cause fixes

@@ -8,11 +8,9 @@ import {
   loginSchema,
   phoneOtpSendSchema,
   phoneOtpVerifySchema,
-  customerSignupSchema,
   type LoginInput,
   type PhoneOtpSendInput,
   type PhoneOtpVerifyInput,
-  type CustomerSignupInput,
 } from '@/lib/utils/validation';
 import { formatPhoneInput, formatPhone } from '@/lib/utils/format';
 import { usePhoneOtp } from '@/lib/hooks/usePhoneOtp';
@@ -58,11 +56,11 @@ export interface InlineAuthProps {
   businessName: string;
 }
 
-// Simplified schema for post-OTP profile completion
+// Post-OTP profile completion schema — email is optional for phone-first signup
 const otpProfileSchema = z.object({
   first_name: z.string().min(1, 'Required'),
   last_name: z.string().min(1, 'Required'),
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
 });
 
 type OtpProfileInput = z.infer<typeof otpProfileSchema>;
@@ -532,7 +530,7 @@ function SignInFlow({
 
 // --- Sign Up Flow ---
 
-type SignUpMode = 'phone-otp' | 'phone-verify' | 'otp-profile' | 'full';
+type SignUpMode = 'phone' | 'otp' | 'profile';
 
 function SignUpFlow({
   onSuccess,
@@ -542,9 +540,8 @@ function SignUpFlow({
   onSwitchToSignIn: (phone?: string) => void;
   businessName: string;
 }) {
-  const [mode, setMode] = useState<SignUpMode>('phone-otp');
+  const [mode, setMode] = useState<SignUpMode>('phone');
   const [jsxError, setJsxError] = useState<ReactNode | null>(null);
-  const [hint, setHint] = useState<ReactNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [phoneExists, setPhoneExists] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
@@ -557,8 +554,12 @@ function SignUpFlow({
     onBeforeSend: async (phone) => {
       const phoneCheck = await checkExists({ phone });
       if (phoneCheck.exists) {
-        setPhoneExists(true);
-        return { abort: true, error: AUTH_ERRORS.PHONE_ALREADY_LINKED };
+        if (phoneCheck.hasAuthAccount) {
+          setPhoneExists(true);
+          return { abort: true, error: AUTH_ERRORS.PHONE_ALREADY_LINKED };
+        }
+        // Voice-agent customer (exists without auth) — proceed to OTP
+        return { abort: false };
       }
       return { abort: false };
     },
@@ -570,7 +571,7 @@ function SignUpFlow({
       }
       // New signup: show profile form
       if (result.isNewOtpSignup) {
-        setMode('otp-profile');
+        setMode('profile');
       } else {
         // Customer already linked (rare but possible)
         await onSuccess();
@@ -580,7 +581,7 @@ function SignUpFlow({
 
   // Auto-focus OTP input — aggressive strategy for iOS Safari
   useEffect(() => {
-    if (mode === 'phone-verify') {
+    if (mode === 'otp') {
       const tryFocus = () => otpInputRef.current?.focus();
 
       requestAnimationFrame(() => {
@@ -598,7 +599,7 @@ function SignUpFlow({
 
   // Sync OTP phase → mode
   useEffect(() => {
-    if (otp.phase === 'otp' && mode === 'phone-otp') setMode('phone-verify');
+    if (otp.phase === 'otp' && mode === 'phone') setMode('otp');
   }, [otp.phase, mode]);
 
   // Map hook errors → JSX
@@ -632,26 +633,19 @@ function SignUpFlow({
     resolver: formResolver(otpProfileSchema),
   });
 
-  const fullForm = useForm<CustomerSignupInput>({
-    resolver: formResolver(customerSignupSchema),
-  });
-
   const handleSendOtp = async (data: PhoneOtpSendInput) => {
     setJsxError(null);
-    setHint(null);
     await otp.sendOtp(data.phone);
     otpVerifyForm.setValue('phone', data.phone);
   };
 
   const handleVerifyOtp = async (data: PhoneOtpVerifyInput) => {
     setJsxError(null);
-    setHint(null);
     await otp.verifyOtp(data.phone, data.code);
   };
 
   const handleResendOtp = async () => {
     setJsxError(null);
-    setHint(null);
     otpVerifyForm.setValue('code', '');
     await otp.resendOtp();
   };
@@ -660,9 +654,6 @@ function SignUpFlow({
   const handleSignInInstead = async () => {
     const phone = phoneForm.getValues('phone');
     setJsxError(null);
-    setHint(null);
-
-    // Reset to sign-in mode for OTP hook, then send
     await otp.sendOtp(phone);
     otpVerifyForm.setValue('phone', phone);
   };
@@ -671,145 +662,13 @@ function SignUpFlow({
   const onOtpProfileSubmit = async (data: OtpProfileInput) => {
     setLoading(true);
     setJsxError(null);
-    setHint(null);
 
     try {
       const result = await linkAccount({
         first_name: data.first_name,
         last_name: data.last_name,
-        email: data.email,
+        email: data.email || undefined,
         phone: otp.otpPhone,
-      });
-
-      if (!result.success) {
-        if (result.error === 'SESSION_EXPIRED') {
-          setJsxError('Your session has expired. Please try again.');
-        } else if (result.error === 'STAFF_ACCOUNT') {
-          setJsxError('This email is used for a staff account. Please use a different email.');
-        } else {
-          setJsxError('Something went wrong creating your account. Please try again.');
-        }
-        return;
-      }
-
-      await onSuccess();
-    } catch {
-      setJsxError('Something went wrong creating your account. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Full registration (email/password)
-  const onFullSubmit = async (data: CustomerSignupInput) => {
-    setLoading(true);
-    setJsxError(null);
-    setHint(null);
-
-    try {
-      // Pre-check email
-      const emailCheck = await checkExists({ email: data.email });
-      if (emailCheck.exists) {
-        if (emailCheck.hasAuthAccount) {
-          setJsxError(
-            <>
-              This email is already linked to an account.{' '}
-              <button
-                type="button"
-                onClick={() => onSwitchToSignIn(data.phone)}
-                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
-              >
-                Sign in instead &rarr;
-              </button>
-            </>
-          );
-        } else {
-          setHint(
-            <>
-              Welcome back! We already have your info on file.{' '}
-              <button
-                type="button"
-                onClick={() => onSwitchToSignIn(data.phone)}
-                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
-              >
-                Sign in here
-              </button>{' '}
-              to access your account.
-            </>
-          );
-        }
-        return;
-      }
-
-      // Pre-check phone
-      if (data.phone) {
-        const phoneCheck = await checkExists({ phone: data.phone });
-        if (phoneCheck.exists) {
-          if (phoneCheck.hasAuthAccount) {
-            setJsxError(
-              <>
-                This phone number is already linked to an account.{' '}
-                <button
-                  type="button"
-                  onClick={() => onSwitchToSignIn(data.phone)}
-                  className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
-                >
-                  Sign in instead &rarr;
-                </button>
-              </>
-            );
-          } else {
-            setHint(
-              <>
-                Welcome back! We already have your info on file.{' '}
-                <button
-                  type="button"
-                  onClick={() => onSwitchToSignIn(data.phone)}
-                  className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
-                >
-                  Sign in here
-                </button>{' '}
-                to access your account.
-              </>
-            );
-          }
-          return;
-        }
-      }
-
-      const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (signUpError) {
-        if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
-          setJsxError(
-            <>
-              This email is already linked to an account.{' '}
-              <button
-                type="button"
-                onClick={() => onSwitchToSignIn(data.phone)}
-                className="font-medium text-accent-brand hover:text-accent-brand-hover underline"
-              >
-                Sign in instead &rarr;
-              </button>
-            </>
-          );
-        } else if (signUpError.message.includes('rate') || signUpError.message.includes('too many')) {
-          setJsxError('Too many attempts. Please wait a few minutes and try again.');
-        } else {
-          setJsxError('Something went wrong creating your account. Please try again.');
-        }
-        return;
-      }
-
-      const result = await linkAccount({
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        phone: data.phone,
       });
 
       if (!result.success) {
@@ -840,14 +699,9 @@ function SignUpFlow({
           {currentError}
         </div>
       )}
-      {hint && (
-        <div className="rounded-md border border-amber-800 bg-amber-950 p-3 text-sm text-amber-200">
-          {hint}
-        </div>
-      )}
 
-      {/* Phone OTP Send */}
-      {mode === 'phone-otp' && (
+      {/* Phone Entry */}
+      {mode === 'phone' && (
         <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-5">
           <FormField
             label="Mobile"
@@ -872,7 +726,6 @@ function SignUpFlow({
                   if (phoneExists) {
                     setPhoneExists(false);
                     setJsxError(null);
-                    setHint(null);
                     otp.resetError();
                   }
                 },
@@ -889,33 +742,28 @@ function SignUpFlow({
             {isOtpLoading ? <Spinner size="sm" /> : phoneExists ? 'Sign In Instead' : 'Continue'}
           </Button>
 
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-site-border" />
-            <span className="text-xs font-medium text-site-text-dim">OR</span>
-            <div className="h-px flex-1 bg-site-border" />
-          </div>
+          {phoneExists && (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-site-border" />
+                <span className="text-xs font-medium text-site-text-dim">OR</span>
+                <div className="h-px flex-1 bg-site-border" />
+              </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (phoneExists) {
-                onSwitchToSignIn();
-              } else {
-                setMode('full');
-                setJsxError(null);
-                setHint(null);
-                otp.resetError();
-              }
-            }}
-            className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
-          >
-            {phoneExists ? 'Sign in with email' : 'Sign up with email'}
-          </button>
+              <button
+                type="button"
+                onClick={() => onSwitchToSignIn()}
+                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
+              >
+                Sign in with email
+              </button>
+            </>
+          )}
         </form>
       )}
 
-      {/* Phone OTP Verify */}
-      {mode === 'phone-verify' && (
+      {/* OTP Verification */}
+      {mode === 'otp' && (
         <form onSubmit={otpVerifyForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
           <div className="text-center">
             <p className="text-sm text-site-text-muted">
@@ -957,7 +805,7 @@ function SignUpFlow({
           <div className="flex items-center justify-between text-sm">
             <button
               type="button"
-              onClick={() => { setMode('phone-otp'); setJsxError(null); setHint(null); setPhoneExists(false); otp.resetToPhone(); otpVerifyForm.reset(); }}
+              onClick={() => { setMode('phone'); setJsxError(null); setPhoneExists(false); otp.resetToPhone(); otpVerifyForm.reset(); }}
               className="text-site-text-muted hover:text-site-text"
             >
               Change number
@@ -975,7 +823,7 @@ function SignUpFlow({
       )}
 
       {/* Post-OTP Profile Completion */}
-      {mode === 'otp-profile' && (
+      {mode === 'profile' && (
         <form onSubmit={otpProfileForm.handleSubmit(onOtpProfileSubmit)} className="space-y-5">
           <p className="text-sm text-site-text-muted">
             Phone verified! Complete your profile to finish signing up.
@@ -1023,7 +871,6 @@ function SignUpFlow({
 
           <FormField
             label="Email"
-            required
             error={otpProfileForm.formState.errors.email?.message}
             htmlFor="inline-otp-email"
           >
@@ -1035,6 +882,9 @@ function SignUpFlow({
               className={inputCls}
               {...otpProfileForm.register('email')}
             />
+            <p className="mt-1 text-xs text-site-text-dim">
+              Optional — for booking confirmations &amp; receipts
+            </p>
           </FormField>
 
           <Button
@@ -1044,124 +894,6 @@ function SignUpFlow({
           >
             {loading ? <Spinner size="sm" /> : 'Complete Sign Up'}
           </Button>
-        </form>
-      )}
-
-      {/* Full Registration (email/password) */}
-      {mode === 'full' && (
-        <form onSubmit={fullForm.handleSubmit(onFullSubmit)} className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FormField
-              label="First Name"
-              required
-              error={fullForm.formState.errors.first_name?.message}
-              htmlFor="inline-full-first-name"
-            >
-              <Input
-                id="inline-full-first-name"
-                placeholder="John"
-                autoFocus
-                className={inputCls}
-                {...fullForm.register('first_name')}
-              />
-            </FormField>
-
-            <FormField
-              label="Last Name"
-              required
-              error={fullForm.formState.errors.last_name?.message}
-              htmlFor="inline-full-last-name"
-            >
-              <Input
-                id="inline-full-last-name"
-                placeholder="Doe"
-                className={inputCls}
-                {...fullForm.register('last_name')}
-              />
-            </FormField>
-          </div>
-
-          <FormField label="Email" required error={fullForm.formState.errors.email?.message} htmlFor="inline-full-email">
-            <Input
-              id="inline-full-email"
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              className={inputCls}
-              {...fullForm.register('email')}
-            />
-          </FormField>
-
-          <FormField
-            label="Mobile"
-            required
-            error={fullForm.formState.errors.phone?.message}
-            htmlFor="inline-full-phone"
-          >
-            <Input
-              id="inline-full-phone"
-              placeholder="(310) 555-1234"
-              className={inputCls}
-              {...fullForm.register('phone', {
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                  const formatted = formatPhoneInput(e.target.value);
-                  fullForm.setValue('phone', formatted, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  });
-                },
-              })}
-            />
-          </FormField>
-
-          <FormField label="Password" required error={fullForm.formState.errors.password?.message} htmlFor="inline-full-password">
-            <Input
-              id="inline-full-password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="At least 8 characters"
-              className={inputCls}
-              {...fullForm.register('password')}
-            />
-          </FormField>
-
-          <FormField
-            label="Confirm Password"
-            required
-            error={fullForm.formState.errors.confirm_password?.message}
-            htmlFor="inline-full-confirm-password"
-          >
-            <Input
-              id="inline-full-confirm-password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="Re-enter your password"
-              className={inputCls}
-              {...fullForm.register('confirm_password')}
-            />
-          </FormField>
-
-          <Button
-            type="submit"
-            disabled={loading}
-            className="site-btn-primary w-full py-3 text-sm font-semibold"
-          >
-            {loading ? <Spinner size="sm" /> : 'Create Account'}
-          </Button>
-
-          <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-site-border" />
-            <span className="text-xs font-medium text-site-text-dim">OR</span>
-            <div className="h-px flex-1 bg-site-border" />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => { setMode('phone-otp'); setJsxError(null); setHint(null); otp.resetError(); }}
-            className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
-          >
-            Sign up with phone
-          </button>
         </form>
       )}
     </div>
