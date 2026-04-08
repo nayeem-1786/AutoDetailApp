@@ -298,6 +298,7 @@ function SignInFlow({
   const resendOtp = async () => {
     if (resendCooldown > 0) return;
     setError(null);
+    otpForm.setValue('code', '');
 
     const e164 = normalizePhone(otpPhone);
     if (!e164) return;
@@ -923,6 +924,7 @@ function SignUpFlow({
     if (resendCooldown > 0) return;
     setError(null);
     setHint(null);
+    otpVerifyForm.setValue('code', '');
 
     const e164 = normalizePhone(otpPhone);
     if (!e164) return;
@@ -1647,9 +1649,26 @@ export function InlineAuth({
     }
   }, [pendingAuthData, completeFirstName, completeLastName, completeEmail, onAuthComplete]);
 
-  // Already authenticated — show compact info line
+  // Journey E: If authenticated but profile incomplete (voice-agent customers),
+  // trigger profile completion form via effect instead of showing compact card.
   const effectiveData = customerData || localAuthData || localAuthRef.current;
-  if ((isAuthenticated || !!localAuthData || !!localAuthRef.current) && effectiveData) {
+  const isEffectivelyAuthed = isAuthenticated || !!localAuthData || !!localAuthRef.current;
+  const hasIncompleteProfile = isEffectivelyAuthed && effectiveData &&
+    (!effectiveData.customer.first_name?.trim() || !effectiveData.customer.last_name?.trim());
+
+  useEffect(() => {
+    if (hasIncompleteProfile && effectiveData && view !== 'complete-profile') {
+      setPendingAuthData(effectiveData);
+      setCompleteFirstName(effectiveData.customer.first_name || '');
+      setCompleteLastName(effectiveData.customer.last_name || '');
+      setCompleteEmail(effectiveData.customer.email || '');
+      setCompleteError(null);
+      setView('complete-profile');
+    }
+  }, [hasIncompleteProfile, effectiveData, view]);
+
+  // Already authenticated with complete profile — show compact info line
+  if (isEffectivelyAuthed && effectiveData && !hasIncompleteProfile) {
     const { first_name, last_name, phone, email } = effectiveData.customer;
     return (
       <div className="rounded-lg border border-accent-brand/30 bg-accent-brand/5 p-4 booking-auth-card">

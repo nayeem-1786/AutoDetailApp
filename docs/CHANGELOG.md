@@ -4,6 +4,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Unified profile completion card + InlineAuth Journey E profile check — 2026-04-07
+
+### Unified profile completion banner (replaces email-only banner)
+- New `ProfileCompletionBanner` component replaces `EmailOnboardingBanner` on the customer dashboard.
+- Dynamically shows inline-editable fields for missing data: First Name (required), Last Name (required), Email (optional).
+- Name fields are non-dismissable (required for booking). Email-only case remains session-dismissable.
+- Saves name immediately via `PATCH /api/customer/complete-profile`, then re-evaluates to hide completed fields.
+- Handles unverified email state by nudging to the profile page for OTP verification.
+
+### Signin redirect fix (Issue 3B)
+- Voice-agent customers with incomplete profiles now redirect to `/account` (dashboard) instead of `/account/profile?complete=true`.
+- Removed `?complete=true` banner from profile page — dashboard banner handles all prompting.
+
+### OTP input cleared on resend (Issue 1, from previous session)
+- OTP code field now clears when user clicks "Resend code" in signin page and InlineAuth (both SignIn and SignUp flows).
+
+### InlineAuth Journey E (Issue 3A, verified working)
+- `handleAuthSuccess()` intercepts incomplete profiles after inline auth and shows profile completion form.
+- `useEffect` detects already-authenticated customers with incomplete profiles from server-side `customerData` prop.
+- Both null and empty string `last_name` values handled correctly via `?.trim()`.
+
+### Files changed
+- `src/components/account/profile-completion-banner.tsx` — NEW (replaces email-onboarding-banner.tsx)
+- `src/components/account/email-onboarding-banner.tsx` — DELETED
+- `src/components/account/account-shell.tsx` — Updated import
+- `src/app/(customer-auth)/signin/page.tsx` — Redirect to `/account`, OTP clear on resend
+- `src/app/(account)/account/profile/page.tsx` — Removed `?complete=true` banner
+- `src/components/booking/inline-auth.tsx` — OTP clear on resend (SignIn + SignUp flows)
+
+---
+
 ## fix: Auth system — logout, profile completion bypass, link-account crash, touch dropdown, error surfacing — 2026-04-07
 
 ### Critical: link-account infinite recursion (Fix 1A)

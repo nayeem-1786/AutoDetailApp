@@ -215,7 +215,7 @@ export default function CustomerSignInPage() {
         // Check for customer record by auth_user_id first
         const { data: cust } = await supabase
           .from('customers')
-          .select('id')
+          .select('id, first_name, last_name')
           .eq('auth_user_id', user.id)
           .single();
 
@@ -230,7 +230,20 @@ export default function CustomerSignInPage() {
           const linkData = await linkRes.json();
 
           if (linkData.success) {
-            // Successfully linked or already linked — continue to account
+            // Check if the linked customer has incomplete profile (voice-agent customers)
+            const { data: linkedCust } = await supabase
+              .from('customers')
+              .select('first_name, last_name')
+              .eq('auth_user_id', user.id)
+              .single();
+
+            if (linkedCust && (!linkedCust.first_name?.trim() || !linkedCust.last_name?.trim())) {
+              // Redirect to dashboard — unified profile completion banner handles prompting
+              router.push('/account');
+              router.refresh();
+              return;
+            }
+
             router.push(redirectTo);
             router.refresh();
             return;
@@ -260,6 +273,14 @@ export default function CustomerSignInPage() {
           setError('Something went wrong linking your account. Please try again. If the problem continues, contact us.');
           return;
         }
+
+        // Customer found — check if profile is incomplete (voice-agent customers)
+        if (!cust.first_name?.trim() || !cust.last_name?.trim()) {
+          // Redirect to dashboard — unified profile completion banner handles prompting
+          router.push('/account');
+          router.refresh();
+          return;
+        }
       }
 
       router.push(redirectTo);
@@ -276,6 +297,7 @@ export default function CustomerSignInPage() {
   const resendOtp = async () => {
     if (resendCooldown > 0) return;
     setError(null);
+    otpForm.setValue('code', '');
 
     const e164 = normalizePhone(otpPhone);
     if (!e164) return;
