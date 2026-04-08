@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Replace email/password with email OTP on unified auth page — 2026-04-08
+
+- Replaced "Sign in with email & password" with email OTP flow (same pattern as phone)
+- Email entry → OTP code sent to email → verify → same post-verify routing (staff guard, customer check, profile form)
+- "Use email instead" / "Use phone number instead" toggle between the two OTP methods
+- Removed loginSchema, useEmailAuth, forgot password flow from signin page (still used in inline-auth)
+- Profile form: if user came via email OTP, email shown as read-only (already verified), no duplicate email input
+- Profile form: if user came via phone OTP, optional email field still shown
+
+---
+
 ## fix: Sign-out redirect + remove email helper text — 2026-04-08
 
 - Sign-out now redirects to `/` (homepage) instead of `/signin`

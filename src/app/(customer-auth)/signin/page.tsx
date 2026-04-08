@@ -7,17 +7,14 @@ import { createClient } from '@/lib/supabase/client';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import {
-  loginSchema,
   phoneOtpSendSchema,
   phoneOtpVerifySchema,
-  type LoginInput,
   type PhoneOtpSendInput,
   type PhoneOtpVerifyInput,
 } from '@/lib/utils/validation';
 import { formatPhoneInput } from '@/lib/utils/format';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
 import { usePhoneOtp } from '@/lib/hooks/usePhoneOtp';
-import { useEmailAuth } from '@/lib/hooks/useEmailAuth';
 import { useCustomerLink } from '@/lib/hooks/useCustomerLink';
 import { AUTH_ERRORS } from '@/lib/auth/auth-errors';
 import { Button } from '@/components/ui/button';
@@ -36,8 +33,8 @@ const profileSchema = z.object({
 type ProfileInput = z.infer<typeof profileSchema>;
 
 // phone → otp → (profile for new users) → done
-// email-login → done (secondary path for existing email/password users)
-type AuthMode = 'phone' | 'otp' | 'profile' | 'email-login';
+// email → email-otp → (profile for new users) → done
+type AuthMode = 'phone' | 'otp' | 'profile' | 'email' | 'email-otp';
 
 export default function UnifiedAuthPage() {
   const router = useRouter();
@@ -53,45 +50,40 @@ export default function UnifiedAuthPage() {
   const [isNewUser, setIsNewUser] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  // Forgot password sub-state (within email-login mode)
-  const [forgotMode, setForgotMode] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetSent, setResetSent] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
+  // Email OTP state
+  const [emailInput, setEmailInput] = useState('');
+  const [emailOtpCode, setEmailOtpCode] = useState('');
+  const [emailOtpLoading, setEmailOtpLoading] = useState(false);
+  const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
+  const [emailOtpSentTo, setEmailOtpSentTo] = useState('');
 
   const signedOutRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
+  const emailOtpInputRef = useRef<HTMLInputElement>(null);
 
-  const { checkExists, linkByPhone, linkAccount } = useCustomerLink();
+  const { checkExists, linkAccount } = useCustomerLink();
 
   // --- Phone OTP hook (mode: sign-in) ---
-  // Uses sign-in mode so the hook checks for existing customer after verify,
-  // tries linkByPhone, and calls onNoCustomerFound for brand new users.
   const otp = usePhoneOtp({
     mode: 'sign-in',
     onBeforeSend: async (phone) => {
       const check = await checkExists({ phone });
       if (check.exists && check.hasAuthAccount) {
-        // Returning customer — proceed to OTP
         setIsNewUser(false);
         return { abort: false };
       }
       if (check.exists && !check.hasAuthAccount) {
-        // Voice-agent customer — proceed to OTP (will be linked after)
         setIsNewUser(false);
         return { abort: false };
       }
-      // Brand new customer — proceed to OTP (new account)
       setIsNewUser(true);
       return { abort: false };
     },
     onVerified: async (result) => {
       if (!result.customerLinked) {
-        // Customer not linked yet — show profile form for new users
         setMode('profile');
         return;
       }
-      // Check for incomplete profile (voice-agent customers with missing name)
       const supabase = createClient();
       const { data: cust } = await supabase
         .from('customers')
@@ -99,7 +91,6 @@ export default function UnifiedAuthPage() {
         .eq('auth_user_id', result.userId)
         .single();
       if (cust && (!cust.first_name?.trim() || !cust.last_name?.trim())) {
-        // Redirect to dashboard — unified profile completion banner handles prompting
         router.push('/account');
         router.refresh();
         return;
@@ -108,17 +99,8 @@ export default function UnifiedAuthPage() {
       router.refresh();
     },
     onNoCustomerFound: () => {
-      // No customer record at all — show profile form to create one
       setIsNewUser(true);
       setMode('profile');
-    },
-  });
-
-  // --- Email auth hook (secondary path) ---
-  const emailAuth = useEmailAuth({
-    onSuccess: async () => {
-      router.push(redirectTo);
-      router.refresh();
     },
   });
 
@@ -132,7 +114,7 @@ export default function UnifiedAuthPage() {
     }).catch(() => {});
   }, []);
 
-  // If ?phone= param + authenticated → show profile form directly (redirect from old /signup?phone=)
+  // If ?phone= param + authenticated → show profile form directly
   const [checkingAuth, setCheckingAuth] = useState(!!prefillPhone);
   useEffect(() => {
     if (!prefillPhone) {
@@ -151,23 +133,178 @@ export default function UnifiedAuthPage() {
     });
   }, [prefillPhone]);
 
-  // Sync OTP phase → mode
+  // Sync phone OTP phase → mode
   useEffect(() => {
     if (otp.phase === 'otp' && mode === 'phone') setMode('otp');
   }, [otp.phase, mode]);
 
-  // Auto-focus OTP input
+  // Auto-focus OTP inputs
   useEffect(() => {
     if (mode === 'otp') {
       requestAnimationFrame(() => otpInputRef.current?.focus());
     }
+    if (mode === 'email-otp') {
+      requestAnimationFrame(() => emailOtpInputRef.current?.focus());
+    }
   }, [mode]);
+
+  // Email OTP cooldown timer
+  useEffect(() => {
+    if (emailOtpCooldown <= 0) return;
+    const t = setTimeout(() => setEmailOtpCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [emailOtpCooldown]);
+
+  // --- Email OTP handlers ---
+  const handleEmailOtpSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setJsxError(null);
+
+    const trimmed = emailInput.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setJsxError('Please enter a valid email address.');
+      return;
+    }
+
+    setEmailOtpLoading(true);
+
+    // Check if this email belongs to an existing customer
+    const check = await checkExists({ email: trimmed });
+    setIsNewUser(!check.exists);
+
+    const supabase = createClient();
+    const { error: otpError } = await supabase.auth.signInWithOtp({ email: trimmed });
+
+    if (otpError) {
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setJsxError(AUTH_ERRORS.OTP_RATE_LIMITED);
+      } else {
+        setJsxError(AUTH_ERRORS.OTP_SEND_FAILED);
+      }
+      setEmailOtpLoading(false);
+      return;
+    }
+
+    setEmailOtpSentTo(trimmed);
+    setEmailOtpCooldown(60);
+    setMode('email-otp');
+    setEmailOtpLoading(false);
+  };
+
+  const handleEmailOtpVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setJsxError(null);
+
+    if (!emailOtpCode || emailOtpCode.length !== 6) {
+      setJsxError('Please enter the 6-digit code.');
+      return;
+    }
+
+    setEmailOtpLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email: emailOtpSentTo,
+        token: emailOtpCode,
+        type: 'email',
+      });
+
+      if (verifyError) {
+        if (verifyError.message.includes('expired')) {
+          setJsxError(AUTH_ERRORS.OTP_EXPIRED);
+        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
+          setJsxError(AUTH_ERRORS.OTP_INVALID);
+        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
+          setJsxError(AUTH_ERRORS.OTP_RATE_LIMITED);
+        } else {
+          setJsxError(AUTH_ERRORS.OTP_VERIFY_FAILED);
+        }
+        return;
+      }
+
+      // Post-verify: staff guard + customer check (same as phone OTP)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setJsxError(AUTH_ERRORS.OTP_VERIFY_FAILED);
+        return;
+      }
+
+      // Staff guard
+      const { data: emp } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (emp) {
+        await supabase.auth.signOut();
+        setJsxError(
+          <>
+            This email is linked to a staff account.{' '}
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Sign in as staff
+            </Link>{' '}
+            instead, or use a different email.
+          </>
+        );
+        return;
+      }
+
+      // Customer check
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (cust) {
+        // Existing customer — check profile completeness
+        if (!cust.first_name?.trim() || !cust.last_name?.trim()) {
+          router.push('/account');
+          router.refresh();
+          return;
+        }
+        router.push(redirectTo);
+        router.refresh();
+        return;
+      }
+
+      // No customer record — show profile form
+      setIsNewUser(true);
+      setMode('profile');
+    } catch {
+      setJsxError(AUTH_ERRORS.OTP_VERIFY_FAILED);
+    } finally {
+      setEmailOtpLoading(false);
+    }
+  };
+
+  const handleEmailOtpResend = async () => {
+    if (emailOtpCooldown > 0) return;
+    setJsxError(null);
+    setEmailOtpCode('');
+
+    const supabase = createClient();
+    const { error: otpError } = await supabase.auth.signInWithOtp({ email: emailOtpSentTo });
+
+    if (otpError) {
+      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
+        setJsxError(AUTH_ERRORS.OTP_RATE_LIMITED);
+      } else {
+        setJsxError(AUTH_ERRORS.OTP_SEND_FAILED);
+      }
+      return;
+    }
+
+    setEmailOtpCooldown(60);
+  };
 
   // --- Error rendering ---
   const renderError = (): ReactNode => {
     if (jsxError) return jsxError;
 
-    const err = mode === 'email-login' ? emailAuth.error : otp.error;
+    const err = otp.error;
     if (!err) return null;
 
     switch (err) {
@@ -190,26 +327,12 @@ export default function UnifiedAuthPage() {
             </span>
           </>
         );
-      case AUTH_ERRORS.INVALID_CREDENTIALS:
-        return 'Incorrect email or password. Please try again.';
-      case AUTH_ERRORS.STAFF_EMAIL:
-        return (
-          <>
-            This email is linked to a staff account.{' '}
-            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Sign in as staff
-            </Link>{' '}
-            instead, or use a different email.
-          </>
-        );
-      case AUTH_ERRORS.NO_CUSTOMER:
-        return 'We couldn\'t find a customer account with that email. Try signing in with your phone number instead.';
       default:
         return err;
     }
   };
 
-  const isLoading = mode === 'email-login' ? emailAuth.loading : otp.loading;
+  const isLoading = otp.loading;
   const currentError = renderError();
 
   // --- Forms ---
@@ -223,15 +346,11 @@ export default function UnifiedAuthPage() {
     defaultValues: { phone: '', code: '' },
   });
 
-  const emailForm = useForm<LoginInput>({
-    resolver: formResolver(loginSchema),
-  });
-
   const profileForm = useForm<ProfileInput>({
     resolver: formResolver(profileSchema),
   });
 
-  // --- Handlers ---
+  // --- Phone handlers ---
   const handleSendOtp = async (data: PhoneOtpSendInput) => {
     setJsxError(null);
     await otp.sendOtp(data.phone);
@@ -249,11 +368,6 @@ export default function UnifiedAuthPage() {
     await otp.resendOtp();
   };
 
-  const handleEmailSubmit = async (data: LoginInput) => {
-    setJsxError(null);
-    await emailAuth.signIn(data.email, data.password);
-  };
-
   const handleProfileSubmit = async (data: ProfileInput) => {
     setProfileLoading(true);
     setJsxError(null);
@@ -267,7 +381,7 @@ export default function UnifiedAuthPage() {
       const result = await linkAccount({
         first_name: data.first_name,
         last_name: data.last_name,
-        email: data.email || undefined,
+        email: data.email || emailOtpSentTo || undefined,
         phone: otp.otpPhone || prefillPhone,
       });
 
@@ -299,36 +413,6 @@ export default function UnifiedAuthPage() {
       clearTimeout(fallbackTimer);
       setProfileLoading(false);
     }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJsxError(null);
-
-    if (!resetEmail.trim()) {
-      setJsxError('Please enter your email address.');
-      return;
-    }
-
-    setResetLoading(true);
-
-    const supabase = createClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/signin/reset-password`,
-    });
-
-    if (resetError) {
-      if (resetError.message.includes('rate') || resetError.message.includes('too many')) {
-        setJsxError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setJsxError('Something went wrong. Please check your email address and try again.');
-      }
-      setResetLoading(false);
-      return;
-    }
-
-    setResetSent(true);
-    setResetLoading(false);
   };
 
   // OTP code ref merge for auto-focus
@@ -415,24 +499,24 @@ export default function UnifiedAuthPage() {
                 {isLoading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
 
-              {/* Email/password link (secondary) */}
+              {/* Email OTP link (secondary) */}
               <div className="pt-2 text-center">
                 <button
                   type="button"
                   onClick={() => {
-                    setMode('email-login');
+                    setMode('email');
                     setJsxError(null);
                     otp.resetError();
                   }}
                   className="text-xs text-site-text-dim hover:text-site-text-muted transition-colors"
                 >
-                  Sign in with email &amp; password instead
+                  Use email instead
                 </button>
               </div>
             </form>
           )}
 
-          {/* ===== OTP VERIFICATION ===== */}
+          {/* ===== PHONE OTP VERIFICATION ===== */}
           {mode === 'otp' && (
             <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
               <div className="text-center">
@@ -499,18 +583,139 @@ export default function UnifiedAuthPage() {
             </form>
           )}
 
+          {/* ===== EMAIL ENTRY ===== */}
+          {mode === 'email' && (
+            <form onSubmit={handleEmailOtpSend} className="space-y-5">
+              <FormField
+                label="Email"
+                required
+                htmlFor="email-otp-input"
+              >
+                <Input
+                  id="email-otp-input"
+                  type="email"
+                  autoComplete="email"
+                  autoFocus
+                  placeholder="you@example.com"
+                  className="text-base sm:text-sm"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                />
+              </FormField>
+
+              <Button
+                type="submit"
+                disabled={emailOtpLoading}
+                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
+              >
+                {emailOtpLoading ? <Spinner size="sm" /> : 'Continue'}
+              </Button>
+
+              {/* Back to phone */}
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('phone');
+                    setJsxError(null);
+                  }}
+                  className="text-xs text-site-text-dim hover:text-site-text-muted transition-colors"
+                >
+                  Use phone number instead
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ===== EMAIL OTP VERIFICATION ===== */}
+          {mode === 'email-otp' && (
+            <form onSubmit={handleEmailOtpVerify} className="space-y-5">
+              <div className="text-center">
+                <p className="text-sm font-medium text-accent-brand">
+                  {isNewUser ? 'Let\u2019s create your account!' : 'Welcome back!'}
+                </p>
+                <p className="mt-1 text-sm text-site-text-muted">
+                  We sent a 6-digit code to <span className="font-medium text-site-text">{emailOtpSentTo}</span>
+                </p>
+              </div>
+
+              <FormField
+                label="Verification code"
+                required
+                htmlFor="email-otp-code"
+              >
+                <Input
+                  id="email-otp-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="000000"
+                  className="text-center text-lg tracking-[0.3em] text-base sm:text-sm"
+                  value={emailOtpCode}
+                  onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  ref={emailOtpInputRef}
+                />
+              </FormField>
+
+              <Button
+                type="submit"
+                disabled={emailOtpLoading}
+                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
+              >
+                {emailOtpLoading ? <Spinner size="sm" /> : 'Verify'}
+              </Button>
+
+              <div className="flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('email');
+                    setJsxError(null);
+                    setEmailOtpCode('');
+                  }}
+                  className="text-site-text-muted hover:text-site-text"
+                >
+                  Change email
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEmailOtpResend}
+                  disabled={emailOtpCooldown > 0}
+                  className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
+                >
+                  {emailOtpCooldown > 0 ? `Resend in ${emailOtpCooldown}s` : 'Resend code'}
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* ===== PROFILE COMPLETION (new customers / voice-agent customers) ===== */}
           {mode === 'profile' && (
             <form onSubmit={profileForm.handleSubmit(handleProfileSubmit)} className="space-y-5">
-              {/* Phone read-only */}
-              <FormField label="Mobile" htmlFor="profile-phone">
-                <Input
-                  id="profile-phone"
-                  value={otp.otpPhone || prefillPhone}
-                  readOnly
-                  className="bg-brand-dark text-site-text-muted text-base sm:text-sm"
-                />
-              </FormField>
+              {/* Phone read-only (only show if we have a phone) */}
+              {(otp.otpPhone || prefillPhone) && (
+                <FormField label="Mobile" htmlFor="profile-phone">
+                  <Input
+                    id="profile-phone"
+                    value={otp.otpPhone || prefillPhone}
+                    readOnly
+                    className="bg-brand-dark text-site-text-muted text-base sm:text-sm"
+                  />
+                </FormField>
+              )}
+
+              {/* Email read-only (only show if we came via email OTP) */}
+              {emailOtpSentTo && !otp.otpPhone && !prefillPhone && (
+                <FormField label="Email" htmlFor="profile-email-readonly">
+                  <Input
+                    id="profile-email-readonly"
+                    value={emailOtpSentTo}
+                    readOnly
+                    className="bg-brand-dark text-site-text-muted text-base sm:text-sm"
+                  />
+                </FormField>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
@@ -543,20 +748,23 @@ export default function UnifiedAuthPage() {
                 </FormField>
               </div>
 
-              <FormField
-                label="Email"
-                error={profileForm.formState.errors.email?.message}
-                htmlFor="profile-email"
-              >
-                <Input
-                  id="profile-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  className="text-base sm:text-sm"
-                  {...profileForm.register('email')}
-                />
-              </FormField>
+              {/* Only show email input if user didn't come via email OTP (they already have it) */}
+              {!emailOtpSentTo && (
+                <FormField
+                  label="Email"
+                  error={profileForm.formState.errors.email?.message}
+                  htmlFor="profile-email"
+                >
+                  <Input
+                    id="profile-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    className="text-base sm:text-sm"
+                    {...profileForm.register('email')}
+                  />
+                </FormField>
+              )}
 
               <Button
                 type="submit"
@@ -566,147 +774,6 @@ export default function UnifiedAuthPage() {
                 {profileLoading ? <Spinner size="sm" /> : 'Complete Sign Up'}
               </Button>
             </form>
-          )}
-
-          {/* ===== EMAIL/PASSWORD SIGN-IN (secondary) ===== */}
-          {mode === 'email-login' && !forgotMode && (
-            <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-5">
-              <FormField
-                label="Email"
-                required
-                error={emailForm.formState.errors.email?.message}
-                htmlFor="email"
-              >
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  autoFocus
-                  placeholder="you@example.com"
-                  className="text-base sm:text-sm"
-                  {...emailForm.register('email')}
-                />
-              </FormField>
-
-              <FormField
-                label="Password"
-                required
-                error={emailForm.formState.errors.password?.message}
-                htmlFor="password"
-              >
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  placeholder="Enter your password"
-                  className="text-base sm:text-sm"
-                  {...emailForm.register('password')}
-                />
-              </FormField>
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-              >
-                {isLoading ? <Spinner size="sm" /> : 'Sign In'}
-              </Button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setForgotMode(true);
-                  setJsxError(null);
-                  emailAuth.resetError();
-                }}
-                className="block w-full text-center text-sm text-site-text-muted hover:text-accent-ui transition-colors"
-              >
-                Forgot password?
-              </button>
-
-              {/* Divider */}
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-site-border" />
-                <span className="text-xs font-medium text-site-text-dim">OR</span>
-                <div className="h-px flex-1 bg-site-border" />
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('phone');
-                  setJsxError(null);
-                  emailAuth.resetError();
-                }}
-                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
-              >
-                Sign in with phone
-              </button>
-            </form>
-          )}
-
-          {/* ===== FORGOT PASSWORD (sub-state of email-login) ===== */}
-          {mode === 'email-login' && forgotMode && (
-            <div className="space-y-5">
-              {resetSent ? (
-                <div className="space-y-4">
-                  <div className="rounded-md bg-green-950 border border-green-800 p-3 text-sm text-green-200">
-                    Check your email for a reset link. It may take a minute to arrive.
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForgotMode(false);
-                      setResetSent(false);
-                      setResetEmail('');
-                      setJsxError(null);
-                    }}
-                    className="text-sm text-site-text-muted hover:text-site-text"
-                  >
-                    &larr; Back to sign in
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleForgotPassword} className="space-y-5">
-                  <p className="text-sm text-site-text-muted">
-                    Enter your email address and we&apos;ll send you a link to reset your password.
-                  </p>
-
-                  <FormField label="Email" required htmlFor="reset-email">
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      autoComplete="email"
-                      autoFocus
-                      value={resetEmail}
-                      onChange={(e) => setResetEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="text-base sm:text-sm"
-                    />
-                  </FormField>
-
-                  <Button
-                    type="submit"
-                    disabled={resetLoading}
-                    className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-                  >
-                    {resetLoading ? <Spinner size="sm" /> : 'Send Reset Link'}
-                  </Button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForgotMode(false);
-                      setResetEmail('');
-                      setJsxError(null);
-                    }}
-                    className="block text-sm text-site-text-muted hover:text-site-text"
-                  >
-                    &larr; Back to sign in
-                  </button>
-                </form>
-              )}
-            </div>
           )}
         </div>
       </div>
