@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Auth page heading flash + hardcoded business name — 2026-04-08
+
+- Fixed hydration flash: heading changed from mode-dependent "Welcome to [name]" to static "Sign In" / "Complete Your Profile" that doesn't depend on async data or client state
+- Removed hardcoded "SD" logo initials — now dynamically derived from business name (`businessInfo.name` → first letters)
+- Business name shown as subtitle below logo, only rendered after `useBusinessInfo()` loads (no flash, no fallback string)
+- Removed all `'Our Portal'` / `'our shop'` / `'us'` hardcoded fallbacks
+
+---
+
 ## fix: Contextual messaging on unified auth OTP step — 2026-04-07
 
 - Added "Welcome back!" (returning/voice-agent customer) and "Let's create your account!" (new customer) message above OTP input on `/signin`. Uses existing `isNewUser` state set by `checkExists()` in `onBeforeSend`.

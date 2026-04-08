@@ -334,17 +334,15 @@ export default function UnifiedAuthPage() {
   // OTP code ref merge for auto-focus
   const { ref: otpCodeRef, ...otpCodeField } = otpForm.register('code');
 
-  // --- Heading text ---
-  const headingText = () => {
-    if (mode === 'profile') return isNewUser ? 'Create Your Account' : 'Complete Your Profile';
-    return `Welcome to ${businessInfo?.name || 'Our Portal'}`;
-  };
+  // --- Heading text (static to avoid flash) ---
+  const headingText = mode === 'profile'
+    ? (isNewUser ? 'Create Your Account' : 'Complete Your Profile')
+    : 'Sign In';
 
-  const subheadingText = () => {
-    if (mode === 'profile' && isNewUser) return `Join ${businessInfo?.name || 'us'} to book and manage appointments`;
-    if (mode === 'profile') return 'Just a couple more details to get you set up';
-    return null;
-  };
+  // Business name initials for logo (fallback to empty while loading)
+  const businessInitials = businessInfo?.name
+    ? businessInfo.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+    : '';
 
   if (checkingAuth) {
     return (
@@ -360,14 +358,14 @@ export default function UnifiedAuthPage() {
         {/* Business Logo/Icon + Heading */}
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent-brand/10 border border-accent-brand/30 text-xl font-bold text-accent-brand">
-            SD
+            {businessInitials}
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-site-text">
-            {headingText()}
-          </h1>
-          {subheadingText() && (
-            <p className="mt-1 text-sm text-site-text-muted">{subheadingText()}</p>
+          {businessInfo?.name && (
+            <p className="mt-3 text-sm text-site-text-muted">{businessInfo.name}</p>
           )}
+          <h1 className={`${businessInfo?.name ? 'mt-1' : 'mt-4'} text-2xl font-bold text-site-text`}>
+            {headingText}
+          </h1>
         </div>
 
         {/* Card Container */}
