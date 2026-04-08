@@ -334,12 +334,12 @@ export default function UnifiedAuthPage() {
   // OTP code ref merge for auto-focus
   const { ref: otpCodeRef, ...otpCodeField } = otpForm.register('code');
 
-  // --- Heading text (static to avoid flash) ---
+  // --- Heading text ---
   const headingText = mode === 'profile'
     ? (isNewUser ? 'Create Your Account' : 'Complete Your Profile')
-    : 'Sign In';
+    : businessInfo?.name ? `Welcome to ${businessInfo.name}` : '';
 
-  // Business name initials for logo (fallback to empty while loading)
+  // Business name initials for logo (empty while loading — no flash)
   const businessInitials = businessInfo?.name
     ? businessInfo.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : '';
@@ -360,10 +360,7 @@ export default function UnifiedAuthPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent-brand/10 border border-accent-brand/30 text-xl font-bold text-accent-brand">
             {businessInitials}
           </div>
-          {businessInfo?.name && (
-            <p className="mt-3 text-sm text-site-text-muted">{businessInfo.name}</p>
-          )}
-          <h1 className={`${businessInfo?.name ? 'mt-1' : 'mt-4'} text-2xl font-bold text-site-text`}>
+          <h1 className="mt-4 text-2xl font-bold text-site-text">
             {headingText}
           </h1>
         </div>

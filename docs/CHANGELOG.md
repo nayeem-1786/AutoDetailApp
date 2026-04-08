@@ -6,10 +6,9 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ## fix: Auth page heading flash + hardcoded business name — 2026-04-08
 
-- Fixed hydration flash: heading changed from mode-dependent "Welcome to [name]" to static "Sign In" / "Complete Your Profile" that doesn't depend on async data or client state
-- Removed hardcoded "SD" logo initials — now dynamically derived from business name (`businessInfo.name` → first letters)
-- Business name shown as subtitle below logo, only rendered after `useBusinessInfo()` loads (no flash, no fallback string)
-- Removed all `'Our Portal'` / `'our shop'` / `'us'` hardcoded fallbacks
+- Fixed hydration flash: heading renders empty string until `useBusinessInfo()` loads, then shows "Welcome to [Business Name]" — no fallback like "Our Portal" that would flash
+- Removed hardcoded "SD" logo initials — now dynamically derived from business name first letters
+- Removed all hardcoded business name fallbacks (`'Our Portal'`, `'our shop'`, `'us'`)
 
 ---
 
