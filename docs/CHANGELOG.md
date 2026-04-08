@@ -4,14 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## feat: Replace email/password with email OTP on unified auth page — 2026-04-08
+## feat: Replace email/password with email OTP everywhere — 2026-04-08
 
-- Replaced "Sign in with email & password" with email OTP flow (same pattern as phone)
-- Email entry → OTP code sent to email → verify → same post-verify routing (staff guard, customer check, profile form)
-- "Use email instead" / "Use phone number instead" toggle between the two OTP methods
-- Removed loginSchema, useEmailAuth, forgot password flow from signin page (still used in inline-auth)
-- Profile form: if user came via email OTP, email shown as read-only (already verified), no duplicate email input
-- Profile form: if user came via phone OTP, optional email field still shown
+- **Signin page**: Replaced email/password with email OTP (email entry → code sent → verify → same routing)
+- **Inline-auth (booking)**: Same change to SignInFlow — email/password replaced with email OTP
+- **Deleted `src/lib/hooks/useEmailAuth.ts`** — no longer used anywhere (was email/password only)
+- Removed loginSchema, forgot password flow from both consumers
+- Profile form: email shown as read-only if user came via email OTP; optional input if via phone OTP
+- `/signin/reset-password` sub-route kept (existing bookmarked links)
 
 ---
 

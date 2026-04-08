@@ -841,7 +841,6 @@ src/lib/hooks/use-online-status.ts
 src/lib/hooks/use-permission.ts
 src/lib/hooks/use-unsaved-changes.ts
 src/lib/hooks/useCustomerLink.ts          — Customer linking API wrapper hook (check-exists, link-by-phone, link-account)
-src/lib/hooks/useEmailAuth.ts             — Email/password sign-in hook (staff guard, customer check)
 src/lib/hooks/usePhoneOtp.ts              — Phone OTP state machine hook (send, verify, resend, cooldown)
 ```
 
