@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Sign-out redirect + remove email helper text — 2026-04-08
+
+- Sign-out now redirects to `/` (homepage) instead of `/signin`
+- Removed "Optional — for booking confirmations & receipts" helper text from email field on profile form (signin page + inline-auth)
+
+---
+
 ## fix: Auth page heading flash + hardcoded business name — 2026-04-08
 
 - Fixed hydration flash: heading renders empty string until `useBusinessInfo()` loads, then shows "Welcome to [Business Name]" — no fallback like "Our Portal" that would flash

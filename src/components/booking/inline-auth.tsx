@@ -882,9 +882,6 @@ function SignUpFlow({
               className={inputCls}
               {...otpProfileForm.register('email')}
             />
-            <p className="mt-1 text-xs text-site-text-dim">
-              Optional — for booking confirmations &amp; receipts
-            </p>
           </FormField>
 
           <Button

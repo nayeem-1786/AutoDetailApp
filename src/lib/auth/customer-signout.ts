@@ -26,6 +26,6 @@ export async function customerSignOut(options: CustomerSignOutOptions = {}) {
   onSignOut?.();
 
   if (!skipRedirect) {
-    window.location.href = '/signin';
+    window.location.href = '/';
   }
 }
