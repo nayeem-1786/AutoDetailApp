@@ -33,8 +33,7 @@ const profileSchema = z.object({
 type ProfileInput = z.infer<typeof profileSchema>;
 
 // phone → otp → (profile for new users) → done
-// email → email-otp → (profile for new users) → done
-type AuthMode = 'phone' | 'otp' | 'profile' | 'email' | 'email-otp';
+type AuthMode = 'phone' | 'otp' | 'profile';
 
 export default function UnifiedAuthPage() {
   const router = useRouter();
@@ -50,16 +49,8 @@ export default function UnifiedAuthPage() {
   const [isNewUser, setIsNewUser] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  // Email OTP state
-  const [emailInput, setEmailInput] = useState('');
-  const [emailOtpCode, setEmailOtpCode] = useState('');
-  const [emailOtpLoading, setEmailOtpLoading] = useState(false);
-  const [emailOtpCooldown, setEmailOtpCooldown] = useState(0);
-  const [emailOtpSentTo, setEmailOtpSentTo] = useState('');
-
   const signedOutRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
-  const emailOtpInputRef = useRef<HTMLInputElement>(null);
 
   const { checkExists, linkAccount } = useCustomerLink();
 
@@ -138,167 +129,12 @@ export default function UnifiedAuthPage() {
     if (otp.phase === 'otp' && mode === 'phone') setMode('otp');
   }, [otp.phase, mode]);
 
-  // Auto-focus OTP inputs
+  // Auto-focus OTP input
   useEffect(() => {
     if (mode === 'otp') {
       requestAnimationFrame(() => otpInputRef.current?.focus());
     }
-    if (mode === 'email-otp') {
-      requestAnimationFrame(() => emailOtpInputRef.current?.focus());
-    }
   }, [mode]);
-
-  // Email OTP cooldown timer
-  useEffect(() => {
-    if (emailOtpCooldown <= 0) return;
-    const t = setTimeout(() => setEmailOtpCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [emailOtpCooldown]);
-
-  // --- Email OTP handlers ---
-  const handleEmailOtpSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJsxError(null);
-
-    const trimmed = emailInput.trim().toLowerCase();
-    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setJsxError('Please enter a valid email address.');
-      return;
-    }
-
-    setEmailOtpLoading(true);
-
-    // Check if this email belongs to an existing customer
-    const check = await checkExists({ email: trimmed });
-    setIsNewUser(!check.exists);
-
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ email: trimmed });
-
-    if (otpError) {
-      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setJsxError(AUTH_ERRORS.OTP_RATE_LIMITED);
-      } else {
-        setJsxError(AUTH_ERRORS.OTP_SEND_FAILED);
-      }
-      setEmailOtpLoading(false);
-      return;
-    }
-
-    setEmailOtpSentTo(trimmed);
-    setEmailOtpCooldown(60);
-    setMode('email-otp');
-    setEmailOtpLoading(false);
-  };
-
-  const handleEmailOtpVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setJsxError(null);
-
-    if (!emailOtpCode || emailOtpCode.length !== 6) {
-      setJsxError('Please enter the 6-digit code.');
-      return;
-    }
-
-    setEmailOtpLoading(true);
-
-    try {
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        email: emailOtpSentTo,
-        token: emailOtpCode,
-        type: 'email',
-      });
-
-      if (verifyError) {
-        if (verifyError.message.includes('expired')) {
-          setJsxError(AUTH_ERRORS.OTP_EXPIRED);
-        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-          setJsxError(AUTH_ERRORS.OTP_INVALID);
-        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-          setJsxError(AUTH_ERRORS.OTP_RATE_LIMITED);
-        } else {
-          setJsxError(AUTH_ERRORS.OTP_VERIFY_FAILED);
-        }
-        return;
-      }
-
-      // Post-verify: staff guard + customer check (same as phone OTP)
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setJsxError(AUTH_ERRORS.OTP_VERIFY_FAILED);
-        return;
-      }
-
-      // Staff guard
-      const { data: emp } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (emp) {
-        await supabase.auth.signOut();
-        setJsxError(
-          <>
-            This email is linked to a staff account.{' '}
-            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Sign in as staff
-            </Link>{' '}
-            instead, or use a different email.
-          </>
-        );
-        return;
-      }
-
-      // Customer check
-      const { data: cust } = await supabase
-        .from('customers')
-        .select('id, first_name, last_name')
-        .eq('auth_user_id', user.id)
-        .single();
-
-      if (cust) {
-        // Existing customer — check profile completeness
-        if (!cust.first_name?.trim() || !cust.last_name?.trim()) {
-          router.push('/account');
-          router.refresh();
-          return;
-        }
-        router.push(redirectTo);
-        router.refresh();
-        return;
-      }
-
-      // No customer record — show profile form
-      setIsNewUser(true);
-      setMode('profile');
-    } catch {
-      setJsxError(AUTH_ERRORS.OTP_VERIFY_FAILED);
-    } finally {
-      setEmailOtpLoading(false);
-    }
-  };
-
-  const handleEmailOtpResend = async () => {
-    if (emailOtpCooldown > 0) return;
-    setJsxError(null);
-    setEmailOtpCode('');
-
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ email: emailOtpSentTo });
-
-    if (otpError) {
-      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setJsxError(AUTH_ERRORS.OTP_RATE_LIMITED);
-      } else {
-        setJsxError(AUTH_ERRORS.OTP_SEND_FAILED);
-      }
-      return;
-    }
-
-    setEmailOtpCooldown(60);
-  };
 
   // --- Error rendering ---
   const renderError = (): ReactNode => {
@@ -381,7 +217,7 @@ export default function UnifiedAuthPage() {
       const result = await linkAccount({
         first_name: data.first_name,
         last_name: data.last_name,
-        email: data.email || emailOtpSentTo || undefined,
+        email: data.email || undefined,
         phone: otp.otpPhone || prefillPhone,
       });
 
@@ -498,21 +334,6 @@ export default function UnifiedAuthPage() {
               >
                 {isLoading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
-
-              {/* Email OTP link (secondary) */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('email');
-                    setJsxError(null);
-                    otp.resetError();
-                  }}
-                  className="text-xs text-site-text-dim hover:text-site-text-muted transition-colors"
-                >
-                  Use email instead
-                </button>
-              </div>
             </form>
           )}
 
@@ -583,113 +404,6 @@ export default function UnifiedAuthPage() {
             </form>
           )}
 
-          {/* ===== EMAIL ENTRY ===== */}
-          {mode === 'email' && (
-            <form onSubmit={handleEmailOtpSend} className="space-y-5">
-              <FormField
-                label="Email"
-                required
-                htmlFor="email-otp-input"
-              >
-                <Input
-                  id="email-otp-input"
-                  type="email"
-                  autoComplete="email"
-                  autoFocus
-                  placeholder="you@example.com"
-                  className="text-base sm:text-sm"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                />
-              </FormField>
-
-              <Button
-                type="submit"
-                disabled={emailOtpLoading}
-                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-              >
-                {emailOtpLoading ? <Spinner size="sm" /> : 'Continue'}
-              </Button>
-
-              {/* Back to phone */}
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('phone');
-                    setJsxError(null);
-                  }}
-                  className="text-xs text-site-text-dim hover:text-site-text-muted transition-colors"
-                >
-                  Use phone number instead
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* ===== EMAIL OTP VERIFICATION ===== */}
-          {mode === 'email-otp' && (
-            <form onSubmit={handleEmailOtpVerify} className="space-y-5">
-              <div className="text-center">
-                <p className="text-sm font-medium text-accent-brand">
-                  {isNewUser ? 'Let\u2019s create your account!' : 'Welcome back!'}
-                </p>
-                <p className="mt-1 text-sm text-site-text-muted">
-                  We sent a 6-digit code to <span className="font-medium text-site-text">{emailOtpSentTo}</span>
-                </p>
-              </div>
-
-              <FormField
-                label="Verification code"
-                required
-                htmlFor="email-otp-code"
-              >
-                <Input
-                  id="email-otp-code"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  placeholder="000000"
-                  className="text-center text-lg tracking-[0.3em] text-base sm:text-sm"
-                  value={emailOtpCode}
-                  onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  ref={emailOtpInputRef}
-                />
-              </FormField>
-
-              <Button
-                type="submit"
-                disabled={emailOtpLoading}
-                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
-              >
-                {emailOtpLoading ? <Spinner size="sm" /> : 'Verify'}
-              </Button>
-
-              <div className="flex items-center justify-between text-sm">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('email');
-                    setJsxError(null);
-                    setEmailOtpCode('');
-                  }}
-                  className="text-site-text-muted hover:text-site-text"
-                >
-                  Change email
-                </button>
-                <button
-                  type="button"
-                  onClick={handleEmailOtpResend}
-                  disabled={emailOtpCooldown > 0}
-                  className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
-                >
-                  {emailOtpCooldown > 0 ? `Resend in ${emailOtpCooldown}s` : 'Resend code'}
-                </button>
-              </div>
-            </form>
-          )}
-
           {/* ===== PROFILE COMPLETION (new customers / voice-agent customers) ===== */}
           {mode === 'profile' && (
             <form onSubmit={profileForm.handleSubmit(handleProfileSubmit)} className="space-y-5">
@@ -699,18 +413,6 @@ export default function UnifiedAuthPage() {
                   <Input
                     id="profile-phone"
                     value={otp.otpPhone || prefillPhone}
-                    readOnly
-                    className="bg-brand-dark text-site-text-muted text-base sm:text-sm"
-                  />
-                </FormField>
-              )}
-
-              {/* Email read-only (only show if we came via email OTP) */}
-              {emailOtpSentTo && !otp.otpPhone && !prefillPhone && (
-                <FormField label="Email" htmlFor="profile-email-readonly">
-                  <Input
-                    id="profile-email-readonly"
-                    value={emailOtpSentTo}
                     readOnly
                     className="bg-brand-dark text-site-text-muted text-base sm:text-sm"
                   />
@@ -748,23 +450,20 @@ export default function UnifiedAuthPage() {
                 </FormField>
               </div>
 
-              {/* Only show email input if user didn't come via email OTP (they already have it) */}
-              {!emailOtpSentTo && (
-                <FormField
-                  label="Email"
-                  error={profileForm.formState.errors.email?.message}
-                  htmlFor="profile-email"
-                >
-                  <Input
-                    id="profile-email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    className="text-base sm:text-sm"
-                    {...profileForm.register('email')}
-                  />
-                </FormField>
-              )}
+              <FormField
+                label="Email"
+                error={profileForm.formState.errors.email?.message}
+                htmlFor="profile-email"
+              >
+                <Input
+                  id="profile-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  className="text-base sm:text-sm"
+                  {...profileForm.register('email')}
+                />
+              </FormField>
 
               <Button
                 type="submit"

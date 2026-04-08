@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## simplify: Phone-only auth — remove email OTP — 2026-04-08
+
+### Phone is the single auth method for customers
+- Removed email OTP flow from `/signin` page — no more "Use email instead" link, email entry form, or email OTP verification.
+- Removed email OTP flow from InlineAuth `SignInFlow` (booking wizard) — no more "Use email instead" button, email entry, or email OTP verification.
+- Auth flow is now: phone number → SMS OTP → done. Email remains as a data field in the profile completion form during signup.
+- Removed unused `createClient` import from `inline-auth.tsx`.
+
+### Manual follow-up: Supabase Site URL
+The Supabase dashboard Site URL must be updated from `localhost:3000` to the production URL before go-live. This affects password reset links and OAuth redirects. Dashboard → Authentication → URL Configuration → Site URL.
+
+### Files changed
+- `src/app/(customer-auth)/signin/page.tsx` — Removed email OTP modes, state, handlers, and UI
+- `src/components/booking/inline-auth.tsx` — Removed email OTP from SignInFlow
+
+---
+
 ## feat: Replace email/password with email OTP everywhere — 2026-04-08
 
 - **Signin page**: Replaced email/password with email OTP (email entry → code sent → verify → same routing)
