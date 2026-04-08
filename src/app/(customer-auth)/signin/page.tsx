@@ -24,10 +24,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
+import { z } from 'zod';
 
-type AuthMode = 'phone' | 'otp' | 'email';
+// Post-OTP profile completion schema — email is optional
+const profileSchema = z.object({
+  first_name: z.string().min(1, 'Required'),
+  last_name: z.string().min(1, 'Required'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+});
 
-export default function CustomerSignInPage() {
+type ProfileInput = z.infer<typeof profileSchema>;
+
+// phone → otp → (profile for new users) → done
+// email-login → done (secondary path for existing email/password users)
+type AuthMode = 'phone' | 'otp' | 'profile' | 'email-login';
+
+export default function UnifiedAuthPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/account';
@@ -35,31 +47,51 @@ export default function CustomerSignInPage() {
   const sessionExpired = reason === 'session_expired';
   const prefillPhone = searchParams.get('phone') || '';
   const { info: businessInfo } = useBusinessInfo();
+
   const [mode, setMode] = useState<AuthMode>('phone');
   const [jsxError, setJsxError] = useState<ReactNode | null>(null);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Forgot password sub-state (within email-login mode)
   const [forgotMode, setForgotMode] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
+
   const signedOutRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  const { checkExists } = useCustomerLink();
+  const { checkExists, linkByPhone, linkAccount } = useCustomerLink();
 
-  // --- Phone OTP hook ---
+  // --- Phone OTP hook (mode: sign-in) ---
+  // Uses sign-in mode so the hook checks for existing customer after verify,
+  // tries linkByPhone, and calls onNoCustomerFound for brand new users.
   const otp = usePhoneOtp({
     mode: 'sign-in',
     onBeforeSend: async (phone) => {
       const check = await checkExists({ phone });
-      if (!check.exists) return { abort: true, error: AUTH_ERRORS.PHONE_NOT_FOUND };
+      if (check.exists && check.hasAuthAccount) {
+        // Returning customer — proceed to OTP
+        setIsNewUser(false);
+        return { abort: false };
+      }
+      if (check.exists && !check.hasAuthAccount) {
+        // Voice-agent customer — proceed to OTP (will be linked after)
+        setIsNewUser(false);
+        return { abort: false };
+      }
+      // Brand new customer — proceed to OTP (new account)
+      setIsNewUser(true);
       return { abort: false };
     },
     onVerified: async (result) => {
       if (!result.customerLinked) {
-        router.push(`/signup?phone=${encodeURIComponent(result.phone)}`);
+        // Customer not linked yet — show profile form for new users
+        setMode('profile');
         return;
       }
-      // Check for incomplete profile (voice-agent customers)
+      // Check for incomplete profile (voice-agent customers with missing name)
       const supabase = createClient();
       const { data: cust } = await supabase
         .from('customers')
@@ -67,6 +99,7 @@ export default function CustomerSignInPage() {
         .eq('auth_user_id', result.userId)
         .single();
       if (cust && (!cust.first_name?.trim() || !cust.last_name?.trim())) {
+        // Redirect to dashboard — unified profile completion banner handles prompting
         router.push('/account');
         router.refresh();
         return;
@@ -74,12 +107,14 @@ export default function CustomerSignInPage() {
       router.push(redirectTo);
       router.refresh();
     },
-    onNoCustomerFound: (phone) => {
-      router.push(`/signup?phone=${encodeURIComponent(phone)}`);
+    onNoCustomerFound: () => {
+      // No customer record at all — show profile form to create one
+      setIsNewUser(true);
+      setMode('profile');
     },
   });
 
-  // --- Email auth hook ---
+  // --- Email auth hook (secondary path) ---
   const emailAuth = useEmailAuth({
     onSuccess: async () => {
       router.push(redirectTo);
@@ -97,9 +132,28 @@ export default function CustomerSignInPage() {
     }).catch(() => {});
   }, []);
 
+  // If ?phone= param + authenticated → show profile form directly (redirect from old /signup?phone=)
+  const [checkingAuth, setCheckingAuth] = useState(!!prefillPhone);
+  useEffect(() => {
+    if (!prefillPhone) {
+      setCheckingAuth(false);
+      return;
+    }
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
+      if (user) {
+        setIsNewUser(true);
+        setMode('profile');
+      }
+      setCheckingAuth(false);
+    }).catch(() => {
+      setCheckingAuth(false);
+    });
+  }, [prefillPhone]);
+
   // Sync OTP phase → mode
   useEffect(() => {
-    if (otp.phase === 'otp' && mode !== 'otp') setMode('otp');
+    if (otp.phase === 'otp' && mode === 'phone') setMode('otp');
   }, [otp.phase, mode]);
 
   // Auto-focus OTP input
@@ -109,25 +163,14 @@ export default function CustomerSignInPage() {
     }
   }, [mode]);
 
-  // Map hook error strings → JSX with links
+  // --- Error rendering ---
   const renderError = (): ReactNode => {
-    // Check JSX error first (for forgot password errors)
     if (jsxError) return jsxError;
 
-    const err = mode === 'email' ? emailAuth.error : otp.error;
+    const err = mode === 'email-login' ? emailAuth.error : otp.error;
     if (!err) return null;
 
     switch (err) {
-      case AUTH_ERRORS.PHONE_NOT_FOUND:
-        return (
-          <>
-            We couldn&apos;t find an account with that phone number.{' '}
-            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Create a new account
-            </Link>{' '}
-            to get started.
-          </>
-        );
       case AUTH_ERRORS.STAFF_PHONE:
         return (
           <>
@@ -148,15 +191,7 @@ export default function CustomerSignInPage() {
           </>
         );
       case AUTH_ERRORS.INVALID_CREDENTIALS:
-        return (
-          <>
-            Incorrect email or password. Please try again, or{' '}
-            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              create a new account
-            </Link>
-            .
-          </>
-        );
+        return 'Incorrect email or password. Please try again.';
       case AUTH_ERRORS.STAFF_EMAIL:
         return (
           <>
@@ -168,40 +203,35 @@ export default function CustomerSignInPage() {
           </>
         );
       case AUTH_ERRORS.NO_CUSTOMER:
-        return (
-          <>
-            We couldn&apos;t find a customer account with that email.{' '}
-            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Create a new account
-            </Link>{' '}
-            to get started.
-          </>
-        );
+        return 'We couldn\'t find a customer account with that email. Try signing in with your phone number instead.';
       default:
         return err;
     }
   };
 
-  const isLoading = mode === 'email' ? emailAuth.loading : otp.loading;
+  const isLoading = mode === 'email-login' ? emailAuth.loading : otp.loading;
   const currentError = renderError();
 
-  // Phone form
+  // --- Forms ---
   const phoneForm = useForm<PhoneOtpSendInput>({
     resolver: formResolver(phoneOtpSendSchema),
     defaultValues: { phone: prefillPhone },
   });
 
-  // OTP form
   const otpForm = useForm<PhoneOtpVerifyInput>({
     resolver: formResolver(phoneOtpVerifySchema),
     defaultValues: { phone: '', code: '' },
   });
 
-  // Email form
   const emailForm = useForm<LoginInput>({
     resolver: formResolver(loginSchema),
   });
 
+  const profileForm = useForm<ProfileInput>({
+    resolver: formResolver(profileSchema),
+  });
+
+  // --- Handlers ---
   const handleSendOtp = async (data: PhoneOtpSendInput) => {
     setJsxError(null);
     await otp.sendOtp(data.phone);
@@ -222,6 +252,53 @@ export default function CustomerSignInPage() {
   const handleEmailSubmit = async (data: LoginInput) => {
     setJsxError(null);
     await emailAuth.signIn(data.email, data.password);
+  };
+
+  const handleProfileSubmit = async (data: ProfileInput) => {
+    setProfileLoading(true);
+    setJsxError(null);
+
+    const fallbackTimer = setTimeout(() => {
+      setProfileLoading(false);
+      setJsxError('Something went wrong. Please try again.');
+    }, 15000);
+
+    try {
+      const result = await linkAccount({
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email || undefined,
+        phone: otp.otpPhone || prefillPhone,
+      });
+
+      if (!result.success) {
+        if (result.error === 'SESSION_EXPIRED') {
+          setJsxError('Your session has expired. Please start over.');
+          setMode('phone');
+        } else if (result.error === 'STAFF_ACCOUNT') {
+          setJsxError(
+            <>
+              This email is used for a staff account. Please use a different email, or{' '}
+              <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+                sign in as staff
+              </Link>
+              .
+            </>
+          );
+        } else {
+          setJsxError('Something went wrong creating your account. Please try again.');
+        }
+        return;
+      }
+
+      router.push(redirectTo);
+      router.refresh();
+    } catch {
+      setJsxError('Something went wrong. Please try again.');
+    } finally {
+      clearTimeout(fallbackTimer);
+      setProfileLoading(false);
+    }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -254,8 +331,28 @@ export default function CustomerSignInPage() {
     setResetLoading(false);
   };
 
-  // Destructure register to merge refs for auto-focus
+  // OTP code ref merge for auto-focus
   const { ref: otpCodeRef, ...otpCodeField } = otpForm.register('code');
+
+  // --- Heading text ---
+  const headingText = () => {
+    if (mode === 'profile') return isNewUser ? 'Create Your Account' : 'Complete Your Profile';
+    return `Welcome to ${businessInfo?.name || 'Our Portal'}`;
+  };
+
+  const subheadingText = () => {
+    if (mode === 'profile' && isNewUser) return `Join ${businessInfo?.name || 'us'} to book and manage appointments`;
+    if (mode === 'profile') return 'Just a couple more details to get you set up';
+    return null;
+  };
+
+  if (checkingAuth) {
+    return (
+      <section className="flex items-center justify-center py-12 sm:py-16">
+        <Spinner size="lg" />
+      </section>
+    );
+  }
 
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
@@ -266,13 +363,16 @@ export default function CustomerSignInPage() {
             SD
           </div>
           <h1 className="mt-4 text-2xl font-bold text-site-text">
-            Welcome to {businessInfo?.name || 'Our Portal'}
+            {headingText()}
           </h1>
+          {subheadingText() && (
+            <p className="mt-1 text-sm text-site-text-muted">{subheadingText()}</p>
+          )}
         </div>
 
         {/* Card Container */}
         <div className="rounded-2xl bg-brand-surface border border-site-border p-8">
-          {sessionExpired && (
+          {sessionExpired && mode === 'phone' && (
             <div className="mb-5 rounded-md border border-amber-800 bg-amber-950 p-3 text-sm text-amber-200">
               Your session has expired. Please sign in again.
             </div>
@@ -283,7 +383,7 @@ export default function CustomerSignInPage() {
             </div>
           )}
 
-          {/* Phone Input Mode */}
+          {/* ===== PHONE ENTRY ===== */}
           {mode === 'phone' && (
             <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-5">
               <FormField
@@ -298,6 +398,7 @@ export default function CustomerSignInPage() {
                   autoComplete="tel"
                   autoFocus={!prefillPhone}
                   placeholder="(310) 555-1234"
+                  className="text-base sm:text-sm"
                   {...phoneForm.register('phone', {
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                       const formatted = formatPhoneInput(e.target.value);
@@ -319,28 +420,24 @@ export default function CustomerSignInPage() {
                 {isLoading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
 
-              {/* Divider */}
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-site-border" />
-                <span className="text-xs font-medium text-site-text-dim">OR</span>
-                <div className="h-px flex-1 bg-site-border" />
+              {/* Email/password link (secondary) */}
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('email-login');
+                    setJsxError(null);
+                    otp.resetError();
+                  }}
+                  className="text-xs text-site-text-dim hover:text-site-text-muted transition-colors"
+                >
+                  Sign in with email &amp; password instead
+                </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('email');
-                  setJsxError(null);
-                  otp.resetError();
-                }}
-                className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
-              >
-                Sign in with email
-              </button>
             </form>
           )}
 
-          {/* OTP Verification Mode */}
+          {/* ===== OTP VERIFICATION ===== */}
           {mode === 'otp' && (
             <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
               <div className="text-center">
@@ -362,7 +459,7 @@ export default function CustomerSignInPage() {
                   autoComplete="one-time-code"
                   maxLength={6}
                   placeholder="000000"
-                  className="text-center text-lg tracking-[0.3em]"
+                  className="text-center text-lg tracking-[0.3em] text-base sm:text-sm"
                   {...otpCodeField}
                   ref={(el) => {
                     otpCodeRef(el);
@@ -404,8 +501,80 @@ export default function CustomerSignInPage() {
             </form>
           )}
 
-          {/* Email Sign-in Mode */}
-          {mode === 'email' && !forgotMode && (
+          {/* ===== PROFILE COMPLETION (new customers / voice-agent customers) ===== */}
+          {mode === 'profile' && (
+            <form onSubmit={profileForm.handleSubmit(handleProfileSubmit)} className="space-y-5">
+              {/* Phone read-only */}
+              <FormField label="Mobile" htmlFor="profile-phone">
+                <Input
+                  id="profile-phone"
+                  value={otp.otpPhone || prefillPhone}
+                  readOnly
+                  className="bg-brand-dark text-site-text-muted text-base sm:text-sm"
+                />
+              </FormField>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  label="First Name"
+                  required
+                  error={profileForm.formState.errors.first_name?.message}
+                  htmlFor="profile-first-name"
+                >
+                  <Input
+                    id="profile-first-name"
+                    autoFocus
+                    placeholder="John"
+                    className="text-base sm:text-sm"
+                    {...profileForm.register('first_name')}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Last Name"
+                  required
+                  error={profileForm.formState.errors.last_name?.message}
+                  htmlFor="profile-last-name"
+                >
+                  <Input
+                    id="profile-last-name"
+                    placeholder="Doe"
+                    className="text-base sm:text-sm"
+                    {...profileForm.register('last_name')}
+                  />
+                </FormField>
+              </div>
+
+              <FormField
+                label="Email"
+                error={profileForm.formState.errors.email?.message}
+                htmlFor="profile-email"
+              >
+                <Input
+                  id="profile-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  className="text-base sm:text-sm"
+                  {...profileForm.register('email')}
+                />
+                <p className="mt-1 text-xs text-site-text-dim">
+                  Optional — for booking confirmations &amp; receipts
+                </p>
+              </FormField>
+
+              <Button
+                type="submit"
+                disabled={profileLoading}
+                className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
+              >
+                {profileLoading ? <Spinner size="sm" /> : 'Complete Sign Up'}
+              </Button>
+            </form>
+          )}
+
+          {/* ===== EMAIL/PASSWORD SIGN-IN (secondary) ===== */}
+          {mode === 'email-login' && !forgotMode && (
             <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-5">
               <FormField
                 label="Email"
@@ -417,7 +586,9 @@ export default function CustomerSignInPage() {
                   id="email"
                   type="email"
                   autoComplete="email"
+                  autoFocus
                   placeholder="you@example.com"
+                  className="text-base sm:text-sm"
                   {...emailForm.register('email')}
                 />
               </FormField>
@@ -433,6 +604,7 @@ export default function CustomerSignInPage() {
                   type="password"
                   autoComplete="current-password"
                   placeholder="Enter your password"
+                  className="text-base sm:text-sm"
                   {...emailForm.register('password')}
                 />
               </FormField>
@@ -478,8 +650,8 @@ export default function CustomerSignInPage() {
             </form>
           )}
 
-          {/* Forgot Password Mode */}
-          {mode === 'email' && forgotMode && (
+          {/* ===== FORGOT PASSWORD (sub-state of email-login) ===== */}
+          {mode === 'email-login' && forgotMode && (
             <div className="space-y-5">
               {resetSent ? (
                 <div className="space-y-4">
@@ -510,9 +682,11 @@ export default function CustomerSignInPage() {
                       id="reset-email"
                       type="email"
                       autoComplete="email"
+                      autoFocus
                       value={resetEmail}
                       onChange={(e) => setResetEmail(e.target.value)}
                       placeholder="you@example.com"
+                      className="text-base sm:text-sm"
                     />
                   </FormField>
 
@@ -540,17 +714,6 @@ export default function CustomerSignInPage() {
             </div>
           )}
         </div>
-
-        {/* Sign up link */}
-        <p className="text-center text-sm text-site-text-muted">
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/signup"
-            className="font-medium text-accent-brand hover:text-accent-ui transition-colors"
-          >
-            Sign up
-          </Link>
-        </p>
       </div>
     </section>
   );

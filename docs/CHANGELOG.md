@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Unified auth page — combine signin + signup — 2026-04-07
+
+### Changes
+- **Unified `/signin` page**: Combined signin and signup into a single phone-first page. Flow: phone entry → `checkExists()` determines new vs returning → OTP verification → profile form (new users only) or redirect (returning users).
+- **`/signup` → `/signin` redirect**: Signup page is now a server-side redirect that preserves query params (e.g., `/signup?phone=...` → `/signin?phone=...`). Kept in middleware `PUBLIC_ROUTES` so unauthenticated users can access it.
+- **`usePhoneOtp` mode: `sign-in`**: Unified page always uses `sign-in` mode. The hook's `onNoCustomerFound` callback shows the profile form for new users, `onVerified` checks profile completeness for voice-agent customers.
+- **Email/password signin**: Kept as secondary option — small "Sign in with email & password instead" link at bottom of phone entry. Includes forgot password flow.
+- **No personalization before auth**: Dropped "Welcome back, [name]!" (privacy concern — would expose customer names before authentication).
+- **Session expired banner**: Preserved `?reason=session_expired` query param handling.
+- **`/signin/reset-password` sub-route**: Unchanged — still works for password reset callback.
+- **All `/signup` links removed**: Previous error messages with `<Link href="/signup">` now use in-page state changes or plain text alternatives.
+
+---
+
 ## feat: Phone-first signup redesign — 2026-04-07
 
 ### Problem
