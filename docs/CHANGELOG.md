@@ -4,6 +4,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Voice agent quote-based appointment conversion + quote status update — 2026-04-07
+
+### Quote conversion via shared service (Issues 1 & 2)
+- Voice agent `POST /api/voice-agent/appointments` now accepts optional `quote_id` parameter.
+- When `quote_id` is provided, uses shared `convertQuote()` from `src/lib/quotes/convert-service.ts` — same code path as POS and admin conversion.
+- This fixes two issues:
+  - **Wrong service in SMS:** Service names now come from quote items (resolved by `convertQuote()`), not from a separately-passed `service_id` that the LLM could hallucinate.
+  - **Quote status not updated:** Quote is now marked `status: 'converted'` with `converted_appointment_id` linked, matching POS/admin behavior.
+
+### Extended `convertQuote()` interface
+- Added `ConvertQuoteOptions` parameter: `appointmentStatus` (default `'confirmed'`) and `channel` (default `'phone'`).
+- Voice agent passes `{ appointmentStatus: 'pending' }` — staff must manually confirm.
+- POS/admin callers are unaffected (use defaults).
+- Return type now includes `serviceNames` string for caller SMS/logging use.
+
+### Documented pending appointment status (Issue 3)
+- Voice agent appointments default to `'pending'` (not `'confirmed'`). This is intentional — staff reviews before confirming.
+- Added inline documentation comment in the endpoint.
+
+### Manual follow-up required: ElevenLabs agent tool definition
+The ElevenLabs voice agent's `book_appointment` tool definition needs a new optional parameter:
+```json
+{
+  "name": "quote_id",
+  "type": "string",
+  "description": "The quote ID to convert into an appointment. When provided, the service and pricing are resolved from the quote items instead of service_id. Use this when the customer is booking based on a previously sent quote.",
+  "required": false
+}
+```
+When `quote_id` is provided, `service_id` becomes optional. Update the agent's system prompt to prefer `quote_id` over `service_id` when the conversation references an existing quote.
+
+### Files changed
+- `src/lib/quotes/convert-service.ts` — Added `ConvertQuoteOptions`, `serviceNames` in return
+- `src/app/api/voice-agent/appointments/route.ts` — Added `quote_id` branch using shared conversion
+
+---
+
 ## fix: Unified profile completion card + InlineAuth Journey E profile check — 2026-04-07
 
 ### Unified profile completion banner (replaces email-only banner)

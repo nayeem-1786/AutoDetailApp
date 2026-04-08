@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
       customer_name,
       customer_phone,
       service_id,
+      quote_id,
       date,
       time,
       vehicle_year,
@@ -161,7 +162,8 @@ export async function POST(request: NextRequest) {
     } = body as {
       customer_name: string;
       customer_phone: string;
-      service_id: string;
+      service_id?: string;
+      quote_id?: string;
       date: string;
       time: string;
       vehicle_year?: number;
@@ -171,13 +173,16 @@ export async function POST(request: NextRequest) {
       notes?: string;
     };
 
-    // Validate required fields
-    if (!customer_name || !customer_phone || !service_id || !date || !time) {
+    // Validate required fields — service_id required unless quote_id provided
+    if (!customer_name || !customer_phone || !date || !time) {
       return NextResponse.json(
-        {
-          error:
-            'Missing required fields: customer_name, customer_phone, service_id, date, time',
-        },
+        { error: 'Missing required fields: customer_name, customer_phone, date, time' },
+        { status: 400 }
+      );
+    }
+    if (!service_id && !quote_id) {
+      return NextResponse.json(
+        { error: 'Either service_id or quote_id must be provided' },
         { status: 400 }
       );
     }
@@ -196,12 +201,142 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    // -----------------------------------------------------------------------
+    // QUOTE CONVERSION PATH — use shared convertQuote() service
+    // When quote_id is provided, services/pricing come from the quote items.
+    // This ensures the correct service appears in SMS (not LLM-hallucinated).
+    // -----------------------------------------------------------------------
+    if (quote_id) {
+      // Look up customer for SMS consent (convertQuote uses the quote's customer_id)
+      let t = perf.now();
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('id, first_name, sms_consent')
+        .eq('phone', e164Phone)
+        .is('deleted_at', null)
+        .limit(1)
+        .single();
+      perf.mark('query:customers_find', t);
+
+      const hasSmsConsent = existingCustomer?.sms_consent ?? false;
+      const customerId = existingCustomer?.id;
+
+      // Compute total duration from quote's service items
+      t = perf.now();
+      const { data: quoteItems } = await supabase
+        .from('quote_items')
+        .select('service_id')
+        .eq('quote_id', quote_id)
+        .not('service_id', 'is', null);
+      perf.mark('query:quote_items', t);
+
+      let totalDuration = 0;
+      if (quoteItems && quoteItems.length > 0) {
+        const serviceIds = quoteItems.map((qi) => qi.service_id).filter(Boolean) as string[];
+        t = perf.now();
+        const { data: svcDurations } = await supabase
+          .from('services')
+          .select('base_duration_minutes')
+          .in('id', serviceIds);
+        perf.mark('query:service_durations', t);
+        totalDuration = (svcDurations ?? []).reduce(
+          (sum, s) => sum + (s.base_duration_minutes || 0), 0
+        );
+      }
+      if (totalDuration === 0) totalDuration = 60; // Fallback: 1 hour
+
+      // Use shared conversion service — creates appointment, appointment_services,
+      // updates quote status to 'converted', links converted_appointment_id.
+      // Voice agent appointments default to 'pending' — staff must manually
+      // confirm after reviewing details.
+      const { convertQuote } = await import('@/lib/quotes/convert-service');
+      t = perf.now();
+      const result = await convertQuote(
+        supabase,
+        quote_id,
+        { date, time: normalizedTime, duration_minutes: totalDuration },
+        { appointmentStatus: 'pending', channel: 'phone' }
+      );
+      perf.mark('convertQuote', t);
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.status }
+        );
+      }
+
+      const appointment = result.appointment as {
+        id: string;
+        scheduled_date: string;
+        scheduled_start_time: string;
+        scheduled_end_time: string;
+        status: string;
+        channel: string;
+        customer_id: string;
+      };
+      const serviceNames = result.serviceNames;
+
+      // Format date and time for SMS (PST, 12-hour)
+      const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/Los_Angeles',
+      });
+      const formattedTime = formatTime(normalizedTime);
+
+      // Send SMS confirmation using service names from quote items
+      t = perf.now();
+      const biz = await getBusinessInfo();
+      perf.mark('fetch:getBusinessInfo', t);
+
+      if (hasSmsConsent && e164Phone) {
+        const smsBody = await buildAppointmentConfirmationSms({
+          businessName: biz.name,
+          businessPhone: biz.phone,
+          date: formattedDate,
+          time: formattedTime,
+          serviceName: serviceNames,
+        });
+        if (smsBody) {
+          sendSms(e164Phone, smsBody, {
+            logToConversation: true,
+            customerId: customerId || undefined,
+            notificationType: 'appointment_confirmed',
+            contextId: appointment.id,
+          }).catch((err) => console.error('Appointment SMS confirmation failed:', err));
+        }
+      }
+
+      // Log system message to conversation thread (non-blocking)
+      logVoiceAction(supabase, e164Phone, `Appointment booked via phone (from quote): ${serviceNames} on ${formattedDate} at ${formattedTime}`).catch(() => {});
+
+      const responseData = {
+        success: true,
+        converted_from_quote: quote_id,
+        appointment: {
+          id: appointment.id,
+          date: appointment.scheduled_date,
+          start_time: appointment.scheduled_start_time,
+          end_time: appointment.scheduled_end_time,
+          status: appointment.status,
+          channel: appointment.channel,
+          customer_id: appointment.customer_id,
+          services: serviceNames,
+        },
+      };
+      perf.done(responseData);
+      return NextResponse.json(responseData, { status: 201 });
+    }
+
+    // -----------------------------------------------------------------------
+    // DIRECT BOOKING PATH — service_id provided, no quote involved
+    // -----------------------------------------------------------------------
+
     // Get service to determine duration
     let t = perf.now();
     const { data: service } = await supabase
       .from('services')
       .select('id, name, base_duration_minutes')
-      .eq('id', service_id)
+      .eq('id', service_id!)
       .eq('is_active', true)
       .single();
     perf.mark('query:services', t);
@@ -303,6 +438,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment
+    // Voice agent appointments default to 'pending' — staff must manually
+    // confirm after reviewing details. This differs from POS/admin conversion
+    // which sets 'confirmed' because a staff member initiated it.
     t = perf.now();
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')

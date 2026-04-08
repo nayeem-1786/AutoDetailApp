@@ -5,13 +5,22 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import type { ConvertQuoteInput } from '@/lib/utils/validation';
 
 type ConvertQuoteResult =
-  | { success: true; appointment: unknown }
+  | { success: true; appointment: unknown; serviceNames: string }
   | { success: false; error: string; status: number; details?: unknown };
+
+/** Options to customize conversion behavior for different callers (POS, admin, voice agent). */
+export interface ConvertQuoteOptions {
+  /** Override appointment status. Default: 'confirmed' (POS/admin). Voice agent uses 'pending'. */
+  appointmentStatus?: 'confirmed' | 'pending';
+  /** Override channel. Default: 'phone'. */
+  channel?: string;
+}
 
 export async function convertQuote(
   supabase: SupabaseClient,
   quoteId: string,
-  data: ConvertQuoteInput
+  data: ConvertQuoteInput,
+  options?: ConvertQuoteOptions
 ): Promise<ConvertQuoteResult> {
   const { date, time, duration_minutes, employee_id } = data;
 
@@ -56,8 +65,8 @@ export async function convertQuote(
       customer_id: quote.customer_id,
       vehicle_id: quote.vehicle_id,
       employee_id: assignedEmployeeId,
-      status: 'confirmed',
-      channel: 'phone',
+      status: options?.appointmentStatus ?? 'confirmed',
+      channel: options?.channel ?? 'phone',
       scheduled_date: date,
       scheduled_start_time: time,
       scheduled_end_time: endTime,
@@ -118,8 +127,13 @@ export async function convertQuote(
     console.error('Error updating quote status:', updateErr.message);
   }
 
+  // Build service names from quote items for caller use (SMS, logging)
+  const serviceNames = serviceItems
+    .map((item: { item_name?: string; service_id: string }) => item.item_name || 'Service')
+    .join(', ');
+
   // Fire webhook for appointment confirmation
   fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
 
-  return { success: true, appointment };
+  return { success: true, appointment, serviceNames };
 }
