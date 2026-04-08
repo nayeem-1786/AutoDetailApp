@@ -441,7 +441,10 @@ export default function UnifiedAuthPage() {
           {mode === 'otp' && (
             <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
               <div className="text-center">
-                <p className="text-sm text-site-text-muted">
+                <p className="text-sm font-medium text-accent-brand">
+                  {isNewUser ? 'Let\u2019s create your account!' : 'Welcome back!'}
+                </p>
+                <p className="mt-1 text-sm text-site-text-muted">
                   We sent a 6-digit code to <span className="font-medium text-site-text">{otp.otpPhone}</span>
                 </p>
               </div>

@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Contextual messaging on unified auth OTP step — 2026-04-07
+
+- Added "Welcome back!" (returning/voice-agent customer) and "Let's create your account!" (new customer) message above OTP input on `/signin`. Uses existing `isNewUser` state set by `checkExists()` in `onBeforeSend`.
+
+---
+
 ## feat: Unified auth page — combine signin + signup — 2026-04-07
 
 ### Changes
