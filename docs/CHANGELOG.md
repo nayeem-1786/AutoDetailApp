@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Logout redirects to homepage instead of signin — 2026-04-08
+
+- **Root cause:** `AccountShell` has a useEffect that redirects unauthenticated users to `/signin`. When `signOut()` cleared the user state, this useEffect fired and overwrote the `customerSignOut()` navigation to `/` — racing it to `/signin`.
+- **Fix:** Added `signingOut` flag to `CustomerAuthProvider` context. `AccountShell` now skips its unauthenticated redirect when a sign-out is in progress, allowing `customerSignOut()` to navigate to `/` as intended.
+- Files: `customer-auth-provider.tsx`, `account-shell.tsx`
+
+---
+
 ## simplify: Phone-only auth — remove email OTP — 2026-04-08
 
 ### Phone is the single auth method for customers

@@ -32,7 +32,7 @@ function formatPhone(phone: string): string {
 }
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
-  const { user, customer, loading, signOut } = useCustomerAuth();
+  const { user, customer, loading, signingOut, signOut } = useCustomerAuth();
   const pathname = usePathname();
   const [businessPhone, setBusinessPhone] = useState<string | null>(null);
 
@@ -45,11 +45,12 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Redirect unauthenticated visitors to signin (signOut redirect handled by provider)
-    if (!loading && !user) {
+    // Redirect unauthenticated visitors to signin — but NOT during sign-out
+    // (sign-out navigates to '/' via customerSignOut; this redirect would race and win)
+    if (!loading && !user && !signingOut) {
       window.location.href = '/signin?redirect=' + encodeURIComponent(pathname);
     }
-  }, [loading, user, pathname]);
+  }, [loading, user, signingOut, pathname]);
 
   if (loading) {
     return (

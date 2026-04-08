@@ -14,6 +14,7 @@ interface CustomerAuthContextType {
   user: User | null;
   customer: Customer | null;
   loading: boolean;
+  signingOut: boolean;
   signOut: () => Promise<void>;
   refreshCustomer: () => Promise<void>;
 }
@@ -23,6 +24,7 @@ const CustomerAuthContext = createContext<CustomerAuthContextType>({
   user: null,
   customer: null,
   loading: true,
+  signingOut: false,
   signOut: async () => {},
   refreshCustomer: async () => {},
 });
@@ -32,6 +34,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
   const sessionCheckRef = useRef<NodeJS.Timeout | null>(null);
 
   const supabase = createClient();
@@ -136,6 +139,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   }, [session, loading]);
 
   const signOut = async () => {
+    setSigningOut(true);
     setSession(null);
     setUser(null);
     setCustomer(null);
@@ -156,6 +160,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         user,
         customer,
         loading,
+        signingOut,
         signOut,
         refreshCustomer,
       }}
