@@ -14,8 +14,11 @@ import {
   type PhoneOtpSendInput,
   type PhoneOtpVerifyInput,
 } from '@/lib/utils/validation';
-import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
+import { formatPhoneInput } from '@/lib/utils/format';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
+import { usePhoneOtp } from '@/lib/hooks/usePhoneOtp';
+import { useCustomerLink } from '@/lib/hooks/useCustomerLink';
+import { AUTH_ERRORS } from '@/lib/auth/auth-errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
@@ -33,39 +36,40 @@ type OtpProfileInput = z.infer<typeof otpProfileSchema>;
 
 type SignupMode = 'full' | 'phone-otp' | 'phone-verify' | 'otp-profile';
 
-/** Check if phone/email already exists in the customers table */
-async function checkExists(params: { phone?: string; email?: string }): Promise<{
-  exists: boolean;
-  hasAuthAccount: boolean;
-}> {
-  try {
-    const qs = new URLSearchParams();
-    if (params.phone) qs.set('phone', params.phone);
-    if (params.email) qs.set('email', params.email);
-    const res = await fetch(`/api/customer/check-exists?${qs.toString()}`);
-    if (!res.ok) return { exists: false, hasAuthAccount: false };
-    return await res.json();
-  } catch {
-    return { exists: false, hasAuthAccount: false };
-  }
-}
-
 export default function CustomerSignUpPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phoneParam = searchParams.get('phone');
   const { info: businessInfo } = useBusinessInfo();
-  const [error, setError] = useState<ReactNode | null>(null);
+  const [jsxError, setJsxError] = useState<ReactNode | null>(null);
   const [hint, setHint] = useState<ReactNode | null>(null);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<SignupMode>('full');
-  const [otpPhone, setOtpPhone] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
   const [checkingAuth, setCheckingAuth] = useState(!!phoneParam);
   const signedOutRef = useRef(false);
 
-  // Clear any stale session on mount — prevents cross-surface cookie
-  // conflicts (e.g. admin session blocking customer OTP verification).
+  const { checkExists, linkAccount } = useCustomerLink();
+
+  // --- Phone OTP hook ---
+  const otp = usePhoneOtp({
+    mode: 'sign-up',
+    onBeforeSend: async (phone) => {
+      const phoneCheck = await checkExists({ phone });
+      if (phoneCheck.exists) {
+        if (phoneCheck.hasAuthAccount) {
+          return { abort: true, error: AUTH_ERRORS.PHONE_ALREADY_LINKED };
+        }
+        // Has record but no auth — hint to sign in
+        return { abort: true, error: 'PHONE_EXISTS_NO_AUTH' };
+      }
+      return { abort: false };
+    },
+    onVerified: () => {
+      setMode('otp-profile');
+    },
+  });
+
+  // Clear any stale session on mount
   useEffect(() => {
     if (signedOutRef.current) return;
     signedOutRef.current = true;
@@ -86,7 +90,6 @@ export default function CustomerSignUpPage() {
     supabase.auth.getUser().then(({ data: { user } }: { data: { user: unknown } }) => {
       if (user) {
         // Post-OTP flow: user authenticated, phone pre-filled, show simplified form
-        setOtpPhone(phoneParam);
         setMode('otp-profile');
       } else {
         // Phone param but not authenticated — start fresh OTP signup
@@ -99,12 +102,51 @@ export default function CustomerSignUpPage() {
     });
   }, [phoneParam]);
 
-  // Cooldown timer
+  // Sync OTP phase → mode
   useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
+    if (otp.phase === 'otp' && mode === 'phone-otp') setMode('phone-verify');
+  }, [otp.phase, mode]);
+
+  // Map hook errors → JSX
+  const renderError = (): ReactNode => {
+    if (jsxError) return jsxError;
+
+    const err = otp.error;
+    if (!err) return null;
+
+    switch (err) {
+      case AUTH_ERRORS.PHONE_ALREADY_LINKED:
+        return (
+          <>
+            This phone number is already linked to an account.{' '}
+            <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Sign in here
+            </Link>{' '}
+            instead.
+            <span className="mt-1 block text-xs text-site-text-dim">
+              Not your account? Call or text us for help.
+            </span>
+          </>
+        );
+      case 'PHONE_EXISTS_NO_AUTH': {
+        const phoneEnc = encodeURIComponent(phoneForm.getValues('phone'));
+        setHint(
+          <>
+            Welcome back! We already have your info on file.{' '}
+            <Link href={`/signin?phone=${phoneEnc}`} className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Sign in here
+            </Link>{' '}
+            to access your account.
+          </>
+        );
+        return null;
+      }
+      default:
+        return err;
+    }
+  };
+
+  const currentError = renderError();
 
   // Full registration form (email/password)
   const fullForm = useForm<CustomerSignupInput>({
@@ -127,17 +169,37 @@ export default function CustomerSignUpPage() {
     resolver: formResolver(otpProfileSchema),
   });
 
+  const handleSendOtp = async (data: PhoneOtpSendInput) => {
+    setJsxError(null);
+    setHint(null);
+    await otp.sendOtp(data.phone);
+    otpVerifyForm.setValue('phone', data.phone);
+  };
+
+  const handleVerifyOtp = async (data: PhoneOtpVerifyInput) => {
+    setJsxError(null);
+    setHint(null);
+    await otp.verifyOtp(data.phone, data.code);
+  };
+
+  const handleResendOtp = async () => {
+    setJsxError(null);
+    setHint(null);
+    otpVerifyForm.setValue('code', '');
+    await otp.resendOtp();
+  };
+
   // Full registration: create auth user + link customer
   const onFullSubmit = async (data: CustomerSignupInput) => {
     setLoading(true);
-    setError(null);
+    setJsxError(null);
     setHint(null);
 
     // Pre-check: does email already exist?
     const emailCheck = await checkExists({ email: data.email });
     if (emailCheck.exists) {
       if (emailCheck.hasAuthAccount) {
-        setError(
+        setJsxError(
           <>
             This email is already linked to an account.{' '}
             <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -166,7 +228,7 @@ export default function CustomerSignUpPage() {
       const phoneCheck = await checkExists({ phone: data.phone });
       if (phoneCheck.exists) {
         if (phoneCheck.hasAuthAccount) {
-          setError(
+          setJsxError(
             <>
               This phone number is already linked to an account.{' '}
               <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -179,11 +241,11 @@ export default function CustomerSignUpPage() {
             </>
           );
         } else {
-          const phoneParam = encodeURIComponent(data.phone);
+          const phoneEnc = encodeURIComponent(data.phone);
           setHint(
             <>
               Welcome back! We already have your info on file.{' '}
-              <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-accent-brand hover:text-accent-ui underline">
+              <Link href={`/signin?phone=${phoneEnc}`} className="font-medium text-accent-brand hover:text-accent-ui underline">
                 Sign in here
               </Link>{' '}
               to access your account.
@@ -204,7 +266,7 @@ export default function CustomerSignUpPage() {
 
     if (signUpError) {
       if (signUpError.message.includes('already registered') || signUpError.message.includes('already been registered')) {
-        setError(
+        setJsxError(
           <>
             This email is already linked to an account.{' '}
             <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -214,30 +276,24 @@ export default function CustomerSignUpPage() {
           </>
         );
       } else if (signUpError.message.includes('rate') || signUpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
+        setJsxError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError('Something went wrong creating your account. Please try again.');
+        setJsxError('Something went wrong creating your account. Please try again.');
       }
       setLoading(false);
       return;
     }
 
-    const linkRes = await fetch('/api/customer/link-account', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        phone: data.phone,
-      }),
+    const result = await linkAccount({
+      first_name: data.first_name,
+      last_name: data.last_name,
+      email: data.email,
+      phone: data.phone,
     });
 
-    const linkData = await linkRes.json();
-
-    if (!linkRes.ok) {
-      if (linkRes.status === 401) {
-        setError(
+    if (!result.success) {
+      if (result.error === 'SESSION_EXPIRED') {
+        setJsxError(
           <>
             Your session has expired. Please{' '}
             <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -246,8 +302,8 @@ export default function CustomerSignUpPage() {
             to try again.
           </>
         );
-      } else if (linkData.error?.includes('staff account')) {
-        setError(
+      } else if (result.error === 'STAFF_ACCOUNT') {
+        setJsxError(
           <>
             This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
             <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -257,7 +313,7 @@ export default function CustomerSignUpPage() {
           </>
         );
       } else {
-        setError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
+        setJsxError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
       }
       setLoading(false);
       return;
@@ -267,165 +323,28 @@ export default function CustomerSignUpPage() {
     router.refresh();
   };
 
-  // Phone OTP signup: send OTP
-  const sendOtp = async (data: PhoneOtpSendInput) => {
-    setLoading(true);
-    setError(null);
-    setHint(null);
-
-    const e164 = normalizePhone(data.phone);
-    if (!e164) {
-      setError('Please enter a valid 10-digit phone number.');
-      setLoading(false);
-      return;
-    }
-
-    // Pre-check: does phone already exist?
-    const phoneCheck = await checkExists({ phone: data.phone });
-    if (phoneCheck.exists) {
-      if (phoneCheck.hasAuthAccount) {
-        setError(
-          <>
-            This phone number is already linked to an account.{' '}
-            <Link href="/signin" className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Sign in here
-            </Link>{' '}
-            instead.
-            <span className="mt-1 block text-xs text-site-text-dim">
-              Not your account? Call or text us for help.
-            </span>
-          </>
-        );
-      } else {
-        const phoneParam = encodeURIComponent(data.phone);
-        setHint(
-          <>
-            Welcome back! We already have your info on file.{' '}
-            <Link href={`/signin?phone=${phoneParam}`} className="font-medium text-accent-brand hover:text-accent-ui underline">
-              Sign in here
-            </Link>{' '}
-            to access your account.
-          </>
-        );
-      }
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
-
-    if (otpError) {
-      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong sending your code. Please try again.');
-      }
-      setLoading(false);
-      return;
-    }
-
-    setOtpPhone(data.phone);
-    otpVerifyForm.setValue('phone', data.phone);
-    setResendCooldown(60);
-    setMode('phone-verify');
-    setLoading(false);
-  };
-
-  // Verify OTP during signup
-  const verifyOtp = async (data: PhoneOtpVerifyInput) => {
-    setLoading(true);
-    setError(null);
-    setHint(null);
-
-    try {
-      const e164 = normalizePhone(data.phone);
-      if (!e164) {
-        setError('Please enter a valid 10-digit phone number.');
-        return;
-      }
-
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        phone: e164,
-        token: data.code,
-        type: 'sms',
-      });
-
-      if (verifyError) {
-        if (verifyError.message.includes('expired')) {
-          setError('Your verification code has expired. Please request a new one.');
-        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-          setError('That code didn\u2019t work. Please check and try again, or request a new code.');
-        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-          setError('Too many attempts. Please wait a few minutes and try again.');
-        } else {
-          setError('Something went wrong verifying your code. Please try again.');
-        }
-        return;
-      }
-
-      // OTP verified — switch to profile completion
-      setMode('otp-profile');
-    } catch (err) {
-      console.error('OTP verification error:', err);
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resendOtp = async () => {
-    if (resendCooldown > 0) return;
-    setError(null);
-    setHint(null);
-
-    const e164 = normalizePhone(otpPhone);
-    if (!e164) return;
-
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
-
-    if (otpError) {
-      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong sending your code. Please try again.');
-      }
-      return;
-    }
-
-    setResendCooldown(60);
-  };
-
   // Post-OTP profile completion: link customer
   const onOtpProfileSubmit = async (data: OtpProfileInput) => {
     setLoading(true);
-    setError(null);
+    setJsxError(null);
     setHint(null);
 
     const fallbackTimer = setTimeout(() => {
       setLoading(false);
-      setError('Something went wrong. Please try again.');
+      setJsxError('Something went wrong. Please try again.');
     }, 15000);
 
     try {
-      const linkRes = await fetch('/api/customer/link-account', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          first_name: data.first_name,
-          last_name: data.last_name,
-          email: data.email,
-          phone: otpPhone || phoneParam,
-        }),
+      const result = await linkAccount({
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email,
+        phone: otp.otpPhone || phoneParam || '',
       });
 
-      const linkData = await linkRes.json();
-
-      if (!linkRes.ok) {
-        if (linkRes.status === 401) {
-          setError(
+      if (!result.success) {
+        if (result.error === 'SESSION_EXPIRED') {
+          setJsxError(
             <>
               Your session has expired. Please{' '}
               <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -434,8 +353,8 @@ export default function CustomerSignUpPage() {
               to try again.
             </>
           );
-        } else if (linkData.error?.includes('staff account')) {
-          setError(
+        } else if (result.error === 'STAFF_ACCOUNT') {
+          setJsxError(
             <>
               This email is used for a staff account and can&apos;t be used for customer registration. Please use a different email, or{' '}
               <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
@@ -445,16 +364,15 @@ export default function CustomerSignUpPage() {
             </>
           );
         } else {
-          setError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
+          setJsxError('Something went wrong creating your account. Please try again. If the problem continues, contact us.');
         }
         return;
       }
 
       router.push('/account');
       router.refresh();
-    } catch (err) {
-      console.error('Profile completion error:', err);
-      setError('Something went wrong. Please try again.');
+    } catch {
+      setJsxError('Something went wrong. Please try again.');
     } finally {
       clearTimeout(fallbackTimer);
       setLoading(false);
@@ -468,6 +386,8 @@ export default function CustomerSignUpPage() {
       </section>
     );
   }
+
+  const isOtpLoading = otp.loading;
 
   return (
     <section className="flex items-center justify-center py-12 sm:py-16">
@@ -489,9 +409,9 @@ export default function CustomerSignUpPage() {
 
         {/* Card Container */}
         <div className="rounded-2xl bg-brand-surface border border-site-border p-8">
-          {error && (
+          {currentError && (
             <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
-              {error}
+              {currentError}
             </div>
           )}
           {hint && (
@@ -507,7 +427,7 @@ export default function CustomerSignUpPage() {
               <FormField label="Mobile" htmlFor="otp-phone">
                 <Input
                   id="otp-phone"
-                  value={otpPhone || phoneParam || ''}
+                  value={otp.otpPhone || phoneParam || ''}
                   readOnly
                   className="bg-brand-dark text-site-text-muted"
                 />
@@ -568,7 +488,7 @@ export default function CustomerSignUpPage() {
 
           {/* Phone OTP Send */}
           {mode === 'phone-otp' && (
-            <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5">
+            <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-5">
               <FormField
                 label="Mobile"
                 required
@@ -594,10 +514,10 @@ export default function CustomerSignUpPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isOtpLoading}
                 className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
-                {loading ? <Spinner size="sm" /> : 'Continue'}
+                {isOtpLoading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
 
               {/* Divider */}
@@ -611,8 +531,9 @@ export default function CustomerSignUpPage() {
                 type="button"
                 onClick={() => {
                   setMode('full');
-                  setError(null);
+                  setJsxError(null);
                   setHint(null);
+                  otp.resetError();
                 }}
                 className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
@@ -623,10 +544,10 @@ export default function CustomerSignUpPage() {
 
           {/* Phone OTP Verify */}
           {mode === 'phone-verify' && (
-            <form onSubmit={otpVerifyForm.handleSubmit(verifyOtp)} className="space-y-5">
+            <form onSubmit={otpVerifyForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
               <div className="text-center">
                 <p className="text-sm text-site-text-muted">
-                  We sent a 6-digit code to <span className="font-medium text-site-text">{otpPhone}</span>
+                  We sent a 6-digit code to <span className="font-medium text-site-text">{otp.otpPhone}</span>
                 </p>
               </div>
 
@@ -650,10 +571,10 @@ export default function CustomerSignUpPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isOtpLoading}
                 className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
-                {loading ? <Spinner size="sm" /> : 'Verify'}
+                {isOtpLoading ? <Spinner size="sm" /> : 'Verify'}
               </Button>
 
               <div className="flex items-center justify-between text-sm">
@@ -661,8 +582,9 @@ export default function CustomerSignUpPage() {
                   type="button"
                   onClick={() => {
                     setMode('phone-otp');
-                    setError(null);
+                    setJsxError(null);
                     setHint(null);
+                    otp.resetToPhone();
                     otpVerifyForm.reset();
                   }}
                   className="text-site-text-muted hover:text-site-text"
@@ -671,11 +593,11 @@ export default function CustomerSignUpPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={resendOtp}
-                  disabled={resendCooldown > 0}
+                  onClick={handleResendOtp}
+                  disabled={otp.cooldown > 0}
                   className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
                 >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                  {otp.cooldown > 0 ? `Resend in ${otp.cooldown}s` : 'Resend code'}
                 </button>
               </div>
             </form>
@@ -787,7 +709,7 @@ export default function CustomerSignUpPage() {
                 type="button"
                 onClick={() => {
                   setMode('phone-otp');
-                  setError(null);
+                  setJsxError(null);
                   setHint(null);
                 }}
                 className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"

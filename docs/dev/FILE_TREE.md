@@ -783,6 +783,7 @@ src/lib/auth/auth-provider.tsx             — Admin auth context provider
 src/lib/auth/check-permission.ts
 src/lib/auth/customer-auth-provider.tsx    — Customer auth context provider
 src/lib/auth/customer-helpers.ts
+src/lib/auth/auth-errors.ts               — Shared auth error string constants (used by auth hooks)
 src/lib/auth/customer-signout.ts          — Shared customer sign-out utility (all customer sign-out call sites)
 src/lib/auth/get-employee.ts
 src/lib/auth/permission-context.tsx        — Permission context & provider
@@ -839,6 +840,9 @@ src/lib/hooks/use-form-validation.ts
 src/lib/hooks/use-online-status.ts
 src/lib/hooks/use-permission.ts
 src/lib/hooks/use-unsaved-changes.ts
+src/lib/hooks/useCustomerLink.ts          — Customer linking API wrapper hook (check-exists, link-by-phone, link-account)
+src/lib/hooks/useEmailAuth.ts             — Email/password sign-in hook (staff guard, customer check)
+src/lib/hooks/usePhoneOtp.ts              — Phone OTP state machine hook (send, verify, resend, cooldown)
 ```
 
 ### Migration

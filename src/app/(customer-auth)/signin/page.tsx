@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -14,31 +14,18 @@ import {
   type PhoneOtpSendInput,
   type PhoneOtpVerifyInput,
 } from '@/lib/utils/validation';
-import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
+import { formatPhoneInput } from '@/lib/utils/format';
 import { useBusinessInfo } from '@/lib/hooks/use-business-info';
+import { usePhoneOtp } from '@/lib/hooks/usePhoneOtp';
+import { useEmailAuth } from '@/lib/hooks/useEmailAuth';
+import { useCustomerLink } from '@/lib/hooks/useCustomerLink';
+import { AUTH_ERRORS } from '@/lib/auth/auth-errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 
 type AuthMode = 'phone' | 'otp' | 'email';
-
-/** Check if phone/email already exists in the customers table */
-async function checkExists(params: { phone?: string; email?: string }): Promise<{
-  exists: boolean;
-  hasAuthAccount: boolean;
-}> {
-  try {
-    const qs = new URLSearchParams();
-    if (params.phone) qs.set('phone', params.phone);
-    if (params.email) qs.set('email', params.email);
-    const res = await fetch(`/api/customer/check-exists?${qs.toString()}`);
-    if (!res.ok) return { exists: false, hasAuthAccount: false };
-    return await res.json();
-  } catch {
-    return { exists: false, hasAuthAccount: false };
-  }
-}
 
 export default function CustomerSignInPage() {
   const router = useRouter();
@@ -49,18 +36,58 @@ export default function CustomerSignInPage() {
   const prefillPhone = searchParams.get('phone') || '';
   const { info: businessInfo } = useBusinessInfo();
   const [mode, setMode] = useState<AuthMode>('phone');
-  const [error, setError] = useState<ReactNode | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [otpPhone, setOtpPhone] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [jsxError, setJsxError] = useState<ReactNode | null>(null);
   const [forgotMode, setForgotMode] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const signedOutRef = useRef(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
-  // Clear any stale session on mount — prevents cross-surface cookie
-  // conflicts (e.g. admin session blocking customer OTP verification).
+  const { checkExists } = useCustomerLink();
+
+  // --- Phone OTP hook ---
+  const otp = usePhoneOtp({
+    mode: 'sign-in',
+    onBeforeSend: async (phone) => {
+      const check = await checkExists({ phone });
+      if (!check.exists) return { abort: true, error: AUTH_ERRORS.PHONE_NOT_FOUND };
+      return { abort: false };
+    },
+    onVerified: async (result) => {
+      if (!result.customerLinked) {
+        router.push(`/signup?phone=${encodeURIComponent(result.phone)}`);
+        return;
+      }
+      // Check for incomplete profile (voice-agent customers)
+      const supabase = createClient();
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('first_name, last_name')
+        .eq('auth_user_id', result.userId)
+        .single();
+      if (cust && (!cust.first_name?.trim() || !cust.last_name?.trim())) {
+        router.push('/account');
+        router.refresh();
+        return;
+      }
+      router.push(redirectTo);
+      router.refresh();
+    },
+    onNoCustomerFound: (phone) => {
+      router.push(`/signup?phone=${encodeURIComponent(phone)}`);
+    },
+  });
+
+  // --- Email auth hook ---
+  const emailAuth = useEmailAuth({
+    onSuccess: async () => {
+      router.push(redirectTo);
+      router.refresh();
+    },
+  });
+
+  // Clear any stale session on mount
   useEffect(() => {
     if (signedOutRef.current) return;
     signedOutRef.current = true;
@@ -70,20 +97,93 @@ export default function CustomerSignInPage() {
     }).catch(() => {});
   }, []);
 
-  // Auto-focus OTP input when entering verification mode
+  // Sync OTP phase → mode
+  useEffect(() => {
+    if (otp.phase === 'otp' && mode !== 'otp') setMode('otp');
+  }, [otp.phase, mode]);
+
+  // Auto-focus OTP input
   useEffect(() => {
     if (mode === 'otp') {
-      // Small delay to ensure the input is rendered
       requestAnimationFrame(() => otpInputRef.current?.focus());
     }
   }, [mode]);
 
-  // Cooldown timer
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendCooldown]);
+  // Map hook error strings → JSX with links
+  const renderError = (): ReactNode => {
+    // Check JSX error first (for forgot password errors)
+    if (jsxError) return jsxError;
+
+    const err = mode === 'email' ? emailAuth.error : otp.error;
+    if (!err) return null;
+
+    switch (err) {
+      case AUTH_ERRORS.PHONE_NOT_FOUND:
+        return (
+          <>
+            We couldn&apos;t find an account with that phone number.{' '}
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Create a new account
+            </Link>{' '}
+            to get started.
+          </>
+        );
+      case AUTH_ERRORS.STAFF_PHONE:
+        return (
+          <>
+            This phone number is linked to a staff account.{' '}
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Sign in as staff
+            </Link>{' '}
+            instead, or use a different number.
+          </>
+        );
+      case AUTH_ERRORS.PHONE_ALREADY_LINKED:
+        return (
+          <>
+            This phone number is already linked to another account.
+            <span className="mt-1 block text-xs text-site-text-dim">
+              Not your account? Call or text us for help.
+            </span>
+          </>
+        );
+      case AUTH_ERRORS.INVALID_CREDENTIALS:
+        return (
+          <>
+            Incorrect email or password. Please try again, or{' '}
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              create a new account
+            </Link>
+            .
+          </>
+        );
+      case AUTH_ERRORS.STAFF_EMAIL:
+        return (
+          <>
+            This email is linked to a staff account.{' '}
+            <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Sign in as staff
+            </Link>{' '}
+            instead, or use a different email.
+          </>
+        );
+      case AUTH_ERRORS.NO_CUSTOMER:
+        return (
+          <>
+            We couldn&apos;t find a customer account with that email.{' '}
+            <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
+              Create a new account
+            </Link>{' '}
+            to get started.
+          </>
+        );
+      default:
+        return err;
+    }
+  };
+
+  const isLoading = mode === 'email' ? emailAuth.loading : otp.loading;
+  const currentError = renderError();
 
   // Phone form
   const phoneForm = useForm<PhoneOtpSendInput>({
@@ -102,324 +202,38 @@ export default function CustomerSignInPage() {
     resolver: formResolver(loginSchema),
   });
 
-  const sendOtp = async (data: PhoneOtpSendInput) => {
-    setLoading(true);
-    setError(null);
-
-    const e164 = normalizePhone(data.phone);
-    if (!e164) {
-      setError('Please enter a valid 10-digit phone number.');
-      setLoading(false);
-      return;
-    }
-
-    // Pre-check: verify the phone exists before sending OTP
-    const phoneCheck = await checkExists({ phone: data.phone });
-    if (!phoneCheck.exists) {
-      setError(
-        <>
-          We couldn&apos;t find an account with that phone number.{' '}
-          <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-            Create a new account
-          </Link>{' '}
-          to get started.
-        </>
-      );
-      setLoading(false);
-      return;
-    }
-
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
-
-    if (otpError) {
-      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong sending your code. Please try again.');
-      }
-      setLoading(false);
-      return;
-    }
-
-    setOtpPhone(data.phone);
+  const handleSendOtp = async (data: PhoneOtpSendInput) => {
+    setJsxError(null);
+    await otp.sendOtp(data.phone);
     otpForm.setValue('phone', data.phone);
-    setResendCooldown(60);
-    setMode('otp');
-    setLoading(false);
   };
 
-  const verifyOtp = useCallback(async (data: PhoneOtpVerifyInput) => {
-    setLoading(true);
-    setError(null);
+  const handleVerifyOtp = async (data: PhoneOtpVerifyInput) => {
+    setJsxError(null);
+    await otp.verifyOtp(data.phone, data.code);
+  };
 
-    // Fallback timeout — if anything hangs, clear spinner after 15s
-    const fallbackTimer = setTimeout(() => {
-      setLoading(false);
-      setError('Something went wrong. Please try again.');
-    }, 15000);
-
-    try {
-      const e164 = normalizePhone(data.phone);
-      if (!e164) {
-        setError('Please enter a valid 10-digit phone number.');
-        return;
-      }
-
-      const supabase = createClient();
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        phone: e164,
-        token: data.code,
-        type: 'sms',
-      });
-
-      if (verifyError) {
-        if (verifyError.message.includes('expired')) {
-          setError('Your verification code has expired. Please request a new one.');
-        } else if (verifyError.message.includes('invalid') || verifyError.message.includes('incorrect')) {
-          setError('That code didn\u2019t work. Please check and try again, or request a new code.');
-        } else if (verifyError.message.includes('rate') || verifyError.message.includes('too many')) {
-          setError('Too many attempts. Please wait a few minutes and try again.');
-        } else {
-          setError('Something went wrong verifying your code. Please try again.');
-        }
-        return;
-      }
-
-      // Staff guard check
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single();
-
-        if (emp) {
-          await supabase.auth.signOut();
-          setError(
-            <>
-              This phone number is linked to a staff account.{' '}
-              <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-                Sign in as staff
-              </Link>{' '}
-              instead, or use a different number.
-            </>
-          );
-          return;
-        }
-
-        // Check for customer record by auth_user_id first
-        const { data: cust } = await supabase
-          .from('customers')
-          .select('id, first_name, last_name')
-          .eq('auth_user_id', user.id)
-          .single();
-
-        if (!cust) {
-          // No linked customer — try to link via API (bypasses RLS)
-          const linkRes = await fetch('/api/customer/link-by-phone', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: e164 }),
-          });
-
-          const linkData = await linkRes.json();
-
-          if (linkData.success) {
-            // Check if the linked customer has incomplete profile (voice-agent customers)
-            const { data: linkedCust } = await supabase
-              .from('customers')
-              .select('first_name, last_name')
-              .eq('auth_user_id', user.id)
-              .single();
-
-            if (linkedCust && (!linkedCust.first_name?.trim() || !linkedCust.last_name?.trim())) {
-              // Redirect to dashboard — unified profile completion banner handles prompting
-              router.push('/account');
-              router.refresh();
-              return;
-            }
-
-            router.push(redirectTo);
-            router.refresh();
-            return;
-          }
-
-          if (linkData.error === 'This phone number is already linked to another account') {
-            await supabase.auth.signOut();
-            setError(
-              <>
-                This phone number is already linked to another account.
-                <span className="mt-1 block text-xs text-site-text-dim">
-                  Not your account? Call or text us for help.
-                </span>
-              </>
-            );
-            return;
-          }
-
-          if (!linkData.found) {
-            // No customer record — redirect to signup with phone pre-filled
-            const phoneParam = encodeURIComponent(data.phone);
-            router.push(`/signup?phone=${phoneParam}`);
-            return;
-          }
-
-          // Other error
-          setError('Something went wrong linking your account. Please try again. If the problem continues, contact us.');
-          return;
-        }
-
-        // Customer found — check if profile is incomplete (voice-agent customers)
-        if (!cust.first_name?.trim() || !cust.last_name?.trim()) {
-          // Redirect to dashboard — unified profile completion banner handles prompting
-          router.push('/account');
-          router.refresh();
-          return;
-        }
-      }
-
-      router.push(redirectTo);
-      router.refresh();
-    } catch (err) {
-      console.error('OTP verification error:', err);
-      setError('Something went wrong. Please try again.');
-    } finally {
-      clearTimeout(fallbackTimer);
-      setLoading(false);
-    }
-  }, [redirectTo, router]);
-
-  const resendOtp = async () => {
-    if (resendCooldown > 0) return;
-    setError(null);
+  const handleResendOtp = async () => {
+    setJsxError(null);
     otpForm.setValue('code', '');
-
-    const e164 = normalizePhone(otpPhone);
-    if (!e164) return;
-
-    const supabase = createClient();
-    const { error: otpError } = await supabase.auth.signInWithOtp({ phone: e164 });
-
-    if (otpError) {
-      if (otpError.message.includes('rate') || otpError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
-      } else {
-        setError('Something went wrong sending your code. Please try again.');
-      }
-      return;
-    }
-
-    setResendCooldown(60);
+    await otp.resendOtp();
   };
 
-  const onEmailSubmit = async (data: LoginInput) => {
-    setLoading(true);
-    setError(null);
-
-    const fallbackTimer = setTimeout(() => {
-      setLoading(false);
-      setError('Something went wrong. Please try again.');
-    }, 15000);
-
-    try {
-      const supabase = createClient();
-
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
-
-      if (authError) {
-        if (authError.message.includes('Invalid login') || authError.message.includes('invalid')) {
-          setError(
-            <>
-              Incorrect email or password. Please try again, or{' '}
-              <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-                create a new account
-              </Link>
-              .
-            </>
-          );
-        } else if (authError.message.includes('rate') || authError.message.includes('too many')) {
-          setError('Too many attempts. Please wait a few minutes and try again.');
-        } else {
-          setError('Something went wrong signing you in. Please try again.');
-        }
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: emp } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single();
-
-        if (emp) {
-          await supabase.auth.signOut();
-          setError(
-            <>
-              This email is linked to a staff account.{' '}
-              <Link href="/login" className="font-medium text-accent-brand hover:text-accent-ui underline">
-                Sign in as staff
-              </Link>{' '}
-              instead, or use a different email.
-            </>
-          );
-          return;
-        }
-
-        const { data: cust } = await supabase
-          .from('customers')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single();
-
-        if (!cust) {
-          await supabase.auth.signOut();
-          setError(
-            <>
-              We couldn&apos;t find a customer account with that email.{' '}
-              <Link href="/signup" className="font-medium text-accent-brand hover:text-accent-ui underline">
-                Create a new account
-              </Link>{' '}
-              to get started.
-            </>
-          );
-          return;
-        }
-      }
-
-      router.push(redirectTo);
-      router.refresh();
-    } catch (err) {
-      console.error('Email sign-in error:', err);
-      setError('Something went wrong. Please try again.');
-    } finally {
-      clearTimeout(fallbackTimer);
-      setLoading(false);
-    }
+  const handleEmailSubmit = async (data: LoginInput) => {
+    setJsxError(null);
+    await emailAuth.signIn(data.email, data.password);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setJsxError(null);
 
     if (!resetEmail.trim()) {
-      setError('Please enter your email address.');
+      setJsxError('Please enter your email address.');
       return;
     }
 
-    setLoading(true);
+    setResetLoading(true);
 
     const supabase = createClient();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(resetEmail, {
@@ -428,16 +242,16 @@ export default function CustomerSignInPage() {
 
     if (resetError) {
       if (resetError.message.includes('rate') || resetError.message.includes('too many')) {
-        setError('Too many attempts. Please wait a few minutes and try again.');
+        setJsxError('Too many attempts. Please wait a few minutes and try again.');
       } else {
-        setError('Something went wrong. Please check your email address and try again.');
+        setJsxError('Something went wrong. Please check your email address and try again.');
       }
-      setLoading(false);
+      setResetLoading(false);
       return;
     }
 
     setResetSent(true);
-    setLoading(false);
+    setResetLoading(false);
   };
 
   // Destructure register to merge refs for auto-focus
@@ -463,15 +277,15 @@ export default function CustomerSignInPage() {
               Your session has expired. Please sign in again.
             </div>
           )}
-          {error && (
+          {currentError && (
             <div className="mb-5 rounded-md bg-red-950 p-3 text-sm text-red-300">
-              {error}
+              {currentError}
             </div>
           )}
 
           {/* Phone Input Mode */}
           {mode === 'phone' && (
-            <form onSubmit={phoneForm.handleSubmit(sendOtp)} className="space-y-5">
+            <form onSubmit={phoneForm.handleSubmit(handleSendOtp)} className="space-y-5">
               <FormField
                 label="Mobile"
                 required
@@ -498,11 +312,11 @@ export default function CustomerSignInPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 autoFocus={!!prefillPhone}
                 className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
-                {loading ? <Spinner size="sm" /> : 'Continue'}
+                {isLoading ? <Spinner size="sm" /> : 'Continue'}
               </Button>
 
               {/* Divider */}
@@ -516,7 +330,8 @@ export default function CustomerSignInPage() {
                 type="button"
                 onClick={() => {
                   setMode('email');
-                  setError(null);
+                  setJsxError(null);
+                  otp.resetError();
                 }}
                 className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
@@ -527,10 +342,10 @@ export default function CustomerSignInPage() {
 
           {/* OTP Verification Mode */}
           {mode === 'otp' && (
-            <form onSubmit={otpForm.handleSubmit(verifyOtp)} className="space-y-5">
+            <form onSubmit={otpForm.handleSubmit(handleVerifyOtp)} className="space-y-5">
               <div className="text-center">
                 <p className="text-sm text-site-text-muted">
-                  We sent a 6-digit code to <span className="font-medium text-site-text">{otpPhone}</span>
+                  We sent a 6-digit code to <span className="font-medium text-site-text">{otp.otpPhone}</span>
                 </p>
               </div>
 
@@ -558,10 +373,10 @@ export default function CustomerSignInPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
-                {loading ? <Spinner size="sm" /> : 'Verify'}
+                {isLoading ? <Spinner size="sm" /> : 'Verify'}
               </Button>
 
               <div className="flex items-center justify-between text-sm">
@@ -569,7 +384,8 @@ export default function CustomerSignInPage() {
                   type="button"
                   onClick={() => {
                     setMode('phone');
-                    setError(null);
+                    setJsxError(null);
+                    otp.resetToPhone();
                     otpForm.reset();
                   }}
                   className="text-site-text-muted hover:text-site-text"
@@ -578,11 +394,11 @@ export default function CustomerSignInPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={resendOtp}
-                  disabled={resendCooldown > 0}
+                  onClick={handleResendOtp}
+                  disabled={otp.cooldown > 0}
                   className="text-site-text-muted hover:text-site-text disabled:text-site-text-faint"
                 >
-                  {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                  {otp.cooldown > 0 ? `Resend in ${otp.cooldown}s` : 'Resend code'}
                 </button>
               </div>
             </form>
@@ -590,7 +406,7 @@ export default function CustomerSignInPage() {
 
           {/* Email Sign-in Mode */}
           {mode === 'email' && !forgotMode && (
-            <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-5">
+            <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-5">
               <FormField
                 label="Email"
                 required
@@ -623,17 +439,18 @@ export default function CustomerSignInPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isLoading}
                 className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
               >
-                {loading ? <Spinner size="sm" /> : 'Sign In'}
+                {isLoading ? <Spinner size="sm" /> : 'Sign In'}
               </Button>
 
               <button
                 type="button"
                 onClick={() => {
                   setForgotMode(true);
-                  setError(null);
+                  setJsxError(null);
+                  emailAuth.resetError();
                 }}
                 className="block w-full text-center text-sm text-site-text-muted hover:text-accent-ui transition-colors"
               >
@@ -651,7 +468,8 @@ export default function CustomerSignInPage() {
                 type="button"
                 onClick={() => {
                   setMode('phone');
-                  setError(null);
+                  setJsxError(null);
+                  emailAuth.resetError();
                 }}
                 className="w-full rounded-full border border-site-border bg-brand-dark px-4 py-2 text-sm font-medium text-site-text-secondary transition-colors hover:bg-site-border-light"
               >
@@ -674,7 +492,7 @@ export default function CustomerSignInPage() {
                       setForgotMode(false);
                       setResetSent(false);
                       setResetEmail('');
-                      setError(null);
+                      setJsxError(null);
                     }}
                     className="text-sm text-site-text-muted hover:text-site-text"
                   >
@@ -700,10 +518,10 @@ export default function CustomerSignInPage() {
 
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={resetLoading}
                     className="site-btn-primary w-full py-3 text-sm font-semibold transition-all duration-200 hover:shadow-lg"
                   >
-                    {loading ? <Spinner size="sm" /> : 'Send Reset Link'}
+                    {resetLoading ? <Spinner size="sm" /> : 'Send Reset Link'}
                   </Button>
 
                   <button
@@ -711,7 +529,7 @@ export default function CustomerSignInPage() {
                     onClick={() => {
                       setForgotMode(false);
                       setResetEmail('');
-                      setError(null);
+                      setJsxError(null);
                     }}
                     className="block text-sm text-site-text-muted hover:text-site-text"
                   >

@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix+refactor: Auth root causes + shared hooks — 2026-04-07
+
+### Phase A: Infrastructure root cause fixes
+- **Removed no-op auth lock** (`src/lib/supabase/client.ts`): Custom `lock` function was disabling the SDK's built-in `navigator.locks` mutex, causing race conditions between concurrent auth operations (OTP send/verify, signOut, token refresh). SDK now uses its default real mutex.
+- **Removed `getSession()` from customer-auth-provider**: Was racing with `onAuthStateChange` subscription. SDK fires `INITIAL_SESSION` event via `onAuthStateChange`, making the separate `getSession()` call redundant and racy.
+- **Replaced `getSession()` with `getUser()` on signin/signup pages**: Mount-time stale session check now uses server-validated `getUser()` instead of potentially-cached `getSession()`.
+- **Hardened link-account route** (`src/app/api/customer/link-account/route.ts`):
+  - Email normalized to lowercase for case-insensitive matching (matches DB unique index on `lower(email)`)
+  - Added conflict detection: phone/email already linked to a different auth user now returns 409 instead of 500
+- **Improved inline-auth retry condition**: Profile fetch retry now also triggers on 401 responses, not just empty data.
+
+### Phase B: Shared auth hooks (eliminates ~3,400 lines of duplicated logic)
+- **`src/lib/auth/auth-errors.ts`**: Shared error string constants — hooks return constant strings, consumers map to JSX with contextual links/buttons.
+- **`src/lib/hooks/useCustomerLink.ts`**: Wraps `check-exists`, `link-by-phone`, and `link-account` API calls with error classification.
+- **`src/lib/hooks/usePhoneOtp.ts`**: Full OTP state machine (send, verify, resend, cooldown timer, staff guard, customer lookup, link-by-phone). Supports both sign-in and sign-up modes via `onBeforeSend` callback.
+- **`src/lib/hooks/useEmailAuth.ts`**: Email/password sign-in with staff guard and customer verification.
+- **Consumer updates**: `signin/page.tsx`, `signup/page.tsx`, and `inline-auth.tsx` all refactored to use shared hooks. UI (JSX, routing, error rendering) stays in consumers; logic (Supabase calls, state machines, error classification) in hooks.
+
+---
+
 ## fix: Voice agent quote-based appointment conversion + quote status update — 2026-04-07
 
 ### Quote conversion via shared service (Issues 1 & 2)
