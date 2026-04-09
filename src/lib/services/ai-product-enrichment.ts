@@ -4,6 +4,7 @@
  */
 
 import { specsSchema } from '@/lib/utils/validation';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 
 export const ENRICHMENT_SYSTEM_PROMPT = `You are a product content specialist for a professional auto detailing supply store. You research products from manufacturer websites and create accurate, factual product descriptions and specifications.
 
@@ -136,7 +137,7 @@ export function buildEnrichmentUserPrompt(input: EnrichmentInput): string {
       parts.push(`MANUFACTURER/VENDOR: ${input.vendorName} (but do NOT limit search to this vendor)`);
     }
   } else if (isOwnBrand(input.vendorName)) {
-    parts.push('MANUFACTURER/VENDOR: Store Brand (Smart Details Auto Spa) — This is a store-branded/private-label product. Search for this product by name on Google to find general product information, reviews, or similar products. If no specific product page exists, generate a description based on the product name, category, and any available information.');
+    parts.push(`MANUFACTURER/VENDOR: Store Brand (${BUSINESS_DEFAULTS.name}) — This is a store-branded/private-label product. Search for this product by name on Google to find general product information, reviews, or similar products. If no specific product page exists, generate a description based on the product name, category, and any available information.`);
   } else if (isUnknownVendor(input.vendorName)) {
     parts.push('MANUFACTURER/VENDOR: Unknown — search by product name and category only');
   } else {

@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     // Send verification email
     const businessInfo = await getBusinessInfo();
-    const businessName = businessInfo.name || 'Smart Details Auto Spa';
+    const businessName = businessInfo.name;
 
     const text = `Your verification code is: ${code}\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, you can safely ignore this email.\n\n${businessName}`;
 
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 </body>
 </html>`;
 
-    const result = await sendEmail(email, 'Your Smart Details verification code', text, html);
+    const result = await sendEmail(email, `Your ${businessName} verification code`, text, html);
 
     if (!result.success) {
       console.error('Verification email send failed:', result.error);

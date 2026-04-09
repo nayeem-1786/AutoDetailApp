@@ -183,6 +183,7 @@ src/app/api/admin/marketing/promotions/route.ts
 ### Admin — Settings
 ```
 src/app/api/admin/settings/business/route.ts
+src/app/api/admin/settings/revalidate-business/route.ts
 src/app/api/admin/settings/shipping/carriers/route.ts
 src/app/api/admin/settings/shipping/route.ts
 src/app/api/admin/settings/shipping/test-connection/route.ts
@@ -805,6 +806,7 @@ src/lib/cron/scheduler.ts
 ### Data Access
 ```
 src/lib/data/booking.ts
+src/lib/data/business-defaults.ts
 src/lib/data/business-hours.ts
 src/lib/data/business.ts
 src/lib/data/cities.ts

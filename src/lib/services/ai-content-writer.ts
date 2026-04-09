@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 import type { ContentBlockType } from '@/lib/supabase/types';
 
 // ---------------------------------------------------------------------------
@@ -205,7 +206,7 @@ export async function getBusinessContext(): Promise<{
       : { city: 'Lomita', state: 'CA' };
 
   return {
-    businessName: (s.business_name as string) || 'Smart Detail Auto Spa & Supplies',
+    businessName: (s.business_name as string) || BUSINESS_DEFAULTS.name,
     businessLocation: `${addr.city}, ${addr.state}`,
     businessPhone: (s.business_phone as string) || '',
     googleRating: (s.google_review_rating as string) || '5.0',

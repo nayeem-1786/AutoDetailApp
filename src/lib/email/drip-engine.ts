@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/utils/email';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
-import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessInfo, BUSINESS_DEFAULTS } from '@/lib/data/business';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { renderFromBlocks } from './send-templated-email';
@@ -291,7 +291,7 @@ export async function executeStep(
   for (const s of bizSettings || []) {
     settingsMap[s.key] = typeof s.value === 'string' ? s.value : String(s.value ?? '');
   }
-  const businessName = settingsMap.business_name || 'Smart Detail Auto Spa & Supplies';
+  const businessName = settingsMap.business_name || BUSINESS_DEFAULTS.name;
   const loyaltyRedeemRate = parseFloat(settingsMap.loyalty_redeem_rate || '0.01');
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

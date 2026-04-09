@@ -197,8 +197,8 @@ export async function POST(request: NextRequest) {
     // Build personalized first message
     const hasAppt = appts.length > 0;
     const firstMessage = hasAppt
-      ? `Hey ${firstName}, welcome back to Smart Details! I see you have an upcoming appointment. How can I help you today?`
-      : `Hey ${firstName}, welcome back to Smart Details! How can I help you today?`;
+      ? `Hey ${firstName}, welcome back to ${biz.name}! I see you have an upcoming appointment. How can I help you today?`
+      : `Hey ${firstName}, welcome back to ${biz.name}! How can I help you today?`;
 
     const responseData = {
       type: 'conversation_initiation_client_data',

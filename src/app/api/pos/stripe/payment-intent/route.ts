@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     const paymentIntent = await stripe.paymentIntents.create({
       amount, // in cents
       currency: 'usd',
-      description: description || 'Smart Detail POS',
+      description: description || `${BUSINESS_DEFAULTS.name} POS`,
       payment_method_types: ['card_present'],
       capture_method: 'automatic',
     });

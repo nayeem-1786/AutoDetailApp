@@ -10,7 +10,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 export async function POST() {
   try {
     const business = await getBusinessInfo();
-    const businessName = business.name || 'Smart Details Auto Spa';
+    const businessName = business.name;
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>

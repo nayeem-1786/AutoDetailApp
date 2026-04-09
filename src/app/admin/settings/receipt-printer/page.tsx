@@ -18,6 +18,7 @@ import { Upload, Trash2, Image as ImageIcon, Eye, Plus, X, CheckCircle2, XCircle
 import { generateReceiptHtml, generateReceiptLines, receiptToEscPos } from '@/app/pos/lib/receipt-template';
 import type { ReceiptImages, ReceiptContext } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business-defaults';
 import QRCode from 'qrcode';
 
 const SHORTCODES = [
@@ -429,7 +430,7 @@ export default function ReceiptPrinterPage() {
   function buildMergedConfig(): MergedReceiptConfig {
     return {
       name: config.override_name || defaults.business_name || 'Your Business Name',
-      phone: config.override_phone || defaults.business_phone || '(310) 555-1234',
+      phone: config.override_phone || defaults.business_phone || BUSINESS_DEFAULTS.phoneFormatted,
       address: config.override_address || defaults.business_address || '123 Main St, City, ST 00000',
       email: config.override_email || defaults.business_email || null,
       website: config.override_website || defaults.business_website || null,

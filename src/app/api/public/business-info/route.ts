@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAnonClient } from '@/lib/supabase/anon';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 
 export async function GET() {
   const supabase = createAnonClient();
@@ -26,11 +27,11 @@ export async function GET() {
   const addr =
     typeof rawAddr === 'object' && rawAddr !== null
       ? (rawAddr as { line1: string; city: string; state: string; zip: string })
-      : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
+      : { ...BUSINESS_DEFAULTS.address };
 
   const info = {
-    name: (settings.business_name as string) || 'Smart Detail Auto Spa & Supplies',
-    phone: (settings.business_phone as string) || '+13109990000',
+    name: (settings.business_name as string) || BUSINESS_DEFAULTS.name,
+    phone: (settings.business_phone as string) || BUSINESS_DEFAULTS.phone,
     address: `${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`,
     streetAddress: addr.line1,
     city: addr.city,

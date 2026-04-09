@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 
 // ---------------------------------------------------------------------------
 // Page Content Extraction — builds text summaries for AI SEO context
@@ -91,7 +92,7 @@ async function getBusinessContext(): Promise<string> {
     : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
 
   return [
-    `Business: ${s.business_name || 'Smart Detail Auto Spa & Supplies'}`,
+    `Business: ${s.business_name || BUSINESS_DEFAULTS.name}`,
     `Location: ${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`,
     `Phone: ${s.business_phone || ''}`,
     `Website: ${s.business_website || ''}`,

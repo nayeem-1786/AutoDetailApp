@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createAnonClient } from '@/lib/supabase/anon';
+import { getBusinessInfo } from '@/lib/data/business';
 
 // ---------------------------------------------------------------------------
 // GET /ai.txt — AI crawler access rules
 // Content is admin-configurable via business_settings key 'ai_txt_content'
 // ---------------------------------------------------------------------------
 
-const DEFAULT_AI_TXT = `# ai.txt - Smart Details Auto Spa
+function buildDefaultAiTxt(businessName: string) {
+  return `# ai.txt - ${businessName}
 # This file controls AI crawler access
 
 User-agent: GPTBot
@@ -35,9 +37,10 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 `;
+}
 
 export async function GET() {
-  let content = DEFAULT_AI_TXT;
+  let content: string | null = null;
 
   try {
     const supabase = createAnonClient();
@@ -52,6 +55,11 @@ export async function GET() {
     }
   } catch {
     // Fall back to default on error
+  }
+
+  if (!content) {
+    const biz = await getBusinessInfo();
+    content = buildDefaultAiTxt(biz.name);
   }
 
   return new NextResponse(content, {

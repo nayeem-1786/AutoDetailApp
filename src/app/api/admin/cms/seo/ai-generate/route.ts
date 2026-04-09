@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { generateSeoByPath, type AiSeoResult } from '@/lib/services/ai-seo';
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
   const addr = typeof s.business_address === 'object' && s.business_address !== null
     ? s.business_address as { city: string; state: string }
     : { city: 'Lomita', state: 'CA' };
-  const businessName = (s.business_name as string) || 'Smart Detail Auto Spa & Supplies';
+  const businessName = (s.business_name as string) || BUSINESS_DEFAULTS.name;
   const businessLocation = `${addr.city}, ${addr.state}`;
 
   // Fetch known pages once — used for path enumeration, type/title info, and AI context

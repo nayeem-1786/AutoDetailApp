@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { BUSINESS_DEFAULTS } from '@/lib/data/business-defaults';
 
 // ---------------------------------------------------------------------------
 // CustomTextZone — a configurable text block placed on receipts
@@ -139,16 +140,16 @@ export async function fetchReceiptConfig(
   const addr =
     typeof rawAddr === 'object' && rawAddr !== null
       ? (rawAddr as { line1: string; city: string; state: string; zip: string })
-      : { line1: '2021 Lomita Blvd', city: 'Lomita', state: 'CA', zip: '90717' };
+      : { ...BUSINESS_DEFAULTS.address };
   const formattedAddress = `${addr.line1}, ${addr.city}, ${addr.state} ${addr.zip}`;
 
   // Format phone for display
-  const rawPhone = (settings.business_phone as string) || '+13109990000';
+  const rawPhone = (settings.business_phone as string) || BUSINESS_DEFAULTS.phone;
   const displayPhone = rawPhone.replace('+1', '(').replace(/(\d{3})(\d{3})(\d{4})/, '$1) $2-$3');
 
   // Merge: override wins over business profile default; null/empty = use default
   const merged: MergedReceiptConfig = {
-    name: rc.override_name || (settings.business_name as string) || 'Smart Detail Auto Spa & Supplies',
+    name: rc.override_name || (settings.business_name as string) || BUSINESS_DEFAULTS.name,
     phone: rc.override_phone || displayPhone,
     address: rc.override_address || formattedAddress,
     email: rc.override_email || (settings.business_email as string) || null,

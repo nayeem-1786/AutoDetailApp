@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Consolidate business info fallbacks + cache revalidation — 2026-04-08
+
+- **Cache revalidation**: Business profile save now calls `POST /api/admin/settings/revalidate-business` which runs `revalidateTag('business-info')` + `revalidatePath('/api/public/business-info')`. Changes take effect immediately instead of waiting for 60s cache TTL.
+- **BUSINESS_DEFAULTS constant**: Created `src/lib/data/business-defaults.ts` — single source of truth for fallback name, phone (`+14242370913`), and address. Importable by both server and client components.
+- **Replaced all hardcoded fallbacks**: 3x `+13109990000` phone → `BUSINESS_DEFAULTS.phone`, 3x address → `BUSINESS_DEFAULTS.address`, 8x business name → `BUSINESS_DEFAULTS.name` across `business.ts`, `receipt-config.ts`, `public/business-info/route.ts`, `ai-content-writer.ts`, `page-content-extractor.ts`, `drip-engine.ts`, `lifecycle-engine/route.ts`, `seo/ai-generate/route.ts`, `ai-product-enrichment.ts`.
+- **Fixed always-hardcoded names**: Voice agent greeting now uses `biz.name` instead of "Smart Details". Email verification subject uses dynamic `businessName`. Stripe POS description uses `BUSINESS_DEFAULTS.name + ' POS'`. ai.txt uses `getBusinessInfo()`. Twilio voice fallback removed unnecessary hardcoded fallback.
+- **Receipt preview**: Line 432 business phone fallback → `BUSINESS_DEFAULTS.phoneFormatted`. Line 457 (sample customer phone) left as-is.
+- New API route: `src/app/api/admin/settings/revalidate-business/route.ts`
+- New shared constant: `src/lib/data/business-defaults.ts`
+
+---
+
 ## fix: Header logout dropdown — permanent fix for click-not-registering bug — 2026-04-08
 
 - **Root cause**: The user dropdown in the header had a DOM/event timing race. The `mt-1` gap between trigger button and dropdown popup caused `mouseLeave` → 150ms close timer. `pointer-events: none` applied instantly while opacity faded over 200ms, creating an unclickable-but-visible dropdown.

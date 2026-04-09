@@ -194,6 +194,13 @@ export default function BusinessProfilePage() {
       }
     }
 
+    // Bust server-side caches so changes take effect immediately
+    try {
+      await fetch('/api/admin/settings/revalidate-business', { method: 'POST' });
+    } catch {
+      // Non-critical — cache will expire naturally within 60s
+    }
+
     toast.success('Business profile updated');
     reset(formData);
     setSaving(false);

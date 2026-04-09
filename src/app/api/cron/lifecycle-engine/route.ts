@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
-import { getBusinessInfo } from '@/lib/data/business';
+import { getBusinessInfo, BUSINESS_DEFAULTS } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
@@ -442,7 +442,7 @@ async function executePending(
     settingsMap[s.key] = raw;
   }
 
-  const businessName = settingsMap.business_name || 'Smart Detail Auto Spa & Supplies';
+  const businessName = settingsMap.business_name || BUSINESS_DEFAULTS.name;
   const loyaltyRedeemRate = parseFloat(settingsMap.loyalty_redeem_rate || '0.01');
 
   // Shorten review URLs once (reuse across all executions)
