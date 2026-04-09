@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Pre-selected service preserved through Step 1 → Step 2 — 2026-04-08
+
+- `/book?service=express-exterior-wash` now correctly keeps the service pre-selected when advancing from Step 1 to Step 2. Previously, the service was wiped because the category-change check treated "no previous vehicle" as a category change, resetting `state.service` to null.
+- File: `booking-wizard.tsx`
+
+---
+
 ## fix: Vehicle size resets when model changes — 2026-04-08
 
 - Changing Model (e.g., Accord → Ridgeline) now updates the auto-detected vehicle size. Previously, a manual size selection (or prior auto-detection) would stick even after the model changed because `manualSizeClass` took priority over the new classification.

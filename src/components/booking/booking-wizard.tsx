@@ -600,9 +600,9 @@ export function BookingWizard({
       ...state,
       vehicleData: vehicle,
       selectedCategory: vehicle.vehicle_category,
-      // Reset service/config if category changed
-      service: state.vehicleData?.vehicle_category !== vehicle.vehicle_category ? null : state.service,
-      config: state.vehicleData?.vehicle_category !== vehicle.vehicle_category ? null : state.config,
+      // Reset service/config only if category actually changed (not on first vehicle selection)
+      service: state.vehicleData && state.vehicleData.vehicle_category !== vehicle.vehicle_category ? null : state.service,
+      config: state.vehicleData && state.vehicleData.vehicle_category !== vehicle.vehicle_category ? null : state.config,
     };
     setState(newState);
 
