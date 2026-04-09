@@ -194,11 +194,8 @@ export async function POST(request: NextRequest) {
 
     const customerSummary = sections.join('\n');
 
-    // Build personalized first message
-    const hasAppt = appts.length > 0;
-    const firstMessage = hasAppt
-      ? `Hey ${firstName}, welcome back to ${biz.name}! I see you have an upcoming appointment. How can I help you today?`
-      : `Hey ${firstName}, welcome back to ${biz.name}! How can I help you today?`;
+    // Build personalized first message — confirm identity before assuming
+    const firstMessage = `Thanks for calling ${biz.name}. It looks like you've called us before — is this ${firstName}?`;
 
     const responseData = {
       type: 'conversation_initiation_client_data',

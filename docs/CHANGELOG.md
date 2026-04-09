@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Voice agent greeting confirms identity before assuming — 2026-04-08
+
+- Returning customer greeting now asks "is this [Name]?" instead of assuming identity and mentioning appointments upfront.
+- Agent references appointments naturally during conversation via `customer_summary`, not in the greeting.
+- New caller greeting unchanged.
+- File: `voice-agent/initiation/route.ts`
+
+---
+
 ## fix: Consolidate business info fallbacks + cache revalidation — 2026-04-08
 
 - **Cache revalidation**: Business profile save now calls `POST /api/admin/settings/revalidate-business` which runs `revalidateTag('business-info')` + `revalidatePath('/api/public/business-info')`. Changes take effect immediately instead of waiting for 60s cache TTL.
