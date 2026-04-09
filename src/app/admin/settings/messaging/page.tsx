@@ -266,118 +266,120 @@ export default function MessagingSettingsPage() {
         <CardHeader>
           <CardTitle>Voice Agent (ElevenLabs)</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Returning Customer Greeting */}
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              Returning Customer Greeting
-            </p>
-            <p className="mt-0.5 text-sm text-gray-500">
-              The first message spoken when a recognized caller phones in.
-            </p>
-            <div className="mt-3 space-y-2">
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="voice_returning"
-                  checked={!settings.voice_agent_first_message_returning.trim()}
-                  onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: '' }))}
-                  className="text-blue-600"
-                />
-                Use default greeting
-              </label>
-              {!settings.voice_agent_first_message_returning.trim() && (
-                <p className="ml-6 text-xs text-gray-400 italic">{VOICE_GREETING_DEFAULTS.returning}</p>
-              )}
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="voice_returning"
-                  checked={!!settings.voice_agent_first_message_returning.trim()}
-                  onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: prev.voice_agent_first_message_returning.trim() || VOICE_GREETING_DEFAULTS.returning }))}
-                  className="text-blue-600"
-                />
-                Custom greeting
-              </label>
-              {!!settings.voice_agent_first_message_returning.trim() && (
-                <div className="ml-6 space-y-2">
-                  <Textarea
-                    rows={3}
-                    className="font-mono text-xs"
-                    value={settings.voice_agent_first_message_returning}
-                    onChange={(e) => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: e.target.value }))}
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-2">
+            {/* Returning Customer Greeting */}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                Returning Customer
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500">
+                Recognized caller phones in.
+              </p>
+              <div className="mt-3 space-y-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="voice_returning"
+                    checked={!settings.voice_agent_first_message_returning.trim()}
+                    onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: '' }))}
+                    className="text-blue-600"
                   />
-                  <div className="flex flex-wrap gap-1.5">
-                    {VOICE_GREETING_VARIABLES.map((v) => (
-                      <button
-                        key={v.key}
-                        type="button"
-                        onClick={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: prev.voice_agent_first_message_returning + v.key }))}
-                        className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-                      >
-                        {v.key}
-                      </button>
-                    ))}
+                  Use default
+                </label>
+                {!settings.voice_agent_first_message_returning.trim() && (
+                  <p className="ml-6 text-xs text-gray-400 italic">{VOICE_GREETING_DEFAULTS.returning}</p>
+                )}
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="voice_returning"
+                    checked={!!settings.voice_agent_first_message_returning.trim()}
+                    onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: prev.voice_agent_first_message_returning.trim() || VOICE_GREETING_DEFAULTS.returning }))}
+                    className="text-blue-600"
+                  />
+                  Custom
+                </label>
+                {!!settings.voice_agent_first_message_returning.trim() && (
+                  <div className="ml-6 space-y-2">
+                    <Textarea
+                      rows={3}
+                      className="font-mono text-xs"
+                      value={settings.voice_agent_first_message_returning}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: e.target.value }))}
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {VOICE_GREETING_VARIABLES.map((v) => (
+                        <button
+                          key={v.key}
+                          type="button"
+                          onClick={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_returning: prev.voice_agent_first_message_returning + v.key }))}
+                          className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                        >
+                          {v.key}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* New Caller Greeting */}
-          <div>
-            <p className="text-sm font-medium text-gray-900">
-              New Caller Greeting
-            </p>
-            <p className="mt-0.5 text-sm text-gray-500">
-              The first message spoken when an unknown number calls.
-            </p>
-            <div className="mt-3 space-y-2">
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="voice_new"
-                  checked={!settings.voice_agent_first_message_new.trim()}
-                  onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: '' }))}
-                  className="text-blue-600"
-                />
-                Use default greeting
-              </label>
-              {!settings.voice_agent_first_message_new.trim() && (
-                <p className="ml-6 text-xs text-gray-400 italic">{VOICE_GREETING_DEFAULTS.new}</p>
-              )}
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                <input
-                  type="radio"
-                  name="voice_new"
-                  checked={!!settings.voice_agent_first_message_new.trim()}
-                  onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: prev.voice_agent_first_message_new.trim() || VOICE_GREETING_DEFAULTS.new }))}
-                  className="text-blue-600"
-                />
-                Custom greeting
-              </label>
-              {!!settings.voice_agent_first_message_new.trim() && (
-                <div className="ml-6 space-y-2">
-                  <Textarea
-                    rows={3}
-                    className="font-mono text-xs"
-                    value={settings.voice_agent_first_message_new}
-                    onChange={(e) => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: e.target.value }))}
+            {/* New Caller Greeting */}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                New Caller
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500">
+                Unknown number calls.
+              </p>
+              <div className="mt-3 space-y-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="voice_new"
+                    checked={!settings.voice_agent_first_message_new.trim()}
+                    onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: '' }))}
+                    className="text-blue-600"
                   />
-                  <div className="flex flex-wrap gap-1.5">
-                    {VOICE_GREETING_VARIABLES.map((v) => (
-                      <button
-                        key={v.key}
-                        type="button"
-                        onClick={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: prev.voice_agent_first_message_new + v.key }))}
-                        className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
-                      >
-                        {v.key}
-                      </button>
-                    ))}
+                  Use default
+                </label>
+                {!settings.voice_agent_first_message_new.trim() && (
+                  <p className="ml-6 text-xs text-gray-400 italic">{VOICE_GREETING_DEFAULTS.new}</p>
+                )}
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="voice_new"
+                    checked={!!settings.voice_agent_first_message_new.trim()}
+                    onChange={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: prev.voice_agent_first_message_new.trim() || VOICE_GREETING_DEFAULTS.new }))}
+                    className="text-blue-600"
+                  />
+                  Custom
+                </label>
+                {!!settings.voice_agent_first_message_new.trim() && (
+                  <div className="ml-6 space-y-2">
+                    <Textarea
+                      rows={3}
+                      className="font-mono text-xs"
+                      value={settings.voice_agent_first_message_new}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: e.target.value }))}
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {VOICE_GREETING_VARIABLES.map((v) => (
+                        <button
+                          key={v.key}
+                          type="button"
+                          onClick={() => setSettings((prev) => ({ ...prev, voice_agent_first_message_new: prev.voice_agent_first_message_new + v.key }))}
+                          className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+                        >
+                          {v.key}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
