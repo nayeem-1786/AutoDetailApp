@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Customizable voice agent greetings in messaging settings — 2026-04-08
+
+- New "Voice Agent (ElevenLabs)" card in Admin > Settings > Messaging, placed above the AI Assistant card.
+- Two customizable greetings: Returning Customer and New Caller.
+- Each has "Use default" (shows preview) or "Custom" (editable textarea with clickable variable chips).
+- Template variables: `{{business_name}}`, `{{customer_name}}`, `{{first_name}}`, `{{time_of_day}}`.
+- Empty value = use hardcoded default (no key deletion needed).
+- Initiation route fetches custom greetings in parallel with customer lookup (no latency impact).
+- New `business_settings` keys: `voice_agent_first_message_returning`, `voice_agent_first_message_new`.
+- Files: `admin/settings/messaging/page.tsx`, `voice-agent/initiation/route.ts`, `DB_SCHEMA.md`
+
+---
+
 ## fix: Voice agent greeting confirms identity before assuming — 2026-04-08
 
 - Returning customer greeting now asks "is this [Name]?" instead of assuming identity and mentioning appointments upfront.

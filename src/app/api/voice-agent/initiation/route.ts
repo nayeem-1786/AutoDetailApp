@@ -44,9 +44,9 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Round 1: customer + conversation (parallel, must be fast)
+    // Round 1: customer + conversation + greeting settings (parallel, must be fast)
     t = perf.now();
-    const [customerRes, conversationRes] = await Promise.all([
+    const [customerRes, conversationRes, greetingSettingsRes] = await Promise.all([
       supabase
         .from('customers')
         .select('id, first_name, last_name, customer_type, loyalty_points_balance, notes, tags, first_visit_date, last_visit_date, visit_count, lifetime_spend')
@@ -59,13 +59,26 @@ export async function POST(request: NextRequest) {
         .select('summary')
         .eq('phone_number', e164Phone)
         .maybeSingle(),
+      supabase
+        .from('business_settings')
+        .select('key, value')
+        .in('key', ['voice_agent_first_message_returning', 'voice_agent_first_message_new']),
     ]);
 
     perf.mark('query:customer+conversation', t);
     const customer = customerRes.data;
 
     if (!customer) {
-      return NextResponse.json(newCallerResponse(e164Phone, biz.name), { status: 200 });
+      // Use custom new-caller greeting if configured
+      const newGreetingSettings = new Map(
+        (greetingSettingsRes.data ?? []).map((r) => [r.key, String(r.value ?? '')])
+      );
+      const customNew = newGreetingSettings.get('voice_agent_first_message_new') || '';
+      const newTimeOfDay = getTimeOfDay();
+      const customMessage = customNew.trim()
+        ? resolveGreetingVariables(customNew, { businessName: biz.name, customerName: '', firstName: '', timeOfDay: newTimeOfDay })
+        : undefined;
+      return NextResponse.json(newCallerResponse(e164Phone, biz.name, customMessage), { status: 200 });
     }
 
     // Round 2: all detail queries in parallel
@@ -194,8 +207,16 @@ export async function POST(request: NextRequest) {
 
     const customerSummary = sections.join('\n');
 
-    // Build personalized first message — confirm identity before assuming
-    const firstMessage = `Thanks for calling ${biz.name}. It looks like you've called us before — is this ${firstName}?`;
+    // Build personalized first message — use custom greeting if configured
+    const greetingSettings = new Map(
+      (greetingSettingsRes.data ?? []).map((r) => [r.key, String(r.value ?? '')])
+    );
+    const customReturning = greetingSettings.get('voice_agent_first_message_returning') || '';
+    const timeOfDay = getTimeOfDay();
+
+    const firstMessage = customReturning.trim()
+      ? resolveGreetingVariables(customReturning, { businessName: biz.name, customerName: fullName, firstName, timeOfDay })
+      : `Thanks for calling ${biz.name}. It looks like you've called us before — is this ${firstName}?`;
 
     const responseData = {
       type: 'conversation_initiation_client_data',
@@ -231,8 +252,9 @@ function getTimeOfDay(): string {
   return 'evening';
 }
 
-function newCallerResponse(phone: string, businessName?: string) {
+function newCallerResponse(phone: string, businessName?: string, customMessage?: string) {
   const name = businessName || 'our business';
+  const timeOfDay = getTimeOfDay();
   return {
     type: 'conversation_initiation_client_data',
     dynamic_variables: {
@@ -240,12 +262,24 @@ function newCallerResponse(phone: string, businessName?: string) {
       customer_phone: phone,
       is_returning: 'false',
       customer_summary: 'New caller. No account on file.',
-      time_of_day: getTimeOfDay(),
+      time_of_day: timeOfDay,
     },
     conversation_config_override: {
       agent: {
-        first_message: `Thank you for calling ${name}! This is Tom. Can I get your name before we get started?`,
+        first_message: customMessage || `Good ${timeOfDay}! Thank you for calling ${name}. This is Tom. Can I get your name before we get started?`,
       },
     },
   };
+}
+
+/** Replace {{variable}} placeholders in a greeting template */
+function resolveGreetingVariables(
+  template: string,
+  vars: { businessName: string; customerName: string; firstName: string; timeOfDay: string }
+): string {
+  return template
+    .replace(/\{\{business_name\}\}/g, vars.businessName)
+    .replace(/\{\{customer_name\}\}/g, vars.customerName)
+    .replace(/\{\{first_name\}\}/g, vars.firstName)
+    .replace(/\{\{time_of_day\}\}/g, vars.timeOfDay);
 }

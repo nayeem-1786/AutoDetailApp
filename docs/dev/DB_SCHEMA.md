@@ -1625,6 +1625,13 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 | `email_brand_social_facebook` | string | `""` | Facebook URL |
 | `email_brand_footer_text` | string | `""` | Optional custom footer line |
 
+### Voice Agent Greetings (business_settings keys)
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `voice_agent_first_message_returning` | string | `""` | Custom greeting for returning callers. Empty = hardcoded default. Supports `{{business_name}}`, `{{customer_name}}`, `{{first_name}}`, `{{time_of_day}}` |
+| `voice_agent_first_message_new` | string | `""` | Custom greeting for new callers. Empty = hardcoded default. Same template variables |
+
 ### RLS Policies
 
 All email template tables have RLS enabled. Write access is service-role only (via API routes). Read access for authenticated users:
