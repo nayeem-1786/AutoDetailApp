@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## ui: Rename AI Assistant to SMS AI Assistant + consolidate toggles + larger prompt textarea — 2026-04-08
+
+- Renamed all visible labels in the AI Assistant card from "AI Assistant" / "AI" to "SMS AI Assistant" / "SMS AI" (10 text changes). No variable/DB key changes.
+- Consolidated "Enable SMS AI Assistant" toggle and "During Business Hours" section into a single responsive row (`grid md:grid-cols-2`). Both columns always render; right column pills only show when AI is enabled.
+- Doubled AI prompt textarea height from `rows={8}` to `rows={16}`.
+- File: `src/app/admin/settings/messaging/page.tsx`
+
+---
+
 ## feat: Customizable voice agent greetings in messaging settings — 2026-04-08
 
 - New "Voice Agent (ElevenLabs)" card in Admin > Settings > Messaging, placed above the AI Assistant card.

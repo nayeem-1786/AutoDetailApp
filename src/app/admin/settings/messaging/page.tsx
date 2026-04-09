@@ -177,7 +177,7 @@ export default function MessagingSettingsPage() {
       <div className="space-y-6">
         <PageHeader
           title="Messaging"
-          description="Configure AI assistant and conversation settings."
+          description="Configure SMS AI assistant and conversation settings."
         />
         <div className="flex items-center justify-center py-12">
           <Spinner size="lg" />
@@ -190,7 +190,7 @@ export default function MessagingSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Messaging"
-        description="Configure AI assistant and conversation settings."
+        description="Configure SMS AI assistant and conversation settings."
       />
 
       {!twoWaySmsEnabled && (
@@ -385,50 +385,52 @@ export default function MessagingSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* AI Assistant */}
+      {/* SMS AI Assistant */}
       <Card>
         <CardHeader>
-          <CardTitle>AI Assistant</CardTitle>
+          <CardTitle>SMS AI Assistant</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">
-                Enable AI Assistant
-              </p>
-              <p className="mt-0.5 text-sm text-gray-500">
-                When enabled, AI responds to inbound messages automatically.
-              </p>
-            </div>
-            <Switch
-              checked={aiEnabled}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  setSettings((prev) => ({
-                    ...prev,
-                    messaging_ai_unknown_enabled: 'true',
-                    messaging_ai_customers_enabled: 'false',
-                  }));
-                } else {
-                  setSettings((prev) => ({
-                    ...prev,
-                    messaging_ai_unknown_enabled: 'false',
-                    messaging_ai_customers_enabled: 'false',
-                  }));
-                }
-              }}
-            />
-          </div>
-
-          {aiEnabled && (
-            <>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Left: Enable toggle */}
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900">
-                  During Business Hours
+                  Enable SMS AI Assistant
                 </p>
                 <p className="mt-0.5 text-sm text-gray-500">
-                  Choose which messages get AI replies during open hours.
+                  When enabled, SMS AI responds to inbound messages automatically.
                 </p>
+              </div>
+              <Switch
+                checked={aiEnabled}
+                onCheckedChange={(checked) => {
+                  if (checked) {
+                    setSettings((prev) => ({
+                      ...prev,
+                      messaging_ai_unknown_enabled: 'true',
+                      messaging_ai_customers_enabled: 'false',
+                    }));
+                  } else {
+                    setSettings((prev) => ({
+                      ...prev,
+                      messaging_ai_unknown_enabled: 'false',
+                      messaging_ai_customers_enabled: 'false',
+                    }));
+                  }
+                }}
+              />
+            </div>
+
+            {/* Right: During Business Hours */}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                During Business Hours
+              </p>
+              <p className="mt-0.5 text-sm text-gray-500">
+                Choose which messages get SMS AI replies during open hours.
+              </p>
+              {aiEnabled && (
                 <div className="mt-3 flex gap-2">
                   <TogglePill
                     label="Unknown"
@@ -453,14 +455,18 @@ export default function MessagingSettingsPage() {
                     activeClassName="bg-blue-100 text-blue-700"
                   />
                 </div>
-              </div>
+              )}
+            </div>
+          </div>
 
+          {aiEnabled && (
+            <>
               <div>
                 <p className="text-sm font-medium text-gray-900">
                   After Hours
                 </p>
                 <p className="mt-0.5 text-sm text-gray-500">
-                  AI automatically handles all inbound messages when the business is closed.
+                  SMS AI automatically handles all inbound messages when the business is closed.
                   Business hours are configured in{' '}
                   <a href="/admin/settings/business-profile" className="text-blue-600 hover:text-blue-800 hover:underline">
                     Business Profile
@@ -470,11 +476,11 @@ export default function MessagingSettingsPage() {
 
               <div>
                 <p className="text-sm font-medium text-gray-900">
-                  AI Prompt
+                  SMS AI Prompt
                 </p>
                 <Textarea
                   id="ai_instructions"
-                  rows={8}
+                  rows={16}
                   className="mt-2 font-mono text-xs"
                   value={settings.messaging_ai_instructions}
                   onChange={(e) =>
@@ -483,7 +489,7 @@ export default function MessagingSettingsPage() {
                 />
                 <div className="mt-1.5 flex items-center justify-between">
                   <p className="text-xs text-gray-500">
-                    Behavioral rules for the AI. Service catalog and business info are appended automatically.
+                    Behavioral rules for the SMS AI. Service catalog and business info are appended automatically.
                   </p>
                   <button
                     type="button"
@@ -560,7 +566,7 @@ export default function MessagingSettingsPage() {
         open={resetPromptOpen}
         onOpenChange={setResetPromptOpen}
         title="Reset to Standard Template"
-        description="Your custom instructions will be replaced with the default AI prompt template."
+        description="Your custom instructions will be replaced with the default SMS AI prompt template."
         confirmLabel="Reset"
         variant="destructive"
         onConfirm={() => {
