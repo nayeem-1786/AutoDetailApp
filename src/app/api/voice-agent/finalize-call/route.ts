@@ -106,7 +106,6 @@ export async function POST(request: NextRequest) {
 
     const responseData = {
       success: true,
-      message: 'Call logged, processing in background',
     };
     perf.done(responseData);
     return NextResponse.json(responseData);

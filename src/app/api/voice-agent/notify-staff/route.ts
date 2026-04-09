@@ -53,13 +53,13 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!reason || !VALID_REASONS.includes(reason as EscalationReason)) {
       return NextResponse.json(
-        { success: false, message: "I wasn't able to notify staff directly, but your request has been noted. Someone will follow up." },
+        { success: false },
         { status: 200 }
       );
     }
     if (!details?.trim()) {
       return NextResponse.json(
-        { success: false, message: "I wasn't able to notify staff directly, but your request has been noted. Someone will follow up." },
+        { success: false },
         { status: 200 }
       );
     }
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     if (!biz.phone) {
       console.error('[NotifyStaff] No business phone configured — cannot send staff alert');
       return NextResponse.json(
-        { success: false, message: "I wasn't able to notify staff directly, but your request has been noted. Someone will follow up." },
+        { success: false },
         { status: 200 }
       );
     }
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     if (!smsResult.success) {
       console.error('[NotifyStaff] Staff SMS failed:', smsResult.error);
       return NextResponse.json(
-        { success: false, message: "I wasn't able to notify staff directly, but your request has been noted. Someone will follow up." },
+        { success: false },
         { status: 200 }
       );
     }
@@ -142,13 +142,13 @@ export async function POST(request: NextRequest) {
 
     console.log(`[NotifyStaff] Sent alert to staff — reason: ${reason}, customer: ${displayName}, phone: ${displayPhone}`);
 
-    const responseData = { success: true, message: 'Staff has been notified and will follow up shortly.' };
+    const responseData = { success: true };
     perf.done(responseData);
     return NextResponse.json(responseData);
   } catch (err) {
     console.error('[NotifyStaff] Error:', err);
     return NextResponse.json(
-      { success: false, message: "I wasn't able to notify staff directly, but your request has been noted. Someone will follow up." },
+      { success: false },
       { status: 200 }
     );
   }

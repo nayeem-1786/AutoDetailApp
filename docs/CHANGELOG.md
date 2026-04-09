@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Remove conversational text from finalize-call and notify-staff responses — 2026-04-09
+
+- Stripped `message` fields from `finalize-call` and `notify-staff` tool responses. Responses now return only `{ success: true }` or `{ success: false }`.
+- Prevents the ElevenLabs agent from parroting internal messages ("Call logged, processing in background") or generating redundant dialogue (double goodbyes).
+- The agent's system prompt controls what it says after tool calls — not the tool response.
+- Files: `voice-agent/finalize-call/route.ts`, `voice-agent/notify-staff/route.ts`
+
+---
+
 ## feat: Voice agent notify-staff escalation tool — 2026-04-09
 
 - New `POST /api/voice-agent/notify-staff` endpoint — mid-call escalation tool for the ElevenLabs voice agent.
