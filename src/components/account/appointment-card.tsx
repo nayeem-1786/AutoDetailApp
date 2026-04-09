@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { AppointmentEditDialog } from '@/components/account/appointment-edit-dialog';
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils/format';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
@@ -53,14 +52,11 @@ interface AppointmentCardProps {
 export function AppointmentCard({ appointment, onStatusChange }: AppointmentCardProps) {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
 
   const statusConfig = STATUS_CONFIG[appointment.status];
   const canRebook =
     appointment.status === 'completed' || appointment.status === 'cancelled';
   const canCancel =
-    appointment.status === 'pending' || appointment.status === 'confirmed';
-  const canEdit =
     appointment.status === 'pending' || appointment.status === 'confirmed';
 
   const serviceName =
@@ -137,15 +133,6 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
               {formatCurrency(appointment.total_amount)}
             </p>
             <div className="mt-2 flex flex-col gap-1.5">
-              {canEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditOpen(true)}
-                >
-                  Reschedule
-                </Button>
-              )}
               {canCancel && (
                 <Button
                   variant="outline"
@@ -179,12 +166,6 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
         onConfirm={handleCancel}
       />
 
-      <AppointmentEditDialog
-        appointmentId={appointment.id}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSuccess={onStatusChange}
-      />
     </>
   );
 }

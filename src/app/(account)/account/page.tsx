@@ -12,7 +12,9 @@ import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehic
 import { BeforeAfterSlider } from '@/components/before-after-slider';
 import { formatPoints, formatCurrency } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
-import { ArrowRight, Camera } from 'lucide-react';
+import { useBusinessInfo } from '@/lib/hooks/use-business-info';
+import { formatPhone } from '@/lib/utils/format';
+import { ArrowRight, Camera, Phone } from 'lucide-react';
 
 interface CouponRewardData {
   applies_to: string;
@@ -45,6 +47,7 @@ interface LastServiceData {
 
 export default function AccountDashboardPage() {
   const { customer } = useCustomerAuth();
+  const { info: businessInfo } = useBusinessInfo();
   const [upcomingAppointments, setUpcomingAppointments] = useState<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     any[]
@@ -238,6 +241,25 @@ export default function AccountDashboardPage() {
             {coupons.map((coupon) => (
               <CouponCard key={coupon.id} coupon={{ ...coupon, rewards: coupon.coupon_rewards }} />
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* "Need to make changes?" banner — only when upcoming appointments exist */}
+      {!loading && upcomingAppointments.length > 0 && businessInfo?.phone && (
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4">
+          <div className="flex items-start gap-3">
+            <Phone className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-400" />
+            <p className="text-sm text-blue-300">
+              Need to make changes? Please call us at{' '}
+              <a
+                href={`tel:${businessInfo.phone.replace(/\D/g, '')}`}
+                className="font-medium text-blue-200 underline"
+              >
+                {formatPhone(businessInfo.phone)}
+              </a>{' '}
+              — our team will help you reschedule or modify your appointment.
+            </p>
           </div>
         </div>
       )}

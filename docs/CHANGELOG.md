@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Remove customer reschedule — add call-us banner for appointment changes — 2026-04-08
+
+- Removed "Reschedule" button from customer appointment cards (dashboard + appointments page).
+- Deleted `appointment-edit-dialog.tsx` — customer self-service rescheduling had pricing bugs ($0 after date change). Schedule changes now require staff involvement.
+- Added "Need to make changes?" info banner above upcoming appointments on dashboard. Shows phone number from `getBusinessInfo()` as clickable `tel:` link. Only visible when upcoming appointments exist.
+- Cancel button remains unchanged.
+- Admin/POS reschedule functionality unaffected.
+- Files: `appointment-card.tsx`, `account/page.tsx`, `appointment-edit-dialog.tsx` (deleted), `FILE_TREE.md`
+
+---
+
 ## fix: Unify booking InlineAuth to single phone flow + center step indicator — 2026-04-08
 
 - **Replaced two-flow pattern** (SignInFlow + SignUpFlow + "Returning Customer?"/"New here?" buttons) with a single unified phone flow using `usePhoneOtp(mode: 'sign-in')` + `useCustomerLink`.

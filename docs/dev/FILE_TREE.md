@@ -1126,7 +1126,6 @@ src/components/public/cart/quantity-selector.tsx
 src/components/account/account-shell.tsx
 src/components/account/profile-completion-banner.tsx
 src/components/account/appointment-card.tsx
-src/components/account/appointment-edit-dialog.tsx
 src/components/account/coupon-card.tsx
 src/components/account/transaction-card.tsx
 src/components/account/transaction-detail.tsx
