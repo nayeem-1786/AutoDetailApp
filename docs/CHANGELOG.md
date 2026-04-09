@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Slim voice agent products response under ElevenLabs 256KB limit — 2026-04-09
+
+- Response was 893KB (exceeded 256KB ElevenLabs tool response limit) after product enrichment added specs to 403 products.
+- Deduplicated variant groups — only the cheapest product per group is returned, with a compact "Also available in: ..." summary string for siblings.
+- Removed from response: id, sku, image_url, all specs fields, quantity_on_hand (replaced by in_stock boolean), is_on_sale flag, category_slug, full variant sibling objects, product_group_id.
+- Kept: name, category, retail_price, sale_price, in_stock, description (truncated to 150 chars), product_url, variants summary.
+- Removed unused `ProductSpecs` import (specs no longer in response).
+- Added size logging: `[VoiceAgent] Products response: N products, X.XKB`.
+- File: `voice-agent/products/route.ts`
+
+---
+
 ## fix: Add Twilio signature diagnostic logging — 2026-04-09
 
 - Added `console.log` of the signature validation URL in both Twilio webhook routes (inbound + status) before the validation check. Permanent production monitoring — helps diagnose signature failures behind the reverse proxy.

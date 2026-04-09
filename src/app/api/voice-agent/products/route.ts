@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
-import type { ProductSpecs } from '@/lib/utils/validation';
 
 export async function GET(request: NextRequest) {
   const perf = createPerfTimer('GET /voice-agent/products');
@@ -24,14 +23,11 @@ export async function GET(request: NextRequest) {
         name,
         slug,
         description,
-        sku,
         retail_price,
         sale_price,
         sale_starts_at,
         sale_ends_at,
         quantity_on_hand,
-        image_url,
-        specs,
         variant_label,
         product_group_id,
         product_categories ( name, slug )
@@ -67,7 +63,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const formatted = allProducts.map((p) => {
+    // Deduplicate variant groups — keep only the cheapest (primary) product per group
+    const skipIds = new Set<string>();
+    for (const [, members] of groupMap) {
+      if (members.length > 1) {
+        const sorted = [...members].sort((a, b) => Number(a.retail_price) - Number(b.retail_price));
+        for (let i = 1; i < sorted.length; i++) {
+          skipIds.add(sorted[i].id);
+        }
+      }
+    }
+
+    const productsToReturn = allProducts.filter((p) => !skipIds.has(p.id));
+
+    const formatted = productsToReturn.map((p) => {
       const saleWindow = {
         sale_starts_at: p.sale_starts_at as string | null,
         sale_ends_at: p.sale_ends_at as string | null,
@@ -79,58 +88,39 @@ export async function GET(request: NextRequest) {
 
       const cat = p.product_categories as unknown as { name: string; slug: string } | null;
       const categorySlug = cat?.slug ?? null;
-      const specs = p.specs as ProductSpecs | undefined;
 
-      // Build variant siblings (exclude self)
+      // Build compact variant summary (e.g., "Also available in: 1 Gallon ($49.99), 5 Gallon ($159.99)")
       const gid = p.product_group_id as string | null;
       const groupMembers = gid ? groupMap.get(gid) : undefined;
-      const variantSiblings = groupMembers && groupMembers.length > 1
-        ? groupMembers
-            .filter((m) => m.id !== p.id)
-            .map((m) => {
-              const mCat = m.product_categories as unknown as { name: string; slug: string } | null;
-              return {
-                name: m.name,
-                variant_label: m.variant_label ?? null,
-                retail_price: Number(m.retail_price),
-                product_url: mCat?.slug && m.slug ? `/products/${mCat.slug}/${m.slug}` : null,
-              };
-            })
-        : null;
+      let variantSummary: string | null = null;
+      if (groupMembers && groupMembers.length > 1) {
+        const others = groupMembers
+          .filter((m) => m.id !== p.id)
+          .map((m) => {
+            const label = m.variant_label || m.name;
+            return `${label} ($${Number(m.retail_price).toFixed(2)})`;
+          });
+        if (others.length > 0) {
+          variantSummary = `Also available in: ${others.join(', ')}`;
+        }
+      }
 
       return {
-        id: p.id,
         name: p.name,
-        description: p.description,
         category: cat?.name ?? null,
-        category_slug: categorySlug,
-        sku: p.sku,
         retail_price: retailPrice,
         ...(isActiveSale ? { sale_price: salePrice } : {}),
-        is_on_sale: isActiveSale,
         in_stock: (p.quantity_on_hand as number) > 0,
-        quantity_on_hand: p.quantity_on_hand,
-        product_url: categorySlug && p.slug
-          ? `/products/${categorySlug}/${p.slug}`
-          : null,
-        image_url: p.image_url,
-        overview: specs?.overview || null,
-        use_case: specs?.use_case || null,
-        key_features: specs?.key_features || [],
-        application_method: specs?.application_method || null,
-        surface_compatibility: specs?.surface_compatibility || [],
-        size_volume: specs?.size_volume || null,
-        dilution_ratio: specs?.dilution_ratio || null,
-        coverage_yield: specs?.coverage_yield || null,
-        scent: specs?.scent || null,
-        pro_tips: specs?.pro_tips || null,
-        variant_label: p.variant_label ?? null,
-        product_group_id: gid,
-        variants: variantSiblings,
+        description: p.description ? (p.description as string).substring(0, 150) : null,
+        product_url: categorySlug && p.slug ? `/products/${categorySlug}/${p.slug}` : null,
+        variants: variantSummary,
       };
     });
 
     const responseData = { products: formatted };
+    const responseBody = JSON.stringify(responseData);
+    console.log(`[VoiceAgent] Products response: ${formatted.length} products, ${(responseBody.length / 1024).toFixed(1)}KB`);
+
     perf.done(responseData);
     return NextResponse.json(responseData);
   } catch (err) {
