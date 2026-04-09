@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Header logout dropdown — permanent fix for click-not-registering bug — 2026-04-08
+
+- **Root cause**: The user dropdown in the header had a DOM/event timing race. The `mt-1` gap between trigger button and dropdown popup caused `mouseLeave` → 150ms close timer. `pointer-events: none` applied instantly while opacity faded over 200ms, creating an unclickable-but-visible dropdown.
+- **Fix 1**: Added invisible bridge element between trigger and dropdown popup — mouse never "leaves" the hover area during traversal (standard dropdown pattern).
+- **Fix 2**: Added `z-50` to dropdown popup to guarantee it renders above all page content.
+- **Fix 3**: Dropdown is no longer conditionally unmounted (`{displayName ? dropdown : signIn}`). Always rendered, visibility-controlled. The async `handleSignOut` survives re-renders.
+- **Fix 4**: Added `signingOutRef` (useRef) — set to `true` before calling `customerSignOut()`. Prevents `onAuthStateChange('SIGNED_OUT')` from setting `displayName = null` and interfering with the in-progress signout redirect.
+- **Fix 5**: Added guard comment to `customer-signout.ts` documenting it as the single source of truth with grep verification command.
+- Files: `header-client.tsx`, `customer-signout.ts`
+
+---
+
 ## fix: Pre-selected service preserved through Step 1 → Step 2 — 2026-04-08
 
 - `/book?service=express-exterior-wash` now correctly keeps the service pre-selected when advancing from Step 1 to Step 2. Previously, the service was wiped because the category-change check treated "no previous vehicle" as a category change, resetting `state.service` to null.

@@ -1,3 +1,18 @@
+/**
+ * SINGLE SOURCE OF TRUTH for customer sign-out.
+ *
+ * ALL customer-facing sign-out actions MUST use this function.
+ * Do NOT call supabase.auth.signOut() directly in any component.
+ *
+ * Exceptions (direct supabase.auth.signOut() is acceptable):
+ *  - Error recovery in auth hooks (staff guard in usePhoneOtp, stale session cleanup)
+ *  - Server-side API routes
+ *
+ * Verify with: grep -rn "supabase.auth.signOut" src/
+ * Every result must be either this file, a hook error-recovery path, a login page
+ * stale-session cleanup, or a server-side API route. Zero direct calls in components.
+ */
+
 import { createClient } from '@/lib/supabase/client';
 
 interface CustomerSignOutOptions {
@@ -9,10 +24,6 @@ interface CustomerSignOutOptions {
   onSignOut?: () => void;
 }
 
-/**
- * Shared customer sign-out utility.
- * All customer-facing sign-out call sites must use this function.
- */
 export async function customerSignOut(options: CustomerSignOutOptions = {}) {
   const { scope = 'local', skipRedirect = false, onSignOut } = options;
 

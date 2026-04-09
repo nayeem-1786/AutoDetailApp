@@ -31,6 +31,7 @@ export function HeaderClient({
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const userDropdownTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [displayName, setDisplayName] = useState(customerName);
+  const signingOutRef = useRef(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -44,6 +45,10 @@ export function HeaderClient({
     const supabase = createClient();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: { user: { id: string } } | null) => {
+      // Don't update display name during sign-out — prevents unmounting the dropdown
+      // while the async customerSignOut is still running
+      if (signingOutRef.current) return;
+
       if (event === 'SIGNED_OUT' || !session) {
         setDisplayName(null);
         return;
@@ -115,8 +120,13 @@ export function HeaderClient({
   }, [userDropdownOpen]);
 
   const handleSignOut = useCallback(async () => {
+    signingOutRef.current = true;
+    setUserDropdownOpen(false);
     await customerSignOut();
   }, []);
+
+  // Whether to show user account UI (always render, use visibility to hide)
+  const showUser = !!displayName;
 
   return (
     <header
@@ -225,33 +235,37 @@ export function HeaderClient({
 
           {/* Right side */}
           <div className="flex items-center gap-3">
-            {/* Account — desktop */}
-            {displayName ? (
-              <div
-                ref={userDropdownRef}
-                className="relative hidden lg:block"
-                onMouseEnter={openUserDropdown}
-                onMouseLeave={closeUserDropdown}
+            {/* Account dropdown — desktop: always rendered, visibility-controlled */}
+            <div
+              ref={userDropdownRef}
+              className={`relative hidden lg:block ${!showUser ? 'pointer-events-none' : ''}`}
+              onMouseEnter={openUserDropdown}
+              onMouseLeave={closeUserDropdown}
+              style={{ display: showUser ? undefined : 'none' }}
+            >
+              <button
+                type="button"
+                onClick={toggleUserDropdown}
+                className="inline-flex items-center gap-1 text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
               >
-                <button
-                  type="button"
-                  onClick={toggleUserDropdown}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
-                >
-                  Hi, {displayName}
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                      userDropdownOpen ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-                <div
-                  className={`absolute top-full right-0 mt-1 w-44 bg-brand-surface border border-site-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden p-1.5 transition-all duration-200 ${
-                    userDropdownOpen
-                      ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
-                      : 'opacity-0 translate-y-2 scale-[0.96] pointer-events-none'
+                Hi, {displayName}
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    userDropdownOpen ? 'rotate-180' : ''
                   }`}
-                >
+                />
+              </button>
+              {/* Invisible bridge — fills the gap between trigger and popup so
+                  the mouse never "leaves" the hover area during traversal */}
+              <div className="absolute top-full right-0 h-2 w-full" />
+              <div
+                className={`absolute top-full right-0 pt-2 z-50 transition-all duration-200 ${
+                  userDropdownOpen
+                    ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
+                    : 'opacity-0 translate-y-2 scale-[0.96] pointer-events-none'
+                }`}
+              >
+                <div className="w-44 bg-brand-surface border border-site-border rounded-xl shadow-2xl shadow-black/50 overflow-hidden p-1.5">
                   <Link
                     href="/account"
                     className="flex items-center gap-2.5 px-3 py-2 text-sm text-site-text hover:bg-accent-ui/10 rounded-lg transition-colors"
@@ -269,7 +283,9 @@ export function HeaderClient({
                   </button>
                 </div>
               </div>
-            ) : (
+            </div>
+            {/* Sign In link — shown when not logged in */}
+            {!showUser && (
               <Link
                 href="/signin"
                 className="hidden lg:inline-flex items-center text-sm font-medium text-site-text-muted hover:text-site-text transition-colors"
