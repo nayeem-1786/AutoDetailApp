@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Profile email button state + phone verified indicator — 2026-04-08
+
+- Email button now shows "Verify Email" when email exists but is unverified (was incorrectly showing "Add Email").
+- Phone number label now displays green "Verified" badge (same pattern as verified email). Phone is implicitly verified via OTP authentication.
+- File: `account/profile/page.tsx`
+
+---
+
 ## fix: Infinite loading spinner in customer-auth-provider — 2026-04-08
 
 - **Root cause:** `onAuthStateChange` could miss the `INITIAL_SESSION` event due to race conditions (synchronous firing during subscription setup, or effect re-runs from unstable dependencies). With `loading` stuck at `true`, the customer dashboard showed an infinite spinner.

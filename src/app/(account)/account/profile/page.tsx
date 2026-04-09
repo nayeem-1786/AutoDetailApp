@@ -433,7 +433,7 @@ export default function AccountProfilePage() {
             onClick={handleAddEmail}
             disabled={emailLoading || !emailInput.trim()}
           >
-            {emailLoading ? 'Sending...' : emailState === 'editing' ? 'Verify' : 'Add Email'}
+            {emailLoading ? 'Sending...' : (emailState === 'editing' || (customer.email && !customer.email_verified_at)) ? 'Verify Email' : 'Add Email'}
           </Button>
         </div>
         {emailError && (
@@ -493,12 +493,14 @@ export default function AccountProfilePage() {
               {renderEmailSection()}
             </div>
 
-            <FormField
-              label="Mobile"
-              required
-              error={errors.phone?.message}
-              htmlFor="phone"
-            >
+            <div className="space-y-1.5">
+              <label htmlFor="phone" className="text-sm font-medium text-site-text flex items-center gap-1.5">
+                Mobile <span className="text-red-500">*</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-xs font-medium text-green-400">
+                  <ShieldCheck className="h-3 w-3" />
+                  Verified
+                </span>
+              </label>
               <Input
                 id="phone"
                 placeholder="(310) 555-1234"
@@ -512,10 +514,13 @@ export default function AccountProfilePage() {
                   },
                 })}
               />
-              <p className="mt-1 text-xs text-site-text-dim">
+              {errors.phone?.message && (
+                <p className="text-sm text-red-500">{errors.phone.message}</p>
+              )}
+              <p className="text-xs text-site-text-dim">
                 We&apos;ll text you appointment reminders and updates.
               </p>
-            </FormField>
+            </div>
           </CardContent>
         </Card>
 
