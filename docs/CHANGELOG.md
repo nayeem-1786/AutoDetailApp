@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Infinite loading spinner in customer-auth-provider — 2026-04-08
+
+- **Root cause:** `onAuthStateChange` could miss the `INITIAL_SESSION` event due to race conditions (synchronous firing during subscription setup, or effect re-runs from unstable dependencies). With `loading` stuck at `true`, the customer dashboard showed an infinite spinner.
+- **Fix 1:** Added 5-second safety timeout — forces `loading` to `false` if `onAuthStateChange` hasn't resolved by then. Uses `loadingResolvedRef` to prevent double-resolution.
+- **Fix 2:** Added belt-and-suspenders `getUser()` fallback — fires 1 second after mount. If `onAuthStateChange` already resolved, this is a no-op. If it didn't, this catches the session and loads customer data.
+- **Fix 3:** Moved `supabase` client to `useMemo` for guaranteed referential stability — prevents theoretical effect re-subscriptions that could miss `INITIAL_SESSION`.
+- File: `customer-auth-provider.tsx`
+
+---
+
 ## fix: Remove customer reschedule — add call-us banner for appointment changes — 2026-04-08
 
 - Removed "Reschedule" button from customer appointment cards (dashboard + appointments page).
