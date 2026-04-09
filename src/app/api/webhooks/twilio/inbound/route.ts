@@ -234,9 +234,12 @@ export async function POST(request: NextRequest) {
     const requestUrl = process.env.TWILIO_WEBHOOK_URL || request.url;
     const skipSignatureValidation = process.env.NODE_ENV === 'development';
 
-    if (!skipSignatureValidation && !validateTwilioSignature(requestUrl, params, twilioSignature)) {
-      console.error('[Twilio] Invalid signature — rejecting webhook request');
-      return new Response(TWIML_EMPTY, { status: 403, headers: TWIML_HEADERS });
+    if (!skipSignatureValidation) {
+      console.log('[Twilio] Signature validation URL:', requestUrl);
+      if (!validateTwilioSignature(requestUrl, params, twilioSignature)) {
+        console.error('[Twilio] Invalid signature — rejecting webhook request');
+        return new Response(TWIML_EMPTY, { status: 403, headers: TWIML_HEADERS });
+      }
     }
 
     // -------------------------------------------------------------------

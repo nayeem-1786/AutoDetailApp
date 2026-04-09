@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add Twilio signature diagnostic logging — 2026-04-09
+
+- Added `console.log` of the signature validation URL in both Twilio webhook routes (inbound + status) before the validation check. Permanent production monitoring — helps diagnose signature failures behind the reverse proxy.
+- Files: `webhooks/twilio/inbound/route.ts`, `webhooks/twilio/status/route.ts`
+
+---
+
 ## ui: Rename AI Assistant to SMS AI Assistant + consolidate toggles + larger prompt textarea — 2026-04-08
 
 - Renamed all visible labels in the AI Assistant card from "AI Assistant" / "AI" to "SMS AI Assistant" / "SMS AI" (10 text changes). No variable/DB key changes.
