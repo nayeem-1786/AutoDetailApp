@@ -606,12 +606,9 @@ export function BookingWizard({
     };
     setState(newState);
 
-    if (editEntryStep !== null) {
-      setEditEntryStep(null);
-      goToStep(4, newState);
-    } else {
-      goToStep(2, newState);
-    }
+    // Always go to Step 2 — even during edit flow, so pricing recalculates
+    // for the new vehicle size. editEntryStep stays set to enable "Back to Booking".
+    goToStep(2, newState);
   }
 
   // Step 2: Select service + configure (merged)
@@ -626,13 +623,9 @@ export function BookingWizard({
     };
     setState(newState);
 
-    if (editEntryStep !== null) {
-      // Editing from step 4 — go back to step 4
-      setEditEntryStep(null);
-      goToStep(4, newState);
-    } else {
-      goToStep(3, newState);
-    }
+    // Always go to Step 3 — even during edit flow, so schedule validity
+    // is verified for the new service duration. editEntryStep stays set.
+    goToStep(3, newState);
   }
 
   // Step 3: Schedule → advance to Step 4
@@ -997,7 +990,7 @@ export function BookingWizard({
             onContinue={handleVehicleSelect}
             initialVehicle={state.vehicleData}
           />
-          {editEntryStep === 1 && (
+          {editEntryStep !== null && (
             <div className="mt-4">
               <Button
                 variant="outline"
@@ -1024,7 +1017,7 @@ export function BookingWizard({
             vehicleSizeClass={(state.vehicleData?.size_class as VehicleSizeClass) ?? null}
             vehicleSpecialtyTier={state.vehicleData?.specialty_tier ?? null}
           />
-          {editEntryStep === 2 && (
+          {editEntryStep !== null && (
             <div className="mt-4">
               <Button
                 variant="outline"
@@ -1046,7 +1039,7 @@ export function BookingWizard({
           initialDate={state.date}
           initialTime={state.time}
           onContinue={handleScheduleContinue}
-          onBack={() => editEntryStep === 3 ? (setEditEntryStep(null), goToStep(4)) : goToStep(2)}
+          onBack={() => goToStep(2)}
           orderSummary={orderSummary}
         />
       )}

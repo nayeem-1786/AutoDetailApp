@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Edit from Step 4 passes through subsequent steps for price recalculation — 2026-04-08
+
+- Editing vehicle from Step 4 now goes to Step 2 → Step 3 → Step 4 (was skipping directly to Step 4, leaving stale pricing).
+- Editing service from Step 4 now goes to Step 3 → Step 4 (was skipping Step 3).
+- Previously selected service, date, and time are preserved through the edit flow — only pricing updates for the new vehicle size.
+- "Back to Booking" escape button now shows on all intermediate steps during an edit flow (was only on the entry step).
+- Step 3 Back button always goes to Step 2 (was jumping to Step 4 during schedule edit).
+- File: `booking-wizard.tsx`
+
+---
+
 ## fix: Profile email button state + phone verified indicator — 2026-04-08
 
 - Email button now shows "Verify Email" when email exists but is unverified (was incorrectly showing "Add Email").
