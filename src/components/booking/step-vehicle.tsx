@@ -147,6 +147,15 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     setErrors({});
   }
 
+  // When auto-classification updates (make/model changed), clear manual overrides
+  // so the new detected size takes effect. User can still override afterward.
+  useEffect(() => {
+    if (classification) {
+      setManualSizeClass(null);
+      setManualSpecialtyTier(null);
+    }
+  }, [classification]);
+
   // Effective size class: manual override takes priority, then auto-detected
   const effectiveSizeClass = manualSizeClass ?? classification?.size_class ?? null;
 

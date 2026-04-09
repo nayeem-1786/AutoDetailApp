@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Vehicle size resets when model changes — 2026-04-08
+
+- Changing Model (e.g., Accord → Ridgeline) now updates the auto-detected vehicle size. Previously, a manual size selection (or prior auto-detection) would stick even after the model changed because `manualSizeClass` took priority over the new classification.
+- Fix: `manualSizeClass` and `manualSpecialtyTier` clear when classification updates. User can still manually override after.
+- File: `step-vehicle.tsx`
+
+---
+
 ## fix: Edit from Step 4 passes through subsequent steps for price recalculation — 2026-04-08
 
 - Editing vehicle from Step 4 now goes to Step 2 → Step 3 → Step 4 (was skipping directly to Step 4, leaving stale pricing).
