@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Voice agent notify-staff escalation tool — 2026-04-09
+
+- New `POST /api/voice-agent/notify-staff` endpoint — mid-call escalation tool for the ElevenLabs voice agent.
+- Sends SMS alert to staff (via `biz.phone`) when the agent hits a boundary: appointment changes, custom quotes, beyond-scope questions, transfer requests, mobile distance checks.
+- Two separate actions: (1) SMS to staff with no conversation logging, (2) system message logged to customer's conversation thread for admin visibility.
+- Always returns 200 with a speakable message so the agent can respond naturally.
+- Reason codes: `appointment_change`, `custom_quote`, `beyond_scope`, `transfer_request`, `mobile_distance`, `other`.
+- **Manual follow-up required:** Add `notify_staff` tool definition to ElevenLabs agent dashboard and update system prompt with escalation rules.
+- File: `voice-agent/notify-staff/route.ts`
+
+---
+
 ## fix: Slim voice agent products response under ElevenLabs 256KB limit — 2026-04-09
 
 - Response was 893KB (exceeded 256KB ElevenLabs tool response limit) after product enrichment added specs to 403 products.
