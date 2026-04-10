@@ -1060,6 +1060,7 @@ src/components/admin/html-image-manager.tsx
 src/components/admin/icon-picker.tsx
 src/components/admin/image-upload-field.tsx
 src/components/admin/receipt-dialog.tsx
+src/components/admin/table-toolbar.tsx
 src/components/admin/toolbar-items/accordion-dialog.tsx
 src/components/admin/toolbar-items/button-dialog.tsx
 src/components/admin/toolbar-items/callout-dialog.tsx

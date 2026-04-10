@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: TableToolbar component + Products toolbar migration — 2026-04-10
+
+- **`TableToolbar`** (`src/components/admin/table-toolbar.tsx`): Configurable toolbar for admin list pages. Renders search input, filter dropdowns (select), boolean toggles (Switch + Label), quick filter chips (clickable badges with active state), and reset button. Reads/writes `useTableState` — no internal state.
+- **Products page migration**: Replaced inline search input + 3 filter dropdowns + Show Inactive toggle with `<TableToolbar>`. Added 3 quick filter chips: "Active Only", "Out of Stock", "Missing Images" (with `clearOthers` behavior preserved). All existing functionality preserved.
+- Files: `table-toolbar.tsx` (new), `products/page.tsx`
+
+---
+
 ## feat: useTableState hook + DataTable sort indicators + Products URL sync — 2026-04-10
 
 - **`useTableState` hook** (`src/lib/hooks/useTableState.ts`): Manages search (300ms debounce), filters (`string | boolean | string[]`), sort, page, and pageSize with bidirectional URL query param sync. Supports both client-side and server-side filtering patterns.

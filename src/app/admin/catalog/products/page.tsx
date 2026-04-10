@@ -14,13 +14,11 @@ import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { FormField } from '@/components/ui/form-field';
+import { TableToolbar, type FilterConfig, type QuickFilterConfig } from '@/components/admin/table-toolbar';
+import type { FilterValue } from '@/lib/hooks/useTableState';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
@@ -274,6 +272,63 @@ export default function ProductsPage() {
       return true;
     });
   }, [products, table.debouncedSearch, categoryFilter, vendorFilter, stockFilter, showInactive, showMissingImages]);
+
+  // Toolbar filter configs — built from loaded data so options are dynamic
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'category',
+      label: 'Category',
+      type: 'select',
+      options: [
+        { label: 'All Categories', value: '' },
+        ...categories.map((c) => ({ label: c.name, value: c.id })),
+      ],
+    },
+    {
+      key: 'vendor',
+      label: 'Vendor',
+      type: 'select',
+      options: [
+        { label: 'All Vendors', value: '' },
+        ...vendors.map((v) => ({ label: v.name, value: v.id })),
+      ],
+    },
+    {
+      key: 'stock',
+      label: 'Stock',
+      type: 'select',
+      options: [
+        { label: 'All Stock', value: 'all' },
+        { label: 'In Stock', value: 'in-stock' },
+        { label: 'Low Stock', value: 'low-stock' },
+        { label: 'Out of Stock', value: 'out-of-stock' },
+      ],
+    },
+    {
+      key: 'showInactive',
+      label: 'Show Inactive',
+      type: 'boolean-toggle',
+    },
+  ], [categories, vendors]);
+
+  const toolbarQuickFilters: QuickFilterConfig[] = useMemo(() => [
+    {
+      label: 'Active Only',
+      filter: { showInactive: false } as Record<string, FilterValue>,
+      isActive: (f: Record<string, FilterValue>) => f.showInactive !== true,
+    },
+    {
+      label: 'Out of Stock',
+      filter: { stock: 'out-of-stock' } as Record<string, FilterValue>,
+      isActive: (f: Record<string, FilterValue>) => f.stock === 'out-of-stock',
+    },
+    {
+      label: 'Missing Images',
+      filter: { showMissingImages: true } as Record<string, FilterValue>,
+      clearOthers: true,
+      isActive: (f: Record<string, FilterValue>) => f.showMissingImages === true,
+    },
+  ], []);
 
   function getStockIcon(product: ProductWithRelations) {
     if (product.quantity_on_hand === 0) return '🔴';
@@ -560,52 +615,15 @@ export default function ProductsPage() {
         );
       })()}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:flex-wrap">
-        <SearchInput
-          value={table.search}
-          onChange={table.setSearch}
-          placeholder="Search by name or SKU..."
-          className="w-full sm:w-64"
-        />
-        <Select
-          value={categoryFilter}
-          onChange={(e) => table.setFilter('category', e.target.value)}
-          className="w-full sm:w-44"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </Select>
-        <Select
-          value={vendorFilter}
-          onChange={(e) => table.setFilter('vendor', e.target.value)}
-          className="w-full sm:w-44"
-        >
-          <option value="">All Vendors</option>
-          {vendors.map((v) => (
-            <option key={v.id} value={v.id}>{v.name}</option>
-          ))}
-        </Select>
-        <Select
-          value={stockFilter}
-          onChange={(e) => table.setFilter('stock', e.target.value)}
-          className="w-full sm:w-40"
-        >
-          <option value="all">All Stock</option>
-          <option value="in-stock">In Stock</option>
-          <option value="low-stock">Low Stock</option>
-          <option value="out-of-stock">Out of Stock</option>
-        </Select>
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <Switch
-            id="show-inactive-products"
-            checked={showInactive}
-            onCheckedChange={(checked) => table.setFilter('showInactive', checked)}
-          />
-          <Label htmlFor="show-inactive-products">Show Inactive</Label>
-        </div>
-      </div>
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search by name or SKU...',
+          filters: toolbarFilters,
+          quickFilters: toolbarQuickFilters,
+        }}
+      />
 
       <DataTable
         columns={columns}
