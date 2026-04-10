@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## audit: SMS template variables complete review — 2026-04-10
+
+- Full audit of all 16 SMS templates: variable definitions, caller pass-through, DB JSONB, chips, and required flags.
+- Report: `docs/audits/sms-template-variables-audit.md`
+- Found 14 mismatches across templates (missing chips, DB JSONB gaps, unrequired variables).
+
+---
+
 ## fix: Use template recipient_phones for staff notifications, remove redundant setting — 2026-04-10
 
 - `notify-staff/route.ts` now reads recipient phones from the `staff_notification` template's `recipient_phones` field (managed in Admin > SMS Templates), falling back to `biz.phone`. Sends to ALL configured recipients in parallel.
