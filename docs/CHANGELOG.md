@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Staff notification phone number setting — 2026-04-09
+
+- New `staff_notification_phone` key in `business_settings` — dedicated phone number for staff SMS alerts (voice agent escalations, appointment changes, custom quote requests).
+- Admin UI: New "Staff Notifications" card in Admin > Settings > Messaging (between Voice Agent and SMS AI Assistant cards). Phone input with on-blur E.164 normalization. Warning shown when not configured.
+- `notify-staff/route.ts`: Now queries `staff_notification_phone` first, falls back to `biz.phone`. Resolves Twilio error 21266 when business_phone equals the Twilio FROM number.
+- Files: `messaging/page.tsx`, `notify-staff/route.ts`
+
+---
+
 ## fix: Remove conversational text from finalize-call and notify-staff responses — 2026-04-09
 
 - Stripped `message` fields from `finalize-call` and `notify-staff` tool responses. Responses now return only `{ success: true }` or `{ success: false }`.

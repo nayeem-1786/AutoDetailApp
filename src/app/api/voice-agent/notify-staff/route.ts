@@ -81,22 +81,33 @@ export async function POST(request: NextRequest) {
       normalizedPhone ? `Reply to customer: ${displayPhone}` : '',
     ].filter(Boolean).join('\n');
 
-    // Get business info for staff phone
+    // Look up dedicated staff notification phone, fall back to business phone
+    const supabase = createAdminClient();
     let t = perf.now();
-    const biz = await getBusinessInfo();
-    perf.mark('fetch:getBusinessInfo', t);
+    const [staffPhoneSetting, biz] = await Promise.all([
+      supabase
+        .from('business_settings')
+        .select('value')
+        .eq('key', 'staff_notification_phone')
+        .maybeSingle(),
+      getBusinessInfo(),
+    ]);
+    perf.mark('fetch:staffPhone+businessInfo', t);
 
-    if (!biz.phone) {
-      console.error('[NotifyStaff] No business phone configured — cannot send staff alert');
+    const staffPhone = (staffPhoneSetting.data?.value as string) || biz.phone;
+    if (!staffPhone) {
+      console.error('[NotifyStaff] No staff notification phone configured — cannot send staff alert');
       return NextResponse.json(
         { success: false },
         { status: 200 }
       );
     }
 
+    console.log('[NotifyStaff] Sending to:', staffPhone);
+
     // Send SMS to staff — NO conversation logging (this goes to staff, not customer)
     t = perf.now();
-    const smsResult = await sendSms(biz.phone, alertBody);
+    const smsResult = await sendSms(staffPhone, alertBody);
     perf.mark('fetch:sendSms', t);
 
     if (!smsResult.success) {
@@ -109,7 +120,6 @@ export async function POST(request: NextRequest) {
 
     // Log to customer's conversation thread for admin visibility (separate from the staff SMS)
     if (normalizedPhone) {
-      const supabase = createAdminClient();
       t = perf.now();
       const { data: conv } = await supabase
         .from('conversations')
