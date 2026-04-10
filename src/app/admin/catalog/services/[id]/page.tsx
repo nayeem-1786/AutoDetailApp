@@ -54,7 +54,7 @@ import {
   type SpecialtyTier,
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, X, Eye, EyeOff } from 'lucide-react';
 import {
   getSaleStatus,
   getTierSaleInfo,
@@ -983,6 +983,24 @@ export default function ServiceDetailPage() {
           </div>
         }
       />
+
+      {/* Website visibility indicator */}
+      <div className={`flex items-center gap-2 text-sm ${service.show_on_website ? 'text-green-700' : 'text-amber-600'}`}>
+        {service.show_on_website ? (
+          <Eye className="h-4 w-4" />
+        ) : (
+          <EyeOff className="h-4 w-4" />
+        )}
+        <span className="font-medium">
+          {service.show_on_website ? 'Visible on website' : 'Hidden from website'}
+        </span>
+        <a
+          href="/admin/website/catalog"
+          className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+        >
+          (Manage in Website Catalog)
+        </a>
+      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>

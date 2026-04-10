@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink, Sparkles } from 'lucide-react';
+import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { MultiImageUpload } from '@/app/admin/catalog/components/multi-image-upload';
 import {
@@ -710,6 +710,24 @@ export default function ProductDetailPage() {
           </div>
         }
       />
+
+      {/* Website visibility indicator */}
+      <div className={`flex items-center gap-2 text-sm ${product.show_on_website ? 'text-green-700' : 'text-amber-600'}`}>
+        {product.show_on_website ? (
+          <Eye className="h-4 w-4" />
+        ) : (
+          <EyeOff className="h-4 w-4" />
+        )}
+        <span className="font-medium">
+          {product.show_on_website ? 'Visible on website' : 'Hidden from website'}
+        </span>
+        <a
+          href="/admin/website/catalog"
+          className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+        >
+          (Manage in Website Catalog)
+        </a>
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>

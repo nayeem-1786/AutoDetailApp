@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Website visibility indicator on service and product detail pages — 2026-04-10
+
+- Service detail page (`services/[id]/page.tsx`): Shows Eye/EyeOff icon with "Visible on website" or "Hidden from website" text + link to Website Catalog. Placed between PageHeader and Tabs.
+- Product detail page (`products/[id]/page.tsx`): Same indicator pattern, placed between PageHeader and the form.
+- Read-only — admin changes visibility on the CMS catalog page, not here.
+- `show_on_website` already fetched via `*` in both queries, no query changes needed.
+
+---
+
 ## audit: Service detail page complete review — 2026-04-10
 
 - Full audit of Admin > Catalog > Services > [id] detail/edit page (4 tabs: Details, Pricing, Add-Ons, Prerequisites)
