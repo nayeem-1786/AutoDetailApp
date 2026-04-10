@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## audit: Service detail page complete review — 2026-04-10
+
+- Full audit of Admin > Catalog > Services > [id] detail/edit page (4 tabs: Details, Pricing, Add-Ons, Prerequisites)
+- All 15 editable fields save correctly and are consumed by at least one system (website, POS, voice agent, booking, quotes)
+- **No disconnected or broken fields found**
+- One medium-priority issue: `slug` not regenerated on name change (stale public URLs)
+- Three by-design omissions: `pricing_model` read-only after creation, `show_on_website`/`is_featured` managed via CMS catalog page
+
+---
+
 ## audit: SMS template variables complete review — 2026-04-10
 
 - Full audit of all 16 SMS templates: variable definitions, caller pass-through, DB JSONB, chips, and required flags.
