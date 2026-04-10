@@ -246,6 +246,33 @@ export default function MessagingSettingsPage() {
               className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
             />
           </FormField>
+          <FormField
+            label="Staff Notification Phone Number"
+            description="Phone number where staff alerts are sent (e.g., appointment changes, custom quote requests, escalations from the voice agent)."
+            htmlFor="staff_notification_phone"
+          >
+            <input
+              id="staff_notification_phone"
+              type="tel"
+              placeholder="+1XXXXXXXXXX"
+              value={settings.staff_notification_phone}
+              onChange={(e) =>
+                setSettings((prev) => ({ ...prev, staff_notification_phone: e.target.value }))
+              }
+              onBlur={(e) => {
+                const raw = e.target.value.trim();
+                if (!raw) return;
+                const normalized = normalizePhone(raw);
+                if (normalized) {
+                  setSettings((prev) => ({ ...prev, staff_notification_phone: normalized }));
+                }
+              }}
+              className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
+            />
+          </FormField>
+          {!settings.staff_notification_phone.trim() && (
+            <p className="text-xs text-amber-600">Not configured — staff notifications will not be sent.</p>
+          )}
         </CardContent>
       </Card>
 
@@ -386,43 +413,6 @@ export default function MessagingSettingsPage() {
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Staff Notifications */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Staff Notifications</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <FormField
-            label="Staff Notification Phone Number"
-            description="Phone number where staff alerts are sent (e.g., appointment changes, custom quote requests, escalations from the voice agent)."
-            htmlFor="staff_notification_phone"
-          >
-            <input
-              id="staff_notification_phone"
-              type="tel"
-              placeholder="+1XXXXXXXXXX"
-              value={settings.staff_notification_phone}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, staff_notification_phone: e.target.value }))
-              }
-              onBlur={(e) => {
-                const raw = e.target.value.trim();
-                if (!raw) return;
-                const normalized = normalizePhone(raw);
-                if (normalized) {
-                  setSettings((prev) => ({ ...prev, staff_notification_phone: normalized }));
-                }
-              }}
-              className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
-            />
-          </FormField>
-          <p className="text-xs text-gray-500">Enter in any format — will be stored as +1XXXXXXXXXX</p>
-          {!settings.staff_notification_phone.trim() && (
-            <p className="text-xs text-amber-600">Not configured — staff notifications will not be sent.</p>
-          )}
         </CardContent>
       </Card>
 

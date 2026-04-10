@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## ui: Move staff notification phone into SMS Settings card — 2026-04-09
+
+- Moved Staff Notification Phone Number from standalone card into the existing SMS Settings card, below Business Phone Override and SMS Test Phone Number.
+- File: `src/app/admin/settings/messaging/page.tsx`
+
+---
+
 ## feat: Staff notification phone number setting — 2026-04-09
 
 - New `staff_notification_phone` key in `business_settings` — dedicated phone number for staff SMS alerts (voice agent escalations, appointment changes, custom quote requests).
