@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
@@ -34,6 +34,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Package, ImageOff, Sparkles } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { ShieldAlert } from 'lucide-react';
+import { useTableState } from '@/lib/hooks/useTableState';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ProductWithRelations = Product & {
@@ -50,9 +51,16 @@ const adjustSchema = z.object({
 
 type AdjustInput = z.infer<typeof adjustSchema>;
 
+const DEFAULT_FILTERS = {
+  category: '',
+  vendor: '',
+  stock: 'all' as string,
+  showInactive: false,
+  showMissingImages: false,
+};
+
 export default function ProductsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const supabase = createClient();
   const { granted: canViewProducts, loading: loadingViewPerm } = usePermission('products.view');
   const { granted: canEditProducts } = usePermission('products.edit');
@@ -60,22 +68,12 @@ export default function ProductsPage() {
   const { granted: canViewStock } = usePermission('inventory.view_stock');
   const { granted: canAdjustStock } = usePermission('inventory.adjust_stock');
 
-  const initialStock = (['all', 'in-stock', 'low-stock', 'out-of-stock'] as const).includes(
-    searchParams.get('stock') as StockFilter
-  )
-    ? (searchParams.get('stock') as StockFilter)
-    : 'all';
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS });
 
   const [products, setProducts] = useState<ProductWithRelations[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [vendorFilter, setVendorFilter] = useState('');
-  const [stockFilter, setStockFilter] = useState<StockFilter>(initialStock);
-  const [showInactive, setShowInactive] = useState(false);
-  const [showMissingImages, setShowMissingImages] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<ProductWithRelations | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
@@ -93,6 +91,13 @@ export default function ProductsPage() {
   } = useForm<AdjustInput>({
     resolver: formResolver(adjustSchema),
   });
+
+  // Convenience accessors for filter values
+  const categoryFilter = (table.filters.category as string) || '';
+  const vendorFilter = (table.filters.vendor as string) || '';
+  const stockFilter = ((table.filters.stock as string) || 'all') as StockFilter;
+  const showInactive = table.filters.showInactive === true;
+  const showMissingImages = table.filters.showMissingImages === true;
 
   async function loadProducts() {
     setLoading(true);
@@ -244,9 +249,9 @@ export default function ProductsPage() {
       if (showMissingImages) {
         if (!p.is_active || (p.image_url && p.image_url.length > 0)) return false;
       }
-      // Search filter
-      if (search) {
-        const q = search.toLowerCase();
+      // Search filter (use debounced value)
+      if (table.debouncedSearch) {
+        const q = table.debouncedSearch.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(q);
         const matchesSku = p.sku?.toLowerCase().includes(q);
         if (!matchesName && !matchesSku) return false;
@@ -268,7 +273,7 @@ export default function ProductsPage() {
       }
       return true;
     });
-  }, [products, search, categoryFilter, vendorFilter, stockFilter, showInactive, showMissingImages]);
+  }, [products, table.debouncedSearch, categoryFilter, vendorFilter, stockFilter, showInactive, showMissingImages]);
 
   function getStockIcon(product: ProductWithRelations) {
     if (product.quantity_on_hand === 0) return '🔴';
@@ -328,14 +333,14 @@ export default function ProductsPage() {
       id: 'category',
       header: 'Category',
       size: 120,
+      accessorFn: (row) => row.product_categories?.name || '',
       cell: ({ row }) => row.original.product_categories?.name || '--',
-      enableSorting: false,
     },
     {
       id: 'vendor',
       header: 'Vendor',
+      accessorFn: (row) => row.vendors?.name || '',
       cell: ({ row }) => row.original.vendors?.name || '--',
-      enableSorting: false,
     },
     {
       accessorKey: 'retail_price',
@@ -355,6 +360,7 @@ export default function ProductsPage() {
             row.original.cost_price > 0
               ? formatCurrency(row.original.cost_price)
               : '--',
+          enableSorting: false,
         },
         {
           id: 'margin',
@@ -404,6 +410,7 @@ export default function ProductsPage() {
             row.original.reorder_threshold !== null
               ? row.original.reorder_threshold
               : '--',
+          enableSorting: false,
         },
         {
           id: 'status',
@@ -536,14 +543,14 @@ export default function ProductsPage() {
               className="ml-4 flex-shrink-0 font-medium text-amber-900 underline hover:text-amber-700"
               onClick={() => {
                 if (showMissingImages) {
-                  setShowMissingImages(false);
+                  table.setFilter('showMissingImages', false);
                 } else {
-                  setSearch('');
-                  setCategoryFilter('');
-                  setVendorFilter('');
-                  setStockFilter('all');
-                  setShowInactive(false);
-                  setShowMissingImages(true);
+                  // Clear other filters and activate missing images view
+                  table.setFilters({
+                    ...DEFAULT_FILTERS,
+                    showMissingImages: true,
+                  });
+                  table.setSearch('');
                 }
               }}
             >
@@ -555,14 +562,14 @@ export default function ProductsPage() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:flex-wrap">
         <SearchInput
-          value={search}
-          onChange={setSearch}
+          value={table.search}
+          onChange={table.setSearch}
           placeholder="Search by name or SKU..."
           className="w-full sm:w-64"
         />
         <Select
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          onChange={(e) => table.setFilter('category', e.target.value)}
           className="w-full sm:w-44"
         >
           <option value="">All Categories</option>
@@ -572,7 +579,7 @@ export default function ProductsPage() {
         </Select>
         <Select
           value={vendorFilter}
-          onChange={(e) => setVendorFilter(e.target.value)}
+          onChange={(e) => table.setFilter('vendor', e.target.value)}
           className="w-full sm:w-44"
         >
           <option value="">All Vendors</option>
@@ -582,7 +589,7 @@ export default function ProductsPage() {
         </Select>
         <Select
           value={stockFilter}
-          onChange={(e) => setStockFilter(e.target.value as StockFilter)}
+          onChange={(e) => table.setFilter('stock', e.target.value)}
           className="w-full sm:w-40"
         >
           <option value="all">All Stock</option>
@@ -594,7 +601,7 @@ export default function ProductsPage() {
           <Switch
             id="show-inactive-products"
             checked={showInactive}
-            onCheckedChange={setShowInactive}
+            onCheckedChange={(checked) => table.setFilter('showInactive', checked)}
           />
           <Label htmlFor="show-inactive-products">Show Inactive</Label>
         </div>
@@ -613,6 +620,14 @@ export default function ProductsPage() {
             </Button>
           ) : undefined
         }
+        initialSorting={table.sort ?? undefined}
+        onSortingChange={table.setSort}
+        initialPage={table.page}
+        initialPageSize={table.pageSize}
+        onPaginationChange={(page, size) => {
+          table.setPage(page);
+          if (size !== table.pageSize) table.setPageSize(size);
+        }}
       />
 
       {/* Reactivate Confirm Dialog */}

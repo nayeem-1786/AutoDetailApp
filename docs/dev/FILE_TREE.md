@@ -845,6 +845,7 @@ src/lib/hooks/use-permission.ts
 src/lib/hooks/use-unsaved-changes.ts
 src/lib/hooks/useCustomerLink.ts          — Customer linking API wrapper hook (check-exists, link-by-phone, link-account)
 src/lib/hooks/usePhoneOtp.ts              — Phone OTP state machine hook (send, verify, resend, cooldown)
+src/lib/hooks/useTableState.ts            — Admin table state hook (search, filters, sort, pagination) with URL sync
 ```
 
 ### Migration

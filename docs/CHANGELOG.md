@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: useTableState hook + DataTable sort indicators + Products URL sync — 2026-04-10
+
+- **`useTableState` hook** (`src/lib/hooks/useTableState.ts`): Manages search (300ms debounce), filters (`string | boolean | string[]`), sort, page, and pageSize with bidirectional URL query param sync. Supports both client-side and server-side filtering patterns.
+- **DataTable sort direction indicators**: Column headers now show `ChevronUp` (asc), `ChevronDown` (desc), or dim `ArrowUpDown` (unsorted) based on `header.column.getIsSorted()`. Previously always showed neutral `ArrowUpDown`.
+- **DataTable controlled pagination**: New optional props `initialPage`, `initialPageSize`, `onPaginationChange` for external state sync. Page size selector dropdown (10/25/50/100) shown when controlled. "Showing X–Y of Z" result count always visible. Fully backward compatible — existing pages work without changes.
+- **DataTable controlled sorting**: New optional props `initialSorting`, `onSortingChange` for external state sync. Backward compatible.
+- **Products page migration**: All filter state (`search`, `category`, `vendor`, `stock`, `showInactive`, `showMissingImages`) now managed by `useTableState`. Sorting enabled on Name, SKU, Price, Category, Vendor, Stock columns. URL persists all state — refresh/share preserves exact view.
+- **Suspense boundary**: Added `<Suspense>` wrapper in admin layout for `useSearchParams` compatibility.
+- Files: `useTableState.ts`, `data-table.tsx`, `products/page.tsx`, `admin/layout.tsx`
+
+---
+
 ## audit: Admin page search, filter, and sort capabilities — 2026-04-10
 
 - Full audit of 32 admin list pages across customers, catalog, jobs, marketing, inventory, website/CMS, and settings

@@ -17,7 +17,7 @@ import { Pagination } from './pagination';
 import { EmptyState } from './empty-state';
 import { Button } from './button';
 import { Checkbox } from './checkbox';
-import { ArrowUpDown, Download } from 'lucide-react';
+import { ArrowUpDown, ChevronUp, ChevronDown, Download } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface BulkAction<TData> {
@@ -35,7 +35,18 @@ interface DataTableProps<TData> {
   emptyAction?: React.ReactNode;
   exportFilename?: string;
   bulkActions?: BulkAction<TData>[];
+  /** Controlled sorting — when provided, syncs with external state (e.g. useTableState) */
+  initialSorting?: { column: string; direction: 'asc' | 'desc' };
+  onSortingChange?: (sort: { column: string; direction: 'asc' | 'desc' } | null) => void;
+  /** Controlled pagination — when provided, syncs with external state (e.g. useTableState) */
+  initialPage?: number;
+  initialPageSize?: number;
+  onPaginationChange?: (page: number, pageSize: number) => void;
+  /** Show page size selector (only when onPaginationChange is provided) */
+  pageSizeOptions?: number[];
 }
+
+const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 function DataTable<TData>({
   columns,
@@ -46,9 +57,42 @@ function DataTable<TData>({
   emptyAction,
   exportFilename,
   bulkActions,
+  initialSorting,
+  onSortingChange,
+  initialPage,
+  initialPageSize,
+  onPaginationChange,
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
 }: DataTableProps<TData>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  // Convert external sort format to TanStack format
+  const [sorting, setSortingRaw] = React.useState<SortingState>(
+    initialSorting ? [{ id: initialSorting.column, desc: initialSorting.direction === 'desc' }] : []
+  );
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  // Effective page size: use controlled value if provided, otherwise prop
+  const effectivePageSize = initialPageSize ?? pageSize;
+
+  // Wrap setSorting to also notify external handler
+  const setSorting = React.useCallback(
+    (updater: SortingState | ((prev: SortingState) => SortingState)) => {
+      setSortingRaw((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        if (onSortingChange) {
+          if (next.length === 0) {
+            onSortingChange(null);
+          } else {
+            onSortingChange({
+              column: next[0].id,
+              direction: next[0].desc ? 'desc' : 'asc',
+            });
+          }
+        }
+        return next;
+      });
+    },
+    [onSortingChange]
+  );
 
   // Build columns with optional checkbox column prepended
   const allColumns = React.useMemo<ColumnDef<TData, unknown>[]>(() => {
@@ -87,9 +131,27 @@ function DataTable<TData>({
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    initialState: { pagination: { pageSize } },
+    initialState: {
+      pagination: {
+        pageSize: effectivePageSize,
+        pageIndex: initialPage ? initialPage - 1 : 0,
+      },
+    },
     enableRowSelection: !!bulkActions && bulkActions.length > 0,
   });
+
+  // Sync external page/pageSize changes into TanStack table
+  React.useEffect(() => {
+    if (initialPage !== undefined) {
+      table.setPageIndex(initialPage - 1);
+    }
+  }, [initialPage, table]);
+
+  React.useEffect(() => {
+    if (initialPageSize !== undefined) {
+      table.setPageSize(initialPageSize);
+    }
+  }, [initialPageSize, table]);
 
   const selectedRows = React.useMemo(() => {
     return table.getSelectedRowModel().rows.map((row) => row.original);
@@ -152,6 +214,24 @@ function DataTable<TData>({
     URL.revokeObjectURL(url);
   }, [columns, data, exportFilename]);
 
+  // Handle page change — notify external handler if provided
+  const handlePageChange = React.useCallback(
+    (page: number) => {
+      table.setPageIndex(page - 1);
+      onPaginationChange?.(page, table.getState().pagination.pageSize);
+    },
+    [table, onPaginationChange]
+  );
+
+  const handlePageSizeChange = React.useCallback(
+    (newSize: number) => {
+      table.setPageSize(newSize);
+      table.setPageIndex(0);
+      onPaginationChange?.(1, newSize);
+    },
+    [table, onPaginationChange]
+  );
+
   if (data.length === 0) {
     return (
       <EmptyState
@@ -161,6 +241,12 @@ function DataTable<TData>({
       />
     );
   }
+
+  const currentPage = table.getState().pagination.pageIndex + 1;
+  const currentPageSize = table.getState().pagination.pageSize;
+  const totalRows = data.length;
+  const startRow = (currentPage - 1) * currentPageSize + 1;
+  const endRow = Math.min(currentPage * currentPageSize, totalRows);
 
   return (
     <div className="space-y-4">
@@ -179,6 +265,7 @@ function DataTable<TData>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   const colSize = header.column.columnDef.size;
+                  const sortDir = header.column.getIsSorted(); // 'asc' | 'desc' | false
                   return (
                   <TableHead key={header.id} style={colSize ? { width: colSize } : undefined}>
                     {header.isPlaceholder ? null : (
@@ -192,7 +279,11 @@ function DataTable<TData>({
                       >
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {header.column.getCanSort() && (
-                          <ArrowUpDown className="h-4 w-4 text-ui-text-dim" />
+                          sortDir === 'asc'
+                            ? <ChevronUp className="h-4 w-4 text-ui-text" />
+                            : sortDir === 'desc'
+                              ? <ChevronDown className="h-4 w-4 text-ui-text" />
+                              : <ArrowUpDown className="h-3.5 w-3.5 text-ui-text-dim" />
                         )}
                       </div>
                     )}
@@ -217,13 +308,33 @@ function DataTable<TData>({
             ))}
           </TableBody>
         </Table>
-        {table.getPageCount() > 1 && (
-          <div className="border-t border-ui-border px-4 py-3">
-            <Pagination
-              currentPage={table.getState().pagination.pageIndex + 1}
-              totalPages={table.getPageCount()}
-              onPageChange={(page) => table.setPageIndex(page - 1)}
-            />
+        {(table.getPageCount() > 1 || onPaginationChange) && (
+          <div className="flex items-center justify-between border-t border-ui-border px-4 py-3">
+            <span className="text-xs text-ui-text-dim">
+              Showing {startRow}–{endRow} of {totalRows}
+            </span>
+            <div className="flex items-center gap-3">
+              {onPaginationChange && (
+                <select
+                  value={currentPageSize}
+                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                  className="h-8 rounded border border-ui-input-border bg-ui-input-bg px-2 text-xs text-ui-text"
+                >
+                  {pageSizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size} / page
+                    </option>
+                  ))}
+                </select>
+              )}
+              {table.getPageCount() > 1 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={table.getPageCount()}
+                  onPageChange={handlePageChange}
+                />
+              )}
+            </div>
           </div>
         )}
       </div>

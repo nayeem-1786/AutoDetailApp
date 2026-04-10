@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -25,5 +26,9 @@ export default async function AdminLayout({
 
   if (!employee) redirect('/login?reason=not_authorized');
 
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <AdminShell>
+      <Suspense>{children}</Suspense>
+    </AdminShell>
+  );
 }
