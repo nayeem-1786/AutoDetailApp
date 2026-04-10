@@ -43,15 +43,21 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
   quote_accepted_single: [
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'item_name', description: 'Service/item name', sample: 'Ceramic Coating' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
   quote_accepted_multi: [
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
   quote_accepted_staff_notify: [
     { key: 'customer_name', description: 'Customer full name', sample: 'John Smith' },
     { key: 'quote_number', description: 'Quote number', sample: 'Q-001234' },
     { key: 'service_total', description: 'Quote total amount', sample: '$492.19' },
     { key: 'services', description: 'Service names', sample: 'Ceramic Coating, Interior Detail' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
   booking_reminder: [
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
@@ -81,10 +87,14 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
   addon_approved: [
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'service_name', description: 'Add-on service/product name', sample: 'Paint Correction' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
   addon_declined: [
     { key: 'first_name', description: 'Customer first name', sample: 'John' },
     { key: 'service_name', description: 'Add-on service/product name', sample: 'Paint Correction' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
   booking_staff_notify: [
     { key: 'customer_name', description: 'Customer full name', sample: 'John Smith' },
@@ -92,6 +102,8 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'appointment_date', description: 'Appointment date', sample: 'Monday, March 28, 2026' },
     { key: 'appointment_time', description: 'Appointment time', sample: '10:30 AM' },
     { key: 'deposit_info', description: 'Deposit status', sample: 'Deposit paid.' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
   staff_notification: [
     { key: 'customer_name', description: 'Customer name from the call', sample: 'John Smith' },
@@ -109,6 +121,8 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'address', description: 'Mobile service address', sample: '123 Main St, Torrance, CA' },
     { key: 'service_total', description: 'Total amount', sample: '$299.00' },
     { key: 'detailer_first_name', description: "Assigned detailer's first name", sample: 'Mike' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+    { key: 'business_phone', description: 'Business phone number', sample: '[From Settings]' },
   ],
 };
 

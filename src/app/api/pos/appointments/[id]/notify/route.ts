@@ -297,6 +297,7 @@ Thank you for choosing ${business.name}!`;
           appointment_time: displayTime,
           address: appointment.mobile_address || undefined,
           service_total: formatCurrency(appointment.total_amount),
+          detailer_first_name: employee?.first_name || undefined,
         }, detailerFallback);
         if (!detailerResult.isActive) throw new Error('skip');
         const smsResult = await sendSms(employee.phone, detailerResult.body);

@@ -14,6 +14,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add missing SMS template chips + wire detailer_first_name — 2026-04-10
+
+- **P2:** Added `business_name` and `business_phone` chips to 7 templates missing them: `quote_accepted_single`, `quote_accepted_multi`, `quote_accepted_staff_notify`, `addon_approved`, `addon_declined`, `booking_staff_notify`, `detailer_job_assigned`. These are auto-injected by `renderSmsTemplate` — chips just make them visible in the Admin UI editor.
+- **P3:** Wired `detailer_first_name: employee?.first_name` into both notify routes (`appointments/[id]/notify` and `pos/appointments/[id]/notify`) so the `detailer_job_assigned` template renders the actual detailer name instead of fallback "your detailer".
+- Files: `sms-template-variables.ts`, `appointments/[id]/notify/route.ts`, `pos/appointments/[id]/notify/route.ts`
+
+---
+
 ## audit: SMS template variables complete review — 2026-04-10
 
 - Full audit of all 16 SMS templates: variable definitions, caller pass-through, DB JSONB, chips, and required flags.
