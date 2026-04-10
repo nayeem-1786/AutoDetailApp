@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## audit: Admin page search, filter, and sort capabilities — 2026-04-10
+
+- Full audit of 32 admin list pages across customers, catalog, jobs, marketing, inventory, website/CMS, and settings
+- Report: `docs/audits/admin-search-filter-sort-audit.md`
+- Key findings: 44% have search, 50% have filters, only 6% have sortable columns (biggest gap), 6% have export
+- Identified gold standard implementations (Customers, Transactions, Jobs) as foundation for universal component
+- Spec: TableToolbar component + useTableState hook enhancing existing DataTable, with 5 core + 4 high-value + 5 nice-to-have features
+- Recommended 10-page rollout order starting with Products (highest impact)
+
+---
+
 ## feat: Website visibility indicator on service and product detail pages — 2026-04-10
 
 - Service detail page (`services/[id]/page.tsx`): Shows Eye/EyeOff icon with "Visible on website" or "Hidden from website" text + link to Website Catalog. Placed between PageHeader and Tabs.
