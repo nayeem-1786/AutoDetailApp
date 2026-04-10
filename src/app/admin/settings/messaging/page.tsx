@@ -107,6 +107,7 @@ export default function MessagingSettingsPage() {
   const [settings, setSettings] = useState<MessagingSettings>(DEFAULTS);
   const [initial, setInitial] = useState<MessagingSettings>(DEFAULTS);
   const [resetPromptOpen, setResetPromptOpen] = useState(false);
+  const [templateCount, setTemplateCount] = useState<number | null>(null);
 
   const isDirty = JSON.stringify(settings) !== JSON.stringify(initial);
   const aiEnabled = isEnabled(settings.messaging_ai_unknown_enabled) || isEnabled(settings.messaging_ai_customers_enabled);
@@ -143,6 +144,13 @@ export default function MessagingSettingsPage() {
       setSettings(loaded);
       setInitial(loaded);
       setLoading(false);
+
+      // Fetch template count for the navigation badge
+      supabase
+        .from('sms_templates')
+        .select('id', { count: 'exact', head: true })
+        .then(({ count }: { count: number | null }) => { if (count != null) setTemplateCount(count); })
+        .catch(() => {});
     }
     load();
   }, []);
@@ -285,7 +293,9 @@ export default function MessagingSettingsPage() {
               <p className="mt-0.5 text-sm text-gray-500">Customize the wording of automated text messages.</p>
             </div>
             <div className="flex items-center gap-2 text-gray-400">
-              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">15 templates</span>
+              {templateCount != null && (
+                <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">{templateCount} templates</span>
+              )}
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </div>
           </CardContent>

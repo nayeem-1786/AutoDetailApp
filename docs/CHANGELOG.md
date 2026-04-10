@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Staff notification SMS template with admin-editable format — 2026-04-10
+
+- New `staff_notification` SMS template (category: system, recipient: staff) seeded via migration. Default body includes customer name, phone, reason, and details with `{variable}` placeholders.
+- `notify-staff/route.ts` now renders via `renderSmsTemplate()` instead of hardcoded string. Hardcoded format kept as fallback. Respects template `is_active` toggle — admin can silence staff alerts.
+- Variable chips registered in `sms-template-variables.ts` for admin template editor: `customer_name`, `customer_phone`, `reason_label`, `reason_code`, `details`, `business_name`.
+- SMS Templates navigation badge now queries actual count from `sms_templates` table instead of hardcoding "15 templates".
+- Migration: `supabase/migrations/20260410000001_staff_notification_sms_template.sql`
+
+---
+
 ## ui: Move staff notification phone into SMS Settings card — 2026-04-09
 
 - Moved Staff Notification Phone Number from standalone card into the existing SMS Settings card, below Business Phone Override and SMS Test Phone Number.

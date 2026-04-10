@@ -1423,6 +1423,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260404000002_enrichment_drafts_rls_and_cleanup.sql
 20260404000003_enrichment_batches_table.sql
 20260404000004_backfill_og_images.sql
+20260410000001_staff_notification_sms_template.sql
 ```
 
 ---

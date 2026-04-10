@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatPhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 
@@ -71,9 +72,9 @@ export async function POST(request: NextRequest) {
     const displayPhone = normalizedPhone ? formatPhone(normalizedPhone) : 'Unknown';
     const displayName = customer_name?.trim() || 'Unknown';
 
-    // Build SMS alert body
-    const alertBody = [
-      `Staff Action Needed`,
+    // Build hardcoded fallback (disaster-recovery if template is missing from DB)
+    const fallbackBody = [
+      `\u{1F514} Staff Action Needed`,
       `Customer: ${displayName}`,
       `Phone: ${displayPhone}`,
       `Reason: ${reasonLabel}`,
@@ -81,10 +82,17 @@ export async function POST(request: NextRequest) {
       normalizedPhone ? `Reply to customer: ${displayPhone}` : '',
     ].filter(Boolean).join('\n');
 
-    // Look up dedicated staff notification phone, fall back to business phone
+    // Render SMS from admin-editable template
     const supabase = createAdminClient();
     let t = perf.now();
-    const [staffPhoneSetting, biz] = await Promise.all([
+    const [templateResult, staffPhoneSetting, biz] = await Promise.all([
+      renderSmsTemplate('staff_notification', {
+        customer_name: displayName,
+        customer_phone: displayPhone,
+        reason_label: reasonLabel,
+        reason_code: reason,
+        details: details.trim(),
+      }, fallbackBody),
       supabase
         .from('business_settings')
         .select('value')
@@ -92,7 +100,15 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       getBusinessInfo(),
     ]);
-    perf.mark('fetch:staffPhone+businessInfo', t);
+    perf.mark('fetch:template+staffPhone+businessInfo', t);
+
+    // If template is toggled off in admin, skip sending
+    if (!templateResult.isActive) {
+      console.log('[NotifyStaff] Template is inactive — skipping staff alert');
+      const responseData = { success: true };
+      perf.done(responseData);
+      return NextResponse.json(responseData);
+    }
 
     const staffPhone = (staffPhoneSetting.data?.value as string) || biz.phone;
     if (!staffPhone) {
@@ -107,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     // Send SMS to staff — NO conversation logging (this goes to staff, not customer)
     t = perf.now();
-    const smsResult = await sendSms(staffPhone, alertBody);
+    const smsResult = await sendSms(staffPhone, templateResult.body);
     perf.mark('fetch:sendSms', t);
 
     if (!smsResult.success) {

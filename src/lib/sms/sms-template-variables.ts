@@ -93,6 +93,14 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
     { key: 'appointment_time', description: 'Appointment time', sample: '10:30 AM' },
     { key: 'deposit_info', description: 'Deposit status', sample: 'Deposit paid.' },
   ],
+  staff_notification: [
+    { key: 'customer_name', description: 'Customer name from the call', sample: 'John Smith' },
+    { key: 'customer_phone', description: 'Customer phone (formatted)', sample: '(310) 555-1234' },
+    { key: 'reason_label', description: 'Escalation reason', sample: 'Custom Quote Needed' },
+    { key: 'reason_code', description: 'Reason code', sample: 'custom_quote' },
+    { key: 'details', description: 'Details from agent', sample: 'Customer wants ceramic coating for a fleet of 5 vehicles' },
+    { key: 'business_name', description: 'Business name', sample: '[From Settings]' },
+  ],
   detailer_job_assigned: [
     { key: 'services', description: 'Service names', sample: 'Ceramic Coating' },
     { key: 'vehicle_description', description: 'Vehicle year/make/model', sample: '2024 Tesla Model 3' },
