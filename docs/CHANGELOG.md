@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Use template recipient_phones for staff notifications, remove redundant setting — 2026-04-10
+
+- `notify-staff/route.ts` now reads recipient phones from the `staff_notification` template's `recipient_phones` field (managed in Admin > SMS Templates), falling back to `biz.phone`. Sends to ALL configured recipients in parallel.
+- Removed `staff_notification_phone` from: `MessagingSettings` interface, `SETTINGS_KEYS`, `DEFAULTS`, and the SMS Settings card UI.
+- Removed `staff_notification_phone` from `DB_SCHEMA.md`. Existing DB rows are left in place (harmless, no longer read).
+- Files: `notify-staff/route.ts`, `messaging/page.tsx`, `DB_SCHEMA.md`
+
+---
+
 ## feat: Staff notification SMS template with admin-editable format — 2026-04-10
 
 - New `staff_notification` SMS template (category: system, recipient: staff) seeded via migration. Default body includes customer name, phone, reason, and details with `{variable}` placeholders.

@@ -1631,7 +1631,6 @@ Receipt settings are stored in `business_settings` as key-value pairs:
 |-----|------|---------|-------|
 | `voice_agent_first_message_returning` | string | `""` | Custom greeting for returning callers. Empty = hardcoded default. Supports `{{business_name}}`, `{{customer_name}}`, `{{first_name}}`, `{{time_of_day}}` |
 | `voice_agent_first_message_new` | string | `""` | Custom greeting for new callers. Empty = hardcoded default. Same template variables |
-| `staff_notification_phone` | string (E.164) | `""` | Dedicated phone number for staff SMS alerts (voice agent escalations, quote requests). Falls back to `business_phone` if empty. |
 
 ### RLS Policies
 

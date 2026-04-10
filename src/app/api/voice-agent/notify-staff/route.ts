@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     // Render SMS from admin-editable template
     const supabase = createAdminClient();
     let t = perf.now();
-    const [templateResult, staffPhoneSetting, biz] = await Promise.all([
+    const [templateResult, biz] = await Promise.all([
       renderSmsTemplate('staff_notification', {
         customer_name: displayName,
         customer_phone: displayPhone,
@@ -93,14 +93,9 @@ export async function POST(request: NextRequest) {
         reason_code: reason,
         details: details.trim(),
       }, fallbackBody),
-      supabase
-        .from('business_settings')
-        .select('value')
-        .eq('key', 'staff_notification_phone')
-        .maybeSingle(),
       getBusinessInfo(),
     ]);
-    perf.mark('fetch:template+staffPhone+businessInfo', t);
+    perf.mark('fetch:template+businessInfo', t);
 
     // If template is toggled off in admin, skip sending
     if (!templateResult.isActive) {
@@ -110,28 +105,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(responseData);
     }
 
-    const staffPhone = (staffPhoneSetting.data?.value as string) || biz.phone;
-    if (!staffPhone) {
-      console.error('[NotifyStaff] No staff notification phone configured — cannot send staff alert');
+    // Use template recipient_phones (configured in admin SMS template editor),
+    // fall back to business phone if none configured
+    const phones = templateResult.recipientPhones?.length
+      ? templateResult.recipientPhones
+      : (biz.phone ? [biz.phone] : []);
+
+    if (phones.length === 0) {
+      console.error('[NotifyStaff] No recipient phones configured — cannot send staff alert');
       return NextResponse.json(
         { success: false },
         { status: 200 }
       );
     }
 
-    console.log('[NotifyStaff] Sending to:', staffPhone);
+    console.log('[NotifyStaff] Sending to:', phones.join(', '));
 
-    // Send SMS to staff — NO conversation logging (this goes to staff, not customer)
+    // Send SMS to all staff recipients — NO conversation logging (this goes to staff, not customer)
     t = perf.now();
-    const smsResult = await sendSms(staffPhone, templateResult.body);
+    const results = await Promise.all(
+      phones.map((phone) => sendSms(phone, templateResult.body))
+    );
     perf.mark('fetch:sendSms', t);
 
-    if (!smsResult.success) {
-      console.error('[NotifyStaff] Staff SMS failed:', smsResult.error);
-      return NextResponse.json(
-        { success: false },
-        { status: 200 }
-      );
+    const anyFailed = results.some((r) => !r.success);
+    if (anyFailed) {
+      console.error('[NotifyStaff] Some staff SMS failed:', results.filter((r) => !r.success).map((r) => r.error));
     }
 
     // Log to customer's conversation thread for admin visibility (separate from the staff SMS)

@@ -16,7 +16,6 @@ import { TogglePill } from '@/components/ui/toggle-pill';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
-import { normalizePhone } from '@/lib/utils/format';
 
 interface MessagingSettings {
   messaging_ai_unknown_enabled: string;
@@ -28,7 +27,6 @@ interface MessagingSettings {
   sms_test_phone_number: string;
   voice_agent_first_message_returning: string;
   voice_agent_first_message_new: string;
-  staff_notification_phone: string;
 }
 
 const SETTINGS_KEYS = [
@@ -41,7 +39,6 @@ const SETTINGS_KEYS = [
   'sms_test_phone_number',
   'voice_agent_first_message_returning',
   'voice_agent_first_message_new',
-  'staff_notification_phone',
 ] as const;
 
 const DEFAULTS: MessagingSettings = {
@@ -54,7 +51,6 @@ const DEFAULTS: MessagingSettings = {
   sms_test_phone_number: '',
   voice_agent_first_message_returning: '',
   voice_agent_first_message_new: '',
-  staff_notification_phone: '',
 };
 
 const VOICE_GREETING_DEFAULTS = {
@@ -254,33 +250,6 @@ export default function MessagingSettingsPage() {
               className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
             />
           </FormField>
-          <FormField
-            label="Staff Notification Phone Number"
-            description="Phone number where staff alerts are sent (e.g., appointment changes, custom quote requests, escalations from the voice agent)."
-            htmlFor="staff_notification_phone"
-          >
-            <input
-              id="staff_notification_phone"
-              type="tel"
-              placeholder="+1XXXXXXXXXX"
-              value={settings.staff_notification_phone}
-              onChange={(e) =>
-                setSettings((prev) => ({ ...prev, staff_notification_phone: e.target.value }))
-              }
-              onBlur={(e) => {
-                const raw = e.target.value.trim();
-                if (!raw) return;
-                const normalized = normalizePhone(raw);
-                if (normalized) {
-                  setSettings((prev) => ({ ...prev, staff_notification_phone: normalized }));
-                }
-              }}
-              className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
-            />
-          </FormField>
-          {!settings.staff_notification_phone.trim() && (
-            <p className="text-xs text-amber-600">Not configured — staff notifications will not be sent.</p>
-          )}
         </CardContent>
       </Card>
 
