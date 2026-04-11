@@ -9,7 +9,6 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Plus, Pencil, Trash2, Copy } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -18,18 +17,28 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { CampaignTabs } from './_components/campaign-tabs';
 import { usePermission } from '@/lib/hooks/use-permission';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
+
+const DEFAULT_FILTERS = {
+  status: '' as string,
+  channel: '' as string,
+};
 
 export default function CampaignsListPage() {
   const router = useRouter();
   const { granted: canManageCampaigns, loading: permLoading } = usePermission('marketing.campaigns');
 
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS });
+
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [channelFilter, setChannelFilter] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [duplicating, setDuplicating] = useState<string | null>(null);
+
+  const statusFilter = (table.filters.status as string) || '';
+  const channelFilter = (table.filters.channel as string) || '';
 
   useEffect(() => {
     async function load() {
@@ -52,9 +61,13 @@ export default function CampaignsListPage() {
     return campaigns.filter((c) => {
       if (statusFilter && c.status !== statusFilter) return false;
       if (channelFilter && c.channel !== channelFilter) return false;
+      if (table.debouncedSearch) {
+        const q = table.debouncedSearch.toLowerCase();
+        if (!c.name.toLowerCase().includes(q)) return false;
+      }
       return true;
     });
-  }, [campaigns, statusFilter, channelFilter]);
+  }, [campaigns, statusFilter, channelFilter, table.debouncedSearch]);
 
   function statusBadge(status: string) {
     const variant = status === 'sent' ? 'success' : status === 'draft' ? 'secondary' : status === 'scheduled' ? 'info' : status === 'sending' ? 'warning' : status === 'cancelled' ? 'destructive' : 'default';
@@ -100,6 +113,32 @@ export default function CampaignsListPage() {
     }
   }
 
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { label: 'All Statuses', value: '' },
+        { label: 'Draft', value: 'draft' },
+        { label: 'Scheduled', value: 'scheduled' },
+        { label: 'Sent', value: 'sent' },
+        { label: 'Cancelled', value: 'cancelled' },
+      ],
+    },
+    {
+      key: 'channel',
+      label: 'Channel',
+      type: 'select',
+      options: [
+        { label: 'All Channels', value: '' },
+        { label: 'SMS', value: 'sms' },
+        { label: 'Email', value: 'email' },
+        { label: 'SMS + Email', value: 'both' },
+      ],
+    },
+  ], []);
+
   const columns: ColumnDef<Campaign, unknown>[] = [
     {
       accessorKey: 'name',
@@ -118,19 +157,19 @@ export default function CampaignsListPage() {
       id: 'channel',
       header: 'Channel',
       size: 100,
+      accessorFn: (row) => row.channel,
       cell: ({ row }) => (
         <Badge variant="info">
           {CAMPAIGN_CHANNEL_LABELS[row.original.channel] || row.original.channel}
         </Badge>
       ),
-      enableSorting: false,
     },
     {
       id: 'status',
       header: 'Status',
       size: 100,
+      accessorFn: (row) => row.status,
       cell: ({ row }) => statusBadge(row.original.status),
-      enableSorting: false,
     },
     {
       accessorKey: 'recipient_count',
@@ -146,6 +185,7 @@ export default function CampaignsListPage() {
       id: 'sent_at',
       header: 'Sent',
       size: 120,
+      accessorFn: (row) => row.sent_at || '',
       cell: ({ row }) => (
         <span className="text-sm text-gray-500">
           {row.original.sent_at ? formatDate(row.original.sent_at) : '--'}
@@ -227,29 +267,14 @@ export default function CampaignsListPage() {
 
   const oneTimeContent = (
     <>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full sm:w-40"
-        >
-          <option value="">All Statuses</option>
-          <option value="draft">Draft</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="sent">Sent</option>
-          <option value="cancelled">Cancelled</option>
-        </Select>
-        <Select
-          value={channelFilter}
-          onChange={(e) => setChannelFilter(e.target.value)}
-          className="w-full sm:w-40"
-        >
-          <option value="">All Channels</option>
-          <option value="sms">SMS</option>
-          <option value="email">Email</option>
-          <option value="both">SMS + Email</option>
-        </Select>
-      </div>
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search campaigns...',
+          filters: toolbarFilters,
+        }}
+      />
 
       <DataTable
         columns={columns}
@@ -262,6 +287,14 @@ export default function CampaignsListPage() {
             Create Campaign
           </Button>
         }
+        initialSorting={table.sort ?? undefined}
+        onSortingChange={table.setSort}
+        initialPage={table.page}
+        initialPageSize={table.pageSize}
+        onPaginationChange={(page, size) => {
+          table.setPage(page);
+          if (size !== table.pageSize) table.setPageSize(size);
+        }}
       />
 
       <ConfirmDialog
