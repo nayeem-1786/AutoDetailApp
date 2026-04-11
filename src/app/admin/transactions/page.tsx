@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency, formatDateTime, formatRelativeDate } from '@/lib/utils/format';
+import { formatCurrency, formatDateTime } from '@/lib/utils/format';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import type {
   Transaction,
@@ -22,6 +22,25 @@ import { RevenueStats } from './components/revenue-stats';
 import { PaymentBreakdown } from './components/payment-breakdown';
 import { ReceiptDialog } from '@/components/admin/receipt-dialog';
 import { ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Format transaction date: Today, Yesterday, or MM/DD/YY (PST) */
+function formatTxnDate(iso: string): string {
+  const d = new Date(iso);
+  const pstStr = d.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const now = new Date();
+  const todayStr = now.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
+  if (pstStr === todayStr) return 'Today';
+  const yesterday = new Date(now.getTime() - 86400000);
+  const yesterdayStr = yesterday.toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit' });
+  if (pstStr === yesterdayStr) return 'Yesterday';
+  // MM/DD/YY
+  const [month, day, year] = pstStr.split('/');
+  return `${month}/${day}/${year.slice(2)}`;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -402,6 +421,7 @@ export default function AdminTransactionsPage() {
             defaultFilters={DEFAULT_FILTERS}
             config={{
               searchPlaceholder: 'Search receipt #, name, or phone...',
+              searchClassName: 'w-full sm:w-[28rem]',
               filters: toolbarFilters,
             }}
           />
@@ -536,7 +556,7 @@ function TransactionTableRow({
   return (
     <tr className="transition-colors hover:bg-gray-50">
       <td className="whitespace-nowrap px-3 py-3 text-gray-600" title={formatDateTime(tx.transaction_date)}>
-        {formatRelativeDate(tx.transaction_date)}
+        {formatTxnDate(tx.transaction_date)}
       </td>
       <td className="whitespace-nowrap px-3 py-3">
         {tx.receipt_number ? (

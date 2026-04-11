@@ -421,8 +421,9 @@ export default function QuotesPage() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (q.access_token) {
+                                    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
                                     navigator.clipboard
-                                      .writeText(`${window.location.origin}/quote/${q.access_token}`)
+                                      .writeText(`${appUrl}/quote/${q.access_token}`)
                                       .then(() => toast.success('Link copied!'))
                                       .catch(() => toast.error('Failed to copy link'));
                                   } else {

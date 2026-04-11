@@ -101,7 +101,7 @@ export function TableToolbar({ state, config, defaultFilters = {} }: TableToolba
             value={state.search}
             onChange={state.setSearch}
             placeholder={searchPlaceholder}
-            className="w-full sm:w-64"
+            className={searchClassName}
           />
         )}
 
