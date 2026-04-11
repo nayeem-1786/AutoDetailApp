@@ -536,7 +536,7 @@ export async function listQuotesAdmin(
   const offset = (page - 1) * limit;
 
   // Determine sort — only allow known columns
-  const allowedSortCols = ['created_at', 'total_amount', 'quote_number', 'status'];
+  const allowedSortCols = ['created_at', 'total_amount', 'quote_number', 'status', 'valid_until'];
   const effectiveSortCol = sortColumn && allowedSortCols.includes(sortColumn) ? sortColumn : 'created_at';
   const effectiveSortAsc = sortDirection === 'asc';
 

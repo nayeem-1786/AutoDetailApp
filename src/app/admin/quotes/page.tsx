@@ -315,6 +315,14 @@ export default function QuotesPage() {
                           Total <SortIndicator column="total_amount" />
                         </div>
                       </th>
+                      <th
+                        className="px-4 py-3 cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('valid_until')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Expires <SortIndicator column="valid_until" />
+                        </div>
+                      </th>
                       <th className="px-4 py-3">Days Open</th>
                       <th className="px-4 py-3 text-center">Sends</th>
                       <th className="px-4 py-3 w-28"></th>
@@ -388,6 +396,9 @@ export default function QuotesPage() {
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900">
                             {formatCurrency(q.total_amount)}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-gray-500">
+                            {q.valid_until ? formatRelativeDate(q.valid_until) : '--'}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-gray-500">
                             {daysOpen !== null ? `${daysOpen}d` : '--'}
