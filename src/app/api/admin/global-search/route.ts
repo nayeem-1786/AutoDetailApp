@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       .select('role')
       .eq('auth_user_id', user.id)
       .single();
-    if (!employee || !['super_admin', 'admin'].includes(employee.role)) {
+    if (!employee) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
