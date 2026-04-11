@@ -4,6 +4,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## redesign: Global search — clean Google-style UX with blurred backdrop — 2026-04-10
+
+- **Empty state**: Opens with search input only + "Type to search across all records" hint. No pre-populated nav pages.
+- **Wider modal**: `max-w-lg` (512px) → `max-w-2xl` (672px).
+- **Blurred backdrop**: `bg-black/40 backdrop-blur-sm` replaces opaque `bg-black/50`.
+- **Loading state**: Centered spinner with "Searching..." text while API in flight.
+- **No results state**: Shows "No results found for '[query]'" when search returns empty.
+- **Section headers**: Show "(15+ results)" hint when a section hits the limit.
+- **Result labels**: Bold font for primary label, muted subtitle.
+- **API limit**: Increased from 5 to 15 results per section (appointments stays 50 fetch / 15 display for client-side filtering).
+- **Removed**: Nav page results (sidebar handles navigation), "View all" links, `flattenNavItems` function, `navItems` prop.
+- Files: `admin-shell.tsx`, `global-search/route.ts`
+
+---
+
 ## fix: Scrollable global search results + view all links — 2026-04-10
 
 - Results container changed from `max-h-80` (320px) to `max-h-[60vh]` for proper scrolling with many results across 10 sections.

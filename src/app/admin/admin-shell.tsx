@@ -143,27 +143,6 @@ function formatBreadcrumbSegment(segment: string): string | null {
   return formatted;
 }
 
-// Flatten nav items for global search
-function flattenNavItems(items: NavItem[]): NavItem[] {
-  const result: NavItem[] = [];
-  const seen = new Set<string>();
-  for (const item of items) {
-    if (!seen.has(item.href)) {
-      result.push(item);
-      seen.add(item.href);
-    }
-    if (item.children) {
-      for (const child of item.children) {
-        if (!seen.has(child.href)) {
-          result.push(child);
-          seen.add(child.href);
-        }
-      }
-    }
-  }
-  return result;
-}
-
 // Global Search Dialog component
 interface SearchResult {
   id: string;
@@ -173,65 +152,41 @@ interface SearchResult {
   type: string;
 }
 
-// "View all" hrefs append ?q= — only works on pages using useTableState (currently Products).
-// Other pages will navigate correctly but won't pre-fill search. They'll pick up ?q= as they
-// migrate to useTableState in future sessions.
-const SEARCH_SECTION_CONFIG: { type: string; label: string; icon: string; viewAllHref?: string }[] = [
-  { type: 'page', label: 'Pages', icon: 'LayoutDashboard' },
-  { type: 'customer', label: 'Customers', icon: 'Users', viewAllHref: '/admin/customers' },
-  { type: 'product', label: 'Products', icon: 'Package', viewAllHref: '/admin/catalog/products' },
-  { type: 'service', label: 'Services', icon: 'Wrench', viewAllHref: '/admin/catalog/services' },
-  { type: 'vehicle', label: 'Vehicles', icon: 'Truck', viewAllHref: '/admin/customers' },
-  { type: 'transaction', label: 'Transactions', icon: 'ArrowRightLeft', viewAllHref: '/admin/transactions' },
-  { type: 'quote', label: 'Quotes', icon: 'FileText', viewAllHref: '/admin/quotes' },
-  { type: 'order', label: 'Orders', icon: 'ShoppingCart', viewAllHref: '/admin/orders' },
-  { type: 'appointment', label: 'Appointments', icon: 'CalendarDays', viewAllHref: '/admin/appointments' },
-  { type: 'conversation', label: 'Conversations', icon: 'MessageSquare', viewAllHref: '/admin/messaging' },
+const SEARCH_SECTION_CONFIG: { type: string; label: string; icon: string }[] = [
+  { type: 'customer', label: 'Customers', icon: 'Users' },
+  { type: 'vehicle', label: 'Vehicles', icon: 'Truck' },
+  { type: 'product', label: 'Products', icon: 'Package' },
+  { type: 'service', label: 'Services', icon: 'Wrench' },
+  { type: 'transaction', label: 'Transactions', icon: 'ArrowRightLeft' },
+  { type: 'quote', label: 'Quotes', icon: 'FileText' },
+  { type: 'appointment', label: 'Appointments', icon: 'CalendarDays' },
+  { type: 'conversation', label: 'Conversations', icon: 'MessageSquare' },
+  { type: 'order', label: 'Orders', icon: 'ShoppingCart' },
 ];
 
 function CommandPalette({
   open,
   onOpenChange,
-  navItems,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  navItems: NavItem[];
 }) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [apiResults, setApiResults] = useState<SearchResult[]>([]);
-  const [apiLoading, setApiLoading] = useState(false);
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-
-  const allItems = flattenNavItems(navItems);
-
-  // Page results — instant, client-side
-  const pageResults: SearchResult[] = (query.trim()
-    ? allItems.filter((item) =>
-        item.label.toLowerCase().includes(query.toLowerCase()) ||
-        item.href.toLowerCase().includes(query.toLowerCase())
-      )
-    : allItems
-  ).map((item) => ({
-    id: `page-${item.href}`,
-    label: item.label,
-    subtitle: item.href,
-    href: item.href,
-    type: 'page',
-  }));
-
-  // Combine page (client-side) + API results
-  const allResults: SearchResult[] = [...pageResults, ...apiResults];
 
   useEffect(() => {
     if (open) {
       setQuery('');
       setSelectedIndex(0);
-      setApiResults([]);
-      setApiLoading(false);
+      setResults([]);
+      setLoading(false);
+      setSearched(false);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
@@ -254,12 +209,13 @@ function CommandPalette({
     setSelectedIndex(0);
 
     if (!query.trim() || query.trim().length < 2) {
-      setApiResults([]);
-      setApiLoading(false);
+      setResults([]);
+      setLoading(false);
+      setSearched(false);
       return;
     }
 
-    setApiLoading(true);
+    setLoading(true);
     const timer = setTimeout(async () => {
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -273,24 +229,26 @@ function CommandPalette({
         if (!res.ok) throw new Error('Search failed');
         const data = await res.json();
 
-        const results: SearchResult[] = [];
-        for (const type of ['customer', 'product', 'service', 'vehicle', 'transaction', 'quote', 'order', 'appointment', 'conversation']) {
-          const items = data[type + 's'] as SearchResult[] | undefined;
-          if (items) {
-            for (const item of items) {
-              results.push({ ...item, type });
+        const items: SearchResult[] = [];
+        for (const type of ['customer', 'vehicle', 'product', 'service', 'transaction', 'quote', 'appointment', 'conversation', 'order']) {
+          const section = data[type + 's'] as SearchResult[] | undefined;
+          if (section) {
+            for (const item of section) {
+              items.push({ ...item, type });
             }
           }
         }
 
         if (!controller.signal.aborted) {
-          setApiResults(results);
-          setApiLoading(false);
+          setResults(items);
+          setLoading(false);
+          setSearched(true);
         }
       } catch {
         if (!controller.signal.aborted) {
-          setApiResults([]);
-          setApiLoading(false);
+          setResults([]);
+          setLoading(false);
+          setSearched(true);
         }
       }
     }, 300);
@@ -312,13 +270,13 @@ function CommandPalette({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => Math.min(prev + 1, allResults.length - 1));
+      setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && allResults[selectedIndex]) {
+    } else if (e.key === 'Enter' && results[selectedIndex]) {
       e.preventDefault();
-      handleResultSelect(allResults[selectedIndex]);
+      handleResultSelect(results[selectedIndex]);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onOpenChange(false);
@@ -329,21 +287,21 @@ function CommandPalette({
 
   // Group results by type for rendering
   const grouped: Record<string, SearchResult[]> = {};
-  for (const r of allResults) {
+  for (const r of results) {
     if (!grouped[r.type]) grouped[r.type] = [];
     grouped[r.type].push(r);
   }
 
   let globalIndex = -1;
-  const hasAnyResults = allResults.length > 0;
+  const hasQuery = query.trim().length >= 2;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[20vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm pt-[15vh]"
       onClick={() => onOpenChange(false)}
     >
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl"
+        className="relative w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search input */}
@@ -355,10 +313,10 @@ function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search customers, products, transactions, quotes..."
+            placeholder="Search customers, products, quotes, transactions..."
             className="h-12 w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
-          {apiLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-gray-400" />}
+          {loading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-gray-400" />}
           <button
             type="button"
             onClick={() => onOpenChange(false)}
@@ -369,62 +327,67 @@ function CommandPalette({
           </button>
         </div>
 
-        {/* Results */}
-        <div className="max-h-[60vh] overflow-y-auto p-2">
-          {!hasAnyResults && !apiLoading ? (
-            <div className="py-6 text-center text-sm text-gray-500">
-              No results found.
+        {/* Results / Empty / Loading / No Results */}
+        <div className="max-h-[60vh] overflow-y-auto">
+          {!hasQuery ? (
+            /* Empty state — no query yet */
+            <div className="py-10 text-center">
+              <p className="text-sm text-gray-400">Type to search across all records</p>
+            </div>
+          ) : loading && results.length === 0 ? (
+            /* Loading state */
+            <div className="flex items-center justify-center gap-2 py-10">
+              <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+              <span className="text-sm text-gray-500">Searching...</span>
+            </div>
+          ) : searched && results.length === 0 ? (
+            /* No results */
+            <div className="py-10 text-center">
+              <p className="text-sm text-gray-500">No results found for &ldquo;{query.trim()}&rdquo;</p>
             </div>
           ) : (
-            SEARCH_SECTION_CONFIG.map(({ type, label, icon, viewAllHref }) => {
-              const items = grouped[type];
-              if (!items || items.length === 0) return null;
-              const SectionIcon = iconMap[icon] || LayoutDashboard;
-              return (
-                <div key={type}>
-                  {query.trim().length >= 2 && (
+            /* Grouped results */
+            <div className="p-2">
+              {SEARCH_SECTION_CONFIG.map(({ type, label, icon }) => {
+                const items = grouped[type];
+                if (!items || items.length === 0) return null;
+                const SectionIcon = iconMap[icon] || LayoutDashboard;
+                return (
+                  <div key={type}>
                     <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       <SectionIcon className="h-3 w-3" />
                       {label}
+                      {items.length >= 15 && (
+                        <span className="font-normal normal-case">(15+ results)</span>
+                      )}
                     </div>
-                  )}
-                  {items.map((result) => {
-                    globalIndex++;
-                    const idx = globalIndex;
-                    return (
-                      <button
-                        key={result.id}
-                        onClick={() => handleResultSelect(result)}
-                        onMouseEnter={() => setSelectedIndex(idx)}
-                        className={cn(
-                          'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
-                          idx === selectedIndex
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-600 hover:bg-gray-50'
-                        )}
-                      >
-                        <SectionIcon className="h-4 w-4 shrink-0 text-gray-400" />
-                        <span className="flex-1 text-left truncate">{result.label}</span>
-                        {result.subtitle && (
-                          <span className="truncate text-xs text-gray-400">{result.subtitle}</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                  {items.length >= 5 && viewAllHref && (
-                    <button
-                      onClick={() => {
-                        onOpenChange(false);
-                        router.push(`${viewAllHref}?q=${encodeURIComponent(query.trim())}`);
-                      }}
-                      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition-colors"
-                    >
-                      <span className="ml-5">View all matching {label.toLowerCase()}...</span>
-                    </button>
-                  )}
-                </div>
-              );
-            })
+                    {items.map((result) => {
+                      globalIndex++;
+                      const idx = globalIndex;
+                      return (
+                        <button
+                          key={result.id}
+                          onClick={() => handleResultSelect(result)}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          className={cn(
+                            'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+                            idx === selectedIndex
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          )}
+                        >
+                          <SectionIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                          <span className="flex-1 text-left truncate font-medium">{result.label}</span>
+                          {result.subtitle && (
+                            <span className="truncate text-xs text-gray-400">{result.subtitle}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -1069,7 +1032,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
       <CommandPalette
         open={commandOpen}
         onOpenChange={setCommandOpen}
-        navItems={navItems}
       />
     </div>
   );

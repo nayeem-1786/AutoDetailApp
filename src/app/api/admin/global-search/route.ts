@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
             : `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
         )
         .order('last_name')
-        .limit(5),
+        .limit(15),
 
       // 2. PRODUCTS — name, SKU, category name (via join)
       admin.from('products')
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true)
         .or(`name.ilike.${pattern},sku.ilike.${pattern}`)
         .order('name')
-        .limit(5),
+        .limit(15),
 
       // 3. SERVICES — name
       admin.from('services')
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
         .eq('is_active', true)
         .ilike('name', pattern)
         .order('name')
-        .limit(5),
+        .limit(15),
 
       // 4. TRANSACTIONS — receipt number, customer name via join
       admin.from('transactions')
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
             : `receipt_number.ilike.${pattern}`
         )
         .order('transaction_date', { ascending: false })
-        .limit(5),
+        .limit(15),
 
       // 5. QUOTES — quote number, customer name via join
       admin.from('quotes')
@@ -105,13 +105,14 @@ export async function GET(request: NextRequest) {
         .is('deleted_at', null)
         .ilike('quote_number', isQuoteSearch ? `%${cleanedQ}%` : pattern)
         .order('created_at', { ascending: false })
-        .limit(5),
+        .limit(15),
 
       // 6. APPOINTMENTS — customer name via join, service names via nested join
+      // Fetch extra rows because we filter by customer name client-side (Supabase can't .or() on joins)
       admin.from('appointments')
         .select('id, scheduled_date, scheduled_start_time, status, customer:customers!customer_id(first_name, last_name), appointment_services(service:services!service_id(name))')
         .order('scheduled_date', { ascending: false })
-        .limit(50), // Fetch more, filter client-side by customer name
+        .limit(50),
 
       // 7. CONVERSATIONS — phone number, customer name via join
       admin.from('conversations')
@@ -122,20 +123,20 @@ export async function GET(request: NextRequest) {
             : `phone_number.ilike.${pattern}`
         )
         .order('last_message_at', { ascending: false })
-        .limit(5),
+        .limit(15),
 
       // 8. ORDERS — order number, customer name
       admin.from('orders')
         .select('id, order_number, total, first_name, last_name, email, created_at')
         .or(`order_number.ilike.${pattern},first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern}`)
         .order('created_at', { ascending: false })
-        .limit(5),
+        .limit(15),
 
       // 9. VEHICLES — make, model, year + owning customer
       admin.from('vehicles')
         .select('id, year, make, model, color, customer_id, customer:customers!customer_id(id, first_name, last_name)')
         .or(`make.ilike.${pattern},model.ilike.${pattern}`)
-        .limit(5),
+        .limit(15),
     ]);
 
     const results: Record<string, SearchResultItem[]> = {
@@ -231,7 +232,7 @@ export async function GET(request: NextRequest) {
         if (!cust) return false;
         const fullName = `${cust.first_name} ${cust.last_name}`.toLowerCase();
         return fullName.includes(lowerQ);
-      }).slice(0, 5);
+      }).slice(0, 15);
 
       for (const a of matched) {
         const cust = a.customer as unknown as { first_name: string; last_name: string };
