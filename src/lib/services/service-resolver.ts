@@ -80,7 +80,8 @@ export function resolvePrice(
       // for scope services like Hot Shampoo, this selects "Complete Interior"
       // instead of "Floor Mats Only" (the first tier by display_order).
       const sizeAwareTier = tiers.find((t) => t.is_vehicle_size_aware && t.vehicle_size_sedan_price != null);
-      const tier = sizeAwareTier || tiers[0];
+      const matchingTier = tiers.find((t) => t.tier_name === sizeClass);
+      const tier = sizeAwareTier || matchingTier || tiers[0];
 
       let standardPrice: number;
       if (tier.is_vehicle_size_aware && tier.vehicle_size_sedan_price != null) {
