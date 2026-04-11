@@ -195,6 +195,19 @@ function CommandPalette({
     }
   }, [open]);
 
+  // Global Escape listener — closes palette regardless of focus
+  useEffect(() => {
+    if (!open) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onOpenChange(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open, onOpenChange]);
+
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
@@ -226,62 +239,64 @@ function CommandPalette({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[20vh]"
+      onClick={() => onOpenChange(false)}
+    >
       <div
-        className="fixed inset-0 bg-black/50"
-        onClick={() => onOpenChange(false)}
-      />
-      <div className="fixed inset-0 flex items-start justify-center pt-[20vh]">
-        <div
-          className="relative z-50 w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Search input */}
-          <div className="flex items-center gap-3 border-b border-gray-200 px-4">
-            <Search className="h-4 w-4 shrink-0 text-gray-400" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Search pages..."
-              className="h-12 w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
-            />
-            <kbd className="hidden shrink-0 rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-xs text-gray-400 sm:inline">
-              ESC
-            </kbd>
-          </div>
+        className="relative w-full max-w-lg overflow-hidden rounded-lg bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Search input */}
+        <div className="flex items-center gap-3 border-b border-gray-200 px-4">
+          <Search className="h-4 w-4 shrink-0 text-gray-400" />
+          <input
+            ref={inputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search pages..."
+            className="h-12 w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="shrink-0 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Close search"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-          {/* Results */}
-          <div className="max-h-72 overflow-y-auto p-2">
-            {filtered.length === 0 ? (
-              <div className="py-6 text-center text-sm text-gray-500">
-                No results found.
-              </div>
-            ) : (
-              filtered.map((item, index) => {
-                const Icon = iconMap[item.icon] || LayoutDashboard;
-                return (
-                  <button
-                    key={item.href}
-                    onClick={() => handleSelect(item)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
-                      index === selectedIndex
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'text-gray-600 hover:bg-gray-50'
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0 text-gray-400" />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    <span className="text-xs text-gray-400">{item.href}</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
+        {/* Results */}
+        <div className="max-h-72 overflow-y-auto p-2">
+          {filtered.length === 0 ? (
+            <div className="py-6 text-center text-sm text-gray-500">
+              No results found.
+            </div>
+          ) : (
+            filtered.map((item, index) => {
+              const Icon = iconMap[item.icon] || LayoutDashboard;
+              return (
+                <button
+                  key={item.href}
+                  onClick={() => handleSelect(item)}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
+                    index === selectedIndex
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0 text-gray-400" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <span className="text-xs text-gray-400">{item.href}</span>
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
