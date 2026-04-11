@@ -187,6 +187,7 @@ function CommandPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [apiResults, setApiResults] = useState<SearchResult[]>([]);
   const [apiLoading, setApiLoading] = useState(false);
+  const [services, setServices] = useState<{ id: string; name: string; pricing_model: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -207,9 +208,24 @@ function CommandPalette({
     type: 'page' as const,
   }));
 
-  // Combine page + API results
-  const allResults: SearchResult[] = [...pageResults, ...apiResults];
+  // Service results — instant, client-side (loaded once on palette open)
+  const serviceResults: SearchResult[] = query.trim().length >= 2
+    ? services
+        .filter((s) => s.name.toLowerCase().includes(query.trim().toLowerCase()))
+        .slice(0, 5)
+        .map((s) => ({
+          id: `service-${s.id}`,
+          label: s.name,
+          subtitle: s.pricing_model || undefined,
+          href: `/admin/catalog/services/${s.id}`,
+          type: 'service' as const,
+        }))
+    : [];
 
+  // Combine page + service (client-side) + API results
+  const allResults: SearchResult[] = [...pageResults, ...serviceResults, ...apiResults];
+
+  // Load services once when palette opens (client-side, no POS auth needed)
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -217,8 +233,20 @@ function CommandPalette({
       setApiResults([]);
       setApiLoading(false);
       setTimeout(() => inputRef.current?.focus(), 0);
+
+      // Fetch services via Supabase client (uses admin cookie auth)
+      if (services.length === 0) {
+        createClient()
+          .from('services')
+          .select('id, name, pricing_model')
+          .eq('is_active', true)
+          .order('name')
+          .then(({ data }: { data: { id: string; name: string; pricing_model: string }[] | null }) => {
+            if (data) setServices(data);
+          });
+      }
     }
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Global Escape listener — closes palette regardless of focus
   useEffect(() => {
@@ -233,7 +261,7 @@ function CommandPalette({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, onOpenChange]);
 
-  // Debounced API search (300ms)
+  // Debounced API search for customers + products (300ms)
   useEffect(() => {
     setSelectedIndex(0);
 
@@ -254,10 +282,9 @@ function CommandPalette({
       const results: SearchResult[] = [];
 
       try {
-        const [customersRes, productsRes, servicesRes] = await Promise.allSettled([
+        const [customersRes, productsRes] = await Promise.allSettled([
           fetch(`/api/admin/customers/search?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
           fetch(`/api/public/products/search?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
-          fetch(`/api/pos/services?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
         ]);
 
         if (customersRes.status === 'fulfilled' && customersRes.value.data) {
@@ -280,22 +307,6 @@ function CommandPalette({
               subtitle: p.product_categories?.name || undefined,
               href: `/admin/catalog/products/${p.id}`,
               type: 'product',
-            });
-          }
-        }
-
-        if (servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value)) {
-          const svcQuery = query.trim().toLowerCase();
-          const matched = servicesRes.value
-            .filter((s: { name: string }) => s.name.toLowerCase().includes(svcQuery))
-            .slice(0, 5);
-          for (const s of matched) {
-            results.push({
-              id: `service-${s.id}`,
-              label: s.name,
-              subtitle: s.pricing_model || undefined,
-              href: `/admin/catalog/services/${s.id}`,
-              type: 'service',
             });
           }
         }

@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Global search POS services call causing logout — 2026-04-10
+
+- Root cause: CommandPalette fetched `/api/pos/services` which requires POS HMAC auth (`X-POS-Session` header). Without it, the endpoint returned 401. The global fetch interceptor in admin-shell caught the 401 and redirected to login with `reason=session_expired`.
+- Fix: Replaced the POS API call with a client-side Supabase query. Services are loaded once on palette open via `createClient().from('services').select(...)` (uses admin cookie auth), then filtered locally per keystroke. Only customers and products still use debounced API calls.
+- File: `admin-shell.tsx`
+
+---
+
 ## fix: CommandPalette close handler + escape + X button — 2026-04-10
 
 - Merged backdrop and positioning divs into single overlay with `onClick` — fixes clicks outside modal not closing the palette
