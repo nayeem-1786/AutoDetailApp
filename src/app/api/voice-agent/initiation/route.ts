@@ -218,6 +218,14 @@ export async function POST(request: NextRequest) {
       ? resolveGreetingVariables(customReturning, { businessName: biz.name, customerName: fullName, firstName, timeOfDay })
       : `Thanks for calling ${biz.name}. It looks like you've called us before — is this ${firstName}?`;
 
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'America/Los_Angeles',
+    });
+
     const responseData = {
       type: 'conversation_initiation_client_data',
       dynamic_variables: {
@@ -226,6 +234,7 @@ export async function POST(request: NextRequest) {
         is_returning: 'true',
         customer_summary: customerSummary,
         time_of_day: getTimeOfDay(),
+        current_date: currentDate,
       },
       conversation_config_override: {
         agent: {
@@ -255,6 +264,13 @@ function getTimeOfDay(): string {
 function newCallerResponse(phone: string, businessName?: string, customMessage?: string) {
   const name = businessName || 'our business';
   const timeOfDay = getTimeOfDay();
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
   return {
     type: 'conversation_initiation_client_data',
     dynamic_variables: {
@@ -263,6 +279,7 @@ function newCallerResponse(phone: string, businessName?: string, customMessage?:
       is_returning: 'false',
       customer_summary: 'New caller. No account on file.',
       time_of_day: timeOfDay,
+      current_date: currentDate,
     },
     conversation_config_override: {
       agent: {
