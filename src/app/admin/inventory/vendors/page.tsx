@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
@@ -12,13 +12,12 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
 import {
   Dialog,
   DialogHeader,
@@ -37,20 +36,27 @@ type VendorWithCount = Vendor & {
   product_count: number;
 };
 
+const DEFAULT_FILTERS = {
+  showInactive: false,
+};
+
 export default function VendorsPage() {
   const router = useRouter();
   const supabase = createClient();
   const { granted: canManageVendors, loading: loadingPerm } = usePermission('inventory.manage_vendors');
 
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS });
+
   const [vendors, setVendors] = useState<VendorWithCount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Convenience accessor
+  const showInactive = table.filters.showInactive === true;
 
   const {
     register,
@@ -106,18 +112,31 @@ export default function VendorsPage() {
     loadVendors();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = vendors.filter((v) => {
-    // Active/inactive filter
-    if (!showInactive && !v.is_active) return false;
-    // Search filter
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      v.name.toLowerCase().includes(q) ||
-      v.contact_name?.toLowerCase().includes(q) ||
-      v.email?.toLowerCase().includes(q)
-    );
-  });
+  const filtered = useMemo(() => {
+    return vendors.filter((v) => {
+      // Active/inactive filter
+      if (!showInactive && !v.is_active) return false;
+      // Search filter (use debounced value)
+      if (table.debouncedSearch) {
+        const q = table.debouncedSearch.toLowerCase();
+        return (
+          v.name.toLowerCase().includes(q) ||
+          v.contact_name?.toLowerCase().includes(q) ||
+          v.email?.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [vendors, table.debouncedSearch, showInactive]);
+
+  // Toolbar filter configs
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'showInactive',
+      label: 'Show Inactive',
+      type: 'boolean-toggle',
+    },
+  ], []);
 
   function openCreate() {
     setEditingVendor(null);
@@ -245,6 +264,7 @@ export default function VendorsPage() {
       header: 'Phone',
       cell: ({ row }) =>
         row.original.phone ? formatPhone(row.original.phone) : '--',
+      enableSorting: false,
     },
     {
       accessorKey: 'lead_time_days',
@@ -257,10 +277,10 @@ export default function VendorsPage() {
     {
       id: 'products',
       header: 'Products',
+      accessorFn: (row) => row.product_count,
       cell: ({ row }) => (
         <Badge variant="secondary">{row.original.product_count}</Badge>
       ),
-      enableSorting: false,
     },
     {
       id: 'status',
@@ -331,22 +351,14 @@ export default function VendorsPage() {
         }
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search vendors..."
-          className="w-full sm:w-64"
-        />
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <Switch
-            id="show-inactive-vendors"
-            checked={showInactive}
-            onCheckedChange={setShowInactive}
-          />
-          <Label htmlFor="show-inactive-vendors">Show Inactive</Label>
-        </div>
-      </div>
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search vendors...',
+          filters: toolbarFilters,
+        }}
+      />
 
       <DataTable
         columns={columns}
@@ -359,6 +371,14 @@ export default function VendorsPage() {
             Add Vendor
           </Button>
         }
+        initialSorting={table.sort ?? undefined}
+        onSortingChange={table.setSort}
+        initialPage={table.page}
+        initialPageSize={table.pageSize}
+        onPaginationChange={(page, size) => {
+          table.setPage(page);
+          if (size !== table.pageSize) table.setPageSize(size);
+        }}
       />
 
       {/* Add / Edit Dialog */}

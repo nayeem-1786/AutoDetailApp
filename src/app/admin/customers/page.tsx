@@ -7,11 +7,11 @@ import type { Customer } from '@/lib/supabase/types';
 import { formatCurrency, formatPhone, formatRelativeDate, formatPoints } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { TableToolbar, type FilterConfig, type QuickFilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState, type FilterValue } from '@/lib/hooks/useTableState';
 import Link from 'next/link';
 import { Plus, Tag, X, Check, ChevronDown, Users } from 'lucide-react';
 import { CustomerStats } from './components/customer-stats';
@@ -19,11 +19,9 @@ import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { BulkAction } from '@/components/ui/data-table';
 
-type SortOption = 'name' | 'last_visit' | 'spend';
-type CustomerTypeFilter = 'all' | 'enthusiast' | 'professional' | 'unset';
-type VisitStatusFilter = 'all' | 'new' | 'returning' | 'loyal' | 'inactive';
-type ActivityFilter = 'all' | 'open_quotes' | 'pending_appointments';
-type ArchivedFilter = boolean;
+// ---------------------------------------------------------------------------
+// Sub-components (BulkTagDialog + TagFilterDropdown — unchanged)
+// ---------------------------------------------------------------------------
 
 function BulkTagDialog({
   open,
@@ -42,14 +40,12 @@ function BulkTagDialog({
   const [applying, setApplying] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Filter suggestions based on input
   const suggestions = useMemo(() => {
     if (!tagInput.trim()) return allTags;
     const q = tagInput.toLowerCase();
     return allTags.filter((t) => t.toLowerCase().includes(q));
   }, [allTags, tagInput]);
 
-  // Show "create new" option when typing a tag that doesn't exist
   const showCreateOption =
     mode === 'add' &&
     tagInput.trim() &&
@@ -86,7 +82,6 @@ function BulkTagDialog({
               : 'Choose a tag to remove from selected customers.'}
           </p>
         </div>
-
         <div className="p-4">
           <input
             ref={inputRef}
@@ -103,7 +98,6 @@ function BulkTagDialog({
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
             disabled={applying}
           />
-
           <div className="mt-2 max-h-48 overflow-y-auto">
             {showCreateOption && (
               <button
@@ -112,9 +106,7 @@ function BulkTagDialog({
                 className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
                 <Plus className="h-4 w-4 text-green-600" />
-                <span>
-                  Create &quot;{tagInput.trim()}&quot;
-                </span>
+                <span>Create &quot;{tagInput.trim()}&quot;</span>
               </button>
             )}
             {suggestions.map((tag) => (
@@ -135,7 +127,6 @@ function BulkTagDialog({
             )}
           </div>
         </div>
-
         <div className="flex justify-end gap-2 border-t border-gray-100 p-4">
           <button
             onClick={onClose}
@@ -165,7 +156,6 @@ function TagFilterDropdown({
   const [tagSearch, setTagSearch] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     function handleClick(e: MouseEvent) {
@@ -186,7 +176,6 @@ function TagFilterDropdown({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {/* Dropdown trigger — always first */}
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => { setOpen(!open); setTagSearch(''); }}
@@ -196,10 +185,8 @@ function TagFilterDropdown({
           Filter by tag
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
-
         {open && (
           <div className="absolute left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
-            {/* Search input */}
             <div className="border-b border-gray-100 p-2">
               <input
                 autoFocus
@@ -210,8 +197,6 @@ function TagFilterDropdown({
                 className="w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
               />
             </div>
-
-            {/* Tag list */}
             <div className="max-h-48 overflow-y-auto p-1">
               {filteredTags.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-gray-400">No tags found</div>
@@ -226,9 +211,7 @@ function TagFilterDropdown({
                     >
                       <span
                         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                          isSelected
-                            ? 'border-gray-900 bg-gray-900 text-white'
-                            : 'border-gray-300'
+                          isSelected ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300'
                         }`}
                       >
                         {isSelected && <Check className="h-3 w-3" />}
@@ -242,35 +225,40 @@ function TagFilterDropdown({
           </div>
         )}
       </div>
-
-      {/* Selected tag chips */}
       {selectedTags.map((tag) => (
         <span
           key={tag}
           className="inline-flex items-center gap-1 rounded-full bg-gray-900 py-0.5 pl-2.5 pr-1 text-xs font-medium text-white"
         >
           {tag}
-          <button
-            onClick={() => onToggleTag(tag)}
-            className="rounded-full p-0.5 hover:bg-gray-700"
-          >
+          <button onClick={() => onToggleTag(tag)} className="rounded-full p-0.5 hover:bg-gray-700">
             <X className="h-3 w-3" />
           </button>
         </span>
       ))}
-
-      {/* Clear all — always last */}
       {selectedTags.length > 0 && (
-        <button
-          onClick={onClearAll}
-          className="text-xs font-medium text-gray-500 hover:text-gray-700"
-        >
+        <button onClick={onClearAll} className="text-xs font-medium text-gray-500 hover:text-gray-700">
           Clear all
         </button>
       )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Default filter values
+// ---------------------------------------------------------------------------
+
+const DEFAULT_FILTERS = {
+  customerType: 'all' as string,
+  visitStatus: 'all' as string,
+  activity: 'all' as string,
+  showArchived: false,
+};
+
+// ---------------------------------------------------------------------------
+// Main page component
+// ---------------------------------------------------------------------------
 
 export default function CustomersPage() {
   const router = useRouter();
@@ -280,15 +268,12 @@ export default function CustomersPage() {
   const { granted: canEditCustomer } = usePermission('customers.edit');
   const { granted: canMergeCustomers } = usePermission('customers.merge');
 
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS });
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('name');
+  // Tag filters managed locally — AND-logic multi-select doesn't fit toolbar's select type
   const [tagFilters, setTagFilters] = useState<string[]>([]);
-  const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilter>('all');
-  const [visitStatusFilter, setVisitStatusFilter] = useState<VisitStatusFilter>('all');
-  const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
-  const [showArchived, setShowArchived] = useState<ArchivedFilter>(false);
   const [openQuoteCustomerIds, setOpenQuoteCustomerIds] = useState<Set<string>>(new Set());
   const [pendingApptCustomerIds, setPendingApptCustomerIds] = useState<Set<string>>(new Set());
 
@@ -296,6 +281,12 @@ export default function CustomersPage() {
   const [bulkTagMode, setBulkTagMode] = useState<'add' | 'remove'>('add');
   const [bulkTagOpen, setBulkTagOpen] = useState(false);
   const [bulkTagTargets, setBulkTagTargets] = useState<Customer[]>([]);
+
+  // Convenience accessors
+  const customerTypeFilter = (table.filters.customerType as string) || 'all';
+  const visitStatusFilter = (table.filters.visitStatus as string) || 'all';
+  const activityFilter = (table.filters.activity as string) || 'all';
+  const showArchived = table.filters.showArchived === true;
 
   // Gather all unique tags from customers
   const allTags = useMemo(() => {
@@ -317,14 +308,10 @@ export default function CustomersPage() {
           : currentTags.filter((t) => t !== tag);
       return { id: c.id, tags: newTags };
     });
-
-    // Update each customer in Supabase
     const promises = updates.map(({ id, tags }) =>
       supabase.from('customers').update({ tags }).eq('id', id)
     );
     await Promise.all(promises);
-
-    // Update local state
     setCustomers((prev) =>
       prev.map((c) => {
         const upd = updates.find((u) => u.id === c.id);
@@ -366,39 +353,14 @@ export default function CustomersPage() {
       }
       const [custRes, quotesRes, apptsRes] = await Promise.all([
         custQuery,
-        // Open quotes: anything not yet accepted, converted, or expired
-        supabase
-          .from('quotes')
-          .select('customer_id')
-          .in('status', ['draft', 'sent', 'viewed'])
-          .not('customer_id', 'is', null),
-        // Upcoming appointments: today or future, any non-terminal status
-        supabase
-          .from('appointments')
-          .select('customer_id')
-          .gte('scheduled_date', todayStr)
-          .in('status', ['pending', 'confirmed'])
-          .not('customer_id', 'is', null),
+        supabase.from('quotes').select('customer_id').in('status', ['draft', 'sent', 'viewed']).not('customer_id', 'is', null),
+        supabase.from('appointments').select('customer_id').gte('scheduled_date', todayStr).in('status', ['pending', 'confirmed']).not('customer_id', 'is', null),
       ]);
 
-      if (custRes.error) {
-        console.error('Error loading customers:', custRes.error);
-      }
+      if (custRes.error) console.error('Error loading customers:', custRes.error);
       if (custRes.data) setCustomers(custRes.data);
-
-      if (quotesRes.error) {
-        console.error('Error loading quotes:', quotesRes.error);
-      }
-      if (quotesRes.data) {
-        setOpenQuoteCustomerIds(new Set(quotesRes.data.map((q: { customer_id: string }) => q.customer_id)));
-      }
-
-      if (apptsRes.error) {
-        console.error('Error loading appointments:', apptsRes.error);
-      }
-      if (apptsRes.data) {
-        setPendingApptCustomerIds(new Set(apptsRes.data.map((a: { customer_id: string }) => a.customer_id)));
-      }
+      if (quotesRes.data) setOpenQuoteCustomerIds(new Set(quotesRes.data.map((q: { customer_id: string }) => q.customer_id)));
+      if (apptsRes.data) setPendingApptCustomerIds(new Set(apptsRes.data.map((a: { customer_id: string }) => a.customer_id)));
 
       setLoading(false);
     }
@@ -411,16 +373,15 @@ export default function CustomersPage() {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
     let result = customers.filter((c) => {
-      // Text search
-      if (search) {
-        const q = search.toLowerCase();
+      // Text search (debounced)
+      if (table.debouncedSearch) {
+        const q = table.debouncedSearch.toLowerCase();
         const matchesName = `${c.first_name} ${c.last_name}`.toLowerCase().includes(q);
         const matchesPhone = c.phone?.includes(q) || formatPhone(c.phone || '').includes(q);
         const matchesEmail = c.email?.toLowerCase().includes(q);
         if (!matchesName && !matchesPhone && !matchesEmail) return false;
       }
 
-      // Customer type filter
       if (customerTypeFilter !== 'all') {
         if (customerTypeFilter === 'unset') {
           if (c.customer_type) return false;
@@ -429,32 +390,21 @@ export default function CustomersPage() {
         }
       }
 
-      // Visit status filter
       if (visitStatusFilter !== 'all') {
         switch (visitStatusFilter) {
-          case 'new':
-            if (c.visit_count !== 0) return false;
-            break;
-          case 'returning':
-            if (c.visit_count < 1 || c.visit_count > 5) return false;
-            break;
-          case 'loyal':
-            if (c.visit_count < 6) return false;
-            break;
-          case 'inactive':
-            if (!c.last_visit_date || c.last_visit_date > ninetyDaysAgo) return false;
-            break;
+          case 'new': if (c.visit_count !== 0) return false; break;
+          case 'returning': if (c.visit_count < 1 || c.visit_count > 5) return false; break;
+          case 'loyal': if (c.visit_count < 6) return false; break;
+          case 'inactive': if (!c.last_visit_date || c.last_visit_date > ninetyDaysAgo) return false; break;
         }
       }
 
-      // Activity filter
       if (activityFilter === 'open_quotes') {
         if (!openQuoteCustomerIds.has(c.id)) return false;
       } else if (activityFilter === 'pending_appointments') {
         if (!pendingApptCustomerIds.has(c.id)) return false;
       }
 
-      // Tag filter (AND logic)
       if (tagFilters.length > 0) {
         if (!c.tags || !Array.isArray(c.tags)) return false;
         if (!tagFilters.every((t) => c.tags!.includes(t))) return false;
@@ -463,24 +413,29 @@ export default function CustomersPage() {
       return true;
     });
 
-    // Sort
+    // Sort via useTableState sort or default to name
+    const sortCol = table.sort?.column || 'name';
+    const sortDir = table.sort?.direction || 'asc';
+    const multiplier = sortDir === 'desc' ? -1 : 1;
+
     result = [...result].sort((a, b) => {
-      if (sortBy === 'name') {
-        return `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+      if (sortCol === 'name' || sortCol === 'first_name') {
+        return multiplier * `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
       }
-      if (sortBy === 'last_visit') {
-        const dateA = a.last_visit_date || '';
-        const dateB = b.last_visit_date || '';
-        return dateB.localeCompare(dateA); // Most recent first
+      if (sortCol === 'last_visit' || sortCol === 'last_visit_date') {
+        return multiplier * ((a.last_visit_date || '').localeCompare(b.last_visit_date || ''));
       }
-      if (sortBy === 'spend') {
-        return b.lifetime_spend - a.lifetime_spend; // Highest first
+      if (sortCol === 'spend' || sortCol === 'lifetime_spend') {
+        return multiplier * (a.lifetime_spend - b.lifetime_spend);
+      }
+      if (sortCol === 'visit_count') {
+        return multiplier * (a.visit_count - b.visit_count);
       }
       return 0;
     });
 
     return result;
-  }, [customers, search, sortBy, tagFilters, customerTypeFilter, visitStatusFilter, activityFilter, openQuoteCustomerIds, pendingApptCustomerIds]);
+  }, [customers, table.debouncedSearch, table.sort, customerTypeFilter, visitStatusFilter, activityFilter, tagFilters, openQuoteCustomerIds, pendingApptCustomerIds]);
 
   interface CustomerStatsData {
     total: number;
@@ -500,10 +455,7 @@ export default function CustomersPage() {
     setStatsLoading(true);
     try {
       const res = await fetch('/api/admin/customers/stats');
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
+      if (res.ok) setStats(await res.json());
     } catch (err) {
       console.error('Error fetching customer stats:', err);
     } finally {
@@ -512,7 +464,7 @@ export default function CustomersPage() {
   }
 
   function handleAtRiskClick() {
-    setVisitStatusFilter(prev => prev === 'inactive' ? 'all' : 'inactive');
+    table.setFilter('visitStatus', visitStatusFilter === 'inactive' ? 'all' : 'inactive');
   }
 
   async function handleToggleCustomerType(id: string, current: Customer['customer_type']) {
@@ -526,8 +478,63 @@ export default function CustomersPage() {
   }
 
   function handleUncategorizedClick() {
-    setCustomerTypeFilter(prev => prev === 'unset' ? 'all' : 'unset');
+    table.setFilter('customerType', customerTypeFilter === 'unset' ? 'all' : 'unset');
   }
+
+  // Toolbar config
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'customerType',
+      label: 'Type',
+      type: 'select',
+      options: [
+        { label: 'All Types', value: 'all' },
+        { label: 'Enthusiast', value: 'enthusiast' },
+        { label: 'Professional', value: 'professional' },
+        { label: 'No Type Set', value: 'unset' },
+      ],
+    },
+    {
+      key: 'visitStatus',
+      label: 'Visits',
+      type: 'select',
+      options: [
+        { label: 'All Visits', value: 'all' },
+        { label: 'New (0 visits)', value: 'new' },
+        { label: 'Returning (1-5)', value: 'returning' },
+        { label: 'Loyal (6+)', value: 'loyal' },
+        { label: 'Inactive (90+ days)', value: 'inactive' },
+      ],
+    },
+    {
+      key: 'activity',
+      label: 'Activity',
+      type: 'select',
+      options: [
+        { label: 'All Activity', value: 'all' },
+        { label: 'Has Open Quotes', value: 'open_quotes' },
+        { label: 'Has Upcoming Appointments', value: 'pending_appointments' },
+      ],
+    },
+    {
+      key: 'showArchived',
+      label: 'Show Archived',
+      type: 'boolean-toggle',
+    },
+  ], []);
+
+  const toolbarChips: QuickFilterConfig[] = useMemo(() => [
+    {
+      label: 'New Customers',
+      filter: { visitStatus: 'new' } as Record<string, FilterValue>,
+      isActive: (f: Record<string, FilterValue>) => f.visitStatus === 'new',
+    },
+    {
+      label: 'Inactive 90+ Days',
+      filter: { visitStatus: 'inactive' } as Record<string, FilterValue>,
+      isActive: (f: Record<string, FilterValue>) => f.visitStatus === 'inactive',
+    },
+  ], []);
 
   const columns: ColumnDef<Customer, unknown>[] = [
     {
@@ -547,6 +554,7 @@ export default function CustomersPage() {
           )}
         </div>
       ),
+      enableSorting: false,
     },
     {
       id: 'name',
@@ -558,6 +566,7 @@ export default function CustomersPage() {
           {row.original.first_name} {row.original.last_name}
         </span>
       ),
+      enableSorting: false, // Sorting handled by useMemo above via useTableState
     },
     {
       id: 'type',
@@ -584,6 +593,7 @@ export default function CustomersPage() {
           </button>
         );
       },
+      enableSorting: false,
     },
     {
       accessorKey: 'email',
@@ -591,34 +601,28 @@ export default function CustomersPage() {
       cell: ({ row }) => (
         <span className="text-sm text-gray-600 truncate max-w-[180px] block">{row.original.email || '--'}</span>
       ),
+      enableSorting: false,
     },
     {
       accessorKey: 'visit_count',
       header: 'Visits',
       size: 70,
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-600">{row.original.visit_count}</span>
-      ),
+      cell: ({ row }) => <span className="text-sm text-gray-600">{row.original.visit_count}</span>,
     },
     {
       accessorKey: 'lifetime_spend',
       header: 'Lifetime Spend',
       size: 110,
       cell: ({ row }) => (
-        <span className="text-sm font-medium text-gray-900">
-          {formatCurrency(row.original.lifetime_spend)}
-        </span>
+        <span className="text-sm font-medium text-gray-900">{formatCurrency(row.original.lifetime_spend)}</span>
       ),
     },
     {
       accessorKey: 'loyalty_points_balance',
       header: 'Points',
       size: 70,
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-600">
-          {formatPoints(row.original.loyalty_points_balance)}
-        </span>
-      ),
+      cell: ({ row }) => <span className="text-sm text-gray-600">{formatPoints(row.original.loyalty_points_balance)}</span>,
+      enableSorting: false,
     },
     {
       id: 'last_visit',
@@ -633,6 +637,7 @@ export default function CustomersPage() {
           </span>
         );
       },
+      enableSorting: false,
     },
   ];
 
@@ -694,96 +699,29 @@ export default function CustomersPage() {
         loading={statsLoading}
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name, phone, or email..."
-          className="w-full sm:w-96"
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search by name, phone, or email...',
+          filters: toolbarFilters,
+          quickFilters: toolbarChips,
+        }}
+      />
+
+      {/* Tag filter — kept as inline JSX (AND-logic multi-select doesn't fit toolbar's select type) */}
+      {allTags.length > 0 && (
+        <TagFilterDropdown
+          allTags={allTags}
+          selectedTags={tagFilters}
+          onToggleTag={(tag) =>
+            setTagFilters((prev) =>
+              prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+            )
+          }
+          onClearAll={() => setTagFilters([])}
         />
-        <Select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as SortOption)}
-          className="w-full sm:w-44"
-        >
-          <option value="name">Sort by Name</option>
-          <option value="last_visit">Sort by Last Visit</option>
-          <option value="spend">Sort by Spend</option>
-        </Select>
-        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer ml-auto">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
-          />
-          Show archived
-        </label>
-      </div>
-
-      {/* Quick filters + tag filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Select
-          value={customerTypeFilter}
-          onChange={(e) => setCustomerTypeFilter(e.target.value as CustomerTypeFilter)}
-          className="w-auto text-sm"
-        >
-          <option value="all">All Types</option>
-          <option value="enthusiast">Enthusiast</option>
-          <option value="professional">Professional</option>
-          <option value="unset">No Type Set</option>
-        </Select>
-
-        <Select
-          value={visitStatusFilter}
-          onChange={(e) => setVisitStatusFilter(e.target.value as VisitStatusFilter)}
-          className="w-auto text-sm"
-        >
-          <option value="all">All Visits</option>
-          <option value="new">New (0 visits)</option>
-          <option value="returning">Returning (1-5)</option>
-          <option value="loyal">Loyal (6+)</option>
-          <option value="inactive">Inactive (90+ days)</option>
-        </Select>
-
-        <Select
-          value={activityFilter}
-          onChange={(e) => setActivityFilter(e.target.value as ActivityFilter)}
-          className="w-auto text-sm"
-        >
-          <option value="all">All Activity</option>
-          <option value="open_quotes">Has Open Quotes</option>
-          <option value="pending_appointments">Has Upcoming Appointments</option>
-        </Select>
-
-        {allTags.length > 0 && (
-          <TagFilterDropdown
-            allTags={allTags}
-            selectedTags={tagFilters}
-            onToggleTag={(tag) =>
-              setTagFilters((prev) =>
-                prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-              )
-            }
-            onClearAll={() => setTagFilters([])}
-          />
-        )}
-
-        {/* Reset all filters */}
-        {(customerTypeFilter !== 'all' || visitStatusFilter !== 'all' || activityFilter !== 'all' || tagFilters.length > 0) && (
-          <button
-            onClick={() => {
-              setCustomerTypeFilter('all');
-              setVisitStatusFilter('all');
-              setActivityFilter('all');
-              setTagFilters([]);
-            }}
-            className="text-xs font-medium text-red-500 hover:text-red-700"
-          >
-            Reset filters
-          </button>
-        )}
-      </div>
+      )}
 
       <DataTable
         columns={columns}
@@ -797,6 +735,14 @@ export default function CustomersPage() {
             Add Customer
           </Button>
         }
+        initialSorting={table.sort ?? undefined}
+        onSortingChange={table.setSort}
+        initialPage={table.page}
+        initialPageSize={table.pageSize}
+        onPaginationChange={(page, size) => {
+          table.setPage(page);
+          if (size !== table.pageSize) table.setPageSize(size);
+        }}
       />
 
       <BulkTagDialog

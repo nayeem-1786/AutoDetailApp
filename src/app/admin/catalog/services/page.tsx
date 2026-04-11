@@ -8,20 +8,25 @@ import type { Service, ServiceCategory, PricingModel, ServiceClassification } fr
 import { PRICING_MODEL_LABELS, CLASSIFICATION_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
 import { Plus, Check, X as XIcon, Wrench, ImageOff, ShieldAlert } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import type { ColumnDef } from '@tanstack/react-table';
 
 type ServiceWithCategory = Service & {
   service_categories: Pick<ServiceCategory, 'id' | 'name'> | null;
+};
+
+const DEFAULT_FILTERS = {
+  category: '',
+  classification: '',
+  pricingModel: '',
+  showInactive: false,
 };
 
 export default function ServicesPage() {
@@ -31,15 +36,18 @@ export default function ServicesPage() {
   const { granted: canViewServices, loading: loadingViewPerm } = usePermission('services.view');
   const { granted: canEditServices } = usePermission('services.edit');
 
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS });
+
   const [services, setServices] = useState<ServiceWithCategory[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
-  const [classificationFilter, setClassificationFilter] = useState('');
-  const [pricingModelFilter, setPricingModelFilter] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
+
+  // Convenience accessors for filter values
+  const categoryFilter = (table.filters.category as string) || '';
+  const classificationFilter = (table.filters.classification as string) || '';
+  const pricingModelFilter = (table.filters.pricingModel as string) || '';
+  const showInactive = table.filters.showInactive === true;
 
   useEffect(() => {
     async function load() {
@@ -117,9 +125,9 @@ export default function ServicesPage() {
     return services.filter((s) => {
       // Active/inactive filter
       if (!showInactive && !s.is_active) return false;
-      // Search filter
-      if (search) {
-        const q = search.toLowerCase();
+      // Search filter (use debounced value)
+      if (table.debouncedSearch) {
+        const q = table.debouncedSearch.toLowerCase();
         const matchesName = s.name.toLowerCase().includes(q);
         const matchesDesc = s.description?.toLowerCase().includes(q);
         if (!matchesName && !matchesDesc) return false;
@@ -129,7 +137,50 @@ export default function ServicesPage() {
       if (pricingModelFilter && s.pricing_model !== pricingModelFilter) return false;
       return true;
     });
-  }, [services, search, categoryFilter, classificationFilter, pricingModelFilter, showInactive]);
+  }, [services, table.debouncedSearch, categoryFilter, classificationFilter, pricingModelFilter, showInactive]);
+
+  // Toolbar filter configs
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'category',
+      label: 'Category',
+      type: 'select',
+      options: [
+        { label: 'All Categories', value: '' },
+        ...categories.map((c) => ({ label: c.name, value: c.id })),
+      ],
+    },
+    {
+      key: 'classification',
+      label: 'Classification',
+      type: 'select',
+      options: [
+        { label: 'All Classifications', value: '' },
+        { label: 'Primary', value: 'primary' },
+        { label: 'Add-On Only', value: 'addon_only' },
+        { label: 'Both', value: 'both' },
+      ],
+    },
+    {
+      key: 'pricingModel',
+      label: 'Pricing Model',
+      type: 'select',
+      options: [
+        { label: 'All Pricing Models', value: '' },
+        { label: 'Vehicle Size', value: 'vehicle_size' },
+        { label: 'Scope', value: 'scope' },
+        { label: 'Per Unit', value: 'per_unit' },
+        { label: 'Specialty', value: 'specialty' },
+        { label: 'Flat Rate', value: 'flat' },
+        { label: 'Custom Quote', value: 'custom' },
+      ],
+    },
+    {
+      key: 'showInactive',
+      label: 'Show Inactive',
+      type: 'boolean-toggle',
+    },
+  ], [categories]);
 
   function getClassificationBadge(classification: ServiceClassification) {
     const variants: Record<ServiceClassification, 'info' | 'warning' | 'success'> = {
@@ -179,22 +230,22 @@ export default function ServicesPage() {
     {
       id: 'category',
       header: 'Category',
+      accessorFn: (row) => row.service_categories?.name || '',
       cell: ({ row }) => row.original.service_categories?.name || '--',
-      enableSorting: false,
     },
     {
       id: 'classification',
       header: 'Classification',
       size: 120,
+      accessorFn: (row) => CLASSIFICATION_LABELS[row.classification],
       cell: ({ row }) => getClassificationBadge(row.original.classification),
-      enableSorting: false,
     },
     {
       id: 'pricing_model',
       header: 'Pricing',
       size: 100,
+      accessorFn: (row) => PRICING_MODEL_LABELS[row.pricing_model],
       cell: ({ row }) => getPricingModelBadge(row.original.pricing_model),
-      enableSorting: false,
     },
     {
       accessorKey: 'base_duration_minutes',
@@ -209,6 +260,14 @@ export default function ServicesPage() {
         }
         return `${mins}m`;
       },
+    },
+    {
+      accessorKey: 'display_order',
+      header: 'Order',
+      size: 64,
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-500">{row.original.display_order}</span>
+      ),
     },
     {
       id: 'mobile',
@@ -298,72 +357,18 @@ export default function ServicesPage() {
               <ImageOff className="h-4 w-4 flex-shrink-0" />
               <span>{missingCount} active {missingCount === 1 ? 'service' : 'services'} missing images. Services without images won&apos;t display well to customers.</span>
             </div>
-            <button
-              type="button"
-              className="ml-4 flex-shrink-0 font-medium text-amber-900 underline hover:text-amber-700"
-              onClick={() => {
-                setSearch('');
-                setCategoryFilter('');
-                setClassificationFilter('');
-                setPricingModelFilter('');
-                setShowInactive(false);
-              }}
-            >
-              Show all
-            </button>
           </div>
         );
       })()}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:flex-wrap">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search services..."
-          className="w-full sm:w-64"
-        />
-        <Select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="w-full sm:w-44"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </Select>
-        <Select
-          value={classificationFilter}
-          onChange={(e) => setClassificationFilter(e.target.value)}
-          className="w-full sm:w-44"
-        >
-          <option value="">All Classifications</option>
-          <option value="primary">Primary</option>
-          <option value="addon_only">Add-On Only</option>
-          <option value="both">Both</option>
-        </Select>
-        <Select
-          value={pricingModelFilter}
-          onChange={(e) => setPricingModelFilter(e.target.value)}
-          className="w-full sm:w-44"
-        >
-          <option value="">All Pricing Models</option>
-          <option value="vehicle_size">Vehicle Size</option>
-          <option value="scope">Scope</option>
-          <option value="per_unit">Per Unit</option>
-          <option value="specialty">Specialty</option>
-          <option value="flat">Flat Rate</option>
-          <option value="custom">Custom Quote</option>
-        </Select>
-        <div className="flex items-center gap-2 sm:ml-auto">
-          <Switch
-            id="show-inactive-services"
-            checked={showInactive}
-            onCheckedChange={setShowInactive}
-          />
-          <Label htmlFor="show-inactive-services">Show Inactive</Label>
-        </div>
-      </div>
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search services...',
+          filters: toolbarFilters,
+        }}
+      />
 
       <DataTable
         columns={columns}
@@ -378,6 +383,14 @@ export default function ServicesPage() {
             </Button>
           ) : undefined
         }
+        initialSorting={table.sort ?? undefined}
+        onSortingChange={table.setSort}
+        initialPage={table.page}
+        initialPageSize={table.pageSize}
+        onPaginationChange={(page, size) => {
+          table.setPage(page);
+          if (size !== table.pageSize) table.setPageSize(size);
+        }}
       />
     </div>
   );

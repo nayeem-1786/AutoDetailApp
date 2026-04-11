@@ -7,11 +7,11 @@ import { usePermission } from '@/lib/hooks/use-permission';
 import type { Employee } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
-import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
 import { Plus } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -22,18 +22,26 @@ interface RoleOption {
   is_system: boolean;
 }
 
+const DEFAULT_FILTERS = {
+  role: '',
+  status: 'active',
+};
+
 export default function StaffPage() {
   const router = useRouter();
   const supabase = createClient();
   const { granted: canManageUsers } = usePermission('settings.manage_users');
 
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS });
+
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [roleMap, setRoleMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('active');
+
+  // Convenience accessors for filter values
+  const roleFilter = (table.filters.role as string) || '';
+  const statusFilter = (table.filters.status as string) || '';
 
   useEffect(() => {
     async function load() {
@@ -67,8 +75,8 @@ export default function StaffPage() {
 
   const filtered = useMemo(() => {
     return employees.filter((e) => {
-      if (search) {
-        const q = search.toLowerCase();
+      if (table.debouncedSearch) {
+        const q = table.debouncedSearch.toLowerCase();
         const matchesName = `${e.first_name} ${e.last_name}`.toLowerCase().includes(q);
         const matchesEmail = e.email.toLowerCase().includes(q);
         if (!matchesName && !matchesEmail) return false;
@@ -77,7 +85,31 @@ export default function StaffPage() {
       if (statusFilter && e.status !== statusFilter) return false;
       return true;
     });
-  }, [employees, search, roleFilter, statusFilter]);
+  }, [employees, table.debouncedSearch, roleFilter, statusFilter]);
+
+  // Toolbar filter configs
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'role',
+      label: 'Role',
+      type: 'select',
+      options: [
+        { label: 'All Roles', value: '' },
+        ...roles.map((r) => ({ label: r.display_name, value: r.id })),
+      ],
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { label: 'All Statuses', value: '' },
+        { label: 'Active', value: 'active' },
+        { label: 'Inactive', value: 'inactive' },
+        { label: 'Terminated', value: 'terminated' },
+      ],
+    },
+  ], [roles]);
 
   const columns: ColumnDef<Employee, unknown>[] = [
     {
@@ -101,8 +133,9 @@ export default function StaffPage() {
       ),
     },
     {
-      accessorKey: 'role',
+      id: 'role',
       header: 'Role',
+      accessorFn: (row) => roleMap[row.role_id] || row.role,
       cell: ({ row }) => (
         <Badge variant="info">
           {roleMap[row.original.role_id] || row.original.role}
@@ -118,6 +151,7 @@ export default function StaffPage() {
         const label = status.charAt(0).toUpperCase() + status.slice(1);
         return <Badge variant={variant}>{label}</Badge>;
       },
+      enableSorting: false,
     },
     {
       accessorKey: 'bookable_for_appointments',
@@ -127,6 +161,7 @@ export default function StaffPage() {
           {row.original.bookable_for_appointments ? 'Yes' : 'No'}
         </span>
       ),
+      enableSorting: false,
     },
   ];
 
@@ -153,34 +188,14 @@ export default function StaffPage() {
         }
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name or email..."
-          className="w-full sm:w-64"
-        />
-        <Select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-          className="w-full sm:w-44"
-        >
-          <option value="">All Roles</option>
-          {roles.map((r) => (
-            <option key={r.id} value={r.id}>{r.display_name}</option>
-          ))}
-        </Select>
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full sm:w-40"
-        >
-          <option value="">All Statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="terminated">Terminated</option>
-        </Select>
-      </div>
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search staff by name or email...',
+          filters: toolbarFilters,
+        }}
+      />
 
       <DataTable
         columns={columns}
@@ -195,6 +210,14 @@ export default function StaffPage() {
             </Button>
           ) : undefined
         }
+        initialSorting={table.sort ?? undefined}
+        onSortingChange={table.setSort}
+        initialPage={table.page}
+        initialPageSize={table.pageSize}
+        onPaginationChange={(page, size) => {
+          table.setPage(page);
+          if (size !== table.pageSize) table.setPageSize(size);
+        }}
       />
     </div>
   );
