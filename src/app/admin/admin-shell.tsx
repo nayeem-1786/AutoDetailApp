@@ -57,6 +57,7 @@ import {
   Home,
   Layers,
   Award,
+  Loader2,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -164,6 +165,14 @@ function flattenNavItems(items: NavItem[]): NavItem[] {
 }
 
 // Global Search Dialog component
+interface SearchResult {
+  id: string;
+  label: string;
+  subtitle?: string;
+  href: string;
+  type: 'page' | 'customer' | 'product' | 'service';
+}
+
 function CommandPalette({
   open,
   onOpenChange,
@@ -176,21 +185,37 @@ function CommandPalette({
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [apiResults, setApiResults] = useState<SearchResult[]>([]);
+  const [apiLoading, setApiLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const allItems = flattenNavItems(navItems);
 
-  const filtered = query.trim()
+  // Page results — instant, client-side
+  const pageResults: SearchResult[] = (query.trim()
     ? allItems.filter((item) =>
         item.label.toLowerCase().includes(query.toLowerCase()) ||
         item.href.toLowerCase().includes(query.toLowerCase())
       )
-    : allItems;
+    : allItems
+  ).map((item) => ({
+    id: `page-${item.href}`,
+    label: item.label,
+    subtitle: item.href,
+    href: item.href,
+    type: 'page' as const,
+  }));
+
+  // Combine page + API results
+  const allResults: SearchResult[] = [...pageResults, ...apiResults];
 
   useEffect(() => {
     if (open) {
       setQuery('');
       setSelectedIndex(0);
+      setApiResults([]);
+      setApiLoading(false);
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
@@ -208,14 +233,92 @@ function CommandPalette({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, onOpenChange]);
 
+  // Debounced API search (300ms)
   useEffect(() => {
     setSelectedIndex(0);
+
+    if (!query.trim() || query.trim().length < 2) {
+      setApiResults([]);
+      setApiLoading(false);
+      return;
+    }
+
+    setApiLoading(true);
+    const timer = setTimeout(async () => {
+      // Abort previous in-flight requests
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const q = encodeURIComponent(query.trim());
+      const results: SearchResult[] = [];
+
+      try {
+        const [customersRes, productsRes, servicesRes] = await Promise.allSettled([
+          fetch(`/api/admin/customers/search?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
+          fetch(`/api/public/products/search?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
+          fetch(`/api/pos/services?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
+        ]);
+
+        if (customersRes.status === 'fulfilled' && customersRes.value.data) {
+          for (const c of customersRes.value.data.slice(0, 5)) {
+            results.push({
+              id: `customer-${c.id}`,
+              label: `${c.first_name} ${c.last_name}`.trim(),
+              subtitle: c.phone || c.email || undefined,
+              href: `/admin/customers/${c.id}`,
+              type: 'customer',
+            });
+          }
+        }
+
+        if (productsRes.status === 'fulfilled' && productsRes.value.data) {
+          for (const p of productsRes.value.data.slice(0, 5)) {
+            results.push({
+              id: `product-${p.id}`,
+              label: p.name,
+              subtitle: p.product_categories?.name || undefined,
+              href: `/admin/catalog/products/${p.id}`,
+              type: 'product',
+            });
+          }
+        }
+
+        if (servicesRes.status === 'fulfilled' && Array.isArray(servicesRes.value)) {
+          const svcQuery = query.trim().toLowerCase();
+          const matched = servicesRes.value
+            .filter((s: { name: string }) => s.name.toLowerCase().includes(svcQuery))
+            .slice(0, 5);
+          for (const s of matched) {
+            results.push({
+              id: `service-${s.id}`,
+              label: s.name,
+              subtitle: s.pricing_model || undefined,
+              href: `/admin/catalog/services/${s.id}`,
+              type: 'service',
+            });
+          }
+        }
+      } catch {
+        // Aborted or network error — ignore
+      }
+
+      if (!controller.signal.aborted) {
+        setApiResults(results);
+        setApiLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
   }, [query]);
 
-  const handleSelect = useCallback(
-    (item: NavItem) => {
+  const handleResultSelect = useCallback(
+    (result: SearchResult) => {
       onOpenChange(false);
-      router.push(item.href);
+      router.push(result.href);
     },
     [onOpenChange, router]
   );
@@ -223,13 +326,13 @@ function CommandPalette({
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+      setSelectedIndex((prev) => Math.min(prev + 1, allResults.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex((prev) => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && filtered[selectedIndex]) {
+    } else if (e.key === 'Enter' && allResults[selectedIndex]) {
       e.preventDefault();
-      handleSelect(filtered[selectedIndex]);
+      handleResultSelect(allResults[selectedIndex]);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onOpenChange(false);
@@ -237,6 +340,24 @@ function CommandPalette({
   }
 
   if (!open) return null;
+
+  // Group results by type for rendering
+  const grouped = {
+    page: allResults.filter((r) => r.type === 'page'),
+    customer: allResults.filter((r) => r.type === 'customer'),
+    product: allResults.filter((r) => r.type === 'product'),
+    service: allResults.filter((r) => r.type === 'service'),
+  };
+
+  const sectionConfig: { key: keyof typeof grouped; label: string; Icon: LucideIcon }[] = [
+    { key: 'page', label: 'Pages', Icon: LayoutDashboard },
+    { key: 'customer', label: 'Customers', Icon: Users },
+    { key: 'product', label: 'Products', Icon: Package },
+    { key: 'service', label: 'Services', Icon: Wrench },
+  ];
+
+  let globalIndex = -1;
+  const hasAnyResults = allResults.length > 0;
 
   return (
     <div
@@ -256,9 +377,10 @@ function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search pages..."
+            placeholder="Search pages, customers, products..."
             className="h-12 w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
+          {apiLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-gray-400" />}
           <button
             type="button"
             onClick={() => onOpenChange(false)}
@@ -270,30 +392,47 @@ function CommandPalette({
         </div>
 
         {/* Results */}
-        <div className="max-h-72 overflow-y-auto p-2">
-          {filtered.length === 0 ? (
+        <div className="max-h-80 overflow-y-auto p-2">
+          {!hasAnyResults && !apiLoading ? (
             <div className="py-6 text-center text-sm text-gray-500">
               No results found.
             </div>
           ) : (
-            filtered.map((item, index) => {
-              const Icon = iconMap[item.icon] || LayoutDashboard;
+            sectionConfig.map(({ key, label, Icon: SectionIcon }) => {
+              const items = grouped[key];
+              if (items.length === 0) return null;
               return (
-                <button
-                  key={item.href}
-                  onClick={() => handleSelect(item)}
-                  onMouseEnter={() => setSelectedIndex(index)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
-                    index === selectedIndex
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:bg-gray-50'
+                <div key={key}>
+                  {query.trim().length >= 2 && (
+                    <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                      <SectionIcon className="h-3 w-3" />
+                      {label}
+                    </div>
                   )}
-                >
-                  <Icon className="h-4 w-4 shrink-0 text-gray-400" />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  <span className="text-xs text-gray-400">{item.href}</span>
-                </button>
+                  {items.map((result) => {
+                    globalIndex++;
+                    const idx = globalIndex;
+                    return (
+                      <button
+                        key={result.id}
+                        onClick={() => handleResultSelect(result)}
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors',
+                          idx === selectedIndex
+                            ? 'bg-gray-100 text-gray-900'
+                            : 'text-gray-600 hover:bg-gray-50'
+                        )}
+                      >
+                        <SectionIcon className="h-4 w-4 shrink-0 text-gray-400" />
+                        <span className="flex-1 text-left">{result.label}</span>
+                        {result.subtitle && (
+                          <span className="text-xs text-gray-400">{result.subtitle}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               );
             })
           )}

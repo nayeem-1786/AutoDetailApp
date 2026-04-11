@@ -320,7 +320,6 @@ export default function ProductsPage() {
     {
       label: 'Missing Images',
       filter: { showMissingImages: true } as Record<string, FilterValue>,
-      clearOthers: true,
       isActive: (f: Record<string, FilterValue>) => f.showMissingImages === true,
     },
   ], []);
@@ -591,18 +590,7 @@ export default function ProductsPage() {
             <button
               type="button"
               className="ml-4 flex-shrink-0 font-medium text-amber-900 underline hover:text-amber-700"
-              onClick={() => {
-                if (showMissingImages) {
-                  table.setFilter('showMissingImages', false);
-                } else {
-                  // Clear other filters and activate missing images view
-                  table.setFilters({
-                    ...DEFAULT_FILTERS,
-                    showMissingImages: true,
-                  });
-                  table.setSearch('');
-                }
-              }}
+              onClick={() => table.setFilter('showMissingImages', !showMissingImages)}
             >
               {showMissingImages ? 'Clear filter' : 'Show all'}
             </button>
