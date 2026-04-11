@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
         image_url,
         retail_price,
         sale_price,
-        sale_start,
-        sale_end,
+        sale_starts_at,
+        sale_ends_at,
         product_categories!inner(id, name, slug)
       `)
       .eq('is_active', true)
@@ -65,8 +65,8 @@ export async function GET(request: NextRequest) {
           image_url,
           retail_price,
           sale_price,
-          sale_start,
-          sale_end,
+          sale_starts_at,
+          sale_ends_at,
           product_categories!inner(id, name, slug)
         `)
         .eq('is_active', true)
@@ -86,8 +86,8 @@ export async function GET(request: NextRequest) {
       let effectivePrice = p.retail_price;
       if (p.sale_price != null) {
         const now = new Date();
-        const saleStartOk = !p.sale_start || new Date(p.sale_start) <= now;
-        const saleEndOk = !p.sale_end || new Date(p.sale_end) >= now;
+        const saleStartOk = !p.sale_starts_at || new Date(p.sale_starts_at) <= now;
+        const saleEndOk = !p.sale_ends_at || new Date(p.sale_ends_at) >= now;
         if (saleStartOk && saleEndOk) {
           effectivePrice = p.sale_price;
         }
