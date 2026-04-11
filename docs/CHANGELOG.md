@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: CommandPalette close handler + escape + X button — 2026-04-10
+
+- Merged backdrop and positioning divs into single overlay with `onClick` — fixes clicks outside modal not closing the palette
+- Added global `keydown` listener for Escape (works regardless of focus — previously only worked when input was focused)
+- Added X close button replacing the ESC keyboard hint
+
+---
+
+## feat: Global search expanded to customers, products, services — 2026-04-10
+
+- CommandPalette now searches customers (name/phone/email), products (name), and services (name) via debounced API calls (300ms). Results grouped by type with section headers (Pages, Customers, Products, Services).
+- Nav page results still filter instantly (client-side) while API results load asynchronously.
+- Loading spinner shown in search bar during API calls. Only fires for queries >= 2 characters.
+- Clicking a result navigates to the detail page (`/admin/customers/[id]`, `/admin/catalog/products/[id]`, `/admin/catalog/services/[id]`).
+- Missing Images chip: removed `clearOthers`, now preserves other filter selections when toggled. Alert banner simplified to match.
+- Files: `admin-shell.tsx`, `products/page.tsx`
+
+---
+
 ## fix: Toolbar chip toggle states + remove duplicate active filter + preserve dropdown selections — 2026-04-10
 
 - Removed redundant "Active Only" quick filter chip — "Show Inactive" toggle already handles this
