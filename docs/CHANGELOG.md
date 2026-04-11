@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Scrollable global search results + view all links — 2026-04-10
+
+- Results container changed from `max-h-80` (320px) to `max-h-[60vh]` for proper scrolling with many results across 10 sections.
+- "View all matching [type]..." link appears at bottom of each section when it returns 5 results (the per-section limit). Links navigate to the appropriate admin list page with `?q=searchterm` appended. Pre-fill works on Products (uses `useTableState`); other pages navigate correctly but don't pre-fill search until they adopt `useTableState`.
+- File: `admin-shell.tsx`
+
+---
+
 ## feat: Unified global search across all admin data — 2026-04-10
 
 - **New API route** `GET /api/admin/global-search?q=` — single endpoint searches 9 tables in parallel: customers, products, services, transactions, quotes, appointments, conversations, orders, vehicles. Admin cookie auth. Smart prefix detection: `Q-` → quotes, `#` → receipts, phone patterns → customer/conversation phone.

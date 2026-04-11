@@ -173,17 +173,20 @@ interface SearchResult {
   type: string;
 }
 
-const SEARCH_SECTION_CONFIG: { type: string; label: string; icon: string }[] = [
+// "View all" hrefs append ?q= — only works on pages using useTableState (currently Products).
+// Other pages will navigate correctly but won't pre-fill search. They'll pick up ?q= as they
+// migrate to useTableState in future sessions.
+const SEARCH_SECTION_CONFIG: { type: string; label: string; icon: string; viewAllHref?: string }[] = [
   { type: 'page', label: 'Pages', icon: 'LayoutDashboard' },
-  { type: 'customer', label: 'Customers', icon: 'Users' },
-  { type: 'product', label: 'Products', icon: 'Package' },
-  { type: 'service', label: 'Services', icon: 'Wrench' },
-  { type: 'vehicle', label: 'Vehicles', icon: 'Truck' },
-  { type: 'transaction', label: 'Transactions', icon: 'ArrowRightLeft' },
-  { type: 'quote', label: 'Quotes', icon: 'FileText' },
-  { type: 'order', label: 'Orders', icon: 'ShoppingCart' },
-  { type: 'appointment', label: 'Appointments', icon: 'CalendarDays' },
-  { type: 'conversation', label: 'Conversations', icon: 'MessageSquare' },
+  { type: 'customer', label: 'Customers', icon: 'Users', viewAllHref: '/admin/customers' },
+  { type: 'product', label: 'Products', icon: 'Package', viewAllHref: '/admin/catalog/products' },
+  { type: 'service', label: 'Services', icon: 'Wrench', viewAllHref: '/admin/catalog/services' },
+  { type: 'vehicle', label: 'Vehicles', icon: 'Truck', viewAllHref: '/admin/customers' },
+  { type: 'transaction', label: 'Transactions', icon: 'ArrowRightLeft', viewAllHref: '/admin/transactions' },
+  { type: 'quote', label: 'Quotes', icon: 'FileText', viewAllHref: '/admin/quotes' },
+  { type: 'order', label: 'Orders', icon: 'ShoppingCart', viewAllHref: '/admin/orders' },
+  { type: 'appointment', label: 'Appointments', icon: 'CalendarDays', viewAllHref: '/admin/appointments' },
+  { type: 'conversation', label: 'Conversations', icon: 'MessageSquare', viewAllHref: '/admin/messaging' },
 ];
 
 function CommandPalette({
@@ -367,13 +370,13 @@ function CommandPalette({
         </div>
 
         {/* Results */}
-        <div className="max-h-80 overflow-y-auto p-2">
+        <div className="max-h-[60vh] overflow-y-auto p-2">
           {!hasAnyResults && !apiLoading ? (
             <div className="py-6 text-center text-sm text-gray-500">
               No results found.
             </div>
           ) : (
-            SEARCH_SECTION_CONFIG.map(({ type, label, icon }) => {
+            SEARCH_SECTION_CONFIG.map(({ type, label, icon, viewAllHref }) => {
               const items = grouped[type];
               if (!items || items.length === 0) return null;
               const SectionIcon = iconMap[icon] || LayoutDashboard;
@@ -408,6 +411,17 @@ function CommandPalette({
                       </button>
                     );
                   })}
+                  {items.length >= 5 && viewAllHref && (
+                    <button
+                      onClick={() => {
+                        onOpenChange(false);
+                        router.push(`${viewAllHref}?q=${encodeURIComponent(query.trim())}`);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 hover:text-blue-800 transition-colors"
+                    >
+                      <span className="ml-5">View all matching {label.toLowerCase()}...</span>
+                    </button>
+                  )}
                 </div>
               );
             })
