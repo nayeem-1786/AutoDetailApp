@@ -235,6 +235,7 @@ export async function POST(request: NextRequest) {
         customer_summary: customerSummary,
         time_of_day: getTimeOfDay(),
         current_date: currentDate,
+        upcoming_days: getUpcomingDays(),
       },
       conversation_config_override: {
         agent: {
@@ -249,6 +250,21 @@ export async function POST(request: NextRequest) {
     // Return new-caller fallback on any error — don't block the call
     return NextResponse.json(newCallerResponse(''), { status: 200 });
   }
+}
+
+function getUpcomingDays(): string {
+  const days: string[] = [];
+  const now = new Date();
+  for (let i = 0; i <= 14; i++) {
+    const d = new Date(now.getTime() + i * 86400000);
+    days.push(d.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'America/Los_Angeles',
+    }));
+  }
+  return days.join(', ');
 }
 
 function getTimeOfDay(): string {
@@ -280,6 +296,7 @@ function newCallerResponse(phone: string, businessName?: string, customMessage?:
       customer_summary: 'New caller. No account on file.',
       time_of_day: timeOfDay,
       current_date: currentDate,
+      upcoming_days: getUpcomingDays(),
     },
     conversation_config_override: {
       agent: {
