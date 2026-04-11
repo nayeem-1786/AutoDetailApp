@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
     const skipSignatureValidation = process.env.NODE_ENV === 'development';
 
     if (!skipSignatureValidation) {
-      console.log('[SMS_DELIVERY] Signature validation URL:', requestUrl);
       if (!validateTwilioSignature(requestUrl, params, twilioSignature)) {
         console.error('[SMS_DELIVERY] Invalid Twilio signature — rejecting webhook request');
         return NextResponse.json({ error: 'Invalid signature' }, { status: 403 });
