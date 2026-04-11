@@ -1,16 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { formatCurrency, formatRelativeDate } from '@/lib/utils/format';
 import { QUOTE_STATUS_LABELS, QUOTE_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { SearchInput } from '@/components/ui/search-input';
-import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { Plus, Eye, ExternalLink, Link2 } from 'lucide-react';
+import { useTableState } from '@/lib/hooks/useTableState';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { Plus, Eye, ExternalLink, Link2, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { PipelineStats } from './components/pipeline-stats';
 import { QuoteMetrics } from './components/quote-metrics';
@@ -43,45 +43,49 @@ type QuoteWithRelations = {
 
 const PAGE_SIZE = 20;
 
+const DEFAULT_FILTERS = {
+  status: 'all',
+  dateFrom: '',
+  dateTo: '',
+};
+
 // ---------------------------------------------------------------------------
 // Page Component
 // ---------------------------------------------------------------------------
 
 export default function QuotesPage() {
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS, defaultPageSize: PAGE_SIZE });
+
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [sentCounts, setSentCounts] = useState<Record<string, number>>({});
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [pipelineStats, setPipelineStats] = useState<Array<{ status: string; count: number; totalAmount: number }>>([]);
   const [metrics, setMetrics] = useState<{ averageValue: number; conversionRate: number; avgDaysToConvert: number; totalQuotes: number } | null>(null);
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Convenience filter accessors
+  const statusFilter = (table.filters.status as string) || 'all';
+  const dateFrom = (table.filters.dateFrom as string) || '';
+  const dateTo = (table.filters.dateTo as string) || '';
 
   // ---------- Fetch quotes ----------
 
   const fetchQuotes = useCallback(
-    async (
-      searchQuery: string,
-      status: string,
-      from: string,
-      to: string,
-      pageNum: number
-    ) => {
+    async () => {
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        params.set('page', String(pageNum + 1)); // API uses 1-based pages
+        params.set('page', String(table.page));
         params.set('limit', String(PAGE_SIZE));
-        if (status !== 'all') params.set('status', status);
-        if (searchQuery.trim()) params.set('search', searchQuery.trim());
-        if (from) params.set('date_from', from);
-        if (to) params.set('date_to', to);
+        if (statusFilter !== 'all') params.set('status', statusFilter);
+        if (table.debouncedSearch.trim()) params.set('search', table.debouncedSearch.trim());
+        if (dateFrom) params.set('date_from', dateFrom);
+        if (dateTo) params.set('date_to', dateTo);
+        if (table.sort) {
+          params.set('sort', table.sort.column);
+          params.set('dir', table.sort.direction);
+        }
 
         const res = await fetch(`/api/admin/quotes?${params.toString()}`, {
           credentials: 'include',
@@ -106,7 +110,7 @@ export default function QuotesPage() {
         setLoading(false);
       }
     },
-    []
+    [table.page, table.debouncedSearch, statusFilter, dateFrom, dateTo, table.sort]
   );
 
   // ---------- Fetch stats (once on mount) ----------
@@ -129,55 +133,60 @@ export default function QuotesPage() {
     loadStats();
   }, []);
 
-  // ---------- Initial load and page changes ----------
+  // ---------- Fetch on state changes ----------
 
   useEffect(() => {
-    fetchQuotes(search, statusFilter, dateFrom, dateTo, page);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+    fetchQuotes();
+  }, [fetchQuotes]);
 
-  // ---------- Debounced search ----------
-
-  useEffect(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setPage(0);
-      fetchQuotes(search, statusFilter, dateFrom, dateTo, 0);
-    }, 300);
-    return () => clearTimeout(debounceRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
-
-  // ---------- Immediate re-fetch on filter changes ----------
-
-  function handleStatusChange(value: string) {
-    setStatusFilter(value);
-    setPage(0);
-    fetchQuotes(search, value, dateFrom, dateTo, 0);
-  }
-
-  function handleDateFromChange(value: string) {
-    setDateFrom(value);
-    setPage(0);
-    fetchQuotes(search, statusFilter, value, dateTo, 0);
-  }
-
-  function handleDateToChange(value: string) {
-    setDateTo(value);
-    setPage(0);
-    fetchQuotes(search, statusFilter, dateFrom, value, 0);
-  }
+  // ---------- Pipeline status click ----------
 
   function handleStatusClick(status: string | null) {
-    const next = status ?? 'all';
-    setStatusFilter(next);
-    setPage(0);
-    fetchQuotes(search, next, dateFrom, dateTo, 0);
+    table.setFilter('status', status ?? 'all');
+    table.setPage(1);
   }
+
+  // ---------- Sort helpers ----------
+
+  function handleHeaderSort(column: string) {
+    if (table.sort?.column === column) {
+      if (table.sort.direction === 'asc') {
+        table.setSort({ column, direction: 'desc' });
+      } else {
+        table.setSort(null);
+      }
+    } else {
+      table.setSort({ column, direction: 'desc' });
+    }
+  }
+
+  function SortIndicator({ column }: { column: string }) {
+    if (table.sort?.column !== column) return <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />;
+    return table.sort.direction === 'asc'
+      ? <ChevronUp className="h-4 w-4 text-gray-700" />
+      : <ChevronDown className="h-4 w-4 text-gray-700" />;
+  }
+
+  // ---------- Toolbar config ----------
+
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { label: 'All Statuses', value: 'all' },
+        ...Object.entries(QUOTE_STATUS_LABELS).map(([value, label]) => ({
+          label,
+          value,
+        })),
+      ],
+    },
+  ], []);
 
   // ---------- Derived ----------
 
-  const startIndex = page * PAGE_SIZE;
+  const startIndex = (table.page - 1) * PAGE_SIZE;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
@@ -208,41 +217,34 @@ export default function QuotesPage() {
 
       {/* 4. Filters Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              onEnter={() => {
-                clearTimeout(debounceRef.current);
-                setPage(0);
-                fetchQuotes(search, statusFilter, dateFrom, dateTo, 0);
-              }}
-              placeholder="Search quote # or customer..."
-              className="w-full sm:w-80"
-            />
-            <Select
-              value={statusFilter}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="w-full sm:w-44"
-            >
-              <option value="all">All Statuses</option>
-              {Object.entries(QUOTE_STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
+        <CardContent className="p-4 space-y-3">
+          <TableToolbar
+            state={table}
+            defaultFilters={DEFAULT_FILTERS}
+            config={{
+              searchPlaceholder: 'Search quote # or customer...',
+              filters: toolbarFilters,
+            }}
+          />
+          {/* Date range inputs (not supported by toolbar — kept inline) */}
+          <div className="flex items-center gap-3">
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => handleDateFromChange(e.target.value)}
+              onChange={(e) => {
+                table.setFilter('dateFrom', e.target.value);
+                table.setPage(1);
+              }}
               className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
+            <span className="text-sm text-gray-400">to</span>
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => handleDateToChange(e.target.value)}
+              onChange={(e) => {
+                table.setFilter('dateTo', e.target.value);
+                table.setPage(1);
+              }}
               className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -278,13 +280,41 @@ export default function QuotesPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Quote #</th>
+                      <th
+                        className="px-4 py-3 cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('created_at')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Date <SortIndicator column="created_at" />
+                        </div>
+                      </th>
+                      <th
+                        className="px-4 py-3 cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('quote_number')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Quote # <SortIndicator column="quote_number" />
+                        </div>
+                      </th>
                       <th className="px-4 py-3">Customer</th>
                       <th className="px-4 py-3">Services</th>
                       <th className="px-4 py-3">Vehicle</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Total</th>
+                      <th
+                        className="px-4 py-3 cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('status')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Status <SortIndicator column="status" />
+                        </div>
+                      </th>
+                      <th
+                        className="px-4 py-3 text-right cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('total_amount')}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Total <SortIndicator column="total_amount" />
+                        </div>
+                      </th>
                       <th className="px-4 py-3">Days Open</th>
                       <th className="px-4 py-3 text-center">Sends</th>
                       <th className="px-4 py-3 w-28"></th>
@@ -311,22 +341,17 @@ export default function QuotesPage() {
                           onClick={() => setSelectedQuoteId(q.id)}
                           className="cursor-pointer transition-colors hover:bg-gray-50"
                         >
-                          {/* Date */}
                           <td
                             className="whitespace-nowrap px-4 py-3 text-gray-600"
                             title={new Date(q.created_at).toLocaleString()}
                           >
                             {formatRelativeDate(q.created_at)}
                           </td>
-
-                          {/* Quote # */}
                           <td className="whitespace-nowrap px-4 py-3">
                             <span className="text-sm font-mono text-blue-600 hover:text-blue-800 hover:underline">
                               {q.quote_number}
                             </span>
                           </td>
-
-                          {/* Customer */}
                           <td className="whitespace-nowrap px-4 py-3">
                             {customer ? (
                               <a
@@ -340,8 +365,6 @@ export default function QuotesPage() {
                               <span className="text-gray-400">Unknown</span>
                             )}
                           </td>
-
-                          {/* Services */}
                           <td
                             className="max-w-[200px] truncate px-4 py-3 text-gray-600"
                             title={itemNames.join(', ')}
@@ -355,35 +378,23 @@ export default function QuotesPage() {
                               <span className="text-gray-400">--</span>
                             )}
                           </td>
-
-                          {/* Vehicle */}
                           <td className="whitespace-nowrap px-4 py-3 text-gray-600">
                             {vehicle || <span className="text-gray-400">--</span>}
                           </td>
-
-                          {/* Status */}
                           <td className="whitespace-nowrap px-4 py-3">
                             <Badge variant={QUOTE_STATUS_BADGE_VARIANT[q.status] ?? 'default'}>
                               {QUOTE_STATUS_LABELS[q.status] ?? q.status}
                             </Badge>
                           </td>
-
-                          {/* Total */}
                           <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums text-gray-900">
                             {formatCurrency(q.total_amount)}
                           </td>
-
-                          {/* Days Open */}
                           <td className="whitespace-nowrap px-4 py-3 text-gray-500">
                             {daysOpen !== null ? `${daysOpen}d` : '--'}
                           </td>
-
-                          {/* Sends */}
                           <td className="whitespace-nowrap px-4 py-3 text-center text-gray-500">
                             {sentCounts[q.id] ?? 0}
                           </td>
-
-                          {/* Actions */}
                           <td className="whitespace-nowrap px-4 py-3">
                             <div className="flex items-center gap-1">
                               <button
@@ -436,22 +447,22 @@ export default function QuotesPage() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
                   <p className="text-sm text-gray-600">
-                    Page {page + 1} of {totalPages}
+                    Page {table.page} of {totalPages}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={page === 0}
-                      onClick={() => setPage((p) => p - 1)}
+                      disabled={table.page <= 1}
+                      onClick={() => table.setPage(table.page - 1)}
                     >
                       Previous
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={page + 1 >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
+                      disabled={table.page >= totalPages}
+                      onClick={() => table.setPage(table.page + 1)}
                     >
                       Next
                     </Button>
