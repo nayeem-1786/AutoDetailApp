@@ -9,6 +9,7 @@ import { APPOINTMENT } from '@/lib/utils/constants';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { categoryToCompatibilityKey } from '@/lib/utils/vehicle-categories';
 
 // ---------------------------------------------------------------------------
 // GET — Look up upcoming appointments by customer phone
@@ -335,7 +336,7 @@ export async function POST(request: NextRequest) {
     let t = perf.now();
     const { data: service } = await supabase
       .from('services')
-      .select('id, name, base_duration_minutes')
+      .select('id, name, base_duration_minutes, vehicle_compatibility')
       .eq('id', service_id!)
       .eq('is_active', true)
       .single();
@@ -423,6 +424,7 @@ export async function POST(request: NextRequest) {
 
     // Find or create vehicle — shared dedup by make + model + category
     let vehicleId: string | null = null;
+    let mismatchWarning: string | null = null;
     if (vehicle_make) {
       const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
       t = perf.now();
@@ -434,7 +436,18 @@ export async function POST(request: NextRequest) {
         color: sanitizeVehicleField(vehicle_color),
       });
       perf.mark('query:vehicles_findOrCreate', t);
-      if (vehicleResult) vehicleId = vehicleResult.id;
+      if (vehicleResult) {
+        vehicleId = vehicleResult.id;
+
+        // Soft compatibility check — warn staff but don't block voice agent
+        const compatKey = categoryToCompatibilityKey(vehicleResult.vehicle_category as 'automobile' | 'motorcycle' | 'rv' | 'boat' | 'aircraft');
+        const compatibility = Array.isArray(service.vehicle_compatibility) ? service.vehicle_compatibility as string[] : [];
+        if (compatibility.length > 0 && !compatibility.includes(compatKey)) {
+          const vehicleDesc = [vehicle_make, vehicle_model].filter(Boolean).join(' ');
+          console.warn(`[VoiceAgent] Vehicle/service mismatch: ${vehicleDesc} (${vehicleResult.vehicle_category}) booked for ${service.name}`);
+          mismatchWarning = `⚠️ Possible vehicle/service mismatch: [${vehicleDesc}] booked for [${service.name}]. Please verify.`;
+        }
+      }
     }
 
     // Create appointment
@@ -457,7 +470,7 @@ export async function POST(request: NextRequest) {
         tax_amount: 0,
         discount_amount: 0,
         total_amount: 0,
-        job_notes: notes || null,
+        job_notes: [mismatchWarning, notes].filter(Boolean).join('\n') || null,
       })
       .select(
         'id, scheduled_date, scheduled_start_time, scheduled_end_time, status, channel'

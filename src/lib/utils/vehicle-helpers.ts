@@ -48,6 +48,8 @@ export interface FindOrCreateVehicleParams {
 export interface FindOrCreateVehicleResult {
   id: string;
   created: boolean;
+  /** Resolved vehicle category (automobile, motorcycle, rv, boat, aircraft) */
+  vehicle_category: string;
 }
 
 /**
@@ -116,7 +118,7 @@ export async function findOrCreateVehicle(
         console.log(`[findOrCreateVehicle] Backfilled vehicle ${existing.id}:`, updates);
       }
 
-      return { id: existing.id, created: false };
+      return { id: existing.id, created: false, vehicle_category: resolvedCategory };
     }
 
     // Step 4: Insert new vehicle with full classification
@@ -142,7 +144,7 @@ export async function findOrCreateVehicle(
         console.log(`[findOrCreateVehicle] Constraint violation — re-querying for ${make} ${model}`);
         const { data: raceWinner } = await query.limit(1).maybeSingle();
         if (raceWinner) {
-          return { id: raceWinner.id, created: false };
+          return { id: raceWinner.id, created: false, vehicle_category: resolvedCategory };
         }
       }
       console.error('[findOrCreateVehicle] Insert failed:', insertErr.message);
@@ -152,7 +154,7 @@ export async function findOrCreateVehicle(
     if (!newVehicle) return null;
 
     console.log(`[findOrCreateVehicle] Created vehicle: ${year || ''} ${params.color || ''} ${make} ${model || ''} (${resolvedCategory}/${resolvedSizeClass || resolvedSpecialtyTier})`);
-    return { id: newVehicle.id, created: true };
+    return { id: newVehicle.id, created: true, vehicle_category: resolvedCategory };
   } catch (err) {
     console.error('[findOrCreateVehicle] Unexpected error:', err);
     return null;

@@ -14,6 +14,7 @@ import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { categoryToCompatibilityKey } from '@/lib/utils/vehicle-categories';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
@@ -235,7 +236,20 @@ export async function POST(request: NextRequest) {
         size_class: data.vehicle.size_class,
         specialty_tier: data.vehicle.specialty_tier,
       });
-      if (vehicleResult) vehicleId = vehicleResult.id;
+      if (vehicleResult) {
+        vehicleId = vehicleResult.id;
+
+        // Vehicle/service compatibility check
+        const compatKey = categoryToCompatibilityKey(vehicleResult.vehicle_category as 'automobile' | 'motorcycle' | 'rv' | 'boat' | 'aircraft');
+        const compatibility = Array.isArray(serviceRow.vehicle_compatibility) ? serviceRow.vehicle_compatibility as string[] : [];
+        if (compatibility.length > 0 && !compatibility.includes(compatKey)) {
+          const categoryLabel = vehicleResult.vehicle_category.charAt(0).toUpperCase() + vehicleResult.vehicle_category.slice(1);
+          return NextResponse.json(
+            { error: `This service is not available for ${categoryLabel} vehicles. Please select the appropriate service for your vehicle.` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     // 6. Calculate totals
