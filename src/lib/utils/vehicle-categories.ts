@@ -114,29 +114,81 @@ export function getSpecialtyTierLabel(category: VehicleCategory, tierKey: string
 // ---------------------------------------------------------------------------
 
 const MODEL_SIZE_HINTS: Record<string, string[]> = {
+  // 87 entries
   sedan: [
+    // Japanese
     'Accord', 'Civic', 'Camry', 'Corolla', 'Altima', 'Sentra', 'Elantra',
-    'Sonata', 'Model 3', 'Model S', 'A4', '3 Series', 'C-Class', 'Jetta',
-    'Mazda3', 'Impreza', 'Legacy', 'Malibu', 'Cruze', 'Focus', 'Fusion',
-    'Charger', '300', 'IS', 'ES', 'Prius', 'Mustang', 'Challenger', 'Camaro',
-    'Golf', 'Beetle', 'Forte', 'Rio', 'Versa', 'Fit', 'Insight', 'BRZ', '86',
-    'Miata', 'G70', 'TLX', 'ILX', 'A3', 'A5', 'S4', 'S5',
+    'Sonata', 'Maxima', 'Avalon', 'Prius', 'GR86', 'Supra', 'Miata',
+    'Mazda3', 'Impreza', 'Legacy', 'WRX', 'Forte', 'Rio', 'Versa', 'Fit',
+    'Insight', 'BRZ', '86', 'K5', 'Stinger', 'Ioniq 6',
+    // American
+    'Malibu', 'Cruze', 'Focus', 'Fusion', 'Charger', '300', 'Mustang',
+    'Challenger', 'Camaro', 'Lucid Air',
+    // German
+    'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'S4', 'S5', '3 Series', '5 Series',
+    '7 Series', '8 Series', 'C-Class', 'E-Class', 'S-Class', 'EQS', 'EQE',
+    'Jetta', 'Golf', 'Beetle', 'Passat', 'Arteon', 'Polestar 2',
+    // Luxury / Import
+    'IS', 'ES', 'LS', 'GS', 'LC 500', 'RC 350', 'RC F', 'Genesis G80', 'G90',
+    'TLX', 'ILX', 'Integra', 'Q50', 'Q60', 'CT4', 'CT5', 'G70',
+    'Model 3', 'Model S',
+    // European / Niche
+    'Giulia', 'Ghibli', 'Quattroporte', 'Jaguar XE', 'Jaguar XF',
+    'Mini Cooper', 'Fiat 500',
   ],
+  // 131 entries
   truck_suv_2row: [
-    'F-150', 'F150', 'Silverado', 'Sierra', 'Ram 1500', 'Ram1500', 'Tacoma',
-    'Tundra', 'Ranger', 'Colorado', 'Frontier', 'Gladiator', 'Ridgeline',
-    'RAV4', 'CR-V', 'CRV', 'Tucson', 'Santa Fe', 'Sportage', 'CX-5', 'CX5',
-    'Forester', 'Outback', 'Crosstrek', 'Cherokee', 'Grand Cherokee',
-    'Wrangler', 'Bronco', 'Escape', 'Explorer', 'Edge', 'Equinox', 'Blazer',
-    'Model X', 'Model Y', 'X3', 'X5', 'Q5', 'Q7', 'GLC', 'GLE', 'Tiguan',
-    'Atlas', 'Rogue', 'Pathfinder', 'Murano', 'Pilot', 'Passport', '4Runner',
-    'Sorento', 'CX-9', 'CX9',
+    // Full-size trucks
+    'F-150', 'F150', 'F-250', 'F250', 'F-350', 'F350',
+    'Silverado', 'Silverado 2500', 'Silverado 3500',
+    'Sierra', 'Sierra 2500', 'Sierra 3500',
+    'Ram 1500', 'Ram1500', 'Ram 2500', 'Ram2500', 'Ram 3500', 'Ram3500',
+    'Tundra', 'Tacoma', 'Ranger', 'Colorado', 'Frontier', 'Gladiator',
+    'Ridgeline', 'Maverick', 'Santa Cruz', 'Cybertruck',
+    // Compact / Subcompact SUV
+    'RAV4', 'CR-V', 'CRV', 'HR-V', 'HRV', 'Tucson', 'Santa Fe', 'Kona',
+    'Venue', 'Sportage', 'Seltos', 'Niro', 'CX-5', 'CX5',
+    'Forester', 'Outback', 'Crosstrek', 'Solterra',
+    'Kicks', 'Rogue', 'Ariya', 'Venza', 'bZ4X',
+    'Compass', 'Renegade', 'Bolt EUV',
+    // Mid-size SUV
+    'Cherokee', 'Grand Cherokee', 'Wrangler', 'Bronco',
+    'Escape', 'Explorer', 'Edge', 'Equinox', 'Blazer',
+    'Pilot', 'Passport', '4Runner', 'Pathfinder', 'Murano',
+    'Sorento', 'CX-9', 'CX9', 'Atlas', 'Tiguan',
+    // EV SUV / Crossover
+    'Model X', 'Model Y', 'Ioniq 5', 'EV6', 'ID.4', 'ID4',
+    'Mustang Mach-E', 'Mach-E', 'MachE', 'iX', 'Lyriq',
+    'R1T', 'R1S', 'Polestar 3', 'Lucid Gravity',
+    // German luxury SUV
+    'X1', 'X3', 'X4', 'X5', 'X6', 'Q3', 'Q4', 'Q5', 'Q7', 'e-tron',
+    'GLA', 'GLB', 'GLC', 'GLE', 'EQB',
+    // Japanese luxury SUV
+    'NX', 'RX', 'UX', 'RDX', 'MDX', 'QX50', 'QX55', 'QX60',
+    // American luxury SUV
+    'XT4', 'XT5', 'XT6', 'Corsair', 'Nautilus',
+    // European luxury SUV
+    'Cayenne', 'Macan', 'Stelvio', 'Levante',
+    'F-Pace', 'E-Pace', 'XC40', 'XC60', 'XC90',
+    'Defender', 'Range Rover Sport', 'Range Rover Velar', 'Discovery Sport',
+    // Korean luxury
+    'GV70', 'GV80',
   ],
+  // 37 entries
   suv_3row_van: [
-    'Sienna', 'Odyssey', 'Pacifica', 'Carnival', 'Grand Caravan', 'Suburban',
-    'Tahoe', 'Yukon', 'Expedition', 'Sequoia', 'Armada', 'Highlander',
-    'Palisade', 'Telluride', 'Ascent', 'Traverse', 'Transit', 'Sprinter',
-    'ProMaster', 'NV', 'Savana', 'Express',
+    // Full-size SUV
+    'Suburban', 'Tahoe', 'Yukon', 'Expedition', 'Sequoia', 'Armada',
+    'Highlander', 'Palisade', 'Telluride', 'Ascent', 'Traverse',
+    'Wagoneer', 'Grand Wagoneer', 'Land Cruiser',
+    // Luxury full-size SUV
+    'Escalade', 'Escalade ESV', 'Navigator', 'LX', 'QX80', 'GLS', 'X7',
+    // Vans
+    'Sienna', 'Odyssey', 'Pacifica', 'Carnival', 'Grand Caravan', 'Voyager',
+    // Commercial / Cargo vans
+    'Transit', 'Sprinter', 'ProMaster', 'NV', 'NV200', 'Metris',
+    'E-Transit', 'Savana', 'Express',
+    // EV 3-row
+    'EV9',
   ],
 };
 
@@ -146,6 +198,7 @@ const MODEL_SIZE_HINTS: Record<string, string[]> = {
 // Case-insensitive substring match against the model string.
 // ---------------------------------------------------------------------------
 
+// 123 keywords
 const MOTORCYCLE_MODEL_KEYWORDS = [
   // Harley-Davidson
   'sportster', 'softail', 'road king', 'road glide', 'street glide', 'fat boy', 'fat bob',
@@ -174,6 +227,16 @@ const MOTORCYCLE_MODEL_KEYWORDS = [
   // Triumph
   'street triple', 'speed triple', 'tiger', 'bonneville', 'thruxton', 'rocket',
   'trident',
+  // Royal Enfield
+  'interceptor', 'continental gt', 'himalayan', 'meteor', 'classic 350', 'hunter',
+  // Can-Am (3-wheelers, detailed as motorcycles)
+  'ryker', 'spyder',
+  // Electric motorcycles — Zero, Energica
+  'sr/f', 'fxe', 'fxs', 'dsr', 'ego', 'eva', 'experia',
+  // Aprilia
+  'tuono', 'rsv4', 'rs 660',
+  // MV Agusta
+  'f3', 'brutale', 'dragster',
   // Generic motorcycle terms
   'motorcycle', 'bike', 'motorbike',
 ];
