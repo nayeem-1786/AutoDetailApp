@@ -313,11 +313,6 @@ export default function ProductsPage() {
 
   const toolbarQuickFilters: QuickFilterConfig[] = useMemo(() => [
     {
-      label: 'Active Only',
-      filter: { showInactive: false } as Record<string, FilterValue>,
-      isActive: (f: Record<string, FilterValue>) => f.showInactive !== true,
-    },
-    {
       label: 'Out of Stock',
       filter: { stock: 'out-of-stock' } as Record<string, FilterValue>,
       isActive: (f: Record<string, FilterValue>) => f.stock === 'out-of-stock',

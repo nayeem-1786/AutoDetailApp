@@ -68,20 +68,23 @@ export function TableToolbar({ state, config, defaultFilters = {} }: TableToolba
   })();
 
   function handleQuickFilter(qf: QuickFilterConfig) {
-    if (qf.clearOthers) {
+    const isCurrentlyActive = qf.isActive(state.filters);
+
+    if (isCurrentlyActive) {
+      // Deactivate: revert ONLY this chip's filter keys to defaults, preserve all other filters
+      const reverted = { ...state.filters };
+      for (const key of Object.keys(qf.filter)) {
+        reverted[key] = defaultFilters[key] ?? '';
+      }
+      state.setFilters(reverted);
+    } else if (qf.clearOthers) {
+      // Activate with clearOthers: reset all filters to defaults, then apply this chip's values
       state.setFilters({ ...defaultFilters, ...qf.filter });
       state.setSearch('');
     } else {
-      // Toggle: if already active, revert to defaults for those keys
-      const isCurrentlyActive = qf.isActive(state.filters);
-      if (isCurrentlyActive) {
-        const reverted = { ...state.filters };
-        for (const key of Object.keys(qf.filter)) {
-          reverted[key] = defaultFilters[key] ?? '';
-        }
-        state.setFilters(reverted);
-      } else {
-        state.setFilters({ ...state.filters, ...qf.filter });
+      // Activate: merge this chip's filter values into existing filters (preserve dropdown selections)
+      for (const [key, value] of Object.entries(qf.filter)) {
+        state.setFilter(key, value);
       }
     }
   }

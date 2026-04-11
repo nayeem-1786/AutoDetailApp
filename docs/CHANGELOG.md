@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Toolbar chip toggle states + remove duplicate active filter + preserve dropdown selections — 2026-04-10
+
+- Removed redundant "Active Only" quick filter chip — "Show Inactive" toggle already handles this
+- Fixed chip toggle: all chips now properly deactivate on second click (was only working for "Out of Stock")
+- Fixed `clearOthers` chips ("Missing Images"): now checks `isActive` first so clicking again deactivates
+- Fixed non-clearOthers chips: now uses `setFilter()` per key instead of `setFilters()` replacement, preserving existing dropdown selections (category, vendor, stock)
+- Files: `table-toolbar.tsx`, `products/page.tsx`
+
+---
+
 ## feat: TableToolbar component + Products toolbar migration — 2026-04-10
 
 - **`TableToolbar`** (`src/components/admin/table-toolbar.tsx`): Configurable toolbar for admin list pages. Renders search input, filter dropdowns (select), boolean toggles (Switch + Label), quick filter chips (clickable badges with active state), and reset button. Reads/writes `useTableState` — no internal state.
