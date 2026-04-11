@@ -19,12 +19,19 @@ export async function GET(request: NextRequest) {
     const paymentStatus = url.searchParams.get('payment_status') || '';
     const fulfillmentStatus = url.searchParams.get('fulfillment_status') || '';
     const dateRange = url.searchParams.get('date_range') || '';
+    const sortColumn = url.searchParams.get('sort') || '';
+    const sortDir = url.searchParams.get('dir') || '';
+
+    // Determine sort — only allow known columns
+    const allowedSortCols = ['created_at', 'total', 'order_number'];
+    const effectiveSortCol = sortColumn && allowedSortCols.includes(sortColumn) ? sortColumn : 'created_at';
+    const effectiveSortAsc = sortDir === 'asc';
 
     // Build query
     let query = admin
       .from('orders')
       .select('*, order_items(id)', { count: 'exact' })
-      .order('created_at', { ascending: false });
+      .order(effectiveSortCol, { ascending: effectiveSortAsc });
 
     // Search: order number, name, email
     if (search) {

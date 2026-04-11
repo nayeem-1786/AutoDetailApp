@@ -11,15 +11,17 @@ import type {
   Employee,
 } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
-import { SearchInput } from '@/components/ui/search-input';
-import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { usePermission } from '@/lib/hooks/use-permission';
+import { useTableState } from '@/lib/hooks/useTableState';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import type { FilterValue } from '@/lib/hooks/useTableState';
 import { RevenueStats } from './components/revenue-stats';
 import { PaymentBreakdown } from './components/payment-breakdown';
 import { ReceiptDialog } from '@/components/admin/receipt-dialog';
+import { ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -105,6 +107,11 @@ function computeDateRange(preset: DatePreset): { from: string; to: string } {
 const PAGE_SIZE = 50;
 const DATE_PRESETS: DatePreset[] = ['today', 'yesterday', 'this_week', 'this_month', 'this_year', 'all'];
 
+const DEFAULT_FILTERS = {
+  status: 'all',
+  datePreset: 'this_month' as string,
+};
+
 export default function AdminTransactionsPage() {
   const supabase = createClient();
   const { granted: canExport } = usePermission('reports.export');
@@ -113,18 +120,18 @@ export default function AdminTransactionsPage() {
   const { granted: canViewEmployeeTips } = usePermission('reports.employee_tips');
   const { granted: canViewOwnTips } = usePermission('reports.own_tips');
 
+  const table = useTableState({ defaultFilters: DEFAULT_FILTERS, defaultPageSize: PAGE_SIZE });
+
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(0);
 
-  // Filters
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [activePreset, setActivePreset] = useState<DatePreset>('this_month');
-  const initialRange = useMemo(() => computeDateRange('this_month'), []);
-  const [dateFrom, setDateFrom] = useState(initialRange.from);
-  const [dateTo, setDateTo] = useState(initialRange.to);
+  // Convenience filter accessors
+  const statusFilter = (table.filters.status as string) || 'all';
+  const activePreset = (table.filters.datePreset as string) || 'this_month';
+
+  // Compute date range from the active preset
+  const dateRange = useMemo(() => computeDateRange(activePreset as DatePreset), [activePreset]);
 
   // Stats
   const [stats, setStats] = useState<{
@@ -145,8 +152,6 @@ export default function AdminTransactionsPage() {
 
   // Receipt dialog
   const [receiptTransactionId, setReceiptTransactionId] = useState<string | null>(null);
-
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // ---------- Stats fetching ----------
 
@@ -177,18 +182,27 @@ export default function AdminTransactionsPage() {
       status: string,
       from: string,
       to: string,
-      pageNum: number
+      pageNum: number,
+      sortCol?: string,
+      sortDir?: 'asc' | 'desc'
     ) => {
       setLoading(true);
       try {
         const offset = pageNum * PAGE_SIZE;
+
+        // Determine sort column — map UI column IDs to DB column names
+        const dbSortCol = sortCol === 'total_amount' ? 'total_amount'
+          : sortCol === 'receipt_number' ? 'receipt_number'
+          : 'transaction_date';
+        const ascending = sortDir === 'asc';
+
         let query = supabase
           .from('transactions')
           .select(
             '*, customer:customers(id, first_name, last_name, phone), employee:employees(id, first_name, last_name), items:transaction_items(id, item_name)',
             { count: 'exact' }
           )
-          .order('transaction_date', { ascending: false })
+          .order(dbSortCol, { ascending })
           .range(offset, offset + PAGE_SIZE - 1);
 
         // Status filter
@@ -209,17 +223,14 @@ export default function AdminTransactionsPage() {
           );
         }
 
-        // Search filter — PostgREST doesn't support .or() on related tables,
-        // so we search customers first, then filter transactions by matching IDs.
+        // Search filter
         if (searchQuery.trim()) {
           const term = searchQuery.trim();
           const digits = term.replace(/\D/g, '');
           const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
 
-          // Always try receipt number match
           const receiptPattern = `%${term}%`;
 
-          // Search customers separately to get matching IDs
           let customerQuery = supabase
             .from('customers')
             .select('id')
@@ -266,45 +277,73 @@ export default function AdminTransactionsPage() {
     [] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
-  // Initial load and page changes
+  // ---------- Fetch on state changes ----------
+
+  // Track whether initial load is done to avoid double-fetch
+  const didInitialFetch = useRef(false);
+
   useEffect(() => {
-    fetchTransactions(search, statusFilter, dateFrom, dateTo, page);
-    if (page === 0) {
-      fetchStats(statusFilter, dateFrom, dateTo);
+    didInitialFetch.current = true;
+    fetchTransactions(
+      table.debouncedSearch,
+      statusFilter,
+      dateRange.from,
+      dateRange.to,
+      table.page - 1,
+      table.sort?.column,
+      table.sort?.direction
+    );
+    // Also refresh stats when on page 1
+    if (table.page === 1) {
+      fetchStats(statusFilter, dateRange.from, dateRange.to);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [table.debouncedSearch, statusFilter, dateRange.from, dateRange.to, table.page, table.sort?.column, table.sort?.direction]);
 
-  // Debounced search
-  useEffect(() => {
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setPage(0);
-      fetchTransactions(search, statusFilter, dateFrom, dateTo, 0);
-    }, 400);
-    return () => clearTimeout(debounceRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search]);
-
-  // Immediate re-fetch on status or date change
-  function handleStatusChange(value: string) {
-    setStatusFilter(value);
-    setPage(0);
-    fetchTransactions(search, value, dateFrom, dateTo, 0);
-    fetchStats(value, dateFrom, dateTo);
-  }
-
+  // Handle preset click — fires via filter change, which triggers fetchTransactions via the effect above
   function handlePresetClick(preset: DatePreset) {
-    setActivePreset(preset);
-    const range = computeDateRange(preset);
-    setDateFrom(range.from);
-    setDateTo(range.to);
-    setPage(0);
-    fetchTransactions(search, statusFilter, range.from, range.to, 0);
-    fetchStats(statusFilter, range.from, range.to);
+    table.setFilter('datePreset', preset);
+    table.setPage(1);
   }
 
-  const startIndex = page * PAGE_SIZE;
+  // Toolbar filters
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: [
+        { label: 'All Statuses', value: 'all' },
+        { label: 'Completed', value: 'completed' },
+        { label: 'Voided', value: 'voided' },
+        { label: 'Refunded', value: 'refunded' },
+        { label: 'Partial Refund', value: 'partial_refund' },
+        { label: 'Open', value: 'open' },
+      ],
+    },
+  ], []);
+
+  // Sort helper for column headers
+  function handleHeaderSort(column: string) {
+    if (table.sort?.column === column) {
+      if (table.sort.direction === 'asc') {
+        table.setSort({ column, direction: 'desc' });
+      } else {
+        table.setSort(null); // clear sort
+      }
+    } else {
+      table.setSort({ column, direction: 'desc' });
+    }
+  }
+
+  function SortIndicator({ column }: { column: string }) {
+    if (table.sort?.column !== column) return <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />;
+    return table.sort.direction === 'asc'
+      ? <ChevronUp className="h-4 w-4 text-gray-700" />
+      : <ChevronDown className="h-4 w-4 text-gray-700" />;
+  }
+
+  const startIndex = (table.page - 1) * PAGE_SIZE;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
@@ -338,10 +377,9 @@ export default function AdminTransactionsPage() {
         />
       )}
 
-      {/* Filters row */}
+      {/* Date preset chips */}
       <Card>
         <CardContent className="p-4 space-y-4">
-          {/* Date preset chips */}
           <div className="flex flex-wrap gap-2">
             {DATE_PRESETS.map((preset) => (
               <button
@@ -359,26 +397,14 @@ export default function AdminTransactionsPage() {
           </div>
 
           {/* Search + Status filter */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              placeholder="Search receipt #, name, or phone..."
-              className="w-full sm:w-80"
-            />
-            <Select
-              value={statusFilter}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="w-full sm:w-44"
-            >
-              <option value="all">All Statuses</option>
-              <option value="completed">Completed</option>
-              <option value="voided">Voided</option>
-              <option value="refunded">Refunded</option>
-              <option value="partial_refund">Partial Refund</option>
-              <option value="open">Open</option>
-            </Select>
-          </div>
+          <TableToolbar
+            state={table}
+            defaultFilters={DEFAULT_FILTERS}
+            config={{
+              searchPlaceholder: 'Search receipt #, name, or phone...',
+              filters: toolbarFilters,
+            }}
+          />
         </CardContent>
       </Card>
 
@@ -412,14 +438,35 @@ export default function AdminTransactionsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                      <th className="px-3 py-3 w-[72px]">Date</th>
-                      <th className="px-3 py-3 w-[72px]">Receipt #</th>
+                      <th
+                        className="px-3 py-3 w-[72px] cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('transaction_date')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Date <SortIndicator column="transaction_date" />
+                        </div>
+                      </th>
+                      <th
+                        className="px-3 py-3 w-[72px] cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('receipt_number')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Receipt # <SortIndicator column="receipt_number" />
+                        </div>
+                      </th>
                       <th className="px-3 py-3 w-[144px]">Customer</th>
                       <th className="px-3 py-3">Services</th>
                       <th className="px-3 py-3 w-[100px]">Employee</th>
                       <th className="px-3 py-3 w-[70px]">Method</th>
                       <th className="px-3 py-3 w-[90px]">Status</th>
-                      <th className="px-3 py-3 w-[80px] text-right">Total</th>
+                      <th
+                        className="px-3 py-3 w-[80px] text-right cursor-pointer select-none"
+                        onClick={() => handleHeaderSort('total_amount')}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Total <SortIndicator column="total_amount" />
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -438,22 +485,22 @@ export default function AdminTransactionsPage() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
                   <p className="text-sm text-gray-600">
-                    Page {page + 1} of {totalPages}
+                    Page {table.page} of {totalPages}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={page === 0}
-                      onClick={() => setPage((p) => p - 1)}
+                      disabled={table.page <= 1}
+                      onClick={() => table.setPage(table.page - 1)}
                     >
                       Previous
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={page + 1 >= totalPages}
-                      onClick={() => setPage((p) => p + 1)}
+                      disabled={table.page >= totalPages}
+                      onClick={() => table.setPage(table.page + 1)}
                     >
                       Next
                     </Button>

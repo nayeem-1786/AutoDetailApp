@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
-import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
 import { Pagination } from '@/components/ui/pagination';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
 import {
   Dialog,
   DialogHeader,
@@ -37,6 +37,12 @@ const DATE_PRESETS = [
   { label: '7 Days', value: '7d' },
   { label: '30 Days', value: '30d' },
 ];
+
+const DEFAULT_FILTERS = {
+  entityType: '' as string,
+  action: '' as string,
+  datePreset: '' as string,
+};
 
 function formatPstDateTime(iso: string): string {
   return new Intl.DateTimeFormat('en-US', {
@@ -75,7 +81,6 @@ function timeAgo(iso: string): string {
 
 function getDateRange(preset: string): { from: string; to: string } | null {
   if (!preset) return null;
-  // Approximate PST by using America/Los_Angeles offset
   const now = new Date();
   const pstNow = new Date(
     now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' })
@@ -100,17 +105,16 @@ function getDateRange(preset: string): { from: string; to: string } | null {
 
 export default function AuditLogPage() {
   const { granted: canViewAuditLog, loading: permLoading } = usePermission('settings.audit_log');
+
+  const table = useTableState({
+    defaultFilters: DEFAULT_FILTERS,
+    defaultPageSize: PAGE_SIZE,
+  });
+
   const [entries, setEntries] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-
-  // Filters
-  const [search, setSearch] = useState('');
-  const [entityType, setEntityType] = useState('');
-  const [action, setAction] = useState('');
-  const [datePreset, setDatePreset] = useState('');
 
   // Detail dialog
   const [detailEntry, setDetailEntry] = useState<AuditLogEntry | null>(null);
@@ -118,24 +122,17 @@ export default function AuditLogPage() {
   // Export
   const [exporting, setExporting] = useState(false);
 
-  // Debounced search
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, entityType, action, datePreset]);
+  // Convenience
+  const entityType = (table.filters.entityType as string) || '';
+  const action = (table.filters.action as string) || '';
+  const datePreset = (table.filters.datePreset as string) || '';
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    params.set('page', String(page));
+    params.set('page', String(table.page));
     params.set('limit', String(PAGE_SIZE));
-    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (table.debouncedSearch) params.set('search', table.debouncedSearch);
     if (entityType) params.set('entity_type', entityType);
     if (action) params.set('action', action);
 
@@ -158,7 +155,7 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, entityType, action, datePreset]);
+  }, [table.page, table.debouncedSearch, entityType, action, datePreset]);
 
   useEffect(() => {
     fetchEntries();
@@ -168,7 +165,7 @@ export default function AuditLogPage() {
     setExporting(true);
     try {
       const params = new URLSearchParams();
-      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (table.debouncedSearch) params.set('search', table.debouncedSearch);
       if (entityType) params.set('entity_type', entityType);
       if (action) params.set('action', action);
 
@@ -196,6 +193,34 @@ export default function AuditLogPage() {
       setExporting(false);
     }
   }
+
+  // Toolbar config
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'entityType',
+      label: 'Type',
+      type: 'select',
+      options: [
+        { label: 'All Types', value: '' },
+        ...Object.entries(AUDIT_ENTITY_TYPE_LABELS).map(([key, label]) => ({ label, value: key })),
+      ],
+    },
+    {
+      key: 'action',
+      label: 'Action',
+      type: 'select',
+      options: [
+        { label: 'All Actions', value: '' },
+        ...Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => ({ label, value: key })),
+      ],
+    },
+    {
+      key: 'datePreset',
+      label: 'Date Range',
+      type: 'select',
+      options: DATE_PRESETS.map((p) => ({ label: p.label, value: p.value })),
+    },
+  ], []);
 
   if (permLoading) {
     return (
@@ -238,51 +263,14 @@ export default function AuditLogPage() {
         }
       />
 
-      {/* Filters */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          onEnter={() => setDebouncedSearch(search)}
-          placeholder="Search by name, email..."
-          className="w-full sm:w-64"
-        />
-        <Select
-          value={entityType}
-          onChange={(e) => setEntityType(e.target.value)}
-          className="w-full sm:w-40"
-        >
-          <option value="">All Types</option>
-          {Object.entries(AUDIT_ENTITY_TYPE_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={action}
-          onChange={(e) => setAction(e.target.value)}
-          className="w-full sm:w-40"
-        >
-          <option value="">All Actions</option>
-          {Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>
-              {label}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={datePreset}
-          onChange={(e) => setDatePreset(e.target.value)}
-          className="w-full sm:w-36"
-        >
-          {DATE_PRESETS.map((preset) => (
-            <option key={preset.value} value={preset.value}>
-              {preset.label}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search by name, email...',
+          filters: toolbarFilters,
+        }}
+      />
 
       {/* Table */}
       {loading ? (
@@ -366,9 +354,9 @@ export default function AuditLogPage() {
             </Table>
           </div>
           <Pagination
-            currentPage={page}
+            currentPage={table.page}
             totalPages={totalPages}
-            onPageChange={setPage}
+            onPageChange={table.setPage}
           />
         </>
       )}

@@ -507,6 +507,8 @@ interface ListQuotesAdminOptions {
   createdBy?: string | null;
   page?: number;
   limit?: number;
+  sortColumn?: string | null;
+  sortDirection?: 'asc' | 'desc' | null;
 }
 
 interface ListQuotesAdminResult {
@@ -528,14 +530,21 @@ export async function listQuotesAdmin(
     createdBy,
     page = 1,
     limit = 20,
+    sortColumn,
+    sortDirection,
   } = options;
   const offset = (page - 1) * limit;
+
+  // Determine sort — only allow known columns
+  const allowedSortCols = ['created_at', 'total_amount', 'quote_number', 'status'];
+  const effectiveSortCol = sortColumn && allowedSortCols.includes(sortColumn) ? sortColumn : 'created_at';
+  const effectiveSortAsc = sortDirection === 'asc';
 
   let query = supabase
     .from('quotes')
     .select(QUOTE_LIST_SELECT, { count: 'exact' })
     .is('deleted_at', null)
-    .order('created_at', { ascending: false })
+    .order(effectiveSortCol, { ascending: effectiveSortAsc })
     .range(offset, offset + limit - 1);
 
   if (status) {

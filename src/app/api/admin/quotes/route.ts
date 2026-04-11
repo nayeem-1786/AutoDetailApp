@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
       createdBy: searchParams.get('created_by'),
       page: parseInt(searchParams.get('page') || '1', 10),
       limit: parseInt(searchParams.get('limit') || '50', 10),
+      sortColumn: searchParams.get('sort'),
+      sortDirection: (searchParams.get('dir') as 'asc' | 'desc') || null,
     });
 
     // Fetch sent counts for the returned quotes

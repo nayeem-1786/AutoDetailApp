@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { PageHeader } from '@/components/ui/page-header';
-import { SearchInput } from '@/components/ui/search-input';
-import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { Pagination } from '@/components/ui/pagination';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
 import {
   ArrowUpDown,
   ArrowUp,
@@ -81,6 +81,13 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
+const DEFAULT_FILTERS = {
+  status: '' as string,
+  staff: '' as string,
+  dateFrom: '' as string,
+  dateTo: '' as string,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -124,37 +131,22 @@ function formatVehicle(
 export default function AdminJobsPage() {
   const router = useRouter();
 
+  const table = useTableState({
+    defaultFilters: DEFAULT_FILTERS,
+    defaultPageSize: 20,
+  });
+
   // Data
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<StaffOption[]>([]);
 
-  // Filters
-  const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState('');
-  const [staffFilter, setStaffFilter] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('created_at');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-
-  const limit = 20;
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-
-  // Debounce search
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(1);
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [search]);
+  // Convenience accessors
+  const statusFilter = (table.filters.status as string) || '';
+  const staffFilter = (table.filters.staff as string) || '';
+  const dateFrom = (table.filters.dateFrom as string) || '';
+  const dateTo = (table.filters.dateTo as string) || '';
 
   // Load staff for dropdown
   useEffect(() => {
@@ -170,19 +162,19 @@ export default function AdminJobsPage() {
     loadStaff();
   }, []);
 
-  // Load jobs
+  // Load jobs — server-side query driven by useTableState
   const fetchJobs = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('limit', String(limit));
+    params.set('page', String(table.page));
+    params.set('limit', String(table.pageSize));
     if (statusFilter) params.set('status', statusFilter);
     if (staffFilter) params.set('staff_id', staffFilter);
     if (dateFrom) params.set('date_from', dateFrom);
     if (dateTo) params.set('date_to', dateTo);
-    if (debouncedSearch && debouncedSearch.length >= 2) params.set('search', debouncedSearch);
-    params.set('sort_by', sortBy);
-    params.set('sort_dir', sortDir);
+    if (table.debouncedSearch && table.debouncedSearch.length >= 2) params.set('search', table.debouncedSearch);
+    params.set('sort_by', table.sort?.column || 'created_at');
+    params.set('sort_dir', table.sort?.direction || 'desc');
 
     try {
       const res = await adminFetch(`/api/admin/jobs?${params}`);
@@ -196,33 +188,50 @@ export default function AdminJobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, staffFilter, dateFrom, dateTo, debouncedSearch, sortBy, sortDir]);
+  }, [table.page, table.pageSize, statusFilter, staffFilter, dateFrom, dateTo, table.debouncedSearch, table.sort]);
 
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
 
-  // Sort handler
+  // Sort handler — updates useTableState
   const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    if (table.sort?.column === column) {
+      table.setSort({ column, direction: table.sort.direction === 'asc' ? 'desc' : 'asc' });
     } else {
-      setSortBy(column);
-      setSortDir('desc');
+      table.setSort({ column, direction: 'desc' });
     }
-    setPage(1);
   };
 
-  const totalPages = Math.ceil(total / limit);
+  const totalPages = Math.ceil(total / table.pageSize);
 
   const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-gray-400" />;
-    return sortDir === 'asc' ? (
+    if (table.sort?.column !== column) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-gray-400" />;
+    return table.sort.direction === 'asc' ? (
       <ArrowUp className="ml-1 inline h-3.5 w-3.5 text-gray-700" />
     ) : (
       <ArrowDown className="ml-1 inline h-3.5 w-3.5 text-gray-700" />
     );
   };
+
+  // Toolbar config
+  const toolbarFilters: FilterConfig[] = useMemo(() => [
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'select',
+      options: STATUS_OPTIONS.map((o) => ({ label: o.label, value: o.value })),
+    },
+    {
+      key: 'staff',
+      label: 'Staff',
+      type: 'select',
+      options: [
+        { label: 'All Staff', value: '' },
+        ...staff.map((s) => ({ label: `${s.first_name} ${s.last_name}`, value: s.id })),
+      ],
+    },
+  ], [staff]);
 
   return (
     <div className="space-y-6">
@@ -231,73 +240,32 @@ export default function AdminJobsPage() {
         description="All jobs and service visits"
       />
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3">
-        <SearchInput
-          value={search}
-          onChange={setSearch}
-          onEnter={() => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-            setDebouncedSearch(search);
-            setPage(1);
-          }}
-          placeholder="Search customer..."
-          className="w-64"
-        />
+      <TableToolbar
+        state={table}
+        defaultFilters={DEFAULT_FILTERS}
+        config={{
+          searchPlaceholder: 'Search customer...',
+          filters: toolbarFilters,
+        }}
+      />
 
-        <Select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(1);
-          }}
-          className="w-40"
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </Select>
-
-        <Select
-          value={staffFilter}
-          onChange={(e) => {
-            setStaffFilter(e.target.value);
-            setPage(1);
-          }}
-          className="w-40"
-        >
-          <option value="">All Staff</option>
-          {staff.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.first_name} {s.last_name}
-            </option>
-          ))}
-        </Select>
-
+      {/* Date range filters — kept inline (toolbar doesn't support date inputs) */}
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500">From</label>
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => {
-              setDateFrom(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => table.setFilter('dateFrom', e.target.value)}
             className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
           />
         </div>
-
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500">To</label>
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => {
-              setDateTo(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => table.setFilter('dateTo', e.target.value)}
             className="h-9 rounded-md border border-gray-300 bg-white px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
           />
         </div>
@@ -309,7 +277,7 @@ export default function AdminJobsPage() {
           'Loading...'
         ) : (
           <>
-            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, total)} of {total} jobs
+            Showing {(table.page - 1) * table.pageSize + 1}-{Math.min(table.page * table.pageSize, total)} of {total} jobs
           </>
         )}
       </div>
@@ -319,10 +287,7 @@ export default function AdminJobsPage() {
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b bg-gray-50 text-xs font-medium uppercase tracking-wider text-gray-500">
-              <th
-                className="cursor-pointer px-4 py-3 hover:text-gray-700"
-                onClick={() => handleSort('created_at')}
-              >
+              <th className="cursor-pointer px-4 py-3 hover:text-gray-700" onClick={() => handleSort('created_at')}>
                 Date <SortIcon column="created_at" />
               </th>
               <th className="px-4 py-3">Customer</th>
@@ -330,17 +295,11 @@ export default function AdminJobsPage() {
               <th className="px-4 py-3">Services</th>
               <th className="px-4 py-3 text-center">Add-ons</th>
               <th className="px-4 py-3 text-center">Photos</th>
-              <th
-                className="cursor-pointer px-4 py-3 hover:text-gray-700"
-                onClick={() => handleSort('timer_seconds')}
-              >
+              <th className="cursor-pointer px-4 py-3 hover:text-gray-700" onClick={() => handleSort('timer_seconds')}>
                 Duration <SortIcon column="timer_seconds" />
               </th>
               <th className="px-4 py-3">Staff</th>
-              <th
-                className="cursor-pointer px-4 py-3 hover:text-gray-700"
-                onClick={() => handleSort('status')}
-              >
+              <th className="cursor-pointer px-4 py-3 hover:text-gray-700" onClick={() => handleSort('status')}>
                 Status <SortIcon column="status" />
               </th>
             </tr>
@@ -443,7 +402,7 @@ export default function AdminJobsPage() {
         <p className="text-sm text-gray-500">
           {total > 0 && `${total} total job${total !== 1 ? 's' : ''}`}
         </p>
-        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        <Pagination currentPage={table.page} totalPages={totalPages} onPageChange={table.setPage} />
       </div>
     </div>
   );
