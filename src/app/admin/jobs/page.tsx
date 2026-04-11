@@ -290,8 +290,12 @@ export default function AdminJobsPage() {
               <th className="cursor-pointer px-4 py-3 hover:text-gray-700" onClick={() => handleSort('created_at')}>
                 Date <SortIcon column="created_at" />
               </th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Vehicle</th>
+              <th className="cursor-pointer px-4 py-3 hover:text-gray-700" onClick={() => handleSort('customer_id')}>
+                Customer <SortIcon column="customer_id" />
+              </th>
+              <th className="cursor-pointer px-4 py-3 hover:text-gray-700" onClick={() => handleSort('vehicle_id')}>
+                Vehicle <SortIcon column="vehicle_id" />
+              </th>
               <th className="px-4 py-3">Services</th>
               <th className="px-4 py-3 text-center">Add-ons</th>
               <th className="px-4 py-3 text-center">Photos</th>

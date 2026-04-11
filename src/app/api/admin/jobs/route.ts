@@ -107,6 +107,8 @@ export async function GET(request: NextRequest) {
     created_at: 'created_at',
     status: 'status',
     timer_seconds: 'timer_seconds',
+    customer_id: 'customer_id',
+    vehicle_id: 'vehicle_id',
   };
   const sortColumn = validSortColumns[sortBy] || 'created_at';
   query = query.order(sortColumn, { ascending: sortDir === 'asc' });

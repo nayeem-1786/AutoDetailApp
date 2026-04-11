@@ -27,11 +27,21 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')?.trim();
     const dateFrom = searchParams.get('date_from');
     const dateTo = searchParams.get('date_to');
+    const sortBy = searchParams.get('sort_by') || 'created_at';
+    const sortDir = searchParams.get('sort_dir') || 'desc';
+
+    const validSortColumns: Record<string, string> = {
+      created_at: 'created_at',
+      action: 'action',
+      entity_type: 'entity_type',
+      employee_name: 'employee_name',
+    };
+    const sortColumn = validSortColumns[sortBy] || 'created_at';
 
     let query = admin
       .from('audit_log')
       .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false });
+      .order(sortColumn, { ascending: sortDir === 'asc' });
 
     if (entityType) query = query.eq('entity_type', entityType);
     if (action) query = query.eq('action', action);

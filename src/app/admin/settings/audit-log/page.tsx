@@ -21,7 +21,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { ClipboardList, Download } from 'lucide-react';
+import { ClipboardList, Download, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   AUDIT_ACTION_LABELS,
   AUDIT_ENTITY_TYPE_LABELS,
@@ -135,6 +135,10 @@ export default function AuditLogPage() {
     if (table.debouncedSearch) params.set('search', table.debouncedSearch);
     if (entityType) params.set('entity_type', entityType);
     if (action) params.set('action', action);
+    if (table.sort) {
+      params.set('sort_by', table.sort.column);
+      params.set('sort_dir', table.sort.direction);
+    }
 
     const dateRange = getDateRange(datePreset);
     if (dateRange) {
@@ -155,7 +159,7 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false);
     }
-  }, [table.page, table.debouncedSearch, entityType, action, datePreset]);
+  }, [table.page, table.debouncedSearch, table.sort, entityType, action, datePreset]);
 
   useEffect(() => {
     fetchEntries();
@@ -192,6 +196,22 @@ export default function AuditLogPage() {
     } finally {
       setExporting(false);
     }
+  }
+
+  // Sort handler
+  function handleSort(column: string) {
+    if (table.sort?.column === column) {
+      table.setSort({ column, direction: table.sort.direction === 'asc' ? 'desc' : 'asc' });
+    } else {
+      table.setSort({ column, direction: 'desc' });
+    }
+  }
+
+  function SortIcon({ column }: { column: string }) {
+    if (table.sort?.column !== column) return <ArrowUpDown className="ml-1 inline h-3.5 w-3.5 text-ui-text-dim" />;
+    return table.sort.direction === 'asc'
+      ? <ChevronUp className="ml-1 inline h-3.5 w-3.5 text-ui-text" />
+      : <ChevronDown className="ml-1 inline h-3.5 w-3.5 text-ui-text" />;
   }
 
   // Toolbar config
@@ -293,10 +313,18 @@ export default function AuditLogPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead style={{ width: 130 }}>Time</TableHead>
-                  <TableHead style={{ width: 120 }}>User</TableHead>
-                  <TableHead style={{ width: 110 }}>Action</TableHead>
-                  <TableHead style={{ width: 110 }}>Type</TableHead>
+                  <TableHead style={{ width: 130 }} className="cursor-pointer select-none" onClick={() => handleSort('created_at')}>
+                    Time <SortIcon column="created_at" />
+                  </TableHead>
+                  <TableHead style={{ width: 120 }} className="cursor-pointer select-none" onClick={() => handleSort('employee_name')}>
+                    User <SortIcon column="employee_name" />
+                  </TableHead>
+                  <TableHead style={{ width: 110 }} className="cursor-pointer select-none" onClick={() => handleSort('action')}>
+                    Action <SortIcon column="action" />
+                  </TableHead>
+                  <TableHead style={{ width: 110 }} className="cursor-pointer select-none" onClick={() => handleSort('entity_type')}>
+                    Type <SortIcon column="entity_type" />
+                  </TableHead>
                   <TableHead style={{ width: 200 }}>Entity</TableHead>
                   <TableHead>Details</TableHead>
                 </TableRow>
