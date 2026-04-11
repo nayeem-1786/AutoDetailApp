@@ -266,7 +266,7 @@ export default function CampaignsListPage() {
   }
 
   const oneTimeContent = (
-    <>
+    <div className="space-y-6">
       <TableToolbar
         state={table}
         defaultFilters={DEFAULT_FILTERS}
@@ -307,7 +307,7 @@ export default function CampaignsListPage() {
         loading={deleting}
         onConfirm={handleDelete}
       />
-    </>
+    </div>
   );
 
   return (

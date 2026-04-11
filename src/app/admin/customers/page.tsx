@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { TableToolbar, type FilterConfig, type QuickFilterConfig } from '@/components/admin/table-toolbar';
-import { useTableState, type FilterValue } from '@/lib/hooks/useTableState';
+import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
+import { useTableState } from '@/lib/hooks/useTableState';
 import Link from 'next/link';
 import { Plus, Tag, X, Check, ChevronDown, Users } from 'lucide-react';
 import { CustomerStats } from './components/customer-stats';
@@ -413,29 +413,8 @@ export default function CustomersPage() {
       return true;
     });
 
-    // Sort via useTableState sort or default to name
-    const sortCol = table.sort?.column || 'name';
-    const sortDir = table.sort?.direction || 'asc';
-    const multiplier = sortDir === 'desc' ? -1 : 1;
-
-    result = [...result].sort((a, b) => {
-      if (sortCol === 'name' || sortCol === 'first_name') {
-        return multiplier * `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
-      }
-      if (sortCol === 'last_visit' || sortCol === 'last_visit_date') {
-        return multiplier * ((a.last_visit_date || '').localeCompare(b.last_visit_date || ''));
-      }
-      if (sortCol === 'spend' || sortCol === 'lifetime_spend') {
-        return multiplier * (a.lifetime_spend - b.lifetime_spend);
-      }
-      if (sortCol === 'visit_count') {
-        return multiplier * (a.visit_count - b.visit_count);
-      }
-      return 0;
-    });
-
     return result;
-  }, [customers, table.debouncedSearch, table.sort, customerTypeFilter, visitStatusFilter, activityFilter, tagFilters, openQuoteCustomerIds, pendingApptCustomerIds]);
+  }, [customers, table.debouncedSearch, customerTypeFilter, visitStatusFilter, activityFilter, tagFilters, openQuoteCustomerIds, pendingApptCustomerIds]);
 
   interface CustomerStatsData {
     total: number;
@@ -512,8 +491,8 @@ export default function CustomersPage() {
       type: 'select',
       options: [
         { label: 'All Activity', value: 'all' },
-        { label: 'Has Open Quotes', value: 'open_quotes' },
-        { label: 'Has Upcoming Appointments', value: 'pending_appointments' },
+        { label: 'Open Quotes', value: 'open_quotes' },
+        { label: 'Upcoming Appointments', value: 'pending_appointments' },
       ],
     },
     {
@@ -523,24 +502,14 @@ export default function CustomersPage() {
     },
   ], []);
 
-  const toolbarChips: QuickFilterConfig[] = useMemo(() => [
-    {
-      label: 'New Customers',
-      filter: { visitStatus: 'new' } as Record<string, FilterValue>,
-      isActive: (f: Record<string, FilterValue>) => f.visitStatus === 'new',
-    },
-    {
-      label: 'Inactive 90+ Days',
-      filter: { visitStatus: 'inactive' } as Record<string, FilterValue>,
-      isActive: (f: Record<string, FilterValue>) => f.visitStatus === 'inactive',
-    },
-  ], []);
+  // Quick filter chips removed — stat cards and dropdowns provide these filters directly
 
   const columns: ColumnDef<Customer, unknown>[] = [
     {
       id: 'phone',
       header: 'Phone',
       size: 140,
+      accessorFn: (row) => row.phone || '',
       cell: ({ row }) => (
         <div className="flex items-center gap-2">
           <button
@@ -554,24 +523,23 @@ export default function CustomersPage() {
           )}
         </div>
       ),
-      enableSorting: false,
     },
     {
       id: 'name',
       header: 'Name',
       size: 180,
-      accessorFn: (row) => `${row.first_name} ${row.last_name}`,
+      accessorFn: (row) => `${row.last_name} ${row.first_name}`,
       cell: ({ row }) => (
         <span className="text-sm text-gray-900">
           {row.original.first_name} {row.original.last_name}
         </span>
       ),
-      enableSorting: false, // Sorting handled by useMemo above via useTableState
     },
     {
       id: 'type',
       header: 'Type',
       size: 90,
+      accessorFn: (row) => row.customer_type || '',
       cell: ({ row }) => {
         const t = row.original.customer_type;
         return (
@@ -593,7 +561,6 @@ export default function CustomersPage() {
           </button>
         );
       },
-      enableSorting: false,
     },
     {
       accessorKey: 'email',
@@ -601,7 +568,6 @@ export default function CustomersPage() {
       cell: ({ row }) => (
         <span className="text-sm text-gray-600 truncate max-w-[180px] block">{row.original.email || '--'}</span>
       ),
-      enableSorting: false,
     },
     {
       accessorKey: 'visit_count',
@@ -622,12 +588,12 @@ export default function CustomersPage() {
       header: 'Points',
       size: 70,
       cell: ({ row }) => <span className="text-sm text-gray-600">{formatPoints(row.original.loyalty_points_balance)}</span>,
-      enableSorting: false,
     },
     {
       id: 'last_visit',
       header: 'Last Visit',
       size: 90,
+      accessorFn: (row) => row.last_visit_date || '',
       cell: ({ row }) => {
         const d = row.original.last_visit_date;
         if (!d) return <span className="text-sm text-gray-400">Never</span>;
@@ -637,7 +603,6 @@ export default function CustomersPage() {
           </span>
         );
       },
-      enableSorting: false,
     },
   ];
 
@@ -705,7 +670,6 @@ export default function CustomersPage() {
         config={{
           searchPlaceholder: 'Search by name, phone, or email...',
           filters: toolbarFilters,
-          quickFilters: toolbarChips,
         }}
       />
 

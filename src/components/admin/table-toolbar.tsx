@@ -36,6 +36,8 @@ export interface QuickFilterConfig {
 export interface TableToolbarConfig {
   searchPlaceholder?: string;
   searchEnabled?: boolean;
+  /** CSS class override for the search input container (default: "w-full sm:w-64") */
+  searchClassName?: string;
   filters?: FilterConfig[];
   quickFilters?: QuickFilterConfig[];
 }
@@ -55,6 +57,7 @@ export function TableToolbar({ state, config, defaultFilters = {} }: TableToolba
   const {
     searchPlaceholder = 'Search...',
     searchEnabled = true,
+    searchClassName = 'w-full sm:w-64',
     filters = [],
     quickFilters = [],
   } = config;
