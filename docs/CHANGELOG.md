@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Global search multi-word matching + description search — 2026-04-10
+
+- Multi-word queries now work across all searchable tables. "john smith" finds customer John Smith, "brush cone" finds "Cone Shape White Brush". DB fetches broadly with first word, client-side filter ensures ALL words match.
+- Applied to: customers (first_name + last_name + phone + email), products (name + sku + description), services (name + description), orders (order_number + first_name + last_name + email), vehicles (make + model + color + year).
+- Appointments: expanded filter to include service names — "john ceramic" finds John Smith's Ceramic Coating appointment.
+- Vehicles: added `color.ilike` to DB query so color matches in first-word search.
+- Products/services: `description` added to select + DB query for description search (not shown in results subtitle).
+- DB fetch limit: 50 for multi-word queries (narrowed to 15 client-side), 15 for single-word.
+- File: `global-search/route.ts`
+
+---
+
 ## redesign: Global search — clean Google-style UX with blurred backdrop — 2026-04-10
 
 - **Empty state**: Opens with search input only + "Type to search across all records" hint. No pre-populated nav pages.

@@ -11,10 +11,45 @@ interface SearchResultItem {
   type: string;
 }
 
+// ---------------------------------------------------------------------------
+// Multi-word filter: every word in the query must appear somewhere in the
+// concatenated field values. This handles out-of-order matches like
+// "brush cone" finding "Cone Shape White Brush".
+// ---------------------------------------------------------------------------
+
+function multiWordMatch(
+  items: Record<string, unknown>[],
+  query: string,
+  fields: string[],
+  limit: number
+): Record<string, unknown>[] {
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
+  if (words.length <= 1) return items.slice(0, limit);
+
+  return items.filter((item) => {
+    const text = fields.map((f) => String(item[f] ?? '')).join(' ').toLowerCase();
+    return words.every((word) => text.includes(word));
+  }).slice(0, limit);
+}
+
+/** Get the first word of a query for the broadest DB match */
+function firstWordPattern(q: string): string {
+  const first = q.split(/\s+/)[0] || q;
+  return `%${first}%`;
+}
+
+/** Check if query has multiple words */
+function isMultiWord(q: string): boolean {
+  return q.split(/\s+/).filter((w) => w.length > 0).length > 1;
+}
+
 /**
  * GET /api/admin/global-search?q=searchterm
  * Unified search across customers, products, services, transactions,
  * quotes, appointments, conversations, orders, and vehicles.
+ *
+ * Multi-word queries: DB fetches broadly with the first word, then
+ * client-side filters to ensure ALL words match across fields.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -43,17 +78,19 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const pattern = `%${q}%`;
-
     // Smart query detection: Q- prefix → quote number, # prefix → receipt number
     const isQuoteSearch = /^q-/i.test(q);
     const isReceiptSearch = q.startsWith('#');
     const cleanedQ = isReceiptSearch ? q.slice(1).trim() : q;
-    const cleanedPattern = `%${cleanedQ}%`;
 
     // Detect phone-like queries (digits with optional dashes/parens/spaces)
     const digits = q.replace(/\D/g, '');
     const isPhoneSearch = digits.length >= 4 && digits.length <= 11;
+
+    // For multi-word: use first word for DB query, filter all words client-side
+    const multi = isMultiWord(q);
+    const dbPattern = multi ? firstWordPattern(q) : `%${q}%`;
+    const broadLimit = multi ? 50 : 15;
 
     // Run all searches in parallel
     const [
@@ -67,34 +104,34 @@ export async function GET(request: NextRequest) {
         .or(
           isPhoneSearch
             ? `phone.ilike.%${digits}%`
-            : `first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern}`
+            : `first_name.ilike.${dbPattern},last_name.ilike.${dbPattern},email.ilike.${dbPattern},phone.ilike.${dbPattern}`
         )
         .order('last_name')
-        .limit(15),
+        .limit(broadLimit),
 
-      // 2. PRODUCTS — name, SKU, category name (via join)
+      // 2. PRODUCTS — name, SKU, description (description for multi-word filter only)
       admin.from('products')
-        .select('id, name, sku, product_categories(name)')
+        .select('id, name, sku, description, product_categories(name)')
         .eq('is_active', true)
-        .or(`name.ilike.${pattern},sku.ilike.${pattern}`)
+        .or(`name.ilike.${dbPattern},sku.ilike.${dbPattern},description.ilike.${dbPattern}`)
         .order('name')
-        .limit(15),
+        .limit(broadLimit),
 
-      // 3. SERVICES — name
+      // 3. SERVICES — name, description (description for multi-word filter only)
       admin.from('services')
-        .select('id, name, pricing_model')
+        .select('id, name, description, pricing_model')
         .eq('is_active', true)
-        .ilike('name', pattern)
+        .or(`name.ilike.${dbPattern},description.ilike.${dbPattern}`)
         .order('name')
-        .limit(15),
+        .limit(broadLimit),
 
       // 4. TRANSACTIONS — receipt number, customer name via join
       admin.from('transactions')
         .select('id, receipt_number, total_amount, status, transaction_date, customer:customers!customer_id(first_name, last_name)')
         .or(
           isReceiptSearch
-            ? `receipt_number.ilike.${cleanedPattern}`
-            : `receipt_number.ilike.${pattern}`
+            ? `receipt_number.ilike.%${cleanedQ}%`
+            : `receipt_number.ilike.${dbPattern}`
         )
         .order('transaction_date', { ascending: false })
         .limit(15),
@@ -103,12 +140,12 @@ export async function GET(request: NextRequest) {
       admin.from('quotes')
         .select('id, quote_number, total_amount, status, created_at, customer:customers!customer_id(first_name, last_name)')
         .is('deleted_at', null)
-        .ilike('quote_number', isQuoteSearch ? `%${cleanedQ}%` : pattern)
+        .ilike('quote_number', isQuoteSearch ? `%${cleanedQ}%` : dbPattern)
         .order('created_at', { ascending: false })
         .limit(15),
 
       // 6. APPOINTMENTS — customer name via join, service names via nested join
-      // Fetch extra rows because we filter by customer name client-side (Supabase can't .or() on joins)
+      // Always fetches 50, filters client-side (Supabase can't .or() on joins)
       admin.from('appointments')
         .select('id, scheduled_date, scheduled_start_time, status, customer:customers!customer_id(first_name, last_name), appointment_services(service:services!service_id(name))')
         .order('scheduled_date', { ascending: false })
@@ -120,23 +157,23 @@ export async function GET(request: NextRequest) {
         .or(
           isPhoneSearch
             ? `phone_number.ilike.%${digits}%`
-            : `phone_number.ilike.${pattern}`
+            : `phone_number.ilike.${dbPattern}`
         )
         .order('last_message_at', { ascending: false })
         .limit(15),
 
-      // 8. ORDERS — order number, customer name
+      // 8. ORDERS — order number, customer name, email
       admin.from('orders')
         .select('id, order_number, total, first_name, last_name, email, created_at')
-        .or(`order_number.ilike.${pattern},first_name.ilike.${pattern},last_name.ilike.${pattern},email.ilike.${pattern}`)
+        .or(`order_number.ilike.${dbPattern},first_name.ilike.${dbPattern},last_name.ilike.${dbPattern},email.ilike.${dbPattern}`)
         .order('created_at', { ascending: false })
-        .limit(15),
+        .limit(broadLimit),
 
-      // 9. VEHICLES — make, model, year + owning customer
+      // 9. VEHICLES — make, model, color + owning customer
       admin.from('vehicles')
         .select('id, year, make, model, color, customer_id, customer:customers!customer_id(id, first_name, last_name)')
-        .or(`make.ilike.${pattern},model.ilike.${pattern}`)
-        .limit(15),
+        .or(`make.ilike.${dbPattern},model.ilike.${dbPattern},color.ilike.${dbPattern}`)
+        .limit(broadLimit),
     ]);
 
     const results: Record<string, SearchResultItem[]> = {
@@ -151,9 +188,12 @@ export async function GET(request: NextRequest) {
       vehicles: [],
     };
 
-    // Format customers
+    // Format customers (multi-word: filter across first_name + last_name + phone + email)
     if (customersRes.status === 'fulfilled' && customersRes.value.data) {
-      for (const c of customersRes.value.data) {
+      const rows = multi
+        ? multiWordMatch(customersRes.value.data as Record<string, unknown>[], q, ['first_name', 'last_name', 'phone', 'email'], 15)
+        : customersRes.value.data;
+      for (const c of rows as typeof customersRes.value.data) {
         const phone = c.phone ? formatPhone(c.phone) : null;
         results.customers.push({
           id: c.id,
@@ -165,9 +205,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format products
+    // Format products (multi-word: filter across name + sku + description)
     if (productsRes.status === 'fulfilled' && productsRes.value.data) {
-      for (const p of productsRes.value.data) {
+      const rows = multi
+        ? multiWordMatch(productsRes.value.data as Record<string, unknown>[], q, ['name', 'sku', 'description'], 15)
+        : productsRes.value.data;
+      for (const p of rows as typeof productsRes.value.data) {
         const cat = (p.product_categories as unknown as { name: string } | null)?.name;
         results.products.push({
           id: p.id,
@@ -179,9 +222,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format services
+    // Format services (multi-word: filter across name + description)
     if (servicesRes.status === 'fulfilled' && servicesRes.value.data) {
-      for (const s of servicesRes.value.data) {
+      const rows = multi
+        ? multiWordMatch(servicesRes.value.data as Record<string, unknown>[], q, ['name', 'description'], 15)
+        : servicesRes.value.data;
+      for (const s of rows as typeof servicesRes.value.data) {
         results.services.push({
           id: s.id,
           label: s.name,
@@ -192,7 +238,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format transactions
+    // Format transactions (no multi-word — receipt_number is a single token)
     if (transactionsRes.status === 'fulfilled' && transactionsRes.value.data) {
       for (const t of transactionsRes.value.data) {
         const cust = t.customer as unknown as { first_name: string; last_name: string } | null;
@@ -208,7 +254,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format quotes
+    // Format quotes (no multi-word — quote_number is a single token)
     if (quotesRes.status === 'fulfilled' && quotesRes.value.data) {
       for (const qt of quotesRes.value.data) {
         const cust = qt.customer as unknown as { first_name: string; last_name: string } | null;
@@ -224,14 +270,18 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format appointments — filter by customer name client-side (Supabase can't .or() on related tables)
+    // Format appointments — multi-word filter across customer name + service names
     if (appointmentsRes.status === 'fulfilled' && appointmentsRes.value.data) {
-      const lowerQ = q.toLowerCase();
+      const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 0);
       const matched = appointmentsRes.value.data.filter((a) => {
         const cust = a.customer as unknown as { first_name: string; last_name: string } | null;
         if (!cust) return false;
-        const fullName = `${cust.first_name} ${cust.last_name}`.toLowerCase();
-        return fullName.includes(lowerQ);
+        const svcNames = (a.appointment_services as unknown as { service: { name: string } | null }[])
+          ?.map((as) => as.service?.name)
+          .filter(Boolean)
+          .join(' ') || '';
+        const searchText = `${cust.first_name} ${cust.last_name} ${svcNames}`.toLowerCase();
+        return words.every((word) => searchText.includes(word));
       }).slice(0, 15);
 
       for (const a of matched) {
@@ -257,7 +307,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format conversations
+    // Format conversations (keep as-is — phone-based search)
     if (conversationsRes.status === 'fulfilled' && conversationsRes.value.data) {
       for (const c of conversationsRes.value.data) {
         const cust = c.customer as unknown as { first_name: string; last_name: string } | null;
@@ -273,9 +323,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format orders
+    // Format orders (multi-word: filter across order_number + first_name + last_name + email)
     if (ordersRes.status === 'fulfilled' && ordersRes.value.data) {
-      for (const o of ordersRes.value.data) {
+      const rows = multi
+        ? multiWordMatch(ordersRes.value.data as Record<string, unknown>[], q, ['order_number', 'first_name', 'last_name', 'email'], 15)
+        : ordersRes.value.data;
+      for (const o of rows as typeof ordersRes.value.data) {
         const custName = `${o.first_name} ${o.last_name}`.trim();
         const amount = `$${(Number(o.total) / 100).toFixed(2)}`; // orders store in cents
         results.orders.push({
@@ -288,9 +341,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Format vehicles
+    // Format vehicles (multi-word: filter across make + model + color + year)
     if (vehiclesRes.status === 'fulfilled' && vehiclesRes.value.data) {
-      for (const v of vehiclesRes.value.data) {
+      const rows = multi
+        ? multiWordMatch(vehiclesRes.value.data as Record<string, unknown>[], q, ['make', 'model', 'color', 'year'], 15)
+        : vehiclesRes.value.data;
+      for (const v of rows as typeof vehiclesRes.value.data) {
         const cust = v.customer as unknown as { id: string; first_name: string; last_name: string } | null;
         const custName = cust ? `${cust.first_name} ${cust.last_name}`.trim() : '';
         const desc = [v.year, v.make, v.model].filter(Boolean).join(' ');
