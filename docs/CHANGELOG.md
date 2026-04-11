@@ -4,6 +4,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## [Session 24] — 2026-04-10
+
+### Features
+- **Universal Table Controls:** Built reusable useTableState hook (URL-synced search, filters, sort, pagination) + TableToolbar component (search input, filter dropdowns, boolean toggles, quick filter chips, reset button). DataTable enhanced with sort direction indicators (ChevronUp/ChevronDown), controlled pagination, and page size selector.
+- **10 admin pages migrated:** Products, Services, Staff, Vendors, Customers, Campaigns, Transactions, Quotes, Orders, Jobs, and Audit Log now use useTableState + TableToolbar with full URL state persistence.
+- **Global search redesigned:** Google-style clean UX with blurred backdrop. Unified search API across 9 tables (customers, products, services, transactions, quotes, appointments, conversations, vehicles, orders). Multi-word matching in any order, description search, smart prefix detection (Q- for quotes, # for receipts). 15 results per section, scrollable.
+- **Voice agent notify_staff escalation tool:** New API route + ElevenLabs tool. Sends SMS alerts to staff for appointment changes, custom quotes, beyond-scope questions, transfer requests, and mobile distance checks. Uses SMS template system with admin-editable format and multi-recipient support.
+- **Voice agent prompt rewrite:** 16 scenarios traced end-to-end. Added escalation paths with notify_staff, tool response behavior rules, mobile service area boundaries (South Bay cities), single goodbye fix. Removed end_call from sequence — finalize_call is the last action.
+- **Customizable voice agent greetings:** Returning + new caller greetings editable from Admin > Settings > Messaging with template variable chips.
+- **Staff notification SMS template:** Admin-editable template with variable chips (customer_name, customer_phone, reason_label, details). Recipient phones managed per-template.
+- **Website visibility indicator:** Service and product detail pages show green/amber badge with link to CMS Catalog page.
+
+### Fixes
+- **DNS cutover:** Apache proxy live for smartdetailsautospa.com, app.smartdetailsautospa.com, staging.smartdetailsautospa.com. All three proxy to port 5003.
+- **IP whitelist security:** Fixed missing X-Forwarded-For/X-Real-IP headers on app. and staging. proxy configs. iPhone Private Relay identified as IP mismatch cause.
+- **Twilio signature validation:** Permanent fix using TWILIO_WEBHOOK_URL env var instead of request.url. Added diagnostic logging.
+- **SMS AI agent working:** Twilio Console webhook URL updated to production domain.
+- **Business info consolidated:** BUSINESS_DEFAULTS constant, cache revalidation on profile save, 20 files updated to remove hardcoded phone/name/address.
+- **Products API 256KB fix:** Slimmed voice agent products response from 893KB to ~90KB with variant dedup and field reduction.
+- **Tool response messages stripped:** Removed conversational text from finalize_call and notify_staff responses to prevent double goodbye.
+- **Global search close bug:** Fixed backdrop click, added global Escape listener, added X button.
+- **Global search logout bug:** Replaced POS service endpoint (HMAC auth → 401 → interceptor → logout) with client-side Supabase query.
+- **Customers page:** Removed duplicate filter chips, fixed dropdown text truncation, enabled sorting on all columns.
+- **Transactions page:** Wider search bar, dates show Today/Yesterday/MM-DD-YY instead of relative "1w ago".
+- **Quotes page:** Copy link URL uses main domain instead of app. subdomain. All sortable columns enabled.
+- **Jobs + Audit Log:** All columns now sortable with server-side sort support.
+- **Campaigns page:** Added missing spacing between toolbar and cards.
+- **SMS template variables:** 8 DB JSONB mismatches fixed, missing chips added, detailer_first_name wired through notify routes.
+
+### Audits Completed
+- SMS template variables — 16 templates, all variables verified end-to-end (docs/audits/sms-template-variables-audit.md)
+- Service detail page — all fields verified connected and working (docs/audits/service-detail-audit.md)
+- Admin search/filter/sort capabilities — 32 pages audited (docs/audits/admin-search-filter-sort-audit.md)
+
+---
+
 ## fix: Global search multi-word matching + description search — 2026-04-10
 
 - Multi-word queries now work across all searchable tables. "john smith" finds customer John Smith, "brush cone" finds "Cone Shape White Brush". DB fetches broadly with first word, client-side filter ensures ALL words match.
