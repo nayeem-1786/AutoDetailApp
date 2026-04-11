@@ -82,7 +82,7 @@ export async function findOrCreateVehicle(
 
     // Step 1: Resolve classification BEFORE the dedup query
     // Caller overrides take priority (e.g., booking form sends vehicle_category from UI)
-    const classification = await resolveVehicleClassification(supabase, make, model || undefined);
+    const classification = await resolveVehicleClassification(supabase, make, model || undefined, year || undefined);
     const resolvedCategory = params.vehicle_category || classification.vehicle_category;
     const resolvedVehicleType = params.vehicle_type || classification.vehicle_type;
     const resolvedSizeClass = params.size_class || classification.size_class;

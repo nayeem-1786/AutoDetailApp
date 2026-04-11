@@ -340,6 +340,130 @@ function disambiguateCategory(
   return 'automobile';
 }
 
+// ---------------------------------------------------------------------------
+// Exotic vehicle detection
+// ---------------------------------------------------------------------------
+
+/** Makes where ALL models are exotic — case-insensitive */
+const EXOTIC_MAKES = [
+  'ferrari', 'lamborghini', 'mclaren', 'bugatti', 'pagani', 'koenigsegg',
+  'rimac', 'hennessey', 'ssc', 'saleen', 'noble', 'spyker', 'w motors',
+  'czinger', 'de tomaso', 'hispano suiza', 'pininfarina', 'aston martin',
+  'bentley', 'rolls-royce', 'rolls royce', 'lotus', 'duesenberg', 'packard',
+];
+
+/** Specific exotic models from standard makes. Short names use exact match. */
+const EXOTIC_MAKE_MODELS: Record<string, Array<{ model: string; matchType: 'exact' | 'substring' }>> = {
+  porsche: [
+    { model: '918', matchType: 'exact' },
+    { model: '959', matchType: 'exact' },
+    { model: 'carrera gt', matchType: 'substring' },
+    { model: '911 gt3', matchType: 'substring' },
+    { model: '911 gt2', matchType: 'substring' },
+    { model: 'gt3 rs', matchType: 'substring' },
+    { model: 'gt2 rs', matchType: 'substring' },
+    { model: '911 turbo s', matchType: 'substring' },
+  ],
+  dodge: [
+    { model: 'viper', matchType: 'substring' },
+    { model: 'srt viper', matchType: 'substring' },
+  ],
+  ford: [
+    { model: 'gt', matchType: 'exact' },
+  ],
+  chevrolet: [
+    { model: 'corvette z06', matchType: 'substring' },
+    { model: 'corvette zr1', matchType: 'substring' },
+    { model: 'corvette e-ray', matchType: 'substring' },
+  ],
+  nissan: [
+    { model: 'gt-r', matchType: 'substring' },
+    { model: 'gtr', matchType: 'exact' },
+  ],
+  acura: [
+    { model: 'nsx', matchType: 'exact' },
+  ],
+  lexus: [
+    { model: 'lfa', matchType: 'exact' },
+  ],
+  bmw: [
+    { model: 'i8', matchType: 'exact' },
+    { model: 'm8', matchType: 'exact' },
+  ],
+  mercedes: [
+    { model: 'amg gt', matchType: 'substring' },
+    { model: 'amg one', matchType: 'substring' },
+    { model: 'sls', matchType: 'exact' },
+    { model: 'slr', matchType: 'exact' },
+  ],
+  audi: [
+    { model: 'r8', matchType: 'exact' },
+  ],
+  maserati: [
+    { model: 'mc20', matchType: 'substring' },
+    { model: 'mc12', matchType: 'substring' },
+    { model: 'granturismo trofeo', matchType: 'substring' },
+  ],
+  toyota: [
+    { model: '2000gt', matchType: 'substring' },
+  ],
+  jaguar: [
+    { model: 'xj220', matchType: 'substring' },
+  ],
+};
+
+export function isExoticMake(make: string): boolean {
+  return EXOTIC_MAKES.includes(make.trim().toLowerCase());
+}
+
+export function isExoticModel(make: string, model: string): boolean {
+  const entries = EXOTIC_MAKE_MODELS[make.trim().toLowerCase()];
+  if (!entries) return false;
+  const modelTrimmed = model.trim().toLowerCase();
+  return entries.some((e) =>
+    e.matchType === 'exact'
+      ? modelTrimmed === e.model.toLowerCase()
+      : modelTrimmed.includes(e.model.toLowerCase())
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Classic vehicle detection
+// ---------------------------------------------------------------------------
+
+/** Dynamic threshold — vehicles 25+ years old are classic */
+const CLASSIC_YEAR_THRESHOLD = new Date().getFullYear() - 25;
+
+/** Model keywords that strongly imply a classic vehicle (substring match) */
+const CLASSIC_MODEL_KEYWORDS = [
+  // Pre-War and Full Classics
+  'model t', 'model a', 'silver ghost', 'phantom i', 'phantom ii', 'phantom iii',
+  'type 35', 'type 57', 'atlantic',
+  // Golden Age and Muscle Cars (1950s-1970s)
+  'bel air', '300sl', 'gullwing', 'e-type', 'xke', 'road runner', 'hemi cuda',
+  'barracuda', 'chevelle ss', 'el camino', 'nova ss', '442', 'skylark gs',
+  'fairlane', 'galaxie', 'torino', 'boss 302', 'boss 429', 'mach 1',
+  'shelby gt350', 'shelby gt500', 'cobra', 'ac cobra', 'daytona charger',
+  'superbird', 'super bee', 'split window', '2002tii', 'karmann ghia',
+  'vw thing', 'microbus',
+  // Modern Classics (1980s-early 2000s)
+  'f40', 'testarossa', '512 bb', 'countach', 'diablo', 'miura', 'delorean',
+  'dmc-12', 'buick gnx', 'grand national', 'lotus esprit', 'turbo esprit',
+  'e30 m3', '964', '993', 'rx-7 fd', 'supra a80', 'mr2', 'ae86', '240sx',
+  '300zx', 'r32', 'r33', 'r34', 'skyline', 'fj40', 'fj60', 'fj80',
+  'k5 blazer', 'jeep cj', 'willys',
+];
+
+function isClassicByYear(year: number | undefined | null): boolean {
+  return typeof year === 'number' && year > 0 && year <= CLASSIC_YEAR_THRESHOLD;
+}
+
+function isClassicByModel(model: string | undefined | null): boolean {
+  if (!model) return false;
+  const modelLower = model.toLowerCase();
+  return CLASSIC_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw));
+}
+
 // Default specialty tier per category — smallest/most common, correctable by staff
 const DEFAULT_SPECIALTY_TIERS: Record<Exclude<VehicleCategory, 'automobile'>, string> = {
   motorcycle: 'standard_cruiser',
@@ -353,31 +477,39 @@ export interface VehicleClassification {
   vehicle_type: string;
   size_class: string | null;
   specialty_tier: string | null;
+  is_exotic: boolean;
+  is_classic: boolean;
+  requires_custom_quote: boolean;
+  needs_year_confirmation: boolean;
 }
 
 /**
- * Resolve full vehicle classification from make and optional model.
+ * Resolve full vehicle classification from make and optional model/year.
  *
- * 3-layer approach:
+ * 5-layer approach:
  * 1. Query vehicle_makes table for category (automobile vs motorcycle vs rv etc.)
  * 2. For automobiles, infer size_class from model via MODEL_SIZE_HINTS
  * 3. For specialty vehicles, set default specialty_tier (staff corrects in POS)
+ * 4. Layer exotic detection on top (EXOTIC_MAKES + EXOTIC_MAKE_MODELS)
+ * 5. Layer classic detection on top (year-based + model keyword)
  *
- * Returns: { vehicle_category, vehicle_type, size_class, specialty_tier }
+ * Returns full classification with exotic/classic flags.
  *
  * Examples:
- *   ("Toyota", "Camry")       → { automobile, standard, sedan, null }
- *   ("Toyota", "4Runner")     → { automobile, standard, truck_suv_2row, null }
- *   ("Honda", "Odyssey")      → { automobile, standard, suv_3row_van, null }
+ *   ("Toyota", "Camry")              → { automobile, standard, sedan, null, not exotic, not classic }
+ *   ("Ferrari", "488 GTB")           → { automobile, standard, sedan, null, exotic, requires_custom_quote }
+ *   ("Porsche", "Cayenne")           → { automobile, standard, truck_suv_2row, null, not exotic }
+ *   ("Chevrolet", "Camaro", 1967)    → { automobile, standard, sedan, null, classic, requires_custom_quote }
  *   ("Harley-Davidson", "Sportster") → { motorcycle, motorcycle, null, standard_cruiser }
- *   ("Winnebago", "View")     → { rv, rv, null, rv_up_to_24 }
+ *   ("Winnebago", "View")            → { rv, rv, null, rv_up_to_24, requires_custom_quote }
  */
 export async function resolveVehicleClassification(
   supabase: { from: (table: string) => unknown },
   make: string,
-  model?: string
+  model?: string,
+  year?: number
 ): Promise<VehicleClassification> {
-  // Layer 1: resolve category from vehicle_makes table
+  // --- Layer 1: resolve category from vehicle_makes table ---
   let category: VehicleCategory = 'automobile';
 
   if (make) {
@@ -394,11 +526,8 @@ export async function resolveVehicleClassification(
       );
 
       if (validRows.length === 1) {
-        // Unambiguous: single category for this make
         category = validRows[0].category as VehicleCategory;
       } else if (validRows.length > 1) {
-        // Dual-category make (e.g., Honda = automobile + motorcycle)
-        // Disambiguate using model keywords
         const categories = validRows.map((r: { category: string }) => r.category);
         category = disambiguateCategory(categories, model);
       }
@@ -407,7 +536,9 @@ export async function resolveVehicleClassification(
     }
   }
 
-  // Layer 2: for automobiles, infer size_class from model
+  // --- Layer 2+3: build base classification ---
+  let baseResult: VehicleClassification;
+
   if (category === 'automobile') {
     let sizeClass: string = 'sedan'; // safe default
 
@@ -421,19 +552,49 @@ export async function resolveVehicleClassification(
       }
     }
 
-    return {
+    baseResult = {
       vehicle_category: 'automobile',
       vehicle_type: 'standard',
       size_class: sizeClass,
       specialty_tier: null,
+      is_exotic: false,
+      is_classic: false,
+      requires_custom_quote: false,
+      needs_year_confirmation: false,
+    };
+  } else {
+    baseResult = {
+      vehicle_category: category,
+      vehicle_type: category,
+      size_class: null,
+      specialty_tier: DEFAULT_SPECIALTY_TIERS[category],
+      is_exotic: false,
+      is_classic: false,
+      requires_custom_quote: category !== 'motorcycle', // rv, boat, aircraft need custom quotes
+      needs_year_confirmation: false,
     };
   }
 
-  // Layer 3: specialty vehicle — set default tier
-  return {
-    vehicle_category: category,
-    vehicle_type: category,
-    size_class: null,
-    specialty_tier: DEFAULT_SPECIALTY_TIERS[category],
-  };
+  // --- Layer 4: exotic detection (layered on top) ---
+  if (make && isExoticMake(make)) {
+    baseResult.is_exotic = true;
+    baseResult.requires_custom_quote = true;
+  } else if (make && model && isExoticModel(make, model)) {
+    baseResult.is_exotic = true;
+    baseResult.requires_custom_quote = true;
+  }
+
+  // --- Layer 5: classic detection (layered on top) ---
+  if (isClassicByYear(year)) {
+    baseResult.is_classic = true;
+    baseResult.requires_custom_quote = true;
+  } else if (isClassicByModel(model)) {
+    baseResult.is_classic = true;
+    baseResult.requires_custom_quote = true;
+    if (!year) {
+      baseResult.needs_year_confirmation = true;
+    }
+  }
+
+  return baseResult;
 }

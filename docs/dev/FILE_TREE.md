@@ -489,6 +489,7 @@ src/app/api/voice-agent/send-info-sms/route.ts
 src/app/api/voice-agent/notify-staff/route.ts
 src/app/api/voice-agent/send-quote-sms/route.ts
 src/app/api/voice-agent/services/route.ts
+src/app/api/voice-agent/vehicle-classify/route.ts
 src/app/api/waitlist/[id]/route.ts
 src/app/api/waitlist/route.ts
 ```
