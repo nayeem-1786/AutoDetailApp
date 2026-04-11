@@ -461,6 +461,8 @@ idx_refund_items_refund — btree (refund_id)
 | customer_id | UUID | NOT NULL, FK → customers(id) | |
 | vehicle_id | UUID | FK → vehicles(id) | |
 | employee_id | UUID | FK → employees(id) | |
+| scheduled_date | DATE | NOT NULL | Appointment date (YYYY-MM-DD) |
+| scheduled_start_time | TIME | | Appointment start time (HH:MM) |
 | status | appointment_status (enum) | NOT NULL, DEFAULT 'pending' | |
 | mobile_zone_id | UUID | FK → mobile_zones(id) | |
 | mobile_address | TEXT | | |
@@ -651,6 +653,8 @@ idx_refund_items_refund — btree (refund_id)
 | last_channel | TEXT | NOT NULL, DEFAULT 'sms', CHECK ('sms','voice') | Last channel used in conversation |
 | summary | TEXT | | AI-generated conversation summary for cross-session memory |
 | summary_updated_at | TIMESTAMPTZ | | When the summary was last generated |
+| last_message_at | TIMESTAMPTZ | | Timestamp of most recent message in thread |
+| last_message_preview | TEXT | | Truncated preview of most recent message |
 | last_notification_type | TEXT | | Most recent system notification type (e.g., 'job_complete') |
 | last_notification_at | TIMESTAMPTZ | | When the last system notification was sent |
 | created_at | TIMESTAMPTZ | | |

@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Unified global search across all admin data — 2026-04-10
+
+- **New API route** `GET /api/admin/global-search?q=` — single endpoint searches 9 tables in parallel: customers, products, services, transactions, quotes, appointments, conversations, orders, vehicles. Admin cookie auth. Smart prefix detection: `Q-` → quotes, `#` → receipts, phone patterns → customer/conversation phone.
+- **CommandPalette** rewritten to use unified endpoint — single debounced fetch (300ms) replaces previous multi-fetch approach. Results grouped by type (Pages, Customers, Products, Services, Vehicles, Transactions, Quotes, Orders, Appointments, Conversations) with section headers and type-specific icons.
+- **Vehicles search** — "who has the Honda Accord?" searches make/model, shows owning customer, links to customer detail page.
+- **Orders search** — searches by order number (WO-XXXXX) and customer name.
+- **Critical fixes**: `.is('deleted_at', null)` on customers + quotes queries, `.eq('is_active', true)` on products + services queries.
+- **DB_SCHEMA.md updated**: Added missing `scheduled_date`, `scheduled_start_time` to appointments table. Added missing `last_message_at`, `last_message_preview` to conversations table.
+- New file: `src/app/api/admin/global-search/route.ts`
+
+---
+
 ## fix: Global search POS services call causing logout — 2026-04-10
 
 - Root cause: CommandPalette fetched `/api/pos/services` which requires POS HMAC auth (`X-POS-Session` header). Without it, the endpoint returned 401. The global fetch interceptor in admin-shell caught the 401 and redirected to login with `reason=session_expired`.

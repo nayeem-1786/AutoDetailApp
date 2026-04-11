@@ -168,10 +168,23 @@ function flattenNavItems(items: NavItem[]): NavItem[] {
 interface SearchResult {
   id: string;
   label: string;
-  subtitle?: string;
+  subtitle?: string | null;
   href: string;
-  type: 'page' | 'customer' | 'product' | 'service';
+  type: string;
 }
+
+const SEARCH_SECTION_CONFIG: { type: string; label: string; icon: string }[] = [
+  { type: 'page', label: 'Pages', icon: 'LayoutDashboard' },
+  { type: 'customer', label: 'Customers', icon: 'Users' },
+  { type: 'product', label: 'Products', icon: 'Package' },
+  { type: 'service', label: 'Services', icon: 'Wrench' },
+  { type: 'vehicle', label: 'Vehicles', icon: 'Truck' },
+  { type: 'transaction', label: 'Transactions', icon: 'ArrowRightLeft' },
+  { type: 'quote', label: 'Quotes', icon: 'FileText' },
+  { type: 'order', label: 'Orders', icon: 'ShoppingCart' },
+  { type: 'appointment', label: 'Appointments', icon: 'CalendarDays' },
+  { type: 'conversation', label: 'Conversations', icon: 'MessageSquare' },
+];
 
 function CommandPalette({
   open,
@@ -187,7 +200,6 @@ function CommandPalette({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [apiResults, setApiResults] = useState<SearchResult[]>([]);
   const [apiLoading, setApiLoading] = useState(false);
-  const [services, setServices] = useState<{ id: string; name: string; pricing_model: string }[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -205,27 +217,12 @@ function CommandPalette({
     label: item.label,
     subtitle: item.href,
     href: item.href,
-    type: 'page' as const,
+    type: 'page',
   }));
 
-  // Service results — instant, client-side (loaded once on palette open)
-  const serviceResults: SearchResult[] = query.trim().length >= 2
-    ? services
-        .filter((s) => s.name.toLowerCase().includes(query.trim().toLowerCase()))
-        .slice(0, 5)
-        .map((s) => ({
-          id: `service-${s.id}`,
-          label: s.name,
-          subtitle: s.pricing_model || undefined,
-          href: `/admin/catalog/services/${s.id}`,
-          type: 'service' as const,
-        }))
-    : [];
+  // Combine page (client-side) + API results
+  const allResults: SearchResult[] = [...pageResults, ...apiResults];
 
-  // Combine page + service (client-side) + API results
-  const allResults: SearchResult[] = [...pageResults, ...serviceResults, ...apiResults];
-
-  // Load services once when palette opens (client-side, no POS auth needed)
   useEffect(() => {
     if (open) {
       setQuery('');
@@ -233,20 +230,8 @@ function CommandPalette({
       setApiResults([]);
       setApiLoading(false);
       setTimeout(() => inputRef.current?.focus(), 0);
-
-      // Fetch services via Supabase client (uses admin cookie auth)
-      if (services.length === 0) {
-        createClient()
-          .from('services')
-          .select('id, name, pricing_model')
-          .eq('is_active', true)
-          .order('name')
-          .then(({ data }: { data: { id: string; name: string; pricing_model: string }[] | null }) => {
-            if (data) setServices(data);
-          });
-      }
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // Global Escape listener — closes palette regardless of focus
   useEffect(() => {
@@ -261,7 +246,7 @@ function CommandPalette({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, onOpenChange]);
 
-  // Debounced API search for customers + products (300ms)
+  // Debounced unified search (300ms)
   useEffect(() => {
     setSelectedIndex(0);
 
@@ -273,50 +258,37 @@ function CommandPalette({
 
     setApiLoading(true);
     const timer = setTimeout(async () => {
-      // Abort previous in-flight requests
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const q = encodeURIComponent(query.trim());
-      const results: SearchResult[] = [];
-
       try {
-        const [customersRes, productsRes] = await Promise.allSettled([
-          fetch(`/api/admin/customers/search?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
-          fetch(`/api/public/products/search?q=${q}`, { signal: controller.signal }).then((r) => r.json()),
-        ]);
+        const res = await fetch(
+          `/api/admin/global-search?q=${encodeURIComponent(query.trim())}`,
+          { signal: controller.signal }
+        );
+        if (!res.ok) throw new Error('Search failed');
+        const data = await res.json();
 
-        if (customersRes.status === 'fulfilled' && customersRes.value.data) {
-          for (const c of customersRes.value.data.slice(0, 5)) {
-            results.push({
-              id: `customer-${c.id}`,
-              label: `${c.first_name} ${c.last_name}`.trim(),
-              subtitle: c.phone || c.email || undefined,
-              href: `/admin/customers/${c.id}`,
-              type: 'customer',
-            });
+        const results: SearchResult[] = [];
+        for (const type of ['customer', 'product', 'service', 'vehicle', 'transaction', 'quote', 'order', 'appointment', 'conversation']) {
+          const items = data[type + 's'] as SearchResult[] | undefined;
+          if (items) {
+            for (const item of items) {
+              results.push({ ...item, type });
+            }
           }
         }
 
-        if (productsRes.status === 'fulfilled' && productsRes.value.data) {
-          for (const p of productsRes.value.data.slice(0, 5)) {
-            results.push({
-              id: `product-${p.id}`,
-              label: p.name,
-              subtitle: p.product_categories?.name || undefined,
-              href: `/admin/catalog/products/${p.id}`,
-              type: 'product',
-            });
-          }
+        if (!controller.signal.aborted) {
+          setApiResults(results);
+          setApiLoading(false);
         }
       } catch {
-        // Aborted or network error — ignore
-      }
-
-      if (!controller.signal.aborted) {
-        setApiResults(results);
-        setApiLoading(false);
+        if (!controller.signal.aborted) {
+          setApiResults([]);
+          setApiLoading(false);
+        }
       }
     }, 300);
 
@@ -353,19 +325,11 @@ function CommandPalette({
   if (!open) return null;
 
   // Group results by type for rendering
-  const grouped = {
-    page: allResults.filter((r) => r.type === 'page'),
-    customer: allResults.filter((r) => r.type === 'customer'),
-    product: allResults.filter((r) => r.type === 'product'),
-    service: allResults.filter((r) => r.type === 'service'),
-  };
-
-  const sectionConfig: { key: keyof typeof grouped; label: string; Icon: LucideIcon }[] = [
-    { key: 'page', label: 'Pages', Icon: LayoutDashboard },
-    { key: 'customer', label: 'Customers', Icon: Users },
-    { key: 'product', label: 'Products', Icon: Package },
-    { key: 'service', label: 'Services', Icon: Wrench },
-  ];
+  const grouped: Record<string, SearchResult[]> = {};
+  for (const r of allResults) {
+    if (!grouped[r.type]) grouped[r.type] = [];
+    grouped[r.type].push(r);
+  }
 
   let globalIndex = -1;
   const hasAnyResults = allResults.length > 0;
@@ -388,7 +352,7 @@ function CommandPalette({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search pages, customers, products..."
+            placeholder="Search customers, products, transactions, quotes..."
             className="h-12 w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
           {apiLoading && <Loader2 className="h-4 w-4 shrink-0 animate-spin text-gray-400" />}
@@ -409,11 +373,12 @@ function CommandPalette({
               No results found.
             </div>
           ) : (
-            sectionConfig.map(({ key, label, Icon: SectionIcon }) => {
-              const items = grouped[key];
-              if (items.length === 0) return null;
+            SEARCH_SECTION_CONFIG.map(({ type, label, icon }) => {
+              const items = grouped[type];
+              if (!items || items.length === 0) return null;
+              const SectionIcon = iconMap[icon] || LayoutDashboard;
               return (
-                <div key={key}>
+                <div key={type}>
                   {query.trim().length >= 2 && (
                     <div className="flex items-center gap-2 px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
                       <SectionIcon className="h-3 w-3" />
@@ -436,9 +401,9 @@ function CommandPalette({
                         )}
                       >
                         <SectionIcon className="h-4 w-4 shrink-0 text-gray-400" />
-                        <span className="flex-1 text-left">{result.label}</span>
+                        <span className="flex-1 text-left truncate">{result.label}</span>
                         {result.subtitle && (
-                          <span className="text-xs text-gray-400">{result.subtitle}</span>
+                          <span className="truncate text-xs text-gray-400">{result.subtitle}</span>
                         )}
                       </button>
                     );
