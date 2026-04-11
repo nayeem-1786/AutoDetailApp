@@ -48,6 +48,33 @@ export async function GET(request: NextRequest) {
     }).format(dateObj);
     const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
     const dayName = DAY_NAMES[dayMap[pstDayIndex] ?? dateObj.getDay()];
+
+    // Day-of-week validation: if agent passes expected_day, verify the date matches
+    const expectedDay = searchParams.get('expected_day')?.toLowerCase().trim() || '';
+    if (expectedDay && DAY_NAMES.includes(expectedDay as typeof DAY_NAMES[number]) && expectedDay !== dayName) {
+      const correctedDate = findNextDay(expectedDay);
+      const correctedFormatted = correctedDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'America/Los_Angeles',
+      });
+      const correctedDateStr = correctedDate.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+      const actualDayFormatted = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+
+      const responseData = {
+        error: 'day_mismatch',
+        message: `${dateStr} is a ${actualDayFormatted}, not ${expectedDay}. The next ${expectedDay} is ${correctedFormatted}.`,
+        requested_date: dateStr,
+        requested_day: expectedDay,
+        actual_day: dayName,
+        corrected_date: correctedDateStr,
+        corrected_date_formatted: correctedFormatted,
+      };
+      perf.done(responseData);
+      return NextResponse.json(responseData);
+    }
+
     const supabase = createAdminClient();
 
     // 1. Determine duration: from service if provided, otherwise default 60
@@ -153,4 +180,21 @@ function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60) % 24;
   const m = minutes % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Find the next occurrence of a named day from today in PST */
+function findNextDay(dayName: string): Date {
+  const targetIndex = DAY_NAMES.indexOf(dayName.toLowerCase() as typeof DAY_NAMES[number]);
+  if (targetIndex === -1) return new Date();
+
+  const now = new Date();
+  const todayPST = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+
+  for (let i = 1; i <= 14; i++) {
+    const check = new Date(todayPST.getTime() + i * 86400000);
+    if (check.getDay() === targetIndex) {
+      return check;
+    }
+  }
+  return new Date();
 }
