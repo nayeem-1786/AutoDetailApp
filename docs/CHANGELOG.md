@@ -24,6 +24,9 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - **Voice agent date off-by-one** — Server-side day-of-week validation catches LLM calendar math errors and returns corrected dates.
 - **Twilio diagnostic logging removed** — Signature validation debug lines removed from inbound and status webhook routes.
 
+### Audits
+- **Staff permissions** — Comprehensive analysis of all 170 admin API routes and 96 admin pages. Found 54 pages and ~30 API routes lacking permission enforcement. 5 hardcoded super_admin role checks in staff/roles routes (intentional). Report: `docs/audits/staff-permissions-audit.md`
+
 ---
 
 ## [Session 24] — 2026-04-10
