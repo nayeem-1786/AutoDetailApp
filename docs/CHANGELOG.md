@@ -4,6 +4,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## [Session 25] — 2026-04-11
+
+### Features
+- **Vehicle classification tool** — New classify_vehicle API route for voice agent. Returns vehicle category, size_class, tier_name, seat_rows, exotic/classic/custom_quote flags. Handles dual-category makes (Honda cars vs motorcycles), 24+ exotic makes, 65+ classic model keywords, dynamic 25-year classic threshold.
+- **Exotic + classic vehicle detection** — Exotic makes (Ferrari, Lamborghini, Rolls-Royce, Bentley, etc.) and specific exotic models from standard makes (Ford GT, Porsche 918, Corvette Z06) with exact/substring matching to prevent false positives. Classic detection by year (25+ years) and iconic model keywords.
+- **Vehicle model lists expanded** — Sedan: 48→87 models, Truck/SUV: 43→131, SUV 3-row/Van: 20→37, Motorcycle keywords: 70→123. Added EVs, luxury, heavy-duty trucks.
+- **Vehicle/service compatibility check** — Hard block on online booking if service incompatible with vehicle category. Soft warning in voice agent job notes.
+- **Voice agent product tools split** — get_products (lightweight browse ~38KB) + get_product_details (specific lookup with full specs, vendor, variants ~6KB). Products no longer send 90KB+ payloads.
+- **Voice agent services enriched** — get_services now includes addon_suggestions with combo pricing/savings, prerequisites, vehicle_compatibility, classification.
+- **Seat row count** — classify_vehicle returns seat_rows (2 for sedan/truck, 3 for 3-row SUV/van, 0 for motorcycle/rv/boat/aircraft).
+- **Website visibility toggle** — Active toggle on service detail page (Display Settings two-column layout) syncs bidirectionally with CMS Catalog page.
+- **Date awareness** — Voice agent receives current_date and upcoming_days (next 14 days pre-computed). Server-side day-of-week validation in availability tool with expected_day parameter and automatic date correction.
+- **Global search permissions** — Accessible to all authenticated staff, not just super_admin/admin.
+
+### Fixes
+- **resolvePrice sedan default** — Fixed tier matching to use size_class instead of always defaulting to sedan/first tier. Truck/SUV and Oversized vehicles now get correct pricing.
+- **Product search column names** — sale_start→sale_starts_at, sale_end→sale_ends_at in public products search route.
+- **Voice agent date off-by-one** — Server-side day-of-week validation catches LLM calendar math errors and returns corrected dates.
+- **Twilio diagnostic logging removed** — Signature validation debug lines removed from inbound and status webhook routes.
+
+---
+
 ## [Session 24] — 2026-04-10
 
 ### Features
