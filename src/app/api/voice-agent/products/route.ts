@@ -4,6 +4,15 @@ import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
 
+/**
+ * GET /api/voice-agent/products
+ *
+ * Lightweight product catalog browse. Returns ALL active products with minimal
+ * fields for the voice agent to answer "what do you carry?" questions.
+ * For detailed product info, use /api/voice-agent/products/details?search=...
+ *
+ * Target response size: ~38KB for ~300 deduped products.
+ */
 export async function GET(request: NextRequest) {
   const perf = createPerfTimer('GET /voice-agent/products');
   try {
@@ -13,16 +22,13 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const search = request.nextUrl.searchParams.get('search')?.trim() || '';
 
     const t = perf.now();
-    let query = supabase
+    const { data: products, error } = await supabase
       .from('products')
       .select(`
         id,
         name,
-        slug,
-        description,
         retail_price,
         sale_price,
         sale_starts_at,
@@ -30,16 +36,10 @@ export async function GET(request: NextRequest) {
         quantity_on_hand,
         variant_label,
         product_group_id,
-        product_categories ( name, slug )
+        product_categories ( name )
       `)
       .eq('is_active', true)
       .order('name', { ascending: true });
-
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
-    }
-
-    const { data: products, error } = await query;
     perf.mark('query:products', t);
 
     if (error) {
@@ -86,10 +86,9 @@ export async function GET(request: NextRequest) {
       const salePrice = p.sale_price != null ? Number(p.sale_price) : null;
       const isActiveSale = isOnSale && salePrice != null && salePrice < retailPrice;
 
-      const cat = p.product_categories as unknown as { name: string; slug: string } | null;
-      const categorySlug = cat?.slug ?? null;
+      const cat = p.product_categories as unknown as { name: string } | null;
 
-      // Build compact variant summary (e.g., "Also available in: 1 Gallon ($49.99), 5 Gallon ($159.99)")
+      // Build compact variant summary
       const gid = p.product_group_id as string | null;
       const groupMembers = gid ? groupMap.get(gid) : undefined;
       let variantSummary: string | null = null;
@@ -101,25 +100,23 @@ export async function GET(request: NextRequest) {
             return `${label} ($${Number(m.retail_price).toFixed(2)})`;
           });
         if (others.length > 0) {
-          variantSummary = `Also available in: ${others.join(', ')}`;
+          variantSummary = `Also in: ${others.join(', ')}`;
         }
       }
 
       return {
         name: p.name,
         category: cat?.name ?? null,
-        retail_price: retailPrice,
-        ...(isActiveSale ? { sale_price: salePrice } : {}),
+        price: retailPrice,
+        on_sale: isActiveSale,
         in_stock: (p.quantity_on_hand as number) > 0,
-        description: p.description ? (p.description as string).substring(0, 150) : null,
-        product_url: categorySlug && p.slug ? `/products/${categorySlug}/${p.slug}` : null,
         variants: variantSummary,
       };
     });
 
     const responseData = { products: formatted };
     const responseBody = JSON.stringify(responseData);
-    console.log(`[VoiceAgent] Products response: ${formatted.length} products, ${(responseBody.length / 1024).toFixed(1)}KB`);
+    console.log(`[VoiceAgent] Products browse: ${formatted.length} products, ${(responseBody.length / 1024).toFixed(1)}KB`);
 
     perf.done(responseData);
     return NextResponse.json(responseData);

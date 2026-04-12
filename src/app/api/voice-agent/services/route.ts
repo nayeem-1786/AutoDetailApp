@@ -4,6 +4,15 @@ import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
 
+/**
+ * GET /api/voice-agent/services
+ *
+ * Full service catalog with pricing, addon suggestions, prerequisites,
+ * vehicle compatibility, and classification. Used for service inquiries,
+ * pricing quotes, and upselling.
+ *
+ * Target response size: ~18KB for 29 services.
+ */
 export async function GET(request: NextRequest) {
   const perf = createPerfTimer('GET /voice-agent/services');
   try {
@@ -14,13 +23,15 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    const t = perf.now();
+    // Query 1: Services with pricing tiers
+    let t = perf.now();
     const { data: services, error } = await supabase
       .from('services')
       .select(`
         id,
         name,
         description,
+        classification,
         pricing_model,
         flat_price,
         sale_price,
@@ -32,12 +43,13 @@ export async function GET(request: NextRequest) {
         custom_starting_price,
         base_duration_minutes,
         mobile_eligible,
+        vehicle_compatibility,
+        special_requirements,
         service_categories ( name ),
         service_pricing ( tier_name, price, sale_price )
       `)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
-
     perf.mark('query:services', t);
 
     if (error) {
@@ -48,7 +60,101 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const formatted = (services ?? []).map((s) => {
+    const serviceList = services ?? [];
+    const serviceIds = serviceList.map((s) => s.id);
+
+    // Query 2: Addon suggestions (auto_suggest only) with addon service details
+    t = perf.now();
+    const { data: addonRows } = await supabase
+      .from('service_addon_suggestions')
+      .select(`
+        primary_service_id,
+        addon_service_id,
+        combo_price,
+        is_seasonal,
+        seasonal_start,
+        seasonal_end,
+        addon_service:services!service_addon_suggestions_addon_service_id_fkey (
+          id, name, flat_price, pricing_model, per_unit_price, custom_starting_price
+        )
+      `)
+      .eq('auto_suggest', true)
+      .in('primary_service_id', serviceIds)
+      .order('display_order', { ascending: true });
+    perf.mark('query:addon_suggestions', t);
+
+    // Query 3: Prerequisites with prerequisite service names
+    t = perf.now();
+    const { data: prereqRows } = await supabase
+      .from('service_prerequisites')
+      .select(`
+        service_id,
+        enforcement,
+        prerequisite_service:services!service_prerequisites_prerequisite_service_id_fkey (
+          name
+        )
+      `)
+      .in('service_id', serviceIds);
+    perf.mark('query:prerequisites', t);
+
+    // Build lookup maps
+    const now = new Date();
+    const addonMap = new Map<string, Array<{ addon_name: string; addon_id: string; standard_price: number | null; combo_price: number | null; savings: number | null }>>();
+
+    for (const row of addonRows ?? []) {
+      // Filter seasonal addons not in season
+      if (row.is_seasonal) {
+        const start = row.seasonal_start ? new Date(row.seasonal_start) : null;
+        const end = row.seasonal_end ? new Date(row.seasonal_end) : null;
+        if (start && now < start) continue;
+        if (end && now > end) continue;
+      }
+
+      const addon = row.addon_service as unknown as {
+        id: string;
+        name: string;
+        flat_price: number | null;
+        pricing_model: string;
+        per_unit_price: number | null;
+        custom_starting_price: number | null;
+      } | null;
+      if (!addon) continue;
+
+      // Derive standard price from addon's pricing model
+      let standardPrice: number | null = null;
+      if (addon.pricing_model === 'flat' && addon.flat_price != null) {
+        standardPrice = Number(addon.flat_price);
+      } else if (addon.pricing_model === 'per_unit' && addon.per_unit_price != null) {
+        standardPrice = Number(addon.per_unit_price);
+      } else if (addon.pricing_model === 'custom' && addon.custom_starting_price != null) {
+        standardPrice = Number(addon.custom_starting_price);
+      }
+
+      const comboPrice = row.combo_price != null ? Number(row.combo_price) : null;
+      const savings = standardPrice != null && comboPrice != null
+        ? Math.round((standardPrice - comboPrice) * 100) / 100
+        : null;
+
+      const primaryId = row.primary_service_id as string;
+      const entry = { addon_name: addon.name, addon_id: addon.id, standard_price: standardPrice, combo_price: comboPrice, savings };
+      const existing = addonMap.get(primaryId);
+      if (existing) existing.push(entry);
+      else addonMap.set(primaryId, [entry]);
+    }
+
+    const prereqMap = new Map<string, Array<{ service_name: string; enforcement: string }>>();
+    for (const row of prereqRows ?? []) {
+      const prereqService = row.prerequisite_service as unknown as { name: string } | null;
+      if (!prereqService) continue;
+      const serviceId = row.service_id as string;
+      const entry = { service_name: prereqService.name, enforcement: row.enforcement as string };
+      const existing = prereqMap.get(serviceId);
+      if (existing) existing.push(entry);
+      else prereqMap.set(serviceId, [entry]);
+    }
+
+    // Format response
+    const formatted = serviceList.map((s) => {
       const tiers = (s.service_pricing as { tier_name: string; price: number; sale_price: number | null }[]) ?? [];
       const saleWindow = { sale_starts_at: s.sale_starts_at as string | null, sale_ends_at: s.sale_ends_at as string | null };
       const { isOnSale } = getSaleStatus(saleWindow);
@@ -60,7 +166,6 @@ export async function GET(request: NextRequest) {
         case 'vehicle_size':
         case 'scope':
         case 'specialty':
-          // Tiered pricing — use service_pricing rows
           pricing = tiers.map((p) => ({
             tier_name: p.tier_name,
             price: Number(p.price),
@@ -115,19 +220,30 @@ export async function GET(request: NextRequest) {
           }));
       }
 
+      const addons = addonMap.get(s.id) ?? null;
+      const prerequisites = prereqMap.get(s.id) ?? null;
+
       return {
         id: s.id,
         name: s.name,
         description: s.description,
         category: (s.service_categories as unknown as { name: string } | null)?.name ?? null,
+        classification: s.classification,
         duration_minutes: s.base_duration_minutes,
         pricing_model: s.pricing_model,
         mobile_eligible: s.mobile_eligible,
+        vehicle_compatibility: s.vehicle_compatibility ?? [],
+        special_requirements: s.special_requirements ?? null,
         pricing,
+        addon_suggestions: addons,
+        prerequisites,
       };
     });
 
     const responseData = { services: formatted };
+    const responseBody = JSON.stringify(responseData);
+    console.log(`[VoiceAgent] Services response: ${formatted.length} services, ${(responseBody.length / 1024).toFixed(1)}KB`);
+
     perf.done(responseData);
     return NextResponse.json(responseData);
   } catch (err) {
