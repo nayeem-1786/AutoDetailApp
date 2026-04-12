@@ -986,38 +986,6 @@ export default function ServiceDetailPage() {
         }
       />
 
-      {/* Website visibility toggle */}
-      <div className={`flex items-center gap-2 text-sm ${service.show_on_website ? 'text-green-700' : 'text-amber-600'}`}>
-        {service.show_on_website ? (
-          <Eye className="h-4 w-4" />
-        ) : (
-          <EyeOff className="h-4 w-4" />
-        )}
-        <span className="font-medium">
-          {service.show_on_website ? 'Visible on website' : 'Hidden from website'}
-        </span>
-        {canManageCatalogDisplay && (
-          <Switch
-            checked={service.show_on_website}
-            onCheckedChange={async (checked) => {
-              setService((prev) => prev ? { ...prev, show_on_website: checked } : prev);
-              try {
-                const res = await adminFetch('/api/admin/cms/catalog/services', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ updates: [{ id: serviceId, show_on_website: checked }] }),
-                });
-                if (!res.ok) throw new Error('Failed');
-                toast.success(checked ? 'Now visible on website' : 'Hidden from website');
-              } catch {
-                setService((prev) => prev ? { ...prev, show_on_website: !checked } : prev);
-                toast.error('Failed to update website visibility');
-              }
-            }}
-          />
-        )}
-      </div>
-
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
@@ -1162,40 +1130,88 @@ export default function ServiceDetailPage() {
                 <CardHeader>
                   <CardTitle>Display Settings</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    label="Display Order"
-                    description="Lower numbers appear first in POS and booking"
-                    error={errors.display_order?.message}
-                  >
-                    <Input
-                      type="number"
-                      min="0"
-                      step="1"
-                      {...register('display_order')}
-                    />
-                  </FormField>
-
-                  <Controller
-                    name="is_active"
-                    control={control}
-                    render={({ field }) => (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-700">Active</p>
-                          <p className="text-xs text-gray-500">
-                            {field.value
-                              ? 'Service is visible in POS and booking'
-                              : 'Service is hidden from POS and booking'}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={handleIsActiveToggle}
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {/* Column 1: Display Order + Active */}
+                    <div className="space-y-4">
+                      <FormField
+                        label="Display Order"
+                        description="Lower numbers appear first in POS and booking"
+                        error={errors.display_order?.message}
+                      >
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          {...register('display_order')}
                         />
+                      </FormField>
+
+                      <Controller
+                        name="is_active"
+                        control={control}
+                        render={({ field }) => (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-gray-700">Active</p>
+                              <p className="text-xs text-gray-500">
+                                {field.value
+                                  ? 'Service is visible in POS and booking'
+                                  : 'Service is hidden from POS and booking'}
+                              </p>
+                            </div>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={handleIsActiveToggle}
+                            />
+                          </div>
+                        )}
+                      />
+                    </div>
+
+                    {/* Column 2: Website Visibility */}
+                    <div className="space-y-4">
+                      <div className={`flex items-center justify-between ${service.show_on_website ? 'text-green-700' : 'text-amber-600'}`}>
+                        <div className="flex items-center gap-2">
+                          {service.show_on_website ? (
+                            <Eye className="h-4 w-4" />
+                          ) : (
+                            <EyeOff className="h-4 w-4" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium">
+                              {service.show_on_website ? 'Visible on website' : 'Hidden from website'}
+                            </p>
+                            <p className="text-xs opacity-75">
+                              {service.show_on_website
+                                ? 'Shown on public website and sitemap'
+                                : 'Not shown on public website'}
+                            </p>
+                          </div>
+                        </div>
+                        {canManageCatalogDisplay && (
+                          <Switch
+                            checked={service.show_on_website}
+                            onCheckedChange={async (checked) => {
+                              setService((prev) => prev ? { ...prev, show_on_website: checked } : prev);
+                              try {
+                                const res = await adminFetch('/api/admin/cms/catalog/services', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ updates: [{ id: serviceId, show_on_website: checked }] }),
+                                });
+                                if (!res.ok) throw new Error('Failed');
+                                toast.success(checked ? 'Now visible on website' : 'Hidden from website');
+                              } catch {
+                                setService((prev) => prev ? { ...prev, show_on_website: !checked } : prev);
+                                toast.error('Failed to update website visibility');
+                              }
+                            }}
+                          />
+                        )}
                       </div>
-                    )}
-                  />
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
