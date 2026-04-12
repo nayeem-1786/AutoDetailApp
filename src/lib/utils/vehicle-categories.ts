@@ -477,10 +477,22 @@ export interface VehicleClassification {
   vehicle_type: string;
   size_class: string | null;
   specialty_tier: string | null;
+  seat_rows: number;
   is_exotic: boolean;
   is_classic: boolean;
   requires_custom_quote: boolean;
   needs_year_confirmation: boolean;
+}
+
+export function getSeatRows(sizeClass: string | null, vehicleCategory: string): number {
+  if (vehicleCategory === 'motorcycle') return 0;
+  if (vehicleCategory !== 'automobile') return 0;
+  switch (sizeClass) {
+    case 'sedan': return 2;
+    case 'truck_suv_2row': return 2;
+    case 'suv_3row_van': return 3;
+    default: return 2;
+  }
 }
 
 /**
@@ -557,6 +569,7 @@ export async function resolveVehicleClassification(
       vehicle_type: 'standard',
       size_class: sizeClass,
       specialty_tier: null,
+      seat_rows: getSeatRows(sizeClass, 'automobile'),
       is_exotic: false,
       is_classic: false,
       requires_custom_quote: false,
@@ -568,6 +581,7 @@ export async function resolveVehicleClassification(
       vehicle_type: category,
       size_class: null,
       specialty_tier: DEFAULT_SPECIALTY_TIERS[category],
+      seat_rows: getSeatRows(null, category),
       is_exotic: false,
       is_classic: false,
       requires_custom_quote: category !== 'motorcycle', // rv, boat, aircraft need custom quotes

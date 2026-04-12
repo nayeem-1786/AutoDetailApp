@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
     size_class: classification.size_class,
     specialty_tier: classification.specialty_tier,
     tier_name: tierName,
+    seat_rows: classification.seat_rows,
     is_exotic: classification.is_exotic,
     is_classic: classification.is_classic,
     requires_custom_quote: classification.requires_custom_quote,
