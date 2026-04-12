@@ -20,6 +20,8 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent } from '@/components/u
 import { ArrowLeft } from 'lucide-react';
 import { formatDate } from '@/lib/utils/format';
 import type { CustomerType } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 interface ArchivedMatch {
   id: string;
@@ -52,6 +54,7 @@ const US_STATES = [
 ];
 
 export default function NewCustomerPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('customers.create');
   const router = useRouter();
   const [saving, setSaving] = useState(false);
 
@@ -314,6 +317,24 @@ export default function NewCustomerPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
   }
 
   return (

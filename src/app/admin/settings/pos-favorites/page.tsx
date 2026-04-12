@@ -14,6 +14,7 @@ import { ArrowUp, ArrowDown, Trash2, Plus, Pencil, Sun, Moon } from 'lucide-reac
 import { cn } from '@/lib/utils/cn';
 import { TYPE_ICONS, getTileColors } from '@/lib/pos/tile-colors';
 import type { FavoriteItem, FavoriteActionType, FavoriteColor, FavoriteColorShade } from '@/app/pos/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 const SETTINGS_KEY = 'pos_favorites';
 
@@ -227,6 +228,7 @@ interface CatalogItem {
 }
 
 export default function PosFavoritesPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.feature_toggles');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
@@ -435,7 +437,7 @@ export default function PosFavoritesPage() {
     setEditIndex(null);
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader title="POS Favorites" description="Configure quick-action tiles on the POS Favorites tab." />
@@ -448,6 +450,16 @@ export default function PosFavoritesPage() {
 
   const needsReference = newType === 'product' || newType === 'service';
   const referenceOptions = newType === 'product' ? products : services;
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -13,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Sparkles, ArrowLeft, ExternalLink, RotateCcw } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface BatchRecord {
   id: string;
@@ -33,6 +34,7 @@ interface DraftCounts {
 }
 
 export default function EnrichmentSettingsPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('products.edit');
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
@@ -391,10 +393,20 @@ export default function EnrichmentSettingsPage() {
   const isEnded = batchStatus === 'ended' && batch?.status !== 'completed';
   const isCompleted = batch?.status === 'completed';
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

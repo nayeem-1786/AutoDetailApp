@@ -29,6 +29,7 @@ import {
   Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -198,6 +199,7 @@ export default function AdminJobDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { granted: canAccess, loading: permLoading } = usePermission('pos.jobs.view');
   const { id } = use(params);
   const router = useRouter();
   const [job, setJob] = useState<JobDetail | null>(null);
@@ -271,7 +273,7 @@ export default function AdminJobDetailPage({
     }
   };
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
@@ -309,6 +311,16 @@ export default function AdminJobDetailPage({
   for (const p of completionPhotos) {
     if (!photosByZone[p.zone]) photosByZone[p.zone] = { intake: [], completion: [] };
     photosByZone[p.zone].completion.push(p);
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
   }
 
   return (
@@ -873,6 +885,7 @@ function PhotoSection({
   onPhotoClick: (photo: JobPhoto) => void;
   onToggleFeatured: (photo: JobPhoto) => void;
 }) {
+
   return (
     <div className="space-y-3">
       <div>

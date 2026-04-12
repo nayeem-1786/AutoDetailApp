@@ -29,6 +29,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Plus, Pencil, Trash2, Car, Bike, Truck, Ship, Plane, Upload, ImageOff } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 type CategoryType = 'product' | 'service' | 'vehicle';
 
@@ -43,6 +44,7 @@ const VEHICLE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
 
 
 export default function CategoriesPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('services.edit');
   const supabase = createClient();
 
   const [activeTab, setActiveTab] = useState<CategoryType>('product');
@@ -461,10 +463,20 @@ export default function CategoriesPage() {
     ];
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

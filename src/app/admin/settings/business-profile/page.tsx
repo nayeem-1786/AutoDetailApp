@@ -15,6 +15,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 const DAY_LABELS = [
   { key: 'monday', label: 'Monday' },
@@ -29,6 +30,7 @@ const DAY_LABELS = [
 type DayKey = typeof DAY_LABELS[number]['key'];
 
 export default function BusinessProfilePage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.business_hours');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
@@ -206,7 +208,7 @@ export default function BusinessProfilePage() {
     setSaving(false);
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -383,6 +385,16 @@ export default function BusinessProfilePage() {
       setOgImageDirty(false);
     }
     setSavingOgImage(false);
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
   }
 
   return (

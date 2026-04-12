@@ -20,6 +20,8 @@ import { VehicleStep } from './steps/vehicle-step';
 import { TransactionStep } from './steps/transaction-step';
 import { LoyaltyStep } from './steps/loyalty-step';
 import { ValidationStep } from './steps/validation-step';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 function getStepIcon(status: StepStatus) {
   switch (status) {
@@ -52,6 +54,7 @@ function getStepStatusVariant(status: StepStatus): 'success' | 'info' | 'destruc
 }
 
 export default function MigrationPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.backup_export');
   const [state, setState] = useState<MigrationState>(createInitialState);
 
   const currentStepIndex = MIGRATION_STEPS.findIndex((s) => s.key === state.currentStep);
@@ -98,6 +101,24 @@ export default function MigrationPage() {
   const completedCount = Object.values(state.steps).filter(
     (s) => s.status === 'completed' || s.status === 'skipped'
   ).length;
+
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

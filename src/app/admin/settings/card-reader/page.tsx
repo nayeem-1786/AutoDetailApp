@@ -17,6 +17,8 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 interface StripeLocation {
   id: string;
@@ -36,6 +38,7 @@ interface StripeReader {
 }
 
 export default function CardReaderSettingsPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.tax_payment');
   const { dialogProps, ConfirmDialog } = useConfirmDialog();
   // Location state
   const [locations, setLocations] = useState<StripeLocation[]>([]);
@@ -171,6 +174,16 @@ export default function CardReaderSettingsPage() {
     } finally {
       setRegisteringReader(false);
     }
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
   }
 
   return (

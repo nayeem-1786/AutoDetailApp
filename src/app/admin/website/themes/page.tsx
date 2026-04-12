@@ -12,8 +12,10 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { Plus, Trash2, Palette, Sparkles, Play, Square } from 'lucide-react';
 import { THEME_PRESETS } from '@/lib/utils/cms-theme-presets';
 import type { SeasonalTheme } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 export default function ThemeManagerPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.themes.manage');
   const router = useRouter();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [themes, setThemes] = useState<SeasonalTheme[]>([]);
@@ -104,10 +106,20 @@ export default function ThemeManagerPage() {
     });
   };
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

@@ -12,6 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 const TEMPLATE_LABELS: Record<PageTemplate, string> = {
   content: 'Content',
@@ -26,6 +27,7 @@ const TEMPLATE_COLORS: Record<PageTemplate, string> = {
 };
 
 export default function PagesListPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.pages.manage');
   const router = useRouter();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [pages, setPages] = useState<WebsitePage[]>([]);
@@ -159,6 +161,16 @@ export default function PagesListPage() {
     const parent = pages.find((p) => p.id === page.parent_id);
     return parent ? 1 + getIndent(parent) : 0;
   };
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

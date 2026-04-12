@@ -17,6 +17,7 @@ import {
   PAGE_TYPE_LABELS,
   type TickerPosition,
 } from '@/lib/utils/ticker-sections';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Speed → consistent px/s rate (content-width-aware)
@@ -46,6 +47,7 @@ function localToIso(local: string): string | null {
 }
 
 export default function TickerEditorPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.tickers.manage');
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [ticker, setTicker] = useState<AnnouncementTicker | null>(null);
@@ -134,7 +136,7 @@ export default function TickerEditorPage() {
 
   const enterSubmit = useEnterSubmit(save, !saving);
 
-  if (loading || !ticker) {
+  if (permLoading || loading || !ticker) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
@@ -144,6 +146,16 @@ export default function TickerEditorPage() {
 
   const pxPerSec = speedToPxPerSec(speedValue);
   const previewFontSize = ticker.font_size === 'xs' ? '0.75rem' : ticker.font_size === 'sm' ? '0.875rem' : ticker.font_size === 'lg' ? '1.125rem' : '1rem';
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -24,6 +24,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Calendar, Trash2, CalendarOff, Plus, ExternalLink, Loader2, Shield, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { cn } from '@/lib/utils/cn';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // Role option from roles table
 interface RoleOption {
@@ -83,6 +84,7 @@ function mergeScheduleWithDefaults(existing: EmployeeSchedule[]): DaySchedule[] 
 type OverrideState = 'default' | 'grant' | 'deny';
 
 export default function StaffDetailPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.manage_users');
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -528,10 +530,20 @@ export default function StaffDetailPage() {
     }
   }
 
-  if (loading || !employee) {
+  if (permLoading || loading || !employee) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

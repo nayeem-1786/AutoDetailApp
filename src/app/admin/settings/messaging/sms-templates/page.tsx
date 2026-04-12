@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { renderTemplate } from '@/lib/utils/template';
 import type { VariableDefinition } from '@/lib/email/variables';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,6 +98,7 @@ function buildSampleVars(
 // ---------------------------------------------------------------------------
 
 export default function SmsTemplatesPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.feature_toggles');
   const [templates, setTemplates] = useState<SmsTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [editSlug, setEditSlug] = useState<string | null>(null);
@@ -361,11 +363,21 @@ export default function SmsTemplatesPage() {
     templates: templates.filter((t) => t.category === cat),
   })).filter((g) => g.templates.length > 0);
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader title="SMS Templates" description="Settings > Messaging > SMS Templates" />
         <div className="flex items-center justify-center py-12"><Spinner size="lg" /></div>
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

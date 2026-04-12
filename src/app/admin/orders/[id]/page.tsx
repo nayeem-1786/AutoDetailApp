@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import type { Order, OrderItem, OrderEvent } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface OrderDetail extends Omit<Order, 'customer'> {
   order_items: OrderItem[];
@@ -70,6 +71,7 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 export default function AdminOrderDetailPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('orders.view');
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -200,7 +202,7 @@ export default function AdminOrderDetailPage() {
     });
   };
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-24">
         <Spinner size="lg" />
@@ -222,6 +224,16 @@ export default function AdminOrderDetailPage() {
   const payment = PAYMENT_BADGES[order.payment_status] || { label: order.payment_status, variant: 'default' as const };
   const fulfillment = FULFILLMENT_BADGES[order.fulfillment_status] || { label: order.fulfillment_status, variant: 'default' as const };
   const canRefund = order.payment_status === 'paid' || order.payment_status === 'partially_refunded';
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

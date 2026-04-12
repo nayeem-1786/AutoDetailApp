@@ -25,10 +25,12 @@ import {
   RADIUS_OPTIONS,
   SITE_THEME_PRESETS,
 } from './_components/theme-defaults';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 type FormData = Partial<SiteThemeSettings>;
 
 export default function ThemeSettingsPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.themes.manage');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -201,10 +203,20 @@ export default function ThemeSettingsPage() {
     toast.success(`Applied "${preset.name}" preset — click Save to apply`);
   };
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

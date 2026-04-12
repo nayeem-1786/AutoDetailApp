@@ -8,10 +8,13 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Info, Loader2 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 type EnforcementMode = 'soft' | 'hard';
 
 export default function CouponEnforcementPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('marketing.coupons');
   const router = useRouter();
   const supabase = createClient();
   const [mode, setMode] = useState<EnforcementMode>('soft');
@@ -52,10 +55,20 @@ export default function CouponEnforcementPage() {
     }
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

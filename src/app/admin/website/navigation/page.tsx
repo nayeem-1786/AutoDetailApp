@@ -20,6 +20,8 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useAsyncAction } from '@/lib/hooks/use-async-action';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { WebsiteNavItem, WebsitePage, NavPlacement } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 const PLACEMENTS: { value: NavPlacement; label: string }[] = [
   { value: 'header', label: 'Header' },
@@ -42,6 +44,7 @@ interface DropTarget {
 }
 
 export default function NavigationPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.pages.manage');
   const { isSubmitting, execute } = useAsyncAction();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
   const [activePlacement, setActivePlacement] = useState<NavPlacement>('header');
@@ -434,6 +437,16 @@ export default function NavigationPage() {
       );
     });
   };
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

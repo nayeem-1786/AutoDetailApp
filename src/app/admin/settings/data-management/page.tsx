@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
 import { Search, X, Trash2, AlertTriangle, UserX } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface CustomerResult {
   id: string;
@@ -38,6 +39,7 @@ interface PurgeQueueItem {
 }
 
 export default function DataManagementPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.backup_export');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CustomerResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -186,6 +188,24 @@ export default function DataManagementPage() {
   }
 
   const filteredResults = searchResults.filter((r) => !queuedIds.has(r.id));
+
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

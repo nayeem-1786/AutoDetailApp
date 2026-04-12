@@ -32,6 +32,7 @@ import {
   Square,
   AlertCircle,
 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // AI SEO Result Type (mirrors server-side)
@@ -1167,6 +1168,7 @@ function AiReviewModal({
 // ---------------------------------------------------------------------------
 
 export default function SeoDashboardPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.seo.manage');
   const [pages, setPages] = useState<PageSeo[]>([]);
   const [loading, setLoading] = useState(true);
   const [autoPopulating, setAutoPopulating] = useState(false);
@@ -1504,6 +1506,16 @@ export default function SeoDashboardPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

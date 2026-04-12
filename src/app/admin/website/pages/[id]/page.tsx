@@ -20,6 +20,7 @@ import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { formatDistanceToNow } from 'date-fns';
 import type { WebsitePage, PageTemplate } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface Revision {
   id: string;
@@ -36,6 +37,7 @@ interface RevisionSnapshot {
 }
 
 export default function EditPagePage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.pages.manage');
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const [loading, setLoading] = useState(true);
@@ -364,9 +366,19 @@ export default function EditPagePage() {
     prevSavingRef.current = saving;
   }, [saving, revisionsExpanded, loadRevisions]);
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="text-center py-12 text-sm text-gray-500">Loading page...</div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
     );
   }
 

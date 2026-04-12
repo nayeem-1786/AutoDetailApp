@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { TemplateList } from './_components/template-list';
 import { BrandSettings } from './_components/brand-settings';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 const TABS = [
   { key: 'templates', label: 'Templates' },
@@ -13,7 +15,26 @@ const TABS = [
 type TabKey = (typeof TABS)[number]['key'];
 
 export default function EmailTemplatesPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('marketing.campaigns');
   const [activeTab, setActiveTab] = useState<TabKey>('templates');
+
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

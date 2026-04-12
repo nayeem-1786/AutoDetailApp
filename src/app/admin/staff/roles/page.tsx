@@ -33,6 +33,7 @@ import {
   Pencil,
   RotateCcw,
 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // Types matching API response
 interface RoleData {
@@ -92,6 +93,7 @@ function sortRoles(roles: RoleData[]): RoleData[] {
 }
 
 export default function RoleManagementPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.roles_permissions');
   const [roles, setRoles] = useState<RoleData[]>([]);
   const [permDefs, setPermDefs] = useState<PermDef[]>([]);
   const [loading, setLoading] = useState(true);
@@ -428,7 +430,7 @@ export default function RoleManagementPage() {
     selectedRole?.is_super ? true : localPerms[d.key] === true
   ).length;
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -438,6 +440,16 @@ export default function RoleManagementPage() {
         <div className="flex items-center justify-center py-12">
           <Spinner size="lg" />
         </div>
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

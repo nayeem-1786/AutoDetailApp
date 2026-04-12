@@ -27,6 +27,7 @@ import {
   Search,
 } from 'lucide-react';
 import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Block type label helpers
@@ -74,6 +75,7 @@ interface EnrichedBlock extends PageContentBlock {
 }
 
 export default function GlobalBlocksPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.pages.manage');
   const [blocks, setBlocks] = useState<EnrichedBlock[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -172,6 +174,16 @@ export default function GlobalBlocksPage() {
       b.block_type.toLowerCase().includes(term)
     );
   });
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

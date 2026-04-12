@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { Star, LayoutGrid } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,7 @@ interface CatalogProduct {
 // ---------------------------------------------------------------------------
 
 export default function CatalogDisplayPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.catalog_display.manage');
   const [tab, setTab] = useState<'services' | 'products'>('services');
   const [services, setServices] = useState<CatalogService[]>([]);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
@@ -154,7 +156,7 @@ export default function CatalogDisplayPage() {
     }
   };
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
@@ -164,6 +166,16 @@ export default function CatalogDisplayPage() {
 
   const visibleServices = services.filter((s) => s.show_on_website).length;
   const visibleProducts = products.filter((p) => p.show_on_website).length;
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // /admin/website/pages/new — Auto-create a draft page and redirect to editor
 // ---------------------------------------------------------------------------
 
 export default function NewPageRedirect() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.pages.manage');
   const router = useRouter();
   const [error, setError] = useState(false);
 
@@ -60,6 +62,24 @@ export default function NewPageRedirect() {
         >
           Back to Pages
         </button>
+      </div>
+    );
+  }
+
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

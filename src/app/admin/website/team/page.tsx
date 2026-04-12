@@ -23,6 +23,7 @@ import { useDragDropReorder } from '@/lib/hooks/use-drag-drop-reorder';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,6 +58,7 @@ function toSlug(name: string): string {
 // ---------------------------------------------------------------------------
 
 export default function TeamMembersAdminPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.about.manage');
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -324,10 +326,20 @@ export default function TeamMembersAdminPage() {
   // Render
   // -------------------------------------------------------------------------
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

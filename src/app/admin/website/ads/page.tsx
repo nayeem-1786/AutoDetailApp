@@ -24,6 +24,7 @@ import {
 import type { AdCreative, AdPlacement, AdSize } from '@/lib/supabase/types';
 import type { PageZones, AdZoneDefinition } from '@/lib/utils/cms-zones';
 import { AD_SIZE_LABELS } from '@/lib/utils/cms-zones';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +65,7 @@ const TABS: { id: TabId; label: string; icon: typeof Layers }[] = [
 // ---------------------------------------------------------------------------
 
 export default function AdManagementPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.ads.manage');
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>('creatives');
 
@@ -333,6 +335,24 @@ export default function AdManagementPage() {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (permLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Car, Mail, MessageSquare, User, Calendar, DollarSign, Award, Clock, ExternalLink, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -23,6 +24,7 @@ type QuoteWithRelations = Quote & {
 
 
 export default function QuoteDetailPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('quotes.create');
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const supabase = createClient();
@@ -112,7 +114,7 @@ export default function QuoteDetailPage() {
     loadQuote();
   }, [loadQuote]);
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
@@ -128,6 +130,16 @@ export default function QuoteDetailPage() {
         <Button variant="outline" onClick={() => router.push('/admin/quotes')}>
           Back to Quotes
         </Button>
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

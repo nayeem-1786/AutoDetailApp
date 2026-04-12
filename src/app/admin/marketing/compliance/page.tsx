@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import type { ColumnDef } from '@tanstack/react-table';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface ConsentEntry {
   id: string;
@@ -41,6 +42,7 @@ interface CustomerResult {
 }
 
 export default function CompliancePage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('marketing.campaigns');
   const supabase = createClient();
   const [entries, setEntries] = useState<ConsentEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,10 +195,20 @@ export default function CompliancePage() {
     },
   ];
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

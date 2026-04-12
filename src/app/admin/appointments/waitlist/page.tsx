@@ -20,6 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { formatDate, formatTime, formatPhone } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import type { WaitlistStatus } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface WaitlistEntryRow {
   id: string;
@@ -62,6 +63,7 @@ const TAB_VALUES = ['all', 'waiting', 'notified', 'booked', 'cancelled'] as cons
 type TabValue = (typeof TAB_VALUES)[number];
 
 export default function WaitlistPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('appointments.view_today');
   const [entries, setEntries] = useState<WaitlistEntryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -211,6 +213,16 @@ export default function WaitlistPage() {
   }
 
   const totalPages = Math.ceil(total / limit);
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div>

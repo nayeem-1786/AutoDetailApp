@@ -35,6 +35,7 @@ import type {
   FooterBottomLink,
   WebsiteNavItem,
 } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +66,7 @@ function getSpanTotal(columns: ColumnWithLinks[]): number {
 // ---------------------------------------------------------------------------
 
 export default function FooterAdminPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.pages.manage');
   const [sections, setSections] = useState<FooterSection[]>([]);
   const [columns, setColumns] = useState<ColumnWithLinks[]>([]);
   const [bottomLinks, setBottomLinks] = useState<FooterBottomLink[]>([]);
@@ -152,7 +154,7 @@ export default function FooterAdminPage() {
   const mainSectionId = mainSection?.id;
   const mainColumns = columns.filter((c) => c.section_id === mainSectionId);
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -162,6 +164,16 @@ export default function FooterAdminPage() {
         <div className="flex items-center justify-center py-20">
           <Spinner size="lg" />
         </div>
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

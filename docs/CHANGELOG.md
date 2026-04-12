@@ -4,6 +4,20 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add permission gating to 51 admin pages — 2026-04-12
+
+- Added `usePermission` checks to 51 admin pages that previously had no permission gating. Any employee role could access them.
+- **Website/CMS (20 pages)**: `cms.hero.manage`, `cms.pages.manage`, `cms.about.manage`, `cms.seo.manage`, `cms.tickers.manage`, `cms.ads.manage`, `cms.catalog_display.manage`, `cms.themes.manage`
+- **Settings (14 pages)**: `settings.business_hours`, `settings.manage_users`, `settings.feature_toggles`, `settings.backup_export`, `settings.tax_payment`, `products.edit`, `marketing.coupons` (skipped `messaging/page.tsx` — already gated)
+- **Jobs/Quotes/Orders (6 pages)**: `pos.jobs.view`, `quotes.create`, `orders.view`
+- **Staff (3 pages)**: `settings.manage_users`, `settings.roles_permissions`
+- **Other (8 pages)**: `customers.create`, `services.edit`, `products.edit`, `marketing.campaigns`, `appointments.view_today`, `settings.backup_export`
+- All 23 unique permission keys verified against `permission_definitions` table migrations
+- Pattern: `usePermission` hook → combine `permLoading` with existing `loading` state → show "Access Denied" if not granted
+- All pages are `'use client'` — no server component conversions needed
+
+---
+
 ## [Session 25] — 2026-04-11
 
 ### Features

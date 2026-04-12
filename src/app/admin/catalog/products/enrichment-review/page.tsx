@@ -17,6 +17,7 @@ import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Check, X, ChevronDown, ChevronUp, ExternalLink, Sparkles, RotateCcw } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface DraftWithProduct {
   id: string;
@@ -52,6 +53,7 @@ const SPEC_LABELS: Record<string, string> = {
 };
 
 export default function EnrichmentReviewPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('products.edit');
   const router = useRouter();
   const supabase = createClient();
 
@@ -308,10 +310,20 @@ export default function EnrichmentReviewPage() {
     return String(value ?? '');
   }
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex items-center justify-center p-12">
         <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

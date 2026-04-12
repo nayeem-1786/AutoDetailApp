@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { AnnouncementTicker } from '@/lib/supabase/types';
 import { TICKER_POSITION_OPTIONS } from '@/lib/utils/ticker-sections';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types for multi-ticker options
@@ -60,6 +61,7 @@ const TEXT_ENTRY_OPTIONS = [
 // Main Page
 // ---------------------------------------------------------------------------
 export default function TickerManagerPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.tickers.manage');
   const router = useRouter();
   const { isSubmitting, execute } = useAsyncAction();
   const { confirm, dialogProps, ConfirmDialog } = useConfirmDialog();
@@ -273,10 +275,20 @@ export default function TickerManagerPage() {
   const activeTopBar = topBarTickers.filter((t) => t.is_active);
   const activeSection = sectionTickers.filter((t) => t.is_active);
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }
@@ -655,6 +667,7 @@ function TargetPagesBadges({ pages }: { pages: string[] | null }) {
       </span>
     );
   }
+
   return (
     <span className="inline-flex items-center gap-1">
       {targets.map((p) => (

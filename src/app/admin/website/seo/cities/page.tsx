@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { ContentBlockEditor } from '@/components/admin/content/content-block-editor';
 import type { CityLandingPage } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Slug generator — lowercase, hyphenated, ASCII-only
@@ -136,6 +137,7 @@ function cityToForm(city: CityLandingPage): CityFormData {
 // ---------------------------------------------------------------------------
 
 export default function CitiesAdminPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.seo.manage');
   const [cities, setCities] = useState<CityLandingPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
@@ -506,10 +508,20 @@ export default function CitiesAdminPage() {
   // Render
   // -----------------------------------------------------------------------
 
-  if (loading) {
+  if (permLoading || loading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }

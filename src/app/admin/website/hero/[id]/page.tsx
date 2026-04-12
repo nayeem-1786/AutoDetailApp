@@ -11,6 +11,7 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { ArrowLeft, Save, Image as ImageIcon, Video, Columns, ChevronDown, X } from 'lucide-react';
 import { HeroImageUpload } from '../components/hero-image-upload';
 import type { HeroSlide } from '@/lib/supabase/types';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 const CONTENT_TYPES = [
   { value: 'image', label: 'Image', icon: ImageIcon },
@@ -19,6 +20,7 @@ const CONTENT_TYPES = [
 ] as const;
 
 export default function HeroSlideEditorPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('cms.hero.manage');
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [slide, setSlide] = useState<HeroSlide | null>(null);
@@ -88,10 +90,20 @@ export default function HeroSlideEditorPage() {
     }
   };
 
-  if (loading || !slide) {
+  if (permLoading || loading || !slide) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
       </div>
     );
   }
@@ -418,6 +430,7 @@ function ColorField({
   value: string;
   onChange: (v: string) => void;
 }) {
+
   return (
     <div>
       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">

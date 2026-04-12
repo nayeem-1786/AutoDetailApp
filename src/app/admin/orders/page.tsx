@@ -23,6 +23,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useTableState } from '@/lib/hooks/useTableState';
 import { TableToolbar, type FilterConfig } from '@/components/admin/table-toolbar';
 import type { FilterValue } from '@/lib/hooks/useTableState';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 interface OrderRow {
   id: string;
@@ -70,6 +71,7 @@ const DEFAULT_FILTERS = {
 };
 
 export default function AdminOrdersPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('orders.view');
   const router = useRouter();
 
   const table = useTableState({ defaultFilters: DEFAULT_FILTERS, defaultPageSize: 20 });
@@ -184,6 +186,16 @@ export default function AdminOrdersPage() {
     return table.sort.direction === 'asc'
       ? <ChevronUp className="h-4 w-4 text-gray-700" />
       : <ChevronDown className="h-4 w-4 text-gray-700" />;
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
   }
 
   return (

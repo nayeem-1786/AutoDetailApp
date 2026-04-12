@@ -20,10 +20,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { ArrowLeft, Bell, Clock, Info, Loader2, Plus, Trash2 } from 'lucide-react';
+import { usePermission } from '@/lib/hooks/use-permission';
+import { Spinner } from '@/components/ui/spinner';
 
 type NotificationType = 'low_stock' | 'all';
 
 export default function NotificationSettingsPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('settings.feature_toggles');
   const router = useRouter();
   const [recipients, setRecipients] = useState<NotificationRecipient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,6 +158,16 @@ export default function NotificationSettingsPage() {
     } finally {
       setDeleting(false);
     }
+  }
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
   }
 
   return (

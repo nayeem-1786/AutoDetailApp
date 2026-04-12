@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { PipelineStats } from './components/pipeline-stats';
 import { QuoteMetrics } from './components/quote-metrics';
 import { QuoteSlideOver } from './components/quote-slide-over';
+import { usePermission } from '@/lib/hooks/use-permission';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,6 +55,7 @@ const DEFAULT_FILTERS = {
 // ---------------------------------------------------------------------------
 
 export default function QuotesPage() {
+  const { granted: canAccess, loading: permLoading } = usePermission('quotes.create');
   const table = useTableState({ defaultFilters: DEFAULT_FILTERS, defaultPageSize: PAGE_SIZE });
 
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
@@ -188,6 +190,16 @@ export default function QuotesPage() {
 
   const startIndex = (table.page - 1) * PAGE_SIZE;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+
+  if (!canAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h2 className="text-lg font-semibold text-gray-900">Access Denied</h2>
+        <p className="mt-1 text-sm text-gray-500">You don&apos;t have permission to view this page.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
