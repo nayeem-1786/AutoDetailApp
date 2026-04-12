@@ -190,7 +190,8 @@ export function generateProductSchema(
   product: Product,
   category: ProductCategory,
   businessName: string,
-  variants?: ProductVariant[]
+  variants?: ProductVariant[],
+  vendorName?: string
 ) {
   const url = `${SITE_URL}/products/${category.slug}/${product.slug}`;
   const specs = product.specs as ProductSpecs | undefined;
@@ -203,9 +204,10 @@ export function generateProductSchema(
     url,
     image: product.image_url ?? undefined,
     sku: product.sku ?? undefined,
+    ...(product.barcode ? { gtin: product.barcode } : {}),
     brand: {
       '@type': 'Organization',
-      name: businessName,
+      name: vendorName || businessName,
     },
     offers: {
       '@type': 'Offer',

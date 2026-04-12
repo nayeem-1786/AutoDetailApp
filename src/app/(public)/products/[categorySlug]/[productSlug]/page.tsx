@@ -93,7 +93,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
   return (
     <>
-      <JsonLd data={generateProductSchema(product, category, businessInfo.name, variants)} />
+      <JsonLd data={generateProductSchema(product, category, businessInfo.name, variants, product.vendors?.name)} />
       <JsonLd data={generateBreadcrumbSchema(breadcrumbItems)} />
 
       <article className="bg-brand-dark py-8 sm:py-12">

@@ -20,6 +20,7 @@ async function getClient() {
 
 export interface ProductWithCategory extends Product {
   product_categories: ProductCategory;
+  vendors?: { name: string } | null;
 }
 
 export interface ProductCategoryWithProducts {
@@ -120,7 +121,7 @@ export async function getProductBySlug(
 
   const { data: product, error } = await supabase
     .from('products')
-    .select('*, product_categories!inner(*)')
+    .select('*, product_categories!inner(*), vendors(name)')
     .eq('slug', productSlug)
     .eq('is_active', true)
     .eq('show_on_website', true)

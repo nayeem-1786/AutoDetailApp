@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Product schema — add vendor brand and barcode GTIN — 2026-04-12
+
+- `generateProductSchema()` in `json-ld.ts`: brand now uses vendor name (falls back to business name). Added `gtin` field from product barcode when available.
+- `getProductBySlug()` in `products.ts`: added `vendors(name)` join so vendor name is available on product pages.
+- `ProductWithCategory` interface extended with `vendors?: { name: string } | null`.
+- Product page passes vendor name as 5th argument to schema generator.
+
+---
+
 ## fix: Add permission gating to 51 admin pages — 2026-04-12
 
 - Added `usePermission` checks to 51 admin pages that previously had no permission gating. Any employee role could access them.
