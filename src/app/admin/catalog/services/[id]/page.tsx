@@ -55,6 +55,7 @@ import {
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Pencil, Trash2, X, Eye, EyeOff } from 'lucide-react';
+import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   getSaleStatus,
   getTierSaleInfo,
@@ -99,6 +100,7 @@ export default function ServiceDetailPage() {
   const { granted: canDeleteService } = usePermission('services.delete');
   const { granted: canManageAddons } = usePermission('services.manage_addons');
   const { granted: canSetPricing } = usePermission('services.set_pricing');
+  const { granted: canManageCatalogDisplay } = usePermission('cms.catalog_display.manage');
   const serviceId = params.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -984,7 +986,7 @@ export default function ServiceDetailPage() {
         }
       />
 
-      {/* Website visibility indicator */}
+      {/* Website visibility toggle */}
       <div className={`flex items-center gap-2 text-sm ${service.show_on_website ? 'text-green-700' : 'text-amber-600'}`}>
         {service.show_on_website ? (
           <Eye className="h-4 w-4" />
@@ -994,12 +996,26 @@ export default function ServiceDetailPage() {
         <span className="font-medium">
           {service.show_on_website ? 'Visible on website' : 'Hidden from website'}
         </span>
-        <a
-          href="/admin/website/catalog"
-          className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-        >
-          (Manage in Website Catalog)
-        </a>
+        {canManageCatalogDisplay && (
+          <Switch
+            checked={service.show_on_website}
+            onCheckedChange={async (checked) => {
+              setService((prev) => prev ? { ...prev, show_on_website: checked } : prev);
+              try {
+                const res = await adminFetch('/api/admin/cms/catalog/services', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ updates: [{ id: serviceId, show_on_website: checked }] }),
+                });
+                if (!res.ok) throw new Error('Failed');
+                toast.success(checked ? 'Now visible on website' : 'Hidden from website');
+              } catch {
+                setService((prev) => prev ? { ...prev, show_on_website: !checked } : prev);
+                toast.error('Failed to update website visibility');
+              }
+            }}
+          />
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>

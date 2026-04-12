@@ -57,6 +57,7 @@ export default function ProductDetailPage() {
   const { granted: canEditProduct } = usePermission('products.edit');
   const { granted: canViewCost } = usePermission('inventory.view_costs');
   const { granted: canDeleteProduct } = usePermission('products.delete');
+  const { granted: canManageCatalogDisplay } = usePermission('cms.catalog_display.manage');
 
   const [product, setProduct] = useState<ProductWithRelations | null>(null);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
@@ -711,7 +712,7 @@ export default function ProductDetailPage() {
         }
       />
 
-      {/* Website visibility indicator */}
+      {/* Website visibility toggle */}
       <div className={`flex items-center gap-2 text-sm ${product.show_on_website ? 'text-green-700' : 'text-amber-600'}`}>
         {product.show_on_website ? (
           <Eye className="h-4 w-4" />
@@ -721,12 +722,26 @@ export default function ProductDetailPage() {
         <span className="font-medium">
           {product.show_on_website ? 'Visible on website' : 'Hidden from website'}
         </span>
-        <a
-          href="/admin/website/catalog"
-          className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
-        >
-          (Manage in Website Catalog)
-        </a>
+        {canManageCatalogDisplay && (
+          <Switch
+            checked={product.show_on_website}
+            onCheckedChange={async (checked) => {
+              setProduct((prev) => prev ? { ...prev, show_on_website: checked } : prev);
+              try {
+                const res = await adminFetch('/api/admin/cms/catalog/products', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ updates: [{ id: productId, show_on_website: checked }] }),
+                });
+                if (!res.ok) throw new Error('Failed');
+                toast.success(checked ? 'Now visible on website' : 'Hidden from website');
+              } catch {
+                setProduct((prev) => prev ? { ...prev, show_on_website: !checked } : prev);
+                toast.error('Failed to update website visibility');
+              }
+            }}
+          />
+        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
