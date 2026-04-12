@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { invalidateSmsTemplateCache } from '@/lib/sms/render-sms-template';
 
 // ---------------------------------------------------------------------------
@@ -16,6 +17,8 @@ export async function GET(
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const denied = await requirePermission(employee.id, 'settings.feature_toggles');
+  if (denied) return denied;
 
   const { slug } = await params;
   const admin = createAdminClient();
@@ -41,6 +44,8 @@ export async function PUT(
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const deniedPut = await requirePermission(employee.id, 'settings.feature_toggles');
+  if (deniedPut) return deniedPut;
 
   const { slug } = await params;
   const body = await request.json();

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 import { revalidateTag } from '@/lib/utils/revalidate';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
@@ -14,6 +15,8 @@ export async function GET(request: NextRequest) {
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const denied = await requirePermission(employee.id, 'settings.business_hours');
+  if (denied) return denied;
 
   const key = request.nextUrl.searchParams.get('key');
   if (!key) {
@@ -39,6 +42,8 @@ export async function PATCH(request: NextRequest) {
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const denied = await requirePermission(employee.id, 'settings.business_hours');
+  if (denied) return denied;
 
   const body = await request.json();
   const { key, value } = body;

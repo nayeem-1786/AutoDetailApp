@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -7,13 +8,14 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 });
 
 // GET: List all locations
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const employee = await getEmployeeFromSession(request);
+    if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(employee.id, 'settings.tax_payment');
+    if (denied) return denied;
 
     const locations = await stripe.terminal.locations.list({ limit: 100 });
 
@@ -30,11 +32,12 @@ export async function GET() {
 // POST: Create a new location
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const employee = await getEmployeeFromSession(request);
+    if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(employee.id, 'settings.tax_payment');
+    if (denied) return denied;
 
     const body = await request.json();
     const { display_name, address } = body;

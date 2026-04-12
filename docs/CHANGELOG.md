@@ -24,6 +24,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - **Voice agent date off-by-one** — Server-side day-of-week validation catches LLM calendar math errors and returns corrected dates.
 - **Twilio diagnostic logging removed** — Signature validation debug lines removed from inbound and status webhook routes.
 
+### Security
+- **Permission enforcement added to 17 admin API routes** — business settings, Stripe reader/location/debug/register endpoints, receipt logo, SMS templates (4 routes), content image upload, staff permissions view, homepage settings, SEO cities, vehicle makes (POST/PATCH/DELETE), vehicle categories. All use existing `requirePermission()` with existing permission keys.
+- **3 hardcoded role checks replaced** — notification-recipients (2 routes) and customers/search migrated from `includes('admin')` to `requirePermission()` with proper permission keys.
+- **4 Stripe routes modernized** — Refactored from old `createClient()`/`getUser()` pattern to `getEmployeeFromSession()` + `requirePermission()`.
+
 ### Audits
 - **Staff permissions** — Comprehensive analysis of all 170 admin API routes and 96 admin pages. Found 54 pages and ~30 API routes lacking permission enforcement. 5 hardcoded super_admin role checks in staff/roles routes (intentional). Report: `docs/audits/staff-permissions-audit.md`
 

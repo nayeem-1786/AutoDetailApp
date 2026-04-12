@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
+import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const BUCKET = 'receipt-assets';
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate — admin session required
-    const supabaseSession = await createClient();
-    const { data: { user } } = await supabaseSession.auth.getUser();
-    if (!user) {
+    const employee = await getEmployeeFromSession(request);
+    if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(employee.id, 'settings.tax_payment');
+    if (denied) return denied;
 
     const supabase = createAdminClient();
 
@@ -73,13 +74,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
-    const supabaseSession = await createClient();
-    const { data: { user } } = await supabaseSession.auth.getUser();
-    if (!user) {
+    const employee = await getEmployeeFromSession(request);
+    if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(employee.id, 'settings.tax_payment');
+    if (denied) return denied;
 
     const supabase = createAdminClient();
 

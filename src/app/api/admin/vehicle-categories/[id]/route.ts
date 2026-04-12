@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 // PATCH /api/admin/vehicle-categories/[id] — Update a vehicle category
 // Only display_name, description, image_url, image_alt, display_order, is_active are updatable
@@ -13,6 +14,8 @@ export async function PATCH(
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const denied = await requirePermission(employee.id, 'services.edit');
+  if (denied) return denied;
 
   const { id } = await params;
   const body = await request.json();

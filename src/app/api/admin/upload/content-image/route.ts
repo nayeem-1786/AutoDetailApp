@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const BUCKET = 'cms-assets';
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -21,6 +22,8 @@ export async function POST(request: NextRequest) {
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(employee.id, 'cms.pages.manage');
+    if (denied) return denied;
 
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
@@ -93,6 +96,8 @@ export async function DELETE(request: NextRequest) {
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const deniedDel = await requirePermission(employee.id, 'cms.pages.manage');
+    if (deniedDel) return deniedDel;
 
     const body = await request.json();
     const url = body.url as string;
@@ -132,6 +137,8 @@ export async function GET(request: NextRequest) {
     if (!employee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const deniedGet = await requirePermission(employee.id, 'cms.pages.manage');
+    if (deniedGet) return deniedGet;
 
     const folder = request.nextUrl.searchParams.get('folder') || 'general';
     const supabase = createAdminClient();

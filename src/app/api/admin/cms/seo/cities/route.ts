@@ -14,6 +14,8 @@ export async function GET(request: NextRequest) {
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const denied = await requirePermission(employee.id, 'cms.seo.manage');
+  if (denied) return denied;
 
   const admin = createAdminClient();
   const { data, error } = await admin

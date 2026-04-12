@@ -17,6 +17,8 @@ export async function GET(
     if (!caller) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const denied = await requirePermission(caller.id, 'settings.roles_permissions');
+    if (denied) return denied;
 
     const { id } = await params;
     const supabase = createAdminClient();

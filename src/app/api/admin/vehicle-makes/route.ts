@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { requirePermission } from '@/lib/auth/require-permission';
 
 const ACRONYMS = ['BMW', 'GMC', 'RAM', 'BYD', 'MG', 'KTM'];
 
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest) {
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const denied = await requirePermission(employee.id, 'services.edit');
+  if (denied) return denied;
 
   const body = await request.json();
   const rawName = body.name;
@@ -117,6 +120,8 @@ export async function PATCH(request: NextRequest) {
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const deniedPatch = await requirePermission(employee.id, 'services.edit');
+  if (deniedPatch) return deniedPatch;
 
   const body = await request.json();
   const { id, name, category, is_active, sort_order } = body;
@@ -170,6 +175,8 @@ export async function DELETE(request: NextRequest) {
   if (!employee) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const deniedDel = await requirePermission(employee.id, 'services.edit');
+  if (deniedDel) return deniedDel;
 
   const body = await request.json();
   const { id } = body;
