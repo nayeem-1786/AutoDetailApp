@@ -69,6 +69,10 @@ export interface ReceiptTransaction {
   payments: ReceiptPayment[];
   loyalty_points_earned?: number;
   refunds?: ReceiptRefund[];
+  /** Deposit receipt fields — set when transaction is linked to an appointment with payment_type='deposit' */
+  is_deposit?: boolean;
+  deposit_amount?: number;
+  balance_due?: number;
 }
 
 export interface ReceiptLine {
@@ -373,6 +377,12 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   const refundStatus = getRefundStatus(tx.refunds, tx.items);
   const refundedMap = buildRefundedMap(tx.refunds);
 
+  // Deposit receipt label
+  if (tx.is_deposit) {
+    lines.push({ type: 'text', text: '** BOOKING DEPOSIT **', alignment: 'center' });
+    lines.push({ type: 'divider' });
+  }
+
   // Receipt number & date with time
   lines.push({
     type: 'columns',
@@ -525,15 +535,41 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
-  lines.push({
-    type: 'bold',
-    text: '',
-  });
-  lines.push({
-    type: 'columns',
-    left: 'TOTAL',
-    right: `$${tx.total_amount.toFixed(2)}`,
-  });
+  // Deposit receipt: show deposit paid + balance due before TOTAL
+  if (tx.is_deposit && tx.deposit_amount != null && tx.balance_due != null) {
+    lines.push({
+      type: 'columns',
+      left: 'Deposit Paid (Online)',
+      right: `-$${tx.deposit_amount.toFixed(2)}`,
+    });
+
+    lines.push({
+      type: 'bold',
+      text: '',
+    });
+    lines.push({
+      type: 'columns',
+      left: 'TOTAL CHARGED',
+      right: `$${tx.total_amount.toFixed(2)}`,
+    });
+
+    lines.push({ type: 'spacer' });
+    lines.push({
+      type: 'columns',
+      left: 'BALANCE DUE AT SERVICE',
+      right: `$${tx.balance_due.toFixed(2)}`,
+    });
+  } else {
+    lines.push({
+      type: 'bold',
+      text: '',
+    });
+    lines.push({
+      type: 'columns',
+      left: 'TOTAL',
+      right: `$${tx.total_amount.toFixed(2)}`,
+    });
+  }
 
   lines.push({ type: 'divider' });
 
@@ -824,6 +860,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     totals.push(row(`Loyalty${ptsLabel}`, `-$${tx.loyalty_discount.toFixed(2)}`, '#d97706'));
   }
   if (tx.tip_amount > 0) totals.push(row('Tip', `$${tx.tip_amount.toFixed(2)}`));
+  if (tx.is_deposit && tx.deposit_amount != null) {
+    totals.push(row('Deposit Paid (Online)', `-$${tx.deposit_amount.toFixed(2)}`, '#16a34a'));
+  }
 
   const paymentRows = tx.payments
     .map((p) => {
@@ -1026,6 +1065,10 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>` : ''}
   </table>
 
+  ${tx.is_deposit ? `<div style="text-align:center;margin:8px 0;">
+    <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#2563eb;">BOOKING DEPOSIT</span>
+  </div>` : ''}
+
   ${htmlRefundStatus !== 'none' ? `<div style="text-align:center;margin:8px 0;padding:6px 12px;display:inline-block;width:100%;box-sizing:border-box;">
     <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:${htmlRefundStatus === 'full' ? '#dc2626' : '#d97706'};">
       ${htmlRefundStatus === 'full' ? 'REFUNDED' : 'PARTIALLY REFUNDED'}
@@ -1048,9 +1091,13 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       <td colspan="2" style="padding:4px 0;"><hr style="border:none;border-top:1px solid #333;margin:0;"></td>
     </tr>
     <tr>
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;">TOTAL</td>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;">${tx.is_deposit ? 'TOTAL CHARGED' : 'TOTAL'}</td>
       <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${tx.total_amount.toFixed(2)}</td>
     </tr>
+    ${tx.is_deposit && tx.balance_due != null ? `<tr>
+      <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">BALANCE DUE AT SERVICE</td>
+      <td style="padding:6px 0;font-size:14px;font-weight:bold;text-align:right;color:#d97706;">$${tx.balance_due.toFixed(2)}</td>
+    </tr>` : ''}
   </table>
 
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">

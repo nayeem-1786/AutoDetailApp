@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Deposit receipt awareness across all receipt channels — 2026-04-12
+
+- **Deposit transaction insert** (`src/app/api/book/route.ts`): `subtotal` now set to full service total (not deposit amount) so line items and subtotal match. Added `payments` row insert so receipt shows card payment method.
+- **Receipt template** (`src/app/pos/lib/receipt-template.ts`): `ReceiptTransaction` interface gains `is_deposit`, `deposit_amount`, `balance_due` fields. All 3 renderers (HTML, ESC/POS line-based, plain text) show: "BOOKING DEPOSIT" badge, "Deposit Paid (Online)" in green in totals, "TOTAL CHARGED" label, "BALANCE DUE AT SERVICE" in amber.
+- **Receipt data fetcher** (`src/lib/data/receipt-data.ts`): Detects deposit receipts by checking linked appointment's `payment_type='deposit'`. Populates deposit fields on `ReceiptTransaction`.
+- **Public receipt page** (`src/app/(public)/receipt/[token]/page.tsx`): Same deposit detection + deposit badge, deposit line in totals, balance due display.
+- **SMS/email templates** (`src/app/api/book/route.ts`): New template variables `{deposit_amount}`, `{balance_due}`, `{payment_info}` passed to both `booking_confirmed` SMS and `appointment_confirmed` email. SMS fallback includes deposit/balance info.
+
+---
+
 ## fix: Deposit transaction line items + customer type update for existing bookings — 2026-04-12
 
 - **Deposit transaction line items** (`src/app/api/book/route.ts`): Deposit transaction insert now returns ID (`.select('id').single()`) and creates `transaction_items` rows matching the POS format (all 15 columns). One line item per booked service (primary + addons) with correct `tier_name`, `vehicle_size_class`, `standard_price`, `is_addon`, `prerequisite_note`, etc.

@@ -89,7 +89,25 @@ export async function fetchReceiptData(
     } catch { /* barcode generation failed — fallback to text */ }
   }
 
-  // 7. Map database transaction to ReceiptTransaction interface
+  // 7. Detect deposit receipt — check linked appointment for payment_type='deposit'
+  let isDeposit = false;
+  let depositAmount = 0;
+  let balanceDue = 0;
+  if (transaction.appointment_id) {
+    const { data: appt } = await supabase
+      .from('appointments')
+      .select('payment_type, deposit_amount, total_amount')
+      .eq('id', transaction.appointment_id)
+      .single();
+
+    if (appt?.payment_type === 'deposit' && appt.deposit_amount != null && appt.deposit_amount > 0) {
+      isDeposit = true;
+      depositAmount = Number(appt.deposit_amount);
+      balanceDue = Number(appt.total_amount) - depositAmount;
+    }
+  }
+
+  // 8. Map database transaction to ReceiptTransaction interface
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = transaction as any;
   const tx: ReceiptTransaction = {
@@ -110,6 +128,9 @@ export async function fetchReceiptData(
     items: raw.items ?? [],
     payments: raw.payments ?? [],
     refunds: raw.refunds ?? [],
+    is_deposit: isDeposit,
+    deposit_amount: isDeposit ? depositAmount : undefined,
+    balance_due: isDeposit ? balanceDue : undefined,
   };
 
   return { tx, config: merged, context, images, print_server_url };

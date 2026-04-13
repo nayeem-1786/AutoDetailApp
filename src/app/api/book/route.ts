@@ -383,7 +383,7 @@ export async function POST(request: NextRequest) {
           vehicle_id: vehicleId,
           employee_id: null,
           status: 'completed',
-          subtotal: depositAmount,
+          subtotal: totalAfterDiscount,
           tax_amount: 0,
           tip_amount: 0,
           discount_amount: 0,
@@ -453,6 +453,20 @@ export async function POST(request: NextRequest) {
 
           if (itemsErr) {
             console.error('[Booking] Deposit transaction items insert failed:', itemsErr.message);
+          }
+
+          // Insert payment row so receipt shows payment method
+          const { error: payErr } = await supabase.from('payments').insert({
+            transaction_id: depositTx.id,
+            method: 'card',
+            amount: depositAmount,
+            tip_amount: 0,
+            tip_net: 0,
+            stripe_payment_intent_id: data.payment_intent_id,
+          });
+
+          if (payErr) {
+            console.error('[Booking] Deposit payment insert failed:', payErr.message);
           }
         }
       }
@@ -561,12 +575,23 @@ export async function POST(request: NextRequest) {
       const customerName = `${data.customer.first_name} ${data.customer.last_name}`.trim();
       const total = formatCurrency(Number(appointment.total_amount));
 
+      // Deposit-aware variables for SMS/email templates
+      const hasDeposit = !!(data.payment_intent_id && data.deposit_amount && data.deposit_amount > 0);
+      const depositAmountFormatted = hasDeposit ? formatCurrency(data.deposit_amount!) : '';
+      const balanceDueFormatted = hasDeposit
+        ? formatCurrency(Number(appointment.total_amount) - data.deposit_amount!)
+        : '';
+      const paymentInfo = hasDeposit
+        ? `Deposit paid: ${depositAmountFormatted}. Balance due at service: ${balanceDueFormatted}.`
+        : 'Payment due at time of service.';
+
       // G2 — Customer confirmation SMS
       if (e164Phone) {
         const customerSmsFallback = [
           `${biz.name} — Booking Confirmed!`,
           '', `${dateStr}`, `${timeStr}`, serviceNames,
           vehicleStr ? `Vehicle: ${vehicleStr}` : '', `Total: ${total}`,
+          hasDeposit ? `Deposit: ${depositAmountFormatted}. Balance: ${balanceDueFormatted}.` : '',
           '', `Questions? Call ${biz.phone}`,
         ].filter(Boolean).join('\n');
 
@@ -577,6 +602,9 @@ export async function POST(request: NextRequest) {
           services: serviceNames,
           vehicle_description: vehicleStr || undefined,
           service_total: total,
+          deposit_amount: depositAmountFormatted || undefined,
+          balance_due: balanceDueFormatted || undefined,
+          payment_info: paymentInfo,
         }, customerSmsFallback).then((result) => {
           if (result.isActive) {
             sendSms(e164Phone, result.body, {
@@ -608,6 +636,9 @@ export async function POST(request: NextRequest) {
           appointment_date: dateStr,
           appointment_time: timeStr,
           appointment_total: total,
+          deposit_amount: depositAmountFormatted,
+          balance_due: balanceDueFormatted,
+          payment_info: paymentInfo,
           vehicle_info: vehicleStr || 'N/A',
           services_list: serviceNames,
           items_table: servicesTableHtml,

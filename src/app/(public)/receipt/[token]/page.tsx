@@ -19,6 +19,9 @@ interface TransactionWithRelations {
   tip_amount: number;
   total_amount: number;
   loyalty_points_earned: number;
+  is_deposit: boolean;
+  deposit_amount: number;
+  balance_due: number;
   customer: { first_name: string; last_name: string } | null;
   employee: { first_name: string; last_name: string } | null;
   vehicle: { year: number | null; make: string | null; model: string | null; color: string | null } | null;
@@ -82,7 +85,32 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     .single();
 
   if (error || !data) return null;
-  return data as unknown as TransactionWithRelations;
+
+  // Detect deposit receipt via linked appointment
+  const raw = data as Record<string, unknown>;
+  let isDeposit = false;
+  let depositAmount = 0;
+  let balanceDue = 0;
+  if (raw.appointment_id) {
+    const { data: appt } = await supabase
+      .from('appointments')
+      .select('payment_type, deposit_amount, total_amount')
+      .eq('id', raw.appointment_id as string)
+      .single();
+
+    if (appt?.payment_type === 'deposit' && appt.deposit_amount != null && Number(appt.deposit_amount) > 0) {
+      isDeposit = true;
+      depositAmount = Number(appt.deposit_amount);
+      balanceDue = Number(appt.total_amount) - depositAmount;
+    }
+  }
+
+  return {
+    ...(data as unknown as TransactionWithRelations),
+    is_deposit: isDeposit,
+    deposit_amount: depositAmount,
+    balance_due: balanceDue,
+  };
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -156,6 +184,15 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         <h1 className="text-2xl font-bold text-site-text">{businessInfo.name}</h1>
         <p className="mt-1 text-sm text-site-text-muted">{businessInfo.address}</p>
       </div>
+
+      {/* Deposit Badge */}
+      {tx.is_deposit && (
+        <div className="mb-4 text-center">
+          <span className="inline-block rounded px-3 py-1 text-sm font-bold text-white bg-blue-600">
+            BOOKING DEPOSIT
+          </span>
+        </div>
+      )}
 
       {/* Receipt Header */}
       <div className="mb-8 rounded-lg border border-site-border bg-brand-dark p-6 shadow-sm">
@@ -293,12 +330,30 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </span>
               </div>
             )}
+            {tx.is_deposit && tx.deposit_amount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-site-text-muted">Deposit Paid (Online)</span>
+                <span className="font-medium text-green-500">
+                  -{formatCurrency(tx.deposit_amount)}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-site-border pt-2">
-              <span className="text-base font-semibold text-site-text">Total</span>
+              <span className="text-base font-semibold text-site-text">
+                {tx.is_deposit ? 'Total Charged' : 'Total'}
+              </span>
               <span className="text-lg font-bold text-site-text">
                 {formatCurrency(tx.total_amount)}
               </span>
             </div>
+            {tx.is_deposit && tx.balance_due > 0 && (
+              <div className="flex justify-between pt-1">
+                <span className="text-sm font-semibold text-amber-500">Balance Due at Service</span>
+                <span className="text-base font-bold text-amber-500">
+                  {formatCurrency(tx.balance_due)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
