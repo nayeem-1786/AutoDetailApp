@@ -159,6 +159,18 @@ export function AppointmentDetailDialog({
             <dt className="text-xs font-medium text-gray-500">Total</dt>
             <dd className="text-gray-900 font-medium">{formatCurrency(appointment.total_amount)}</dd>
           </div>
+
+          {appointment.deposit_amount != null && appointment.deposit_amount > 0 && (
+            <div>
+              <dt className="text-xs font-medium text-gray-500">Deposit Collected</dt>
+              <dd className="text-green-700 font-medium">
+                {formatCurrency(appointment.deposit_amount)}
+                <span className="text-xs text-gray-500 font-normal ml-1">
+                  (Balance: {formatCurrency(appointment.total_amount - appointment.deposit_amount)})
+                </span>
+              </dd>
+            </div>
+          )}
         </dl>
 
         {/* Services list */}

@@ -33,7 +33,21 @@ export async function POST(request: NextRequest) {
       const orderId = pi.metadata.order_id;
 
       if (!orderId) {
-        // Not an order payment intent (could be a booking)
+        // Not an order payment intent — check if it's a booking deposit
+        const isDeposit = pi.metadata.is_deposit === 'true';
+        if (isDeposit) {
+          const { data: appt } = await admin
+            .from('appointments')
+            .select('id, payment_status')
+            .eq('stripe_payment_intent_id', pi.id)
+            .maybeSingle();
+
+          if (appt) {
+            console.log(`[Stripe Webhook] Booking deposit confirmed for appointment ${appt.id} (PI: ${pi.id})`);
+          } else {
+            console.log(`[Stripe Webhook] Booking deposit received but no appointment found yet (PI: ${pi.id}). Transaction created by booking route.`);
+          }
+        }
         break;
       }
 

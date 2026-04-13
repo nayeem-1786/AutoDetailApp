@@ -350,6 +350,8 @@ export interface Appointment {
   tax_amount: number;
   discount_amount: number;
   total_amount: number;
+  payment_type: 'deposit' | 'pay_on_site' | 'full' | null;
+  deposit_amount: number | null;
   cancellation_fee: number | null;
   cancellation_reason: string | null;
   reminder_sent_at: string | null;
