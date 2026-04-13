@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: POS deposit subtraction — deduct online deposit from final checkout total — 2026-04-13
+
+- **New DB column:** `transactions.deposit_credit` (DECIMAL(10,2), DEFAULT 0) — stores online deposit credit separately from discounts. Requires migration (SQL printed below).
+- **checkout-items API** (`src/app/api/pos/jobs/[id]/checkout-items/route.ts`): Now fetches `deposit_amount` from linked appointment and returns it in response.
+- **TicketState** (`src/app/pos/types.ts`): New `depositCredit` field. Totals formula: `total = subtotal + tax - discountAmount - depositCredit`.
+- **Ticket reducer** (`src/app/pos/context/ticket-reducer.ts`): `depositCredit` included in totals calculation. `RESTORE_TICKET` now runs `recalculateTotals` so deposit is reflected immediately.
+- **calculateTicketTotals** (`src/app/pos/utils/tax.ts`): Accepts `depositCredit` param, subtracts from total.
+- **Ticket totals display** (`src/app/pos/components/ticket-totals.tsx`): Shows "Deposit Paid (Online): -$50.00" in blue, relabels Total to "Balance Due" when deposit present.
+- **All 5 payment submission paths** (card, cash, check, split, loyalty-only): Send `deposit_credit` to transaction API.
+- **Transaction API** (`src/app/api/pos/transactions/route.ts`): Accepts and stores `deposit_credit` on the transaction record.
+- **Validation schema** (`src/lib/utils/validation.ts`): Added `deposit_credit` to `transactionCreateSchema`.
+- **Receipt template** (`src/app/pos/lib/receipt-template.ts`): Balance payment receipts show "Deposit Previously Paid: -$50.00" in both line-based and HTML renderers.
+- **Receipt data fetcher** (`src/lib/data/receipt-data.ts`): Maps `deposit_credit` from transaction to `ReceiptTransaction`.
+- **Public receipt page** (`src/app/(public)/receipt/[token]/page.tsx`): Shows deposit previously paid line when `deposit_credit > 0`.
+- **TS types** (`src/lib/supabase/types.ts`): Added `deposit_credit` to `Transaction` interface.
+
+---
+
 ## fix: Walk-in jobs appear in detailer's timeline row — 2026-04-13
 
 - **Walk-in creation** (`src/app/api/pos/jobs/route.ts`): Now sets `estimated_pickup_at` to current time on creation, so walk-ins appear at the correct position on the timeline grid instead of always landing in Unscheduled.

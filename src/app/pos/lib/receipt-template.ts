@@ -73,6 +73,8 @@ export interface ReceiptTransaction {
   is_deposit?: boolean;
   deposit_amount?: number;
   balance_due?: number;
+  /** Balance payment — deposit_credit > 0 means a prior online deposit was subtracted from this checkout */
+  deposit_credit?: number;
 }
 
 export interface ReceiptLine {
@@ -559,6 +561,23 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       left: 'BALANCE DUE AT SERVICE',
       right: `$${tx.balance_due.toFixed(2)}`,
     });
+  } else if (tx.deposit_credit && tx.deposit_credit > 0) {
+    // Balance payment receipt — deposit was subtracted at checkout
+    lines.push({
+      type: 'columns',
+      left: 'Deposit Previously Paid',
+      right: `-$${tx.deposit_credit.toFixed(2)}`,
+    });
+
+    lines.push({
+      type: 'bold',
+      text: '',
+    });
+    lines.push({
+      type: 'columns',
+      left: 'TOTAL',
+      right: `$${tx.total_amount.toFixed(2)}`,
+    });
   } else {
     lines.push({
       type: 'bold',
@@ -862,6 +881,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   if (tx.tip_amount > 0) totals.push(row('Tip', `$${tx.tip_amount.toFixed(2)}`));
   if (tx.is_deposit && tx.deposit_amount != null) {
     totals.push(row('Deposit Paid (Online)', `-$${tx.deposit_amount.toFixed(2)}`, '#16a34a'));
+  }
+  if (!tx.is_deposit && tx.deposit_credit && tx.deposit_credit > 0) {
+    totals.push(row('Deposit Previously Paid', `-$${tx.deposit_credit.toFixed(2)}`, '#2563eb'));
   }
 
   const paymentRows = tx.payments

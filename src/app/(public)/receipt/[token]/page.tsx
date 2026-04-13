@@ -19,6 +19,7 @@ interface TransactionWithRelations {
   tip_amount: number;
   total_amount: number;
   loyalty_points_earned: number;
+  deposit_credit: number;
   is_deposit: boolean;
   deposit_amount: number;
   balance_due: number;
@@ -335,6 +336,14 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 <span className="text-site-text-muted">Deposit Paid (Online)</span>
                 <span className="font-medium text-green-500">
                   -{formatCurrency(tx.deposit_amount)}
+                </span>
+              </div>
+            )}
+            {!tx.is_deposit && tx.deposit_credit > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-site-text-muted">Deposit Previously Paid</span>
+                <span className="font-medium text-blue-500">
+                  -{formatCurrency(tx.deposit_credit)}
                 </span>
               </div>
             )}

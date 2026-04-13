@@ -52,6 +52,7 @@ export interface TicketState {
   loyaltyPointsToRedeem: number;
   loyaltyDiscount: number;
   manualDiscount: { type: 'dollar' | 'percent'; value: number; label: string } | null;
+  depositCredit: number; // Pre-paid deposit from online booking (separate from discounts)
   notes: string | null;
   // Computed totals
   subtotal: number;

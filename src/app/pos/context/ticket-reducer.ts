@@ -10,6 +10,7 @@ export const initialTicketState: TicketState = {
   loyaltyPointsToRedeem: 0,
   loyaltyDiscount: 0,
   manualDiscount: null,
+  depositCredit: 0,
   notes: null,
   subtotal: 0,
   taxAmount: 0,
@@ -44,7 +45,7 @@ function recalculateTotals(state: TicketState): TicketState {
 
   const discountAmount =
     (state.coupon?.discount ?? 0) + state.loyaltyDiscount + manualDiscountAmount;
-  const totals = calculateTicketTotals(state.items, discountAmount);
+  const totals = calculateTicketTotals(state.items, discountAmount, state.depositCredit);
   return { ...state, ...totals };
 }
 
@@ -488,7 +489,7 @@ export function ticketReducer(
     }
 
     case 'RESTORE_TICKET': {
-      return { ...action.state };
+      return recalculateTotals({ ...action.state });
     }
 
     case 'CLEAR_TICKET': {

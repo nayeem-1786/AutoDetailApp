@@ -35,6 +35,7 @@ export function CheckPayment() {
           tax_amount: ticket.taxAmount,
           tip_amount: 0,
           discount_amount: ticket.discountAmount,
+          deposit_credit: ticket.depositCredit,
           total_amount: ticket.total,
           payment_method: 'check',
           coupon_id: ticket.coupon?.id || null,

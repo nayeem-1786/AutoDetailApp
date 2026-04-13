@@ -60,6 +60,7 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
           tax_amount: ticket.taxAmount,
           tip_amount: 0,
           discount_amount: ticket.discountAmount,
+          deposit_credit: ticket.depositCredit,
           total_amount: 0,
           payment_method: 'cash',
           coupon_id: ticket.coupon?.id || null,

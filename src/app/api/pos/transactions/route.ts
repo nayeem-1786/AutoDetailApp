@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
         tax_amount: data.tax_amount,
         tip_amount: data.tip_amount,
         discount_amount: data.discount_amount,
+        deposit_credit: data.deposit_credit || 0,
         total_amount: data.total_amount,
         payment_method: data.payment_method,
         coupon_id: data.coupon_id || null,

@@ -44,7 +44,7 @@ export async function GET(
     const { data: job, error: jobError } = await supabase
       .from('jobs')
       .select(`
-        id, status, services, customer_id, vehicle_id, quote_id,
+        id, status, services, customer_id, vehicle_id, quote_id, appointment_id,
         customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email, customer_type, tags),
         vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
         addons:job_addons(
@@ -216,6 +216,20 @@ export async function GET(
       }
     }
 
+    // Look up deposit from linked appointment
+    let deposit_amount = 0;
+    if (job.appointment_id) {
+      const { data: appt } = await supabase
+        .from('appointments')
+        .select('payment_type, deposit_amount')
+        .eq('id', job.appointment_id)
+        .single();
+
+      if (appt?.payment_type === 'deposit' && appt.deposit_amount != null && Number(appt.deposit_amount) > 0) {
+        deposit_amount = Number(appt.deposit_amount);
+      }
+    }
+
     return NextResponse.json({
       data: {
         job_id: job.id,
@@ -225,6 +239,7 @@ export async function GET(
         vehicle: job.vehicle,
         items,
         coupon_code,
+        deposit_amount,
         status: job.status,
       },
     });

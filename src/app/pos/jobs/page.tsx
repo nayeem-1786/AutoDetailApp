@@ -77,6 +77,7 @@ function JobsPageInner() {
         category_id?: string;
       }>;
       coupon_code: string | null;
+      deposit_amount: number;
       status: string;
     } | undefined;
 
@@ -134,6 +135,8 @@ function JobsPageInner() {
       const taxAmount = ticketItems.reduce((sum, i) => sum + i.taxAmount, 0);
       const total = Math.max(0, subtotal + taxAmount);
 
+      const depositCredit = data.deposit_amount || 0;
+
       const newTicket: TicketState = {
         items: ticketItems,
         customer: ticketCustomer,
@@ -142,6 +145,7 @@ function JobsPageInner() {
         loyaltyPointsToRedeem: 0,
         loyaltyDiscount: 0,
         manualDiscount: null,
+        depositCredit,
         notes: null,
         subtotal: Math.round(subtotal * 100) / 100,
         taxAmount: Math.round(taxAmount * 100) / 100,

@@ -11,15 +11,16 @@ export function calculateItemTax(price: number, isTaxable: boolean): number {
 }
 
 /**
- * Calculate all ticket totals from items and discounts.
+ * Calculate all ticket totals from items, discounts, and deposit credit.
  */
 export function calculateTicketTotals(
   items: TicketItem[],
-  discountAmount: number = 0
+  discountAmount: number = 0,
+  depositCredit: number = 0
 ) {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const taxAmount = items.reduce((sum, item) => sum + item.taxAmount, 0);
-  const total = Math.max(0, subtotal + taxAmount - discountAmount);
+  const total = Math.max(0, subtotal + taxAmount - discountAmount - depositCredit);
 
   return {
     subtotal: Math.round(subtotal * 100) / 100,

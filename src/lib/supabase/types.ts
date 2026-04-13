@@ -374,6 +374,7 @@ export interface Transaction {
   tax_amount: number;
   tip_amount: number;
   discount_amount: number;
+  deposit_credit: number;
   total_amount: number;
   payment_method: PaymentMethod | null;
   coupon_id: string | null;

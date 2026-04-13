@@ -55,8 +55,15 @@ export function TicketTotals() {
         </div>
       )}
 
+      {ticket.depositCredit > 0 && (
+        <div className="flex justify-between text-sm text-blue-600 dark:text-blue-400">
+          <span>Deposit Paid (Online)</span>
+          <span className="tabular-nums">-${ticket.depositCredit.toFixed(2)}</span>
+        </div>
+      )}
+
       <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-        <span>Total</span>
+        <span>{ticket.depositCredit > 0 ? 'Balance Due' : 'Total'}</span>
         <span className="tabular-nums">${ticket.total.toFixed(2)}</span>
       </div>
     </div>

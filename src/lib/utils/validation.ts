@@ -500,6 +500,7 @@ export const transactionCreateSchema = z.object({
   tax_amount: positiveNumber,
   tip_amount: positiveNumber.default(0),
   discount_amount: positiveNumber.default(0),
+  deposit_credit: positiveNumber.default(0),
   total_amount: positiveNumber,
   payment_method: z.enum(['cash', 'card', 'check', 'split']),
   coupon_id: z.string().uuid().optional().nullable(),

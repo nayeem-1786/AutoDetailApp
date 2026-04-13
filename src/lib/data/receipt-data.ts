@@ -131,6 +131,7 @@ export async function fetchReceiptData(
     is_deposit: isDeposit,
     deposit_amount: isDeposit ? depositAmount : undefined,
     balance_due: isDeposit ? balanceDue : undefined,
+    deposit_credit: raw.deposit_credit > 0 ? raw.deposit_credit : undefined,
   };
 
   return { tx, config: merged, context, images, print_server_url };
