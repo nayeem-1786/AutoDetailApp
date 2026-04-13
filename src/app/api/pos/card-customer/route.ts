@@ -109,32 +109,21 @@ export async function POST(request: NextRequest) {
       .update({ customer_id: matchedCustomerId })
       .eq('id', transaction_id);
 
-    // 6. Update customer visit stats
+    // 6. Customer visit stats handled by DB trigger (tr_update_customer_stats)
     const { data: cust } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, email, phone, visit_count, lifetime_spend, loyalty_points_balance')
+      .select('id, first_name, last_name, email, phone, loyalty_points_balance')
       .eq('id', matchedCustomerId)
       .is('deleted_at', null)
       .single();
 
     if (cust) {
-      // Get the transaction total for stats
+      // Get the transaction for loyalty points
       const { data: tx } = await supabase
         .from('transactions')
         .select('total_amount, receipt_number, id')
         .eq('id', transaction_id)
         .single();
-
-      const totalAmount = tx?.total_amount ?? 0;
-
-      await supabase
-        .from('customers')
-        .update({
-          visit_count: cust.visit_count + 1,
-          lifetime_spend: Math.round((cust.lifetime_spend + totalAmount) * 100) / 100,
-          last_visit_date: new Date().toISOString().split('T')[0],
-        })
-        .eq('id', matchedCustomerId);
 
       // 7. Loyalty points earn
       // Get transaction items for earnable spend calculation

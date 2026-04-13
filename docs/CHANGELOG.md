@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Remove double-counting of visit_count and lifetime_spend — 2026-04-13
+
+- **DB trigger `tr_update_customer_stats`** is the single source of truth for `visit_count`, `lifetime_spend`, and `last_visit_date` on completed transaction INSERT.
+- **Removed redundant app-code increments** from 3 POS routes:
+  - `src/app/api/pos/transactions/route.ts` — removed customer stats select+update block
+  - `src/app/api/pos/card-customer/route.ts` — removed stats update, kept customer select (needed for loyalty points)
+  - `src/app/api/pos/sync-offline-transaction/route.ts` — removed customer stats select+update block
+- **Stripe webhook NOT touched** — e-commerce orders use the `orders` table (no trigger fires), so the app code increment there is the only source and must remain.
+
+---
+
 ## fix: Deposit receipt awareness across all receipt channels — 2026-04-12
 
 - **Deposit transaction insert** (`src/app/api/book/route.ts`): `subtotal` now set to full service total (not deposit amount) so line items and subtotal match. Added `payments` row insert so receipt shows card payment method.

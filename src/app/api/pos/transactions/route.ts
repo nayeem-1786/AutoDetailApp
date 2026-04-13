@@ -216,25 +216,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 5. Update customer visit stats if customer provided
-    if (data.customer_id) {
-      const { data: cust } = await supabase
-        .from('customers')
-        .select('visit_count, lifetime_spend')
-        .eq('id', data.customer_id)
-        .single();
-
-      if (cust) {
-        await supabase
-          .from('customers')
-          .update({
-            visit_count: cust.visit_count + 1,
-            lifetime_spend: Math.round((cust.lifetime_spend + data.total_amount) * 100) / 100,
-            last_visit_date: new Date().toISOString().split('T')[0],
-          })
-          .eq('id', data.customer_id);
-      }
-    }
+    // 5. Customer visit stats handled by DB trigger (tr_update_customer_stats)
 
     // 6. Loyalty points earn (if customer, and items qualify)
     const loyaltyEnabled = await isFeatureEnabled(FEATURE_FLAGS.LOYALTY_REWARDS);
