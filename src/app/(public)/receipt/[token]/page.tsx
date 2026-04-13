@@ -6,6 +6,15 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { PrintButton } from './print-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
+function formatDepositLabel(depositDate: string | null): string {
+  if (!depositDate) return 'Deposit Paid - Online';
+  const formatted = new Date(depositDate).toLocaleDateString('en-US', {
+    month: '2-digit', day: '2-digit', year: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+  return `Deposit Paid - Online on ${formatted}`;
+}
+
 interface TransactionWithRelations {
   id: string;
   receipt_number: string | null;
@@ -20,6 +29,7 @@ interface TransactionWithRelations {
   total_amount: number;
   loyalty_points_earned: number;
   deposit_credit: number;
+  deposit_date: string | null;
   is_deposit: boolean;
   deposit_amount: number;
   balance_due: number;
@@ -92,6 +102,8 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
   let isDeposit = false;
   let depositAmount = 0;
   let balanceDue = 0;
+  let depositDate: string | null = null;
+
   if (raw.appointment_id) {
     const { data: appt } = await supabase
       .from('appointments')
@@ -103,6 +115,31 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
       isDeposit = true;
       depositAmount = Number(appt.deposit_amount);
       balanceDue = Number(appt.total_amount) - depositAmount;
+      depositDate = raw.transaction_date as string;
+    }
+  }
+
+  // For balance payment receipts, find deposit date via job → appointment → deposit transaction
+  if (!isDeposit && Number(raw.deposit_credit) > 0) {
+    const { data: linkedJob } = await supabase
+      .from('jobs')
+      .select('appointment_id')
+      .eq('transaction_id', raw.id as string)
+      .maybeSingle();
+
+    if (linkedJob?.appointment_id) {
+      const { data: depositTxn } = await supabase
+        .from('transactions')
+        .select('transaction_date')
+        .eq('appointment_id', linkedJob.appointment_id)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (depositTxn?.transaction_date) {
+        depositDate = depositTxn.transaction_date;
+      }
     }
   }
 
@@ -111,6 +148,7 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     is_deposit: isDeposit,
     deposit_amount: depositAmount,
     balance_due: balanceDue,
+    deposit_date: depositDate,
   };
 }
 
@@ -292,14 +330,12 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               <span className="text-site-text-muted">Subtotal</span>
               <span className="font-medium text-site-text">{formatCurrency(tx.subtotal)}</span>
             </div>
-            {tx.tax_amount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-site-text-muted">Tax</span>
-                <span className="font-medium text-site-text">
-                  {formatCurrency(tx.tax_amount)}
-                </span>
-              </div>
-            )}
+            <div className="flex justify-between text-sm">
+              <span className="text-site-text-muted">Tax</span>
+              <span className="font-medium text-site-text">
+                {formatCurrency(tx.tax_amount)}
+              </span>
+            </div>
             {(() => {
               const nonLoyaltyDiscount = tx.discount_amount - (tx.loyalty_discount || 0);
               return nonLoyaltyDiscount > 0 ? (
@@ -333,7 +369,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
             )}
             {tx.is_deposit && tx.deposit_amount > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-site-text-muted">Deposit Paid (Online)</span>
+                <span className="text-site-text-muted">{formatDepositLabel(tx.deposit_date)}</span>
                 <span className="font-medium text-green-500">
                   -{formatCurrency(tx.deposit_amount)}
                 </span>
@@ -341,7 +377,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
             )}
             {!tx.is_deposit && tx.deposit_credit > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-site-text-muted">Deposit Previously Paid</span>
+                <span className="text-site-text-muted">{formatDepositLabel(tx.deposit_date)}</span>
                 <span className="font-medium text-blue-500">
                   -{formatCurrency(tx.deposit_credit)}
                 </span>

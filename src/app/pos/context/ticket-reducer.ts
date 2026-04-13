@@ -11,6 +11,7 @@ export const initialTicketState: TicketState = {
   loyaltyDiscount: 0,
   manualDiscount: null,
   depositCredit: 0,
+  depositDate: null,
   notes: null,
   subtotal: 0,
   taxAmount: 0,

@@ -2,6 +2,15 @@
 
 import { useTicket } from '../context/ticket-context';
 
+function formatDepositLabel(depositDate: string | null): string {
+  if (!depositDate) return 'Deposit Paid - Online';
+  const formatted = new Date(depositDate).toLocaleDateString('en-US', {
+    month: '2-digit', day: '2-digit', year: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+  return `Deposit Paid - Online on ${formatted}`;
+}
+
 export function TicketTotals() {
   const { ticket } = useTicket();
 
@@ -12,12 +21,10 @@ export function TicketTotals() {
         <span className="tabular-nums">${ticket.subtotal.toFixed(2)}</span>
       </div>
 
-      {ticket.taxAmount > 0 && (
-        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-          <span>Tax</span>
-          <span className="tabular-nums">${ticket.taxAmount.toFixed(2)}</span>
-        </div>
-      )}
+      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+        <span>Tax</span>
+        <span className="tabular-nums">${ticket.taxAmount.toFixed(2)}</span>
+      </div>
 
       {ticket.coupon && (
         <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
@@ -57,7 +64,7 @@ export function TicketTotals() {
 
       {ticket.depositCredit > 0 && (
         <div className="flex justify-between text-sm text-blue-600 dark:text-blue-400">
-          <span>Deposit Paid (Online)</span>
+          <span>{formatDepositLabel(ticket.depositDate)}</span>
           <span className="tabular-nums">-${ticket.depositCredit.toFixed(2)}</span>
         </div>
       )}

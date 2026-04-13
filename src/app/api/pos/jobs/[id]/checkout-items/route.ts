@@ -216,8 +216,9 @@ export async function GET(
       }
     }
 
-    // Look up deposit from linked appointment
+    // Look up deposit from linked appointment + deposit transaction date
     let deposit_amount = 0;
+    let deposit_date: string | null = null;
     if (job.appointment_id) {
       const { data: appt } = await supabase
         .from('appointments')
@@ -227,6 +228,20 @@ export async function GET(
 
       if (appt?.payment_type === 'deposit' && appt.deposit_amount != null && Number(appt.deposit_amount) > 0) {
         deposit_amount = Number(appt.deposit_amount);
+
+        // Fetch the original deposit transaction date
+        const { data: depositTxn } = await supabase
+          .from('transactions')
+          .select('transaction_date')
+          .eq('appointment_id', job.appointment_id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (depositTxn?.transaction_date) {
+          deposit_date = depositTxn.transaction_date;
+        }
       }
     }
 
@@ -240,6 +255,7 @@ export async function GET(
         items,
         coupon_code,
         deposit_amount,
+        deposit_date,
         status: job.status,
       },
     });

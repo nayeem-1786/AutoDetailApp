@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Deposit label shows date + always show tax line — 2026-04-13
+
+- **Deposit label with date**: All deposit labels across POS cart, receipts (thermal, HTML, public web) now show "Deposit Paid - Online on MM/DD/YYYY" where the date is the actual deposit transaction date. Falls back to "Deposit Paid - Online" when date unavailable.
+- **Deposit date lookup**: checkout-items API fetches deposit transaction date from `transactions` table by `appointment_id`. Receipt data fetcher (`receipt-data.ts`) resolves deposit date via join chain: transaction → job → appointment → deposit transaction.
+- **TicketState**: Added `depositDate: string | null` field, passed through ticket builder and reducer.
+- **ReceiptTransaction**: Added `deposit_date?: string` field, populated for both deposit receipts and balance payment receipts.
+- **Always show Tax line**: Removed `> 0` conditionals from all 4 tax display locations (ESC/POS lines, HTML totals, POS ticket-totals, public receipt page). Tax now always shows as "$0.00" even when zero.
+- Files changed: `checkout-items/route.ts`, `types.ts`, `ticket-reducer.ts`, `jobs/page.tsx`, `ticket-totals.tsx`, `receipt-template.ts`, `receipt-data.ts`, `receipt/[token]/page.tsx`
+
+---
+
 ## feat: POS deposit subtraction — deduct online deposit from final checkout total — 2026-04-13
 
 - **New DB column:** `transactions.deposit_credit` (DECIMAL(10,2), DEFAULT 0) — stores online deposit credit separately from discounts. Requires migration (SQL printed below).

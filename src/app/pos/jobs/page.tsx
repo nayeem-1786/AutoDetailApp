@@ -78,6 +78,7 @@ function JobsPageInner() {
       }>;
       coupon_code: string | null;
       deposit_amount: number;
+      deposit_date: string | null;
       status: string;
     } | undefined;
 
@@ -146,6 +147,7 @@ function JobsPageInner() {
         loyaltyDiscount: 0,
         manualDiscount: null,
         depositCredit,
+        depositDate: data.deposit_date || null,
         notes: null,
         subtotal: Math.round(subtotal * 100) / 100,
         taxAmount: Math.round(taxAmount * 100) / 100,

@@ -53,6 +53,7 @@ export interface TicketState {
   loyaltyDiscount: number;
   manualDiscount: { type: 'dollar' | 'percent'; value: number; label: string } | null;
   depositCredit: number; // Pre-paid deposit from online booking (separate from discounts)
+  depositDate: string | null; // ISO date when the deposit was collected online
   notes: string | null;
   // Computed totals
   subtotal: number;

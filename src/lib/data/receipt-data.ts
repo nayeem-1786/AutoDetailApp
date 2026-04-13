@@ -93,7 +93,10 @@ export async function fetchReceiptData(
   let isDeposit = false;
   let depositAmount = 0;
   let balanceDue = 0;
+  let depositDate: string | undefined;
+
   if (transaction.appointment_id) {
+    // This transaction is directly linked to an appointment (deposit receipt)
     const { data: appt } = await supabase
       .from('appointments')
       .select('payment_type, deposit_amount, total_amount')
@@ -104,10 +107,38 @@ export async function fetchReceiptData(
       isDeposit = true;
       depositAmount = Number(appt.deposit_amount);
       balanceDue = Number(appt.total_amount) - depositAmount;
+      // For deposit receipts, the transaction date IS the deposit date
+      depositDate = transaction.transaction_date;
     }
   }
 
-  // 8. Map database transaction to ReceiptTransaction interface
+  // 8. For balance payment receipts (deposit_credit > 0), find deposit date via job → appointment → deposit transaction
+  if (!isDeposit && transaction.deposit_credit > 0) {
+    // Find the job linked to this transaction
+    const { data: linkedJob } = await supabase
+      .from('jobs')
+      .select('appointment_id')
+      .eq('transaction_id', transaction.id)
+      .maybeSingle();
+
+    if (linkedJob?.appointment_id) {
+      // Find the original deposit transaction by appointment_id
+      const { data: depositTxn } = await supabase
+        .from('transactions')
+        .select('transaction_date')
+        .eq('appointment_id', linkedJob.appointment_id)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (depositTxn?.transaction_date) {
+        depositDate = depositTxn.transaction_date;
+      }
+    }
+  }
+
+  // 9. Map database transaction to ReceiptTransaction interface
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = transaction as any;
   const tx: ReceiptTransaction = {
@@ -132,6 +163,7 @@ export async function fetchReceiptData(
     deposit_amount: isDeposit ? depositAmount : undefined,
     balance_due: isDeposit ? balanceDue : undefined,
     deposit_credit: raw.deposit_credit > 0 ? raw.deposit_credit : undefined,
+    deposit_date: depositDate,
   };
 
   return { tx, config: merged, context, images, print_server_url };

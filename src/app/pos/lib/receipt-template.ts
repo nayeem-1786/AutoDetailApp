@@ -75,6 +75,8 @@ export interface ReceiptTransaction {
   balance_due?: number;
   /** Balance payment — deposit_credit > 0 means a prior online deposit was subtracted from this checkout */
   deposit_credit?: number;
+  /** ISO date when the deposit was originally collected (for label display) */
+  deposit_date?: string;
 }
 
 export interface ReceiptLine {
@@ -153,6 +155,15 @@ function getVehicleTypeLabel(vehicleType: string | null | undefined): string {
 /**
  * Build a vehicle description string: "Type | Year Color Make Model"
  */
+function formatDepositLabel(depositDate?: string): string {
+  if (!depositDate) return 'Deposit Paid - Online';
+  const formatted = new Date(depositDate).toLocaleDateString('en-US', {
+    month: '2-digit', day: '2-digit', year: 'numeric',
+    timeZone: 'America/Los_Angeles',
+  });
+  return `Deposit Paid - Online on ${formatted}`;
+}
+
 function buildVehicleDesc(v: ReceiptTransaction['vehicle']): string {
   if (!v) return '';
   const typeLabel = getVehicleTypeLabel(v.vehicle_type);
@@ -502,13 +513,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     right: `$${tx.subtotal.toFixed(2)}`,
   });
 
-  if (tx.tax_amount > 0) {
-    lines.push({
-      type: 'columns',
-      left: 'Tax',
-      right: `$${tx.tax_amount.toFixed(2)}`,
-    });
-  }
+  lines.push({
+    type: 'columns',
+    left: 'Tax',
+    right: `$${tx.tax_amount.toFixed(2)}`,
+  });
 
   const nonLoyaltyDiscount = tx.discount_amount - (tx.loyalty_discount || 0);
   if (nonLoyaltyDiscount > 0) {
@@ -541,7 +550,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   if (tx.is_deposit && tx.deposit_amount != null && tx.balance_due != null) {
     lines.push({
       type: 'columns',
-      left: 'Deposit Paid (Online)',
+      left: formatDepositLabel(tx.deposit_date),
       right: `-$${tx.deposit_amount.toFixed(2)}`,
     });
 
@@ -565,7 +574,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     // Balance payment receipt — deposit was subtracted at checkout
     lines.push({
       type: 'columns',
-      left: 'Deposit Previously Paid',
+      left: formatDepositLabel(tx.deposit_date),
       right: `-$${tx.deposit_credit.toFixed(2)}`,
     });
 
@@ -868,7 +877,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 
   const totals: string[] = [];
   totals.push(row('Subtotal', `$${tx.subtotal.toFixed(2)}`));
-  if (tx.tax_amount > 0) totals.push(row('Tax', `$${tx.tax_amount.toFixed(2)}`));
+  totals.push(row('Tax', `$${tx.tax_amount.toFixed(2)}`));
   const htmlNonLoyaltyDiscount = tx.discount_amount - (tx.loyalty_discount || 0);
   if (htmlNonLoyaltyDiscount > 0) {
     const discountLabel = tx.coupon_code ? `Coupon (${tx.coupon_code})` : 'Discount';
@@ -880,10 +889,10 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   }
   if (tx.tip_amount > 0) totals.push(row('Tip', `$${tx.tip_amount.toFixed(2)}`));
   if (tx.is_deposit && tx.deposit_amount != null) {
-    totals.push(row('Deposit Paid (Online)', `-$${tx.deposit_amount.toFixed(2)}`, '#16a34a'));
+    totals.push(row(esc(formatDepositLabel(tx.deposit_date)), `-$${tx.deposit_amount.toFixed(2)}`, '#16a34a'));
   }
   if (!tx.is_deposit && tx.deposit_credit && tx.deposit_credit > 0) {
-    totals.push(row('Deposit Previously Paid', `-$${tx.deposit_credit.toFixed(2)}`, '#2563eb'));
+    totals.push(row(esc(formatDepositLabel(tx.deposit_date)), `-$${tx.deposit_credit.toFixed(2)}`, '#2563eb'));
   }
 
   const paymentRows = tx.payments
