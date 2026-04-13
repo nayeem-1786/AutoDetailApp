@@ -47,7 +47,7 @@ const HOUR_WIDTH = 120;
 const TIMELINE_WIDTH = (END_HOUR - START_HOUR) * HOUR_WIDTH;
 const SNAP_MINUTES = 15;
 
-const DRAGGABLE_STATUSES: JobStatus[] = ['scheduled', 'intake'];
+const DRAGGABLE_STATUSES: JobStatus[] = ['scheduled', 'intake', 'in_progress'];
 
 const STATUS_BLOCK_COLORS: Record<JobStatus, string> = {
   scheduled: 'bg-gray-600 border-gray-500',
@@ -128,6 +128,20 @@ function formatHourLabel(hour: number): string {
   if (hour === 0) return '12 AM';
   if (hour === 12) return '12 PM';
   return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
+}
+
+/** Extract HH:MM start time from appointment or estimated_pickup_at (walk-in fallback) */
+function getJobStartTime(job: JobListItem): string | null {
+  if (job.appointment?.scheduled_start_time) return job.appointment.scheduled_start_time;
+  if (job.estimated_pickup_at) {
+    // estimated_pickup_at is TIMESTAMPTZ — extract PST time
+    const d = new Date(job.estimated_pickup_at);
+    const pst = new Date(d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const h = String(pst.getHours()).padStart(2, '0');
+    const m = String(pst.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+  }
+  return null;
 }
 
 // ─── Draggable Block ────────────────────────────────────────────
@@ -382,7 +396,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
     const scheduled: JobListItem[] = [];
     const unscheduled: JobListItem[] = [];
     for (const job of jobs) {
-      if (job.appointment?.scheduled_start_time) scheduled.push(job);
+      if (getJobStartTime(job)) scheduled.push(job);
       else unscheduled.push(job);
     }
     return { scheduledJobs: scheduled, unscheduledJobs: unscheduled };
@@ -450,22 +464,22 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
       const targetStaffId = targetLaneId === '__unassigned__' ? null : targetLaneId;
 
       // Calculate new time from drag delta
+      const currentStartTime = getJobStartTime(job);
       let newTime: string | null = null;
       if (data.fromUnscheduled) {
         // Dragged from unscheduled — calculate time from drop position
-        // Use the center of the lane as a reference — approximate with delta
         const dropMinutes = snapToGrid(leftToMinutes(Math.max(0, delta.x)));
         newTime = minutesToTimeStr(dropMinutes);
-      } else if (job.appointment?.scheduled_start_time) {
+      } else if (currentStartTime) {
         // Time block — calculate new time from current position + delta
-        const currentMinutes = timeToMinutes(job.appointment.scheduled_start_time);
+        const currentMinutes = timeToMinutes(currentStartTime);
         const deltaMinutes = (delta.x / TIMELINE_WIDTH) * TOTAL_MINUTES;
         const newMinutes = snapToGrid(currentMinutes + deltaMinutes);
         newTime = minutesToTimeStr(newMinutes);
       }
 
       const oldStaffId = job.assigned_staff?.id || null;
-      const oldTime = job.appointment?.scheduled_start_time || null;
+      const oldTime = currentStartTime || null;
 
       // Check if anything actually changed
       const timeChanged = newTime && newTime !== oldTime?.slice(0, 5);
@@ -644,7 +658,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
 
                       {/* Job blocks */}
                       {laneJobs.map((job) => {
-                        const startTime = job.appointment?.scheduled_start_time;
+                        const startTime = getJobStartTime(job);
                         if (!startTime) return null;
                         const startMinutes = timeToMinutes(startTime);
                         const duration = job.estimated_duration_minutes || 60;

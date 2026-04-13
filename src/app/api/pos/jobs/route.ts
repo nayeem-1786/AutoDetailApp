@@ -207,23 +207,30 @@ export async function POST(request: NextRequest) {
 
     // Auto-assign detailer if none provided (walk-in)
     let assignedStaffId = providedStaffId || null;
+    const now = new Date();
+    const pstDate = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+    const pstTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Los_Angeles',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(now);
     if (!assignedStaffId) {
-      const now = new Date();
-      const pstDate = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Los_Angeles',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).format(now);
-      const pstTime = new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'America/Los_Angeles',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }).format(now);
       const estimatedEnd = addMinutesToTime(pstTime, 60);
-
       assignedStaffId = await findAvailableDetailer(supabase, pstDate, pstTime, estimatedEnd);
+    }
+
+    // Compute estimated_pickup_at for timeline placement (walk-ins have no appointment)
+    // Use caller-provided value, or default to now (so the job appears at current time on timeline)
+    let pickupAt = estimated_pickup_at || null;
+    if (!pickupAt) {
+      // Set to current PST time as ISO timestamp — the timeline extracts the time portion
+      pickupAt = now.toISOString();
     }
 
     const { data: job, error } = await supabase
@@ -235,7 +242,7 @@ export async function POST(request: NextRequest) {
         appointment_id: null, // walk-in
         services,
         status: 'scheduled',
-        estimated_pickup_at: estimated_pickup_at || null,
+        estimated_pickup_at: pickupAt,
         created_by: posEmployee.employee_id,
         quote_id: quote_id || null,
         intake_notes: notes || null,

@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
-const DRAGGABLE_STATUSES = ['scheduled', 'intake'];
+const DRAGGABLE_STATUSES = ['scheduled', 'intake', 'in_progress'];
 
 /**
  * PATCH /api/pos/jobs/[id]/reschedule — Reschedule a job's time and/or detailer
@@ -115,11 +115,24 @@ export async function PATCH(
         changes.push(`time: ${currentApt.scheduled_start_time} → ${scheduled_start_time}`);
       }
     } else if (scheduled_start_time && !job.appointment_id) {
-      // Walk-in job: no appointment record — use estimated_pickup_at as time reference
-      // The timeline reads scheduled_start_time from the appointment join.
-      // For walk-ins, we need to create a lightweight time marker.
-      // Store in estimated_pickup_at since walk-ins don't have appointments.
-      // The timeline component will need to check this as a fallback.
+      // Walk-in job: no appointment record — store time in estimated_pickup_at
+      // The timeline reads this as a fallback when appointment.scheduled_start_time is null
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date());
+      const isoTime = `${today}T${normalizeTime(scheduled_start_time)}`;
+      // Convert PST to UTC for TIMESTAMPTZ storage
+      const pstDate = new Date(isoTime + '-07:00');
+
+      await supabase
+        .from('jobs')
+        .update({
+          estimated_pickup_at: pstDate.toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
       changes.push(`time set to ${scheduled_start_time} (walk-in)`);
     }
 

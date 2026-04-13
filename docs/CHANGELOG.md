@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Walk-in jobs appear in detailer's timeline row — 2026-04-13
+
+- **Walk-in creation** (`src/app/api/pos/jobs/route.ts`): Now sets `estimated_pickup_at` to current time on creation, so walk-ins appear at the correct position on the timeline grid instead of always landing in Unscheduled.
+- **Reschedule endpoint** (`src/app/api/pos/jobs/[id]/reschedule/route.ts`): Walk-in time changes now persist — writes `estimated_pickup_at` to the jobs table (was previously a no-op that only logged). Added `in_progress` to DRAGGABLE_STATUSES.
+- **Timeline component** (`src/app/pos/jobs/components/job-timeline.tsx`): New `getJobStartTime()` helper extracts time from `appointment.scheduled_start_time` (bookings) OR `estimated_pickup_at` (walk-ins). Updated: scheduled/unscheduled split, job block positioning, drag delta calculation. Added `in_progress` to DRAGGABLE_STATUSES.
+
+---
+
 ## fix: Remove double-counting of visit_count and lifetime_spend — 2026-04-13
 
 - **DB trigger `tr_update_customer_stats`** is the single source of truth for `visit_count`, `lifetime_spend`, and `last_visit_date` on completed transaction INSERT.
