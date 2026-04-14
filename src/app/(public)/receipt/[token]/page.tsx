@@ -440,12 +440,17 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               </span>
             </div>
             {tx.is_deposit && tx.balance_due > 0 && (
-              <div className="flex justify-between pt-1">
-                <span className="text-sm font-semibold text-amber-500">Balance Due at Service</span>
-                <span className="text-base font-bold text-amber-500">
-                  {formatCurrency(tx.balance_due)}
-                </span>
-              </div>
+              <>
+                <div className="flex justify-between pt-1">
+                  <span className="text-sm font-semibold text-amber-500">Est. Balance Due at Service</span>
+                  <span className="text-base font-bold text-amber-500">
+                    {formatCurrency(tx.balance_due)}
+                  </span>
+                </div>
+                <p className="text-xs text-site-text-muted italic text-center mt-1">
+                  Final balance may include additional services
+                </p>
+              </>
             )}
             {tx.linked_receipt && (
               <div className="pt-2 text-center">

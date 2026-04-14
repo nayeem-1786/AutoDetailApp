@@ -578,8 +578,13 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     lines.push({ type: 'spacer' });
     lines.push({
       type: 'columns',
-      left: 'BALANCE DUE AT SERVICE',
+      left: 'EST. BALANCE DUE AT SERVICE',
       right: `$${tx.balance_due.toFixed(2)}`,
+    });
+    lines.push({
+      type: 'text',
+      text: 'Final balance may include additional services',
+      alignment: 'center',
     });
   } else if (tx.deposit_credit && tx.deposit_credit > 0) {
     // Balance payment receipt — deposit was subtracted at checkout
@@ -1161,8 +1166,11 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${tx.total_amount.toFixed(2)}</td>
     </tr>
     ${tx.is_deposit && tx.balance_due != null ? `<tr>
-      <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">BALANCE DUE AT SERVICE</td>
+      <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">EST. BALANCE DUE AT SERVICE</td>
       <td style="padding:6px 0;font-size:14px;font-weight:bold;text-align:right;color:#d97706;">$${tx.balance_due.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:0 0 4px;font-size:11px;color:#888;font-style:italic;text-align:center;">Final balance may include additional services</td>
     </tr>` : ''}
     ${tx.linked_receipt ? `<tr>
       <td colspan="2" style="padding:6px 0;font-size:12px;color:#2563eb;text-align:center;">See also: ${esc(tx.linked_receipt.label)} #${esc(tx.linked_receipt.receipt_number)}</td>

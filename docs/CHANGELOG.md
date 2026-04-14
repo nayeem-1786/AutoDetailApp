@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Deposit receipt shows estimated balance due with disclaimer — 2026-04-13
+
+- Deposit receipts now show "Est. Balance Due at Service" instead of "Balance Due at Service" across all 3 renderers (ESC/POS, HTML, public web).
+- Added disclaimer line below: "Final balance may include additional services" — communicates that add-on services during the detail may change the final amount.
+- Balance payment receipts (non-deposit) are unchanged — they show actual charged amounts.
+
+---
+
 ## feat: Receipt cross-referencing + Online Booking employee label — 2026-04-13
 
 - **Receipt cross-reference**: Deposit and balance receipts now link to each other with "See also: {label} #{receipt_number}" displayed after totals. Deposit receipts show the balance payment receipt number; balance receipts show the deposit receipt number. Works on all 4 renderers (ESC/POS, HTML, public web, copier).
