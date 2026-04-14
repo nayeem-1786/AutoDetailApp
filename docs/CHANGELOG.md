@@ -4,6 +4,13 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Customer stats void/refund reversal + accurate transaction count — 2026-04-13
+
+- **Transaction count stat card** (`src/app/admin/customers/[id]/page.tsx`): "Total Transactions" now filters to `completed` + `partial_refund` only, excluding voided and fully refunded transactions.
+- **DB trigger migration**: `update_customer_stats()` rewritten to handle INSERT (increment) and UPDATE (decrement on void/refund). Deposit-aware: deposits increment `lifetime_spend` only. Void/refund: decrements stats, recalculates `last_visit_date` from remaining completed transactions. `partial_refund` does NOT decrement. Migration SQL printed for manual execution.
+
+---
+
 ## fix: Deposit label shows date + always show tax line — 2026-04-13
 
 - **Deposit label with date**: All deposit labels across POS cart, receipts (thermal, HTML, public web) now show "Deposit Paid - Online on MM/DD/YYYY" where the date is the actual deposit transaction date. Falls back to "Deposit Paid - Online" when date unavailable.

@@ -1743,7 +1743,7 @@ export default function CustomerProfilePage() {
                   <ShoppingCart className="h-4 w-4" />
                   Total Transactions
                 </div>
-                <p className="mt-1 text-2xl font-bold text-gray-900">{transactions.length}</p>
+                <p className="mt-1 text-2xl font-bold text-gray-900">{transactions.filter(t => t.status === 'completed' || t.status === 'partial_refund').length}</p>
               </CardContent>
             </Card>
             <Card>
