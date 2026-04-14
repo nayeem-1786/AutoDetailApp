@@ -142,6 +142,7 @@ export async function fetchReceiptData(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = transaction as any;
   const tx: ReceiptTransaction = {
+    status: raw.status,
     receipt_number: raw.receipt_number,
     transaction_date: raw.transaction_date,
     subtotal: raw.subtotal,

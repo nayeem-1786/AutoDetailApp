@@ -17,6 +17,7 @@ function formatDepositLabel(depositDate: string | null): string {
 
 interface TransactionWithRelations {
   id: string;
+  status: string;
   receipt_number: string | null;
   transaction_date: string;
   subtotal: number;
@@ -224,6 +225,14 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         <p className="mt-1 text-sm text-site-text-muted">{businessInfo.address}</p>
       </div>
 
+      {/* Voided Banner */}
+      {tx.status === 'voided' && (
+        <div className="mb-4 rounded-lg bg-red-600 px-6 py-3 text-center">
+          <span className="text-lg font-bold tracking-widest text-white">VOIDED</span>
+          <p className="mt-1 text-xs text-red-100">This transaction has been voided and is no longer valid.</p>
+        </div>
+      )}
+
       {/* Deposit Badge */}
       {tx.is_deposit && (
         <div className="mb-4 text-center">
@@ -240,7 +249,12 @@ export default async function PublicReceiptPage({ params }: PageProps) {
             <h2 className="text-lg font-semibold text-site-text">
               Receipt {receiptId}
             </h2>
-            {refundStatus !== 'none' && (
+            {tx.status === 'voided' && (
+              <span className="mt-1 inline-block rounded px-2 py-0.5 text-xs font-bold text-white bg-red-600">
+                VOIDED
+              </span>
+            )}
+            {tx.status !== 'voided' && refundStatus !== 'none' && (
               <span className={`mt-1 inline-block rounded px-2 py-0.5 text-xs font-bold text-white ${refundStatus === 'full' ? 'bg-red-600' : 'bg-amber-500'}`}>
                 {refundStatus === 'full' ? 'REFUNDED' : 'PARTIALLY REFUNDED'}
               </span>

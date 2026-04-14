@@ -4,6 +4,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Voided transaction receipt display — VOIDED banner on all renderers — 2026-04-13
+
+- **ReceiptTransaction interface** (`receipt-template.ts`): Added `status` field so receipt renderers can detect voided/refunded transactions.
+- **Receipt data fetcher** (`receipt-data.ts`): Now passes transaction `status` through to `ReceiptTransaction`.
+- **ESC/POS thermal receipt** (`receipt-template.ts`): Double-height `*** VOIDED ***` banner before line items and after totals.
+- **HTML receipt** (`receipt-template.ts`): Red "VOIDED" banner at top + 45-degree rotated watermark overlay across receipt body.
+- **Public web receipt** (`receipt/[token]/page.tsx`): Red VOIDED banner with explanation text + VOIDED badge in receipt header card.
+- **Copier HTML receipt** (`receipts/html/route.ts`): Same HTML renderer — gets VOIDED display automatically via shared `generateReceiptHtml()`.
+- All renderers still show full original transaction details (items, amounts, payment method) so staff can see what was voided.
+- Refund display continues to work as before — voided takes precedence over refund badges since a voided transaction can't also be refunded.
+
+---
+
 ## fix: Customer stats void/refund reversal + accurate transaction count — 2026-04-13
 
 - **Transaction count stat card** (`src/app/admin/customers/[id]/page.tsx`): "Total Transactions" now filters to `completed` + `partial_refund` only, excluding voided and fully refunded transactions.

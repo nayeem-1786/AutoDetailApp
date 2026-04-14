@@ -45,6 +45,8 @@ interface ReceiptPayment {
 }
 
 export interface ReceiptTransaction {
+  /** Transaction status — used to render VOIDED/REFUNDED banners on receipts */
+  status?: string;
   receipt_number: string | null;
   transaction_date: string;
   subtotal: number;
@@ -386,6 +388,13 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     lines.push({ type: 'divider' });
   }
 
+  // Voided transaction banner — uses 'header' type for double-height on thermal printers
+  const isVoided = tx.status === 'voided';
+  if (isVoided) {
+    lines.push({ type: 'header', text: '*** VOIDED ***' });
+    lines.push({ type: 'divider' });
+  }
+
   // Refund status + refunded map
   const refundStatus = getRefundStatus(tx.refunds, tx.items);
   const refundedMap = buildRefundedMap(tx.refunds);
@@ -599,6 +608,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
+  // Voided indicator after totals — double-height on thermal printers
+  if (isVoided) {
+    lines.push({ type: 'header', text: '*** VOIDED ***' });
+  }
+
   lines.push({ type: 'divider' });
 
   // Payments
@@ -800,6 +814,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     hour: 'numeric',
     minute: '2-digit',
   });
+
+  // Void status
+  const htmlIsVoided = tx.status === 'voided';
 
   // Refund data
   const htmlRefundStatus = getRefundStatus(tx.refunds, tx.items);
@@ -1061,7 +1078,12 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
 </style>
 </head>
 <body style="margin:0;padding:20px;background:#f5f5f5;">
-<div class="receipt-wrap" style="max-width:400px;margin:0 auto;background:#fff;border:1px solid #ddd;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#222;line-height:1.5;">
+<div class="receipt-wrap" style="max-width:400px;margin:0 auto;background:#fff;border:1px solid #ddd;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#222;line-height:1.5;position:relative;overflow:hidden;">
+  ${htmlIsVoided ? `<!-- VOIDED watermark overlay -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72px;font-weight:bold;color:rgba(220,38,38,0.12);white-space:nowrap;pointer-events:none;z-index:1;letter-spacing:8px;">VOIDED</div>
+  <!-- VOIDED banner -->
+  <div style="text-align:center;margin:0 -20px 16px;padding:10px 20px;background:#dc2626;color:#fff;font-size:16px;font-weight:bold;letter-spacing:2px;">VOIDED</div>` : ''}
+
   <!-- Header -->
   ${c.logo_placement === 'above_name' ? logoHtml : ''}
   <div style="text-align:center;margin-bottom:16px;">
@@ -1100,7 +1122,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#2563eb;">BOOKING DEPOSIT</span>
   </div>` : ''}
 
-  ${htmlRefundStatus !== 'none' ? `<div style="text-align:center;margin:8px 0;padding:6px 12px;display:inline-block;width:100%;box-sizing:border-box;">
+  ${htmlIsVoided ? `<div style="text-align:center;margin:8px 0;">
+    <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#dc2626;">VOIDED</span>
+  </div>` : htmlRefundStatus !== 'none' ? `<div style="text-align:center;margin:8px 0;padding:6px 12px;display:inline-block;width:100%;box-sizing:border-box;">
     <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:${htmlRefundStatus === 'full' ? '#dc2626' : '#d97706'};">
       ${htmlRefundStatus === 'full' ? 'REFUNDED' : 'PARTIALLY REFUNDED'}
     </span>
