@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Automation form — transform empty UUID strings to null before save — 2026-04-14
+
+- `trigger_service_id` and `coupon_id` dropdowns send `""` when "Any service" / "None" is selected. Zod rejects empty strings as invalid UUIDs, causing a "Validation failed" error on save.
+- Both detail and new automation pages now convert empty strings to `null` in `onSubmit` before sending the payload.
+- `email_template_id` was already handled via its `onChange` handler — no change needed.
+
+---
+
 ## fix: Remove redundant Active + dead Vehicle-aware checkboxes from automation detail/new pages — 2026-04-14
 
 - Removed the `is_active` checkbox from both the detail and new automation pages — the list page toggle already writes to `is_active` and is the single source of truth.

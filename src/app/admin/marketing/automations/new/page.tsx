@@ -126,10 +126,15 @@ export default function NewAutomationPage() {
   async function onSubmit(data: LifecycleRuleInput) {
     setSaving(true);
     try {
+      const payload = {
+        ...data,
+        trigger_service_id: data.trigger_service_id || null,
+        coupon_id: data.coupon_id || null,
+      };
       const res = await fetch('/api/marketing/automations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
 
       const result = await res.json();
