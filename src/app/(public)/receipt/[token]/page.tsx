@@ -34,6 +34,7 @@ interface TransactionWithRelations {
   is_deposit: boolean;
   deposit_amount: number;
   balance_due: number;
+  linked_receipt: { receipt_number: string; label: string } | null;
   customer: { first_name: string; last_name: string } | null;
   employee: { first_name: string; last_name: string } | null;
   vehicle: { year: number | null; make: string | null; model: string | null; color: string | null } | null;
@@ -120,7 +121,9 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     }
   }
 
-  // For balance payment receipts, find deposit date via job → appointment → deposit transaction
+  // For balance payment receipts, find deposit date + receipt via job → appointment → deposit transaction
+  let linkedReceipt: { receipt_number: string; label: string } | null = null;
+
   if (!isDeposit && Number(raw.deposit_credit) > 0) {
     const { data: linkedJob } = await supabase
       .from('jobs')
@@ -131,7 +134,7 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     if (linkedJob?.appointment_id) {
       const { data: depositTxn } = await supabase
         .from('transactions')
-        .select('transaction_date')
+        .select('transaction_date, receipt_number')
         .eq('appointment_id', linkedJob.appointment_id)
         .eq('status', 'completed')
         .order('created_at', { ascending: true })
@@ -141,15 +144,46 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
       if (depositTxn?.transaction_date) {
         depositDate = depositTxn.transaction_date;
       }
+      if (depositTxn?.receipt_number) {
+        linkedReceipt = { receipt_number: depositTxn.receipt_number, label: 'Deposit Receipt' };
+      }
     }
   }
 
+  // For deposit receipts, find the balance payment receipt via appointment → jobs → transaction
+  if (isDeposit && raw.appointment_id) {
+    const { data: balanceJob } = await supabase
+      .from('jobs')
+      .select('transaction_id')
+      .eq('appointment_id', raw.appointment_id as string)
+      .not('transaction_id', 'is', null)
+      .maybeSingle();
+
+    if (balanceJob?.transaction_id) {
+      const { data: balanceTxn } = await supabase
+        .from('transactions')
+        .select('receipt_number')
+        .eq('id', balanceJob.transaction_id)
+        .maybeSingle();
+
+      if (balanceTxn?.receipt_number) {
+        linkedReceipt = { receipt_number: balanceTxn.receipt_number, label: 'Balance Payment' };
+      }
+    }
+  }
+
+  // Employee fallback: online booking deposits have no employee
+  const employee = (raw.employee as TransactionWithRelations['employee'])
+    ?? (isDeposit ? { first_name: 'Online', last_name: 'Booking' } : null);
+
   return {
     ...(data as unknown as TransactionWithRelations),
+    employee,
     is_deposit: isDeposit,
     deposit_amount: depositAmount,
     balance_due: balanceDue,
     deposit_date: depositDate,
+    linked_receipt: linkedReceipt,
   };
 }
 
@@ -410,6 +444,13 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 <span className="text-sm font-semibold text-amber-500">Balance Due at Service</span>
                 <span className="text-base font-bold text-amber-500">
                   {formatCurrency(tx.balance_due)}
+                </span>
+              </div>
+            )}
+            {tx.linked_receipt && (
+              <div className="pt-2 text-center">
+                <span className="text-xs text-blue-500">
+                  See also: {tx.linked_receipt.label} #{tx.linked_receipt.receipt_number}
                 </span>
               </div>
             )}

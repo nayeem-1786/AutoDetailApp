@@ -112,7 +112,9 @@ export async function fetchReceiptData(
     }
   }
 
-  // 8. For balance payment receipts (deposit_credit > 0), find deposit date via job → appointment → deposit transaction
+  // 8. For balance payment receipts (deposit_credit > 0), find deposit date + receipt via job → appointment → deposit transaction
+  let linkedReceipt: { receipt_number: string; label: string } | null = null;
+
   if (!isDeposit && transaction.deposit_credit > 0) {
     // Find the job linked to this transaction
     const { data: linkedJob } = await supabase
@@ -125,7 +127,7 @@ export async function fetchReceiptData(
       // Find the original deposit transaction by appointment_id
       const { data: depositTxn } = await supabase
         .from('transactions')
-        .select('transaction_date')
+        .select('transaction_date, receipt_number')
         .eq('appointment_id', linkedJob.appointment_id)
         .eq('status', 'completed')
         .order('created_at', { ascending: true })
@@ -134,6 +136,31 @@ export async function fetchReceiptData(
 
       if (depositTxn?.transaction_date) {
         depositDate = depositTxn.transaction_date;
+      }
+      if (depositTxn?.receipt_number) {
+        linkedReceipt = { receipt_number: depositTxn.receipt_number, label: 'Deposit Receipt' };
+      }
+    }
+  }
+
+  // 8b. For deposit receipts, find the balance payment receipt via appointment → jobs → transaction
+  if (isDeposit && transaction.appointment_id) {
+    const { data: balanceJob } = await supabase
+      .from('jobs')
+      .select('transaction_id')
+      .eq('appointment_id', transaction.appointment_id)
+      .not('transaction_id', 'is', null)
+      .maybeSingle();
+
+    if (balanceJob?.transaction_id) {
+      const { data: balanceTxn } = await supabase
+        .from('transactions')
+        .select('receipt_number')
+        .eq('id', balanceJob.transaction_id)
+        .maybeSingle();
+
+      if (balanceTxn?.receipt_number) {
+        linkedReceipt = { receipt_number: balanceTxn.receipt_number, label: 'Balance Payment' };
       }
     }
   }
@@ -155,7 +182,7 @@ export async function fetchReceiptData(
     total_amount: raw.total_amount,
     loyalty_points_earned: raw.loyalty_points_earned ?? 0,
     customer: raw.customer,
-    employee: raw.employee,
+    employee: raw.employee ?? (isDeposit ? { first_name: 'Online', last_name: 'Booking' } : null),
     vehicle: raw.vehicle,
     items: raw.items ?? [],
     payments: raw.payments ?? [],
@@ -165,6 +192,7 @@ export async function fetchReceiptData(
     balance_due: isDeposit ? balanceDue : undefined,
     deposit_credit: raw.deposit_credit > 0 ? raw.deposit_credit : undefined,
     deposit_date: depositDate,
+    linked_receipt: linkedReceipt,
   };
 
   return { tx, config: merged, context, images, print_server_url };

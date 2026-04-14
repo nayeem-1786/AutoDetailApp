@@ -79,6 +79,8 @@ export interface ReceiptTransaction {
   deposit_credit?: number;
   /** ISO date when the deposit was originally collected (for label display) */
   deposit_date?: string;
+  /** Cross-reference to the linked deposit or balance receipt */
+  linked_receipt?: { receipt_number: string; label: string } | null;
 }
 
 export interface ReceiptLine {
@@ -605,6 +607,15 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       type: 'columns',
       left: 'TOTAL',
       right: `$${tx.total_amount.toFixed(2)}`,
+    });
+  }
+
+  // Linked receipt cross-reference
+  if (tx.linked_receipt) {
+    lines.push({
+      type: 'text',
+      text: `See also: ${tx.linked_receipt.label} #${tx.linked_receipt.receipt_number}`,
+      alignment: 'center',
     });
   }
 
@@ -1152,6 +1163,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     ${tx.is_deposit && tx.balance_due != null ? `<tr>
       <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">BALANCE DUE AT SERVICE</td>
       <td style="padding:6px 0;font-size:14px;font-weight:bold;text-align:right;color:#d97706;">$${tx.balance_due.toFixed(2)}</td>
+    </tr>` : ''}
+    ${tx.linked_receipt ? `<tr>
+      <td colspan="2" style="padding:6px 0;font-size:12px;color:#2563eb;text-align:center;">See also: ${esc(tx.linked_receipt.label)} #${esc(tx.linked_receipt.receipt_number)}</td>
     </tr>` : ''}
   </table>
 

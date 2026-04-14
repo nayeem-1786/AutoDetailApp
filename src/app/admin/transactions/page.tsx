@@ -598,6 +598,8 @@ function TransactionTableRow({
           >
             {tx.employee.first_name}
           </a>
+        ) : tx.appointment_id ? (
+          <span className="text-gray-500 italic text-xs">Online Booking</span>
         ) : (
           <span className="text-gray-600">---</span>
         )}
@@ -640,7 +642,7 @@ function ExportButton({ transactions }: { transactions: TransactionRow[] }) {
       tx.items?.map((i: { item_name: string }) => i.item_name).join('; ') || '',
       tx.employee
         ? `${tx.employee.first_name} ${tx.employee.last_name}`
-        : '',
+        : tx.appointment_id ? 'Online Booking' : '',
       tx.payment_method ?? '',
       tx.status,
       tx.total_amount.toFixed(2),

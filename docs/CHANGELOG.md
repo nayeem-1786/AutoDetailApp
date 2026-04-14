@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Receipt cross-referencing + Online Booking employee label — 2026-04-13
+
+- **Receipt cross-reference**: Deposit and balance receipts now link to each other with "See also: {label} #{receipt_number}" displayed after totals. Deposit receipts show the balance payment receipt number; balance receipts show the deposit receipt number. Works on all 4 renderers (ESC/POS, HTML, public web, copier).
+- **ReceiptTransaction**: Added `linked_receipt` field (`{ receipt_number, label }`). Data fetcher resolves via appointment_id → jobs → transactions chain.
+- **Online Booking employee**: Deposit transactions with no employee (online bookings) now show "Online Booking" as the employee name on receipts instead of blank. Applies to all receipt renderers via the data layer.
+- **Admin transactions page**: Employee column shows "Online Booking" (italic) when employee is null and `appointment_id` is present. CSV export also includes this fallback.
+
+---
+
 ## fix: Voided transaction receipt display — VOIDED banner on all renderers — 2026-04-13
 
 - **ReceiptTransaction interface** (`receipt-template.ts`): Added `status` field so receipt renderers can detect voided/refunded transactions.
