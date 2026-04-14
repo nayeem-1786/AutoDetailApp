@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Remove redundant Active + dead Vehicle-aware checkboxes from automation detail/new pages — 2026-04-14
+
+- Removed the `is_active` checkbox from both the detail and new automation pages — the list page toggle already writes to `is_active` and is the single source of truth.
+- Removed the `is_vehicle_aware` checkbox — dead field never read by the lifecycle engine.
+- Removed unused `Checkbox` component imports from both pages.
+- No API or lifecycle engine changes — both were already correct.
+
+---
+
 ## fix: Deposit receipt shows estimated balance due with disclaimer — 2026-04-13
 
 - Deposit receipts now show "Est. Balance Due at Service" instead of "Balance Due at Service" across all 3 renderers (ESC/POS, HTML, public web).

@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
@@ -354,26 +353,6 @@ export default function NewAutomationPage() {
               >
                 Manage coupons →
               </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Options */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3">
-                <Checkbox id="is_active" {...register('is_active')} defaultChecked />
-                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
-                  Active (enable immediately)
-                </label>
-              </div>
-              <div className="flex items-center gap-3">
-                <Checkbox id="is_vehicle_aware" {...register('is_vehicle_aware')} />
-                <label htmlFor="is_vehicle_aware" className="text-sm font-medium text-gray-700">
-                  Vehicle-aware (include vehicle info in messages)
-                </label>
-              </div>
             </div>
           </CardContent>
         </Card>
