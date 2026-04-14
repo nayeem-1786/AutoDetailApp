@@ -134,15 +134,10 @@ export default function AutomationDetailPage() {
   async function onSubmit(data: LifecycleRuleInput) {
     setSaving(true);
     try {
-      const payload = {
-        ...data,
-        trigger_service_id: data.trigger_service_id || null,
-        coupon_id: data.coupon_id || null,
-      };
       const res = await fetch(`/api/marketing/automations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
@@ -256,7 +251,7 @@ export default function AutomationDetailPage() {
                 </Select>
               </FormField>
               <FormField label="Trigger Service" error={errors.trigger_service_id?.message} htmlFor="trigger_service_id">
-                <Select id="trigger_service_id" {...register('trigger_service_id')}>
+                <Select id="trigger_service_id" {...register('trigger_service_id', { setValueAs: (v: string) => v || null })}>
                   <option value="">Any service</option>
                   {services.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
@@ -360,7 +355,7 @@ export default function AutomationDetailPage() {
           <CardContent>
             <div className="space-y-3">
               <FormField label="Attach Coupon" error={errors.coupon_id?.message} htmlFor="coupon_id">
-                <Select id="coupon_id" {...register('coupon_id')}>
+                <Select id="coupon_id" {...register('coupon_id', { setValueAs: (v: string) => v || null })}>
                   <option value="">None</option>
                   {coupons.map((c) => (
                     <option key={c.id} value={c.id}>

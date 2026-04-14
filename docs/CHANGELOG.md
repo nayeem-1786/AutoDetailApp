@@ -4,11 +4,11 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix: Automation form — transform empty UUID strings to null before save — 2026-04-14
+## fix: Automation form — setValueAs transforms empty UUID to null before validation — 2026-04-14
 
-- `trigger_service_id` and `coupon_id` dropdowns send `""` when "Any service" / "None" is selected. Zod rejects empty strings as invalid UUIDs, causing a "Validation failed" error on save.
-- Both detail and new automation pages now convert empty strings to `null` in `onSubmit` before sending the payload.
-- `email_template_id` was already handled via its `onChange` handler — no change needed.
+- Previous fix (onSubmit transform) was unreachable — Zod validation via `handleSubmit` rejects `""` as invalid UUID before `onSubmit` ever runs.
+- Moved the transform to `register()` with `setValueAs: (v) => v || null` on `trigger_service_id` and `coupon_id` — converts empty string to `null` as it enters form state, before validation.
+- Removed redundant `|| null` transforms from `onSubmit` payloads on both pages.
 
 ---
 
