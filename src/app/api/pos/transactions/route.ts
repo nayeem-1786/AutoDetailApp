@@ -300,6 +300,50 @@ export async function POST(request: NextRequest) {
           .from('transactions')
           .update({ loyalty_points_earned: pointsEarned })
           .eq('id', transaction.id);
+
+        // Loyalty milestone notification — fire and forget
+        const prevBalance = currentBalance - pointsEarned;
+        if (prevBalance < LOYALTY.REDEEM_MINIMUM && currentBalance >= LOYALTY.REDEEM_MINIMUM) {
+          (async () => {
+            try {
+              const { data: custMilestone } = await supabase
+                .from('customers')
+                .select('phone, first_name')
+                .eq('id', data.customer_id!)
+                .single();
+              if (!custMilestone?.phone) return;
+
+              const bizInfo = await getBusinessInfo();
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+              const bookingLink = await createShortLink(`${appUrl}/book`);
+              const cashValue = `$${(currentBalance * LOYALTY.REDEEM_RATE).toFixed(2)}`;
+
+              const vars: Record<string, string> = {
+                first_name: custMilestone.first_name || '',
+                loyalty_points_balance: String(currentBalance),
+                loyalty_cash_value: cashValue,
+                booking_link: bookingLink,
+                business_name: bizInfo.name,
+              };
+
+              const fallback = `Great news ${vars.first_name}! You now have ${currentBalance} loyalty points — that's ${cashValue} off your next visit! Book now: ${bookingLink}\n\n${bizInfo.name}`;
+
+              const rendered = await renderSmsTemplate('loyalty_milestone', vars, fallback);
+              if (!rendered.isActive) return;
+
+              await sendSms(custMilestone.phone, rendered.body, {
+                customerId: data.customer_id!,
+                source: 'transactional',
+                logToConversation: true,
+                notificationType: 'loyalty_milestone',
+                contextId: transaction.id,
+              });
+              console.log(`[LoyaltyMilestone] SMS sent to ${custMilestone.phone} — ${currentBalance} pts crossed ${LOYALTY.REDEEM_MINIMUM} threshold`);
+            } catch (err) {
+              console.error('[LoyaltyMilestone] Failed to send milestone SMS:', err);
+            }
+          })();
+        }
       }
     }
 

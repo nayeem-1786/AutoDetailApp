@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Loyalty milestone SMS + rebooking reminder activation SQL — 2026-04-15
+
+- **Loyalty milestone notification**: When a customer crosses the `REDEEM_MINIMUM` (100 points) threshold after earning points at checkout, an SMS is sent notifying them of their reward eligibility. Uses new `loyalty_milestone` template slug. Fire-and-forget — never blocks POS.
+- **Rebooking reminder**: SQL provided below for manual activation of the existing 30-Day Win-Back drip sequence.
+- Files changed: `src/app/api/pos/transactions/route.ts`
+
+### Migration SQL — run manually:
+
+**1. Loyalty milestone SMS template:**
+```sql
+INSERT INTO sms_templates (slug, name, category, body, variables, is_active)
+VALUES (
+  'loyalty_milestone',
+  'Loyalty Milestone — Reward Eligible',
+  'transactional',
+  E'Great news {first_name}! You now have {loyalty_points_balance} loyalty points — that''s {loyalty_cash_value} off your next visit! Book now: {booking_link}\n\n{business_name}',
+  '["first_name", "loyalty_points_balance", "loyalty_cash_value", "booking_link", "business_name"]',
+  true
+);
+```
+
+**2. Activate 30-Day Win-Back drip sequence:**
+```sql
+UPDATE drip_sequences SET is_active = true WHERE name ILIKE '%win%back%';
+```
+
+---
+
 ## feat: Auto-send receipt SMS + appointment completion + thank you message — 2026-04-15
 
 - **Auto receipt SMS**: After POS checkout, automatically sends a combined "thank you + receipt link + points earned" SMS to customers with a phone on file. Uses new `payment_receipt` SMS template (editable in Admin > Settings > Messaging > SMS Templates). Fire-and-forget — never blocks POS.
