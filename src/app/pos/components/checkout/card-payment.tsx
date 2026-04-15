@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { CreditCard, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
+import { TIP_PRESETS } from '@/lib/utils/constants';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 
@@ -68,8 +69,15 @@ export function CardPayment() {
 
       setStatus('waiting-for-card');
 
-      // 2. Collect payment (ensureConnected is called internally)
-      const paymentIntent = await collectPaymentMethod(piJson.client_secret);
+      // 2. Collect payment with on-reader tipping (ensureConnected is called internally)
+      const subtotalCents = Math.round(ticket.subtotal * 100);
+      const tipOptions = TIP_PRESETS.map((pct) => ({
+        amount: Math.round(subtotalCents * pct / 100),
+        label: `${pct}%`,
+      }));
+      const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
+        tip_configuration: { options: tipOptions },
+      });
 
       setStatus('processing');
 

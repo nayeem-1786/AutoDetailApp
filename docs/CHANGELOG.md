@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Enable tipping prompt on Stripe Terminal for standard card payments — 2026-04-14
+
+- Standard card payments now show tip options (15%, 20%, 25%) on the Stripe Terminal reader, matching the split-payment flow.
+- Tip amounts are calculated against the subtotal (pre-tax), consistent with `TIP_PRESETS` from `constants.ts`.
+- Downstream tip handling was already in place — tip is calculated from the amount difference returned by the reader and flows through to the transaction record.
+
+---
+
 ## fix: Automation form — setValueAs transforms empty UUID to null before validation — 2026-04-14
 
 - Previous fix (onSubmit transform) was unreachable — Zod validation via `handleSubmit` rejects `""` as invalid UUID before `onSubmit` ever runs.
