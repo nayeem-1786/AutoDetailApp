@@ -8,6 +8,11 @@ import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { createShortLink } from '@/lib/utils/short-link';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { getBusinessInfo } from '@/lib/data/business';
 
 export async function POST(request: NextRequest) {
   try {
@@ -351,12 +356,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Job linking — fire and forget, never block POS
-    // If customer has completed jobs, link the most recent one to this transaction and close it
+    // If customer has completed jobs, link the most recent one to this transaction and close it.
+    // Also mark the linked appointment as completed.
     if (data.customer_id) {
       Promise.resolve(
         supabase
           .from('jobs')
-          .select('id')
+          .select('id, appointment_id')
           .eq('customer_id', data.customer_id)
           .eq('status', 'completed')
           .is('transaction_id', null)
@@ -374,10 +380,84 @@ export async function POST(request: NextRequest) {
             })
             .eq('id', completedJob.id);
           console.log(`[JobCheckout] Job ${completedJob.id} linked to transaction ${transaction.id}, status → closed`);
+
+          // Mark linked appointment as completed
+          if (completedJob.appointment_id) {
+            await supabase
+              .from('appointments')
+              .update({ status: 'completed', updated_at: new Date().toISOString() })
+              .eq('id', completedJob.appointment_id);
+            console.log(`[JobCheckout] Appointment ${completedJob.appointment_id} → completed`);
+          }
         }
       }).catch((err: unknown) => {
         console.error('[JobCheckout] Failed to link job to transaction:', err);
       });
+    }
+
+    // Auto-send receipt SMS — fire and forget, never block POS
+    if (data.customer_id) {
+      (async () => {
+        try {
+          // Fetch customer phone + vehicle info
+          const { data: cust } = await supabase
+            .from('customers')
+            .select('phone, first_name')
+            .eq('id', data.customer_id!)
+            .single();
+          if (!cust?.phone) return;
+
+          // Build receipt link
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+          const receiptUrl = `${appUrl}/receipt/${transaction.access_token}`;
+          const receiptLink = await createShortLink(receiptUrl);
+
+          // Build vehicle description
+          let vehicleDesc = '';
+          if (data.vehicle_id) {
+            const { data: veh } = await supabase
+              .from('vehicles')
+              .select('year, make, model')
+              .eq('id', data.vehicle_id)
+              .single();
+            if (veh) vehicleDesc = cleanVehicleDescription(veh);
+          }
+
+          // Fetch loyalty points earned (may have been updated after insert)
+          const { data: txRefresh } = await supabase
+            .from('transactions')
+            .select('loyalty_points_earned')
+            .eq('id', transaction.id)
+            .single();
+          const pointsEarned = txRefresh?.loyalty_points_earned ?? 0;
+
+          const businessInfo = await getBusinessInfo();
+
+          const vars: Record<string, string> = {
+            first_name: cust.first_name || '',
+            vehicle_description: vehicleDesc || 'your vehicle',
+            loyalty_points_earned: String(pointsEarned),
+            receipt_link: receiptLink,
+            business_name: businessInfo.name,
+          };
+
+          const fallback = `Thank you ${vars.first_name}! Your ${vars.vehicle_description} is all set.${pointsEarned > 0 ? ` You earned ${pointsEarned} loyalty points today.` : ''} View your receipt: ${receiptLink}\n\n${businessInfo.name}`;
+
+          const rendered = await renderSmsTemplate('payment_receipt', vars, fallback);
+          if (!rendered.isActive) return;
+
+          await sendSms(cust.phone, rendered.body, {
+            customerId: data.customer_id!,
+            source: 'transactional',
+            logToConversation: true,
+            notificationType: 'payment_receipt',
+            contextId: transaction.id,
+          });
+          console.log(`[AutoReceipt] SMS sent to ${cust.phone} for transaction ${transaction.id}`);
+        } catch (err) {
+          console.error('[AutoReceipt] Failed to send auto receipt SMS:', err);
+        }
+      })();
     }
 
     logAudit({

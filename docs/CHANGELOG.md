@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Auto-send receipt SMS + appointment completion + thank you message — 2026-04-15
+
+- **Auto receipt SMS**: After POS checkout, automatically sends a combined "thank you + receipt link + points earned" SMS to customers with a phone on file. Uses new `payment_receipt` SMS template (editable in Admin > Settings > Messaging > SMS Templates). Fire-and-forget — never blocks POS.
+- **Appointment status → completed**: When a job is linked to a transaction at checkout, the linked appointment is now also updated to `status='completed'`. Previously, appointments stayed `pending` forever through the normal checkout flow.
+- **Dedup with manual receipts**: Auto-receipt uses `notificationType: 'payment_receipt'` while manual receipt uses `'receipt_sent'` — they're separate notification types. Staff can still manually send receipts; auto-receipt is an additional convenience, not a replacement.
+- **New SMS template migration** (SQL below for manual execution):
+  ```sql
+  INSERT INTO sms_templates (slug, name, category, body, variables, is_active)
+  VALUES (
+    'payment_receipt',
+    'Payment Receipt & Thank You',
+    'transactional',
+    E'Thank you {first_name}! Your {vehicle_description} is all set.{loyalty_points_earned, pts:  You earned {loyalty_points_earned} loyalty points today.} View your receipt: {receipt_link}\n\n{business_name}',
+    '["first_name", "vehicle_description", "loyalty_points_earned", "receipt_link", "business_name"]',
+    true
+  );
+  ```
+- Files changed: `src/app/api/pos/transactions/route.ts`
+
+---
+
 ## feat: Enable tipping prompt on Stripe Terminal for standard card payments — 2026-04-14
 
 - Standard card payments now show tip options (15%, 20%, 25%) on the Stripe Terminal reader, matching the split-payment flow.
