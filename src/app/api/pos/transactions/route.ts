@@ -494,7 +494,7 @@ export async function POST(request: NextRequest) {
             customerId: data.customer_id!,
             source: 'transactional',
             logToConversation: true,
-            notificationType: 'payment_receipt',
+            notificationType: 'receipt_sent',
             contextId: transaction.id,
           });
           console.log(`[AutoReceipt] SMS sent to ${cust.phone} for transaction ${transaction.id}`);

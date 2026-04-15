@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Align auto-receipt SMS notificationType with manual route — 2026-04-15
+
+- Changed auto-receipt `notificationType` from `'payment_receipt'` to `'receipt_sent'` to match the manual SMS receipt route. Both paths now log identically to the messages table.
+
+---
+
 ## feat: Loyalty milestone SMS + rebooking reminder activation SQL — 2026-04-15
 
 - **Loyalty milestone notification**: When a customer crosses the `REDEEM_MINIMUM` (100 points) threshold after earning points at checkout, an SMS is sent notifying them of their reward eligibility. Uses new `loyalty_milestone` template slug. Fire-and-forget — never blocks POS.
