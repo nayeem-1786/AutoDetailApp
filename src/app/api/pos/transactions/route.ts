@@ -439,39 +439,59 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Auto-send receipt SMS — fire and forget, never block POS
+    // Auto-send receipt SMS — 30s delay so staff can manually send first, then dedup check
     if (data.customer_id) {
-      (async () => {
+      const autoReceiptCustomerId = data.customer_id;
+      const autoReceiptVehicleId = data.vehicle_id || null;
+      const autoReceiptTxId = transaction.id;
+      const autoReceiptAccessToken = transaction.access_token;
+
+      setTimeout(async () => {
         try {
-          // Fetch customer phone + vehicle info
-          const { data: cust } = await supabase
+          const admin = createAdminClient();
+
+          // Dedup: skip if a receipt SMS was already sent (manually or otherwise)
+          const { data: alreadySent } = await admin
+            .from('messages')
+            .select('id')
+            .contains('metadata', { notificationType: 'receipt_sent', contextId: autoReceiptTxId })
+            .limit(1)
+            .maybeSingle();
+
+          if (alreadySent) {
+            console.log(`[AutoReceipt] Skipped — receipt already sent for transaction ${autoReceiptTxId}`);
+            return;
+          }
+
+          // Fetch customer phone
+          const { data: cust } = await admin
             .from('customers')
             .select('phone, first_name')
-            .eq('id', data.customer_id!)
+            .eq('id', autoReceiptCustomerId)
             .single();
           if (!cust?.phone) return;
 
           // Build receipt link
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-          const receiptUrl = `${appUrl}/receipt/${transaction.access_token}`;
+          const receiptUrl = `${appUrl}/receipt/${autoReceiptAccessToken}`;
           const receiptLink = await createShortLink(receiptUrl);
 
           // Build vehicle description
           let vehicleDesc = '';
-          if (data.vehicle_id) {
-            const { data: veh } = await supabase
+          if (autoReceiptVehicleId) {
+            const { data: veh } = await admin
               .from('vehicles')
               .select('year, make, model')
-              .eq('id', data.vehicle_id)
+              .eq('id', autoReceiptVehicleId)
               .single();
             if (veh) vehicleDesc = cleanVehicleDescription(veh);
           }
 
-          // Fetch loyalty points earned (may have been updated after insert)
-          const { data: txRefresh } = await supabase
+          // Fetch loyalty points earned (updated after insert)
+          const { data: txRefresh } = await admin
             .from('transactions')
             .select('loyalty_points_earned')
-            .eq('id', transaction.id)
+            .eq('id', autoReceiptTxId)
             .single();
           const pointsEarned = txRefresh?.loyalty_points_earned ?? 0;
 
@@ -491,17 +511,17 @@ export async function POST(request: NextRequest) {
           if (!rendered.isActive) return;
 
           await sendSms(cust.phone, rendered.body, {
-            customerId: data.customer_id!,
+            customerId: autoReceiptCustomerId,
             source: 'transactional',
             logToConversation: true,
             notificationType: 'receipt_sent',
-            contextId: transaction.id,
+            contextId: autoReceiptTxId,
           });
-          console.log(`[AutoReceipt] SMS sent to ${cust.phone} for transaction ${transaction.id}`);
+          console.log(`[AutoReceipt] SMS sent to ${cust.phone} for transaction ${autoReceiptTxId}`);
         } catch (err) {
           console.error('[AutoReceipt] Failed to send auto receipt SMS:', err);
         }
-      })();
+      }, 30_000);
     }
 
     logAudit({

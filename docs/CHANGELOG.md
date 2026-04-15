@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Auto receipt SMS — 30s delay with dedup check — 2026-04-15
+
+- Auto-receipt SMS now waits 30 seconds before sending, giving staff time to manually send a receipt first.
+- After the delay, checks `messages.metadata` for an existing `receipt_sent` entry for this transaction. If found (staff already sent), the auto-send is skipped.
+- Uses a fresh `createAdminClient()` inside the `setTimeout` callback since the original request context is closed after 30 seconds.
+- Captured transaction/customer/vehicle IDs as local variables before the timeout to avoid closure over the mutable `data` object.
+
+---
+
 ## fix: Align auto-receipt SMS notificationType with manual route — 2026-04-15
 
 - Changed auto-receipt `notificationType` from `'payment_receipt'` to `'receipt_sent'` to match the manual SMS receipt route. Both paths now log identically to the messages table.
