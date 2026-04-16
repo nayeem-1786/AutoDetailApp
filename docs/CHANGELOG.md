@@ -9,7 +9,7 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 - TOTAL line on all receipts now shows `total_amount + tip_amount` — the actual amount charged to the customer.
 - Previously TOTAL showed `total_amount` (excludes tip) while the payment line showed the correct higher amount, creating a mismatch.
 - Deposit receipts excluded from this change — deposits don't have tips, so `total_amount` is correct as-is.
-- All 3 renderers updated: ESC/POS lines, HTML receipt, public web receipt.
+- All 5 receipt paths updated: ESC/POS thermal, HTML (copier), public web, SMS receipt, email receipt (plain text fallback).
 
 ---
 

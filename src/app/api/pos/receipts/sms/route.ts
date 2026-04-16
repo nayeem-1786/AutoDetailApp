@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
       .select(`
         access_token,
         total_amount,
+        tip_amount,
         vehicle:vehicles(year, make, model)
       `)
       .eq('id', transaction_id)
@@ -51,8 +52,9 @@ export async function POST(request: NextRequest) {
     const receiptUrl = `${appUrl}/receipt/${transaction.access_token}`;
     const shortUrl = await createShortLink(receiptUrl);
 
-    // Format total
-    const total = `$${Number(transaction.total_amount).toFixed(2)}`;
+    // Format total (includes tip)
+    const grandTotal = Number(transaction.total_amount) + Number(transaction.tip_amount || 0);
+    const total = `$${grandTotal.toFixed(2)}`;
 
     // Build SMS body — vehicle line or "Your total"
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
