@@ -85,6 +85,20 @@ export function SplitPayment() {
 
       const processed = await processPayment(paymentIntent);
 
+      // Capture the authorized payment (finalizes charge including tip)
+      const captureRes = await posFetch('/api/pos/stripe/capture-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          payment_intent_id: piJson.id,
+          amount_to_capture: processed.amount,
+        }),
+      });
+      if (!captureRes.ok) {
+        const captureErr = await captureRes.json();
+        throw new Error(captureErr.error || 'Failed to capture payment');
+      }
+
       // Calculate tip from amount difference
       const tipCents = Math.max(0, processed.amount - cardCents);
       const tipAmount = tipCents / 100;

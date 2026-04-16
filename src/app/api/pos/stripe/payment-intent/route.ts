@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       currency: 'usd',
       description: description || `${BUSINESS_DEFAULTS.name} POS`,
       payment_method_types: ['card_present'],
-      capture_method: 'automatic',
+      capture_method: 'manual',
     });
 
     return NextResponse.json({

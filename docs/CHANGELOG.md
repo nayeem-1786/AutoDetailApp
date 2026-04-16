@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Stripe Terminal tipping — manual capture mode for on-reader tips — 2026-04-16
+
+- **Root cause**: `capture_method: 'automatic'` causes the reader to silently skip the tip screen — Stripe requires `capture_method: 'manual'` for on-reader tipping.
+- **POS payment intent** (`payment-intent/route.ts`): Changed to `capture_method: 'manual'`. Booking deposit payment intent is unchanged (separate file, uses `automatic_payment_methods`).
+- **New endpoint** `POST /api/pos/stripe/capture-payment`: Captures the authorized PaymentIntent after `processPayment` returns, finalizing the charge with any tip included.
+- **card-payment.tsx + split-payment.tsx**: Added capture call after `processPayment` — sends `payment_intent_id` and `amount_to_capture` (which includes the tip).
+- Flow: create intent (manual) → collectPaymentMethod (reader shows tip screen) → processPayment (authorizes) → capture-payment (finalizes charge).
+
+---
+
 ## fix: Stripe Terminal tipping — add config_override for smart reader — 2026-04-16
 
 - Smart readers (WisePOS E) require `config_override.tipping.eligible_amount` to show the tip screen — `tip_configuration` alone only works for Bluetooth readers.

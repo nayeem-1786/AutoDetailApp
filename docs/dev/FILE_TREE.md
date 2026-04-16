@@ -409,6 +409,7 @@ src/app/api/pos/services/check-prerequisites/route.ts
 src/app/api/pos/services/durations/route.ts
 src/app/api/pos/services/route.ts
 src/app/api/pos/staff/available/route.ts
+src/app/api/pos/stripe/capture-payment/route.ts
 src/app/api/pos/stripe/connection-token/route.ts
 src/app/api/pos/stripe/payment-intent/route.ts
 src/app/api/pos/sync-offline-transaction/route.ts
