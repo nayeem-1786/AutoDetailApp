@@ -20,6 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     other: {
       'mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-capable': 'yes',
     },
   };
 }

@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add explicit apple-mobile-web-app-capable meta tag for iOS PWA — 2026-04-16
+
+- Next.js `appleWebApp.capable: true` outputs `mobile-web-app-capable` (Android) but not the Apple variant. Added `apple-mobile-web-app-capable: yes` explicitly via the `other` metadata field.
+
+---
+
 ## feat: POS search bar auto-focus with smart re-focus after inactivity — 2026-04-16
 
 - Auto-focuses the search input on mount so barcode scanner output always targets it.
