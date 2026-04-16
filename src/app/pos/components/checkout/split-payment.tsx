@@ -79,7 +79,7 @@ export function SplitPayment() {
       }));
 
       const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
-        tip_configuration: { options: tipOptions },
+        tip_configuration: { options: tipOptions, hide_custom_amount: false },
       });
 
       const processed = await processPayment(paymentIntent);

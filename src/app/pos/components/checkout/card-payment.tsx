@@ -76,7 +76,7 @@ export function CardPayment() {
         label: `${pct}%`,
       }));
       const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
-        tip_configuration: { options: tipOptions },
+        tip_configuration: { options: tipOptions, hide_custom_amount: false },
       });
 
       setStatus('processing');

@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Add hide_custom_amount to Stripe Terminal tip config — 2026-04-16
+
+- Added `hide_custom_amount: false` to `tip_configuration` in both `card-payment.tsx` and `split-payment.tsx`. The SDK requires this field when `tip_configuration` is provided — omitting it causes a runtime validation error.
+
+---
+
 ## fix: Auto receipt SMS — 30s delay with dedup check — 2026-04-15
 
 - Auto-receipt SMS now waits 30 seconds before sending, giving staff time to manually send a receipt first.
