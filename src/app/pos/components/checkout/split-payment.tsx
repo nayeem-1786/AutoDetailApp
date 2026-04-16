@@ -80,6 +80,7 @@ export function SplitPayment() {
 
       const paymentIntent = await collectPaymentMethod(piJson.client_secret, {
         tip_configuration: { options: tipOptions, hide_custom_amount: false },
+        config_override: { tipping: { eligible_amount: subtotalCents } },
       });
 
       const processed = await processPayment(paymentIntent);

@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Stripe Terminal tipping — add config_override for smart reader — 2026-04-16
+
+- Smart readers (WisePOS E) require `config_override.tipping.eligible_amount` to show the tip screen — `tip_configuration` alone only works for Bluetooth readers.
+- Added `config_override: { tipping: { eligible_amount: subtotalCents } }` to both `card-payment.tsx` and `split-payment.tsx`.
+- **Stripe Dashboard action required**: Enable tipping in Stripe Dashboard → Settings → Terminal → Tipping for your location.
+
+---
+
 ## fix: Add hide_custom_amount to Stripe Terminal tip config — 2026-04-16
 
 - Added `hide_custom_amount: false` to `tip_configuration` in both `card-payment.tsx` and `split-payment.tsx`. The SDK requires this field when `tip_configuration` is provided — omitting it causes a runtime validation error.
