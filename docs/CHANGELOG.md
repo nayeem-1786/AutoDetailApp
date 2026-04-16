@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: POS search bar auto-focus with smart re-focus after inactivity — 2026-04-16
+
+- Auto-focuses the search input on mount so barcode scanner output always targets it.
+- After the input loses focus, a 5-second timer re-focuses it — but only if no modal/dialog is open (`[role="dialog"]` or `.fixed.z-50`) and no other input/textarea/select is active.
+- Scanner cleanup already re-focuses via `pos-scanner-detected` event (from previous commit).
+
+---
+
 ## fix: Barcode scanner Bluetooth compatibility — 2026-04-16
 
 - **Timing threshold**: Increased `maxKeystrokeGap` from 50ms to 150ms — accommodates Bluetooth scanners (60-100ms gaps) while still distinguishing from human typing (200-400ms).

@@ -22,6 +22,35 @@ export function SearchBar({
     setLocal(value);
   }, [value]);
 
+  // Auto-focus on mount
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // Re-focus after 5 seconds of inactivity when nothing else needs focus
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    function handleBlur() {
+      timer = setTimeout(() => {
+        const active = document.activeElement;
+        const isInModal = document.querySelector('[role="dialog"], .fixed.z-50');
+        const isInInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA' || active?.tagName === 'SELECT';
+
+        if (!isInModal && !isInInput) {
+          inputRef.current?.focus();
+        }
+      }, 5000);
+    }
+
+    const input = inputRef.current;
+    input?.addEventListener('blur', handleBlur);
+    return () => {
+      input?.removeEventListener('blur', handleBlur);
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Clear search bar and re-focus after a barcode scan completes
   useEffect(() => {
     const handler = () => {
