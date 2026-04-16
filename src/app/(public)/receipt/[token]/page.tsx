@@ -436,7 +436,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 {tx.is_deposit ? 'Total Charged' : 'Total'}
               </span>
               <span className="text-lg font-bold text-site-text">
-                {formatCurrency(tx.total_amount)}
+                {formatCurrency(tx.is_deposit ? tx.total_amount : tx.total_amount + tx.tip_amount)}
               </span>
             </div>
             {tx.is_deposit && tx.balance_due > 0 && (

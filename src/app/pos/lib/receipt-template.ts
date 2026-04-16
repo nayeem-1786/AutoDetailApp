@@ -598,20 +598,22 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       type: 'bold',
       text: '',
     });
+    const balanceGrandTotal = tx.total_amount + tx.tip_amount;
     lines.push({
       type: 'columns',
       left: 'TOTAL',
-      right: `$${tx.total_amount.toFixed(2)}`,
+      right: `$${balanceGrandTotal.toFixed(2)}`,
     });
   } else {
     lines.push({
       type: 'bold',
       text: '',
     });
+    const grandTotal = tx.total_amount + tx.tip_amount;
     lines.push({
       type: 'columns',
       left: 'TOTAL',
-      right: `$${tx.total_amount.toFixed(2)}`,
+      right: `$${grandTotal.toFixed(2)}`,
     });
   }
 
@@ -1163,7 +1165,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>
     <tr>
       <td style="padding:6px 0;font-size:15px;font-weight:bold;">${tx.is_deposit ? 'TOTAL CHARGED' : 'TOTAL'}</td>
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${tx.total_amount.toFixed(2)}</td>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(tx.is_deposit ? tx.total_amount : tx.total_amount + tx.tip_amount).toFixed(2)}</td>
     </tr>
     ${tx.is_deposit && tx.balance_due != null ? `<tr>
       <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">EST. BALANCE DUE AT SERVICE</td>

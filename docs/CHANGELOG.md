@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Receipt total includes tip amount — 2026-04-16
+
+- TOTAL line on all receipts now shows `total_amount + tip_amount` — the actual amount charged to the customer.
+- Previously TOTAL showed `total_amount` (excludes tip) while the payment line showed the correct higher amount, creating a mismatch.
+- Deposit receipts excluded from this change — deposits don't have tips, so `total_amount` is correct as-is.
+- All 3 renderers updated: ESC/POS lines, HTML receipt, public web receipt.
+
+---
+
 ## fix: Stripe Terminal tipping — manual capture mode for on-reader tips — 2026-04-16
 
 - **Root cause**: `capture_method: 'automatic'` causes the reader to silently skip the tip screen — Stripe requires `capture_method: 'manual'` for on-reader tipping.
