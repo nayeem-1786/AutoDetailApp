@@ -5,7 +5,7 @@ import { useEffect, useRef } from 'react';
 interface UseBarcodeOptions {
   /** Callback when a barcode is scanned */
   onScan: (barcode: string) => void;
-  /** Max time between keystrokes in ms (USB scanners are very fast) */
+  /** Max time between keystrokes in ms (Bluetooth scanners need ~150ms) */
   maxKeystrokeGap?: number;
   /** Minimum barcode length to consider valid */
   minLength?: number;
@@ -14,44 +14,42 @@ interface UseBarcodeOptions {
 }
 
 /**
- * Detects USB barcode scanner input (keyboard emulation mode).
- * Scanners type characters very rapidly (< 50ms apart) and end with Enter.
- * This distinguishes scanner input from normal keyboard typing.
+ * Detects barcode scanner input (keyboard emulation mode).
+ * Supports both USB (~10ms/char) and Bluetooth (~60-100ms/char) scanners.
  *
  * Works globally — attaches on `document` regardless of focus.
- * Uses timing threshold to distinguish scanner (~10ms/char) from human typing (100-300ms).
- * Prevents characters from echoing into focused input fields during rapid sequences.
+ * Uses timing threshold to distinguish scanner from human typing (200-400ms).
+ * Once a rapid pair of characters is detected, ALL subsequent characters are
+ * suppressed (preventDefault) until Enter fires or the idle timeout clears.
  */
 export function useBarcodeScanner({
   onScan,
-  maxKeystrokeGap = 50,
+  maxKeystrokeGap = 150,
   minLength = 4,
   enabled = true,
 }: UseBarcodeOptions) {
   const bufferRef = useRef('');
   const lastKeystrokeRef = useRef(0);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const scanningRef = useRef(false);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
   useEffect(() => {
     if (!enabled) return;
 
-    function clearBuffer() {
+    function endScanSession() {
       bufferRef.current = '';
-    }
-
-    function isRapidSequence() {
-      return bufferRef.current.length >= 2;
+      scanningRef.current = false;
     }
 
     function handleKeyDown(e: KeyboardEvent) {
       const now = Date.now();
       const gap = now - lastKeystrokeRef.current;
 
-      // If too much time passed since last keystroke, reset buffer
+      // If too much time passed since last keystroke, reset
       if (gap > maxKeystrokeGap) {
-        bufferRef.current = '';
+        endScanSession();
       }
       lastKeystrokeRef.current = now;
 
@@ -62,14 +60,13 @@ export function useBarcodeScanner({
         const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
         const activeEl = document.activeElement;
         const isBarcodeScanTarget = activeEl?.hasAttribute('data-barcode-target');
-        console.log('[barcode-scanner] Enter', { bufferLen: barcode.length, isBarcodeScanTarget, activeTag: activeEl?.tagName, willSwallow: barcode.length >= minLength && isBarcodeScanTarget });
         if (barcode.length >= minLength && isBarcodeScanTarget) {
           e.preventDefault();
           e.stopPropagation();
           onScanRef.current(barcode);
           window.dispatchEvent(new Event('pos-scanner-detected'));
         }
-        bufferRef.current = '';
+        endScanSession();
         return;
       }
 
@@ -77,14 +74,19 @@ export function useBarcodeScanner({
       if (e.key.length === 1) {
         bufferRef.current += e.key;
 
-        // Prevent characters from echoing into focused inputs during rapid sequences
-        if (isRapidSequence()) {
+        // Once we see 2+ rapid characters, flag as scanning — suppress ALL chars
+        if (bufferRef.current.length >= 2) {
+          scanningRef.current = true;
+        }
+
+        // Prevent character from echoing into focused inputs during scan
+        if (scanningRef.current) {
           e.preventDefault();
         }
       }
 
-      // Set idle timeout to clear buffer after 100ms of inactivity
-      idleTimerRef.current = setTimeout(clearBuffer, 100);
+      // Idle timeout: clear buffer after maxKeystrokeGap + 50ms headroom
+      idleTimerRef.current = setTimeout(endScanSession, maxKeystrokeGap + 50);
     }
 
     document.addEventListener('keydown', handleKeyDown, { capture: true });

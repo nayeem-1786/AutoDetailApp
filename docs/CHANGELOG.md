@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Barcode scanner Bluetooth compatibility — 2026-04-16
+
+- **Timing threshold**: Increased `maxKeystrokeGap` from 50ms to 150ms — accommodates Bluetooth scanners (60-100ms gaps) while still distinguishing from human typing (200-400ms).
+- **Idle timeout**: Now dynamically set to `maxKeystrokeGap + 50ms` (200ms) instead of hardcoded 100ms, preventing mid-scan buffer clears.
+- **Suppress all characters during scan**: Added `scanningRef` flag — once 2+ rapid characters are detected, ALL subsequent characters are `preventDefault()`'d until Enter or timeout. Previously only the first character leaked into the search input.
+- **Search bar cleanup**: `SearchBar` now listens for `pos-scanner-detected` event — clears its local state, cancels pending debounce, and re-focuses the input after a successful scan.
+- Files changed: `src/app/pos/hooks/use-barcode-scanner.ts`, `src/app/pos/components/search-bar.tsx`
+
+---
+
 ## fix: Receipt total includes tip amount — 2026-04-16
 
 - TOTAL line on all receipts now shows `total_amount + tip_amount` — the actual amount charged to the customer.

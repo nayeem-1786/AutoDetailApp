@@ -22,6 +22,18 @@ export function SearchBar({
     setLocal(value);
   }, [value]);
 
+  // Clear search bar and re-focus after a barcode scan completes
+  useEffect(() => {
+    const handler = () => {
+      setLocal('');
+      onChange('');
+      clearTimeout(debounceRef.current);
+      inputRef.current?.focus();
+    };
+    window.addEventListener('pos-scanner-detected', handler);
+    return () => window.removeEventListener('pos-scanner-detected', handler);
+  }, [onChange]);
+
   function handleChange(val: string) {
     setLocal(val);
     clearTimeout(debounceRef.current);
