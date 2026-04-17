@@ -192,6 +192,9 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
           prerequisiteNote,
         });
         toast.success(`Added ${service.name}`);
+        if (ticket.customer && !ticket.vehicle) {
+          window.dispatchEvent(new Event('pos-vehicle-needed'));
+        }
       }
       onClose();
       return;
@@ -224,6 +227,9 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         prerequisiteNote,
       });
       toast.success(`Added ${service.name}`);
+      if (ticket.customer && !ticket.vehicle) {
+        window.dispatchEvent(new Event('pos-vehicle-needed'));
+      }
     }
     onClose();
   }
