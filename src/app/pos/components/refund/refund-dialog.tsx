@@ -320,6 +320,9 @@ export function RefundDialog({
               reason={reason}
               processing={processing}
               onConfirm={handleConfirm}
+              loyaltyPointsRedeemed={transaction.loyalty_points_redeemed}
+              loyaltyPointsEarned={transaction.loyalty_points_earned}
+              couponCode={transaction.coupon_code}
             />
           </div>
         )}

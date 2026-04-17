@@ -15,6 +15,9 @@ interface RefundSummaryProps {
   reason: string;
   processing: boolean;
   onConfirm: () => void;
+  loyaltyPointsRedeemed?: number;
+  loyaltyPointsEarned?: number;
+  couponCode?: string | null;
 }
 
 export function RefundSummary({
@@ -23,6 +26,9 @@ export function RefundSummary({
   reason,
   processing,
   onConfirm,
+  loyaltyPointsRedeemed = 0,
+  loyaltyPointsEarned = 0,
+  couponCode,
 }: RefundSummaryProps) {
   const itemsTotal = items.reduce((sum, entry) => sum + entry.amount, 0);
   const totalAmount = Math.round((itemsTotal + tipRefund) * 100) / 100;
@@ -77,6 +83,28 @@ export function RefundSummary({
           ${totalAmount.toFixed(2)}
         </span>
       </div>
+
+      {/* Loyalty + coupon reversal info */}
+      {(loyaltyPointsRedeemed > 0 || loyaltyPointsEarned > 0 || couponCode) && (
+        <div className="space-y-1 rounded-md bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Also reversed:</p>
+          {loyaltyPointsRedeemed > 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Loyalty points restored: +{loyaltyPointsRedeemed} pts
+            </p>
+          )}
+          {loyaltyPointsEarned > 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Loyalty points clawed back: -{loyaltyPointsEarned} pts
+            </p>
+          )}
+          {couponCode && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Coupon usage reversed: {couponCode}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Reason */}
       {reason && (

@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Allow zero-dollar refunds + coupon use_count reversal — 2026-04-17
+
+- **$0 refund support**: API no longer blocks refunds when `totalRefundAmount <= 0`. Instead checks if there are loyalty points, coupon usage, or items to restock before rejecting. The `maxRefundable` cap check is also skipped for $0 refunds.
+- **Coupon use_count reversal**: On full refund, decrements `coupon.use_count`. If the coupon is campaign-linked, also decrements `campaign.redeemed_count` and `campaign.revenue_attributed`.
+- **Refund summary shows reversal info**: `RefundSummary` now displays loyalty points restored/clawed back and coupon usage reversed — makes $0 refunds understandable for staff.
+- Files changed: `refunds/route.ts`, `refund-dialog.tsx`, `refund-summary.tsx`
+
+---
+
 ## feat: Ticket panel compaction — reclaim ~176px vertical space — 2026-04-17
 
 - **Removed "TICKET" header row** (~44px): Held count badge moved to Hold button in TicketActions. Hold button now opens held panel when ticket is empty.

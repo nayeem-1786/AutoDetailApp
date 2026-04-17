@@ -58,29 +58,36 @@ export async function POST(request: NextRequest) {
     const tipRefund = data.tip_refund ?? 0;
     const totalRefundAmount = Math.round((itemsRefundAmount + tipRefund) * 100) / 100;
 
-    if (totalRefundAmount <= 0) {
+    // Allow $0 refunds when there's loyalty, coupon, or restock to reverse
+    const hasLoyaltyToReverse = (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0);
+    const hasCouponToReverse = !!transaction.coupon_id;
+    const hasItemsToRestock = data.items.some((item) => item.restock);
+
+    if (totalRefundAmount <= 0 && !hasLoyaltyToReverse && !hasCouponToReverse && !hasItemsToRestock) {
       return NextResponse.json(
-        { error: 'Refund amount must be greater than zero' },
+        { error: 'Nothing to refund — no payment, loyalty points, or items to restock' },
         { status: 400 }
       );
     }
 
     // Server-side cap: refund must not exceed actual amount paid minus already refunded
-    const { data: existingRefunds } = await supabase
-      .from('refunds')
-      .select('amount')
-      .eq('transaction_id', data.transaction_id)
-      .eq('status', 'processed');
-    const alreadyRefunded = (existingRefunds || []).reduce(
-      (sum: number, r: { amount: number }) => sum + r.amount,
-      0
-    );
-    const maxRefundable = (transaction.total_amount + (transaction.tip_amount || 0)) - alreadyRefunded;
-    if (totalRefundAmount > maxRefundable + 0.01) {
-      return NextResponse.json(
-        { error: `Refund amount ($${totalRefundAmount.toFixed(2)}) exceeds maximum refundable ($${maxRefundable.toFixed(2)})` },
-        { status: 400 }
+    if (totalRefundAmount > 0) {
+      const { data: existingRefunds } = await supabase
+        .from('refunds')
+        .select('amount')
+        .eq('transaction_id', data.transaction_id)
+        .eq('status', 'processed');
+      const alreadyRefunded = (existingRefunds || []).reduce(
+        (sum: number, r: { amount: number }) => sum + r.amount,
+        0
       );
+      const maxRefundable = (transaction.total_amount + (transaction.tip_amount || 0)) - alreadyRefunded;
+      if (totalRefundAmount > maxRefundable + 0.01) {
+        return NextResponse.json(
+          { error: `Refund amount ($${totalRefundAmount.toFixed(2)}) exceeds maximum refundable ($${maxRefundable.toFixed(2)})` },
+          { status: 400 }
+        );
+      }
     }
 
     // 1. If payment was card, issue Stripe refund FIRST (before inserting records)
@@ -266,6 +273,42 @@ export async function POST(request: NextRequest) {
       .from('transactions')
       .update({ status: newStatus })
       .eq('id', transaction.id);
+
+    // 7. Reverse coupon use_count + campaign metrics on full refund
+    if (transaction.coupon_id && newStatus === 'refunded') {
+      const { data: coupon } = await supabase
+        .from('coupons')
+        .select('use_count, campaign_id')
+        .eq('id', transaction.coupon_id)
+        .single();
+
+      if (coupon) {
+        if (coupon.use_count > 0) {
+          await supabase
+            .from('coupons')
+            .update({ use_count: coupon.use_count - 1 })
+            .eq('id', transaction.coupon_id);
+        }
+
+        if (coupon.campaign_id) {
+          const { data: camp } = await supabase
+            .from('campaigns')
+            .select('redeemed_count, revenue_attributed')
+            .eq('id', coupon.campaign_id)
+            .single();
+
+          if (camp) {
+            await supabase
+              .from('campaigns')
+              .update({
+                redeemed_count: Math.max(0, (camp.redeemed_count || 0) - 1),
+                revenue_attributed: Math.max(0, Math.round(((camp.revenue_attributed || 0) - transaction.total_amount) * 100) / 100),
+              })
+              .eq('id', coupon.campaign_id);
+          }
+        }
+      }
+    }
 
     logAudit({
       userId: posEmployee.auth_user_id,
