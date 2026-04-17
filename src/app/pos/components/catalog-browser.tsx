@@ -320,18 +320,8 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
       return;
     }
-    // Require customer + vehicle before opening service detail (skip in quote builder mode)
-    if (!onAddService) {
-      if (!ticket.customer) {
-        toast.error('Please select a customer first');
-        return;
-      }
-      if (!ticket.vehicle) {
-        window.dispatchEvent(new CustomEvent('pos-vehicle-needed', { detail: { service } }));
-        toast.info('Please select a vehicle first');
-        return;
-      }
-    }
+    // No customer/vehicle guard here — browsing service details is always allowed.
+    // The guard fires inside ServiceDetailDialog:handleAdd when the user taps "Add to Ticket".
     if (!isServiceCompatible(service)) {
       setCompatWarning({ service, mode: 'detail' });
       return;

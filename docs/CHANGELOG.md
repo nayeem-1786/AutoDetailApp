@@ -4,6 +4,14 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Allow viewing service details without vehicle — guard only on add — 2026-04-16
+
+- Removed customer/vehicle guard from `catalog-browser.tsx:handleTapService` — tapping a service card now always opens the detail dialog for browsing descriptions and pricing.
+- Re-added guard to `service-detail-dialog.tsx:handleAdd` — fires when "Add to Ticket" is tapped. No customer → toast + close. No vehicle → close dialog + open vehicle selector with pending service. After vehicle is selected, the pending service auto-adds.
+- Tier picker shows all tiers clickable when browsing (no vehicle set). When vehicle IS set, non-matching tiers remain locked/grayed (existing `autoMatchIdx` behavior).
+
+---
+
 ## fix: Vehicle guard fires before service dialog + auto-match vehicle tier — 2026-04-16
 
 - **Guard moved earlier**: `catalog-browser.tsx:handleTapService` (card tap → detail dialog) now checks customer+vehicle BEFORE opening `ServiceDetailDialog`. Previously the dialog opened without a vehicle, showing tier picker without context.
