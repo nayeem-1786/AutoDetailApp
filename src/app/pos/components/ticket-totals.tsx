@@ -18,8 +18,13 @@ export function TicketTotals() {
   return (
     <div className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-3">
       <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-        <span>Subtotal <span className="text-xs text-gray-400 dark:text-gray-500">(+${ticket.taxAmount.toFixed(2)} tax)</span></span>
+        <span>Subtotal</span>
         <span className="tabular-nums">${ticket.subtotal.toFixed(2)}</span>
+      </div>
+
+      <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+        <span>Tax</span>
+        <span className="tabular-nums">${ticket.taxAmount.toFixed(2)}</span>
       </div>
 
       {ticket.coupon && (
