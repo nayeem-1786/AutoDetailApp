@@ -44,7 +44,9 @@ export function PosWorkspace() {
     return () => window.removeEventListener('pos-reset-register', handler);
   }, []);
 
-  // Re-add pending service after vehicle selection — opens tier picker or direct adds
+  // Re-add pending service after vehicle selection — auto-matches vehicle tier when possible
+  const VEHICLE_SIZE_CLASSES_SET = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+
   const handlePendingService = useCallback((e: Event) => {
     const service = (e as CustomEvent).detail?.service as CatalogService | undefined;
     if (!service) return;
@@ -75,7 +77,22 @@ export function PosWorkspace() {
       toast.success(`Added ${service.name}`);
       return;
     }
-    // Multi-tier or vehicle-size-aware → picker
+    // Vehicle-size tiers — auto-match by vehicle size class (no picker needed)
+    if (vsc && pricing.length > 1 && pricing.every((t) => VEHICLE_SIZE_CLASSES_SET.has(t.tier_name))) {
+      const matchingTier = pricing.find((t) => t.tier_name === vsc);
+      if (matchingTier) {
+        dispatch({ type: 'ADD_SERVICE', service, pricing: matchingTier, vehicleSizeClass: vsc });
+        toast.success(`Added ${service.name}`);
+        return;
+      }
+    }
+    // Single vehicle-size-aware tier — direct add with vehicle size
+    if (vsc && pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
+      dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass: vsc });
+      toast.success(`Added ${service.name}`);
+      return;
+    }
+    // Fallback: multi-tier non-vehicle (scope/specialty) → picker
     setPickerService(service);
   }, [ticket.vehicle, dispatch]);
 

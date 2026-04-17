@@ -119,21 +119,6 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   }
 
   async function handleAdd() {
-    // Require customer + vehicle before adding services (POS ticket path only, not quote builder)
-    if (!onAdd && dispatch) {
-      if (!ticket.customer) {
-        toast.error('Please select a customer first');
-        onClose();
-        return;
-      }
-      if (!ticket.vehicle) {
-        window.dispatchEvent(new CustomEvent('pos-vehicle-needed', { detail: { service } }));
-        toast.info('Please select a vehicle first');
-        onClose();
-        return;
-      }
-    }
-
     // Duplicate check for POS ticket path (not callback mode)
     if (!onAdd && dispatch) {
       const useTierMatching = service.pricing_model === 'scope' || service.pricing_model === 'specialty';

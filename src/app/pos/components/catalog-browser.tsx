@@ -320,6 +320,18 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
       return;
     }
+    // Require customer + vehicle before opening service detail (skip in quote builder mode)
+    if (!onAddService) {
+      if (!ticket.customer) {
+        toast.error('Please select a customer first');
+        return;
+      }
+      if (!ticket.vehicle) {
+        window.dispatchEvent(new CustomEvent('pos-vehicle-needed', { detail: { service } }));
+        toast.info('Please select a vehicle first');
+        return;
+      }
+    }
     if (!isServiceCompatible(service)) {
       setCompatWarning({ service, mode: 'detail' });
       return;

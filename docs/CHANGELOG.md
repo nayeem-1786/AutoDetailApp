@@ -4,6 +4,15 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Vehicle guard fires before service dialog + auto-match vehicle tier — 2026-04-16
+
+- **Guard moved earlier**: `catalog-browser.tsx:handleTapService` (card tap → detail dialog) now checks customer+vehicle BEFORE opening `ServiceDetailDialog`. Previously the dialog opened without a vehicle, showing tier picker without context.
+- **Guard removed from ServiceDetailDialog**: The `handleAdd` guard was redundant — outer guards now ensure vehicle is set before the dialog opens.
+- **Pending service auto-matches vehicle tier**: After vehicle selection, `handlePendingService` in `pos-workspace.tsx` now auto-matches vehicle-size tiers (sedan/truck/SUV) by `size_class` and adds directly — no redundant picker dialog.
+- **Tier locking already existed**: `ServiceDetailDialog` already disables non-matching vehicle-size tiers at line 414 (`autoMatchIdx >= 0 && idx !== autoMatchIdx`). No change needed.
+
+---
+
 ## fix: Require customer + vehicle before adding services to POS ticket — 2026-04-16
 
 - All 4 user-facing service-add entry points now guard: `pos-workspace.tsx` (Register search), `register-tab.tsx` (favorites), `catalog-browser.tsx` (Services tab quick-add), `service-detail-dialog.tsx` ("Add to Ticket" button).
