@@ -18,7 +18,7 @@ export function ProductGrid({ products, onTapProduct }: ProductGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="pos-catalog-grid grid grid-cols-3 gap-3">
       {products.map((product) => (
         <ProductCard key={product.id} product={product} onTap={onTapProduct} />
       ))}
@@ -49,7 +49,7 @@ export function ServiceGrid({
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="pos-catalog-grid grid grid-cols-3 gap-3">
       {services.map((service) => (
         <ServiceCard
           key={service.id}

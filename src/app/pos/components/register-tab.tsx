@@ -235,7 +235,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   return (
     <div className="flex h-full flex-col overflow-y-auto p-4">
       {/* Main grid: favorites + (dollar display + description + numpad) */}
-      <div className="grid flex-1 grid-cols-2 gap-4">
+      <div className="pos-register-layout grid flex-1 grid-cols-2 gap-4">
         {/* Left — Favorites (3 cols) */}
         <div className="flex flex-col">
           {/* Spacer to align favorites top with description input */}
@@ -247,7 +247,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
               <Loader2 className="h-5 w-5 animate-spin text-gray-400 dark:text-gray-500" />
             </div>
           ) : favorites.length > 0 ? (
-            <div className="grid grid-cols-3 gap-2" style={{ gridAutoRows: 'minmax(64px, 1fr)' }}>
+            <div className="pos-favorites-grid grid grid-cols-3 gap-2" style={{ gridAutoRows: 'minmax(64px, 1fr)' }}>
               {favorites.slice(0, 15).map((fav) => {
                 // Use dark override color when in dark mode and override is set
                 const useColor = (resolvedTheme === 'dark' && fav.darkColor) ? fav.darkColor : fav.color;

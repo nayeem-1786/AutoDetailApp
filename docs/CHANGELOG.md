@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: iPad portrait mode optimization — responsive POS layout — 2026-04-16
+
+- Pure CSS portrait overrides via `@media (orientation: portrait)` in `globals.css` — no JavaScript, instant on rotation.
+- **Register tab**: Favorites + keypad stack vertically (grid single-column), favorites become 4-across.
+- **Services/Products tabs**: Cards go from 3-per-row to 2-per-row for larger tap targets.
+- **Categories**: Tiles go from 3-per-row to 2-per-row.
+- Semantic class names added: `pos-register-layout`, `pos-favorites-grid`, `pos-catalog-grid`, `pos-category-grid`.
+- Landscape and desktop layouts completely unchanged.
+- Ticket panel (right side, 380px fixed) not modified.
+
+---
+
 ## fix: Allow viewing service details without vehicle — guard only on add — 2026-04-16
 
 - Removed customer/vehicle guard from `catalog-browser.tsx:handleTapService` — tapping a service card now always opens the detail dialog for browsing descriptions and pricing.

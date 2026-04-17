@@ -738,3 +738,26 @@ h1, h2, h3 {
     grid-column: span var(--footer-col-span, 4);
   }
 }
+
+/* ── POS Portrait Overrides ─────────────────────────────────────────────────
+   iPad portrait (810×1080): stack register layout, reduce grid columns.
+   Landscape and desktop are unaffected — these rules only fire in portrait.
+   ────────────────────────────────────────────────────────────────────────── */
+@media (orientation: portrait) {
+  /* Register tab: stack favorites above keypad (single column) */
+  .pos-register-layout {
+    grid-template-columns: 1fr;
+  }
+  /* Favorites grid: 4 across instead of 3 */
+  .pos-favorites-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  /* Product + service cards: 2 per row instead of 3 */
+  .pos-catalog-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* Category tiles: 2 per row instead of 3 */
+  .pos-category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

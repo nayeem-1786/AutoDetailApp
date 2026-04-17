@@ -619,7 +619,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           No {type} found
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="pos-category-grid grid grid-cols-3 gap-3">
           {categories.map((cat) => (
             <CategoryTile
               key={cat.id}
