@@ -445,6 +445,7 @@ export async function POST(request: NextRequest) {
       const autoReceiptVehicleId = data.vehicle_id || null;
       const autoReceiptTxId = transaction.id;
       const autoReceiptAccessToken = transaction.access_token;
+      const autoReceiptHasServices = (data.items || []).some((i: { item_type: string }) => i.item_type === 'service');
 
       setTimeout(async () => {
         try {
@@ -497,15 +498,22 @@ export async function POST(request: NextRequest) {
 
           const businessInfo = await getBusinessInfo();
 
+          // Build context-aware greeting
+          const greeting = autoReceiptHasServices && vehicleDesc
+            ? `Your ${vehicleDesc} is looking great.`
+            : 'We appreciate your purchase.';
+
           const vars: Record<string, string> = {
             first_name: cust.first_name || '',
             vehicle_description: vehicleDesc || 'your vehicle',
+            transaction_greeting: greeting,
             loyalty_points_earned: String(pointsEarned),
             receipt_link: receiptLink,
             business_name: businessInfo.name,
           };
 
-          const fallback = `Thank you ${vars.first_name}! Your ${vars.vehicle_description} is all set.${pointsEarned > 0 ? ` You earned ${pointsEarned} loyalty points today.` : ''} View your receipt: ${receiptLink}\n\n${businessInfo.name}`;
+          const pointsLine = pointsEarned > 0 ? ` You earned ${pointsEarned} loyalty points today.` : '';
+          const fallback = `Thank you ${vars.first_name}! ${greeting}${pointsLine} View your receipt: ${receiptLink}\n\n${businessInfo.name}`;
 
           const rendered = await renderSmsTemplate('payment_receipt', vars, fallback);
           if (!rendered.isActive) return;

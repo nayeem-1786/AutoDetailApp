@@ -109,6 +109,21 @@ export function formatDateTime(date: string | Date): string {
   }).format(new Date(date));
 }
 
+/**
+ * Format a date/time for receipt display — always PST, always includes time.
+ * Produces: "Apr 16, 2026, 4:18 PM"
+ */
+export function formatReceiptDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'America/Los_Angeles',
+  });
+}
+
 export function formatTime(time: string): string {
   const [hours, minutes] = time.split(':');
   const h = parseInt(hours);

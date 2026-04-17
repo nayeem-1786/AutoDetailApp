@@ -241,9 +241,13 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         return true;
       }
       dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote, prerequisiteForServiceId });
+      // Prompt vehicle selection if customer is set but no vehicle
+      if (ticket.customer && !ticket.vehicle) {
+        window.dispatchEvent(new Event('pos-vehicle-needed'));
+      }
     }
     return true;
-  }, [onAddService, dispatch, ticket.items, checkPrerequisites]);
+  }, [onAddService, dispatch, ticket.items, ticket.customer, ticket.vehicle, checkPrerequisites]);
 
   /** Handle prerequisite warning: override → add the original service */
   const handlePrereqOverride = useCallback((managerName?: string) => {

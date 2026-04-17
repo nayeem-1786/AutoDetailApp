@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatReceiptDateTime } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { PrintButton } from './print-button';
@@ -294,7 +294,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               </span>
             )}
             <p className="mt-1 text-sm text-site-text-muted">
-              Date: {formatDate(tx.transaction_date)}
+              Date: {formatReceiptDateTime(tx.transaction_date)}
             </p>
             {customerName && (
               <p className="text-sm text-site-text-muted">

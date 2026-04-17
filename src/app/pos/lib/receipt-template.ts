@@ -1,5 +1,5 @@
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, formatReceiptDateTime } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
 import QRCode from 'qrcode';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
@@ -411,9 +411,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   lines.push({
     type: 'columns',
     left: `Receipt #${tx.receipt_number || 'N/A'}`,
-    right: new Date(tx.transaction_date).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-    }),
+    right: formatReceiptDateTime(tx.transaction_date),
   });
 
   if (refundStatus !== 'none') {
@@ -825,13 +823,7 @@ function esc(s: string): string {
  */
 export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedReceiptConfig, images?: ReceiptImages): string {
   const c = config ?? FALLBACK_CONFIG;
-  const date = new Date(tx.transaction_date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const date = formatReceiptDateTime(tx.transaction_date);
 
   // Void status
   const htmlIsVoided = tx.status === 'voided';

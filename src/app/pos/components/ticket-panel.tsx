@@ -99,6 +99,17 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 10);
   }, [ticket.items.length]);
 
+  // Open vehicle selector when a service is added without a vehicle
+  useEffect(() => {
+    const handler = () => {
+      if (ticket.customer && !ticket.vehicle) {
+        setShowVehicleSelector(true);
+      }
+    };
+    window.addEventListener('pos-vehicle-needed', handler);
+    return () => window.removeEventListener('pos-vehicle-needed', handler);
+  }, [ticket.customer, ticket.vehicle]);
+
   // Prerequisite removal guard state
   const [prereqRemoval, setPrereqRemoval] = useState<{
     prerequisiteItemId: string;
@@ -236,8 +247,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     if (!customer.customer_type) {
       setShowTypePrompt(true);
     }
-    // Open vehicle selector for the new customer
-    setShowVehicleSelector(true);
+    // Vehicle selector opens on-demand when a service is added (via pos-vehicle-needed event)
   }
 
   function handleGuestCheckout() {
@@ -253,8 +263,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     if (!customer.customer_type) {
       setShowTypePrompt(true);
     }
-    // Open vehicle selector for newly created customer
-    setShowVehicleSelector(true);
+    // Vehicle selector opens on-demand when a service is added (via pos-vehicle-needed event)
   }
 
   function applyVehicleSelection(vehicle: Vehicle) {

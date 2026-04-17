@@ -74,6 +74,13 @@ export function PosWorkspace() {
     toast.success(`Added ${product.name}`);
   }
 
+  // Prompt vehicle selection if customer is set but no vehicle selected
+  function promptVehicleIfNeeded() {
+    if (ticket.customer && !ticket.vehicle) {
+      window.dispatchEvent(new Event('pos-vehicle-needed'));
+    }
+  }
+
   function handleTapService(service: CatalogService) {
     // Duplicate check — non-per-unit services are one-per-ticket
     const existingItem = ticket.items.find(
@@ -113,6 +120,7 @@ export function PosWorkspace() {
         vehicleSizeClass: ticket.vehicle?.size_class ?? null,
       });
       toast.success(`Added ${service.name}`);
+      promptVehicleIfNeeded();
       return;
     }
     if (pricing.length === 0 && service.flat_price != null) {
@@ -139,6 +147,7 @@ export function PosWorkspace() {
         vehicleSizeClass: ticket.vehicle?.size_class ?? null,
       });
       toast.success(`Added ${service.name}`);
+      promptVehicleIfNeeded();
       return;
     }
     setPickerService(service);
@@ -159,6 +168,7 @@ export function PosWorkspace() {
     });
     toast.success(`Added ${pickerService.name}`);
     setPickerService(null);
+    promptVehicleIfNeeded();
   }
 
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;

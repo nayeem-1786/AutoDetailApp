@@ -112,9 +112,10 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
   }
 
   function handleCheckout() {
-    // Require vehicle selection if customer is selected but no vehicle
-    if (ticket.customer && !ticket.vehicle) {
-      toast.error('Please select a vehicle before checkout');
+    // Require vehicle only when services are in the cart
+    const hasServices = ticket.items.some((i) => i.itemType === 'service');
+    if (hasServices && !ticket.vehicle) {
+      toast.error('Please select a vehicle for service checkout');
       onRequireVehicle?.();
       return;
     }

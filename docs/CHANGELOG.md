@@ -4,6 +4,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Vehicle optional for products + context-aware receipt SMS + unified receipt datetime — 2026-04-16
+
+**Part 1 — Vehicle only required for services:**
+- Removed auto-open vehicle selector on customer selection (`ticket-panel.tsx`). Vehicle selector now opens on-demand when a service is added without a vehicle.
+- Checkout guard (`ticket-actions.tsx`) now only blocks when services are in the cart and no vehicle is selected. Products-only checkout works without a vehicle.
+- Added `pos-vehicle-needed` event: when a service is added (in `pos-workspace.tsx` or `catalog-browser.tsx`) with a customer but no vehicle, the event fires and `ticket-panel.tsx` opens the vehicle selector. `RECALCULATE_VEHICLE_PRICES` reprices services once vehicle is chosen.
+
+**Part 2 — Context-aware auto receipt SMS:**
+- Auto-receipt message varies by purchase type: services → "Your {vehicle} is looking great." / products only → "We appreciate your purchase."
+- Added `transaction_greeting` template variable for SMS template customization.
+
+**Part 3 — Unified receipt datetime:**
+- New `formatReceiptDateTime()` in `format.ts` — always PST, always date + time ("Apr 16, 2026, 4:18 PM").
+- Applied to all 4 receipt paths: ESC/POS thermal, HTML (copier), public web, email plain text.
+- Deposit label and shortcode dates intentionally unchanged.
+
+---
+
 ## fix: Add explicit apple-mobile-web-app-capable meta tag for iOS PWA — 2026-04-16
 
 - Next.js `appleWebApp.capable: true` outputs `mobile-web-app-capable` (Android) but not the Apple variant. Added `apple-mobile-web-app-capable: yes` explicitly via the `other` metadata field.

@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/utils/email';
 import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import { LOYALTY } from '@/lib/utils/constants';
 import { fetchReceiptData } from '@/lib/data/receipt-data';
+import { formatReceiptDateTime } from '@/lib/utils/format';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 ${config.address}
 
 Receipt #${tx.receipt_number || 'N/A'}
-Date: ${new Date(tx.transaction_date).toLocaleDateString()}
+Date: ${formatReceiptDateTime(tx.transaction_date)}
 Customer: ${customerName}
 
 Items:
