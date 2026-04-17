@@ -399,26 +399,6 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         />
       </div>
 
-      {/* Header */}
-      <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          Ticket
-        </h2>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent('pos-open-held-panel'))}
-          className={cn(
-            'flex items-center gap-1 px-1.5 py-1',
-            heldCount > 0
-              ? 'text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300'
-              : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400'
-          )}
-          title="Held tickets"
-        >
-          <PauseCircle className="h-5 w-5" />
-          {heldCount > 0 && <span className="text-xs font-medium">{heldCount} held</span>}
-        </button>
-      </div>
-
       {/* Items list */}
       <div className="relative min-h-0 flex-1">
         {/* Top fade — shows when scrolled down */}
@@ -490,9 +470,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
       {/* Coupon + Loyalty + Discount */}
       {ticket.items.length > 0 && (
         <div className="shrink-0 space-y-2 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
+          {/* CouponInput: renders collapsed link when no coupon, null when applied (display moved to totals) */}
           <CouponInput
             renderCollapsedInline={
-              canManualDiscount && !ticket.manualDiscount && !showDiscountForm
+              canManualDiscount && !ticket.manualDiscount && !showDiscountForm && !ticket.coupon
                 ? (
                   <button
                     onClick={() => {
@@ -514,29 +495,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           <LoyaltyPanel />
 
           {/* Manual Discount — permission gated */}
-          {canManualDiscount && (
+          {canManualDiscount && !ticket.manualDiscount && (
             <>
-              {ticket.manualDiscount ? (
-                <div className="flex items-center justify-between rounded-md bg-red-50 dark:bg-red-900/30 px-3 py-1.5">
-                  <div className="flex items-center gap-1.5 text-sm text-red-700 dark:text-red-400">
-                    <Tag className="h-3.5 w-3.5" />
-                    <span className="font-medium">
-                      {ticket.manualDiscount.label || 'Discount'}
-                    </span>
-                    <span className="text-red-600 dark:text-red-400">
-                      {ticket.manualDiscount.type === 'percent'
-                        ? `${ticket.manualDiscount.value}%`
-                        : `-$${ticket.manualDiscount.value.toFixed(2)}`}
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleRemoveDiscount}
-                    className="flex h-11 w-11 items-center justify-center rounded text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 hover:text-red-700 dark:hover:text-red-400"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : showDiscountForm ? (
+              {showDiscountForm ? (
                 <div className="space-y-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-3">
                   {/* Toggle: Dollar / Percent */}
                   <div className="flex gap-1">
@@ -615,7 +576,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
                   </div>
                 </div>
               ) : (
-                /* Standalone "Add Discount" — only when coupon IS applied (otherwise rendered inline) */
+                /* Standalone "Add Discount" link — only when coupon IS applied (inline version is gone) */
                 ticket.coupon && (
                   <button
                     onClick={() => {
@@ -642,6 +603,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         <TicketTotals />
         <div className="mt-3">
           <TicketActions
+            heldCount={heldCount}
             onRequireVehicle={() => {
               if (ticket.customer) {
                 setShowVehicleSelector(true);

@@ -12,10 +12,11 @@ import { CustomerTypePrompt } from './customer-type-prompt';
 import { posFetch } from '../lib/pos-fetch';
 
 interface TicketActionsProps {
+  heldCount?: number;
   onRequireVehicle?: () => void;
 }
 
-export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
+export function TicketActions({ heldCount = 0, onRequireVehicle }: TicketActionsProps) {
   const { ticket, dispatch } = useTicket();
   const { openCheckout, setComplete } = useCheckout();
   const { holdTicket } = useHeldTickets();
@@ -39,7 +40,10 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
   }
 
   function handleHold() {
-    if (!hasItems) return;
+    if (!hasItems) {
+      window.dispatchEvent(new CustomEvent('pos-open-held-panel'));
+      return;
+    }
     holdTicket(ticket);
     dispatch({ type: 'CLEAR_TICKET' });
     toast.success('Ticket held');
@@ -140,12 +144,16 @@ export function TicketActions({ onRequireVehicle }: TicketActionsProps) {
         </Button>
         <Button
           variant="outline"
-          className="shrink-0"
-          disabled={!hasItems}
+          className="shrink-0 relative"
           onClick={handleHold}
-          title="Hold ticket"
+          title={hasItems ? 'Hold ticket' : heldCount > 0 ? 'View held tickets' : 'Hold ticket'}
         >
           <PauseCircle className="h-4 w-4" />
+          {heldCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {heldCount}
+            </span>
+          )}
         </Button>
 
         {isFullyPaidByLoyalty ? (

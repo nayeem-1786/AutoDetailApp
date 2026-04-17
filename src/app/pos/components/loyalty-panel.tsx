@@ -163,11 +163,6 @@ export function LoyaltyPanel() {
         </p>
       )}
 
-      {earnPreview > 0 && !isRedeeming && !showInput && (
-        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-          Will earn ~{earnPreview} pts from this purchase
-        </p>
-      )}
     </div>
   );
 }

@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Ticket panel compaction — reclaim ~176px vertical space — 2026-04-17
+
+- **Removed "TICKET" header row** (~44px): Held count badge moved to Hold button in TicketActions. Hold button now opens held panel when ticket is empty.
+- **Removed "Will earn" line** (~20px): Points preview removed from LoyaltyPanel — already shown on receipt after checkout.
+- **Combined Subtotal + Tax** (~24px): Single row with tax as muted parenthetical: `Subtotal (+$X.XX tax)  $XX.XX`.
+- **Coupon banner → inline totals** (~44px): Applied coupon banner removed from CouponInput (returns null). Coupon line in TicketTotals now has inline X button for removal.
+- **Discount banner → inline totals** (~44px): Applied discount red banner removed from ticket-panel. Discount line in TicketTotals now has inline X button for removal.
+- Coupon/discount section restructured: "Add Coupon" + "Add Discount" links render independently. When coupon is applied, standalone "Add Discount" link shows. Discount entry form preserved unchanged.
+
+---
+
 ## feat: iPad portrait mode optimization — responsive POS layout — 2026-04-16
 
 - Pure CSS portrait overrides via `@media (orientation: portrait)` in `globals.css` — no JavaScript, instant on rotation.
