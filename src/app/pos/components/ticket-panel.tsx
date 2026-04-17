@@ -99,16 +99,20 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 10);
   }, [ticket.items.length]);
 
-  // Open vehicle selector when a service is added without a vehicle
+  // Open vehicle selector when a service needs a vehicle — stores pending service for re-add after selection
+  const [pendingService, setPendingService] = useState<CatalogService | null>(null);
+
   useEffect(() => {
-    const handler = () => {
-      if (ticket.customer && !ticket.vehicle) {
-        setShowVehicleSelector(true);
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.service) {
+        setPendingService(detail.service as CatalogService);
       }
+      setShowVehicleSelector(true);
     };
     window.addEventListener('pos-vehicle-needed', handler);
     return () => window.removeEventListener('pos-vehicle-needed', handler);
-  }, [ticket.customer, ticket.vehicle]);
+  }, []);
 
   // Prerequisite removal guard state
   const [prereqRemoval, setPrereqRemoval] = useState<{
@@ -281,6 +285,16 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     }
 
     setShowVehicleSelector(false);
+
+    // Re-trigger pending service add now that vehicle is set
+    if (pendingService) {
+      const svc = pendingService;
+      setPendingService(null);
+      // Use setTimeout to let the vehicle state propagate before the service add runs
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('pos-add-pending-service', { detail: { service: svc } }));
+      }, 50);
+    }
   }
 
   function handleSelectVehicle(vehicle: Vehicle) {

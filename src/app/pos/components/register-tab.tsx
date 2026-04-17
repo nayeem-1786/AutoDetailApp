@@ -82,6 +82,16 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           toast.error('Service not found');
           return;
         }
+        // Require customer + vehicle before adding services
+        if (!ticket.customer) {
+          toast.error('Please select a customer first');
+          return;
+        }
+        if (!ticket.vehicle) {
+          window.dispatchEvent(new CustomEvent('pos-vehicle-needed', { detail: { service } }));
+          toast.info('Please select a vehicle first');
+          return;
+        }
         // Per-unit services always need the quantity picker
         if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
           setPickerService(service);

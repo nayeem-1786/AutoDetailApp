@@ -241,13 +241,9 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         return true;
       }
       dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote, prerequisiteForServiceId });
-      // Prompt vehicle selection if customer is set but no vehicle
-      if (ticket.customer && !ticket.vehicle) {
-        window.dispatchEvent(new Event('pos-vehicle-needed'));
-      }
     }
     return true;
-  }, [onAddService, dispatch, ticket.items, ticket.customer, ticket.vehicle, checkPrerequisites]);
+  }, [onAddService, dispatch, ticket.items, checkPrerequisites]);
 
   /** Handle prerequisite warning: override → add the original service */
   const handlePrereqOverride = useCallback((managerName?: string) => {
@@ -335,6 +331,18 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     if (addDisabled) {
       toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
       return;
+    }
+    // Require customer + vehicle before adding services (skip in quote builder mode)
+    if (!onAddService) {
+      if (!ticket.customer) {
+        toast.error('Please select a customer first');
+        return;
+      }
+      if (!ticket.vehicle) {
+        window.dispatchEvent(new CustomEvent('pos-vehicle-needed', { detail: { service } }));
+        toast.info('Please select a vehicle first');
+        return;
+      }
     }
     if (!isServiceCompatible(service)) {
       setCompatWarning({ service, mode: 'direct' });

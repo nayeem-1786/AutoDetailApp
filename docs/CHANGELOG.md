@@ -4,6 +4,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Require customer + vehicle before adding services to POS ticket — 2026-04-16
+
+- All 4 user-facing service-add entry points now guard: `pos-workspace.tsx` (Register search), `register-tab.tsx` (favorites), `catalog-browser.tsx` (Services tab quick-add), `service-detail-dialog.tsx` ("Add to Ticket" button).
+- No customer → toast "Please select a customer first", blocks add.
+- No vehicle → stores pending service, opens vehicle selector with toast "Please select a vehicle first", blocks add. After vehicle is selected, the pending service re-enters the normal add flow (tier picker or direct add) with the correct vehicle.
+- Quote builder is exempted — `catalog-browser.tsx` and `service-detail-dialog.tsx` skip the guard when `onAddService`/`onAdd` callbacks are provided (quote context).
+- Browsing/viewing service details is always allowed — guards only fire on the add action.
+- Prerequisite auto-adds and internal dispatch paths are not guarded — they only fire after an entry point already passed.
+- Removed old post-add `pos-vehicle-needed` dispatches that fired AFTER the service was added (wrong timing).
+
+---
+
 ## fix: Vehicle optional for products + context-aware receipt SMS + unified receipt datetime — 2026-04-16
 
 **Part 1 — Vehicle only required for services:**

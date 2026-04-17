@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
@@ -44,6 +44,46 @@ export function PosWorkspace() {
     return () => window.removeEventListener('pos-reset-register', handler);
   }, []);
 
+  // Re-add pending service after vehicle selection — opens tier picker or direct adds
+  const handlePendingService = useCallback((e: Event) => {
+    const service = (e as CustomEvent).detail?.service as CatalogService | undefined;
+    if (!service) return;
+
+    const pricing = service.pricing ?? [];
+    const vsc = ticket.vehicle?.size_class ?? null;
+
+    // Per-unit → picker
+    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+      setPickerService(service);
+      return;
+    }
+    // Single non-vehicle-aware tier → direct add
+    if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
+      dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass: vsc });
+      toast.success(`Added ${service.name}`);
+      return;
+    }
+    // Flat price → direct add
+    if (pricing.length === 0 && service.flat_price != null) {
+      const syntheticPricing: ServicePricing = {
+        id: 'flat', service_id: service.id, tier_name: 'default', tier_label: null,
+        price: service.flat_price, sale_price: service.sale_price ?? null, display_order: 0,
+        is_vehicle_size_aware: false, vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null, max_qty: null, qty_label: null, created_at: '',
+      };
+      dispatch({ type: 'ADD_SERVICE', service, pricing: syntheticPricing, vehicleSizeClass: vsc });
+      toast.success(`Added ${service.name}`);
+      return;
+    }
+    // Multi-tier or vehicle-size-aware → picker
+    setPickerService(service);
+  }, [ticket.vehicle, dispatch]);
+
+  useEffect(() => {
+    window.addEventListener('pos-add-pending-service', handlePendingService);
+    return () => window.removeEventListener('pos-add-pending-service', handlePendingService);
+  }, [handlePendingService]);
+
   // Barcode scanner is mounted globally in PosShellContent (pos-shell.tsx)
 
   // Determine search scope
@@ -74,14 +114,18 @@ export function PosWorkspace() {
     toast.success(`Added ${product.name}`);
   }
 
-  // Prompt vehicle selection if customer is set but no vehicle selected
-  function promptVehicleIfNeeded() {
-    if (ticket.customer && !ticket.vehicle) {
-      window.dispatchEvent(new Event('pos-vehicle-needed'));
-    }
-  }
-
   function handleTapService(service: CatalogService) {
+    // Require customer + vehicle before adding services
+    if (!ticket.customer) {
+      toast.error('Please select a customer first');
+      return;
+    }
+    if (!ticket.vehicle) {
+      window.dispatchEvent(new CustomEvent('pos-vehicle-needed', { detail: { service } }));
+      toast.info('Please select a vehicle first');
+      return;
+    }
+
     // Duplicate check — non-per-unit services are one-per-ticket
     const existingItem = ticket.items.find(
       (i) => i.itemType === 'service' && i.serviceId === service.id && !i.parentItemId
@@ -120,7 +164,6 @@ export function PosWorkspace() {
         vehicleSizeClass: ticket.vehicle?.size_class ?? null,
       });
       toast.success(`Added ${service.name}`);
-      promptVehicleIfNeeded();
       return;
     }
     if (pricing.length === 0 && service.flat_price != null) {
@@ -147,7 +190,6 @@ export function PosWorkspace() {
         vehicleSizeClass: ticket.vehicle?.size_class ?? null,
       });
       toast.success(`Added ${service.name}`);
-      promptVehicleIfNeeded();
       return;
     }
     setPickerService(service);
@@ -168,7 +210,6 @@ export function PosWorkspace() {
     });
     toast.success(`Added ${pickerService.name}`);
     setPickerService(null);
-    promptVehicleIfNeeded();
   }
 
   const vehicleSizeClass = ticket.vehicle?.size_class ?? null;
