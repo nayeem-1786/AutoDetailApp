@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Backfill script imports real classifier — 2026-04-17 (Session 26B)
+
+Eliminated ~150 lines of duplicated classifier logic from `scripts/backfill-vehicle-classification.ts`. The script now imports `resolveVehicleClassification()` and `canonicalizeMake()` directly from `src/lib/utils/vehicle-categories.ts` via relative imports (`../src/lib/utils/...`).
+
+**Path alias solution:** Relative imports — consistent with existing `scripts/import-square-data.mjs` convention. `tsx` resolves TypeScript imports natively without needing `@/` path aliases (those are a Next.js/webpack concern). Added `dotenv` loading for `.env.local` (also matching existing script convention).
+
+**Dry-run output (production, 2026-04-17):**
+- 29 vehicles scanned, 10 with changes
+- 5 newly exotic: Ferrari 488, Ferrari Dino 246, Lamborghini Huracán, Rolls-Royce Ghost, Ford GT
+- 4 newly classic: Camaro SS (1967), Mustang (1969), DeLorean DMC-12 (1991), Ferrari Dino 246 (1972)
+- 1 both exotic+classic: Ferrari Dino 246 (1972)
+- 2 make canonicalized: Chevy → Chevrolet (Suburban, Silverado)
+
+Files changed: `scripts/backfill-vehicle-classification.ts`
+
+---
+
 ## fix: Specialty tier classification audit + classifier expansion — 2026-04-17 (Session 26)
 
 **Root cause:** `resolveVehicleClassification()` correctly detected exotic/classic vehicles and returned `is_exotic`/`is_classic` flags, but the `vehicles` table had no columns for these flags. They were computed and immediately discarded. Every Ferrari, Lamborghini, and classic muscle car was stored identically to a Toyota Camry (`vehicle_type: 'standard'`, `size_class: 'sedan'`, `specialty_tier: null`).
