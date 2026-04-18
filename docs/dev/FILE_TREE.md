@@ -1437,8 +1437,9 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 ## Scripts
 
 ```
-scripts/backfill-vehicle-classification.ts
 scripts/import-square-data.mjs
+scripts/seed-admin.ts
+scripts/seed-data.ts
 ```
 
 ## Config
