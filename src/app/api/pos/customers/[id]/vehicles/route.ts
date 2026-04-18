@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { resolveVehicleClassification, canonicalizeMake, detectFieldInversion } from '@/lib/utils/vehicle-categories';
 
 export async function GET(
   request: NextRequest,
@@ -62,6 +63,35 @@ export async function POST(
       );
     }
 
+    // Canonicalize make + detect field inversions
+    const canonicalMake = make ? canonicalizeMake(make) : null;
+    const trimmedModel = model?.trim() || null;
+
+    const inversion = detectFieldInversion(canonicalMake, trimmedModel);
+    if (inversion) {
+      console.warn(`[POS Vehicle Create] FIELD INVERSION DETECTED: ${inversion.reason}`);
+    }
+
+    // Run classifier to get exotic/classic flags even for direct inserts
+    let isExotic = false;
+    let isClassic = false;
+    if (canonicalMake) {
+      const parsedYear = year ? parseInt(year, 10) : undefined;
+      const classification = await resolveVehicleClassification(
+        supabase, canonicalMake, trimmedModel || undefined, parsedYear || undefined
+      );
+      isExotic = classification.is_exotic;
+      isClassic = classification.is_classic;
+
+      // Log override mismatch
+      if (vehicle_category && vehicle_category !== classification.vehicle_category) {
+        console.warn(
+          `[POS Vehicle Create] Override: caller sent vehicle_category="${vehicle_category}" ` +
+          `but classifier resolved "${classification.vehicle_category}" for ${canonicalMake} ${trimmedModel || ''}`
+        );
+      }
+    }
+
     const { data: vehicle, error } = await supabase
       .from('vehicles')
       .insert({
@@ -70,9 +100,11 @@ export async function POST(
         vehicle_type,
         size_class: size_class || null,
         specialty_tier: specialty_tier || null,
+        is_exotic: isExotic,
+        is_classic: isClassic,
         year: year ? parseInt(year, 10) : null,
-        make: make?.trim() || null,
-        model: model?.trim() || null,
+        make: canonicalMake || null,
+        model: trimmedModel,
         color: color?.trim() || null,
       })
       .select('*')
@@ -119,6 +151,20 @@ export async function PATCH(
       );
     }
 
+    // Canonicalize make + run classifier for exotic/classic flags on update
+    const canonicalMake = make ? canonicalizeMake(make) : null;
+    const trimmedModel = model?.trim() || null;
+    let isExotic = false;
+    let isClassic = false;
+    if (canonicalMake) {
+      const parsedYear = year ? parseInt(String(year), 10) : undefined;
+      const classification = await resolveVehicleClassification(
+        supabase, canonicalMake, trimmedModel || undefined, parsedYear || undefined
+      );
+      isExotic = classification.is_exotic;
+      isClassic = classification.is_classic;
+    }
+
     const { data: vehicle, error } = await supabase
       .from('vehicles')
       .update({
@@ -126,9 +172,11 @@ export async function PATCH(
         vehicle_type: vehicle_type || 'standard',
         size_class: size_class || null,
         specialty_tier: specialty_tier || null,
+        is_exotic: isExotic,
+        is_classic: isClassic,
         year: year ? parseInt(String(year), 10) : null,
-        make: make?.trim() || null,
-        model: model?.trim() || null,
+        make: canonicalMake || null,
+        model: trimmedModel,
         color: color?.trim() || null,
       })
       .eq('id', vehicle_id)

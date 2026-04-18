@@ -88,9 +88,15 @@ customers_square_customer_id_key — UNIQUE btree (square_customer_id)
 |--------|------|-------------|-------|
 | id | UUID | PK | |
 | customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
+| vehicle_category | TEXT | NOT NULL, DEFAULT 'automobile' | CHECK: automobile, motorcycle, rv, boat, aircraft. Added via `20260224000001` |
 | vehicle_type | vehicle_type (enum) | NOT NULL, DEFAULT 'standard' | |
+| size_class | TEXT | | sedan, truck_suv_2row, suv_3row_van (automobiles only) |
+| specialty_tier | TEXT | | CHECK constraint limits to valid tier keys (motorcycle/rv/boat/aircraft tiers). NULL for automobiles. Added via `20260224000001` |
+| is_exotic | BOOLEAN | NOT NULL, DEFAULT false | Set by classifier. Ferrari, Lamborghini, etc. Added via `20260417000001` |
+| is_classic | BOOLEAN | NOT NULL, DEFAULT false | Set by classifier. Requires year ≤ threshold AND curated make+model match. Added via `20260417000001` |
+| requires_custom_quote | BOOLEAN | GENERATED ALWAYS AS (is_exotic OR is_classic) STORED | Computed. Downstream consumers check this single field. Added via `20260417000001` |
 | year | INTEGER | | |
-| make | TEXT | | |
+| make | TEXT | | Canonicalized at write time (Chevy → Chevrolet) |
 | model | TEXT | | |
 | color | TEXT | | |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
@@ -99,6 +105,10 @@ customers_square_customer_id_key — UNIQUE btree (square_customer_id)
 **Indexes:**
 ```
 idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(model), vehicle_category) WHERE make IS NOT NULL AND model IS NOT NULL
+idx_vehicles_vehicle_category — btree (vehicle_category)
+idx_vehicles_is_exotic — btree (is_exotic) WHERE is_exotic = true
+idx_vehicles_is_classic — btree (is_classic) WHERE is_classic = true
+idx_vehicles_requires_custom_quote — btree (requires_custom_quote) WHERE requires_custom_quote = true
 ```
 
 ---

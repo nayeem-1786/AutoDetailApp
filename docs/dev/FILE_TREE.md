@@ -1006,6 +1006,7 @@ src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
+src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/webhook.ts
 ```
 
@@ -1430,6 +1431,20 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260404000003_enrichment_batches_table.sql
 20260404000004_backfill_og_images.sql
 20260410000001_staff_notification_sms_template.sql
+20260417000001_vehicle_exotic_classic_flags.sql
+```
+
+## Scripts
+
+```
+scripts/backfill-vehicle-classification.ts
+scripts/import-square-data.mjs
+```
+
+## Config
+
+```
+vitest.config.ts
 ```
 
 ---

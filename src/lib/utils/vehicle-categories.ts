@@ -198,27 +198,31 @@ const MODEL_SIZE_HINTS: Record<string, string[]> = {
 // Case-insensitive substring match against the model string.
 // ---------------------------------------------------------------------------
 
-// 123 keywords
+// ~160 keywords (Session 26: expanded Honda/Yamaha/Suzuki/Kawasaki/BMW gaps)
 const MOTORCYCLE_MODEL_KEYWORDS = [
   // Harley-Davidson
   'sportster', 'softail', 'road king', 'road glide', 'street glide', 'fat boy', 'fat bob',
   'iron', 'nightster', 'breakout', 'heritage', 'electra glide', 'ultra limited', 'low rider',
-  'night rod',
+  'night rod', 'pan america', 'livewire',
   // Honda motorcycle
-  'cbr', 'crf', 'cb500', 'cb650', 'cb300', 'africa twin', 'gold wing', 'goldwing',
-  'rebel', 'grom', 'monkey', 'trail',
+  'cbr', 'crf', 'cb500', 'cb650', 'cb300', 'cb1000', 'cb125',
+  'africa twin', 'gold wing', 'goldwing',
+  'rebel', 'grom', 'monkey', 'trail', 'shadow', 'fury', 'valkyrie',
+  'vtx', 'ctx', 'nc700', 'nc750', 'vfr', 'st1100', 'st1300', 'rune',
+  'pcx', 'forza', 'navi', 'adv150',
   // BMW motorcycle
   'r1250', 'r1200', 'f850', 'f750', 'f900', 'g310', 'c400', 's1000', 'r nine', 'rninet',
-  'k1600', 'ce 04',
+  'k1600', 'ce 04', 'r18', 'f800', 'f650',
   // Yamaha motorcycle
   'yzf', 'mt-', 'mt0', 'mt1', 'tenere', 'r1', 'r6', 'r7', 'r3', 'fz', 'xsr',
-  'bolt', 'v-star', 'vstar', 'drag star',
+  'bolt', 'v-star', 'vstar', 'drag star', 'vmax', 'tw200', 'wr250', 'wr450',
+  'star venture', 'star eluder',
   // Suzuki motorcycle
   'gsx', 'gsxr', 'gsx-r', 'v-strom', 'vstrom', 'hayabusa', 'katana', 'boulevard',
-  'burgman', 'dr-z', 'drz',
+  'burgman', 'dr-z', 'drz', 'sv650', 'sv1000', 'tu250', 'gs500', 'bandit',
   // Kawasaki motorcycle
   'ninja', 'zx-', 'zx6', 'zx10', 'zx14', 'z900', 'z650', 'z400', 'versys',
-  'klr', 'klx', 'vulcan', 'concours', 'eliminator',
+  'klr', 'klx', 'vulcan', 'concours', 'eliminator', 'w800', 'w650', 'er-6', 'er6',
   // Ducati
   'panigale', 'monster', 'scrambler', 'multistrada', 'diavel', 'streetfighter',
   'hypermotard', 'desert x',
@@ -237,6 +241,8 @@ const MOTORCYCLE_MODEL_KEYWORDS = [
   'tuono', 'rsv4', 'rs 660',
   // MV Agusta
   'f3', 'brutale', 'dragster',
+  // KTM
+  'duke', 'adventure', 'exc', 'sx-f', 'enduro',
   // Generic motorcycle terms
   'motorcycle', 'bike', 'motorbike',
 ];
@@ -350,9 +356,17 @@ const EXOTIC_MAKES = [
   'rimac', 'hennessey', 'ssc', 'saleen', 'noble', 'spyker', 'w motors',
   'czinger', 'de tomaso', 'hispano suiza', 'pininfarina', 'aston martin',
   'bentley', 'rolls-royce', 'rolls royce', 'lotus', 'duesenberg', 'packard',
+  // Session 26 additions
+  'maserati', 'maybach', 'mercedes-maybach',
 ];
 
-/** Specific exotic models from standard makes. Short names use exact match. */
+/**
+ * Specific exotic models from standard makes. Short names use exact match.
+ * Session 26: expanded BMW M, Audi RS, Mercedes-AMG, Tesla, Dodge, Porsche.
+ * Maserati removed — now full-make exotic.
+ * NOTE: Corvette Stingray (base C8) is NOT flagged — under judgment.
+ *       The Z06/ZR1/E-Ray variants are flagged. Owner can override in POS.
+ */
 const EXOTIC_MAKE_MODELS: Record<string, Array<{ model: string; matchType: 'exact' | 'substring' }>> = {
   porsche: [
     { model: '918', matchType: 'exact' },
@@ -363,10 +377,17 @@ const EXOTIC_MAKE_MODELS: Record<string, Array<{ model: string; matchType: 'exac
     { model: 'gt3 rs', matchType: 'substring' },
     { model: 'gt2 rs', matchType: 'substring' },
     { model: '911 turbo s', matchType: 'substring' },
+    { model: '911 turbo', matchType: 'substring' },
+    { model: 'taycan turbo s', matchType: 'substring' },
+    { model: 'panamera turbo s', matchType: 'substring' },
   ],
   dodge: [
     { model: 'viper', matchType: 'substring' },
     { model: 'srt viper', matchType: 'substring' },
+    { model: 'hellcat', matchType: 'substring' },
+    { model: 'demon', matchType: 'substring' },
+    { model: 'srt', matchType: 'substring' },
+    { model: 'jailbreak', matchType: 'substring' },
   ],
   ford: [
     { model: 'gt', matchType: 'exact' },
@@ -388,27 +409,57 @@ const EXOTIC_MAKE_MODELS: Record<string, Array<{ model: string; matchType: 'exac
   ],
   bmw: [
     { model: 'i8', matchType: 'exact' },
+    { model: 'm3', matchType: 'exact' },
+    { model: 'm4', matchType: 'exact' },
+    { model: 'm5', matchType: 'exact' },
     { model: 'm8', matchType: 'exact' },
+    { model: 'xm', matchType: 'exact' },
+    { model: 'm3 ', matchType: 'substring' },
+    { model: 'm4 ', matchType: 'substring' },
+    { model: 'm5 ', matchType: 'substring' },
+    { model: 'm8 ', matchType: 'substring' },
   ],
   mercedes: [
     { model: 'amg gt', matchType: 'substring' },
     { model: 'amg one', matchType: 'substring' },
     { model: 'sls', matchType: 'exact' },
     { model: 'slr', matchType: 'exact' },
+    { model: 'black series', matchType: 'substring' },
+    { model: 's63', matchType: 'substring' },
+    { model: 's65', matchType: 'substring' },
+    { model: 'gt 4-door', matchType: 'substring' },
+    { model: 'gt 63', matchType: 'substring' },
+  ],
+  'mercedes-benz': [
+    { model: 'amg gt', matchType: 'substring' },
+    { model: 'amg one', matchType: 'substring' },
+    { model: 'sls', matchType: 'exact' },
+    { model: 'slr', matchType: 'exact' },
+    { model: 'black series', matchType: 'substring' },
+    { model: 's63', matchType: 'substring' },
+    { model: 's65', matchType: 'substring' },
+    { model: 'gt 4-door', matchType: 'substring' },
+    { model: 'gt 63', matchType: 'substring' },
   ],
   audi: [
     { model: 'r8', matchType: 'exact' },
+    { model: 'rs6', matchType: 'substring' },
+    { model: 'rs7', matchType: 'substring' },
+    { model: 'rs e-tron', matchType: 'substring' },
+    { model: 'rs etron', matchType: 'substring' },
   ],
-  maserati: [
-    { model: 'mc20', matchType: 'substring' },
-    { model: 'mc12', matchType: 'substring' },
-    { model: 'granturismo trofeo', matchType: 'substring' },
+  tesla: [
+    { model: 'model s plaid', matchType: 'substring' },
+    { model: 'roadster', matchType: 'substring' },
   ],
   toyota: [
     { model: '2000gt', matchType: 'substring' },
   ],
   jaguar: [
     { model: 'xj220', matchType: 'substring' },
+  ],
+  lucid: [
+    { model: 'air sapphire', matchType: 'substring' },
   ],
 };
 
@@ -428,40 +479,139 @@ export function isExoticModel(make: string, model: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Classic vehicle detection
+// Classic vehicle detection — curated make+model list (Session 26 rewrite)
+//
+// Classic requires BOTH: year <= threshold AND make+model on curated list.
+// Does NOT blanket-classify every old car — a 2001 Civic is not a classic.
+// Stored as TypeScript constants (not DB) — stable domain taxonomy that
+// changes a few times per year at most. Promotes to DB table if needed later.
 // ---------------------------------------------------------------------------
 
-/** Dynamic threshold — vehicles 25+ years old are classic */
-const CLASSIC_YEAR_THRESHOLD = new Date().getFullYear() - 25;
+/** Dynamic threshold — vehicles 25+ years old are classic-eligible */
+export const CLASSIC_YEAR_THRESHOLD = new Date().getFullYear() - 25;
 
-/** Model keywords that strongly imply a classic vehicle (substring match) */
-const CLASSIC_MODEL_KEYWORDS = [
-  // Pre-War and Full Classics
-  'model t', 'model a', 'silver ghost', 'phantom i', 'phantom ii', 'phantom iii',
-  'type 35', 'type 57', 'atlantic',
-  // Golden Age and Muscle Cars (1950s-1970s)
-  'bel air', '300sl', 'gullwing', 'e-type', 'xke', 'road runner', 'hemi cuda',
-  'barracuda', 'chevelle ss', 'el camino', 'nova ss', '442', 'skylark gs',
-  'fairlane', 'galaxie', 'torino', 'boss 302', 'boss 429', 'mach 1',
-  'shelby gt350', 'shelby gt500', 'cobra', 'ac cobra', 'daytona charger',
-  'superbird', 'super bee', 'split window', '2002tii', 'karmann ghia',
-  'vw thing', 'microbus',
-  // Modern Classics (1980s-early 2000s)
-  'f40', 'testarossa', '512 bb', 'countach', 'diablo', 'miura', 'delorean',
-  'dmc-12', 'buick gnx', 'grand national', 'lotus esprit', 'turbo esprit',
-  'e30 m3', '964', '993', 'rx-7 fd', 'supra a80', 'mr2', 'ae86', '240sx',
-  '300zx', 'r32', 'r33', 'r34', 'skyline', 'fj40', 'fj60', 'fj80',
-  'k5 blazer', 'jeep cj', 'willys',
-];
+/**
+ * Curated list of makes + models eligible for classic classification.
+ * Both year threshold AND make+model match are required.
+ * Use '*' for makes where ALL old models qualify as classic.
+ * Array entries are case-insensitive substring matches against the model field.
+ */
+export const CLASSIC_ELIGIBLE_MAKES: Readonly<Record<string, readonly string[] | '*'>> = {
+  // ── American Muscle & Classic ──────────────────────────────────────────
+  ford: ['mustang', 'bronco', 'f-100', 'f100', 'thunderbird', 'fairlane', 'galaxie',
+    'torino', 'falcon', 'gt40', 'shelby', 'cobra', 'ranchero', 'boss', 'mach 1',
+    'model t', 'model a', 'pinto'],
+  chevrolet: ['camaro', 'corvette', 'chevelle', 'nova', 'impala', 'bel air', 'el camino',
+    'blazer', 'c10', 'c-10', 'k5', 'monte carlo', 'malibu ss', '3100', 'apache',
+    'step side', 'stepside', 'split window', 'ss'],
+  pontiac: ['gto', 'firebird', 'trans am', 'lemans', 'catalina', 'grand prix', 'tempest'],
+  plymouth: ['barracuda', 'cuda', 'hemi cuda', 'road runner', 'gtx', 'duster', 'satellite',
+    'superbird', 'fury', 'valiant'],
+  dodge: ['charger', 'challenger', 'dart', 'coronet', 'super bee', 'daytona', 'power wagon',
+    'd100', 'd-100', 'lil red'],
+  amc: ['amx', 'javelin', 'gremlin', 'pacer', 'rebel', 'scrambler', 'hornet'],
+  oldsmobile: ['442', 'cutlass', 'toronado', 'hurst', 'delta 88', 'w-30', 'w30'],
+  buick: ['skylark', 'gs', 'gsx', 'riviera', 'grand national', 'gnx', 'wildcat', 'century'],
+  mercury: ['cougar', 'cyclone', 'comet', 'monterey'],
+  shelby: '*',
+  delorean: '*',
+  studebaker: '*',
+  hudson: '*',
+  nash: '*',
+  jeep: ['cj', 'willys', 'wagoneer', 'j-10', 'j10', 'j-20', 'j20'],
+  'international harvester': '*',
+  international: ['scout'],
+  lincoln: ['continental', 'mark'],
+
+  // ── European Classic ───────────────────────────────────────────────────
+  porsche: '*',
+  bmw: ['2002', 'e30', 'e28', 'e24', 'e9', 'isetta', 'm3', 'm5', 'm6', 'z3 m', 'z8',
+    '3.0', 'tii'],
+  'mercedes-benz': ['300sl', 'gullwing', 'pagoda', '190sl', '280sl', '560', 'w123', 'w124',
+    'w113', 'w107', 'w111', '190e'],
+  mercedes: ['300sl', 'gullwing', 'pagoda', '190sl', '280sl', '560', 'w123', 'w124',
+    'w113', 'w107', 'w111', '190e'],
+  volkswagen: ['beetle', 'bus', 'karmann ghia', 'thing', 'type 3', 'type 1', 'type 2',
+    'microbus', 'vanagon', 'westfalia'],
+  jaguar: ['e-type', 'xke', 'xk120', 'xk140', 'xk150', 'xk', 'mark ii', 'mk ii', 'xjs'],
+  mg: '*',
+  triumph: ['tr6', 'tr4', 'tr3', 'tr2', 'spitfire', 'gt6', 'stag', 'herald'],
+  'austin-healey': '*',
+  'alfa romeo': ['spider', 'giulietta', 'gtv', 'gta', 'montreal', 'duetto', 'giulia sprint'],
+  fiat: ['124 spider', '124', '500', 'x1/9', 'dino'],
+  lotus: ['elan', 'europa', 'seven', 'elite', 'esprit', 'turbo esprit'],
+  mini: ['cooper', 'classic'],
+  'land rover': ['series', 'defender'],
+  volvo: ['p1800', '1800', 'amazon', '122s', '544'],
+  ac: ['cobra'],
+  'de tomaso': ['pantera', 'mangusta'],
+
+  // ── Japanese Classic ───────────────────────────────────────────────────
+  datsun: '*',
+  nissan: ['240z', '260z', '280z', '280zx', '300zx', '510', 'skyline', 'r32', 'r33',
+    'r34', 'hakosuka', 'kenmeri', 'fairlady', '240sx'],
+  toyota: ['land cruiser', 'fj40', 'fj60', 'fj80', '2000gt', 'celica', 'supra', 'ae86',
+    'mr2', 'te27', 'hilux'],
+  honda: ['s600', 's800', 's2000', 'n600', 'z600', 'prelude', 'crx'],
+  mazda: ['rx-7', 'rx7', 'rx-3', 'rx3', 'rx-2', 'rx2', 'cosmo', 'miata'],
+  subaru: ['brat', '360', 'svx'],
+  mitsubishi: ['starion', '3000gt', 'gto', 'eclipse gsx', 'evo'],
+
+  // ── Exotic makes (old models get both exotic + classic per coexistence rule) ──
+  ferrari: '*',
+  lamborghini: '*',
+  mclaren: '*',
+  'aston martin': '*',
+  bentley: '*',
+  'rolls-royce': '*',
+  'rolls royce': '*',
+  maserati: '*',
+  bugatti: '*',
+  // Packard & Duesenberg already in EXOTIC_MAKES — classic too
+  packard: '*',
+  duesenberg: '*',
+};
 
 function isClassicByYear(year: number | undefined | null): boolean {
   return typeof year === 'number' && year > 0 && year <= CLASSIC_YEAR_THRESHOLD;
 }
 
-function isClassicByModel(model: string | undefined | null): boolean {
+/**
+ * Check if a vehicle qualifies as classic.
+ * Requires BOTH year threshold AND curated make+model match.
+ */
+function isClassicVehicle(
+  make: string | undefined | null,
+  model: string | undefined | null,
+  year: number | undefined | null
+): boolean {
+  if (!isClassicByYear(year)) return false;
+  if (!make) return false;
+  const makeLower = make.trim().toLowerCase();
+  const eligible = CLASSIC_ELIGIBLE_MAKES[makeLower];
+  if (!eligible) return false;
+  if (eligible === '*') return true;
   if (!model) return false;
-  const modelLower = model.toLowerCase();
-  return CLASSIC_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw));
+  const modelLower = model.trim().toLowerCase();
+  return (eligible as readonly string[]).some((pattern) => modelLower.includes(pattern));
+}
+
+/**
+ * Check if a vehicle MIGHT be classic (model matches curated list, year unconfirmed).
+ * Used to set needs_year_confirmation when year is not provided.
+ */
+function mightBeClassicVehicle(
+  make: string | undefined | null,
+  model: string | undefined | null
+): boolean {
+  if (!make) return false;
+  const makeLower = make.trim().toLowerCase();
+  const eligible = CLASSIC_ELIGIBLE_MAKES[makeLower];
+  if (!eligible) return false;
+  if (eligible === '*') return true;
+  if (!model) return false;
+  const modelLower = model.trim().toLowerCase();
+  return (eligible as readonly string[]).some((pattern) => modelLower.includes(pattern));
 }
 
 // Default specialty tier per category — smallest/most common, correctable by staff
@@ -598,17 +748,118 @@ export async function resolveVehicleClassification(
     baseResult.requires_custom_quote = true;
   }
 
-  // --- Layer 5: classic detection (layered on top) ---
-  if (isClassicByYear(year)) {
+  // --- Layer 5: classic detection (requires year + curated make+model match) ---
+  if (isClassicVehicle(make, model, year)) {
     baseResult.is_classic = true;
     baseResult.requires_custom_quote = true;
-  } else if (isClassicByModel(model)) {
-    baseResult.is_classic = true;
-    baseResult.requires_custom_quote = true;
-    if (!year) {
-      baseResult.needs_year_confirmation = true;
-    }
+  } else if (!year && mightBeClassicVehicle(make, model)) {
+    // Model is on curated classic list but year unknown — ask to confirm
+    baseResult.needs_year_confirmation = true;
   }
 
   return baseResult;
+}
+
+// ---------------------------------------------------------------------------
+// Make canonicalization — normalize common abbreviations/misspellings
+// ---------------------------------------------------------------------------
+
+const MAKE_CANONICAL_MAP: Record<string, string> = {
+  'chevy': 'Chevrolet',
+  'mercedes': 'Mercedes-Benz',
+  'merc': 'Mercedes-Benz',
+  'vw': 'Volkswagen',
+  'beemer': 'BMW',
+  'bimmer': 'BMW',
+  'caddy': 'Cadillac',
+  'lambo': 'Lamborghini',
+  'rolls': 'Rolls-Royce',
+  'aston': 'Aston Martin',
+  'alfa': 'Alfa Romeo',
+  'porshe': 'Porsche',
+  'porche': 'Porsche',
+  'lexis': 'Lexus',
+  'infinti': 'Infiniti',
+  'infinity': 'Infiniti',
+  'acurra': 'Acura',
+  'toyata': 'Toyota',
+  'hyundia': 'Hyundai',
+  'hundai': 'Hyundai',
+};
+
+/**
+ * Canonicalize a vehicle make string.
+ * Maps common abbreviations (Chevy → Chevrolet) and misspellings.
+ * Returns the original (trimmed) value if no canonical mapping exists.
+ */
+export function canonicalizeMake(make: string): string {
+  const trimmed = make.trim();
+  if (!trimmed) return trimmed;
+  const canonical = MAKE_CANONICAL_MAP[trimmed.toLowerCase()];
+  return canonical ?? trimmed;
+}
+
+// ---------------------------------------------------------------------------
+// Field inversion detection — flag swapped make/model fields
+// ---------------------------------------------------------------------------
+
+/** Known vehicle makes for inversion detection */
+const KNOWN_MAKES_SET = new Set([
+  // Major auto manufacturers
+  'acura', 'alfa romeo', 'amc', 'aston martin', 'audi', 'bentley', 'bmw', 'buick',
+  'cadillac', 'chevrolet', 'chrysler', 'dodge', 'ferrari', 'fiat', 'ford',
+  'genesis', 'gmc', 'honda', 'hyundai', 'infiniti', 'jaguar', 'jeep', 'kia',
+  'lamborghini', 'land rover', 'lexus', 'lincoln', 'lotus', 'lucid', 'maserati',
+  'maybach', 'mazda', 'mclaren', 'mercedes-benz', 'mini', 'mitsubishi', 'nissan',
+  'oldsmobile', 'plymouth', 'pontiac', 'porsche', 'ram', 'rivian',
+  'rolls-royce', 'subaru', 'suzuki', 'tesla', 'toyota', 'volkswagen', 'volvo',
+  // Motorcycle makes
+  'harley-davidson', 'ducati', 'triumph', 'indian', 'aprilia', 'ktm',
+  'royal enfield', 'kawasaki', 'yamaha',
+  // RV/Boat/Aircraft
+  'winnebago', 'airstream', 'thor', 'cessna', 'piper', 'beechcraft', 'cirrus',
+  'boston whaler', 'sea ray', 'bayliner', 'mastercraft',
+  // Other exotic
+  'bugatti', 'pagani', 'koenigsegg', 'datsun', 'delorean',
+]);
+
+export interface FieldInversionResult {
+  isInverted: boolean;
+  reason: string;
+}
+
+/**
+ * Detect if make/model fields are likely swapped.
+ * Checks if `model` starts with a known make AND `make` is NOT a known make.
+ * Returns null if no inversion detected.
+ * Does NOT auto-correct — flags for human review.
+ */
+export function detectFieldInversion(
+  make: string | null | undefined,
+  model: string | null | undefined
+): FieldInversionResult | null {
+  if (!make || !model) return null;
+  const makeTrimmed = make.trim();
+  const modelTrimmed = model.trim();
+  if (!makeTrimmed || !modelTrimmed) return null;
+
+  const makeLower = makeTrimmed.toLowerCase();
+  const modelLower = modelTrimmed.toLowerCase();
+
+  // Is the provided make NOT a known make?
+  const makeIsKnown = KNOWN_MAKES_SET.has(makeLower);
+
+  // Does the model field start with a known make?
+  const modelFirstWord = modelLower.split(/[\s,]+/)[0];
+  const modelStartsWithKnownMake = KNOWN_MAKES_SET.has(modelFirstWord) ||
+    [...KNOWN_MAKES_SET].some((m) => modelLower.startsWith(m + ' '));
+
+  if (!makeIsKnown && modelStartsWithKnownMake) {
+    return {
+      isInverted: true,
+      reason: `make="${makeTrimmed}" is not recognized; model="${modelTrimmed}" starts with a known make — fields may be swapped`,
+    };
+  }
+
+  return null;
 }

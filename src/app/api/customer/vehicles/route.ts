@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { customerVehicleSchema } from '@/lib/utils/validation';
+import { resolveVehicleClassification, canonicalizeMake } from '@/lib/utils/vehicle-categories';
 
 export async function GET() {
   try {
@@ -77,6 +78,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
+    // Canonicalize make + run classifier for exotic/classic flags
+    const canonicalMake = parsed.data.make ? canonicalizeMake(parsed.data.make) : null;
+    const trimmedModel = parsed.data.model ?? null;
+    let isExotic = false;
+    let isClassic = false;
+    if (canonicalMake) {
+      const classification = await resolveVehicleClassification(
+        admin, canonicalMake, trimmedModel || undefined, parsed.data.year || undefined
+      );
+      isExotic = classification.is_exotic;
+      isClassic = classification.is_classic;
+    }
+
     const { data: vehicle, error } = await admin
       .from('vehicles')
       .insert({
@@ -85,12 +99,14 @@ export async function POST(request: NextRequest) {
         vehicle_type: parsed.data.vehicle_type,
         size_class: parsed.data.size_class ?? null,
         specialty_tier: parsed.data.specialty_tier ?? null,
+        is_exotic: isExotic,
+        is_classic: isClassic,
         year: parsed.data.year ?? null,
-        make: parsed.data.make ?? null,
-        model: parsed.data.model ?? null,
+        make: canonicalMake,
+        model: trimmedModel,
         color: parsed.data.color ?? null,
       })
-      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, created_at')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, is_exotic, is_classic, requires_custom_quote, year, make, model, color, created_at')
       .single();
 
     if (error) {

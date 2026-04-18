@@ -4,6 +4,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix: Specialty tier classification audit + classifier expansion — 2026-04-17 (Session 26)
+
+**Root cause:** `resolveVehicleClassification()` correctly detected exotic/classic vehicles and returned `is_exotic`/`is_classic` flags, but the `vehicles` table had no columns for these flags. They were computed and immediately discarded. Every Ferrari, Lamborghini, and classic muscle car was stored identically to a Toyota Camry (`vehicle_type: 'standard'`, `size_class: 'sedan'`, `specialty_tier: null`).
+
+**Three-part fix:**
+1. **Schema:** Added `is_exotic`, `is_classic` (BOOLEAN) and `requires_custom_quote` (generated column = `is_exotic OR is_classic`) to `vehicles` table
+2. **Classifier expansion:** Expanded exotic detection (Maserati/Maybach full-make, BMW M/Audi RS/Mercedes-AMG/Tesla Plaid/Dodge SRT partial-make). Rewrote classic detection from blanket year-only threshold to curated make+model list requiring BOTH year ≤ threshold AND model on collectible list (a 2001 Civic is no longer "classic")
+3. **Write path fix:** All vehicle insert/update paths now persist `is_exotic`/`is_classic` from classifier — including `findOrCreateVehicle()`, POS vehicle create/update, and customer portal vehicle create
+
+**Additional fixes:**
+- Motorcycle keyword expansion: +37 keywords (Honda Shadow/Fury/Valkyrie/VTX/CTX, Yamaha VMAX/TW200, Suzuki SV650/Bandit, Kawasaki W800, KTM Duke/Adventure, BMW R18/F800)
+- Make canonicalization at write time: Chevy → Chevrolet, Mercedes → Mercedes-Benz, VW → Volkswagen, etc.
+- Field inversion detection: Logs warning when make/model fields appear swapped (e.g., make="Skyhawk", model="Yamaha AR250")
+- Override path tightening: Logs warning when caller-provided vehicle_category contradicts classifier output
+- DB_SCHEMA.md updated with missing `vehicle_category`, `size_class`, `specialty_tier` columns on vehicles table
+
+**Decisions documented:**
+- Classic detection: TypeScript constants (not DB table) — stable domain taxonomy, changes rarely
+- DeLorean DMC-12: classic only, NOT exotic
+- Corvette Stingray (base C8): NOT flagged exotic — owner overrides in POS if needed
+- Exotic + classic coexistence: 1972 Ferrari Dino → `is_exotic=true, is_classic=true`
+- No pricing model change — flags drive UX gates (POS badge, booking block, voice agent handoff), not automated pricing
+
+**Test suite:** 143 tests covering exotic marques, classic curated list, motorcycle disambiguation, make canonicalization, field inversion detection, null/empty handling, year boundary edge cases
+
+**Backfill script:** `scripts/backfill-vehicle-classification.ts` — dry-run only, not executed. Awaiting approval.
+
+**Files changed:**
+- `supabase/migrations/20260417000001_vehicle_exotic_classic_flags.sql` (new)
+- `src/lib/utils/vehicle-categories.ts` (expanded exotic/classic/motorcycle detection, added canonicalization + inversion detection)
+- `src/lib/utils/vehicle-helpers.ts` (persist is_exotic/is_classic, canonicalization, inversion detection, override logging)
+- `src/app/api/pos/customers/[id]/vehicles/route.ts` (classifier integration for POST/PATCH)
+- `src/app/api/customer/vehicles/route.ts` (classifier integration for POST)
+- `src/lib/utils/__tests__/vehicle-categories.test.ts` (new — 143 tests)
+- `scripts/backfill-vehicle-classification.ts` (new — dry-run backfill)
+- `vitest.config.ts` (new)
+- `docs/dev/DB_SCHEMA.md` (updated vehicles table)
+- `docs/dev/FILE_TREE.md` (updated)
+- `docs/audits/specialty-tier-audit.md` (new)
+
+---
+
 ## fix: Allow zero-dollar refunds + coupon use_count reversal — 2026-04-17
 
 - **$0 refund support**: API no longer blocks refunds when `totalRefundAmount <= 0`. Instead checks if there are loyalty points, coupon usage, or items to restock before rejecting. The `maxRefundable` cap check is also skipped for $0 refunds.

@@ -1,5 +1,9 @@
 import { type SupabaseClient } from '@supabase/supabase-js';
-import { resolveVehicleClassification } from '@/lib/utils/vehicle-categories';
+import {
+  resolveVehicleClassification,
+  canonicalizeMake,
+  detectFieldInversion,
+} from '@/lib/utils/vehicle-categories';
 
 /**
  * Sanitize a single vehicle field value.
@@ -43,6 +47,8 @@ export interface FindOrCreateVehicleParams {
   vehicle_type?: string | null;
   size_class?: string | null;
   specialty_tier?: string | null;
+  /** Optional source identifier for override-mismatch logging */
+  source?: string;
 }
 
 export interface FindOrCreateVehicleResult {
@@ -57,23 +63,34 @@ export interface FindOrCreateVehicleResult {
  *
  * Dedup key: customer_id + LOWER(make) + LOWER(model) + vehicle_category
  *
- * - Resolves classification BEFORE the dedup query so the correct
- *   vehicle_category is used in the SELECT (motorcycle vs automobile, etc.)
- * - Backfills NULL fields on existing records (size_class, color, year, etc.)
- * - Handles unique constraint violations gracefully (re-query on 23505)
- * - Never throws — returns null on failure so vehicle creation doesn't block callers
+ * Session 26 additions:
+ * - Canonicalizes make before classification (Chevy → Chevrolet, etc.)
+ * - Persists is_exotic/is_classic flags from classifier
+ * - Detects field inversions and logs warnings
+ * - Logs override mismatches when caller-provided category differs from classifier
  */
 export async function findOrCreateVehicle(
   supabase: SupabaseClient,
   params: FindOrCreateVehicleParams
 ): Promise<FindOrCreateVehicleResult | null> {
   try {
-    const make = params.make?.trim();
-    const model = params.model?.trim() || null;
-
-    if (!make) {
+    // Canonicalize make before anything else
+    const rawMake = params.make?.trim();
+    if (!rawMake) {
       console.warn('[findOrCreateVehicle] No make provided — skipping');
       return null;
+    }
+    const make = canonicalizeMake(rawMake);
+    if (make !== rawMake) {
+      console.log(`[findOrCreateVehicle] Canonicalized make: "${rawMake}" → "${make}"`);
+    }
+
+    const model = params.model?.trim() || null;
+
+    // Field inversion detection
+    const inversion = detectFieldInversion(make, model);
+    if (inversion) {
+      console.warn(`[findOrCreateVehicle] FIELD INVERSION DETECTED: ${inversion.reason}`);
     }
 
     const year = params.year
@@ -81,9 +98,18 @@ export async function findOrCreateVehicle(
       : null;
 
     // Step 1: Resolve classification BEFORE the dedup query
-    // Caller overrides take priority (e.g., booking form sends vehicle_category from UI)
     const classification = await resolveVehicleClassification(supabase, make, model || undefined, year || undefined);
+
+    // Phase 5: Override path — log when caller-provided category contradicts classifier
     const resolvedCategory = params.vehicle_category || classification.vehicle_category;
+    if (params.vehicle_category && params.vehicle_category !== classification.vehicle_category) {
+      console.warn(
+        `[findOrCreateVehicle] Override mismatch: caller sent vehicle_category="${params.vehicle_category}" ` +
+        `but classifier resolved "${classification.vehicle_category}" for ${make} ${model || ''}` +
+        (params.source ? ` (source: ${params.source})` : '')
+      );
+    }
+
     const resolvedVehicleType = params.vehicle_type || classification.vehicle_type;
     const resolvedSizeClass = params.size_class || classification.size_class;
     const resolvedSpecialtyTier = params.specialty_tier || classification.specialty_tier;
@@ -91,7 +117,7 @@ export async function findOrCreateVehicle(
     // Step 2: Dedup query — customer_id + LOWER(make) + LOWER(model) + vehicle_category
     let query = supabase
       .from('vehicles')
-      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, color')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, color, is_exotic, is_classic')
       .eq('customer_id', params.customerId)
       .ilike('make', make)
       .eq('vehicle_category', resolvedCategory);
@@ -105,13 +131,16 @@ export async function findOrCreateVehicle(
     const { data: existing } = await query.limit(1).maybeSingle();
 
     if (existing) {
-      // Step 3: Backfill NULL fields on existing record
+      // Step 3: Backfill NULL fields on existing record + update exotic/classic flags
       const updates: Record<string, unknown> = {};
       if (!existing.size_class && resolvedSizeClass) updates.size_class = resolvedSizeClass;
       if (!existing.specialty_tier && resolvedSpecialtyTier) updates.specialty_tier = resolvedSpecialtyTier;
       if (!existing.vehicle_type) updates.vehicle_type = resolvedVehicleType;
       if (!existing.year && year) updates.year = year;
       if (!existing.color && params.color) updates.color = params.color;
+      // Always sync exotic/classic flags from classifier (they may have been wrong before)
+      if (existing.is_exotic !== classification.is_exotic) updates.is_exotic = classification.is_exotic;
+      if (existing.is_classic !== classification.is_classic) updates.is_classic = classification.is_classic;
 
       if (Object.keys(updates).length > 0) {
         await supabase.from('vehicles').update(updates).eq('id', existing.id);
@@ -121,7 +150,7 @@ export async function findOrCreateVehicle(
       return { id: existing.id, created: false, vehicle_category: resolvedCategory };
     }
 
-    // Step 4: Insert new vehicle with full classification
+    // Step 4: Insert new vehicle with full classification + exotic/classic flags
     const { data: newVehicle, error: insertErr } = await supabase
       .from('vehicles')
       .insert({
@@ -130,6 +159,8 @@ export async function findOrCreateVehicle(
         vehicle_type: resolvedVehicleType,
         size_class: resolvedSizeClass,
         specialty_tier: resolvedSpecialtyTier,
+        is_exotic: classification.is_exotic,
+        is_classic: classification.is_classic,
         year: year,
         make: make,
         model: model,
@@ -153,7 +184,16 @@ export async function findOrCreateVehicle(
 
     if (!newVehicle) return null;
 
-    console.log(`[findOrCreateVehicle] Created vehicle: ${year || ''} ${params.color || ''} ${make} ${model || ''} (${resolvedCategory}/${resolvedSizeClass || resolvedSpecialtyTier})`);
+    const flags = [
+      classification.is_exotic ? 'EXOTIC' : null,
+      classification.is_classic ? 'CLASSIC' : null,
+    ].filter(Boolean).join('+');
+
+    console.log(
+      `[findOrCreateVehicle] Created vehicle: ${year || ''} ${params.color || ''} ${make} ${model || ''} ` +
+      `(${resolvedCategory}/${resolvedSizeClass || resolvedSpecialtyTier})` +
+      (flags ? ` [${flags}]` : '')
+    );
     return { id: newVehicle.id, created: true, vehicle_category: resolvedCategory };
   } catch (err) {
     console.error('[findOrCreateVehicle] Unexpected error:', err);
