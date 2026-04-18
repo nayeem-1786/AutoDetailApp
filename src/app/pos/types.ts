@@ -66,7 +66,7 @@ export interface TicketState {
 
 export type TicketAction =
   | { type: 'ADD_PRODUCT'; product: Product }
-  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number; parentItemId?: string; comboPrice?: number; comboPrimaryServiceId?: string; prerequisiteNote?: string; prerequisiteForServiceId?: string }
+  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number; parentItemId?: string; comboPrice?: number; comboPrimaryServiceId?: string; prerequisiteNote?: string; prerequisiteForServiceId?: string; customPrice?: number; customNote?: string }
   | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
   | { type: 'UPDATE_PER_UNIT_QTY'; itemId: string; perUnitQty: number }
@@ -144,7 +144,7 @@ export interface QuoteState {
 
 export type QuoteAction =
   | { type: 'ADD_PRODUCT'; product: Product }
-  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number; parentItemId?: string; comboPrice?: number; comboPrimaryServiceId?: string; prerequisiteNote?: string; prerequisiteForServiceId?: string }
+  | { type: 'ADD_SERVICE'; service: Service; pricing: ServicePricing; vehicleSizeClass: VehicleSizeClass | null; perUnitQty?: number; parentItemId?: string; comboPrice?: number; comboPrimaryServiceId?: string; prerequisiteNote?: string; prerequisiteForServiceId?: string; customPrice?: number; customNote?: string }
   | { type: 'ADD_CUSTOM_ITEM'; name: string; price: number; isTaxable: boolean }
   | { type: 'UPDATE_ITEM_QUANTITY'; itemId: string; quantity: number }
   | { type: 'UPDATE_PER_UNIT_QTY'; itemId: string; perUnitQty: number }

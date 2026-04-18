@@ -112,8 +112,51 @@ export function quoteReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId } = action;
+      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId, customPrice, customNote } = action;
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
+
+      // Custom price override from specialty gate modal
+      if (typeof customPrice === 'number') {
+        const totalPrice = customPrice;
+        const newItem: TicketItem = {
+          id: generateId(),
+          itemType: 'service',
+          productId: null,
+          serviceId: service.id,
+          categoryId: service.category_id ?? null,
+          itemName: service.name,
+          quantity: 1,
+          unitPrice: totalPrice,
+          totalPrice,
+          taxAmount: calculateItemTax(totalPrice, service.is_taxable),
+          isTaxable: service.is_taxable,
+          tierName: pricing.tier_label || pricing.tier_name,
+          vehicleSizeClass,
+          notes: customNote || null,
+          perUnitQty: null,
+          perUnitLabel: null,
+          perUnitPrice: null,
+          perUnitMax: null,
+          parentItemId: parentItemId ?? null,
+          standardPrice: totalPrice,
+          pricingType: 'standard',
+          comboSourcePrimaryId: null,
+          saleEffectivePrice: null,
+          prerequisiteNote: prerequisiteNote ?? null,
+          prerequisiteForServiceId: prerequisiteForServiceId ?? null,
+        };
+        if (parentItemId) {
+          const items = [...state.items];
+          const parentIdx = items.findIndex((i) => i.id === parentItemId);
+          if (parentIdx >= 0) {
+            let insertIdx = parentIdx + 1;
+            while (insertIdx < items.length && items[insertIdx].parentItemId === parentItemId) insertIdx++;
+            items.splice(insertIdx, 0, newItem);
+            return recalculateTotals({ ...state, items });
+          }
+        }
+        return recalculateTotals({ ...state, items: [...state.items, newItem] });
+      }
 
       // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };

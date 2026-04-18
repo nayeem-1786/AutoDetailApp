@@ -1,9 +1,11 @@
 'use client';
 
-import { createContext, useContext, useReducer, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef, useCallback, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { TicketState, TicketAction } from '../types';
+import type { Service, ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { ticketReducer, initialTicketState } from './ticket-reducer';
+import { CustomPriceModal } from '../components/custom-price-modal';
 import { posFetch } from '../lib/pos-fetch';
 
 const TICKET_SESSION_KEY = 'pos-ticket-state';
@@ -35,8 +37,26 @@ function saveTicketToSession(state: TicketState): void {
 }
 
 export function TicketProvider({ children }: { children: ReactNode }) {
-  const [ticket, dispatch] = useReducer(ticketReducer, initialTicketState);
+  const [ticket, rawDispatch] = useReducer(ticketReducer, initialTicketState);
   const restoredRef = useRef(false);
+
+  // Specialty gate state — intercepts ADD_SERVICE for exotic/classic vehicles
+  const [gateModalOpen, setGateModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(TicketAction & { type: 'ADD_SERVICE' }) | null>(null);
+
+  // Wrap dispatch to gate ADD_SERVICE when vehicle requires custom quote
+  const dispatch = useCallback((action: TicketAction) => {
+    if (
+      action.type === 'ADD_SERVICE' &&
+      !action.customPrice && // Not already a custom-priced dispatch
+      ticket.vehicle?.requires_custom_quote
+    ) {
+      setPendingAction(action as TicketAction & { type: 'ADD_SERVICE' });
+      setGateModalOpen(true);
+      return;
+    }
+    rawDispatch(action);
+  }, [ticket.vehicle, rawDispatch]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevItemsRef = useRef<string>('');
   const prevCustomerRef = useRef<string | null>(null);
@@ -207,6 +227,25 @@ export function TicketProvider({ children }: { children: ReactNode }) {
   return (
     <TicketContext.Provider value={{ ticket, dispatch }}>
       {children}
+      {/* Specialty gate modal — intercepts ADD_SERVICE for exotic/classic vehicles */}
+      <CustomPriceModal
+        open={gateModalOpen}
+        vehicle={ticket.vehicle}
+        service={pendingAction?.service as Service | null}
+        pricing={pendingAction?.pricing as ServicePricing | null}
+        vehicleSizeClass={(pendingAction?.vehicleSizeClass ?? null) as VehicleSizeClass | null}
+        onConfirm={(customPrice, customNote) => {
+          if (pendingAction) {
+            rawDispatch({ ...pendingAction, customPrice, customNote: customNote ?? undefined });
+          }
+          setGateModalOpen(false);
+          setPendingAction(null);
+        }}
+        onCancel={() => {
+          setGateModalOpen(false);
+          setPendingAction(null);
+        }}
+      />
     </TicketContext.Provider>
   );
 }

@@ -102,6 +102,9 @@ export interface Vehicle {
   vehicle_category: VehicleCategory;
   size_class: VehicleSizeClass | null;
   specialty_tier: string | null;
+  is_exotic: boolean;
+  is_classic: boolean;
+  requires_custom_quote: boolean;
   year: number | null;
   make: string | null;
   model: string | null;
@@ -244,6 +247,8 @@ export interface Service {
   sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
+  exotic_floor_price: number | null;
+  classic_floor_price: number | null;
   created_at: string;
   updated_at: string;
   // Joined relations

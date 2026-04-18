@@ -36,6 +36,9 @@ export interface VehicleSelection {
   model: string | null;
   year: number | null;
   color: string | null;
+  is_exotic?: boolean;
+  is_classic?: boolean;
+  requires_custom_quote?: boolean;
 }
 
 interface StepVehicleProps {
@@ -225,6 +228,9 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       model: model.trim(),
       year: year,
       color: color.trim(),
+      is_exotic: classification?.is_exotic ?? false,
+      is_classic: classification?.is_classic ?? false,
+      requires_custom_quote: classification?.requires_custom_quote ?? false,
     };
   }
 

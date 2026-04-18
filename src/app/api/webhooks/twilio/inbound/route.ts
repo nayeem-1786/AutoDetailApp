@@ -536,7 +536,7 @@ export async function POST(request: NextRequest) {
                 .limit(10),
               admin
                 .from('vehicles')
-                .select('year, make, model, color, vehicle_type, size_class')
+                .select('year, make, model, color, vehicle_type, size_class, is_exotic, is_classic, requires_custom_quote')
                 .eq('customer_id', custId)
                 .order('created_at', { ascending: false }),
               admin
@@ -608,15 +608,66 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          autoReply = await getAIResponse(
-            history || [],
-            body,
-            customerCtx,
-            conversation.customer_id,
-            conversation.summary,
-            conversation.last_notification_type,
-            conversation.last_notification_at,
-          );
+          // Specialty vehicle gate: if customer has ANY exotic/classic vehicle,
+          // pivot to custom-quote handoff instead of AI catalog quoting.
+          let hasSpecialtyVehicle = false;
+          let specialtyVehicleDesc = '';
+          let specialtyVehicleWord = 'specialty';
+          if (isCustomer && conversation.customer_id) {
+            const { data: specialtyCheck } = await admin
+              .from('vehicles')
+              .select('year, make, model, is_exotic, is_classic, requires_custom_quote')
+              .eq('customer_id', conversation.customer_id)
+              .eq('requires_custom_quote', true)
+              .limit(1)
+              .maybeSingle();
+            if (specialtyCheck) {
+              hasSpecialtyVehicle = true;
+              specialtyVehicleDesc = [specialtyCheck.year, specialtyCheck.make, specialtyCheck.model].filter(Boolean).join(' ') || 'your vehicle';
+              specialtyVehicleWord = specialtyCheck.is_exotic && specialtyCheck.is_classic ? 'specialty'
+                : specialtyCheck.is_exotic ? 'exotic' : 'classic';
+            }
+          }
+
+          if (hasSpecialtyVehicle) {
+            autoReply = `Thanks for reaching out! For ${specialtyVehicleDesc}, we give custom quotes because every ${specialtyVehicleWord} vehicle is unique. Can I have one of our specialists call you back? What's the best time to reach you?`;
+
+            // Fire staff notification
+            try {
+              const custName = customerCtx?.name || 'Unknown customer';
+              const staffMsg = `Specialty vehicle SMS inquiry!\n${custName} (${normalizedPhone}) texted about their ${specialtyVehicleWord} ${specialtyVehicleDesc}.\nLast message: "${body.slice(0, 100)}"\n\nRequires custom quote — please follow up.`;
+              const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+              const { getBusinessInfo } = await import('@/lib/data/business');
+              const [templateResult, biz] = await Promise.all([
+                renderSmsTemplate('staff_notification', { customer_name: custName, customer_phone: normalizedPhone }, staffMsg),
+                getBusinessInfo(),
+              ]);
+              const smsBody = templateResult?.body || staffMsg;
+              const recipients = templateResult?.recipientPhones?.length
+                ? templateResult.recipientPhones
+                : [biz.phone].filter(Boolean);
+              const { sendSms } = await import('@/lib/utils/sms');
+              for (const rPhone of recipients) {
+                if (rPhone) await sendSms(rPhone, smsBody);
+              }
+            } catch (notifyErr) {
+              console.error('[Messaging] Staff notification for specialty vehicle failed:', notifyErr);
+            }
+
+            // Disable AI on this conversation — staff takes over
+            await admin.from('conversations').update({ is_ai_enabled: false }).eq('id', conversation.id);
+            console.log(`[Messaging] Disabled AI for conversation ${conversation.id} — specialty vehicle detected`);
+          } else {
+            autoReply = await getAIResponse(
+              history || [],
+              body,
+              customerCtx,
+              conversation.customer_id,
+              conversation.summary,
+              conversation.last_notification_type,
+              conversation.last_notification_at,
+            );
+          }
         } catch (err) {
           console.error('AI auto-reply failed:', err);
         }

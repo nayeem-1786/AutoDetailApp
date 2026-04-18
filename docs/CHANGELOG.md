@@ -4,6 +4,80 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat: Exotic/classic consumer surfaces — 2026-04-18 (Session 27)
+
+**POS badge + custom price modal, booking block, SMS pivot, voice agent docs.**
+
+**Phase 0 — Schema + Admin UI:**
+- Migration `20260417000002`: `exotic_floor_price` and `classic_floor_price` nullable columns on `services`
+- Admin service edit form: two new number inputs near pricing section
+- TypeScript types updated: `Vehicle` interface (is_exotic/is_classic/requires_custom_quote), `Service` interface (exotic_floor_price/classic_floor_price)
+
+**Phase 1–2 — Badge + Placement:**
+- `SpecialtyBadge` component: amber "EXOTIC", blue-gray "CLASSIC", stacked if both
+- Placed in: POS ticket vehicle card, POS vehicle selector, admin customer vehicles tab, admin appointment detail
+- 6 unit tests (render, stacking, aria-labels, null safety)
+
+**Phase 3 — Custom Price Modal (transparent gate):**
+- Gate implemented at `TicketProvider` and `QuoteProvider` level — wraps `dispatch` with specialty check
+- Zero changes to any of the 6 consumer files (pos-workspace, register-tab, catalog-browser, catalog-panel, service-detail-dialog, quote-builder)
+- `ADD_SERVICE` action type extended with optional `customPrice`/`customNote`
+- Both ticket-reducer and quote-reducer handle custom price bypass
+- Modal: vehicle info, catalog/floor price reference, price input, optional reason dropdown, below-catalog confirmation
+
+**Phase 4 — Booking Block:**
+- Block page renders inline in booking wizard when `requires_custom_quote` detected after vehicle step
+- Phone CTA from `getBusinessInfo().phone` (Rule #8 — no hardcoded numbers)
+- Callback form → POST `/api/public/specialty-callback` → audit log + staff_notification SMS
+- "Edit my vehicle" link for typo recovery
+
+**Phase 5 — Voice Agent:**
+- `/api/voice-agent/vehicle-classify` confirmed: returns `is_exotic`, `is_classic`, `requires_custom_quote`
+- `docs/dev/VOICE_AGENT.md` updated with specialty vehicle handling documentation
+- Owner action: verify ElevenLabs dashboard prompt handles `requires_custom_quote` flag
+
+**Phase 6 — SMS Pivot:**
+- Twilio inbound handler: pre-AI gate checks if customer has any vehicle with `requires_custom_quote`
+- If yes: custom-quote reply instead of catalog pricing, staff_notification SMS, `conversations.is_ai_enabled = false`
+- DB_SCHEMA.md updated with previously-undocumented `conversations.is_ai_enabled` and `conversations.unread_count`
+
+**Migration SQL (apply via Supabase SQL Editor):**
+```sql
+ALTER TABLE services ADD COLUMN exotic_floor_price NUMERIC(10,2) DEFAULT NULL;
+ALTER TABLE services ADD COLUMN classic_floor_price NUMERIC(10,2) DEFAULT NULL;
+```
+
+**Files changed:**
+- `supabase/migrations/20260417000002_service_exotic_classic_floor_prices.sql` (new)
+- `src/lib/supabase/types.ts` (Vehicle + Service interfaces)
+- `src/lib/utils/validation.ts` (serviceCreateSchema)
+- `src/app/admin/catalog/services/[id]/page.tsx` (floor price fields)
+- `src/app/pos/components/specialty-badge.tsx` (new)
+- `src/app/pos/components/custom-price-modal.tsx` (new)
+- `src/app/pos/components/__tests__/specialty-badge.test.tsx` (new)
+- `src/app/pos/components/customer-vehicle-summary.tsx` (badge placement)
+- `src/app/pos/components/vehicle-selector.tsx` (badge placement)
+- `src/app/pos/types.ts` (customPrice/customNote on ADD_SERVICE)
+- `src/app/pos/context/ticket-context.tsx` (gate logic + modal render)
+- `src/app/pos/context/ticket-reducer.ts` (customPrice handler)
+- `src/app/pos/context/quote-context.tsx` (gate logic + modal render)
+- `src/app/pos/context/quote-reducer.ts` (customPrice handler)
+- `src/app/admin/customers/[id]/page.tsx` (badge placement)
+- `src/app/admin/appointments/types.ts` (vehicle Pick + is_exotic/is_classic)
+- `src/app/admin/appointments/page.tsx` (vehicle query + flags)
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (badge)
+- `src/components/booking/step-vehicle.tsx` (VehicleSelection + classification flags)
+- `src/components/booking/booking-wizard.tsx` (specialty block gate)
+- `src/components/booking/specialty-vehicle-block.tsx` (new)
+- `src/app/(public)/book/page.tsx` (businessPhone prop)
+- `src/app/api/public/specialty-callback/route.ts` (new)
+- `src/app/api/webhooks/twilio/inbound/route.ts` (specialty vehicle SMS gate)
+- `docs/dev/VOICE_AGENT.md` (specialty vehicle handling docs)
+- `docs/dev/DB_SCHEMA.md` (services + conversations columns)
+- `docs/audits/session-27-qa.md` (new)
+
+---
+
 ## refactor: Backfill script imports real classifier — 2026-04-17 (Session 26B)
 
 Eliminated ~150 lines of duplicated classifier logic from `scripts/backfill-vehicle-classification.ts`. The script now imports `resolveVehicleClassification()` and `canonicalizeMake()` directly from `src/lib/utils/vehicle-categories.ts` via relative imports (`../src/lib/utils/...`).

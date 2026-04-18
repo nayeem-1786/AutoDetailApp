@@ -28,6 +28,7 @@ import {
   getSpecialtyTierLabel,
   type VehicleCategory,
 } from '@/lib/utils/vehicle-categories';
+import { SpecialtyBadge } from '@/app/pos/components/specialty-badge';
 import type {
   Customer,
   Vehicle,
@@ -1433,6 +1434,7 @@ export default function CustomerProfilePage() {
                                 Incomplete
                               </Badge>
                             )}
+                            <SpecialtyBadge isExotic={v.is_exotic} isClassic={v.is_classic} />
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <Badge variant="default">

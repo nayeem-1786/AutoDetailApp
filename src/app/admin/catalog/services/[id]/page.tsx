@@ -250,6 +250,8 @@ export default function ServiceDetailPage() {
       is_taxable: svc.is_taxable,
       vehicle_compatibility: svc.vehicle_compatibility,
       special_requirements: svc.special_requirements || '',
+      exotic_floor_price: svc.exotic_floor_price,
+      classic_floor_price: svc.classic_floor_price,
       is_active: svc.is_active,
       display_order: svc.display_order,
     });
@@ -503,6 +505,8 @@ export default function ServiceDetailPage() {
         is_taxable: formData.is_taxable,
         vehicle_compatibility: formData.vehicle_compatibility,
         special_requirements: formData.special_requirements || null,
+        exotic_floor_price: typeof formData.exotic_floor_price === 'number' ? formData.exotic_floor_price : null,
+        classic_floor_price: typeof formData.classic_floor_price === 'number' ? formData.classic_floor_price : null,
         is_active: formData.is_active,
         display_order: formData.display_order,
         image_url: imageUrl,
@@ -1061,6 +1065,35 @@ export default function ServiceDetailPage() {
                   <FormField label="Special Requirements" error={errors.special_requirements?.message}>
                     <Textarea {...register('special_requirements')} rows={2} />
                   </FormField>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <FormField
+                      label="Exotic Starting Price (optional)"
+                      error={errors.exotic_floor_price?.message}
+                      description="Suggested starting price for exotic vehicles. Staff can adjust up or down at checkout."
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="—"
+                        {...register('exotic_floor_price', { valueAsNumber: true })}
+                      />
+                    </FormField>
+                    <FormField
+                      label="Classic Starting Price (optional)"
+                      error={errors.classic_floor_price?.message}
+                      description="Suggested starting price for classic vehicles. Staff can adjust up or down at checkout."
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="—"
+                        {...register('classic_floor_price', { valueAsNumber: true })}
+                      />
+                    </FormField>
+                  </div>
                 </CardContent>
               </Card>
 

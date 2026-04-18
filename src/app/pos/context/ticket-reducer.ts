@@ -112,7 +112,7 @@ export function ticketReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId } = action;
+      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId, customPrice, customNote } = action;
 
       // Duplicate guard: check if this service (same serviceId, same tier, same parent context) already exists
       const useTierMatching = service.pricing_model === 'scope' || service.pricing_model === 'specialty';
@@ -164,6 +164,39 @@ export function ticketReducer(
 
       const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
       const isScopeTierWithQty = !isPerUnit && !!perUnitQty && !!pricing?.max_qty && pricing.max_qty > 1;
+
+      // Custom price override from specialty gate modal — bypass normal pricing resolution
+      if (typeof customPrice === 'number') {
+        const totalPrice = customPrice;
+        const newItem: TicketItem = {
+          id: generateId(),
+          itemType: 'service',
+          productId: null,
+          serviceId: service.id,
+          categoryId: service.category_id ?? null,
+          itemName: service.name,
+          quantity: 1,
+          unitPrice: totalPrice,
+          totalPrice,
+          taxAmount: calculateItemTax(totalPrice, service.is_taxable),
+          isTaxable: service.is_taxable,
+          tierName: pricing.tier_label || pricing.tier_name,
+          vehicleSizeClass,
+          notes: customNote || null,
+          perUnitQty: null,
+          perUnitLabel: null,
+          perUnitPrice: null,
+          perUnitMax: null,
+          parentItemId: parentItemId ?? null,
+          standardPrice: totalPrice,
+          saleEffectivePrice: null,
+          pricingType: 'standard',
+          comboSourcePrimaryId: null,
+          prerequisiteNote: prerequisiteNote ?? null,
+          prerequisiteForServiceId: prerequisiteForServiceId ?? null,
+        };
+        return recalculateTotals({ ...state, items: [...state.items, newItem] });
+      }
 
       // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };

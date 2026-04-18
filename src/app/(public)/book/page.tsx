@@ -62,7 +62,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     return (data ?? []) as VehicleCategoryRecord[];
   }
 
-  const [categories, mobileZones, businessHours, bookingConfig, cmsToggles, vehicleCategories] =
+  const [categories, mobileZones, businessHours, bookingConfig, cmsToggles, vehicleCategories, businessInfo] =
     await Promise.all([
       getBookableServices(),
       getMobileZones(),
@@ -70,6 +70,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       getBookingConfig(),
       getCmsToggles(),
       getVehicleCategories(),
+      getBusinessInfo(),
     ]);
 
   // Pre-select service if ?service=slug is provided
@@ -175,6 +176,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
               customerData={customerData ?? campaignCustomerData}
               couponCode={params.coupon ?? null}
               vehicleCategories={vehicleCategories}
+              businessPhone={businessInfo.phone}
             />
           </div>
         </div>

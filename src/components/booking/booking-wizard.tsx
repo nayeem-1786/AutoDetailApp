@@ -18,6 +18,7 @@ import type { MobileZone, VehicleSizeClass, VehicleType, VehicleCategoryRecord, 
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
 import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import { customerSignOut } from '@/lib/auth/customer-signout';
+import { SpecialtyVehicleBlock } from './specialty-vehicle-block';
 
 interface CustomerDataProp {
   customer: {
@@ -49,6 +50,7 @@ interface BookingWizardProps {
   customerData?: CustomerDataProp | null;
   couponCode?: string | null;
   vehicleCategories?: VehicleCategoryRecord[];
+  businessPhone?: string;
 }
 
 interface AvailableCoupon {
@@ -124,6 +126,7 @@ export function BookingWizard({
   customerData,
   couponCode,
   vehicleCategories = [],
+  businessPhone,
 }: BookingWizardProps) {
   const searchParams = useSearchParams();
   const initializedRef = useRef(false);
@@ -594,7 +597,10 @@ export function BookingWizard({
     }))
     .filter((cat) => cat.services.length > 0);
 
-  // Step 1: Vehicle → advance to Step 2
+  // Specialty vehicle block state (Phase 4 — exotic/classic booking gate)
+  const [showSpecialtyBlock, setShowSpecialtyBlock] = useState(false);
+
+  // Step 1: Vehicle → advance to Step 2 (or block if specialty)
   function handleVehicleSelect(vehicle: VehicleSelection) {
     const newState: BookingState = {
       ...state,
@@ -606,6 +612,13 @@ export function BookingWizard({
     };
     setState(newState);
 
+    // Gate: if vehicle requires custom quote, show block page instead of step 2
+    if (vehicle.requires_custom_quote) {
+      setShowSpecialtyBlock(true);
+      return;
+    }
+
+    setShowSpecialtyBlock(false);
     // Always go to Step 2 — even during edit flow, so pricing recalculates
     // for the new vehicle size. editEntryStep stays set to enable "Back to Booking".
     goToStep(2, newState);
@@ -983,7 +996,15 @@ export function BookingWizard({
         onStepClick={handleStepClick}
       />
 
-      {step === 1 && (
+      {step === 1 && showSpecialtyBlock && state.vehicleData && businessPhone && (
+        <SpecialtyVehicleBlock
+          vehicle={state.vehicleData}
+          businessPhone={businessPhone}
+          onEditVehicle={() => setShowSpecialtyBlock(false)}
+        />
+      )}
+
+      {step === 1 && !showSpecialtyBlock && (
         <>
           <StepVehicle
             customerData={authCustomerData}

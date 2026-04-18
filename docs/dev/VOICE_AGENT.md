@@ -12,6 +12,7 @@ Twilio forwards to ElevenLabs voice agent (SIP/webhook)
 ElevenLabs agent converses with customer using TTS/STT
     ↓ (tool calls during conversation)
 GET /api/voice-agent/context?phone=X      → full customer context
+GET /api/voice-agent/vehicle-classify     → classify vehicle (exotic/classic/size)
 GET /api/voice-agent/services             → service catalog with pricing
 GET /api/voice-agent/availability?date=X  → open time slots
 POST /api/voice-agent/appointments        → book an appointment
@@ -23,6 +24,34 @@ POST /api/voice-agent/finalize-call       → log call + trigger follow-ups
 POST /api/webhooks/elevenlabs/call-complete → log call (if webhook fires)
     ↓ (safety net — polling cron)
 GET /api/cron/voice-calls-poll            → catch missed calls every 5 min
+```
+
+### Specialty Vehicle Handling (Session 27)
+
+The `classify_vehicle` tool call returns `requires_custom_quote: true` for exotic and classic vehicles. **The ElevenLabs dashboard prompt must handle this flag.**
+
+**Expected behavior when `requires_custom_quote: true`:**
+1. Agent does NOT quote pricing from the service catalog
+2. Agent says something like: "For your [vehicle], I'd like to have one of our detailing specialists call you back with a custom quote. Can I get your name and the best time to reach you?"
+3. Agent collects callback info (name + phone + preferred time)
+4. Agent calls the `notify_staff` tool to fire a staff notification SMS
+
+**Owner action required:** Verify the ElevenLabs dashboard prompt includes this routing logic. If it does not, edit the prompt in the dashboard to check `requires_custom_quote` from the `classify_vehicle` tool response and branch accordingly. This is NOT a code change — it's a prompt configuration in the ElevenLabs platform.
+
+**API response shape** (`GET /api/voice-agent/vehicle-classify`):
+```json
+{
+  "make": "Ferrari",
+  "model": "488",
+  "year": 2022,
+  "vehicle_category": "automobile",
+  "size_class": "sedan",
+  "tier_name": "Exotic (Custom Quote)",
+  "is_exotic": true,
+  "is_classic": false,
+  "requires_custom_quote": true,
+  "needs_year_confirmation": false
+}
 ```
 
 ### Post-Call Data Ingestion — Three Layers

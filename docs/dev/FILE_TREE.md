@@ -431,6 +431,7 @@ src/app/api/public/cms/theme/route.ts
 src/app/api/public/cms/theme-preview/route.ts
 src/app/api/public/cms/tickers/route.ts
 src/app/api/public/products/search/route.ts
+src/app/api/public/specialty-callback/route.ts
 ```
 
 ### Quotes
@@ -1154,6 +1155,7 @@ src/components/booking/step-payment.tsx
 src/components/booking/step-schedule.tsx
 src/components/booking/step-service-select.tsx      (merged service select + configure — Step 2)
 src/components/booking/step-vehicle.tsx              (vehicle selection — Step 1)
+src/components/booking/specialty-vehicle-block.tsx   (exotic/classic booking block page — Session 27)
 ```
 
 ### Quote Components
@@ -1214,6 +1216,9 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         transactions/
                                                         vehicle-create-dialog.tsx
                                                         vehicle-selector.tsx
+                                                        specialty-badge.tsx
+                                                        custom-price-modal.tsx
+                                                        __tests__/specialty-badge.test.tsx
                                                         quotes/
 ```
 
@@ -1432,6 +1437,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260404000004_backfill_og_images.sql
 20260410000001_staff_notification_sms_template.sql
 20260417000001_vehicle_exotic_classic_flags.sql
+20260417000002_service_exotic_classic_floor_prices.sql
 ```
 
 ## Scripts

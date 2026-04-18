@@ -9,6 +9,7 @@ import {
   VEHICLE_TYPE_LABELS,
 } from '@/lib/utils/constants';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { SpecialtyBadge } from './specialty-badge';
 import type { Vehicle } from '@/lib/supabase/types';
 import { posFetch } from '../lib/pos-fetch';
 
@@ -89,7 +90,10 @@ export function VehicleSelector({
                 </p>
               </div>
             </div>
-            {isSelected && <Check className="h-4 w-4 text-blue-500 dark:text-blue-400" />}
+            <div className="flex items-center gap-1.5">
+              <SpecialtyBadge isExotic={v.is_exotic} isClassic={v.is_classic} />
+              {isSelected && <Check className="h-4 w-4 text-blue-500 dark:text-blue-400" />}
+            </div>
           </button>
         );
       })}

@@ -6,6 +6,7 @@ import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { VEHICLE_CATEGORY_LABELS } from '@/lib/utils/vehicle-categories';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { CustomerTypeBadge } from './customer-type-badge';
+import { SpecialtyBadge } from './specialty-badge';
 import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
 
 interface CustomerVehicleSummaryProps {
@@ -116,6 +117,13 @@ export function CustomerVehicleSummary({
           >
             <Pencil className="h-3 w-3" />
           </button>
+        )}
+        {vehicle && (
+          <SpecialtyBadge
+            isExotic={vehicle.is_exotic}
+            isClassic={vehicle.is_classic}
+            className="ml-auto"
+          />
         )}
       </div>
     </div>

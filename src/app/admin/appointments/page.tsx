@@ -138,7 +138,7 @@ export default function AppointmentsPage() {
         .select(`
           *,
           customer:customers!customer_id(id, first_name, last_name, phone, email),
-          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color, is_exotic, is_classic),
           employee:employees!employee_id(id, first_name, last_name, role),
           appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
         `)
@@ -163,7 +163,7 @@ export default function AppointmentsPage() {
         .select(`
           *,
           customer:customers!customer_id(id, first_name, last_name, phone, email),
-          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color, is_exotic, is_classic),
           employee:employees!employee_id(id, first_name, last_name, role),
           appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
         `)
