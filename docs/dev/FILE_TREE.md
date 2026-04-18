@@ -431,6 +431,7 @@ src/app/api/public/cms/theme/route.ts
 src/app/api/public/cms/theme-preview/route.ts
 src/app/api/public/cms/tickers/route.ts
 src/app/api/public/products/search/route.ts
+src/app/api/public/specialty-block-view/route.ts
 src/app/api/public/specialty-callback/route.ts
 ```
 

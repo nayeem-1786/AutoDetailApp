@@ -28,6 +28,8 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 **Phase 4 — Booking Block:**
 - Block page renders inline in booking wizard when `requires_custom_quote` detected after vehicle step
 - Phone CTA from `getBusinessInfo().phone` (Rule #8 — no hardcoded numbers)
+- Two audit events: `booking_blocked_specialty_vehicle` fires on block page render (denominator), `specialty_callback_requested` fires on callback form submit (numerator)
+- Block page render → POST `/api/public/specialty-block-view` → audit log (fire-and-forget on mount)
 - Callback form → POST `/api/public/specialty-callback` → audit log + staff_notification SMS
 - "Edit my vehicle" link for typo recovery
 

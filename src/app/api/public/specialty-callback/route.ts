@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       entityType: 'booking',
       entityLabel: `Specialty callback: ${name} — ${vehicleDesc}`,
       details: {
-        event: 'booking_blocked_specialty_vehicle',
+        event: 'specialty_callback_requested',
         customer_name: name,
         customer_phone: phone,
         preferred_time: preferred_time || null,

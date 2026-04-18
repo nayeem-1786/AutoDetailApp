@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
@@ -20,6 +20,24 @@ export function SpecialtyVehicleBlock({
   businessPhone,
   onEditVehicle,
 }: SpecialtyVehicleBlockProps) {
+  // Fire block-view audit event on mount (denominator for conversion tracking)
+  const viewLoggedRef = useRef(false);
+  useEffect(() => {
+    if (viewLoggedRef.current) return;
+    viewLoggedRef.current = true;
+    fetch('/api/public/specialty-block-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vehicle_year: vehicle.year,
+        vehicle_make: vehicle.make,
+        vehicle_model: vehicle.model,
+        is_exotic: vehicle.is_exotic,
+        is_classic: vehicle.is_classic,
+      }),
+    }).catch(() => {}); // Fire-and-forget
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [callbackName, setCallbackName] = useState('');
   const [callbackPhone, setCallbackPhone] = useState('');
   const [callbackTime, setCallbackTime] = useState('');
