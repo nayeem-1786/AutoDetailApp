@@ -45,7 +45,7 @@ export function PosWorkspace() {
   }, []);
 
   // Re-add pending service after vehicle selection — auto-matches vehicle tier when possible
-  const VEHICLE_SIZE_CLASSES_SET = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+  const VEHICLE_SIZE_CLASSES_SET = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']);
 
   const handlePendingService = useCallback((e: Event) => {
     const service = (e as CustomEvent).detail?.service as CatalogService | undefined;

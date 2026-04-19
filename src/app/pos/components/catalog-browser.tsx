@@ -20,7 +20,7 @@ import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCatego
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']);
 
 /** Resolve sale-aware price for toast messages */
 function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {

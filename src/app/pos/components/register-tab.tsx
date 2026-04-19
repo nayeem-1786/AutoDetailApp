@@ -17,7 +17,7 @@ import { getTileColors, TYPE_ICONS } from '@/lib/pos/tile-colors';
 import type { FavoriteItem, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 
-const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van']);
+const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']);
 
 /** Resolve sale-aware price for toast messages */
 function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {

@@ -4,6 +4,25 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): Extend all POS tier sets to 5 values — 2026-04-19 (Session 29 follow-up #2)
+
+**Root cause:** ServiceDetailDialog (line 70) had a hardcoded 3-value `VEHICLE_SIZE_CLASSES` set, separate from ServicePricingPicker. Staff tapping a service card in the catalog browser opened ServiceDetailDialog (not ServicePricingPicker), so the Session 29 follow-up fix to the picker was never invoked. This also explains why the diagnostic console.log produced no output — the wrong component was rendering.
+
+**Audit found 3 additional stale 3-value sets** in the same codebase:
+- `register-tab.tsx:20` — favorites quick-add auto-match
+- `catalog-browser.tsx:23` — direct-add auto-match
+- `pos-workspace.tsx:48` — global search auto-match
+
+All 4 files extended to 5-value sets (sedan/truck_suv_2row/suv_3row_van/exotic/classic). Also fixed a secondary 3-value list in `service-detail-dialog.tsx:566` (vehicle-size-aware pricing chips).
+
+**Architecture debt noted:** Tier button rendering logic is duplicated across ServiceDetailDialog and ServicePricingPicker with independently maintained size-class sets. Consolidation audit determined merging is not recommended (different UX patterns: select-then-confirm vs click-to-commit). Future candidate: extract shared tier constants or a shared `useTierButtonState()` hook to prevent drift.
+
+5 new ServiceDetailDialog tests. 176 total passing.
+
+Files changed: `service-detail-dialog.tsx`, `register-tab.tsx`, `catalog-browser.tsx`, `pos-workspace.tsx`, `__tests__/service-detail-dialog.test.tsx` (new)
+
+---
+
 ## fix(pos): Vehicle dropdown + picker tier disable — 2026-04-18 (Session 29 follow-up)
 
 **POS vehicle create/edit dialog:** Extended `AUTOMOBILE_SIZE_CLASSES` from 3 to 5 entries (added exotic, classic). Staff can now set size_class to exotic/classic when creating or editing vehicles from POS. Customer portal dropdown intentionally stays at 3 values.
