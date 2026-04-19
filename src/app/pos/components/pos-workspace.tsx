@@ -15,6 +15,7 @@ import { TicketPanel } from './ticket-panel';
 import { RegisterTab } from './register-tab';
 import { CatalogBrowser } from './catalog-browser';
 import { PromotionsTab } from './promotions-tab';
+import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 
 type PosTab = 'register' | 'products' | 'services' | 'promotions';
 
@@ -24,6 +25,9 @@ const TABS: { key: PosTab; label: string }[] = [
   { key: 'services', label: 'Services' },
   { key: 'promotions', label: 'Promos' },
 ];
+
+// Session 30: hoisted from component body — once-per-module vs once-per-render.
+const VEHICLE_SIZE_CLASSES_SET = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 export function PosWorkspace() {
   const { products, services, loading } = useCatalog();
@@ -45,8 +49,6 @@ export function PosWorkspace() {
   }, []);
 
   // Re-add pending service after vehicle selection — auto-matches vehicle tier when possible
-  const VEHICLE_SIZE_CLASSES_SET = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']);
-
   const handlePendingService = useCallback((e: Event) => {
     const service = (e as CustomEvent).detail?.service as CatalogService | undefined;
     if (!service) return;

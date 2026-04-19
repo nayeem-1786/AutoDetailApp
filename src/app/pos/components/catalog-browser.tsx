@@ -17,10 +17,11 @@ import { ServiceDetailDialog } from './service-detail-dialog';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { resolveServicePriceWithSale } from '../utils/pricing';
 import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCategory } from '@/lib/utils/vehicle-categories';
+import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
-const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']);
+const VEHICLE_SIZE_CLASSES = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 /** Resolve sale-aware price for toast messages */
 function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {

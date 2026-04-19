@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import {
   VEHICLE_SIZE_LABELS,
+  VEHICLE_SIZE_CLASS_KEYS,
 } from '@/lib/utils/constants';
 import {
   VEHICLE_CATEGORIES,
@@ -30,7 +31,7 @@ import {
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import type { Vehicle } from '@/lib/supabase/types';
 
-const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'] as const;
+const AUTOMOBILE_SIZE_CLASSES = VEHICLE_SIZE_CLASS_KEYS;
 
 interface VehicleCreateDialogProps {
   open: boolean;

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { VEHICLE_SIZE_CLASS_KEYS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
+import type { VehicleSizeClass } from '@/lib/supabase/types';
 
 // Phone validation - accepts (XXX) XXX-XXXX format (also allows E.164 for backwards compat)
 const phoneRegex = /^(\(\d{3}\) \d{3}-\d{4}|\+1\d{10})$/;
@@ -66,10 +68,11 @@ export const vehicleSchema = z.object({
     error: 'Please select a vehicle category',
   }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']),
-  // Session 29: admin vehicle form accepts all 5 size_class values (dropdown supports exotic/classic).
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'], {
-    error: 'Please select a size class',
-  }).optional().nullable(),
+  // Session 30: admin vehicle form accepts all 5 size_class values via canonical constant.
+  size_class: z.enum(
+    [...VEHICLE_SIZE_CLASS_KEYS] as [VehicleSizeClass, ...VehicleSizeClass[]],
+    { error: 'Please select a size class' }
+  ).optional().nullable(),
   specialty_tier: optionalString,
   year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
   make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
@@ -319,9 +322,10 @@ export const bookingVehicleSchema = z.object({
     error: 'Please select a vehicle category',
   }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van'], {
-    error: 'Please select a size class',
-  }).optional().nullable(),
+  size_class: z.enum(
+    [...CUSTOMER_SELF_SERVICE_SIZE_CLASSES] as [VehicleSizeClass, ...VehicleSizeClass[]],
+    { error: 'Please select a size class' }
+  ).optional().nullable(),
   specialty_tier: optionalString,
   year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
   make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
@@ -397,9 +401,10 @@ export const customerVehicleSchema = z.object({
     error: 'Please select a vehicle category',
   }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']).default('standard'),
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van'], {
-    error: 'Please select a size class',
-  }).optional().nullable(),
+  size_class: z.enum(
+    [...CUSTOMER_SELF_SERVICE_SIZE_CLASSES] as [VehicleSizeClass, ...VehicleSizeClass[]],
+    { error: 'Please select a size class' }
+  ).optional().nullable(),
   specialty_tier: optionalString,
   year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
   make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
@@ -478,8 +483,10 @@ const transactionItemSchema = z.object({
   tax_amount: positiveNumber,
   is_taxable: z.boolean(),
   tier_name: optionalString,
-  // Session 29: transaction items record the vehicle size used for pricing (5-value).
-  vehicle_size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']).optional().nullable(),
+  // Session 30: transaction items record the vehicle size used for pricing (5-value, canonical).
+  vehicle_size_class: z.enum(
+    [...VEHICLE_SIZE_CLASS_KEYS] as [VehicleSizeClass, ...VehicleSizeClass[]]
+  ).optional().nullable(),
   notes: optionalString,
   standard_price: z.coerce.number().optional().nullable(),
   pricing_type: z.enum(['standard', 'sale', 'combo']).optional().default('standard'),

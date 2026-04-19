@@ -1,3 +1,5 @@
+import type { VehicleSizeClass } from '@/lib/supabase/types';
+
 // Site-wide constants
 export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://smartdetailsautospa.com';
 export const SITE_DESCRIPTION = 'Professional auto detailing, ceramic coatings, and car care supplies in Lomita, CA. Mobile detailing available in the South Bay area.';
@@ -37,6 +39,37 @@ export const VEHICLE_SIZE_LABELS: Record<string, string> = {
   exotic: 'Exotic',
   classic: 'Classic',
 } as const;
+
+/**
+ * Canonical size_class keys for automobile pricing. Source of truth for
+ * POS tier detection, tier-button disable/highlight logic, admin staff
+ * vehicle-edit forms, and admin service-pricing tables.
+ *
+ * Session 30: consolidated from 11 duplicated hardcoded sites across 9 files.
+ */
+export const VEHICLE_SIZE_CLASS_KEYS: readonly VehicleSizeClass[] = [
+  'sedan',
+  'truck_suv_2row',
+  'suv_3row_van',
+  'exotic',
+  'classic',
+] as const;
+
+/**
+ * Restricted 3-value size_class subset used in customer-facing flows ONLY:
+ * booking wizard, account portal, /api/book validation, customer vehicle save.
+ *
+ * This is a deliberate UX/trust boundary. Customers cannot self-identify as
+ * exotic or classic — those require staff quote handoff per business policy.
+ *
+ * Do NOT collapse this into VEHICLE_SIZE_CLASS_KEYS. The two are semantically
+ * different — one is the full taxonomy, one is the customer-exposed subset.
+ */
+export const CUSTOMER_SELF_SERVICE_SIZE_CLASSES: readonly VehicleSizeClass[] = [
+  'sedan',
+  'truck_suv_2row',
+  'suv_3row_van',
+] as const;
 
 // Vehicle type labels
 export const VEHICLE_TYPE_LABELS: Record<string, string> = {
@@ -138,14 +171,14 @@ export const QUOTE_STATUS_BADGE_VARIANT: Record<string, 'default' | 'info' | 'wa
 } as const;
 
 // Size classes valid for each vehicle type
-export const VEHICLE_TYPE_SIZE_CLASSES: Record<string, string[]> = {
-  // Session 29: extended to include 'exotic' and 'classic' as first-class size values.
-  standard: ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'],
+export const VEHICLE_TYPE_SIZE_CLASSES: Record<string, readonly VehicleSizeClass[]> = {
+  // Session 30: references canonical VEHICLE_SIZE_CLASS_KEYS to eliminate duplication.
+  standard: VEHICLE_SIZE_CLASS_KEYS,
   motorcycle: [],
   rv: [],
   boat: [],
   aircraft: [],
-} as const;
+};
 
 // Coupon type labels
 export const DISCOUNT_TYPE_LABELS: Record<string, string> = {

@@ -15,7 +15,7 @@ import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { resolveServicePrice } from '../utils/pricing';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
-import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS, VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 
 interface ServicePricingPickerProps {
   open: boolean;
@@ -41,10 +41,11 @@ export function ServicePricingPicker({
   const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
   const [tierQtyPick, setTierQtyPick] = useState<{ tier: ServicePricing; vsc: VehicleSizeClass | null } | null>(null);
 
-  // Session 29: size_class is 5-value. Scope tiers with is_vehicle_size_aware render
-  // a price button per size. Columns for exotic/classic may be null on existing tiers —
-  // the resolver falls back to pricing.price in that case.
-  const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'];
+  // Session 30: size_class keys now imported from canonical constant. Scope tiers
+  // with is_vehicle_size_aware render a price button per size. Columns for
+  // exotic/classic may be null on existing tiers — the resolver falls back to
+  // pricing.price in that case.
+  const VEHICLE_SIZES = VEHICLE_SIZE_CLASS_KEYS;
 
   // Check sale status for this service
   const { isOnSale } = getSaleStatus({
@@ -199,8 +200,7 @@ export function ServicePricingPicker({
                 // Disable non-matching size-class tier buttons when a vehicle is assigned.
                 // Only the 5 canonical size-class names get this treatment — custom scope
                 // tier names (e.g., 'complete_interior') are never disabled.
-                const SIZE_CLASS_TIER_NAMES = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'];
-                const isSizeClassTier = SIZE_CLASS_TIER_NAMES.includes(tier.tier_name);
+                const isSizeClassTier = (VEHICLE_SIZE_CLASS_KEYS as readonly string[]).includes(tier.tier_name);
                 const isMatchingVehicleSize = vehicleSizeClass != null && tier.tier_name === vehicleSizeClass;
                 const isDisabled = (
                   vehicleSizeClass != null &&

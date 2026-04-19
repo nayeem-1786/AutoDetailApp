@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { customerVehicleSchema, type CustomerVehicleInput } from '@/lib/utils/validation';
-import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_LABELS,
@@ -30,7 +30,7 @@ import { FormField } from '@/components/ui/form-field';
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import { toast } from 'sonner';
 
-const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
+const AUTOMOBILE_SIZE_CLASSES = CUSTOMER_SELF_SERVICE_SIZE_CLASSES;
 
 interface VehicleFormDialogProps {
   open: boolean;

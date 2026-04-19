@@ -15,6 +15,7 @@ import {
 } from '@/lib/utils/validation';
 import {
   VEHICLE_SIZE_LABELS,
+  VEHICLE_SIZE_CLASS_KEYS,
   TRANSACTION_STATUS_LABELS,
   QUOTE_STATUS_LABELS,
 } from '@/lib/utils/constants';
@@ -319,9 +320,9 @@ export default function CustomerProfilePage() {
   const isVehicleSpecialty = isSpecialtyCategory(vehicleCategory);
   const vehicleTierLabel = TIER_DROPDOWN_LABELS[vehicleCategory];
   const vehicleSpecialtyOptions = isVehicleSpecialty ? SPECIALTY_TIERS[vehicleCategory] : [];
-  // Session 29: admin dropdown supports all 5 size_class values. Customer-facing
-  // vehicle form remains at 3 (customers can't self-identify as exotic/classic).
-  const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'] as const;
+  // Session 30: admin dropdown supports all 5 size_class values via canonical constant.
+  // Customer-facing vehicle form uses CUSTOMER_SELF_SERVICE_SIZE_CLASSES (3-value subset).
+  const AUTOMOBILE_SIZE_CLASSES = VEHICLE_SIZE_CLASS_KEYS;
 
   function handleVehicleCategoryChange(newCategory: VehicleCategory) {
     setVehicleCategory(newCategory);

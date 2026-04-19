@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
-import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS, VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 
 // ---- Value types for each pricing model ----
@@ -113,7 +113,7 @@ function VehicleSizeForm({ value, onChange }: {
   onChange: (value: PricingValue) => void;
 }) {
   const data = value.data;
-  const sizeKeys: (keyof VehicleSizePricing)[] = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'];
+  const sizeKeys: readonly (keyof VehicleSizePricing)[] = VEHICLE_SIZE_CLASS_KEYS;
 
   return (
     <div className="space-y-4">

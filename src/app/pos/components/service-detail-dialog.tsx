@@ -8,7 +8,7 @@ import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { useTicket } from '../context/ticket-context';
 import { resolveServicePrice, resolveServicePriceWithSale } from '../utils/pricing';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
-import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS, VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 
@@ -67,7 +67,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     : [];
 
   // Detect if tiers represent vehicle sizes (e.g., "sedan", "truck_suv_2row", "suv_3row_van")
-  const VEHICLE_SIZE_CLASSES = new Set(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']);
+  const VEHICLE_SIZE_CLASSES = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
   const isVehicleSizeTiers = tiers.length > 1
     && tiers.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
 
@@ -563,7 +563,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
             <div className="mt-5">
               <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Vehicle Size Pricing</h3>
               <div className="flex flex-wrap gap-2">
-                {(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'] as VehicleSizeClass[]).map((size) => {
+                {VEHICLE_SIZE_CLASS_KEYS.map((size) => {
                   const standardPrice = resolveServicePrice(tiers[0], size);
                   const saleInfo = getTierSaleInfo(standardPrice, tiers[0].sale_price, isOnSale);
                   const isActive = vehicleSizeClass === size;

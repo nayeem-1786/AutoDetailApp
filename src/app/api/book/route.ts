@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bookingSubmitSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
-import { APPOINTMENT, FEATURE_FLAGS } from '@/lib/utils/constants';
+import { APPOINTMENT, FEATURE_FLAGS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
@@ -399,8 +399,7 @@ export async function POST(request: NextRequest) {
           console.log(`[Booking] Deposit transaction recorded: $${depositAmount} for appointment ${appointment.id}`);
 
           // Insert transaction_items matching POS format for receipt compatibility
-          const validSizeClasses = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
-          const sizeClass = data.vehicle?.size_class && validSizeClasses.includes(data.vehicle.size_class)
+          const sizeClass = data.vehicle?.size_class && (CUSTOMER_SELF_SERVICE_SIZE_CLASSES as readonly string[]).includes(data.vehicle.size_class)
             ? data.vehicle.size_class
             : null;
 

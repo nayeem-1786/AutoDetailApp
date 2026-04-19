@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: consolidate size_class arrays into shared constants — 2026-04-19 (Session 30)
+
+**Problem:** The canonical vehicle size_class taxonomy (sedan / truck_suv_2row / suv_3row_van / exotic / classic) was hardcoded at 11 sites across 9 files — POS components, admin pages, shared form, and Zod schemas. Each site maintained its own array. This was the direct cause of the Session 28 gap (`a79886ac`) and both Session 29 follow-ups (`6aa6d289`, `79c7f301`) — whenever the taxonomy grew, hardcoded sites drifted.
+
+**Strategy:** Ship shared constant consolidation per `docs/audits/tier-rendering-consolidation.md`. Rejected shared hook / shared component options because dialog-button JSX overlap is only ~24% character-identical and the two dialogs use different state machines (radio-select vs click-commit).
+
+**Changes:**
+
+- Added `VEHICLE_SIZE_CLASS_KEYS` (5-value canonical) and `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` (3-value customer subset) to `src/lib/utils/constants.ts`. Two exports encode a deliberate UX/trust boundary — customers can't self-identify as exotic/classic.
+- Refactored `VEHICLE_TYPE_SIZE_CLASSES.standard` to reference `VEHICLE_SIZE_CLASS_KEYS` (no more inline duplication inside constants.ts itself).
+- Replaced 11 POS/admin hardcoded sites across 9 files: `service-detail-dialog.tsx` (×2), `service-pricing-picker.tsx` (×2), `register-tab.tsx`, `catalog-browser.tsx`, `pos-workspace.tsx`, `vehicle-create-dialog.tsx`, `admin/customers/[id]/page.tsx`, `admin/catalog/services/[id]/page.tsx`, `components/service-pricing-form.tsx`, `lib/utils/validation.ts` (×2 POS schemas).
+- Replaced 5 customer-facing sites with the restricted 3-value export: `account/vehicle-form-dialog.tsx`, `booking/step-service-select.tsx`, `api/book/route.ts`, `lib/utils/validation.ts` (×2 customer schemas).
+- `VEHICLE_SIZE_TIER_KEYS` in admin catalog services now **derived via `.map()`** from `VEHICLE_SIZE_CLASS_KEYS` + `VEHICLE_SIZE_LABELS` — adding a 6th size_class to the taxonomy automatically adds a pricing row.
+- Zod schemas use `[VehicleSizeClass, ...VehicleSizeClass[]]` tuple typing (non-empty array, follows taxonomy). No fixed-arity tuples — the schema grows with the constant.
+- All existing Zod error message strings preserved verbatim.
+- `pos-workspace.tsx` `VEHICLE_SIZE_CLASSES_SET` hoisted from component body to module scope — once-per-module vs once-per-render. Observationally identical; flagged for git blame.
+
+**Tests:** 176 existing → 185 (added 9 new tests in `src/lib/utils/__tests__/constants.test.ts` covering constant shape + both schemas' trust-boundary enforcement with path-filtered issue checks). `npx tsc --noEmit` clean.
+
+**Prevents recurrence of:** hardcoded-array-drift bugs. Future taxonomy changes update one file (`constants.ts`) instead of 11–14 sites.
+
+Files changed: `src/lib/utils/constants.ts`, `src/lib/utils/validation.ts`, `src/lib/utils/__tests__/constants.test.ts` (new), plus the 13 consumer sites listed above.
+
+---
+
 ## fix(pos): Extend all POS tier sets to 5 values — 2026-04-19 (Session 29 follow-up #2)
 
 **Root cause:** ServiceDetailDialog (line 70) had a hardcoded 3-value `VEHICLE_SIZE_CLASSES` set, separate from ServicePricingPicker. Staff tapping a service card in the catalog browser opened ServiceDetailDialog (not ServicePricingPicker), so the Session 29 follow-up fix to the picker was never invoked. This also explains why the diagnostic console.log produced no output — the wrong component was rendering.

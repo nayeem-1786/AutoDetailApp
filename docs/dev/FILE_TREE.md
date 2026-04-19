@@ -1008,6 +1008,7 @@ src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
+src/lib/utils/__tests__/constants.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/webhook.ts
 ```

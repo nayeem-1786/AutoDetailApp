@@ -15,12 +15,15 @@ import type {
   ServicePrerequisite,
   PricingModel,
   VehicleType,
+  VehicleSizeClass,
   PrerequisiteEnforcement,
 } from '@/lib/supabase/types';
 import {
   PRICING_MODEL_LABELS,
   CLASSIFICATION_LABELS,
   VEHICLE_TYPE_LABELS,
+  VEHICLE_SIZE_CLASS_KEYS,
+  VEHICLE_SIZE_LABELS,
 } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
@@ -1981,13 +1984,13 @@ function SaleDiscountControls({
 
 // ─── Vehicle Size Unified Pricing (Standard + Sale in one table) ─────────
 
-const VEHICLE_SIZE_TIER_KEYS: { key: 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic'; label: string }[] = [
-  { key: 'sedan', label: 'Sedan' },
-  { key: 'truck_suv_2row', label: 'Truck/SUV (2-Row)' },
-  { key: 'suv_3row_van', label: 'SUV (3-Row) / Van' },
-  { key: 'exotic', label: 'Exotic' },
-  { key: 'classic', label: 'Classic' },
-];
+// Session 30: derived from canonical source so adding a 6th size_class to
+// VEHICLE_SIZE_CLASS_KEYS automatically adds a pricing row here.
+const VEHICLE_SIZE_TIER_KEYS: { key: VehicleSizeClass; label: string }[] =
+  VEHICLE_SIZE_CLASS_KEYS.map((key) => ({
+    key,
+    label: VEHICLE_SIZE_LABELS[key],
+  }));
 
 function VehicleSizeUnifiedPricing({
   pricingValue,

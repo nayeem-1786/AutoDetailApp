@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
+import { VEHICLE_SIZE_LABELS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import type { BookableCategory, BookableService } from '@/lib/data/booking';
 import type { MobileZone, ServicePricing, VehicleSizeClass, VehicleCategoryRecord } from '@/lib/supabase/types';
 
@@ -972,7 +972,7 @@ function PricingSelector({
                   Choose Vehicle Size
                 </h3>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  {(['sedan', 'truck_suv_2row', 'suv_3row_van'] as const).map((sc) => {
+                  {CUSTOMER_SELF_SERVICE_SIZE_CLASSES.map((sc) => {
                     const p = getVehicleSizePrice(current, sc);
                     if (p == null) return null;
                     const SizeIcon = VEHICLE_SIZE_ICONS[sc] ?? Car;
