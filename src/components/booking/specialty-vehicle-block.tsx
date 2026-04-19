@@ -20,6 +20,11 @@ export function SpecialtyVehicleBlock({
   businessPhone,
   onEditVehicle,
 }: SpecialtyVehicleBlockProps) {
+  // Session 29: vehicle specialty status is derived from size_class directly.
+  // Exotic wins for dual-flag vehicles (classifier already resolved that precedence),
+  // so we only need to check whether size_class is 'classic' or 'exotic'.
+  const vehicleWord: 'exotic' | 'classic' = vehicle.size_class === 'classic' ? 'classic' : 'exotic';
+
   // Fire block-view audit event on mount (denominator for conversion tracking)
   const viewLoggedRef = useRef(false);
   useEffect(() => {
@@ -32,8 +37,7 @@ export function SpecialtyVehicleBlock({
         vehicle_year: vehicle.year,
         vehicle_make: vehicle.make,
         vehicle_model: vehicle.model,
-        is_exotic: vehicle.is_exotic,
-        is_classic: vehicle.is_classic,
+        size_class: vehicle.size_class,
       }),
     }).catch(() => {}); // Fire-and-forget
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -43,10 +47,6 @@ export function SpecialtyVehicleBlock({
   const [callbackTime, setCallbackTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-
-  const isExotic = vehicle.is_exotic;
-  const isClassic = vehicle.is_classic;
-  const vehicleWord = isExotic && isClassic ? 'specialty' : isExotic ? 'exotic' : 'classic';
 
   const vehicleDesc = cleanVehicleDescription({
     year: vehicle.year,
@@ -70,8 +70,7 @@ export function SpecialtyVehicleBlock({
           vehicle_year: vehicle.year,
           vehicle_make: vehicle.make,
           vehicle_model: vehicle.model,
-          is_exotic: vehicle.is_exotic,
-          is_classic: vehicle.is_classic,
+          size_class: vehicle.size_class,
         }),
       });
       setSubmitted(true);

@@ -30,15 +30,13 @@ export interface VehicleSelection {
   id?: string;
   vehicle_category: string;
   vehicle_type: string;
+  /** Session 29: size_class carries 'exotic' / 'classic' directly — no parallel flags. */
   size_class: string | null;
   specialty_tier: string | null;
   make: string | null;
   model: string | null;
   year: number | null;
   color: string | null;
-  is_exotic?: boolean;
-  is_classic?: boolean;
-  requires_custom_quote?: boolean;
 }
 
 interface StepVehicleProps {
@@ -159,8 +157,15 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     }
   }, [classification]);
 
-  // Effective size class: manual override takes priority, then auto-detected
-  const effectiveSizeClass = manualSizeClass ?? classification?.size_class ?? null;
+  // Effective size class: classifier-detected 'exotic' / 'classic' always wins; otherwise
+  // manual override takes priority, then auto-detected. Session 29 anti-gaming: the manual
+  // dropdown is limited to 3 values (sedan / truck_suv_2row / suv_3row_van), so classifier
+  // is the only authority for specialty vehicles.
+  const classifierSpecialty =
+    classification?.size_class === 'exotic' || classification?.size_class === 'classic';
+  const effectiveSizeClass = classifierSpecialty
+    ? classification!.size_class
+    : (manualSizeClass ?? classification?.size_class ?? null);
 
   // Effective specialty tier: manual override takes priority, then auto-detected
   const effectiveSpecialtyTier = manualSpecialtyTier ?? classification?.specialty_tier ?? null;
@@ -217,7 +222,9 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       };
     }
 
-    // Manual entry — all fields required
+    // Manual entry — all fields required.
+    // Session 29: classifier's exotic/classic detection flows through effectiveSizeClass
+    // (derived above) and overrides the user's manual size_class pick for specialty cases.
     const effectiveCat = classification?.vehicle_category ?? category;
     return {
       vehicle_category: effectiveCat,
@@ -228,9 +235,6 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       model: model.trim(),
       year: year,
       color: color.trim(),
-      is_exotic: classification?.is_exotic ?? false,
-      is_classic: classification?.is_classic ?? false,
-      requires_custom_quote: classification?.requires_custom_quote ?? false,
     };
   }
 

@@ -625,12 +625,21 @@ const DEFAULT_SPECIALTY_TIERS: Record<Exclude<VehicleCategory, 'automobile'>, st
 export interface VehicleClassification {
   vehicle_category: VehicleCategory;
   vehicle_type: string;
+  /**
+   * Canonical vehicle size taxonomy after Session 29 cleanup.
+   * Values: 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic' | null.
+   * Exotic and classic are first-class members of this taxonomy — no parallel flags.
+   */
   size_class: string | null;
   specialty_tier: string | null;
   seat_rows: number;
-  is_exotic: boolean;
-  is_classic: boolean;
-  requires_custom_quote: boolean;
+  /**
+   * Orthogonal UX signal — NOT a size_class value itself.
+   * True when the model matches a curated classic candidate but the year is unknown.
+   * The caller should prompt the customer to confirm the year before the classification
+   * locks in as 'classic'. Survives the Session 29 flag cull because it describes
+   * classifier confidence, not vehicle attributes.
+   */
   needs_year_confirmation: boolean;
 }
 
@@ -641,6 +650,10 @@ export function getSeatRows(sizeClass: string | null, vehicleCategory: string): 
     case 'sedan': return 2;
     case 'truck_suv_2row': return 2;
     case 'suv_3row_van': return 3;
+    // Session 29: exotic and classic default to 2 seat rows (most specialty vehicles are 2-seaters).
+    // Current EXOTIC_MAKE_MODELS and CLASSIC_ELIGIBLE_MAKES contain no known 3-row exceptions.
+    case 'exotic': return 2;
+    case 'classic': return 2;
     default: return 2;
   }
 }
@@ -652,18 +665,21 @@ export function getSeatRows(sizeClass: string | null, vehicleCategory: string): 
  * 1. Query vehicle_makes table for category (automobile vs motorcycle vs rv etc.)
  * 2. For automobiles, infer size_class from model via MODEL_SIZE_HINTS
  * 3. For specialty vehicles, set default specialty_tier (staff corrects in POS)
- * 4. Layer exotic detection on top (EXOTIC_MAKES + EXOTIC_MAKE_MODELS)
- * 5. Layer classic detection on top (year-based + model keyword)
+ * 4. Exotic detection overrides automobile size_class → 'exotic'
+ * 5. Classic detection overrides automobile size_class → 'classic' (exotic wins dual-flag)
  *
- * Returns full classification with exotic/classic flags.
+ * Session 29: size_class is the canonical taxonomy. Exotic and classic are first-class
+ * members, not parallel boolean flags. A vehicle matching BOTH criteria (e.g., a 1972
+ * Ferrari) resolves to 'exotic' — exotic takes precedence.
  *
  * Examples:
- *   ("Toyota", "Camry")              → { automobile, standard, sedan, null, not exotic, not classic }
- *   ("Ferrari", "488 GTB")           → { automobile, standard, sedan, null, exotic, requires_custom_quote }
- *   ("Porsche", "Cayenne")           → { automobile, standard, truck_suv_2row, null, not exotic }
- *   ("Chevrolet", "Camaro", 1967)    → { automobile, standard, sedan, null, classic, requires_custom_quote }
+ *   ("Toyota", "Camry")              → { automobile, standard, sedan }
+ *   ("Ferrari", "488 GTB")           → { automobile, standard, exotic }
+ *   ("Porsche", "Cayenne")           → { automobile, standard, truck_suv_2row }
+ *   ("Chevrolet", "Camaro", 1967)    → { automobile, standard, classic }
+ *   ("Ferrari", "Dino 246", 1972)    → { automobile, standard, exotic }  // exotic wins dual-flag
  *   ("Harley-Davidson", "Sportster") → { motorcycle, motorcycle, null, standard_cruiser }
- *   ("Winnebago", "View")            → { rv, rv, null, rv_up_to_24, requires_custom_quote }
+ *   ("Winnebago", "View")            → { rv, rv, null, rv_up_to_24 }
  */
 export async function resolveVehicleClassification(
   supabase: { from: (table: string) => unknown },
@@ -720,9 +736,6 @@ export async function resolveVehicleClassification(
       size_class: sizeClass,
       specialty_tier: null,
       seat_rows: getSeatRows(sizeClass, 'automobile'),
-      is_exotic: false,
-      is_classic: false,
-      requires_custom_quote: false,
       needs_year_confirmation: false,
     };
   } else {
@@ -732,29 +745,28 @@ export async function resolveVehicleClassification(
       size_class: null,
       specialty_tier: DEFAULT_SPECIALTY_TIERS[category],
       seat_rows: getSeatRows(null, category),
-      is_exotic: false,
-      is_classic: false,
-      requires_custom_quote: category !== 'motorcycle', // rv, boat, aircraft need custom quotes
       needs_year_confirmation: false,
     };
   }
 
-  // --- Layer 4: exotic detection (layered on top) ---
-  if (make && isExoticMake(make)) {
-    baseResult.is_exotic = true;
-    baseResult.requires_custom_quote = true;
-  } else if (make && model && isExoticModel(make, model)) {
-    baseResult.is_exotic = true;
-    baseResult.requires_custom_quote = true;
+  // --- Layer 4: exotic detection (automobile only — overrides size_class to 'exotic') ---
+  if (category === 'automobile' && make) {
+    const exotic = isExoticMake(make) || (model ? isExoticModel(make, model) : false);
+    if (exotic) {
+      baseResult.size_class = 'exotic';
+      baseResult.seat_rows = getSeatRows('exotic', 'automobile');
+    }
   }
 
-  // --- Layer 5: classic detection (requires year + curated make+model match) ---
-  if (isClassicVehicle(make, model, year)) {
-    baseResult.is_classic = true;
-    baseResult.requires_custom_quote = true;
-  } else if (!year && mightBeClassicVehicle(make, model)) {
-    // Model is on curated classic list but year unknown — ask to confirm
-    baseResult.needs_year_confirmation = true;
+  // --- Layer 5: classic detection (exotic already set → skip; exotic wins dual-flag) ---
+  if (category === 'automobile' && baseResult.size_class !== 'exotic') {
+    if (isClassicVehicle(make, model, year)) {
+      baseResult.size_class = 'classic';
+      baseResult.seat_rows = getSeatRows('classic', 'automobile');
+    } else if (!year && mightBeClassicVehicle(make, model)) {
+      // Model is on curated classic list but year unknown — caller should prompt customer
+      baseResult.needs_year_confirmation = true;
+    }
   }
 
   return baseResult;

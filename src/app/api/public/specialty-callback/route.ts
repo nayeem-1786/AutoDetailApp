@@ -9,6 +9,8 @@ import { getBusinessInfo } from '@/lib/data/business';
  *
  * Fired when a customer with an exotic/classic vehicle requests a callback
  * from the booking block page. Logs an audit event and sends a staff notification.
+ *
+ * Session 29: payload switched from boolean flags to size_class (canonical taxonomy).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -20,8 +22,7 @@ export async function POST(request: NextRequest) {
       vehicle_year,
       vehicle_make,
       vehicle_model,
-      is_exotic,
-      is_classic,
+      size_class,
     } = body as {
       name: string;
       phone: string;
@@ -29,8 +30,7 @@ export async function POST(request: NextRequest) {
       vehicle_year?: number | null;
       vehicle_make?: string | null;
       vehicle_model?: string | null;
-      is_exotic?: boolean;
-      is_classic?: boolean;
+      size_class?: string | null;
     };
 
     if (!name || !phone) {
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const vehicleDesc = [vehicle_year, vehicle_make, vehicle_model].filter(Boolean).join(' ') || 'Unknown vehicle';
-    const vehicleWord = is_exotic && is_classic ? 'specialty' : is_exotic ? 'exotic' : 'classic';
+    const vehicleWord = size_class === 'classic' ? 'classic' : 'exotic';
 
     // Log audit event
     logAudit({
@@ -53,8 +53,7 @@ export async function POST(request: NextRequest) {
         vehicle_year,
         vehicle_make,
         vehicle_model,
-        is_exotic: is_exotic ?? false,
-        is_classic: is_classic ?? false,
+        size_class: size_class ?? null,
         vehicle_type: vehicleWord,
       },
       source: 'api',

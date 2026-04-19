@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
-import { SpecialtyBadge } from '@/app/pos/components/specialty-badge';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
@@ -154,10 +153,6 @@ export function AppointmentDetailDialog({
                   {cleanVehicleDescription({ year: appointment.vehicle.year, make: appointment.vehicle.make, model: appointment.vehicle.model })}
                   {sanitizeVehicleField(appointment.vehicle.color) ? ` — ${appointment.vehicle.color}` : ''}
                 </span>
-                <SpecialtyBadge
-                  isExotic={appointment.vehicle.is_exotic}
-                  isClassic={appointment.vehicle.is_classic}
-                />
               </dd>
             </div>
           )}

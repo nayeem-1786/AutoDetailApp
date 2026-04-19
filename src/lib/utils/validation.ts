@@ -66,7 +66,8 @@ export const vehicleSchema = z.object({
     error: 'Please select a vehicle category',
   }).default('automobile'),
   vehicle_type: z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft']),
-  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van'], {
+  // Session 29: admin vehicle form accepts all 5 size_class values (dropdown supports exotic/classic).
+  size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'], {
     error: 'Please select a size class',
   }).optional().nullable(),
   specialty_tier: optionalString,
@@ -477,7 +478,8 @@ const transactionItemSchema = z.object({
   tax_amount: positiveNumber,
   is_taxable: z.boolean(),
   tier_name: optionalString,
-  vehicle_size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van']).optional().nullable(),
+  // Session 29: transaction items record the vehicle size used for pricing (5-value).
+  vehicle_size_class: z.enum(['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic']).optional().nullable(),
   notes: optionalString,
   standard_price: z.coerce.number().optional().nullable(),
   pricing_type: z.enum(['standard', 'sale', 'combo']).optional().default('standard'),

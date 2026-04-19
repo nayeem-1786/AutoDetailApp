@@ -71,7 +71,7 @@ export function PosWorkspace() {
         id: 'flat', service_id: service.id, tier_name: 'default', tier_label: null,
         price: service.flat_price, sale_price: service.sale_price ?? null, display_order: 0,
         is_vehicle_size_aware: false, vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null,
-        vehicle_size_suv_van_price: null, max_qty: null, qty_label: null, created_at: '',
+        vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
       };
       dispatch({ type: 'ADD_SERVICE', service, pricing: syntheticPricing, vehicleSizeClass: vsc });
       toast.success(`Added ${service.name}`);
@@ -196,6 +196,8 @@ export function PosWorkspace() {
         vehicle_size_sedan_price: null,
         vehicle_size_truck_suv_price: null,
         vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
         max_qty: null,
         qty_label: null,
         created_at: '',
@@ -336,8 +338,6 @@ export function PosWorkspace() {
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
-          vehicleIsExotic={ticket.vehicle?.is_exotic}
-          vehicleIsClassic={ticket.vehicle?.is_classic}
           onSelect={handlePricingSelect}
         />
       )}

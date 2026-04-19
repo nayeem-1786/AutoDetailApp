@@ -139,7 +139,8 @@ export const QUOTE_STATUS_BADGE_VARIANT: Record<string, 'default' | 'info' | 'wa
 
 // Size classes valid for each vehicle type
 export const VEHICLE_TYPE_SIZE_CLASSES: Record<string, string[]> = {
-  standard: ['sedan', 'truck_suv_2row', 'suv_3row_van'],
+  // Session 29: extended to include 'exotic' and 'classic' as first-class size values.
+  standard: ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'],
   motorcycle: [],
   rv: [],
   boat: [],

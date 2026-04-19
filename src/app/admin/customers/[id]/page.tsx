@@ -28,7 +28,6 @@ import {
   getSpecialtyTierLabel,
   type VehicleCategory,
 } from '@/lib/utils/vehicle-categories';
-import { SpecialtyBadge } from '@/app/pos/components/specialty-badge';
 import type {
   Customer,
   Vehicle,
@@ -320,7 +319,9 @@ export default function CustomerProfilePage() {
   const isVehicleSpecialty = isSpecialtyCategory(vehicleCategory);
   const vehicleTierLabel = TIER_DROPDOWN_LABELS[vehicleCategory];
   const vehicleSpecialtyOptions = isVehicleSpecialty ? SPECIALTY_TIERS[vehicleCategory] : [];
-  const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
+  // Session 29: admin dropdown supports all 5 size_class values. Customer-facing
+  // vehicle form remains at 3 (customers can't self-identify as exotic/classic).
+  const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'] as const;
 
   function handleVehicleCategoryChange(newCategory: VehicleCategory) {
     setVehicleCategory(newCategory);
@@ -541,12 +542,25 @@ export default function CustomerProfilePage() {
     setSavingVehicle(true);
     try {
       const specialty = isSpecialtyCategory(vehicleCategory);
+
+      // Session 29: admin dropdown wins for size_class. Any admin save on an
+      // automobile sets size_class_manual_override = true, preventing future
+      // classifier runs from overwriting the manually picked size. Exception:
+      // if make or model changed, reset the flag so classifier re-runs fresh
+      // (a different vehicle should be classified from scratch).
+      const makeOrModelChanged = !!editingVehicle && (
+        (editingVehicle.make || '').toLowerCase() !== (data.make || '').toLowerCase() ||
+        (editingVehicle.model || '').toLowerCase() !== (data.model || '').toLowerCase()
+      );
+      const sizeClassManualOverride = !specialty && !makeOrModelChanged;
+
       const payload = {
         customer_id: id,
         vehicle_category: vehicleCategory,
         vehicle_type: specialty ? vehicleCategory : 'standard',
         size_class: !specialty ? data.size_class : null,
         specialty_tier: specialty ? (data.specialty_tier || null) : null,
+        size_class_manual_override: sizeClassManualOverride,
         year: data.year || null,
         make: data.make || null,
         model: titleCaseField(data.model || ''),
@@ -1434,7 +1448,6 @@ export default function CustomerProfilePage() {
                                 Incomplete
                               </Badge>
                             )}
-                            <SpecialtyBadge isExotic={v.is_exotic} isClassic={v.is_classic} />
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <Badge variant="default">

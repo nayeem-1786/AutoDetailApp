@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-03-12 (Comprehensive file tree audit — all missing files added)
+> **Last updated:** 2026-04-18 (Session 29 — removed specialty-badge, custom-price-modal; added 2 migrations)
 
 ---
 
@@ -1217,9 +1217,6 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         transactions/
                                                         vehicle-create-dialog.tsx
                                                         vehicle-selector.tsx
-                                                        specialty-badge.tsx
-                                                        custom-price-modal.tsx
-                                                        __tests__/specialty-badge.test.tsx
                                                         utils/__tests__/pricing.test.ts
                                                         quotes/
 ```
@@ -1441,6 +1438,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260417000001_vehicle_exotic_classic_flags.sql
 20260417000002_service_exotic_classic_floor_prices.sql
 20260418000001_drop_service_floor_price_columns.sql
+20260418000002_extend_vehicle_size_class_enum.sql
+20260418000003_backfill_and_drop_specialty_flags.sql
 ```
 
 ## Scripts

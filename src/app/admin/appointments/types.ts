@@ -13,7 +13,7 @@ export interface AppointmentService {
 
 export interface AppointmentWithRelations extends Appointment {
   customer: Pick<Customer, 'id' | 'first_name' | 'last_name' | 'phone' | 'email'>;
-  vehicle: Pick<Vehicle, 'id' | 'year' | 'make' | 'model' | 'color' | 'is_exotic' | 'is_classic'> | null;
+  vehicle: Pick<Vehicle, 'id' | 'year' | 'make' | 'model' | 'color' | 'size_class'> | null;
   employee: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'> | null;
   appointment_services: AppointmentService[];
 }

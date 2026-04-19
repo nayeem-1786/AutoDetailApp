@@ -34,6 +34,7 @@ After commit, push, and cache clear, print: `⚠️ Session complete. Run: npm r
 16. **iOS input zoom prevention**: All text inputs in customer-facing forms must use `text-base sm:text-sm` to prevent iOS auto-zoom on focus (iOS zooms inputs with font-size < 16px).
 17. **Schema reference**: Read `docs/dev/DB_SCHEMA.md` when session touches pricing, services, or booking.
 18. **Customer soft delete**: Customers table uses soft delete (`deleted_at` column). All forward-looking queries (search, selection, eligibility, enrollment, creation uniqueness) MUST filter `.is('deleted_at', null)`. Historical joins (transactions, receipts, refunds, analytics, lifecycle engine) are intentionally unfiltered. One phone = one customer record; archived match surfaced on creation with restore as default path.
+19. **Vehicle size taxonomy**: `size_class` is the canonical vehicle size taxonomy (5 values: sedan, truck_suv_2row, suv_3row_van, exotic, classic). All vehicle attributes that influence size-based pricing, booking gating, or agent handoff MUST be expressed as `size_class` values. Do NOT introduce parallel boolean flags (is_exotic, is_classic, requires_custom_quote, etc.). The admin vehicle edit dropdown uses `size_class_manual_override` to persist staff overrides across classifier runs.
 
 ## Project Structure
 

@@ -536,7 +536,7 @@ export async function POST(request: NextRequest) {
                 .limit(10),
               admin
                 .from('vehicles')
-                .select('year, make, model, color, vehicle_type, size_class, is_exotic, is_classic, requires_custom_quote')
+                .select('year, make, model, color, vehicle_type, size_class')
                 .eq('customer_id', custId)
                 .order('created_at', { ascending: false }),
               admin
@@ -614,18 +614,18 @@ export async function POST(request: NextRequest) {
           let specialtyVehicleDesc = '';
           let specialtyVehicleWord = 'specialty';
           if (isCustomer && conversation.customer_id) {
+            // Session 29: specialty vehicles are identified by size_class IN ('exotic','classic').
             const { data: specialtyCheck } = await admin
               .from('vehicles')
-              .select('year, make, model, is_exotic, is_classic, requires_custom_quote')
+              .select('year, make, model, size_class')
               .eq('customer_id', conversation.customer_id)
-              .eq('requires_custom_quote', true)
+              .in('size_class', ['exotic', 'classic'])
               .limit(1)
               .maybeSingle();
             if (specialtyCheck) {
               hasSpecialtyVehicle = true;
               specialtyVehicleDesc = [specialtyCheck.year, specialtyCheck.make, specialtyCheck.model].filter(Boolean).join(' ') || 'your vehicle';
-              specialtyVehicleWord = specialtyCheck.is_exotic && specialtyCheck.is_classic ? 'specialty'
-                : specialtyCheck.is_exotic ? 'exotic' : 'classic';
+              specialtyVehicleWord = specialtyCheck.size_class === 'classic' ? 'classic' : 'exotic';
             }
           }
 

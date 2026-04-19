@@ -1,158 +1,138 @@
 import { describe, it, expect } from 'vitest';
-import { selectPricingTierForVehicle, shouldOpenSpecialtyModal } from '../pricing';
-import type { Vehicle, Service, ServicePricing } from '@/lib/supabase/types';
+import { resolveServicePrice, resolveServicePriceWithSale } from '../pricing';
+import type { ServicePricing } from '@/lib/supabase/types';
 
-// Minimal mock builders
-function mockVehicle(overrides: Partial<Vehicle> = {}): Vehicle {
+function mockTier(overrides: Partial<ServicePricing> = {}): ServicePricing {
   return {
-    id: 'v1', customer_id: 'c1', vehicle_type: 'standard', vehicle_category: 'automobile',
-    size_class: 'sedan', specialty_tier: null, is_exotic: false, is_classic: false,
-    requires_custom_quote: false, year: 2023, make: 'Honda', model: 'Civic', color: 'White',
-    vin: null, license_plate: null, notes: null, is_incomplete: false,
-    created_at: '', updated_at: '',
+    id: 'p1',
+    service_id: 's1',
+    tier_name: 'sedan',
+    tier_label: 'Sedan',
+    price: 100,
+    sale_price: null,
+    display_order: 0,
+    is_vehicle_size_aware: false,
+    vehicle_size_sedan_price: null,
+    vehicle_size_truck_suv_price: null,
+    vehicle_size_suv_van_price: null,
+    vehicle_size_exotic_price: null,
+    vehicle_size_classic_price: null,
+    max_qty: null,
+    qty_label: null,
+    created_at: '',
     ...overrides,
   };
 }
 
-function mockServiceWithPricing(tiers: Partial<ServicePricing>[] = []): Service & { pricing: ServicePricing[] } {
-  return {
-    id: 's1', name: 'Interior Detail', slug: 'interior-detail', description: null,
-    category_id: null, pricing_model: 'vehicle_size', classification: 'primary',
-    base_duration_minutes: 60, flat_price: null, custom_starting_price: null,
-    per_unit_price: null, per_unit_max: null, per_unit_label: null,
-    mobile_eligible: false, online_bookable: true, staff_assessed: false,
-    is_taxable: false, vehicle_compatibility: ['standard'],
-    special_requirements: null, image_url: null, image_alt: null,
-    is_active: true, show_on_website: true, is_featured: false, display_order: 0,
-    sale_price: null, sale_starts_at: null, sale_ends_at: null,
-    created_at: '', updated_at: '',
-    pricing: tiers.map((t, i) => ({
-      id: `p${i}`, service_id: 's1', tier_name: 'sedan', tier_label: 'Sedan',
-      price: 100, sale_price: null, display_order: i,
-      is_vehicle_size_aware: false,
-      vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null,
-      vehicle_size_suv_van_price: null, max_qty: null, qty_label: null,
-      created_at: '',
-      ...t,
-    })),
-  };
-}
-
 // ═══════════════════════════════════════════════════════════════
-// selectPricingTierForVehicle
+// resolveServicePrice — 5-value size_class parity
 // ═══════════════════════════════════════════════════════════════
 
-describe('selectPricingTierForVehicle', () => {
-  it('exotic vehicle + valid exotic tier → returns exotic row', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([
-      { tier_name: 'sedan', price: 100 },
-      { tier_name: 'exotic', tier_label: 'Exotic', price: 500 },
-    ]);
-    const result = selectPricingTierForVehicle(service, vehicle);
-    expect(result).not.toBeNull();
-    expect(result!.tier_name).toBe('exotic');
-    expect(result!.price).toBe(500);
+describe('resolveServicePrice', () => {
+  it('non-size-aware tier returns base price regardless of size_class', () => {
+    const tier = mockTier({ price: 150, is_vehicle_size_aware: false });
+    expect(resolveServicePrice(tier, 'sedan')).toBe(150);
+    expect(resolveServicePrice(tier, 'exotic')).toBe(150);
+    expect(resolveServicePrice(tier, 'classic')).toBe(150);
+    expect(resolveServicePrice(tier, null)).toBe(150);
   });
 
-  it('classic vehicle + valid classic tier → returns classic row', () => {
-    const vehicle = mockVehicle({ is_classic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([
-      { tier_name: 'sedan', price: 100 },
-      { tier_name: 'classic', tier_label: 'Classic', price: 350 },
-    ]);
-    const result = selectPricingTierForVehicle(service, vehicle);
-    expect(result).not.toBeNull();
-    expect(result!.tier_name).toBe('classic');
-    expect(result!.price).toBe(350);
+  it('size-aware tier returns sedan price for sedan vehicle', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_sedan_price: 100,
+      vehicle_size_truck_suv_price: 150,
+      vehicle_size_suv_van_price: 200,
+    });
+    expect(resolveServicePrice(tier, 'sedan')).toBe(100);
   });
 
-  it('exotic vehicle + no exotic tier → returns null', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([{ tier_name: 'sedan', price: 100 }]);
-    expect(selectPricingTierForVehicle(service, vehicle)).toBeNull();
+  it('size-aware tier returns truck_suv price for truck_suv_2row vehicle', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_sedan_price: 100,
+      vehicle_size_truck_suv_price: 150,
+      vehicle_size_suv_van_price: 200,
+    });
+    expect(resolveServicePrice(tier, 'truck_suv_2row')).toBe(150);
   });
 
-  it('exotic vehicle + exotic tier with price: 0 → returns null', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([
-      { tier_name: 'sedan', price: 100 },
-      { tier_name: 'exotic', price: 0 },
-    ]);
-    expect(selectPricingTierForVehicle(service, vehicle)).toBeNull();
+  it('size-aware tier returns suv_van price for suv_3row_van vehicle', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_sedan_price: 100,
+      vehicle_size_truck_suv_price: 150,
+      vehicle_size_suv_van_price: 200,
+    });
+    expect(resolveServicePrice(tier, 'suv_3row_van')).toBe(200);
   });
 
-  it('dual-flag vehicle → returns null (gate should open modal)', () => {
-    const vehicle = mockVehicle({ is_exotic: true, is_classic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([
-      { tier_name: 'exotic', price: 500 },
-      { tier_name: 'classic', price: 350 },
-    ]);
-    expect(selectPricingTierForVehicle(service, vehicle)).toBeNull();
+  it('size-aware tier returns exotic price for exotic vehicle (Session 29)', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_exotic_price: 500,
+    });
+    expect(resolveServicePrice(tier, 'exotic')).toBe(500);
   });
 
-  it('normal vehicle → returns null (not a specialty vehicle)', () => {
-    const vehicle = mockVehicle();
-    const service = mockServiceWithPricing([{ tier_name: 'sedan', price: 100 }]);
-    expect(selectPricingTierForVehicle(service, vehicle)).toBeNull();
+  it('size-aware tier returns classic price for classic vehicle (Session 29)', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_classic_price: 350,
+    });
+    expect(resolveServicePrice(tier, 'classic')).toBe(350);
   });
 
-  it('undefined service.pricing → returns null', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = { ...mockServiceWithPricing(), pricing: undefined };
-    expect(selectPricingTierForVehicle(service, vehicle)).toBeNull();
+  it('null vehicle_size_exotic_price falls through to base price', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      price: 200,
+      vehicle_size_exotic_price: null,
+    });
+    expect(resolveServicePrice(tier, 'exotic')).toBe(200);
+  });
+
+  it('null vehicle_size_classic_price falls through to base price', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      price: 250,
+      vehicle_size_classic_price: null,
+    });
+    expect(resolveServicePrice(tier, 'classic')).toBe(250);
+  });
+
+  it('null size_class returns base price', () => {
+    const tier = mockTier({ is_vehicle_size_aware: true, price: 100 });
+    expect(resolveServicePrice(tier, null)).toBe(100);
   });
 });
 
 // ═══════════════════════════════════════════════════════════════
-// shouldOpenSpecialtyModal
+// resolveServicePriceWithSale — sale pricing is orthogonal to size_class
 // ═══════════════════════════════════════════════════════════════
 
-describe('shouldOpenSpecialtyModal', () => {
-  it('normal vehicle → false (no modal)', () => {
-    const vehicle = mockVehicle();
-    const service = mockServiceWithPricing();
-    expect(shouldOpenSpecialtyModal(vehicle, service)).toBe(false);
+describe('resolveServicePriceWithSale', () => {
+  it('exotic vehicle with active sale applies sale_price', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_exotic_price: 500,
+      sale_price: 400,
+    });
+    const saleWindow = { sale_starts_at: null, sale_ends_at: null };
+    const result = resolveServicePriceWithSale(tier, 'exotic', saleWindow);
+    expect(result.isOnSale).toBe(true);
+    expect(result.effectivePrice).toBe(400);
+    expect(result.standardPrice).toBe(500);
   });
 
-  it('exotic vehicle with valid exotic tier → false (skip modal)', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([
-      { tier_name: 'sedan', price: 100 },
-      { tier_name: 'exotic', price: 500 },
-    ]);
-    expect(shouldOpenSpecialtyModal(vehicle, service)).toBe(false);
-  });
-
-  it('exotic vehicle without exotic tier → true (open modal)', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([{ tier_name: 'sedan', price: 100 }]);
-    expect(shouldOpenSpecialtyModal(vehicle, service)).toBe(true);
-  });
-
-  it('exotic vehicle with exotic tier price: 0 → true (treat as unset)', () => {
-    const vehicle = mockVehicle({ is_exotic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([{ tier_name: 'exotic', price: 0 }]);
-    expect(shouldOpenSpecialtyModal(vehicle, service)).toBe(true);
-  });
-
-  it('dual-flag vehicle → true even with both tiers populated', () => {
-    const vehicle = mockVehicle({ is_exotic: true, is_classic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([
-      { tier_name: 'exotic', price: 500 },
-      { tier_name: 'classic', price: 350 },
-    ]);
-    expect(shouldOpenSpecialtyModal(vehicle, service)).toBe(true);
-  });
-
-  it('null vehicle → false', () => {
-    const service = mockServiceWithPricing();
-    expect(shouldOpenSpecialtyModal(null, service)).toBe(false);
-  });
-
-  it('classic vehicle with valid classic tier → false', () => {
-    const vehicle = mockVehicle({ is_classic: true, requires_custom_quote: true });
-    const service = mockServiceWithPricing([{ tier_name: 'classic', price: 350 }]);
-    expect(shouldOpenSpecialtyModal(vehicle, service)).toBe(false);
+  it('classic vehicle without sale returns standard classic price', () => {
+    const tier = mockTier({
+      is_vehicle_size_aware: true,
+      vehicle_size_classic_price: 350,
+      sale_price: null,
+    });
+    const result = resolveServicePriceWithSale(tier, 'classic', null);
+    expect(result.isOnSale).toBe(false);
+    expect(result.effectivePrice).toBe(350);
   });
 });

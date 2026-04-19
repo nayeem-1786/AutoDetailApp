@@ -4,6 +4,116 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Consolidate exotic/classic as size_class taxonomy — 2026-04-18 (Session 29)
+
+**Context:** Sessions 26–28 built exotic/classic handling on a flawed premise — independent boolean flags (`is_exotic`, `is_classic`, `requires_custom_quote`) with parallel gate/modal/badge/block-page/SMS-pivot systems layered on top of normal pricing. This was wrong. The correct architecture — and the one the codebase already used for sedan/truck_suv_2row/suv_3row_van — is that exotic and classic are additional members of the `vehicle_size_class` taxonomy. Session 29 completes the consolidation. Net: subtractive (more deleted than added).
+
+**Phase 0 — Data inventory** (owner-run, pre-migration):
+- 10 flagged vehicles, all currently `size_class = 'sedan'` (will be overwritten)
+- 1 dual-flag Ferrari Dino 246 (entity_id `7c85fd44-2978-460c-8f72-6e3e0234400f`) — exotic wins, dual-flag state preserved to `audit_log`
+- 0 historical transactions or jobs on flagged vehicles (clean slate)
+- 0 Session 27 audit events fired in production
+- 2 `service_pricing` rows with `tier_name IN ('exotic','classic')` across 1 service (Express Interior Clean)
+- 0 orphans (flags only on automobiles)
+
+**Phase 1 — Two migration files** (ENUM ADD VALUE and UPDATE cannot coexist in the same transaction — split):
+
+File 1 — `supabase/migrations/20260418000002_extend_vehicle_size_class_enum.sql`:
+```sql
+ALTER TYPE vehicle_size_class ADD VALUE IF NOT EXISTS 'exotic';
+ALTER TYPE vehicle_size_class ADD VALUE IF NOT EXISTS 'classic';
+```
+
+File 2 — `supabase/migrations/20260418000003_backfill_and_drop_specialty_flags.sql`:
+```sql
+-- 1. Audit-log dual-flag vehicles BEFORE overwriting
+INSERT INTO audit_log (action, entity_type, entity_id, entity_label, details, source)
+SELECT 'dual_flag_backfill_preserved', 'vehicle', id::text,
+       CONCAT_WS(' ', COALESCE(year::text, ''), COALESCE(make, ''), COALESCE(model, '')),
+       jsonb_build_object('was_exotic', true, 'was_classic', true, 'resolved_to', 'exotic',
+                          'prior_size_class', size_class::text,
+                          'reason', 'Session 29 architecture cleanup: dual-flag consolidated to exotic (exotic wins policy)'),
+       'migration'
+FROM vehicles WHERE is_exotic = true AND is_classic = true;
+
+-- 2. Backfill size_class — exotic wins
+UPDATE vehicles SET size_class = 'exotic' WHERE is_exotic = true;
+UPDATE vehicles SET size_class = 'classic' WHERE is_classic = true AND is_exotic = false;
+
+-- 3. Drop partial indexes
+DROP INDEX IF EXISTS idx_vehicles_is_exotic;
+DROP INDEX IF EXISTS idx_vehicles_is_classic;
+DROP INDEX IF EXISTS idx_vehicles_requires_custom_quote;
+
+-- 4. Drop generated column, then source flags
+ALTER TABLE vehicles DROP COLUMN IF EXISTS requires_custom_quote;
+ALTER TABLE vehicles DROP COLUMN IF EXISTS is_exotic;
+ALTER TABLE vehicles DROP COLUMN IF EXISTS is_classic;
+
+-- 5. Scope-pricing fan-out columns for exotic/classic (nullable)
+ALTER TABLE service_pricing
+  ADD COLUMN IF NOT EXISTS vehicle_size_exotic_price DECIMAL(10,2),
+  ADD COLUMN IF NOT EXISTS vehicle_size_classic_price DECIMAL(10,2);
+
+-- 6. Admin dropdown-wins persistence flag
+ALTER TABLE vehicles
+  ADD COLUMN IF NOT EXISTS size_class_manual_override BOOLEAN NOT NULL DEFAULT false;
+```
+
+Verified post-migration: enum = 5 values, 7 exotic + 3 classic vehicles backfilled, 3 legacy columns gone, 3 new columns present, 1 dual-flag audit entry preserved.
+
+**Phase 2 — Classifier rewrite** (`src/lib/utils/vehicle-categories.ts`):
+- `VehicleClassification` interface — dropped `is_exotic`, `is_classic`, `requires_custom_quote`. Kept `needs_year_confirmation` (orthogonal UX signal).
+- Layer 4 (exotic detection) now writes `size_class = 'exotic'` directly
+- Layer 5 (classic detection) writes `size_class = 'classic'`; skipped if already exotic (exotic wins dual-flag)
+- `getSeatRows()` extended with `exotic`/`classic` cases (both → 2)
+- Callers updated: `vehicle-helpers.ts:findOrCreateVehicle`, `customer/vehicles/route.ts`, `pos/customers/[id]/vehicles/route.ts` (POST+PATCH), `voice-agent/vehicle-classify/route.ts`, `booking/step-vehicle.tsx` — all drop flag reads, use size_class. Customer portal + booking wizard enforce classifier-wins for specialty detection (anti-gaming).
+
+**Phase 3 — POS dead-code deletion + type cleanup**:
+- Deleted: `custom-price-modal.tsx`, `specialty-badge.tsx`, `specialty-badge.test.tsx`
+- Deleted from `pos/utils/pricing.ts`: `selectPricingTierForVehicle`, `shouldOpenSpecialtyModal`
+- Deleted gate wrappers in `ticket-context.tsx` and `quote-context.tsx` (raw useReducer dispatch restored)
+- Badge callsites removed: `vehicle-selector.tsx:94`, `customer-vehicle-summary.tsx:122`, `admin/customers/[id]/page.tsx:1437`, `admin/appointments/components/appointment-detail-dialog.tsx:157`
+- Admin appointments: `page.tsx` select join trimmed (was `is_exotic, is_classic` → now `size_class`), `types.ts` Pick updated
+- Handwritten Vehicle type (`lib/supabase/types.ts`) — dropped flag fields, added `size_class_manual_override`, extended `VehicleSizeClass` to 5 values, added `vehicle_size_exotic_price`/`vehicle_size_classic_price` to `ServicePricing`
+- `resolveServicePrice` switch extended to 5 cases (exotic → `vehicle_size_exotic_price ?? pricing.price`; classic same)
+- `service-pricing-picker.tsx` filter simplified: keys off `vehicleSizeClass === 'exotic'/'classic'` instead of parallel props; `VEHICLE_SIZES` array extended to 5 values
+- 6 POS catalog consumer files stopped passing `vehicleIsExotic`/`vehicleIsClassic` props
+- `pricing.test.ts` rewritten: 11 size-parity tests for `resolveServicePrice` and `resolveServicePriceWithSale` (all 5 sizes, null fallback)
+
+**Phase 4 — Admin UI** (scope 5-column + vehicle edit dropdown with persistence):
+- `service-pricing-form.tsx` scope tier `is_vehicle_size_aware` editor extended to 5 per-size inputs (Sedan / Truck/SUV / SUV 3-Row/Van / Exotic / Classic) — `ScopeTier` type, `getDefaultPricingValue`, `addTier`, save/load helpers all updated to the new fields
+- `admin/catalog/services/[id]/page.tsx` and `admin/catalog/services/new/page.tsx` persist `vehicle_size_exotic_price` and `vehicle_size_classic_price` (null when toggle off or empty, preserved when `is_vehicle_size_aware = true`)
+- `VEHICLE_TYPE_SIZE_CLASSES` (constants.ts:141) extended to 5 values for `standard` (M3 defensive fix)
+- `admin/customers/[id]/page.tsx` — `AUTOMOBILE_SIZE_CLASSES` extended to 5 values for the admin edit dropdown. `onSaveVehicle` sets `size_class_manual_override = true` on any automobile save, resets to false when make/model change detected. `findOrCreateVehicle()` in `vehicle-helpers.ts` respects the flag — skips classifier size_class overwrite when true
+- Customer portal `vehicle-form-dialog.tsx` remains at 3 values (customers can't self-identify as exotic/classic; protects against pricing gaming)
+
+**Phase 5 — Customer-surface triggers rewired** (preserve UX, change only trigger):
+- `booking-wizard.tsx` — block page trigger changed from `requires_custom_quote = true` to `size_class IN ('exotic','classic')`
+- `step-vehicle.tsx` `VehicleSelection` interface — dropped 3 flag fields, added anti-gaming override: classifier-detected exotic/classic always wins over user's manual dropdown pick
+- `specialty-vehicle-block.tsx` (M2) — internals rewritten to derive `vehicleWord` from `vehicle.size_class`. Audit payloads for `/specialty-block-view` and `/specialty-callback` switched from `is_exotic`/`is_classic` booleans to `size_class`
+- `api/public/specialty-block-view/route.ts` and `specialty-callback/route.ts` — payload shape refactored (size_class replaces flag booleans). Audit events and staff SMS notifications preserved
+- `api/webhooks/twilio/inbound/route.ts` SMS pivot — query changed from `.eq('requires_custom_quote', true)` to `.in('size_class', ['exotic','classic'])`. All pivot behavior preserved (AI disabled, staff SMS, custom-quote auto-reply copy)
+- `api/voice-agent/vehicle-classify/route.ts` (C2) — `tier_name` label logic rekeyed off `classification.size_class`. Response payload dropped `is_exotic`/`is_classic`/`requires_custom_quote` fields. `size_class` and `tier_name` (unchanged strings "Exotic (Custom Quote)" / "Classic (Custom Quote)") remain — owner must confirm ElevenLabs dashboard prompt still routes correctly (**post-ship action**)
+
+**Phase 6 — Tests:** 165 tests pass (143 original classifier + 11 pricing + 11 new classifier parity for resolveVehicleClassification output shape). Deleted gate tests and badge tests. New tests assert Ferrari → `size_class = 'exotic'`, 1969 Mustang → `'classic'`, 1972 Ferrari Dino → `'exotic'` (exotic wins), Civic → `'sedan'`, F-150 → `'truck_suv_2row'`, Odyssey → `'suv_3row_van'`, no-year Mustang → `'sedan'` + `needs_year_confirmation: true`, final output shape assertion (no parallel flag fields).
+
+**Phase 7 — Grep verification:** zero matches in source for `is_exotic`, `is_classic`, `requires_custom_quote`, `selectPricingTierForVehicle`, `shouldOpenSpecialtyModal`, `SpecialtyBadge`, `CustomPriceModal`, `exotic_floor_price`, `classic_floor_price`, `gateModalOpen`, `vehicleIsExotic`, `vehicleIsClassic`. Three deleted files confirmed gone. `database.types.ts` hand-edited for enum + service_pricing + vehicles shapes (N2 — no CLI auth for regen). TypeScript build passes with zero errors.
+
+**Owner post-ship actions:**
+1. Populate exotic/classic `service_pricing` rows across more services (Phase 0 showed only 1 service has them today; without rows, POS falls back to base `pricing.price`)
+2. Verify ElevenLabs dashboard prompt reads `size_class` or `tier_name`, not the removed flag fields
+3. Optional: populate `vehicle_size_exotic_price` / `vehicle_size_classic_price` on any `is_vehicle_size_aware` scope tiers
+
+**QA checklist:** `docs/audits/session-29-qa.md`
+
+**Files changed (22 total):**
+- Created: `supabase/migrations/20260418000002_extend_vehicle_size_class_enum.sql`, `20260418000003_backfill_and_drop_specialty_flags.sql`, `docs/audits/session-29-qa.md`
+- Deleted: `src/app/pos/components/custom-price-modal.tsx`, `specialty-badge.tsx`, `__tests__/specialty-badge.test.tsx`
+- Modified: 16 source files (classifier, helpers, pricing, POS components, admin pages, booking, voice/SMS routes, types, validation, constants, catalog consumers, tests)
+
+---
+
 ## refactor: Promote exotic/classic to first-class pricing tiers + badge restyle — 2026-04-18 (Session 28)
 
 **Phase 0 — Drop dead columns:** Removed `services.exotic_floor_price` and `services.classic_floor_price` (Session 27 shipped to wrong tab). 4 references cleaned from types, validation, admin form, and modal.

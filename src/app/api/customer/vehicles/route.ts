@@ -78,18 +78,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // Canonicalize make + run classifier for exotic/classic flags
+    // Canonicalize make + run classifier to detect exotic/classic size_class.
+    // Session 29: classifier's 'exotic'/'classic' detection wins over client-provided
+    // size_class to prevent gaming (customer portal dropdown only exposes 3 values).
     const canonicalMake = parsed.data.make ? canonicalizeMake(parsed.data.make) : null;
     const trimmedModel = parsed.data.model ?? null;
-    let isExotic = false;
-    let isClassic = false;
+    let classifierSizeClass: string | null = null;
     if (canonicalMake) {
       const classification = await resolveVehicleClassification(
         admin, canonicalMake, trimmedModel || undefined, parsed.data.year || undefined
       );
-      isExotic = classification.is_exotic;
-      isClassic = classification.is_classic;
+      classifierSizeClass = classification.size_class;
     }
+    const isClassifierSpecialty = classifierSizeClass === 'exotic' || classifierSizeClass === 'classic';
+    const resolvedSizeClass = isClassifierSpecialty
+      ? classifierSizeClass
+      : (parsed.data.size_class ?? classifierSizeClass);
 
     const { data: vehicle, error } = await admin
       .from('vehicles')
@@ -97,16 +101,14 @@ export async function POST(request: NextRequest) {
         customer_id: customer.id,
         vehicle_category: parsed.data.vehicle_category ?? 'automobile',
         vehicle_type: parsed.data.vehicle_type,
-        size_class: parsed.data.size_class ?? null,
+        size_class: resolvedSizeClass,
         specialty_tier: parsed.data.specialty_tier ?? null,
-        is_exotic: isExotic,
-        is_classic: isClassic,
         year: parsed.data.year ?? null,
         make: canonicalMake,
         model: trimmedModel,
         color: parsed.data.color ?? null,
       })
-      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, is_exotic, is_classic, requires_custom_quote, year, make, model, color, created_at')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, created_at')
       .single();
 
     if (error) {

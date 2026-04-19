@@ -72,16 +72,17 @@ export async function POST(
       console.warn(`[POS Vehicle Create] FIELD INVERSION DETECTED: ${inversion.reason}`);
     }
 
-    // Run classifier to get exotic/classic flags even for direct inserts
-    let isExotic = false;
-    let isClassic = false;
+    // Run classifier to detect exotic/classic size_class (Session 29 — flags retired).
+    // Staff-provided size_class is trusted, but classifier's 'exotic'/'classic' always
+    // wins (prevents staff from accidentally saving a Ferrari as sedan and skipping the
+    // specialty pricing path).
+    let classifierSizeClass: string | null = null;
     if (canonicalMake) {
       const parsedYear = year ? parseInt(year, 10) : undefined;
       const classification = await resolveVehicleClassification(
         supabase, canonicalMake, trimmedModel || undefined, parsedYear || undefined
       );
-      isExotic = classification.is_exotic;
-      isClassic = classification.is_classic;
+      classifierSizeClass = classification.size_class;
 
       // Log override mismatch
       if (vehicle_category && vehicle_category !== classification.vehicle_category) {
@@ -91,6 +92,10 @@ export async function POST(
         );
       }
     }
+    const isClassifierSpecialty = classifierSizeClass === 'exotic' || classifierSizeClass === 'classic';
+    const resolvedSizeClass = isClassifierSpecialty
+      ? classifierSizeClass
+      : (size_class || classifierSizeClass);
 
     const { data: vehicle, error } = await supabase
       .from('vehicles')
@@ -98,10 +103,8 @@ export async function POST(
         customer_id: customerId,
         vehicle_category: vehicle_category || 'automobile',
         vehicle_type,
-        size_class: size_class || null,
+        size_class: resolvedSizeClass,
         specialty_tier: specialty_tier || null,
-        is_exotic: isExotic,
-        is_classic: isClassic,
         year: year ? parseInt(year, 10) : null,
         make: canonicalMake || null,
         model: trimmedModel,
@@ -151,29 +154,30 @@ export async function PATCH(
       );
     }
 
-    // Canonicalize make + run classifier for exotic/classic flags on update
+    // Canonicalize make + run classifier to detect exotic/classic size_class.
+    // Session 29: classifier's specialty detection wins over caller-provided size_class.
     const canonicalMake = make ? canonicalizeMake(make) : null;
     const trimmedModel = model?.trim() || null;
-    let isExotic = false;
-    let isClassic = false;
+    let classifierSizeClass: string | null = null;
     if (canonicalMake) {
       const parsedYear = year ? parseInt(String(year), 10) : undefined;
       const classification = await resolveVehicleClassification(
         supabase, canonicalMake, trimmedModel || undefined, parsedYear || undefined
       );
-      isExotic = classification.is_exotic;
-      isClassic = classification.is_classic;
+      classifierSizeClass = classification.size_class;
     }
+    const isClassifierSpecialty = classifierSizeClass === 'exotic' || classifierSizeClass === 'classic';
+    const resolvedSizeClass = isClassifierSpecialty
+      ? classifierSizeClass
+      : (size_class || classifierSizeClass);
 
     const { data: vehicle, error } = await supabase
       .from('vehicles')
       .update({
         vehicle_category: vehicle_category || 'automobile',
         vehicle_type: vehicle_type || 'standard',
-        size_class: size_class || null,
+        size_class: resolvedSizeClass,
         specialty_tier: specialty_tier || null,
-        is_exotic: isExotic,
-        is_classic: isClassic,
         year: year ? parseInt(String(year), 10) : null,
         make: canonicalMake || null,
         model: trimmedModel,

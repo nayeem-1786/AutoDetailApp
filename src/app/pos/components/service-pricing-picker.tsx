@@ -23,8 +23,6 @@ interface ServicePricingPickerProps {
   service: CatalogService;
   vehicleSizeClass: VehicleSizeClass | null;
   vehicleSpecialtyTier: string | null;
-  vehicleIsExotic?: boolean;
-  vehicleIsClassic?: boolean;
   onSelect: (pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
 }
 
@@ -34,21 +32,26 @@ export function ServicePricingPicker({
   service,
   vehicleSizeClass,
   vehicleSpecialtyTier,
-  vehicleIsExotic,
-  vehicleIsClassic,
   onSelect,
 }: ServicePricingPickerProps) {
-  // Filter out exotic/classic tiers for non-specialty vehicles
+  // Session 29: size_class is the canonical taxonomy (5 values). The picker shows all
+  // tier rows that either match the vehicle's size_class (for specialty tiers) or are
+  // generally applicable (sedan/truck/van are always visible for scope-model services
+  // and for non-specialty vehicles). Exotic/classic tiers are only shown when the
+  // vehicle's size_class matches, to keep the picker relevant.
   const allPricing = service.pricing ?? [];
   const pricing = allPricing.filter(tier => {
-    if (tier.tier_name === 'exotic') return vehicleIsExotic === true;
-    if (tier.tier_name === 'classic') return vehicleIsClassic === true;
+    if (tier.tier_name === 'exotic') return vehicleSizeClass === 'exotic';
+    if (tier.tier_name === 'classic') return vehicleSizeClass === 'classic';
     return true;
   });
   const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
   const [tierQtyPick, setTierQtyPick] = useState<{ tier: ServicePricing; vsc: VehicleSizeClass | null } | null>(null);
 
-  const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
+  // Session 29: size_class is 5-value. Scope tiers with is_vehicle_size_aware render
+  // a price button per size. Columns for exotic/classic may be null on existing tiers —
+  // the resolver falls back to pricing.price in that case.
+  const VEHICLE_SIZES: VehicleSizeClass[] = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'];
 
   // Check sale status for this service
   const { isOnSale } = getSaleStatus({
@@ -300,6 +303,8 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
     vehicle_size_sedan_price: null,
     vehicle_size_truck_suv_price: null,
     vehicle_size_suv_van_price: null,
+    vehicle_size_exotic_price: null,
+    vehicle_size_classic_price: null,
     max_qty: null,
     qty_label: null,
     created_at: '',

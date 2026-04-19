@@ -120,6 +120,8 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
             vehicle_size_sedan_price: null,
             vehicle_size_truck_suv_price: null,
             vehicle_size_suv_van_price: null,
+            vehicle_size_exotic_price: null,
+            vehicle_size_classic_price: null,
             max_qty: null,
             qty_label: null,
             created_at: '',
@@ -333,8 +335,6 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
-          vehicleIsExotic={ticket.vehicle?.is_exotic}
-          vehicleIsClassic={ticket.vehicle?.is_classic}
           onSelect={handlePricingSelect}
         />
       )}

@@ -1,12 +1,9 @@
 'use client';
 
-import { createContext, useContext, useReducer, useEffect, useRef, useCallback, useState, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { TicketState, TicketAction } from '../types';
-import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { ticketReducer, initialTicketState } from './ticket-reducer';
-import { CustomPriceModal } from '../components/custom-price-modal';
-import { shouldOpenSpecialtyModal, selectPricingTierForVehicle } from '../utils/pricing';
 import { posFetch } from '../lib/pos-fetch';
 
 const TICKET_SESSION_KEY = 'pos-ticket-state';
@@ -38,42 +35,13 @@ function saveTicketToSession(state: TicketState): void {
 }
 
 export function TicketProvider({ children }: { children: ReactNode }) {
-  const [ticket, rawDispatch] = useReducer(ticketReducer, initialTicketState);
+  // Session 29: the specialty gate wrapper was removed. Exotic/classic vehicles now
+  // resolve pricing through the normal size_class path in the picker — no modal,
+  // no dispatch interception. If a service has no exotic/classic tier configured,
+  // the resolver falls back to pricing.price (a pricing-config issue to fix in admin,
+  // not a POS-time prompt).
+  const [ticket, dispatch] = useReducer(ticketReducer, initialTicketState);
   const restoredRef = useRef(false);
-
-  // Specialty gate state — intercepts ADD_SERVICE for exotic/classic vehicles
-  const [gateModalOpen, setGateModalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<(TicketAction & { type: 'ADD_SERVICE' }) | null>(null);
-
-  // Wrap dispatch to gate ADD_SERVICE for specialty vehicles (Option B)
-  // Modal opens for: (a) dual-flag, (b) single-flag without valid tier pricing
-  // Skip modal for: single-flag with valid tier row — REPLACE pricing with correct tier
-  const dispatch = useCallback((action: TicketAction) => {
-    if (action.type === 'ADD_SERVICE' && !action.customPrice) {
-      const vehicle = ticket.vehicle;
-
-      if (shouldOpenSpecialtyModal(vehicle, action.service)) {
-        // Open modal — dual-flag or missing tier
-        setPendingAction(action as TicketAction & { type: 'ADD_SERVICE' });
-        setGateModalOpen(true);
-        return;
-      }
-
-      // Skip-modal path: if specialty vehicle with valid tier, REPLACE pricing
-      if (vehicle?.is_exotic || vehicle?.is_classic) {
-        const correctTier = selectPricingTierForVehicle(action.service, vehicle);
-        if (correctTier) {
-          rawDispatch({ ...action, pricing: correctTier });
-          return;
-        }
-        // Defensive fallback: open modal if tier selection fails unexpectedly
-        setPendingAction(action as TicketAction & { type: 'ADD_SERVICE' });
-        setGateModalOpen(true);
-        return;
-      }
-    }
-    rawDispatch(action);
-  }, [ticket.vehicle, rawDispatch]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevItemsRef = useRef<string>('');
   const prevCustomerRef = useRef<string | null>(null);
@@ -244,25 +212,6 @@ export function TicketProvider({ children }: { children: ReactNode }) {
   return (
     <TicketContext.Provider value={{ ticket, dispatch }}>
       {children}
-      {/* Specialty gate modal — intercepts ADD_SERVICE for exotic/classic vehicles */}
-      <CustomPriceModal
-        open={gateModalOpen}
-        vehicle={ticket.vehicle}
-        service={pendingAction?.service ?? null}
-        pricing={pendingAction?.pricing as ServicePricing | null}
-        vehicleSizeClass={(pendingAction?.vehicleSizeClass ?? null) as VehicleSizeClass | null}
-        onConfirm={(customPrice, customNote) => {
-          if (pendingAction) {
-            rawDispatch({ ...pendingAction, customPrice, customNote: customNote ?? undefined });
-          }
-          setGateModalOpen(false);
-          setPendingAction(null);
-        }}
-        onCancel={() => {
-          setGateModalOpen(false);
-          setPendingAction(null);
-        }}
-      />
     </TicketContext.Provider>
   );
 }

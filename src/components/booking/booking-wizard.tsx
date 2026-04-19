@@ -612,8 +612,9 @@ export function BookingWizard({
     };
     setState(newState);
 
-    // Gate: if vehicle requires custom quote, show block page instead of step 2
-    if (vehicle.requires_custom_quote) {
+    // Gate: if vehicle is exotic or classic, show block page instead of step 2.
+    // Session 29: trigger keyed off size_class (canonical taxonomy), not parallel flags.
+    if (vehicle.size_class === 'exotic' || vehicle.size_class === 'classic') {
       setShowSpecialtyBlock(true);
       return;
     }

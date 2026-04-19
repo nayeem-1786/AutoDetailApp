@@ -90,11 +90,9 @@ customers_square_customer_id_key — UNIQUE btree (square_customer_id)
 | customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE CASCADE | |
 | vehicle_category | TEXT | NOT NULL, DEFAULT 'automobile' | CHECK: automobile, motorcycle, rv, boat, aircraft. Added via `20260224000001` |
 | vehicle_type | vehicle_type (enum) | NOT NULL, DEFAULT 'standard' | |
-| size_class | TEXT | | sedan, truck_suv_2row, suv_3row_van (automobiles only) |
+| size_class | vehicle_size_class (enum) | | sedan, truck_suv_2row, suv_3row_van, exotic, classic (automobiles only). Session 29: enum extended to 5 values — exotic/classic are first-class members, no parallel flags. |
 | specialty_tier | TEXT | | CHECK constraint limits to valid tier keys (motorcycle/rv/boat/aircraft tiers). NULL for automobiles. Added via `20260224000001` |
-| is_exotic | BOOLEAN | NOT NULL, DEFAULT false | Set by classifier. Ferrari, Lamborghini, etc. Added via `20260417000001` |
-| is_classic | BOOLEAN | NOT NULL, DEFAULT false | Set by classifier. Requires year ≤ threshold AND curated make+model match. Added via `20260417000001` |
-| requires_custom_quote | BOOLEAN | GENERATED ALWAYS AS (is_exotic OR is_classic) STORED | Computed. Downstream consumers check this single field. Added via `20260417000001` |
+| size_class_manual_override | BOOLEAN | NOT NULL, DEFAULT false | Session 29 (`20260418000003`). When true, `findOrCreateVehicle` skips overwriting size_class from classifier. Set by admin vehicle-edit dropdown save; reset on make/model change. |
 | year | INTEGER | | |
 | make | TEXT | | Canonicalized at write time (Chevy → Chevrolet) |
 | model | TEXT | | |
@@ -102,13 +100,12 @@ customers_square_customer_id_key — UNIQUE btree (square_customer_id)
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
+**Removed Session 29 (`20260418000003`):** `is_exotic`, `is_classic`, `requires_custom_quote` columns + their partial indexes. Exotic/classic are now first-class `size_class` values. See Session 29 CHANGELOG entry.
+
 **Indexes:**
 ```
 idx_vehicles_customer_make_model — UNIQUE (customer_id, LOWER(make), LOWER(model), vehicle_category) WHERE make IS NOT NULL AND model IS NOT NULL
 idx_vehicles_vehicle_category — btree (vehicle_category)
-idx_vehicles_is_exotic — btree (is_exotic) WHERE is_exotic = true
-idx_vehicles_is_classic — btree (is_classic) WHERE is_classic = true
-idx_vehicles_requires_custom_quote — btree (requires_custom_quote) WHERE requires_custom_quote = true
 ```
 
 ---
@@ -271,6 +268,8 @@ idx_vehicles_requires_custom_quote — btree (requires_custom_quote) WHERE requi
 | vehicle_size_sedan_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
 | vehicle_size_truck_suv_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
 | vehicle_size_suv_van_price | DECIMAL(10,2) | | Only when is_vehicle_size_aware = true |
+| vehicle_size_exotic_price | DECIMAL(10,2) | | Session 29 (`20260418000003`). Only when is_vehicle_size_aware = true. NULL falls back to `price`. |
+| vehicle_size_classic_price | DECIMAL(10,2) | | Session 29 (`20260418000003`). Only when is_vehicle_size_aware = true. NULL falls back to `price`. |
 | max_qty | INTEGER | DEFAULT NULL | Max quantity per tier. NULL/1 = single qty. 2+ = qty stepper in POS |
 | qty_label | TEXT | DEFAULT NULL | Short unit label for qty display (e.g. 'row', 'panel'). Falls back to tier_label |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
@@ -1425,7 +1424,7 @@ Seeded with 45 common makes. Used in POS, admin, booking, and customer portal ve
 - **user_role**: super_admin, admin, cashier, detailer
 - **employee_status**: active, inactive, terminated
 - **vehicle_type**: standard, motorcycle, rv, boat, aircraft
-- **vehicle_size_class**: sedan, truck_suv_2row, suv_3row_van
+- **vehicle_size_class**: sedan, truck_suv_2row, suv_3row_van, exotic, classic (Session 29 added last two)
 - **pricing_model**: flat, vehicle_size, scope, specialty, per_unit, custom
 - **service_classification**: primary, addon_only, both
 - **prerequisite_enforcement**: required_same_ticket, required_history, recommended

@@ -13,9 +13,21 @@ import {
   isExoticModel,
   canonicalizeMake,
   detectFieldInversion,
+  resolveVehicleClassification,
   CLASSIC_YEAR_THRESHOLD,
   CLASSIC_ELIGIBLE_MAKES,
 } from '../vehicle-categories';
+
+// Mock Supabase client that returns no vehicle_makes rows (falls back to automobile default).
+const mockSupabase = {
+  from: () => ({
+    select: () => ({
+      ilike: () => ({
+        eq: () => Promise.resolve({ data: [] }),
+      }),
+    }),
+  }),
+} as unknown as Parameters<typeof resolveVehicleClassification>[0];
 
 // ---------------------------------------------------------------------------
 // Helper: inline classic check (mirrors the non-exported isClassicVehicle)
@@ -480,5 +492,80 @@ describe('Year-prefix edge cases', () => {
 
   it('negative year → NOT classic', () => {
     expect(isClassicVehicle('Ford', 'Mustang', -1)).toBe(false);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SESSION 29: resolveVehicleClassification → size_class parity
+// Asserts that exotic/classic are written to size_class directly (no parallel flags).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Session 29 — resolveVehicleClassification size_class output', () => {
+  it('Ferrari 488 GTB → size_class = "exotic"', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Ferrari', '488 GTB');
+    expect(result.size_class).toBe('exotic');
+    expect(result.vehicle_category).toBe('automobile');
+    expect(result).not.toHaveProperty('is_exotic');
+    expect(result).not.toHaveProperty('is_classic');
+    expect(result).not.toHaveProperty('requires_custom_quote');
+  });
+
+  it('Lamborghini Huracán → size_class = "exotic"', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Lamborghini', 'Huracan');
+    expect(result.size_class).toBe('exotic');
+  });
+
+  it('Porsche 911 GT3 → size_class = "exotic" (partial-make exotic model)', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Porsche', '911 GT3');
+    expect(result.size_class).toBe('exotic');
+  });
+
+  it('1969 Ford Mustang → size_class = "classic"', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Ford', 'Mustang', 1969);
+    expect(result.size_class).toBe('classic');
+  });
+
+  it('1967 Chevrolet Camaro → size_class = "classic"', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Chevrolet', 'Camaro', 1967);
+    expect(result.size_class).toBe('classic');
+  });
+
+  it('1972 Ferrari Dino 246 → size_class = "exotic" (dual-flag: exotic wins)', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Ferrari', 'Dino 246', 1972);
+    expect(result.size_class).toBe('exotic');
+  });
+
+  it('2023 Honda Civic → size_class = "sedan" (non-specialty)', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Honda', 'Civic', 2023);
+    expect(result.size_class).toBe('sedan');
+  });
+
+  it('2024 Ford F-150 → size_class = "truck_suv_2row"', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Ford', 'F-150', 2024);
+    expect(result.size_class).toBe('truck_suv_2row');
+  });
+
+  it('2023 Honda Odyssey → size_class = "suv_3row_van"', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Honda', 'Odyssey', 2023);
+    expect(result.size_class).toBe('suv_3row_van');
+  });
+
+  it('Ford Mustang (no year) → size_class = "sedan" + needs_year_confirmation', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Ford', 'Mustang');
+    expect(result.size_class).toBe('sedan');
+    expect(result.needs_year_confirmation).toBe(true);
+  });
+
+  it('classifier output shape has no parallel flag fields', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Ferrari', '488');
+    const keys = Object.keys(result).sort();
+    expect(keys).toEqual([
+      'needs_year_confirmation',
+      'seat_rows',
+      'size_class',
+      'specialty_tier',
+      'vehicle_category',
+      'vehicle_type',
+    ]);
   });
 });

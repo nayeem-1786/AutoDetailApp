@@ -43,14 +43,17 @@ export async function GET(request: NextRequest) {
   );
   perf.mark('classify', t);
 
-  // Map classification to human-friendly tier name for the voice agent
+  // Map classification to human-friendly tier name for the voice agent.
+  // Session 29: tier_name is derived from size_class (the canonical taxonomy).
+  // needs_year_confirmation remains an orthogonal UX signal for ambiguous-year
+  // classic candidates.
   let tierName: string;
 
-  if (classification.is_exotic) {
+  if (classification.size_class === 'exotic') {
     tierName = 'Exotic (Custom Quote)';
   } else if (classification.needs_year_confirmation) {
     tierName = 'Possible Classic — confirm year with customer';
-  } else if (classification.is_classic) {
+  } else if (classification.size_class === 'classic') {
     tierName = 'Classic (Custom Quote)';
   } else if (classification.vehicle_category === 'rv') {
     tierName = 'RV (Custom Quote)';
@@ -80,9 +83,6 @@ export async function GET(request: NextRequest) {
     specialty_tier: classification.specialty_tier,
     tier_name: tierName,
     seat_rows: classification.seat_rows,
-    is_exotic: classification.is_exotic,
-    is_classic: classification.is_classic,
-    requires_custom_quote: classification.requires_custom_quote,
     needs_year_confirmation: classification.needs_year_confirmation,
   };
 

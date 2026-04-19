@@ -1693,6 +1693,8 @@ export type Database = {
           service_id: string
           tier_label: string | null
           tier_name: string
+          vehicle_size_classic_price: number | null
+          vehicle_size_exotic_price: number | null
           vehicle_size_sedan_price: number | null
           vehicle_size_suv_van_price: number | null
           vehicle_size_truck_suv_price: number | null
@@ -1706,6 +1708,8 @@ export type Database = {
           service_id: string
           tier_label?: string | null
           tier_name: string
+          vehicle_size_classic_price?: number | null
+          vehicle_size_exotic_price?: number | null
           vehicle_size_sedan_price?: number | null
           vehicle_size_suv_van_price?: number | null
           vehicle_size_truck_suv_price?: number | null
@@ -1719,6 +1723,8 @@ export type Database = {
           service_id?: string
           tier_label?: string | null
           tier_name?: string
+          vehicle_size_classic_price?: number | null
+          vehicle_size_exotic_price?: number | null
           vehicle_size_sedan_price?: number | null
           vehicle_size_suv_van_price?: number | null
           vehicle_size_truck_suv_price?: number | null
@@ -2132,6 +2138,7 @@ export type Database = {
           model: string | null
           notes: string | null
           size_class: Database["public"]["Enums"]["vehicle_size_class"] | null
+          size_class_manual_override: boolean
           updated_at: string
           vehicle_type: Database["public"]["Enums"]["vehicle_type"]
           vin: string | null
@@ -2148,6 +2155,7 @@ export type Database = {
           model?: string | null
           notes?: string | null
           size_class?: Database["public"]["Enums"]["vehicle_size_class"] | null
+          size_class_manual_override?: boolean
           updated_at?: string
           vehicle_type?: Database["public"]["Enums"]["vehicle_type"]
           vin?: string | null
@@ -2164,6 +2172,7 @@ export type Database = {
           model?: string | null
           notes?: string | null
           size_class?: Database["public"]["Enums"]["vehicle_size_class"] | null
+          size_class_manual_override?: boolean
           updated_at?: string
           vehicle_type?: Database["public"]["Enums"]["vehicle_type"]
           vin?: string | null
@@ -2314,7 +2323,7 @@ export type Database = {
         | "refunded"
         | "partial_refund"
       user_role: "super_admin" | "admin" | "cashier" | "detailer"
-      vehicle_size_class: "sedan" | "truck_suv_2row" | "suv_3row_van"
+      vehicle_size_class: "sedan" | "truck_suv_2row" | "suv_3row_van" | "exotic" | "classic"
       vehicle_type: "standard" | "motorcycle" | "rv" | "boat" | "aircraft"
     }
     CompositeTypes: {
@@ -2524,7 +2533,7 @@ export const Constants = {
         "partial_refund",
       ],
       user_role: ["super_admin", "admin", "cashier", "detailer"],
-      vehicle_size_class: ["sedan", "truck_suv_2row", "suv_3row_van"],
+      vehicle_size_class: ["sedan", "truck_suv_2row", "suv_3row_van", "exotic", "classic"],
       vehicle_type: ["standard", "motorcycle", "rv", "boat", "aircraft"],
     },
   },

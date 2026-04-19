@@ -28,6 +28,9 @@ export interface ScopeTier {
   vehicle_size_sedan_price: number | '';
   vehicle_size_truck_suv_price: number | '';
   vehicle_size_suv_van_price: number | '';
+  /** Session 29: exotic/classic scope-pricing fan-out. Leave blank to fall back to tier price. */
+  vehicle_size_exotic_price: number | '';
+  vehicle_size_classic_price: number | '';
   max_qty: number | '';
   qty_label: string;
 }
@@ -67,7 +70,7 @@ export function getDefaultPricingValue(model: PricingModel): PricingValue {
     case 'vehicle_size':
       return { model: 'vehicle_size', data: { sedan: '', truck_suv_2row: '', suv_3row_van: '', exotic: '', classic: '' } };
     case 'scope':
-      return { model: 'scope', data: [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', max_qty: '', qty_label: '' }] };
+      return { model: 'scope', data: [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', vehicle_size_exotic_price: '', vehicle_size_classic_price: '', max_qty: '', qty_label: '' }] };
     case 'per_unit':
       return { model: 'per_unit', data: { per_unit_price: '', per_unit_max: '', per_unit_label: '' } };
     case 'specialty':
@@ -157,7 +160,7 @@ function ScopeForm({ value, onChange }: {
   const addTier = useCallback(() => {
     onChange({
       model: 'scope',
-      data: [...tiers, { tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', max_qty: '', qty_label: '' }],
+      data: [...tiers, { tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', vehicle_size_exotic_price: '', vehicle_size_classic_price: '', max_qty: '', qty_label: '' }],
     });
   }, [tiers, onChange]);
 
@@ -244,7 +247,7 @@ function ScopeForm({ value, onChange }: {
             <span className="text-sm text-gray-600">Vehicle size aware pricing</span>
           </div>
           {tier.is_vehicle_size_aware && (
-            <div className="grid grid-cols-3 gap-3 pl-4 border-l-2 border-gray-200">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-4 border-l-2 border-gray-200">
               <FormField label="Sedan">
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
@@ -284,6 +287,34 @@ function ScopeForm({ value, onChange }: {
                     className="pl-7"
                     value={tier.vehicle_size_suv_van_price}
                     onChange={(e) => updateTier(index, { vehicle_size_suv_van_price: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                  />
+                </div>
+              </FormField>
+              <FormField label="Exotic">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="pl-7"
+                    value={tier.vehicle_size_exotic_price}
+                    onChange={(e) => updateTier(index, { vehicle_size_exotic_price: e.target.value === '' ? '' : parseFloat(e.target.value) })}
+                  />
+                </div>
+              </FormField>
+              <FormField label="Classic">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    className="pl-7"
+                    value={tier.vehicle_size_classic_price}
+                    onChange={(e) => updateTier(index, { vehicle_size_classic_price: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                   />
                 </div>
               </FormField>

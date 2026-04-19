@@ -3,7 +3,7 @@
 
 export type UserRole = 'super_admin' | 'admin' | 'cashier' | 'detailer';
 export type VehicleType = 'standard' | 'motorcycle' | 'rv' | 'boat' | 'aircraft';
-export type VehicleSizeClass = 'sedan' | 'truck_suv_2row' | 'suv_3row_van';
+export type VehicleSizeClass = 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic';
 export type PricingModel = 'vehicle_size' | 'scope' | 'per_unit' | 'specialty' | 'flat' | 'custom';
 export type ServiceClassification = 'primary' | 'addon_only' | 'both';
 export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
@@ -100,11 +100,11 @@ export interface Vehicle {
   customer_id: string;
   vehicle_type: VehicleType;
   vehicle_category: VehicleCategory;
+  /** Session 29: 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic' | null */
   size_class: VehicleSizeClass | null;
   specialty_tier: string | null;
-  is_exotic: boolean;
-  is_classic: boolean;
-  requires_custom_quote: boolean;
+  /** Session 29: admin dropdown-wins flag. When true, classifier runs do not overwrite size_class. */
+  size_class_manual_override: boolean;
   year: number | null;
   make: string | null;
   model: string | null;
@@ -268,6 +268,9 @@ export interface ServicePricing {
   vehicle_size_sedan_price: number | null;
   vehicle_size_truck_suv_price: number | null;
   vehicle_size_suv_van_price: number | null;
+  /** Session 29: exotic/classic scope-pricing fan-out columns (nullable). */
+  vehicle_size_exotic_price: number | null;
+  vehicle_size_classic_price: number | null;
   max_qty: number | null;
   qty_label: string | null;
   created_at: string;

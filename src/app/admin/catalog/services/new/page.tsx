@@ -208,6 +208,8 @@ export default function NewServicePage() {
             vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
             vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
             vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
+            vehicle_size_exotic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_exotic_price === 'number' ? t.vehicle_size_exotic_price : null,
+            vehicle_size_classic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_classic_price === 'number' ? t.vehicle_size_classic_price : null,
           }));
         if (pricingRows.length > 0) {
           const { error: pricingError } = await supabase.from('service_pricing').insert(pricingRows);

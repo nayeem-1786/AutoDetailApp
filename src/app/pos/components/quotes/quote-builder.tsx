@@ -234,6 +234,8 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
         vehicle_size_sedan_price: null,
         vehicle_size_truck_suv_price: null,
         vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
         max_qty: null,
         qty_label: null,
         created_at: '',
@@ -288,7 +290,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
         price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, max_qty: null, qty_label: null, created_at: '',
+        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
       };
       dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });
       toast.success(`Added ${prereqService.name}`);
@@ -406,8 +408,6 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
-          vehicleIsExotic={quote.vehicle?.is_exotic}
-          vehicleIsClassic={quote.vehicle?.is_classic}
           onSelect={handlePricingSelect}
         />
       )}
