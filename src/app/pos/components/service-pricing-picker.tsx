@@ -34,17 +34,10 @@ export function ServicePricingPicker({
   vehicleSpecialtyTier,
   onSelect,
 }: ServicePricingPickerProps) {
-  // Session 29: size_class is the canonical taxonomy (5 values). The picker shows all
-  // tier rows that either match the vehicle's size_class (for specialty tiers) or are
-  // generally applicable (sedan/truck/van are always visible for scope-model services
-  // and for non-specialty vehicles). Exotic/classic tiers are only shown when the
-  // vehicle's size_class matches, to keep the picker relevant.
-  const allPricing = service.pricing ?? [];
-  const pricing = allPricing.filter(tier => {
-    if (tier.tier_name === 'exotic') return vehicleSizeClass === 'exotic';
-    if (tier.tier_name === 'classic') return vehicleSizeClass === 'classic';
-    return true;
-  });
+  // Session 29 follow-up: all tier rows render. Matching tier is enabled; non-matching
+  // size-class tiers are disabled (grayed out). Scope/specialty tiers with custom names
+  // are never disabled by this logic.
+  const pricing = service.pricing ?? [];
   const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
   const [tierQtyPick, setTierQtyPick] = useState<{ tier: ServicePricing; vsc: VehicleSizeClass | null } | null>(null);
 
@@ -203,14 +196,32 @@ export function ServicePricingPicker({
                 const isHighlighted =
                   (vehicleSizeClass && tier.is_vehicle_size_aware) || isSpecialtyMatch;
 
+                // Disable non-matching size-class tier buttons when a vehicle is assigned.
+                // Only the 5 canonical size-class names get this treatment — custom scope
+                // tier names (e.g., 'complete_interior') are never disabled.
+                const SIZE_CLASS_TIER_NAMES = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'];
+                const isSizeClassTier = SIZE_CLASS_TIER_NAMES.includes(tier.tier_name);
+                const isMatchingVehicleSize = vehicleSizeClass != null && tier.tier_name === vehicleSizeClass;
+                const isDisabled = (
+                  vehicleSizeClass != null &&
+                  isSizeClassTier &&
+                  !isMatchingVehicleSize &&
+                  !isSpecialtyMatch
+                );
+
                 return (
                   <button
                     key={tier.id}
-                    onClick={() => handleSelect(tier)}
+                    onClick={isDisabled ? undefined : () => handleSelect(tier)}
+                    disabled={isDisabled}
+                    aria-disabled={isDisabled}
                     className={cn(
                       'flex items-center justify-between rounded-lg border p-4 text-left transition-all',
-                      'min-h-[56px] active:scale-[0.99] active:bg-gray-50 dark:active:bg-gray-800',
-                      isHighlighted
+                      'min-h-[56px]',
+                      !isDisabled && 'active:scale-[0.99] active:bg-gray-50 dark:active:bg-gray-800',
+                      isDisabled
+                        ? 'border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/10 opacity-50 cursor-not-allowed'
+                        : isHighlighted
                         ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700'
                         : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm dark:hover:shadow-gray-950/30'
                     )}

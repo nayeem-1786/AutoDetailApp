@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): Vehicle dropdown + picker tier disable — 2026-04-18 (Session 29 follow-up)
+
+**POS vehicle create/edit dialog:** Extended `AUTOMOBILE_SIZE_CLASSES` from 3 to 5 entries (added exotic, classic). Staff can now set size_class to exotic/classic when creating or editing vehicles from POS. Customer portal dropdown intentionally stays at 3 values.
+
+**Service pricing picker:** Replaced the exotic/classic hide-filter with a disable pattern. All 5 tier rows now render. Only the tier matching the vehicle's `size_class` is enabled (highlighted, clickable). Non-matching size-class tiers are grayed out and disabled. Scope tiers with custom names (e.g., 'complete_interior') are never disabled. No-vehicle case preserves all tiers clickable.
+
+Files changed: `vehicle-create-dialog.tsx`, `service-pricing-picker.tsx`, `__tests__/service-pricing-picker.test.tsx` (new — 6 tests)
+
+---
+
 ## refactor: Consolidate exotic/classic as size_class taxonomy — 2026-04-18 (Session 29)
 
 **Context:** Sessions 26–28 built exotic/classic handling on a flawed premise — independent boolean flags (`is_exotic`, `is_classic`, `requires_custom_quote`) with parallel gate/modal/badge/block-page/SMS-pivot systems layered on top of normal pricing. This was wrong. The correct architecture — and the one the codebase already used for sedan/truck_suv_2row/suv_3row_van — is that exotic and classic are additional members of the `vehicle_size_class` taxonomy. Session 29 completes the consolidation. Net: subtractive (more deleted than added).

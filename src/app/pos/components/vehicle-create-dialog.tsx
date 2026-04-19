@@ -30,7 +30,7 @@ import {
 import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
 import type { Vehicle } from '@/lib/supabase/types';
 
-const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van'] as const;
+const AUTOMOBILE_SIZE_CLASSES = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'] as const;
 
 interface VehicleCreateDialogProps {
   open: boolean;

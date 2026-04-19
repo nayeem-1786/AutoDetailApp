@@ -1217,6 +1217,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         transactions/
                                                         vehicle-create-dialog.tsx
                                                         vehicle-selector.tsx
+                                                        __tests__/service-pricing-picker.test.tsx
                                                         utils/__tests__/pricing.test.ts
                                                         quotes/
 ```
