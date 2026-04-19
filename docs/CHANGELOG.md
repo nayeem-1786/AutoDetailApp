@@ -4,6 +4,57 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor: Promote exotic/classic to first-class pricing tiers + badge restyle — 2026-04-18 (Session 28)
+
+**Phase 0 — Drop dead columns:** Removed `services.exotic_floor_price` and `services.classic_floor_price` (Session 27 shipped to wrong tab). 4 references cleaned from types, validation, admin form, and modal.
+
+**Migration SQL (apply via Supabase SQL Editor):**
+```sql
+ALTER TABLE services DROP COLUMN IF EXISTS exotic_floor_price;
+ALTER TABLE services DROP COLUMN IF EXISTS classic_floor_price;
+```
+
+**Phase 1 — Pricing tiers:** Exotic and classic are now `service_pricing` rows with `tier_name = 'exotic'` / `'classic'`. Admin Pricing tab shows 5-row Vehicle Size Pricing table. Empty exotic/classic inputs skip row creation (not price: 0). Clearing deletes the row. Standard tiers (sedan/truck/van) keep existing always-upsert behavior.
+
+**Phase 2 — Badge restyle:** Removed uppercase/tracking-wider/solid-fill. Now matches Enthusiast/Professional chip pattern — soft orange (exotic), soft slate (classic), rounded-full border with dot indicator, title case text.
+
+**Phase 3 — Gate logic (Option B):**
+- Single-flag + valid tier row (price > 0): modal skipped, service adds at tier price directly. Gate REPLACES action's pricing field with exotic/classic tier.
+- Single-flag + missing/invalid tier: modal opens (staff enters price)
+- Dual-flag (exotic AND classic): modal ALWAYS opens regardless of tier population
+- Picker filter hides exotic/classic buttons from non-specialty vehicles
+- New helpers: `selectPricingTierForVehicle()`, `shouldOpenSpecialtyModal()` in `src/app/pos/utils/pricing.ts`
+
+**Phase 4 — Leakage check passed:** No exotic/classic tier lookup in booking/SMS/voice surfaces.
+
+**Phase 5 — Tests:** 165 tests (143 classifier + 8 badge + 14 new pricing tier/gate tests). All passing.
+
+**Files changed:**
+- `supabase/migrations/20260418000001_drop_service_floor_price_columns.sql` (new)
+- `src/lib/supabase/types.ts` (remove dead fields)
+- `src/lib/utils/validation.ts` (remove dead fields)
+- `src/lib/utils/constants.ts` (VEHICLE_SIZE_LABELS + exotic/classic)
+- `src/components/service-pricing-form.tsx` (VehicleSizePricing type + form + defaults)
+- `src/app/admin/catalog/services/[id]/page.tsx` (remove floor price fields, extend pricing save/load)
+- `src/app/pos/components/specialty-badge.tsx` (restyle)
+- `src/app/pos/components/custom-price-modal.tsx` (tier-based pre-fill)
+- `src/app/pos/components/service-pricing-picker.tsx` (filter exotic/classic for non-specialty)
+- `src/app/pos/components/catalog-panel.tsx` (pass vehicle flags to picker)
+- `src/app/pos/components/register-tab.tsx` (pass vehicle flags to picker)
+- `src/app/pos/components/pos-workspace.tsx` (pass vehicle flags to picker)
+- `src/app/pos/components/catalog-browser.tsx` (pass vehicle flags to picker)
+- `src/app/pos/components/quotes/quote-builder.tsx` (pass vehicle flags to picker)
+- `src/app/pos/types.ts` (widen ADD_SERVICE service type)
+- `src/app/pos/context/ticket-context.tsx` (Option B gate + tier replacement)
+- `src/app/pos/context/quote-context.tsx` (same gate logic)
+- `src/app/pos/utils/pricing.ts` (selectPricingTierForVehicle, shouldOpenSpecialtyModal)
+- `src/app/pos/utils/__tests__/pricing.test.ts` (new — 14 tests)
+- `src/app/pos/components/__tests__/specialty-badge.test.tsx` (updated assertions)
+- `docs/dev/DB_SCHEMA.md` (drop columns, extend tier_name docs)
+- `docs/audits/session-28-qa.md` (new)
+
+---
+
 ## feat: Exotic/classic consumer surfaces — 2026-04-18 (Session 27)
 
 **POS badge + custom price modal, booking block, SMS pivot, voice agent docs.**

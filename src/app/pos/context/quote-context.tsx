@@ -2,9 +2,10 @@
 
 import { createContext, useContext, useReducer, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { QuoteState, QuoteAction } from '../types';
-import type { Service, ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { quoteReducer, initialQuoteState } from './quote-reducer';
 import { CustomPriceModal } from '../components/custom-price-modal';
+import { shouldOpenSpecialtyModal, selectPricingTierForVehicle } from '../utils/pricing';
 import { posFetch } from '../lib/pos-fetch';
 
 interface QuoteContextType {
@@ -23,16 +24,27 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
   const [gateModalOpen, setGateModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<(QuoteAction & { type: 'ADD_SERVICE' }) | null>(null);
 
-  // Wrap dispatch to gate ADD_SERVICE when vehicle requires custom quote
+  // Wrap dispatch — same Option B gate logic as TicketProvider
   const dispatch = useCallback((action: QuoteAction) => {
-    if (
-      action.type === 'ADD_SERVICE' &&
-      !action.customPrice &&
-      quote.vehicle?.requires_custom_quote
-    ) {
-      setPendingAction(action as QuoteAction & { type: 'ADD_SERVICE' });
-      setGateModalOpen(true);
-      return;
+    if (action.type === 'ADD_SERVICE' && !action.customPrice) {
+      const vehicle = quote.vehicle;
+
+      if (shouldOpenSpecialtyModal(vehicle, action.service)) {
+        setPendingAction(action as QuoteAction & { type: 'ADD_SERVICE' });
+        setGateModalOpen(true);
+        return;
+      }
+
+      if (vehicle?.is_exotic || vehicle?.is_classic) {
+        const correctTier = selectPricingTierForVehicle(action.service, vehicle);
+        if (correctTier) {
+          rawDispatch({ ...action, pricing: correctTier });
+          return;
+        }
+        setPendingAction(action as QuoteAction & { type: 'ADD_SERVICE' });
+        setGateModalOpen(true);
+        return;
+      }
     }
     rawDispatch(action);
   }, [quote.vehicle, rawDispatch]);
@@ -54,7 +66,7 @@ export function QuoteProvider({ children }: { children: ReactNode }) {
       <CustomPriceModal
         open={gateModalOpen}
         vehicle={quote.vehicle}
-        service={pendingAction?.service as Service | null}
+        service={pendingAction?.service ?? null}
         pricing={pendingAction?.pricing as ServicePricing | null}
         vehicleSizeClass={(pendingAction?.vehicleSizeClass ?? null) as VehicleSizeClass | null}
         onConfirm={(customPrice, customNote) => {

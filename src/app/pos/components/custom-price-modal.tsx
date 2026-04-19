@@ -28,7 +28,7 @@ const REASON_OPTIONS = [
 interface CustomPriceModalProps {
   open: boolean;
   vehicle: Vehicle | null;
-  service: Service | null;
+  service: (Service & { pricing?: ServicePricing[] }) | null;
   pricing: ServicePricing | null;
   vehicleSizeClass: VehicleSizeClass | null;
   onConfirm: (price: number, note: string | null) => void;
@@ -49,24 +49,38 @@ export function CustomPriceModal({
   const [otherReason, setOtherReason] = useState('');
   const [showBelowCatalogConfirm, setShowBelowCatalogConfirm] = useState(false);
 
-  // Compute catalog price for reference
+  // Compute catalog price for reference (sedan/truck/van based on vehicle size_class)
   const catalogPrice = pricing ? resolveServicePrice(pricing, vehicleSizeClass) : 0;
 
-  // Determine floor price reference
+  // Look up exotic/classic tier prices from service_pricing rows
   const isExotic = vehicle?.is_exotic ?? false;
   const isClassic = vehicle?.is_classic ?? false;
-  const exoticFloor = service?.exotic_floor_price;
-  const classicFloor = service?.classic_floor_price;
+  const isDualFlag = isExotic && isClassic;
 
-  let referenceLabel = `Catalog price: ${formatCurrency(catalogPrice)} (reference only)`;
+  const exoticTier = service?.pricing?.find(p => p.tier_name === 'exotic');
+  const classicTier = service?.pricing?.find(p => p.tier_name === 'classic');
+  const exoticPrice = exoticTier && exoticTier.price > 0 ? exoticTier.price : null;
+  const classicPrice = classicTier && classicTier.price > 0 ? classicTier.price : null;
+
+  // Build reference label and prefill
+  let referenceLabel: string;
   let prefillPrice: number | null = null;
 
-  if (exoticFloor != null && isExotic) {
-    referenceLabel = `Exotic starting price: ${formatCurrency(exoticFloor)}`;
-    prefillPrice = exoticFloor;
-  } else if (classicFloor != null && isClassic) {
-    referenceLabel = `Classic starting price: ${formatCurrency(classicFloor)}`;
-    prefillPrice = classicFloor;
+  if (isDualFlag) {
+    // Dual-flag: show both tier prices as reference, input always empty
+    const exoticRef = exoticPrice != null ? formatCurrency(exoticPrice) : 'not set';
+    const classicRef = classicPrice != null ? formatCurrency(classicPrice) : 'not set';
+    referenceLabel = `Exotic tier: ${exoticRef} · Classic tier: ${classicRef} (reference only)`;
+  } else if (isExotic && exoticPrice != null) {
+    referenceLabel = `Exotic tier: ${formatCurrency(exoticPrice)}`;
+    prefillPrice = exoticPrice;
+  } else if (isClassic && classicPrice != null) {
+    referenceLabel = `Classic tier: ${formatCurrency(classicPrice)}`;
+    prefillPrice = classicPrice;
+  } else {
+    // Single-flag, tier missing — show catalog equivalent as reference
+    const tierWord = isExotic ? 'exotic' : 'classic';
+    referenceLabel = `Reference price: ${formatCurrency(catalogPrice)} (no ${tierWord} tier set)`;
   }
 
   // Reset state when modal opens with new service

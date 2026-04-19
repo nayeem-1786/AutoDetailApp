@@ -23,6 +23,8 @@ interface ServicePricingPickerProps {
   service: CatalogService;
   vehicleSizeClass: VehicleSizeClass | null;
   vehicleSpecialtyTier: string | null;
+  vehicleIsExotic?: boolean;
+  vehicleIsClassic?: boolean;
   onSelect: (pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
 }
 
@@ -32,9 +34,17 @@ export function ServicePricingPicker({
   service,
   vehicleSizeClass,
   vehicleSpecialtyTier,
+  vehicleIsExotic,
+  vehicleIsClassic,
   onSelect,
 }: ServicePricingPickerProps) {
-  const pricing = service.pricing ?? [];
+  // Filter out exotic/classic tiers for non-specialty vehicles
+  const allPricing = service.pricing ?? [];
+  const pricing = allPricing.filter(tier => {
+    if (tier.tier_name === 'exotic') return vehicleIsExotic === true;
+    if (tier.tier_name === 'classic') return vehicleIsClassic === true;
+    return true;
+  });
   const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
   const [tierQtyPick, setTierQtyPick] = useState<{ tier: ServicePricing; vsc: VehicleSizeClass | null } | null>(null);
 

@@ -3,9 +3,10 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useCallback, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import type { TicketState, TicketAction } from '../types';
-import type { Service, ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { ticketReducer, initialTicketState } from './ticket-reducer';
 import { CustomPriceModal } from '../components/custom-price-modal';
+import { shouldOpenSpecialtyModal, selectPricingTierForVehicle } from '../utils/pricing';
 import { posFetch } from '../lib/pos-fetch';
 
 const TICKET_SESSION_KEY = 'pos-ticket-state';
@@ -44,16 +45,32 @@ export function TicketProvider({ children }: { children: ReactNode }) {
   const [gateModalOpen, setGateModalOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<(TicketAction & { type: 'ADD_SERVICE' }) | null>(null);
 
-  // Wrap dispatch to gate ADD_SERVICE when vehicle requires custom quote
+  // Wrap dispatch to gate ADD_SERVICE for specialty vehicles (Option B)
+  // Modal opens for: (a) dual-flag, (b) single-flag without valid tier pricing
+  // Skip modal for: single-flag with valid tier row — REPLACE pricing with correct tier
   const dispatch = useCallback((action: TicketAction) => {
-    if (
-      action.type === 'ADD_SERVICE' &&
-      !action.customPrice && // Not already a custom-priced dispatch
-      ticket.vehicle?.requires_custom_quote
-    ) {
-      setPendingAction(action as TicketAction & { type: 'ADD_SERVICE' });
-      setGateModalOpen(true);
-      return;
+    if (action.type === 'ADD_SERVICE' && !action.customPrice) {
+      const vehicle = ticket.vehicle;
+
+      if (shouldOpenSpecialtyModal(vehicle, action.service)) {
+        // Open modal — dual-flag or missing tier
+        setPendingAction(action as TicketAction & { type: 'ADD_SERVICE' });
+        setGateModalOpen(true);
+        return;
+      }
+
+      // Skip-modal path: if specialty vehicle with valid tier, REPLACE pricing
+      if (vehicle?.is_exotic || vehicle?.is_classic) {
+        const correctTier = selectPricingTierForVehicle(action.service, vehicle);
+        if (correctTier) {
+          rawDispatch({ ...action, pricing: correctTier });
+          return;
+        }
+        // Defensive fallback: open modal if tier selection fails unexpectedly
+        setPendingAction(action as TicketAction & { type: 'ADD_SERVICE' });
+        setGateModalOpen(true);
+        return;
+      }
     }
     rawDispatch(action);
   }, [ticket.vehicle, rawDispatch]);
@@ -231,7 +248,7 @@ export function TicketProvider({ children }: { children: ReactNode }) {
       <CustomPriceModal
         open={gateModalOpen}
         vehicle={ticket.vehicle}
-        service={pendingAction?.service as Service | null}
+        service={pendingAction?.service ?? null}
         pricing={pendingAction?.pricing as ServicePricing | null}
         vehicleSizeClass={(pendingAction?.vehicleSizeClass ?? null) as VehicleSizeClass | null}
         onConfirm={(customPrice, customNote) => {

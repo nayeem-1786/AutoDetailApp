@@ -1220,6 +1220,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         specialty-badge.tsx
                                                         custom-price-modal.tsx
                                                         __tests__/specialty-badge.test.tsx
+                                                        utils/__tests__/pricing.test.ts
                                                         quotes/
 ```
 
@@ -1439,6 +1440,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260410000001_staff_notification_sms_template.sql
 20260417000001_vehicle_exotic_classic_flags.sql
 20260417000002_service_exotic_classic_floor_prices.sql
+20260418000001_drop_service_floor_price_columns.sql
 ```
 
 ## Scripts

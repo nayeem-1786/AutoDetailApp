@@ -250,8 +250,6 @@ export default function ServiceDetailPage() {
       is_taxable: svc.is_taxable,
       vehicle_compatibility: svc.vehicle_compatibility,
       special_requirements: svc.special_requirements || '',
-      exotic_floor_price: svc.exotic_floor_price,
-      classic_floor_price: svc.classic_floor_price,
       is_active: svc.is_active,
       display_order: svc.display_order,
     });
@@ -286,11 +284,13 @@ export default function ServiceDetailPage() {
 
     switch (model) {
       case 'vehicle_size': {
-        const vsp: VehicleSizePricing = { sedan: '', truck_suv_2row: '', suv_3row_van: '' };
+        const vsp: VehicleSizePricing = { sedan: '', truck_suv_2row: '', suv_3row_van: '', exotic: '', classic: '' };
         rows.forEach((r) => {
           if (r.tier_name === 'sedan') vsp.sedan = r.price;
           if (r.tier_name === 'truck_suv_2row') vsp.truck_suv_2row = r.price;
           if (r.tier_name === 'suv_3row_van') vsp.suv_3row_van = r.price;
+          if (r.tier_name === 'exotic') vsp.exotic = r.price;
+          if (r.tier_name === 'classic') vsp.classic = r.price;
         });
         setPricingValue({ model: 'vehicle_size', data: vsp });
         break;
@@ -505,8 +505,6 @@ export default function ServiceDetailPage() {
         is_taxable: formData.is_taxable,
         vehicle_compatibility: formData.vehicle_compatibility,
         special_requirements: formData.special_requirements || null,
-        exotic_floor_price: typeof formData.exotic_floor_price === 'number' ? formData.exotic_floor_price : null,
-        classic_floor_price: typeof formData.classic_floor_price === 'number' ? formData.classic_floor_price : null,
         is_active: formData.is_active,
         display_order: formData.display_order,
         image_url: imageUrl,
@@ -600,11 +598,49 @@ export default function ServiceDetailPage() {
 
         // ---- Vehicle Size: use upsert on (service_id, tier_name) unique constraint ----
         if (model === 'vehicle_size' && pricingValue.model === 'vehicle_size') {
-          const upsertRows = [
+          // Standard tiers: always upsert (empty → 0)
+          const standardRows = [
             { service_id: serviceId, tier_name: 'sedan', tier_label: 'Sedan', price: typeof pricingValue.data.sedan === 'number' ? pricingValue.data.sedan : 0, display_order: 0, is_vehicle_size_aware: false, sale_price: typeof salePrices['sedan'] === 'number' ? salePrices['sedan'] : null },
             { service_id: serviceId, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: typeof pricingValue.data.truck_suv_2row === 'number' ? pricingValue.data.truck_suv_2row : 0, display_order: 1, is_vehicle_size_aware: false, sale_price: typeof salePrices['truck_suv_2row'] === 'number' ? salePrices['truck_suv_2row'] : null },
             { service_id: serviceId, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: typeof pricingValue.data.suv_3row_van === 'number' ? pricingValue.data.suv_3row_van : 0, display_order: 2, is_vehicle_size_aware: false, sale_price: typeof salePrices['suv_3row_van'] === 'number' ? salePrices['suv_3row_van'] : null },
           ];
+
+          // Specialty tiers (exotic/classic): skip upsert if empty, delete if cleared
+          const specialtyTiers = [
+            { name: 'exotic' as const, label: 'Exotic', display_order: 3 },
+            { name: 'classic' as const, label: 'Classic', display_order: 4 },
+          ];
+          const specialtyUpserts: typeof standardRows = [];
+          const specialtyDeletes: string[] = [];
+
+          for (const { name, label, display_order } of specialtyTiers) {
+            const priceValue = pricingValue.data[name];
+            const hasPrice = typeof priceValue === 'number' && priceValue > 0;
+            if (hasPrice) {
+              specialtyUpserts.push({
+                service_id: serviceId,
+                tier_name: name,
+                tier_label: label,
+                price: priceValue,
+                sale_price: (typeof salePrices[name] === 'number' && (salePrices[name] as number) > 0) ? salePrices[name] as number : null,
+                is_vehicle_size_aware: false,
+                display_order,
+              });
+            } else {
+              specialtyDeletes.push(name);
+            }
+          }
+
+          // Delete cleared specialty tiers BEFORE upserting
+          if (specialtyDeletes.length > 0) {
+            await supabase
+              .from('service_pricing')
+              .delete()
+              .eq('service_id', serviceId)
+              .in('tier_name', specialtyDeletes);
+          }
+
+          const upsertRows = [...standardRows, ...specialtyUpserts];
           const { error: upsertError } = await supabase
             .from('service_pricing')
             .upsert(upsertRows, { onConflict: 'service_id,tier_name' });
@@ -1066,34 +1102,6 @@ export default function ServiceDetailPage() {
                     <Textarea {...register('special_requirements')} rows={2} />
                   </FormField>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <FormField
-                      label="Exotic Starting Price (optional)"
-                      error={errors.exotic_floor_price?.message}
-                      description="Suggested starting price for exotic vehicles. Staff can adjust up or down at checkout."
-                    >
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="—"
-                        {...register('exotic_floor_price', { valueAsNumber: true })}
-                      />
-                    </FormField>
-                    <FormField
-                      label="Classic Starting Price (optional)"
-                      error={errors.classic_floor_price?.message}
-                      description="Suggested starting price for classic vehicles. Staff can adjust up or down at checkout."
-                    >
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="—"
-                        {...register('classic_floor_price', { valueAsNumber: true })}
-                      />
-                    </FormField>
-                  </div>
                 </CardContent>
               </Card>
 

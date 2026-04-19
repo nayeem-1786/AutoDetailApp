@@ -406,6 +406,8 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
+          vehicleIsExotic={quote.vehicle?.is_exotic}
+          vehicleIsClassic={quote.vehicle?.is_classic}
           onSelect={handlePricingSelect}
         />
       )}

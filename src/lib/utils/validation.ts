@@ -155,8 +155,6 @@ export const serviceCreateSchema = z.object({
   is_taxable: z.boolean().default(false),
   vehicle_compatibility: z.array(z.enum(['standard', 'motorcycle', 'rv', 'boat', 'aircraft'])).default(['standard']),
   special_requirements: optionalString,
-  exotic_floor_price: positiveNumber.optional().nullable(),
-  classic_floor_price: positiveNumber.optional().nullable(),
   is_active: z.boolean().default(true),
   display_order: positiveInt.default(0),
 });

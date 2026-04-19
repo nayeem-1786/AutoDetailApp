@@ -34,6 +34,8 @@ export const VEHICLE_SIZE_LABELS: Record<string, string> = {
   sedan: 'Sedan',
   truck_suv_2row: 'Truck/SUV (2-Row)',
   suv_3row_van: 'SUV (3-Row) / Van',
+  exotic: 'Exotic',
+  classic: 'Classic',
 } as const;
 
 // Vehicle type labels

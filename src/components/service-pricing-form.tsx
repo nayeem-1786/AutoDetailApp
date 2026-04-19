@@ -15,6 +15,8 @@ export interface VehicleSizePricing {
   sedan: number | '';
   truck_suv_2row: number | '';
   suv_3row_van: number | '';
+  exotic: number | '';
+  classic: number | '';
 }
 
 export interface ScopeTier {
@@ -63,7 +65,7 @@ export type PricingValue =
 export function getDefaultPricingValue(model: PricingModel): PricingValue {
   switch (model) {
     case 'vehicle_size':
-      return { model: 'vehicle_size', data: { sedan: '', truck_suv_2row: '', suv_3row_van: '' } };
+      return { model: 'vehicle_size', data: { sedan: '', truck_suv_2row: '', suv_3row_van: '', exotic: '', classic: '' } };
     case 'scope':
       return { model: 'scope', data: [{ tier_name: '', tier_label: '', price: '', is_vehicle_size_aware: false, vehicle_size_sedan_price: '', vehicle_size_truck_suv_price: '', vehicle_size_suv_van_price: '', max_qty: '', qty_label: '' }] };
     case 'per_unit':
@@ -108,7 +110,7 @@ function VehicleSizeForm({ value, onChange }: {
   onChange: (value: PricingValue) => void;
 }) {
   const data = value.data;
-  const sizeKeys: (keyof VehicleSizePricing)[] = ['sedan', 'truck_suv_2row', 'suv_3row_van'];
+  const sizeKeys: (keyof VehicleSizePricing)[] = ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'];
 
   return (
     <div className="space-y-4">

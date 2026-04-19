@@ -210,6 +210,8 @@ export function CatalogPanel() {
           service={pickerService}
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
+          vehicleIsExotic={ticket.vehicle?.is_exotic}
+          vehicleIsClassic={ticket.vehicle?.is_classic}
           onSelect={handlePricingSelect}
         />
       )}

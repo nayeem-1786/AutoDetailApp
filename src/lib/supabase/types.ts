@@ -247,8 +247,6 @@ export interface Service {
   sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
-  exotic_floor_price: number | null;
-  classic_floor_price: number | null;
   created_at: string;
   updated_at: string;
   // Joined relations

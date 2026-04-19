@@ -246,8 +246,6 @@ idx_vehicles_requires_custom_quote — btree (requires_custom_quote) WHERE requi
 | sale_price | DECIMAL(10,2) | DEFAULT NULL, CHECK >= 0 | For flat/per_unit models only. Tiered models use `service_pricing.sale_price`. Added via `20260317000001` |
 | sale_starts_at | TIMESTAMPTZ | DEFAULT NULL | Shared sale date range for all tiers. Added via `20260219000009` |
 | sale_ends_at | TIMESTAMPTZ | DEFAULT NULL | Added via `20260219000009` |
-| exotic_floor_price | NUMERIC(10,2) | DEFAULT NULL | Suggested starting price for exotic vehicles in POS custom pricing modal. Added via `20260417000002` |
-| classic_floor_price | NUMERIC(10,2) | DEFAULT NULL | Suggested starting price for classic vehicles in POS custom pricing modal. Added via `20260417000002` |
 | show_on_website | BOOLEAN | NOT NULL, DEFAULT true | Controls visibility on public website |
 | is_featured | BOOLEAN | NOT NULL, DEFAULT false | Featured on homepage or category pages |
 | is_active | BOOLEAN | NOT NULL, DEFAULT true | |
@@ -281,7 +279,7 @@ idx_vehicles_requires_custom_quote — btree (requires_custom_quote) WHERE requi
 **Index:** service_id
 
 **Pricing model → tier usage:**
-- `vehicle_size`: 3 rows per service (sedan, truck_suv_2row, suv_3row_van)
+- `vehicle_size`: 3–5 rows per service (sedan, truck_suv_2row, suv_3row_van + optional `exotic`, `classic`). Exotic/classic rows are OPTIONAL — absence means "not priced, POS gate opens modal"; presence with price > 0 means "tier-priced, POS skips modal for single-flag vehicles". Added via Session 28.
 - `scope`: N rows per service (custom tier names like 'floor_mats', 'complete_interior')
 - `specialty`: N rows per service (vehicle-type tiers like 'single_engine', 'turboprop')
 - `flat` / `per_unit` / `custom`: NO rows in service_pricing (price lives on `services` table)
