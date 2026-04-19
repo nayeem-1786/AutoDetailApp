@@ -1975,10 +1975,12 @@ function SaleDiscountControls({
 
 // ─── Vehicle Size Unified Pricing (Standard + Sale in one table) ─────────
 
-const VEHICLE_SIZE_TIER_KEYS: { key: 'sedan' | 'truck_suv_2row' | 'suv_3row_van'; label: string }[] = [
+const VEHICLE_SIZE_TIER_KEYS: { key: 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic'; label: string }[] = [
   { key: 'sedan', label: 'Sedan' },
   { key: 'truck_suv_2row', label: 'Truck/SUV (2-Row)' },
   { key: 'suv_3row_van', label: 'SUV (3-Row) / Van' },
+  { key: 'exotic', label: 'Exotic' },
+  { key: 'classic', label: 'Classic' },
 ];
 
 function VehicleSizeUnifiedPricing({

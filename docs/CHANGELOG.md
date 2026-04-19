@@ -29,6 +29,8 @@ ALTER TABLE services DROP COLUMN IF EXISTS classic_floor_price;
 
 **Phase 5 — Tests:** 165 tests (143 classifier + 8 badge + 14 new pricing tier/gate tests). All passing.
 
+**Post-build patch:** `VEHICLE_SIZE_TIER_KEYS` constant at line 1978 had only 3 keys (sedan/truck/van), causing admin pricing UI to render 3 rows instead of 5. Extended to include exotic and classic — fixes standard price rows, sale price rows, and sale-price recomputation loop simultaneously.
+
 **Files changed:**
 - `supabase/migrations/20260418000001_drop_service_floor_price_columns.sql` (new)
 - `src/lib/supabase/types.ts` (remove dead fields)
