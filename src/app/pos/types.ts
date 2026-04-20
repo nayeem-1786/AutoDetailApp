@@ -39,6 +39,17 @@ export interface TicketItem {
   saleEffectivePrice: number | null;        // Stored so combo→sale revert works without catalog lookup
   /** True if unitPrice was manually set by staff via the custom-price modal; skip in reprice. */
   isCustomPrice?: boolean;
+  /**
+   * Session 32: set when a vehicle-change reprice failed because the service has no
+   * tier row for the new vehicle's size_class (or new specialty_tier). The item keeps
+   * its previous price; the sidebar shows an amber warning badge.
+   */
+  repriceFailed?: {
+    reason: 'no_tier_for_size';
+    attemptedSize: VehicleSizeClass | null;
+    previousSize: VehicleSizeClass | null;
+    previousTierName: string;
+  };
   // Prerequisite tracking
   prerequisiteNote: string | null;          // "Prereq met: ..." or "Prereq overridden by ..."
   prerequisiteForServiceId: string | null;  // When added as a prereq, the dependent service's ID

@@ -445,13 +445,53 @@ export function ticketReducer(
         if (item.isCustomPrice === true) return item;
 
         const service = services.find((s) => s.id === item.serviceId);
-        // Session 31.5: match tier_name OR tier_label because ADD_SERVICE stores
-        // `tier_label || tier_name` as item.tierName — for vehicle_size rows (and any
-        // tier with a populated label), the stored value is the label not the key.
-        const pricingTier = service?.pricing?.find(
-          (p) => p.tier_name === item.tierName || p.tier_label === item.tierName
-        );
-        if (!pricingTier || !service) return item;
+        if (!service) return item;
+
+        // Session 32: branch tier lookup by pricing_model.
+        // - vehicle_size: each tier row IS a size_class (separate rows, is_vehicle_size_aware:false).
+        //   Match the NEW size_class — do NOT rely on the item's stored tierName (that's the OLD size).
+        // - specialty: match the new vehicle's specialty_tier; fall back to stored tierName if unset.
+        // - scope / others: keep Session 31.5 tierName-matching (label OR key) — those rows are shape-invariant
+        //   across vehicle swaps; size variance lives in the per-size columns resolved by resolveServicePrice.
+        let pricingTier: import('@/lib/supabase/types').ServicePricing | null = null;
+        let repriceFailed: TicketItem['repriceFailed'] | undefined = undefined;
+
+        if (service.pricing_model === 'vehicle_size') {
+          pricingTier = service.pricing?.find((p) => p.tier_name === sizeClass) ?? null;
+          if (!pricingTier) {
+            repriceFailed = {
+              reason: 'no_tier_for_size',
+              attemptedSize: sizeClass,
+              previousSize: item.vehicleSizeClass,
+              previousTierName: item.tierName ?? '',
+            };
+            return { ...item, vehicleSizeClass: sizeClass, repriceFailed };
+          }
+        } else if (service.pricing_model === 'specialty') {
+          const newSpecialtyTier = vehicle?.specialty_tier ?? null;
+          if (newSpecialtyTier) {
+            pricingTier = service.pricing?.find((p) => p.tier_name === newSpecialtyTier) ?? null;
+          }
+          if (!pricingTier) {
+            pricingTier = service.pricing?.find(
+              (p) => p.tier_name === item.tierName || p.tier_label === item.tierName
+            ) ?? null;
+          }
+          if (!pricingTier) {
+            repriceFailed = {
+              reason: 'no_tier_for_size',
+              attemptedSize: sizeClass,
+              previousSize: item.vehicleSizeClass,
+              previousTierName: item.tierName ?? '',
+            };
+            return { ...item, vehicleSizeClass: sizeClass, repriceFailed };
+          }
+        } else {
+          pricingTier = service.pricing?.find(
+            (p) => p.tier_name === item.tierName || p.tier_label === item.tierName
+          ) ?? null;
+          if (!pricingTier) return item;
+        }
 
         // Resolve with sale awareness (always pass window — null dates = no time limit)
         const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
@@ -477,16 +517,25 @@ export function ticketReducer(
 
         const unitPrice = effectivePrice;
         const totalPrice = unitPrice * item.quantity;
+        // For vehicle_size / specialty reprice, the tier row itself changed — update tierName too.
+        // For scope / others, tierName is invariant across swaps.
+        const updatedTierName =
+          service.pricing_model === 'vehicle_size' || service.pricing_model === 'specialty'
+            ? (pricingTier.tier_label || pricingTier.tier_name)
+            : item.tierName;
         return {
           ...item,
           unitPrice,
           totalPrice,
           taxAmount: calculateItemTax(totalPrice, item.isTaxable),
           vehicleSizeClass: sizeClass,
+          tierName: updatedTierName,
           standardPrice: resolved.standardPrice,
           pricingType,
           comboSourcePrimaryId: comboSourceId,
           saleEffectivePrice: saleEffective,
+          // Clear any stale repriceFailed flag — this reprice succeeded.
+          repriceFailed: undefined,
         };
       });
 

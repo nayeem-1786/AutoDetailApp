@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): vehicle_size reprice matches new size_class; add repriceFailed flag + badge — 2026-04-19 (Session 32)
+
+**Problem:** Real-user smoke test (Honda sedan → Ferrari exotic) revealed the vehicle-change reprice was still a silent no-op for the canonical `pricing_model: 'vehicle_size'` services. Session 31 collapsed the actions. Session 31.5 fixed label-vs-name matching. Neither addressed the structural shape of `vehicle_size` services: each size_class is a **separate tier row** with `is_vehicle_size_aware: false` and its own `price`. Matching by the item's stored `tierName` found the OLD size's row, and `resolveServicePrice` returned that row's own price regardless of the new `size_class` parameter.
+
+**Root cause (pre-existing since `vehicle_size` model introduction):**
+- Admin saves 3–5 rows per service, one per size_class (services/[id]/page.tsx:608-610). Each row: `tier_name: 'sedan'|..., tier_label: 'Sedan'|..., price: <size-specific>, is_vehicle_size_aware: false`.
+- ADD_SERVICE stores `pricing.tier_label || pricing.tier_name` → "Sedan" (the old size's label).
+- Reprice lookup `p.tier_name === item.tierName || p.tier_label === item.tierName` matched the SEDAN row. Resolver then saw `is_vehicle_size_aware: false` and returned that row's `price = 140`. The `sizeClass: 'exotic'` parameter was never consulted.
+
+**Fix:** Branch the reprice tier lookup by `service.pricing_model` in both reducers:
+- `vehicle_size`: match on the **new** `size_class` — `service.pricing.find(p => p.tier_name === sizeClass)`. Update both `item.tierName` and `item.unitPrice` from the new row.
+- `specialty`: match on the **new** vehicle's `specialty_tier`. Fallback to label/name lookup if no specialty_tier on the vehicle. Update `item.tierName` on success.
+- `scope` / others: keep Session 31.5 logic (label-OR-name match; `resolveServicePrice` switch handles size-aware columns).
+
+**New `repriceFailed` flag on TicketItem:** when the new vehicle's size (or specialty) has no tier row for the service, the item keeps its previous price and gains a `repriceFailed: { reason: 'no_tier_for_size', attemptedSize, previousSize, previousTierName }` flag. The UI renders an amber "No {Size} pricing" badge alongside Sale/Combo chips in ticket-item-row. A 5-second amber toast warns staff after the reducer pass. The flag clears automatically on a subsequent successful reprice (e.g., swap back to a size with a tier row).
+
+**Payment remains unblocked** when `repriceFailed` is set — staff can still complete the sale. The badge is informational only, matching the spec's "advisory, not blocking" design.
+
+**Pure-reducer discipline preserved:** the reducer doesn't toast (pure-function rule). The toast lives in a `useEffect` watcher in ticket-panel.tsx that diffs the set of failed item IDs across renders — new failures trigger the toast exactly once per transition.
+
+**Test fix — the bug was codified as correct:** Session 31.5's test #11 asserted `expect(unitPrice).toBe(140)` after a sedan→exotic swap on a vehicle_size fixture (narrative comment: "is_vehicle_size_aware is false, resolver returns pricing.price = 140"). The test was green because the reducer produced that buggy result. Session 32 corrects the assertion to `toBe(200)` — the exotic row's price. Also added tests #13-16 (exotic→classic, sale price preservation, no-tier-row sets repriceFailed, repriceFailed clears on recovery). All 4 new tests mirrored in `quote-reducer-vehicle-change.test.ts`.
+
+**Test coverage:** 213 → 221 tests passing. `npx tsc --noEmit` clean.
+
+**Lesson (documented in `docs/audits/vehicle-change-reprice.md` post-ship discovery):** test fixtures must exercise real storage shapes. The Session 31 and 31.5 fixtures used `is_vehicle_size_aware: true` (scope-aware shape) by default; only one test used the real `vehicle_size` shape and asserted the observed (buggy) output rather than the correct behavior.
+
+**Deferred:** architectural refactor to store canonical `tier_name` key on items (not label), resolving labels at render time. Would simplify the reprice branching but touches ADD_SERVICE, duplicate-check, quote persistence, in-flight tickets. Out of scope.
+
+Files changed: `src/app/pos/types.ts`, `src/app/pos/context/ticket-reducer.ts`, `src/app/pos/context/quote-reducer.ts`, `src/app/pos/components/ticket-panel.tsx`, `src/app/pos/components/ticket-item-row.tsx`, `src/app/pos/context/__tests__/ticket-reducer-vehicle-change.test.ts`, `src/app/pos/context/__tests__/quote-reducer-vehicle-change.test.ts`.
+
+---
+
 ## fix(pos): vehicle-reprice tier lookup matches tier_label OR tier_name — 2026-04-19 (Session 31.5 hotfix)
 
 **Problem:** Session 31 shipped collapsed `SET_VEHICLE` with inline reprice; unit tests all passed. Real-user smoke test revealed vehicle swap did NOT reprice services in the POS — silent no-op.

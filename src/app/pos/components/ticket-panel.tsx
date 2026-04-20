@@ -39,7 +39,8 @@ import {
   SwipeableCartItemWrapper,
 } from './swipeable-cart-item';
 import type { TicketItem, CatalogService } from '../types';
-import type { Customer, Vehicle, CustomerType } from '@/lib/supabase/types';
+import type { Customer, Vehicle, CustomerType, VehicleSizeClass } from '@/lib/supabase/types';
+import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 
 interface TicketPanelProps {
   customerLookupOpen: boolean;
@@ -117,6 +118,28 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     window.addEventListener('pos-vehicle-needed', handler);
     return () => window.removeEventListener('pos-vehicle-needed', handler);
   }, [checkoutOpen, checkoutProcessing]);
+
+  // Session 32: toast when vehicle-change reprice failed for one or more items.
+  // Watches ticket.items for NEW repriceFailed flags (not carried over from prior state).
+  const prevFailedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentFailedIds = new Set(
+      ticket.items.filter((i) => i.repriceFailed).map((i) => i.id)
+    );
+    const newlyFailed = ticket.items.filter(
+      (i) => i.repriceFailed && !prevFailedIdsRef.current.has(i.id)
+    );
+    if (newlyFailed.length > 0) {
+      // All newly-failed items share the same attemptedSize (set in the same reducer pass).
+      const attemptedSize = newlyFailed[0].repriceFailed!.attemptedSize;
+      const sizeLabel = attemptedSize ? VEHICLE_SIZE_LABELS[attemptedSize as VehicleSizeClass] : 'this vehicle';
+      toast.warning(
+        `${newlyFailed.length} item${newlyFailed.length === 1 ? '' : 's'} kept at previous price — no pricing configured for ${sizeLabel}`,
+        { duration: 5000 }
+      );
+    }
+    prevFailedIdsRef.current = currentFailedIds;
+  }, [ticket.items]);
 
   // Prerequisite removal guard state
   const [prereqRemoval, setPrereqRemoval] = useState<{

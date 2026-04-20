@@ -316,49 +316,125 @@ describe('quoteReducer SET_VEHICLE (Session 31 silent reprice)', () => {
     expect(next.items[0].vehicleSizeClass).toBe('sedan');
   });
 
-  // ─── Session 31.5 regression tests — realistic tierName = tier_label storage ─
+  // ─── Session 32: vehicle_size pricing_model reprice (mirror of ticket-reducer tests) ─
 
-  it('11. sedan→exotic swap reprices when tierName stored as label (real-world case)', () => {
+  function vsTier(
+    size: 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic',
+    price: number,
+    salePrice: number | null = null,
+    displayOrder = 0,
+  ): ServicePricing {
+    const labelMap: Record<string, string> = {
+      sedan: 'Sedan',
+      truck_suv_2row: 'Truck/SUV (2-Row)',
+      suv_3row_van: 'SUV (3-Row) / Van',
+      exotic: 'Exotic',
+      classic: 'Classic',
+    };
+    return {
+      id: `tier-${size}`,
+      service_id: 'svc-1',
+      tier_name: size,
+      tier_label: labelMap[size],
+      price,
+      sale_price: salePrice,
+      display_order: displayOrder,
+      is_vehicle_size_aware: false,
+      vehicle_size_sedan_price: null,
+      vehicle_size_truck_suv_price: null,
+      vehicle_size_suv_van_price: null,
+      vehicle_size_exotic_price: null,
+      vehicle_size_classic_price: null,
+      max_qty: null,
+      qty_label: null,
+      created_at: '',
+    };
+  }
+
+  it('11. vehicle_size: sedan→exotic swap reprices to EXOTIC row price (not sedan row)', () => {
+    const service = mockService({
+      pricing_model: 'vehicle_size',
+      pricing: [vsTier('sedan', 140, null, 0), vsTier('exotic', 200, null, 3)],
+    });
+    const state = stateWithItems([
+      mockServiceItem({
+        unitPrice: 140,
+        standardPrice: 140,
+        vehicleSizeClass: 'sedan',
+        tierName: 'Sedan',
+      }),
+    ]);
+    const next = quoteReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('exotic'),
+      services: [service],
+    });
+    expect(next.items[0].unitPrice).toBe(200);
+    expect(next.items[0].standardPrice).toBe(200);
+    expect(next.items[0].tierName).toBe('Exotic');
+    expect(next.items[0].vehicleSizeClass).toBe('exotic');
+    expect(next.items[0].repriceFailed).toBeUndefined();
+  });
+
+  it('13. vehicle_size: sedan→classic swap reprices to classic row (all 5 rows populated)', () => {
     const service = mockService({
       pricing_model: 'vehicle_size',
       pricing: [
-        {
-          id: 'tier-sedan',
-          service_id: 'svc-1',
-          tier_name: 'sedan',
-          tier_label: 'Sedan',
-          price: 140,
-          sale_price: null,
-          display_order: 0,
-          is_vehicle_size_aware: false,
-          vehicle_size_sedan_price: null,
-          vehicle_size_truck_suv_price: null,
-          vehicle_size_suv_van_price: null,
-          vehicle_size_exotic_price: null,
-          vehicle_size_classic_price: null,
-          max_qty: null,
-          qty_label: null,
-          created_at: '',
-        },
-        {
-          id: 'tier-exotic',
-          service_id: 'svc-1',
-          tier_name: 'exotic',
-          tier_label: 'Exotic',
-          price: 200,
-          sale_price: null,
-          display_order: 3,
-          is_vehicle_size_aware: false,
-          vehicle_size_sedan_price: null,
-          vehicle_size_truck_suv_price: null,
-          vehicle_size_suv_van_price: null,
-          vehicle_size_exotic_price: null,
-          vehicle_size_classic_price: null,
-          max_qty: null,
-          qty_label: null,
-          created_at: '',
-        },
+        vsTier('sedan', 140, null, 0),
+        vsTier('truck_suv_2row', 150, null, 1),
+        vsTier('suv_3row_van', 160, null, 2),
+        vsTier('exotic', 200, null, 3),
+        vsTier('classic', 180, null, 4),
       ],
+    });
+    const state = stateWithItems([
+      mockServiceItem({
+        unitPrice: 140,
+        standardPrice: 140,
+        vehicleSizeClass: 'sedan',
+        tierName: 'Sedan',
+      }),
+    ]);
+    const next = quoteReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('classic'),
+      services: [service],
+    });
+    expect(next.items[0].unitPrice).toBe(180);
+    expect(next.items[0].tierName).toBe('Classic');
+    expect(next.items[0].vehicleSizeClass).toBe('classic');
+  });
+
+  it('14. vehicle_size: reprice keeps sale price when new tier has active sale_price', () => {
+    const service = mockService({
+      sale_starts_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      sale_ends_at: null,
+      pricing_model: 'vehicle_size',
+      pricing: [vsTier('sedan', 140, null, 0), vsTier('exotic', 200, 170, 3)],
+    });
+    const state = stateWithItems([
+      mockServiceItem({
+        unitPrice: 140,
+        standardPrice: 140,
+        vehicleSizeClass: 'sedan',
+        tierName: 'Sedan',
+      }),
+    ]);
+    const next = quoteReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('exotic'),
+      services: [service],
+    });
+    expect(next.items[0].unitPrice).toBe(170);
+    expect(next.items[0].saleEffectivePrice).toBe(170);
+    expect(next.items[0].pricingType).toBe('sale');
+    expect(next.items[0].standardPrice).toBe(200);
+  });
+
+  it('15. vehicle_size: no tier row for new size sets repriceFailed and keeps old price', () => {
+    const service = mockService({
+      pricing_model: 'vehicle_size',
+      pricing: [vsTier('sedan', 140, null, 0), vsTier('truck_suv_2row', 150, null, 1)],
     });
     const state = stateWithItems([
       mockServiceItem({
@@ -375,6 +451,42 @@ describe('quoteReducer SET_VEHICLE (Session 31 silent reprice)', () => {
     });
     expect(next.items[0].unitPrice).toBe(140);
     expect(next.items[0].vehicleSizeClass).toBe('exotic');
+    expect(next.items[0].repriceFailed).toEqual({
+      reason: 'no_tier_for_size',
+      attemptedSize: 'exotic',
+      previousSize: 'sedan',
+      previousTierName: 'Sedan',
+    });
+  });
+
+  it('16. vehicle_size: repriceFailed clears on subsequent successful reprice (swap back)', () => {
+    const service = mockService({
+      pricing_model: 'vehicle_size',
+      pricing: [vsTier('sedan', 140, null, 0), vsTier('truck_suv_2row', 150, null, 1)],
+    });
+    let state = stateWithItems([
+      mockServiceItem({
+        unitPrice: 140,
+        standardPrice: 140,
+        vehicleSizeClass: 'sedan',
+        tierName: 'Sedan',
+      }),
+    ]);
+    state = quoteReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('exotic'),
+      services: [service],
+    });
+    expect(state.items[0].repriceFailed?.reason).toBe('no_tier_for_size');
+
+    const recovered = quoteReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('sedan'),
+      services: [service],
+    });
+    expect(recovered.items[0].repriceFailed).toBeUndefined();
+    expect(recovered.items[0].unitPrice).toBe(140);
+    expect(recovered.items[0].vehicleSizeClass).toBe('sedan');
   });
 
   it('12. vehicle-size-aware scope tier reprices when tierName stored as label', () => {
