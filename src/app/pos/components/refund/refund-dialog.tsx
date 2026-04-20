@@ -18,6 +18,11 @@ import type {
 import { posFetch } from '../../lib/pos-fetch';
 import { RefundItemRow } from './refund-item-row';
 import { RefundSummary } from './refund-summary';
+import {
+  computePerUnitRefundableCents,
+  computeTotalRefundCents,
+  fromCents,
+} from '@/lib/utils/refund-math';
 
 interface RefundDialogProps {
   open: boolean;
@@ -116,55 +121,76 @@ export function RefundDialog({
     });
   }, []);
 
-  // Calculate per-unit refundable amount for each item (proportional discount + tax)
-  const perUnitRefundableMap = useMemo(() => {
+  // Per-unit refundable amount for each item, in FRACTIONAL CENTS.
+  // Used by RefundItemRow for its pre-selection display approximation.
+  // The authoritative per-line refund amount comes from computeTotalRefundCents
+  // below (includes residual-cent distribution for multi-line discounted
+  // refunds). See src/lib/utils/refund-math.ts invariants.
+  const perUnitCentsMap = useMemo(() => {
     const map = new Map<string, number>();
-    const txSubtotal = transaction.subtotal || 0;
-    const txDiscount = transaction.discount_amount || 0;
+    const tx_subtotal = transaction.subtotal || 0;
+    const tx_discount_amount = transaction.discount_amount || 0;
 
     for (const item of transaction.items) {
-      const itemSubtotal = item.unit_price * item.quantity;
-      const itemTax = item.tax_amount || 0;
-      const itemTotalWithTax = itemSubtotal + itemTax;
-
-      // Proportional share of the transaction-level discount
-      const itemShare = txSubtotal > 0 ? itemSubtotal / txSubtotal : 0;
-      const itemDiscount = txDiscount * itemShare;
-
-      const refundableTotal = Math.max(0, itemTotalWithTax - itemDiscount);
-      const perUnit = item.quantity > 0
-        ? Math.round(refundableTotal / item.quantity * 100) / 100
-        : 0;
-      map.set(item.id, perUnit);
+      const perUnitCents = computePerUnitRefundableCents({
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        tax_amount: item.tax_amount || 0,
+        tx_subtotal,
+        tx_discount_amount,
+      });
+      map.set(item.id, perUnitCents);
     }
 
     return map;
   }, [transaction.items, transaction.subtotal, transaction.discount_amount]);
 
-  // Build summary items for the confirm step
+  // Authoritative refund line amounts (integer cents, residual-distributed).
+  // Payload sent to API uses fromCents() at the boundary — API contract is
+  // unchanged (accepts dollars).
   const summaryItems = useMemo(() => {
-    const result: Array<{
+    const selectedEntries: Array<{
       item: TransactionItem;
-      quantity: number;
-      amount: number;
-      restock: boolean;
+      state: SelectedItemState;
     }> = [];
 
     for (const [itemId, state] of selectedItems) {
       const item = transaction.items.find((i) => i.id === itemId);
-      if (item) {
-        const perUnit = perUnitRefundableMap.get(item.id) ?? 0;
-        result.push({
-          item,
-          quantity: state.qty,
-          amount: Math.round(perUnit * state.qty * 100) / 100,
-          restock: state.restock,
-        });
-      }
+      if (item) selectedEntries.push({ item, state });
     }
 
-    return result;
-  }, [selectedItems, transaction.items, perUnitRefundableMap]);
+    if (selectedEntries.length === 0) return [];
+
+    const { lineAmountsCents } = computeTotalRefundCents({
+      transaction: {
+        subtotal: transaction.subtotal || 0,
+        discount_amount: transaction.discount_amount || 0,
+        tip_amount: transaction.tip_amount || 0,
+      },
+      items: selectedEntries.map(({ item, state }) => ({
+        unit_price: item.unit_price,
+        quantity: item.quantity,
+        tax_amount: item.tax_amount || 0,
+        refund_quantity: state.qty,
+      })),
+      tip_refund: 0, // tip is added separately on the payload, not per-line
+    });
+
+    return selectedEntries.map(({ item, state }, i) => ({
+      item,
+      quantity: state.qty,
+      amountCents: lineAmountsCents[i],
+      // boundary: cents → dollars for existing API contract
+      amountDollars: fromCents(lineAmountsCents[i]),
+      restock: state.restock,
+    }));
+  }, [
+    selectedItems,
+    transaction.items,
+    transaction.subtotal,
+    transaction.discount_amount,
+    transaction.tip_amount,
+  ]);
 
   // Check if all refundable items are fully selected (full refund → include tip)
   const isFullRefund = useMemo(() => {
@@ -191,7 +217,9 @@ export function RefundDialog({
         items: summaryItems.map((entry) => ({
           transaction_item_id: entry.item.id,
           quantity: entry.quantity,
-          amount: entry.amount,
+          // boundary: cents → dollars for API contract (amountDollars is
+          // fromCents(amountCents); server recomputes and enforces exact match)
+          amount: entry.amountDollars,
           restock: entry.restock,
         })),
         tip_refund: tipRefund,
@@ -260,7 +288,7 @@ export function RefundDialog({
                       selected={!!selection}
                       refundQty={selection?.qty ?? 1}
                       restock={selection?.restock ?? false}
-                      perUnitRefundable={perUnitRefundableMap.get(item.id) ?? 0}
+                      perUnitCents={perUnitCentsMap.get(item.id) ?? 0}
                       onToggle={() => toggleItem(item.id)}
                       onQtyChange={(qty) => updateQty(item.id, qty)}
                       onRestockChange={(rs) => updateRestock(item.id, rs)}

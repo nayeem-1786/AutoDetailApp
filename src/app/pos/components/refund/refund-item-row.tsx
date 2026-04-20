@@ -2,6 +2,7 @@
 
 import { Minus, Plus } from 'lucide-react';
 import type { TransactionItem } from '@/lib/supabase/types';
+import { fromCents } from '@/lib/utils/refund-math';
 
 interface RefundItemRowProps {
   item: TransactionItem;
@@ -9,7 +10,9 @@ interface RefundItemRowProps {
   selected: boolean;
   refundQty: number;
   restock: boolean;
-  perUnitRefundable: number;
+  // Fractional cents per unit — display approximation only. Authoritative
+  // line amount (with residual distribution) comes from RefundSummary.
+  perUnitCents: number;
   onToggle: () => void;
   onQtyChange: (qty: number) => void;
   onRestockChange: (restock: boolean) => void;
@@ -28,15 +31,17 @@ export function RefundItemRow({
   selected,
   refundQty,
   restock,
-  perUnitRefundable,
+  perUnitCents,
   onToggle,
   onQtyChange,
   onRestockChange,
 }: RefundItemRowProps) {
   const disabled = maxRefundableQty <= 0;
+  // boundary: fractional cents → dollars for display only (approximate;
+  // confirm-step summary uses residual-distributed integer cents)
   const displayAmount = selected
-    ? (perUnitRefundable * refundQty).toFixed(2)
-    : perUnitRefundable.toFixed(2);
+    ? fromCents(perUnitCents * refundQty).toFixed(2)
+    : fromCents(perUnitCents).toFixed(2);
 
   function decrement() {
     if (refundQty > 1) {

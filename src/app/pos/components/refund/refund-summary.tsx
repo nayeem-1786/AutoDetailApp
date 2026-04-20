@@ -3,12 +3,14 @@
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { TransactionItem } from '@/lib/supabase/types';
+import { fromCents, toCents } from '@/lib/utils/refund-math';
 
 interface RefundSummaryProps {
   items: Array<{
     item: TransactionItem;
     quantity: number;
-    amount: number;
+    // Integer cents (residual-distributed). Display via fromCents().
+    amountCents: number;
     restock: boolean;
   }>;
   tipRefund?: number;
@@ -30,8 +32,15 @@ export function RefundSummary({
   loyaltyPointsEarned = 0,
   couponCode,
 }: RefundSummaryProps) {
-  const itemsTotal = items.reduce((sum, entry) => sum + entry.amount, 0);
-  const totalAmount = Math.round((itemsTotal + tipRefund) * 100) / 100;
+  // All aggregation done in integer cents to match server recompute exactly.
+  const itemsTotalCents = items.reduce(
+    (sum, entry) => sum + entry.amountCents,
+    0
+  );
+  // boundary: tipRefund arrives in dollars from parent → cents
+  const totalCents = itemsTotalCents + toCents(tipRefund);
+  // boundary: cents → dollars for display
+  const totalAmount = fromCents(totalCents);
 
   return (
     <div className="space-y-4">
@@ -55,7 +64,7 @@ export function RefundSummary({
               )}
             </div>
             <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              ${entry.amount.toFixed(2)}
+              ${fromCents(entry.amountCents).toFixed(2)}
             </span>
           </div>
         ))}

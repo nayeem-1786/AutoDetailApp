@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-18 (Session 29 — removed specialty-badge, custom-price-modal; added 2 migrations)
+> **Last updated:** 2026-04-20 (Session 36 — added refund-math.ts + test)
 
 ---
 
@@ -1006,9 +1006,11 @@ src/lib/utils/template.ts
 src/lib/utils/ticker-sections.ts
 src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
+src/lib/utils/refund-math.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
 src/lib/utils/__tests__/constants.test.ts
+src/lib/utils/__tests__/refund-math.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/webhook.ts
 ```

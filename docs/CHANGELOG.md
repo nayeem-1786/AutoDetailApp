@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): integer-cent refund math with residual distribution + server per-line recompute — 2026-04-20 (Session 36)
+
+**Problem:** Receipt SD-006211 showed a refund of -$71.39 against a $71.43 transaction — off by $0.04. Paper Mats (qty 40, unit $0.40, stored tax $1.64) refunded at $17.60 instead of $17.64. A sibling test transaction computed $0.02 OVER the original and hit the server's aggregate cap (+$0.01 tolerance) — blocking the refund entirely.
+
+**Root cause (Session 35 audit, `refund-dialog.tsx:136`):** `Math.round(refundableTotal / item.quantity * 100) / 100` rounded the per-unit value BEFORE multiplying by quantity. For Paper Mats: `17.64 / 40 = 0.441`, rounded to `$0.44`, × 40 units = `$17.60` — $0.04 lost. On other shapes (e.g. `0.17 × 3 + tax 0.05`) the division rounds UP and over-refunds by pennies, tripping the cap.
+
+**Fix:** Integer-cent arithmetic end-to-end with a single rounding site per line.
+
+- New shared helper `src/lib/utils/refund-math.ts`: `toCents`, `fromCents`, `computePerUnitRefundableCents` (fractional cents, no mid-pipeline rounding), `computeRefundLineAmountCents` (`Math.round(perUnit × refundQty)` — only rounding site), `computeTotalRefundCents` (aggregates + calls `distributeResidualCents`), `distributeResidualCents` (allocates ±1¢ per line to the largest-abs lines so `sum(lineAmountsCents) === targetTotalCents` exactly).
+- Critical invariants documented at file header. Tax convention (pre-discount, verified in Phase 0 against `src/app/pos/utils/tax.ts:8-11`) recorded inline.
+- Client refactor (`refund-dialog.tsx`, `refund-item-row.tsx`, `refund-summary.tsx`): `perUnitCentsMap` carries fractional cents for row-level display; authoritative line amounts come from one `computeTotalRefundCents` call on the selected items. Payload preserves API contract — `amount` sent in dollars via `fromCents()` at the boundary.
+- Server recompute (`src/app/api/pos/refunds/route.ts`): new bulk fetch of `transaction_items` (`unit_price, quantity, tax_amount`) for every payload item; exact-match check (`toCents(clientAmount) === recomputed.lineAmountsCents[i]`) with tolerance 0 — any mismatch rejects with 400. Server values are written to `refund_items.amount`; client values were validated input only. `already_refunded` summed in cents, not dollars. Aggregate cap keeps `+1¢` tolerance for legacy DB rows only.
+- `refunds.amount`, `refund_items.amount`: schema unchanged, DECIMAL(10,2).
+
+**Regression-proof tests (`src/lib/utils/__tests__/refund-math.test.ts`):** Paper Mats full/partial (1764, 882, 221 cents), sibling +$0.02 case (56 cents), Teflon (2292), Wheel Acid (3087), full bug-transaction aggregate (7143 cents), tip aggregation (7643), three identical discounted lines → −1¢ residual redistributes to one line (`sum === 899` exact), `distributeResidualCents` edge cases (empty, 0 residual, residual ≥ length, tie-break, non-mutation), IEEE-754 `toCents(17.64) === 1764`, boundary round-trips.
+
+**Tests: 221 → 247 passing.** `npm run typecheck` clean. Bug-pattern greps in `src/app/pos/components/refund/` return zero.
+
+**Known gap (deferred):** `src/app/api/admin/orders/[id]/refund/route.ts` (online-store order refunds) is a separate code path and was not touched this session. Likely has the same bug class; separate audit.
+
+**Known gap (documented):** Tax convention is pre-discount. If the business ever switches to post-discount tax calculation, the refund formula in `refund-math.ts` must be re-derived — the file header comment records today's finding (2026-04-20) and points to the source-of-truth call sites in `src/app/pos/utils/tax.ts`.
+
+Files changed: `src/lib/utils/refund-math.ts` (new), `src/lib/utils/__tests__/refund-math.test.ts` (new), `src/app/pos/components/refund/refund-dialog.tsx`, `src/app/pos/components/refund/refund-item-row.tsx`, `src/app/pos/components/refund/refund-summary.tsx`, `src/app/api/pos/refunds/route.ts`, `docs/dev/FILE_TREE.md`.
+
+---
+
 ## fix(pos): vehicle_size reprice matches new size_class; add repriceFailed flag + badge — 2026-04-19 (Session 32)
 
 **Problem:** Real-user smoke test (Honda sedan → Ferrari exotic) revealed the vehicle-change reprice was still a silent no-op for the canonical `pricing_model: 'vehicle_size'` services. Session 31 collapsed the actions. Session 31.5 fixed label-vs-name matching. Neither addressed the structural shape of `vehicle_size` services: each size_class is a **separate tier row** with `is_vehicle_size_aware: false` and its own `price`. Matching by the item's stored `tierName` found the OLD size's row, and `resolveServicePrice` returned that row's own price regardless of the new `size_class` parameter.

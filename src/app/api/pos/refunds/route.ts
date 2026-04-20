@@ -5,6 +5,11 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { refundCreateSchema } from '@/lib/utils/validation';
 import Stripe from 'stripe';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import {
+  computeTotalRefundCents,
+  fromCents,
+  toCents,
+} from '@/lib/utils/refund-math';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -53,38 +58,114 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate total refund amount (items + tip)
-    const itemsRefundAmount = data.items.reduce((sum, item) => sum + item.amount, 0);
+    // Bulk fetch transaction_items — needed for server-side refund math
+    // recompute. See src/lib/utils/refund-math.ts invariants.
+    const { data: txItems, error: txItemsError } = await supabase
+      .from('transaction_items')
+      .select('id, unit_price, quantity, tax_amount')
+      .eq('transaction_id', data.transaction_id);
+
+    if (txItemsError || !txItems) {
+      console.error('Transaction items fetch error:', txItemsError);
+      return NextResponse.json(
+        { error: 'Failed to load transaction items' },
+        { status: 500 }
+      );
+    }
+
+    const itemsById = new Map(
+      txItems.map((row) => [row.id as string, row])
+    );
+
+    // Validate every payload item resolves to a real transaction_item row
+    for (const payloadItem of data.items) {
+      if (!itemsById.has(payloadItem.transaction_item_id)) {
+        return NextResponse.json(
+          { error: `Unknown transaction_item_id: ${payloadItem.transaction_item_id}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Recompute refund amounts server-side from stored transaction_items.
+    // Client-sent amounts are validated input; server values are authoritative
+    // on write.
     const tipRefund = data.tip_refund ?? 0;
-    const totalRefundAmount = Math.round((itemsRefundAmount + tipRefund) * 100) / 100;
+    const recomputed = computeTotalRefundCents({
+      transaction: {
+        subtotal: transaction.subtotal,
+        discount_amount: transaction.discount_amount || 0,
+        tip_amount: transaction.tip_amount || 0,
+      },
+      items: data.items.map((payloadItem) => {
+        const row = itemsById.get(payloadItem.transaction_item_id)!;
+        return {
+          unit_price: row.unit_price,
+          quantity: row.quantity,
+          tax_amount: row.tax_amount || 0,
+          refund_quantity: payloadItem.quantity,
+        };
+      }),
+      tip_refund: tipRefund,
+    });
+
+    // Per-line exact-match check (tolerance 0). Both client and server use the
+    // shared helper — any disagreement indicates a bug, not rounding drift.
+    for (let i = 0; i < data.items.length; i++) {
+      const clientCents = toCents(data.items[i].amount);
+      const serverCents = recomputed.lineAmountsCents[i];
+      if (clientCents !== serverCents) {
+        return NextResponse.json(
+          {
+            error: `Refund line ${i + 1} amount mismatch: expected $${fromCents(
+              serverCents
+            ).toFixed(2)}, got $${fromCents(clientCents).toFixed(2)}`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const totalRefundAmount = fromCents(recomputed.totalCents);
 
     // Allow $0 refunds when there's loyalty, coupon, or restock to reverse
     const hasLoyaltyToReverse = (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0);
     const hasCouponToReverse = !!transaction.coupon_id;
     const hasItemsToRestock = data.items.some((item) => item.restock);
 
-    if (totalRefundAmount <= 0 && !hasLoyaltyToReverse && !hasCouponToReverse && !hasItemsToRestock) {
+    if (recomputed.totalCents <= 0 && !hasLoyaltyToReverse && !hasCouponToReverse && !hasItemsToRestock) {
       return NextResponse.json(
         { error: 'Nothing to refund — no payment, loyalty points, or items to restock' },
         { status: 400 }
       );
     }
 
-    // Server-side cap: refund must not exceed actual amount paid minus already refunded
-    if (totalRefundAmount > 0) {
+    // Aggregate cap: refund total must not exceed amount paid minus already
+    // refunded. Keeps a +1¢ tolerance for legacy DB rows whose rounded amounts
+    // may drift; new-path recompute is exact.
+    if (recomputed.totalCents > 0) {
       const { data: existingRefunds } = await supabase
         .from('refunds')
         .select('amount')
         .eq('transaction_id', data.transaction_id)
         .eq('status', 'processed');
-      const alreadyRefunded = (existingRefunds || []).reduce(
-        (sum: number, r: { amount: number }) => sum + r.amount,
+      const alreadyRefundedCents = (existingRefunds || []).reduce(
+        (sum: number, r: { amount: number }) => sum + toCents(r.amount),
         0
       );
-      const maxRefundable = (transaction.total_amount + (transaction.tip_amount || 0)) - alreadyRefunded;
-      if (totalRefundAmount > maxRefundable + 0.01) {
+      const maxRefundableCents =
+        toCents(transaction.total_amount) +
+        toCents(transaction.tip_amount || 0) -
+        alreadyRefundedCents;
+      if (recomputed.totalCents > maxRefundableCents + 1) {
         return NextResponse.json(
-          { error: `Refund amount ($${totalRefundAmount.toFixed(2)}) exceeds maximum refundable ($${maxRefundable.toFixed(2)})` },
+          {
+            error: `Refund amount ($${fromCents(
+              recomputed.totalCents
+            ).toFixed(2)}) exceeds maximum refundable ($${fromCents(
+              maxRefundableCents
+            ).toFixed(2)})`,
+          },
           { status: 400 }
         );
       }
@@ -138,12 +219,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Insert refund items
-    const refundItemRows = data.items.map((item) => ({
+    // 3. Insert refund items (server-computed amounts; client values were
+    //    validated input only)
+    const refundItemRows = data.items.map((item, i) => ({
       refund_id: refund.id,
       transaction_item_id: item.transaction_item_id,
       quantity: item.quantity,
-      amount: item.amount,
+      amount: fromCents(recomputed.lineAmountsCents[i]),
       restock: item.restock,
     }));
 
