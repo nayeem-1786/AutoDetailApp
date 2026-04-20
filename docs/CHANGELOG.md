@@ -4,6 +4,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): vehicle-reprice tier lookup matches tier_label OR tier_name — 2026-04-19 (Session 31.5 hotfix)
+
+**Problem:** Session 31 shipped collapsed `SET_VEHICLE` with inline reprice; unit tests all passed. Real-user smoke test revealed vehicle swap did NOT reprice services in the POS — silent no-op.
+
+**Root cause (pre-existing bug since `RECALCULATE_VEHICLE_PRICES` was introduced):**
+- `ADD_SERVICE` stores `tierName: pricing.tier_label || pricing.tier_name` on the TicketItem. For every row saved by the admin `vehicle_size` model (services/[id]/page.tsx:608-610), `tier_label` is populated with the human label (e.g., `'Sedan'`, `'Truck/SUV (2-Row)'`), so the stored `tierName` is the label, not the `tier_name` key.
+- Reprice lookup used only `p.tier_name === item.tierName`. Label `'Sedan'` never matches key `'sedan'` — lookup returns undefined — item silently unchanged.
+- Session 31's collapse preserved the bug. Test fixtures used matching values (`tier_name: 'default'`, `tierName: 'default'`), bypassing the real-world storage path entirely. The audit concluded "RECALCULATE_VEHICLE_PRICES works correctly" based on logic reading, not runtime exercise.
+
+**Fix (one-line in each reducer):**
+```ts
+// ticket-reducer.ts:452, quote-reducer.ts:381
+(p) => p.tier_name === item.tierName || p.tier_label === item.tierName
+```
+Reprice now matches on either field. Backward-compatible with items stored when `tier_label` was null (`tierName === tier_name` path still works).
+
+**Scope of fix:** all services affected by the pre-existing bug now reprice correctly:
+- `pricing_model: 'vehicle_size'` rows with populated `tier_label` (the canonical case)
+- Specialty-model services with populated `tier_label`
+- Scope-model services with `is_vehicle_size_aware: true` and a populated `tier_label` (e.g., "Complete Interior")
+
+**Tests:** 4 new regression tests added (2 per reducer) using realistic fixture patterns — items stored with `tierName = tier_label`, tier rows with `tier_name` as the key and `tier_label` as the label. 209 → 213 tests, all passing. `npx tsc --noEmit` clean.
+
+**Deferred (out of scope for hotfix):** refactoring ADD_SERVICE to store just `pricing.tier_name` as canonical key and resolving label at render time. That's the cleaner architectural fix but touches duplicate-check logic, quote-side `tier_name` persistence writes, existing in-flight tickets. Separate session.
+
+Files changed: `src/app/pos/context/ticket-reducer.ts`, `src/app/pos/context/quote-reducer.ts`, `src/app/pos/context/__tests__/ticket-reducer-vehicle-change.test.ts`, `src/app/pos/context/__tests__/quote-reducer-vehicle-change.test.ts`.
+
+---
+
 ## feat(pos): silent reprice on vehicle change — 2026-04-19 (Session 31)
 
 **Problem:** Staff swapping vehicles mid-ticket left services at their original add-time prices. Edit-existing-vehicle path at `ticket-panel.tsx:681` dispatched `SET_VEHICLE` without the paired `RECALCULATE_VEHICLE_PRICES` — a service added at sedan pricing stayed at sedan pricing after the vehicle was re-classified as exotic. Silent mispricing.

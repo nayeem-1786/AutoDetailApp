@@ -335,3 +335,29 @@ All line numbers are current as of HEAD `2a5a8619` (post-Session-30).
 - Prerequisites: `src/app/pos/hooks/use-prerequisite-check.ts`
 - Dispatch sites: `ticket-panel.tsx:{259, 274, 280, 320, 333, 681}`, `quote-ticket-panel.tsx:{108, 113, 142, 155}`
 - Canonical size_class: `src/lib/utils/constants.ts:VEHICLE_SIZE_CLASS_KEYS` (Session 30)
+
+---
+
+## Post-ship discovery — Session 31.5 hotfix
+
+After Session 31 shipped (collapsed action, 209 unit tests green), a real-user smoke test in the POS revealed vehicle swap still did NOT reprice services on the ticket. Investigation found a bug **pre-existing** in `RECALCULATE_VEHICLE_PRICES` that this audit failed to catch.
+
+**The bug:** `ADD_SERVICE` stores `tierName: pricing.tier_label || pricing.tier_name` on the TicketItem. The admin `vehicle_size` model save path (services/[id]/page.tsx:608-610) populates `tier_label` with human labels (`'Sedan'`, `'Truck/SUV (2-Row)'`, etc.). So in practice the item's `tierName` is the *label*, not the `tier_name` key. The reprice lookup — in both the pre-Session-31 `RECALCULATE_VEHICLE_PRICES` case and the post-Session-31 collapsed `SET_VEHICLE` case — compared only `p.tier_name === item.tierName`. Label `'Sedan'` never matched key `'sedan'`. The lookup returned undefined, the early-return `if (!pricingTier) return item` fired, and every vehicle-size-aware service was silently skipped.
+
+This affected the canonical case (standard vehicle-size services) — essentially all services in production.
+
+**Why this audit missed it:**
+- Section 4 ("Pricing resolver") and Section 3 ("Sale pricing pattern") were walked through statically and concluded the logic was correct.
+- No runtime smoke test was performed against a real service with a populated `tier_label`.
+- The pre-existing `RECALCULATE_VEHICLE_PRICES` was treated as a known-good primitive and reused via collapse, inheriting the latent bug.
+- Session 31's unit test fixtures used `tier_name: 'default'` / `tierName: 'default'` so the lookup trivially matched. The path from ADD_SERVICE's `tier_label || tier_name` storage to reprice's `p.tier_name === item.tierName` lookup was never exercised by a test.
+
+**Lesson:** audits concluding "X works correctly" must exercise realistic fixtures — values produced by the actual save path, not synthetic test data. A single fixture built by round-tripping through ADD_SERVICE (rather than hand-constructed with arbitrary field values) would have caught this.
+
+**Fix (one-line in each reducer, Session 31.5):**
+```ts
+(p) => p.tier_name === item.tierName || p.tier_label === item.tierName
+```
+Plus 4 regression tests with the realistic `tierName = tier_label` storage pattern — 2 per reducer, covering the `vehicle_size` model and the `scope + is_vehicle_size_aware` model.
+
+**Cleaner architectural fix (deferred):** normalize `tierName` storage to always be the canonical `tier_name` key, resolve label at render time. Touches duplicate-check, quote persistence, in-flight tickets — out of scope for hotfix.

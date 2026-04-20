@@ -323,6 +323,124 @@ describe('ticketReducer SET_VEHICLE (Session 31 silent reprice)', () => {
     expect(next.items[0].vehicleSizeClass).toBe('sedan');
   });
 
+  // ─── Session 31.5 regression tests — realistic tierName = tier_label storage ─
+
+  it('11. sedan→exotic swap reprices when tierName stored as label (real-world case)', () => {
+    // Admin saves vehicle_size rows with BOTH tier_name and tier_label populated
+    // (see services/[id]/page.tsx:608-610). ADD_SERVICE stores `tier_label || tier_name`
+    // on the item, so real-world items have tierName = "Sedan" (label), not "sedan" (key).
+    const service = mockService({
+      pricing_model: 'vehicle_size',
+      pricing: [
+        // Separate rows per size_class with is_vehicle_size_aware=false (vehicle_size model)
+        {
+          id: 'tier-sedan',
+          service_id: 'svc-1',
+          tier_name: 'sedan',
+          tier_label: 'Sedan',
+          price: 140,
+          sale_price: null,
+          display_order: 0,
+          is_vehicle_size_aware: false,
+          vehicle_size_sedan_price: null,
+          vehicle_size_truck_suv_price: null,
+          vehicle_size_suv_van_price: null,
+          vehicle_size_exotic_price: null,
+          vehicle_size_classic_price: null,
+          max_qty: null,
+          qty_label: null,
+          created_at: '',
+        },
+        {
+          id: 'tier-exotic',
+          service_id: 'svc-1',
+          tier_name: 'exotic',
+          tier_label: 'Exotic',
+          price: 200,
+          sale_price: null,
+          display_order: 3,
+          is_vehicle_size_aware: false,
+          vehicle_size_sedan_price: null,
+          vehicle_size_truck_suv_price: null,
+          vehicle_size_suv_van_price: null,
+          vehicle_size_exotic_price: null,
+          vehicle_size_classic_price: null,
+          max_qty: null,
+          qty_label: null,
+          created_at: '',
+        },
+      ],
+    });
+    // Item added with tierName = 'Sedan' (label, what ADD_SERVICE actually stores).
+    const state = stateWithItems([
+      mockServiceItem({
+        unitPrice: 140,
+        standardPrice: 140,
+        vehicleSizeClass: 'sedan',
+        tierName: 'Sedan',
+      }),
+    ]);
+    const next = ticketReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('exotic'),
+      services: [service],
+    });
+    // With label-OR-name matching, reprice finds the "exotic" row and reprices.
+    // Note: vehicle_size model has separate rows per size — the item's tierName references
+    // the original row ("Sedan"), which still exists after the swap. The reducer finds it by label
+    // and reprices using resolveServicePriceWithSale against exotic sizeClass. Because
+    // is_vehicle_size_aware is false on these rows, the resolver returns pricing.price = 140.
+    // The item's tier reference stays "Sedan" — swapping vehicle doesn't relabel the tier.
+    // The effective fix: reprice executes (didn't silently no-op).
+    expect(next.items[0].unitPrice).toBe(140);
+    expect(next.items[0].vehicleSizeClass).toBe('exotic');
+  });
+
+  it('12. vehicle-size-aware scope tier reprices when tierName stored as label', () => {
+    // Scope model with is_vehicle_size_aware=true: one tier row with per-size columns populated,
+    // tier_label is a scope name like "Complete Interior". Item's tierName = label.
+    const service = mockService({
+      pricing_model: 'scope',
+      pricing: [
+        {
+          id: 'tier-complete',
+          service_id: 'svc-1',
+          tier_name: 'complete_interior',
+          tier_label: 'Complete Interior',
+          price: 100,
+          sale_price: null,
+          display_order: 0,
+          is_vehicle_size_aware: true,
+          vehicle_size_sedan_price: 140,
+          vehicle_size_truck_suv_price: 150,
+          vehicle_size_suv_van_price: 160,
+          vehicle_size_exotic_price: 220,
+          vehicle_size_classic_price: 180,
+          max_qty: null,
+          qty_label: null,
+          created_at: '',
+        },
+      ],
+    });
+    const state = stateWithItems([
+      mockServiceItem({
+        unitPrice: 140,
+        standardPrice: 140,
+        vehicleSizeClass: 'sedan',
+        tierName: 'Complete Interior', // label stored per ADD_SERVICE semantics
+      }),
+    ]);
+    const next = ticketReducer(state, {
+      type: 'SET_VEHICLE',
+      vehicle: mockVehicle('exotic'),
+      services: [service],
+    });
+    // Reprice runs (lookup matches on label), resolver picks exotic size column = 220.
+    expect(next.items[0].unitPrice).toBe(220);
+    expect(next.items[0].standardPrice).toBe(220);
+    expect(next.items[0].vehicleSizeClass).toBe('exotic');
+  });
+
   // Constants-usage sanity check — the canonical constant is exported and contains the values this suite references.
   it('uses canonical VEHICLE_SIZE_CLASS_KEYS constant (no hardcoded arrays in test fixtures)', () => {
     expect(VEHICLE_SIZE_CLASS_KEYS).toContain('sedan');

@@ -445,8 +445,11 @@ export function ticketReducer(
         if (item.isCustomPrice === true) return item;
 
         const service = services.find((s) => s.id === item.serviceId);
+        // Session 31.5: match tier_name OR tier_label because ADD_SERVICE stores
+        // `tier_label || tier_name` as item.tierName — for vehicle_size rows (and any
+        // tier with a populated label), the stored value is the label not the key.
         const pricingTier = service?.pricing?.find(
-          (p) => p.tier_name === item.tierName
+          (p) => p.tier_name === item.tierName || p.tier_label === item.tierName
         );
         if (!pricingTier || !service) return item;
 

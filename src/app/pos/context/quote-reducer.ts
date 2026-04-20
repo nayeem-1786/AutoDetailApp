@@ -376,8 +376,9 @@ export function quoteReducer(
         if (item.isCustomPrice === true) return item;
 
         const service = services.find((s) => s.id === item.serviceId);
+        // Session 31.5: match tier_name OR tier_label — see ticket-reducer.ts for rationale.
         const pricingTier = service?.pricing?.find(
-          (p) => p.tier_name === item.tierName
+          (p) => p.tier_name === item.tierName || p.tier_label === item.tierName
         );
         if (!pricingTier || !service) return item;
 
