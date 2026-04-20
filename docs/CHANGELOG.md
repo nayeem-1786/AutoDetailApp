@@ -4,6 +4,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pos): silent reprice on vehicle change — 2026-04-19 (Session 31)
+
+**Problem:** Staff swapping vehicles mid-ticket left services at their original add-time prices. Edit-existing-vehicle path at `ticket-panel.tsx:681` dispatched `SET_VEHICLE` without the paired `RECALCULATE_VEHICLE_PRICES` — a service added at sedan pricing stayed at sedan pricing after the vehicle was re-classified as exotic. Silent mispricing.
+
+**Root design flaw:** `SET_VEHICLE` and `RECALCULATE_VEHICLE_PRICES` were two separate reducer actions that callers had to dispatch in pair. Any new dispatch site forgetting the second dispatch caused the same bug class. 5 of 5 ticket-panel dispatch sites got it right; the 6th (edit path added later) didn't.
+
+**Fix (Shape A per `docs/audits/vehicle-change-reprice.md`):** Collapse both actions into one atomic `SET_VEHICLE` that performs both the vehicle mutation and the reprice. Forgetting the reprice becomes structurally impossible.
+
+**Changes:**
+
+- **Collapsed `SET_VEHICLE` + `RECALCULATE_VEHICLE_PRICES` into one atomic action** in both `ticket-reducer.ts` and `quote-reducer.ts`. New signature: `{ type: 'SET_VEHICLE'; vehicle: Vehicle | null; services: Service[]; blockedByPayment?: boolean }`. The reducer updates the vehicle and reprices service items in one pass.
+- **Reprice logic** (unchanged from the prior `RECALCULATE_VEHICLE_PRICES`): resolves each service item's tier against the new `size_class` via `resolveServicePriceWithSale` (picks up sale state at reprice time), preserves combo pricing when still lowest, skips per-unit items, updates `unitPrice`, `totalPrice`, `standardPrice`, `saleEffectivePrice`, `pricingType`, `comboSourcePrimaryId`, `vehicleSizeClass` atomically.
+- **Added `isCustomPrice?: boolean` to `TicketItem`** (`src/app/pos/types.ts`). Set to `true` in both reducers' custom-price branches (ADD_SERVICE when `customPrice` is provided). Reprice skips items with this flag — staff overrides survive vehicle changes.
+- **8 dispatch sites updated** to pass `services` (via `useCatalog()`) and `blockedByPayment` (from `checkout.isOpen || checkout.processing` in ticket-panel; always `false` in quote-ticket-panel since quotes have no payment path):
+  - ticket-panel.tsx: handleGuestCheckout, applyVehicleSelection, handleConfirmVehicleChange, handleClearCustomer, **VehicleCreateDialog.onCreated edit path (the bug)**
+  - quote-ticket-panel.tsx: applyVehicleSelection, handleConfirmVehicleChange, handleClearCustomer
+  - The 2 separate `RECALCULATE_VEHICLE_PRICES` dispatches (ticket-panel.tsx:280, quote-ticket-panel.tsx:113) removed — redundant after collapse.
+- **Payment-in-flight UI protection — reuses existing `CheckoutContext`** (zero parallel state):
+  - `customer-vehicle-summary.tsx` gained a `disabled?: boolean` prop. Change-Vehicle and Edit-Vehicle buttons render disabled with a tooltip when true. Threaded from ticket-panel with `disabled={checkoutOpen || checkoutProcessing}`.
+  - Reducer-level belt-and-suspenders guard via `blockedByPayment` action param. If `true`, reducer logs a console warning and returns state unchanged.
+  - `pos-vehicle-needed` event handler in ticket-panel.tsx added an early-return when checkout is open/processing (defense-in-depth — service-add UI is also gated during checkout).
+- **Fixed `card-payment.tsx` `checkout.setProcessing` gap (in passing):** the card path previously used a local `isProcessingRef` but never notified CheckoutContext. Now calls `checkout.setProcessing(true|false)` consistent with cash/check/split paths. Closes a pre-existing inconsistency that would have left card payment invisible to the vehicle-change guard.
+- **Tests:** created `src/app/pos/context/__tests__/ticket-reducer-vehicle-change.test.ts` (12 tests) and `src/app/pos/context/__tests__/quote-reducer-vehicle-change.test.ts` (12 tests). Coverage: sedan↔exotic↔classic swaps, no-matching-tier fallback, combo preservation and drop, expired sale reprice, per-unit skip, custom-priced skip, payment-blocked refusal, null vehicle. Tests reference `VEHICLE_SIZE_CLASS_KEYS` from `src/lib/utils/constants.ts` per Session 30 consolidation — no hardcoded size_class arrays.
+- **209 total tests passing** (185 baseline → 209). `npx tsc --noEmit` clean.
+
+**V2 deferral:** scope-tier-with-qty-and-size-aware items (edge case i from audit) still skipped on reprice. Documented limitation; no active catalog service currently hits this combination. Separate session when needed.
+
+**Pre-existing drift NOT fixed:** `ticket-reducer.ts` and `quote-reducer.ts` have known structural differences (ticket has existing-item increment path, scope-tier-qty multiplier, RESTORE_ITEM that quote lacks). Session 31 propagated ONLY Session 31 additions (`isCustomPrice`, collapsed `SET_VEHICLE`). Drift is a future session.
+
+Files changed: `src/app/pos/types.ts`, `src/app/pos/context/ticket-reducer.ts`, `src/app/pos/context/quote-reducer.ts`, `src/app/pos/components/ticket-panel.tsx`, `src/app/pos/components/quotes/quote-ticket-panel.tsx`, `src/app/pos/components/customer-vehicle-summary.tsx`, `src/app/pos/components/checkout/card-payment.tsx`, `src/app/pos/context/__tests__/ticket-reducer-vehicle-change.test.ts` (new), `src/app/pos/context/__tests__/quote-reducer-vehicle-change.test.ts` (new).
+
+---
+
 ## refactor: consolidate size_class arrays into shared constants — 2026-04-19 (Session 30)
 
 **Problem:** The canonical vehicle size_class taxonomy (sedan / truck_suv_2row / suv_3row_van / exotic / classic) was hardcoded at 11 sites across 9 files — POS components, admin pages, shared form, and Zod schemas. Each site maintained its own array. This was the direct cause of the Session 28 gap (`a79886ac`) and both Session 29 follow-ups (`6aa6d289`, `79c7f301`) — whenever the taxonomy grew, hardcoded sites drifted.

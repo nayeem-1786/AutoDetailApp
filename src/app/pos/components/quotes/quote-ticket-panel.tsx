@@ -105,15 +105,10 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   }
 
   function applyVehicleSelection(vehicle: Vehicle) {
-    dispatch({ type: 'SET_VEHICLE', vehicle });
-
     const hasServices = quote.items.some((i) => i.itemType === 'service');
+    // Session 31: atomic vehicle-change action. Quotes have no checkout/payment path so blockedByPayment is always false.
+    dispatch({ type: 'SET_VEHICLE', vehicle, services, blockedByPayment: false });
     if (hasServices) {
-      dispatch({
-        type: 'RECALCULATE_VEHICLE_PRICES',
-        vehicle,
-        services,
-      });
       toast.info('Service prices updated for vehicle size');
     }
 
@@ -139,7 +134,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
       }
     }
-    dispatch({ type: 'SET_VEHICLE', vehicle: pendingVehicleChange });
+    dispatch({ type: 'SET_VEHICLE', vehicle: pendingVehicleChange, services, blockedByPayment: false });
     setPendingVehicleChange(null);
     setShowVehicleSelector(false);
     toast.info('Services cleared — vehicle type changed');
@@ -152,7 +147,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
   function handleClearCustomer() {
     dispatch({ type: 'SET_CUSTOMER', customer: null });
-    dispatch({ type: 'SET_VEHICLE', vehicle: null });
+    dispatch({ type: 'SET_VEHICLE', vehicle: null, services, blockedByPayment: false });
   }
 
   function handleApplyDiscount() {

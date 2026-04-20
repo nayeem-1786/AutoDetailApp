@@ -16,6 +16,8 @@ interface CustomerVehicleSummaryProps {
   onClear: () => void;
   onCustomerTypeChanged?: (newType: CustomerType | null) => void;
   onEditVehicle?: () => void;
+  /** When true, Change Vehicle and Edit Vehicle buttons are disabled (e.g., during checkout). */
+  disabled?: boolean;
 }
 
 export function CustomerVehicleSummary({
@@ -26,6 +28,7 @@ export function CustomerVehicleSummary({
   onClear,
   onCustomerTypeChanged,
   onEditVehicle,
+  disabled = false,
 }: CustomerVehicleSummaryProps) {
   if (!customer) {
     // Guest state -- show "Add Customer" button
@@ -91,7 +94,9 @@ export function CustomerVehicleSummary({
       <div className="mt-1 flex items-center gap-1">
         <button
           onClick={onChangeVehicle}
-          className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+          disabled={disabled}
+          title={disabled ? 'Cannot change vehicle during checkout' : undefined}
+          className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:text-gray-600 disabled:dark:hover:text-gray-400"
         >
           <Car className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500" />
           {vehicleLabel ? (
@@ -111,8 +116,9 @@ export function CustomerVehicleSummary({
         {vehicle && onEditVehicle && (
           <button
             onClick={onEditVehicle}
-            className="ml-1 rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-400"
-            title="Edit vehicle"
+            disabled={disabled}
+            className="ml-1 rounded p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent dark:disabled:hover:bg-transparent"
+            title={disabled ? 'Cannot change vehicle during checkout' : 'Edit vehicle'}
           >
             <Pencil className="h-3 w-3" />
           </button>

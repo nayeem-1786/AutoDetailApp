@@ -52,7 +52,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   const { heldTickets } = useHeldTickets();
   const heldCount = heldTickets.length;
   const { ticket, dispatch } = useTicket();
-  const { isOpen: checkoutOpen } = useCheckout();
+  const { isOpen: checkoutOpen, processing: checkoutProcessing } = useCheckout();
   const { services } = useCatalog();
   const { suggestionsMap } = useAddonSuggestions();
   const ticketServiceIds = useMemo(
@@ -104,6 +104,10 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
   useEffect(() => {
     const handler = (e: Event) => {
+      // Session 31: defense-in-depth against vehicle-change during checkout.
+      // The service-add UI is already gated when checkout is open, but if a pos-vehicle-needed
+      // event somehow fires in that state, refuse to open the selector.
+      if (checkoutOpen || checkoutProcessing) return;
       const detail = (e as CustomEvent).detail;
       if (detail?.service) {
         setPendingService(detail.service as CatalogService);
@@ -112,7 +116,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     };
     window.addEventListener('pos-vehicle-needed', handler);
     return () => window.removeEventListener('pos-vehicle-needed', handler);
-  }, []);
+  }, [checkoutOpen, checkoutProcessing]);
 
   // Prerequisite removal guard state
   const [prereqRemoval, setPrereqRemoval] = useState<{
@@ -256,7 +260,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
   function handleGuestCheckout() {
     dispatch({ type: 'SET_CUSTOMER', customer: null });
-    dispatch({ type: 'SET_VEHICLE', vehicle: null });
+    dispatch({ type: 'SET_VEHICLE', vehicle: null, services, blockedByPayment: checkoutOpen || checkoutProcessing });
     onCustomerLookupChange(false);
   }
 
@@ -271,16 +275,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
   }
 
   function applyVehicleSelection(vehicle: Vehicle) {
-    dispatch({ type: 'SET_VEHICLE', vehicle });
-
-    // Recalculate service prices if ticket has service items
     const hasServices = ticket.items.some((i) => i.itemType === 'service');
+    dispatch({ type: 'SET_VEHICLE', vehicle, services, blockedByPayment: checkoutOpen || checkoutProcessing });
     if (hasServices) {
-      dispatch({
-        type: 'RECALCULATE_VEHICLE_PRICES',
-        vehicle,
-        services,
-      });
       toast.info('Service prices updated for vehicle size');
     }
 
@@ -317,7 +314,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
         dispatch({ type: 'REMOVE_ITEM', itemId: item.id });
       }
     }
-    dispatch({ type: 'SET_VEHICLE', vehicle: pendingVehicleChange });
+    dispatch({ type: 'SET_VEHICLE', vehicle: pendingVehicleChange, services, blockedByPayment: checkoutOpen || checkoutProcessing });
     setPendingVehicleChange(null);
     setShowVehicleSelector(false);
     toast.info('Services cleared — vehicle type changed');
@@ -330,7 +327,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
 
   function handleClearCustomer() {
     dispatch({ type: 'SET_CUSTOMER', customer: null });
-    dispatch({ type: 'SET_VEHICLE', vehicle: null });
+    dispatch({ type: 'SET_VEHICLE', vehicle: null, services, blockedByPayment: checkoutOpen || checkoutProcessing });
   }
 
   function handleCustomerTypeChanged(newType: CustomerType | null) {
@@ -396,6 +393,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
               setShowVehicleCreate(true);
             }
           }}
+          disabled={checkoutOpen || checkoutProcessing}
         />
       </div>
 
@@ -677,8 +675,9 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           customerId={ticket.customer.id}
           onCreated={(vehicle) => {
             if (editingVehicle) {
-              // Editing existing vehicle — update on ticket
-              dispatch({ type: 'SET_VEHICLE', vehicle });
+              // Editing existing vehicle — update on ticket.
+              // Session 31: atomic SET_VEHICLE triggers silent reprice against the edited size_class.
+              dispatch({ type: 'SET_VEHICLE', vehicle, services, blockedByPayment: checkoutOpen || checkoutProcessing });
               setShowVehicleCreate(false);
               setEditingVehicle(null);
             } else {

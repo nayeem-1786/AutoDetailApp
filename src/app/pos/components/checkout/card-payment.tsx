@@ -33,6 +33,8 @@ export function CardPayment() {
       return;
     }
     isProcessingRef.current = true;
+    // Session 31: mark payment in flight in CheckoutContext — aligns with cash/check/split paths.
+    checkout.setProcessing(true);
 
     setStatus('creating-intent');
     setErrorMsg(null);
@@ -221,6 +223,7 @@ export function CardPayment() {
       }
     } finally {
       isProcessingRef.current = false;
+      checkout.setProcessing(false);
     }
   }, [amountDue, ticket, checkout, dispatch]);
 
@@ -319,6 +322,7 @@ export function CardPayment() {
             size="lg"
             onClick={() => {
               isProcessingRef.current = false; // Reset to allow retry
+              checkout.setProcessing(false);
               processCard();
             }}
             className="bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600"

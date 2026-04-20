@@ -37,6 +37,8 @@ export interface TicketItem {
   pricingType: 'standard' | 'sale' | 'combo';  // Which discount is active
   comboSourcePrimaryId: string | null;      // Which primary service triggered combo price
   saleEffectivePrice: number | null;        // Stored so combo→sale revert works without catalog lookup
+  /** True if unitPrice was manually set by staff via the custom-price modal; skip in reprice. */
+  isCustomPrice?: boolean;
   // Prerequisite tracking
   prerequisiteNote: string | null;          // "Prereq met: ..." or "Prereq overridden by ..."
   prerequisiteForServiceId: string | null;  // When added as a prereq, the dependent service's ID
@@ -73,8 +75,7 @@ export type TicketAction =
   | { type: 'REMOVE_ITEM'; itemId: string }
   | { type: 'RESTORE_ITEM'; item: TicketItem; index: number }
   | { type: 'SET_CUSTOMER'; customer: Customer | null }
-  | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }
-  | { type: 'RECALCULATE_VEHICLE_PRICES'; vehicle: Vehicle | null; services: Service[] }
+  | { type: 'SET_VEHICLE'; vehicle: Vehicle | null; services: Service[]; blockedByPayment?: boolean }
   | { type: 'SET_COUPON'; coupon: { id: string; code: string; discount: number; isAutoApplied?: boolean } | null }
   | { type: 'SET_LOYALTY_REDEEM'; points: number; discount: number }
   | { type: 'SET_NOTES'; notes: string | null }
@@ -150,8 +151,7 @@ export type QuoteAction =
   | { type: 'UPDATE_PER_UNIT_QTY'; itemId: string; perUnitQty: number }
   | { type: 'REMOVE_ITEM'; itemId: string }
   | { type: 'SET_CUSTOMER'; customer: Customer | null }
-  | { type: 'SET_VEHICLE'; vehicle: Vehicle | null }
-  | { type: 'RECALCULATE_VEHICLE_PRICES'; vehicle: Vehicle | null; services: Service[] }
+  | { type: 'SET_VEHICLE'; vehicle: Vehicle | null; services: Service[]; blockedByPayment?: boolean }
   | { type: 'SET_COUPON'; coupon: { id: string; code: string; discount: number; isAutoApplied?: boolean } | null }
   | { type: 'SET_LOYALTY_REDEEM'; points: number; discount: number }
   | { type: 'SET_NOTES'; notes: string | null }

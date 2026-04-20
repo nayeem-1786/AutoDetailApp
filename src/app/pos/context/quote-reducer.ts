@@ -142,6 +142,7 @@ export function quoteReducer(
           pricingType: 'standard',
           comboSourcePrimaryId: null,
           saleEffectivePrice: null,
+          isCustomPrice: true,
           prerequisiteNote: prerequisiteNote ?? null,
           prerequisiteForServiceId: prerequisiteForServiceId ?? null,
         };
@@ -352,18 +353,27 @@ export function quoteReducer(
     }
 
     case 'SET_VEHICLE': {
-      return { ...state, vehicle: action.vehicle };
-    }
+      // Session 31: atomic vehicle-change action — also reprices service items against the new size_class.
+      if (action.blockedByPayment === true) {
+        console.warn('[SET_VEHICLE] Refused: payment in flight');
+        return state;
+      }
 
-    case 'RECALCULATE_VEHICLE_PRICES': {
       const { vehicle, services } = action;
       const sizeClass = vehicle?.size_class ?? null;
+
+      // No items or clearing vehicle — just update the vehicle field.
+      if (!vehicle || state.items.length === 0) {
+        return { ...state, vehicle };
+      }
 
       const items = state.items.map((item) => {
         if (item.itemType !== 'service' || !item.serviceId || !item.tierName) {
           return item;
         }
         if (item.perUnitQty != null && item.perUnitPrice != null) return item;
+        // Skip custom-priced items — staff override is preserved
+        if (item.isCustomPrice === true) return item;
 
         const service = services.find((s) => s.id === item.serviceId);
         const pricingTier = service?.pricing?.find(
