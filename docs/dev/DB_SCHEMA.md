@@ -861,12 +861,60 @@ idx_refund_items_refund — btree (refund_id)
 | quantity_after | INTEGER | NOT NULL | |
 | reason | TEXT | | |
 | reference_id | UUID | | |
-| reference_type | TEXT | CHECK ('purchase_order','transaction','refund','shop_use') | |
+| reference_type | TEXT | CHECK ('purchase_order','transaction','refund','shop_use','stock_count') | `stock_count` added via `20260421000002` |
 | created_by | UUID | FK → employees(id) | |
 | unit_cost | NUMERIC(10,2) | DEFAULT NULL | Cost snapshot at time of adjustment. Used by expense reporting for shop_use; null for older rows. Added via `20260420000001` |
 | created_at | TIMESTAMPTZ | | |
 
 **Indexes:** `idx_stock_adjustments_type_created` on `(adjustment_type, created_at DESC)`. Added via `20260420000001`.
+
+### stock_counts
+Header for physical-count sessions. Added via `20260421000002` (Session 42D-1). Design source: `docs/audits/INVENTORY_COUNT_AUDIT_SESSION42C.md` (Option C shared-header model).
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| status | TEXT | NOT NULL, DEFAULT 'active', CHECK ('active','review','committed','cancelled') | |
+| count_type | TEXT | NOT NULL, DEFAULT 'sectional', CHECK ('full','sectional') | |
+| section_label | TEXT | | Free-text scope label (e.g., "Shelf A1-A5") |
+| notes | TEXT | | |
+| started_by | UUID | NOT NULL, FK → employees(id) ON DELETE RESTRICT | |
+| started_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| committed_by | UUID | FK → employees(id) ON DELETE RESTRICT | |
+| committed_at | TIMESTAMPTZ | | |
+| cancelled_by | UUID | FK → employees(id) ON DELETE RESTRICT | |
+| cancelled_at | TIMESTAMPTZ | | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | `update_updated_at` trigger |
+
+**Indexes:** `idx_stock_counts_status` on `(status)`, `idx_stock_counts_started_at` on `(started_at DESC)`.
+
+**RLS:** Permissive `FOR ALL TO authenticated` — API layer enforces `inventory.counts.manage` permission.
+
+### stock_count_items
+Per-product line within a stock count. `expected_qty` is snapshotted on first-touch (first scan / manual add) from `products.quantity_on_hand` and never updated after insert. Commit math: `new_qty = products.quantity_on_hand (live) + (counted_qty - expected_qty)` — POS sales during the count are tolerated without double-counting shrink.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, default gen_random_uuid() | |
+| stock_count_id | UUID | NOT NULL, FK → stock_counts(id) ON DELETE CASCADE | |
+| product_id | UUID | NOT NULL, FK → products(id) ON DELETE RESTRICT | |
+| expected_qty | INTEGER | NOT NULL | First-touch snapshot of `products.quantity_on_hand`. Never updated. |
+| counted_qty | INTEGER | NOT NULL, DEFAULT 0 | Incremented by scan; overridable via manual entry |
+| last_updated_by | UUID | NOT NULL, FK → employees(id) ON DELETE RESTRICT | Attribution for the most recent edit |
+| created_by | UUID | NOT NULL, FK → employees(id) ON DELETE RESTRICT | |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | `update_updated_at` trigger |
+
+**Unique:** `(stock_count_id, product_id)` — one line per product per count.
+
+**Indexes:** `idx_stock_count_items_count` on `(stock_count_id)`, `idx_stock_count_items_product` on `(product_id)`.
+
+**RLS:** Permissive `FOR ALL TO authenticated`.
+
+**RPC — `commit_stock_count(p_count_id UUID, p_employee_id UUID) RETURNS JSONB`:** atomic commit. Locks the count header and each affected product row (`FOR UPDATE`), skips zero-delta items, aborts if any product would go negative, writes one `stock_adjustments` row per non-zero delta (with `adjustment_type='recount'` and `reference_type='stock_count'`, `reference_id=<count_id>`), and flips `stock_counts.status` to `'committed'`. Returns `{count_id, adjustments_created}`. Defined in `20260421000002`.
+
+**Permission:** `inventory.counts.manage` (sort_order 507) — gated at the API layer on all six `/api/admin/inventory/counts/*` routes.
 
 ### vendors
 | Column | Type | Constraints | Notes |

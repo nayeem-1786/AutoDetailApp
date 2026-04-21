@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-21 (Session 42B — vendor_sku + vendor_product_name columns on products)
+> **Last updated:** 2026-04-21 (Session 42D-1 — Inventory Count schema + API + minimal list page)
 
 ---
 
@@ -66,6 +66,12 @@ src/app/api/admin/quotes/stats/route.ts
 src/app/api/admin/receipt-logo/route.ts
 src/app/api/admin/shop-expenses/export/route.ts
 src/app/api/admin/stock-adjustments/route.ts
+src/app/api/admin/inventory/counts/route.ts
+src/app/api/admin/inventory/counts/[id]/route.ts
+src/app/api/admin/inventory/counts/[id]/items/route.ts
+src/app/api/admin/inventory/counts/[id]/commit/route.ts
+src/app/api/admin/inventory/counts/[id]/cancel/route.ts
+src/app/api/admin/inventory/counts/__tests__/commit.test.ts
 src/app/api/admin/transactions/stats/route.ts
 src/app/api/admin/upload/content-image/route.ts
 ```
@@ -549,6 +555,7 @@ src/app/admin/customers/page.tsx
 ```
 src/app/admin/inventory/layout.tsx
 src/app/admin/inventory/page.tsx
+src/app/admin/inventory/counts/page.tsx
 src/app/admin/inventory/purchase-orders/[id]/page.tsx
 src/app/admin/inventory/purchase-orders/new/page.tsx
 src/app/admin/inventory/purchase-orders/page.tsx
@@ -1462,6 +1469,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260418000003_backfill_and_drop_specialty_flags.sql
 20260420000001_extend_stock_adjustments.sql
 20260421000001_add_vendor_reorder_fields.sql
+20260421000002_create_stock_counts.sql
 ```
 
 ## Scripts

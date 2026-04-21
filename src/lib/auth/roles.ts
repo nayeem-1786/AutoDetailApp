@@ -118,6 +118,11 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'ClipboardList',
       },
       {
+        label: 'Counts',
+        href: '/admin/inventory/counts',
+        icon: 'ClipboardCheck',
+      },
+      {
         label: 'Stock History',
         href: '/admin/inventory/stock-history',
         icon: 'History',

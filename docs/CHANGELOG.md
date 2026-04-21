@@ -4,6 +4,70 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(inventory): count schema + API + list page — 2026-04-21 (Session 42D-1)
+
+First of two sessions building the Inventory Count feature (design source: `docs/audits/INVENTORY_COUNT_AUDIT_SESSION42C.md`, Option C shared-header model, first-touch `expected_qty` freeze). This session delivers schema + API + a minimal list page so Session 42D-2 can build the counting UI against verified endpoints. **No counting UI, no scanner wiring, no POS changes in this session.** The count detail page is intentionally a 404 until 42D-2 ships it.
+
+**Migration:** `supabase/migrations/20260421000002_create_stock_counts.sql` — two new tables, one RPC, one CHECK extension, one permission seed.
+
+**New tables**
+
+- `stock_counts` — count session header. `status` ∈ {active, review, committed, cancelled}. `count_type` ∈ {full, sectional}. Tracks `started_by`, `committed_by`, `cancelled_by` with timestamps. Indexes on `(status)` and `(started_at DESC)`. Permissive RLS (API enforces role).
+- `stock_count_items` — per-product line. `expected_qty` is snapshotted on first-touch from `products.quantity_on_hand` and never updated after insert. `counted_qty` is incremented by scan / overwritten by manual set. UNIQUE `(stock_count_id, product_id)`. `last_updated_by` attributes the most recent edit (audit §5 multi-counter, last-write-wins). FK to products uses ON DELETE RESTRICT — historical counts can't lose their product references.
+
+**Extended CHECK:** `stock_adjustments.reference_type` now accepts `'stock_count'` in addition to the prior four values. `adjustment_type='recount'` was already valid (no enum change needed there).
+
+**RPC:** `commit_stock_count(p_count_id UUID, p_employee_id UUID) RETURNS JSONB` — atomic commit. Locks the count header (`SELECT … FOR UPDATE`) and each affected product row (`FOR UPDATE OF p` inside the per-item loop), skips zero-delta items (no audit noise), aborts the entire commit if any product would go negative, writes one `stock_adjustments` row per non-zero delta with `adjustment_type='recount'`, `reference_type='stock_count'`, `reference_id=<count_id>`, then flips the count to `'committed'`. Returns `{count_id, adjustments_created}`. `SECURITY DEFINER`, `GRANT EXECUTE … TO authenticated`. Inline JS chains in Supabase are NOT transactional — the RPC is the only way to get all-or-nothing semantics across N product updates + N adjustment inserts + 1 status update.
+
+**Permission:** `inventory.counts.manage` at `sort_order=507` (next unused after `inventory.manage_vendors`=506). Granted to super_admin + admin, denied to cashier + detailer (mirrors `inventory.adjust_stock` distribution). Seeded inline in the migration via the same pattern as `20260322000001_add_missing_permission_definitions.sql`.
+
+**API routes** (six, all under `src/app/api/admin/inventory/counts/`):
+
+| Path | Method | Purpose |
+|------|--------|---------|
+| `/` | POST | Create count (body: `count_type`, optional `section_label`, `notes`) |
+| `/` | GET | List counts, optional `?status=…`, ordered `started_at DESC`, limit 50, includes `items_count` per row |
+| `/[id]` | GET | Fetch one count + its items (products joined) |
+| `/[id]/items` | POST | Add/update a line. Body: `product_id` + exactly one of `increment` (default +1, upserts with snapshot `expected_qty` if new) or `set_to` (requires existing line). Rejects non-active counts. |
+| `/[id]/commit` | POST | Calls `commit_stock_count` RPC. Maps RPC errors: `Count not found` → 404, `not in committable status` → 409, `negative quantity for product <uuid>` → 400 with `product_id`. |
+| `/[id]/cancel` | POST | Set status='cancelled' + cancelled_by/at. Line items retained for audit. |
+
+All six routes use `getEmployeeFromSession(request)` (preferred over inline `auth.getUser → employees` lookup — adds IP whitelist + `status='active'` filter per `src/lib/auth/get-employee.ts:22` JSDoc), gate on `FEATURE_FLAGS.INVENTORY_MANAGEMENT`, and enforce `inventory.counts.manage`. Pattern mirrors `src/app/api/admin/shop-expenses/export/route.ts` (modern inventory-route pattern, not the older inline pattern still used by `/api/admin/stock-adjustments`).
+
+**Commit helper choice:** the RPC writes `stock_adjustments` rows via direct INSERT inside the Postgres function, not via the JS-side `logStockAdjustment()` helper. The helper remains the canonical entry point for single-item adjustments (drawer, PO receive, POS sale/refund/shop-use) — it is not touched by this session. The RPC's INSERT covers the same columns the helper covers, plus the new `reference_type='stock_count'` value.
+
+**Admin UI**
+
+- `src/app/admin/inventory/counts/page.tsx` — list view with status filter (All/Active/Review/Committed/Cancelled), `DataTable` of counts (Started, Type badge, Section, Started By, Status badge, Items count, Open button), and a "New Count" dialog (radio for count_type, section_label input, notes textarea). On create, redirects to `/admin/inventory/counts/<id>` — which 404s until 42D-2 adds the detail page. This is intentional MVP scope per the plan.
+- Sidebar nav: "Counts" entry added to the Inventory group in `src/lib/auth/roles.ts` between Purchase Orders and Stock History, icon `ClipboardCheck`. The icon is also added to `src/app/admin/admin-shell.tsx` import + `iconMap`.
+
+**Tests added**
+
+- `src/app/api/admin/inventory/counts/__tests__/commit.test.ts` — 11 tests on the commit route: happy paths with 0/1/3 adjustments (scenarios 1–4 and 7 from the plan), RPC-error mappings (negative quantity → 400 with product_id, already-committed → 409, not-found → 404, unknown → 500), and the three auth/flag gates (401 unauthed, 403 flag-off, 403 permission-denied). Mocks `@/lib/utils/feature-flags`, `@/lib/auth/get-employee`, `@/lib/auth/require-permission`, and `@/lib/supabase/admin`. The RPC's internal arithmetic is black-box from the route's POV — it's validated manually via SQL Editor smoke tests on the live DB after migration apply.
+
+Skipped unit tests for the other five CRUD routes per the plan (thin passthrough, low test value).
+
+**Files changed:**
+- `supabase/migrations/20260421000002_create_stock_counts.sql` (new)
+- `src/app/api/admin/inventory/counts/route.ts` (new)
+- `src/app/api/admin/inventory/counts/[id]/route.ts` (new)
+- `src/app/api/admin/inventory/counts/[id]/items/route.ts` (new)
+- `src/app/api/admin/inventory/counts/[id]/commit/route.ts` (new)
+- `src/app/api/admin/inventory/counts/[id]/cancel/route.ts` (new)
+- `src/app/api/admin/inventory/counts/__tests__/commit.test.ts` (new)
+- `src/app/admin/inventory/counts/page.tsx` (new)
+- `src/lib/auth/roles.ts` (nav entry)
+- `src/app/admin/admin-shell.tsx` (icon import + iconMap entry)
+- `docs/dev/DB_SCHEMA.md` (CHECK extension note + new tables + RPC + permission)
+- `docs/dev/FILE_TREE.md` (new paths + last-updated line)
+- `docs/CHANGELOG.md` (this entry)
+
+**Deliberately not touched:** Quick Edit drawer, POS (scanner/register/transactions/refund/shop-use), `/api/admin/stock-adjustments` endpoint, `src/lib/utils/stock-adjustments.ts` (`logStockAdjustment`), the products edit page. Drawer-barcode-rescan fix and the active-count scanner UI are deferred to a later session (the latter is Session 42D-2).
+
+**User action required:** apply `supabase/migrations/20260421000002_create_stock_counts.sql` in Supabase SQL Editor before running the UI. Verify with: `SELECT table_name FROM information_schema.tables WHERE table_name IN ('stock_counts','stock_count_items');`, `SELECT proname FROM pg_proc WHERE proname='commit_stock_count';`, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='stock_adjustments_reference_type_check';`, `SELECT key FROM permission_definitions WHERE key='inventory.counts.manage';`.
+
+---
+
 ## feat(products): add vendor_sku and vendor_product_name for reorder metadata — 2026-04-21 (Session 42B)
 
 Adds two nullable TEXT columns to `products` for capturing vendor reorder identity, separate from the scan-code SKU and user-facing display name. Motivated by the Session 42A audit: ~90% of products are vendor-branded with the vendor UPC stored in `products.sku` (this is correct and unchanged); ~8-10% are white-labeled with short internal codes; some vendors use their own part numbers on POs rather than UPC, and their product names often differ from the user's display name. These fields live on the full edit page and new-product page only — Quick Edit drawer is unchanged (PO-prep scope, not daily ops).
