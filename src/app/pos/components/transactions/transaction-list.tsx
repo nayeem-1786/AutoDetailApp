@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Search, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
+import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
 import type { Transaction } from '@/lib/supabase/types';
 
 type TransactionWithRelations = Transaction & {
@@ -95,6 +97,38 @@ export function TransactionList({ onSelect }: TransactionListProps) {
   const [dateTo, setDateTo] = useState(initialRange.to);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
+
+  const handleReceiptScan = useCallback(async (barcode: string) => {
+    try {
+      const params = new URLSearchParams({ q: barcode, limit: '5', offset: '0' });
+      const res = await posFetch(`/api/pos/transactions/search?${params}`);
+      if (!res.ok) {
+        toast.error('Receipt lookup failed');
+        return;
+      }
+      const json = await res.json();
+      const results: TransactionWithRelations[] = json.data ?? [];
+      const exact = results.find((r) => r.receipt_number === barcode);
+      if (exact) {
+        onSelect(exact);
+        return;
+      }
+      if (results.length === 1) {
+        onSelect(results[0]);
+        return;
+      }
+      toast.error(`No receipt matching ${barcode}`);
+    } catch {
+      toast.error('Receipt lookup failed');
+    }
+  }, [onSelect]);
+
+  useBarcodeScanner({ onScan: handleReceiptScan });
 
   const fetchTransactions = useCallback(async (search: string, pageNum: number, from: string, to: string) => {
     setLoading(true);
@@ -211,6 +245,8 @@ export function TransactionList({ onSelect }: TransactionListProps) {
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
           <Input
+            ref={searchInputRef}
+            data-barcode-target
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -221,7 +257,7 @@ export function TransactionList({ onSelect }: TransactionListProps) {
                 fetchTransactions(query, 0, dateFrom, dateTo);
               }
             }}
-            placeholder="Receipt # or phone..."
+            placeholder="Receipt # or phone, or scan receipt..."
             className="pl-9"
           />
         </div>

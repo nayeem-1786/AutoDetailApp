@@ -6,6 +6,9 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
+import { usePosAuth } from '../context/pos-auth-context';
+import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
+import { posFetch } from '../lib/pos-fetch';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { SearchBar } from './search-bar';
@@ -32,6 +35,7 @@ const VEHICLE_SIZE_CLASSES_SET = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 export function PosWorkspace() {
   const { products, services, loading } = useCatalog();
   const { ticket, dispatch } = useTicket();
+  const { locked } = usePosAuth();
 
   const [tab, setTab] = useState<PosTab>('register');
   const [search, setSearch] = useState('');
@@ -103,7 +107,42 @@ export function PosWorkspace() {
     return () => window.removeEventListener('pos-add-pending-service', handlePendingService);
   }, [handlePendingService]);
 
-  // Barcode scanner is mounted globally in PosShellContent (pos-shell.tsx)
+  const handleBarcodeScan = useCallback(async (barcode: string) => {
+    try {
+      const res = await posFetch('/api/pos/products/barcode-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode }),
+      });
+
+      if (res.status === 404) {
+        toast.error(`Product not found: ${barcode}`);
+        return;
+      }
+
+      if (!res.ok) {
+        toast.error('Scan failed — try again');
+        return;
+      }
+
+      const { product } = await res.json();
+
+      if (product.quantity_on_hand != null && product.quantity_on_hand <= 0) {
+        toast.warning(`Out of stock: ${product.name}`);
+        return;
+      }
+
+      dispatch({ type: 'ADD_PRODUCT', product });
+      toast.success(`Added ${product.name}`);
+    } catch {
+      toast.error('Scan failed — try again');
+    }
+  }, [dispatch]);
+
+  useBarcodeScanner({
+    onScan: handleBarcodeScan,
+    enabled: !locked,
+  });
 
   // Determine search scope
   const searchScope = tab === 'products' ? 'products' : tab === 'services' ? 'services' : 'all';

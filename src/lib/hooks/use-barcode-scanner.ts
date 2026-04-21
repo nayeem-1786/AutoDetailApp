@@ -11,6 +11,15 @@ interface UseBarcodeOptions {
   minLength?: number;
   /** Whether scanning is enabled */
   enabled?: boolean;
+  /**
+   * When true (default), Enter only fires `onScan` if the focused element
+   * carries `data-barcode-target`. This prevents the scanner from eating
+   * Enter in unrelated inputs (e.g. POS cash/tip fields).
+   *
+   * Set to false on pages that want any rapid keystroke burst to trigger
+   * a scan regardless of focus (e.g. a list view with no dedicated input).
+   */
+  requireTargetAttribute?: boolean;
 }
 
 /**
@@ -27,6 +36,7 @@ export function useBarcodeScanner({
   maxKeystrokeGap = 150,
   minLength = 4,
   enabled = true,
+  requireTargetAttribute = true,
 }: UseBarcodeOptions) {
   const bufferRef = useRef('');
   const lastKeystrokeRef = useRef(0);
@@ -59,8 +69,9 @@ export function useBarcodeScanner({
       if (e.key === 'Enter') {
         const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
         const activeEl = document.activeElement;
-        const isBarcodeScanTarget = activeEl?.hasAttribute('data-barcode-target');
-        if (barcode.length >= minLength && isBarcodeScanTarget) {
+        const hasTarget = activeEl?.hasAttribute('data-barcode-target') ?? false;
+        const gatePass = requireTargetAttribute ? hasTarget : true;
+        if (barcode.length >= minLength && gatePass) {
           e.preventDefault();
           e.stopPropagation();
           onScanRef.current(barcode);
@@ -94,5 +105,5 @@ export function useBarcodeScanner({
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, [enabled, maxKeystrokeGap, minLength]);
+  }, [enabled, maxKeystrokeGap, minLength, requireTargetAttribute]);
 }

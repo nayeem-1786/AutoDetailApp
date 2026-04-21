@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-20 (Session 37 — stock-adjustments helper, shop-use endpoint/dialog/report, refund disposition)
+> **Last updated:** 2026-04-20 (Session 40A — scanner hook moved to src/lib/hooks/, wired per-page across POS)
 
 ---
 
@@ -844,6 +844,7 @@ src/lib/contexts/cart-context.tsx           — Shopping cart context provider
 ```
 src/lib/hooks/feature-flag-provider.tsx     — Feature flag context provider
 src/lib/hooks/use-async-action.ts
+src/lib/hooks/use-barcode-scanner.ts        — BT/USB scanner keystroke detection (mounted per-page)
 src/lib/hooks/use-business-info.ts
 src/lib/hooks/use-drag-drop-reorder.ts
 src/lib/hooks/use-enter-submit.ts

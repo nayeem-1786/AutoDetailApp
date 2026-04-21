@@ -9,6 +9,7 @@ import { useCatalog } from '../../hooks/use-catalog';
 import { usePrerequisiteCheck } from '../../hooks/use-prerequisite-check';
 import { PrerequisiteWarningDialog } from '../prerequisite-warning-dialog';
 import { posFetch } from '../../lib/pos-fetch';
+import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
 import { SearchBar } from '../search-bar';
 import { CatalogBrowser } from '../catalog-browser';
 import { ProductGrid, ServiceGrid } from '../catalog-grid';
@@ -159,6 +160,33 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     dispatch({ type: 'ADD_PRODUCT', product });
     toast.success(`Added ${product.name}`);
   }, [dispatch]);
+
+  const handleBarcodeScan = useCallback(async (barcode: string) => {
+    try {
+      const res = await posFetch('/api/pos/products/barcode-lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode }),
+      });
+
+      if (res.status === 404) {
+        toast.error(`Product not found: ${barcode}`);
+        return;
+      }
+
+      if (!res.ok) {
+        toast.error('Scan failed — try again');
+        return;
+      }
+
+      const { product } = await res.json();
+      handleAddProduct(product);
+    } catch {
+      toast.error('Scan failed — try again');
+    }
+  }, [handleAddProduct]);
+
+  useBarcodeScanner({ onScan: handleBarcodeScan });
 
   const handleAddService = useCallback((service: CatalogService, pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) => {
     // Check if this service is already on the ticket

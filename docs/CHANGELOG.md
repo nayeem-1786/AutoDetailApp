@@ -4,6 +4,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): scanner routing per-page; transactions auto-focus; quote builder scan support — 2026-04-20 (Session 40A)
+
+Session 33 audit identified that the BT/USB scanner hook was mounted once at POS shell level but always dispatched into `TicketProvider`, causing silent misroute whenever the cashier was on a non-register POS screen. On `/pos/transactions` specifically, the lack of auto-focus on the search input meant the scan burst's first character landed on an untargeted focused element, the hook's default gate dropped the scan, and the user saw only "S" — the first character.
+
+- **Fix:** Scanner no longer silently misroutes to the register ticket on `/pos/quotes`, `/pos/transactions`, `/pos/end-of-day`, or `/pos/jobs`. Hook is now mounted per-page with a page-local handler.
+- **Fix:** POS Transactions search input auto-focuses on mount and is now the `data-barcode-target` for scanner Enter dispatch. Scanning a printed receipt barcode looks up the transaction via `/api/pos/transactions/search?q=<code>` and opens its detail via the existing `onSelect` path (same navigation as row-click).
+- **Feat:** POS Quote Builder accepts product scans — barcode resolves to a product and adds it to the quote (via `QuoteProvider.dispatch({ type: 'ADD_PRODUCT' })`), not the register ticket.
+- **Refactor:** Hook moved from `src/app/pos/hooks/use-barcode-scanner.ts` → `src/lib/hooks/use-barcode-scanner.ts` (neutral path — not POS-specific). Added `requireTargetAttribute` option (default `true`) for page-local mounts that want to drop the `data-barcode-target` focus gate.
+- **EOD + Jobs:** Scanner inert — hook not mounted on these pages by design (nothing meaningful to scan).
+
+POS register behavior unchanged: same API call, same `TicketProvider` dispatch, same `enabled: !locked` gate. `PosWorkspace` now owns the scan mount that `PosShellContent` used to own. `pos-scanner-detected` event still fires to light up the header scanner icon.
+
+Tests: 272 passing. `npx tsc --noEmit` clean.
+
+Files changed: `src/lib/hooks/use-barcode-scanner.ts` (new — moved from `src/app/pos/hooks/`), `src/app/pos/hooks/use-barcode-scanner.ts` (deleted), `src/app/pos/pos-shell.tsx`, `src/app/pos/components/pos-workspace.tsx`, `src/app/pos/components/quotes/quote-builder.tsx`, `src/app/pos/components/transactions/transaction-list.tsx`, `docs/dev/FILE_TREE.md`, `docs/CHANGELOG.md`.
+
+Session 40B (admin-surface wiring: PO receive barcode scanning, product-edit barcode field fill, admin transactions receipt lookup, catalog list navigate-on-scan) is planned but not in this commit.
+
+---
+
 ## fix(pos): inline refund disposition radios + complete chip display — 2026-04-20 (Session 38)
 
 - **Fix:** Mixed-mode refund disposition radios now render inline on the Review Refund summary (Step 2), eliminating the ping-pong between Step 1 and Step 2 that forced users to navigate back to set per-line dispositions.
