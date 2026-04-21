@@ -210,3 +210,86 @@ describe('useBarcodeScanner — first-char leak suppression', () => {
     expect(onScan).not.toHaveBeenCalled();
   });
 });
+
+describe('useBarcodeScanner — data-barcode-scan-target override (42D-interlude)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    document.body.innerHTML = '';
+  });
+
+  // Test 1: regression — without the new attribute, onScan fires as before.
+  it('scan burst still fires onScan when no input has data-barcode-scan-target', () => {
+    installTargetedInput();
+    const onScan = vi.fn();
+    renderHook(() => useBarcodeScanner({ onScan }));
+
+    for (const ch of ['S', 'D', '-', '1', '2', '3', '4']) {
+      pressKey(ch);
+      vi.advanceTimersByTime(15);
+    }
+    pressKey('Enter');
+
+    expect(onScan).toHaveBeenCalledTimes(1);
+    expect(onScan).toHaveBeenCalledWith('SD-1234');
+  });
+
+  // Test 2: with the attribute, onScan is NOT called and keystrokes are not intercepted.
+  it('scan burst does NOT call onScan when active element has data-barcode-scan-target="input"', () => {
+    // The input opts into scan-target behavior. It does NOT carry
+    // data-barcode-target (the onScan-opt-in), but the early-return in the
+    // hook should take precedence regardless.
+    const input = document.createElement('input');
+    input.setAttribute('data-barcode-scan-target', 'input');
+    document.body.appendChild(input);
+    input.focus();
+
+    const onScan = vi.fn();
+    renderHook(() => useBarcodeScanner({ onScan }));
+
+    const events = ['S', 'D', '-', '9', '9', '9', '9'].map((ch) => {
+      const ev = pressKey(ch);
+      vi.advanceTimersByTime(15);
+      return ev;
+    });
+    const enterEv = pressKey('Enter');
+
+    // None of the keystrokes were intercepted — native behavior (and the
+    // input's own handlers, if any) take over.
+    for (const ev of events) {
+      expect(ev.defaultPrevented).toBe(false);
+    }
+    expect(enterEv.defaultPrevented).toBe(false);
+    expect(onScan).not.toHaveBeenCalled();
+
+    // Release timer must not fire later either — hook didn't buffer anything.
+    vi.advanceTimersByTime(500);
+    expect(onScan).not.toHaveBeenCalled();
+  });
+
+  // Test 3: first-char suppression (from 40B) is bypassed for target-attribute
+  // inputs — the very first keystroke is not eaten by the hook.
+  it('first character of a burst is not eaten when the input has data-barcode-scan-target', () => {
+    const input = document.createElement('input');
+    input.setAttribute('data-barcode-scan-target', 'input');
+    document.body.appendChild(input);
+    input.focus();
+
+    const onScan = vi.fn();
+    renderHook(() => useBarcodeScanner({ onScan }));
+
+    const first = pressKey('S');
+    // 40B would have preventDefaulted this keystroke. With the override it
+    // flows through natively — asserted via defaultPrevented.
+    expect(first.defaultPrevented).toBe(false);
+
+    // Nothing got buffered, so the release-as-typing path must not fire.
+    vi.advanceTimersByTime(500);
+    expect(onScan).not.toHaveBeenCalled();
+  });
+});

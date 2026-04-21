@@ -323,6 +323,7 @@ export function QuickEditDrawer({
               onBlur={handleBarcodeBlur}
               placeholder="Scan or type…"
               autoComplete="off"
+              data-barcode-scan-target="input"
             />
           </FormField>
 

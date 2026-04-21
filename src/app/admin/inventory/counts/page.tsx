@@ -110,7 +110,9 @@ export default function InventoryCountsPage() {
     setModalOpen(true);
   }
 
-  async function handleCreate() {
+  async function handleCreate(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (creating) return;
     setCreating(true);
     try {
       const res = await adminFetch('/api/admin/inventory/counts', {
@@ -156,7 +158,21 @@ export default function InventoryCountsPage() {
     {
       id: 'section_label',
       header: 'Section',
-      cell: ({ row }) => row.original.section_label || '--',
+      cell: ({ row }) => {
+        const label =
+          row.original.section_label ||
+          (row.original.count_type === 'full'
+            ? 'Full Store'
+            : `Section — ${formatDate(row.original.started_at)}`);
+        return (
+          <button
+            className="text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            onClick={() => router.push(`/admin/inventory/counts/${row.original.id}`)}
+          >
+            {label}
+          </button>
+        );
+      },
     },
     {
       id: 'started_by',
@@ -183,21 +199,6 @@ export default function InventoryCountsPage() {
       header: 'Items',
       size: 80,
       cell: ({ row }) => row.original.items_count,
-      enableSorting: false,
-    },
-    {
-      id: 'actions',
-      header: '',
-      size: 100,
-      cell: ({ row }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push(`/admin/inventory/counts/${row.original.id}`)}
-        >
-          Open
-        </Button>
-      ),
       enableSorting: false,
     },
   ];
@@ -260,6 +261,7 @@ export default function InventoryCountsPage() {
             variances before committing.
           </DialogDescription>
         </DialogHeader>
+        <form onSubmit={handleCreate}>
         <DialogContent>
           <div className="space-y-4">
             <div>
@@ -315,13 +317,19 @@ export default function InventoryCountsPage() {
           </div>
         </DialogContent>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setModalOpen(false)} disabled={creating}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setModalOpen(false)}
+            disabled={creating}
+          >
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={creating}>
+          <Button type="submit" disabled={creating}>
             {creating ? 'Starting…' : 'Start Count'}
           </Button>
         </DialogFooter>
+        </form>
       </Dialog>
     </div>
   );

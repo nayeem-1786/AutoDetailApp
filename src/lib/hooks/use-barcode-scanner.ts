@@ -87,7 +87,26 @@ export function useBarcodeScanner({
       el.setSelectionRange?.(newCursor, newCursor);
     }
 
+    function isScanTargetInput(): boolean {
+      const el = document.activeElement;
+      return (
+        el instanceof HTMLInputElement &&
+        el.getAttribute('data-barcode-scan-target') === 'input'
+      );
+    }
+
     function handleKeyDown(e: KeyboardEvent) {
+      // Target-override: when the focused input opts in via
+      // data-barcode-scan-target="input", bypass the hook entirely and let
+      // keystrokes (including Enter) flow natively. Used by the Quick Edit
+      // drawer's Barcode field so staff can rescan without the page-level
+      // scanner hook reopening the drawer with a different product.
+      if (isScanTargetInput()) {
+        clearReleaseTimer();
+        bufferRef.current = '';
+        return;
+      }
+
       if (e.key === 'Enter') {
         clearReleaseTimer();
         const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();

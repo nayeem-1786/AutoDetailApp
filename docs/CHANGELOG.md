@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(inventory,drawer): scanner rescan in drawer, modal Enter submit, list row action — 2026-04-21 (Session 42D-interlude)
+
+Three small UX fixes shipped together before 42D-2 builds the counting UI.
+
+**Fix 1 — Quick Edit drawer accepts barcode rescans.** Previously, scanning into the drawer's Barcode input fired the page-level scanner hook's `onScan` instead of populating the field — staff couldn't rescan to replace a barcode without the drawer reopening on a different product. Resolved with a new data attribute `data-barcode-scan-target="input"` plus an early-return at the top of `useBarcodeScanner`'s keydown handler: when the active element is an `HTMLInputElement` carrying that attribute, the hook bypasses itself entirely — no `preventDefault`, no buffer, no `onScan` dispatch (including on Enter). The Barcode input in `quick-edit-drawer.tsx` opts in via the attribute; Price / Cost / Quantity / Reorder Threshold deliberately do NOT (scanning into numeric fields would produce junk values). Existing onBlur save + 5s undo toast + soft conflict check from Session 41C fire normally once keystrokes flow natively.
+
+Attribute naming is deliberately distinct from the existing `data-barcode-target` attribute (which is the OPT-IN to onScan). The new attribute has the opposite meaning: opt the input OUT of the hook. Different names, different semantics, no collision.
+
+**Fix 2 — "New Count" modal submits on Enter.** The Dialog-wrapped form on `/admin/inventory/counts` was using a raw `<div>` with `onClick={handleCreate}` on the Start Count button. Enter in the Section Label input or Notes textarea did nothing. Wrapped the fields in `<form onSubmit={handleCreate}>`, changed the submit button to `type="submit"`, and explicitly set the Cancel button to `type="button"` so it doesn't accidentally submit. `handleCreate` now accepts an optional `FormEvent`, calls `e?.preventDefault()`, and guards against double-submission with an early return when `creating` is true.
+
+**Fix 3 — Counts list row action matches admin convention.** Deleted the standalone "Actions" column with the ghost "Open" button — every other admin list page (Purchase Orders, Vendors, Customers, Services, Staff, Products, Campaigns, Automations) makes the primary descriptive column a blue-underlined nav button. Promoted the Section Label column to the same pattern. Fallback strings for null section labels (first-scan counts may omit a label): `"Full Store"` for `count_type='full'`, and `` `Section — ${formatDate(started_at)}` `` for `count_type='sectional'` (defensive — the modal prevents null labels but the fallback ensures something clickable always renders).
+
+**Tests added** (3 new, 321 total passing):
+- `useBarcodeScanner` scan burst with no `data-barcode-scan-target` input still fires onScan (regression)
+- `useBarcodeScanner` scan burst does NOT fire onScan and does NOT `preventDefault` when active input has `data-barcode-scan-target="input"`
+- `useBarcodeScanner` first char of a burst is not eaten (no `preventDefault`) for target-attribute inputs — the 40B speculative-prevent is cleanly bypassed
+
+Skipped tests for form-submit wiring and the row-action UX per the plan (pure wiring, low test value).
+
+Tests: 318 → 321 passing. `tsc --noEmit` clean.
+
+**Files changed:**
+- `src/lib/hooks/use-barcode-scanner.ts` (early-return for scan-target inputs)
+- `src/lib/hooks/__tests__/use-barcode-scanner.test.ts` (3 new tests in new describe block)
+- `src/app/admin/catalog/products/components/quick-edit-drawer.tsx` (attribute on Barcode input)
+- `src/app/admin/inventory/counts/page.tsx` (form wrapper, button types, column rework, Actions column removed)
+- `docs/CHANGELOG.md` (this entry)
+
+**Deliberately not touched:** POS scanner behavior, drawer's other field save paths, count detail page (still 404s — that is Session 42D-2), any other input's attribute set. No DB changes, no API changes, no schema changes.
+
+---
+
 ## feat(inventory): count schema + API + list page — 2026-04-21 (Session 42D-1)
 
 First of two sessions building the Inventory Count feature (design source: `docs/audits/INVENTORY_COUNT_AUDIT_SESSION42C.md`, Option C shared-header model, first-touch `expected_qty` freeze). This session delivers schema + API + a minimal list page so Session 42D-2 can build the counting UI against verified endpoints. **No counting UI, no scanner wiring, no POS changes in this session.** The count detail page is intentionally a 404 until 42D-2 ships it.
