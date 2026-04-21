@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(admin): Quick Edit drawer for products with scanner + autosave + audit-preserving qty edits — 2026-04-20 (Session 41B)
+
+Scanner-driven Quick Edit workflow on the admin products list. Scan a printed barcode (or tap the pencil icon on a row) → slide-over drawer opens from the right with price / cost / reorder threshold / quantity fields. Three of them autosave on blur with a 5-second undo toast; quantity requires an explicit reason category before saving, and routes through the existing `/api/admin/stock-adjustments` endpoint so every change writes a `stock_adjustments` audit row + `audit_log` entry.
+
+**New**
+- `src/app/admin/catalog/products/components/quick-edit-drawer.tsx` — 4-field drawer built on the existing `SlideOver` primitive. Price, cost (gated on `inventory.view_costs`), and reorder threshold use direct `supabase.from('products').update({...})` per the existing edit-page pattern. Quantity goes through `adminFetch('/api/admin/stock-adjustments')` so the endpoint handles employee-id lookup, the non-negative floor, the `stock_adjustments` insert via `logStockAdjustment()`, and the audit-log entry in one transaction.
+- `src/app/api/admin/products/barcode-lookup/route.ts` — cookie-authed POST, matches existing admin-route pattern (Supabase server client for `getUser`, admin client for data, employee-row check for 403). Returns `{ product | null }`.
+- Scanner hook mounted on the products list page with `requireTargetAttribute: false` — any bluetooth scan anywhere on the page looks up by barcode and opens the drawer on match.
+- Rightmost "Quick Edit" column (pencil icon) gated on `products.edit`. Name column still navigates to full edit page; row otherwise remains un-clickable, preserving all current navigation.
+- First in-codebase use of Sonner's `action:` prop for the undo pattern: `toast.success('Price updated — $12.50', { duration: 5000, action: { label: 'Undo', onClick: ... } })`.
+
+**Fix**
+- 11 numeric inputs across `src/app/admin/catalog/products/` (list adjust dialog, new product, edit page, sale/discount inputs) migrated from `type="number"` → `type="text" + inputMode="decimal"` (money) or `inputMode="numeric"` (qty/threshold) + corresponding `pattern`. iPad now shows the compact numeric keypad instead of full QWERTY. Reference pattern: `src/app/pos/components/checkout/cash-payment.tsx:230–233`.
+
+**Tests added**
+- `src/app/admin/catalog/products/components/__tests__/quick-edit-drawer.test.tsx` — 9 tests: field hydration, cost-field permission gate, price blur → supabase update, toast action-prop shape, undo issues second update, qty change reveals reason block, qty does NOT autosave on blur, reason-category required to enable save, qty save sends signed delta + concatenated reason.
+- `src/app/api/admin/products/__tests__/barcode-lookup.test.ts` — 6 tests: 200-found, 200-null, 400 missing/empty, 401 unauthenticated, 403 non-employee, 500 db error.
+
+Tests: 280 → 295 passing. `tsc --noEmit` clean.
+
+Qty intentionally has no undo: the audit trail is the safety mechanism, not a reversible action. Undoing an audit entry would just append a second audit entry.
+
+Files changed: `src/app/admin/catalog/products/components/quick-edit-drawer.tsx` (new), `src/app/api/admin/products/barcode-lookup/route.ts` (new), `src/app/admin/catalog/products/components/__tests__/quick-edit-drawer.test.tsx` (new), `src/app/api/admin/products/__tests__/barcode-lookup.test.ts` (new), `src/app/admin/catalog/products/page.tsx`, `src/app/admin/catalog/products/[id]/page.tsx`, `src/app/admin/catalog/products/new/page.tsx`, `docs/dev/FILE_TREE.md`, `docs/CHANGELOG.md`.
+
+---
+
 ## fix(scanner): release multi-char human typing on timeout — 2026-04-20 (Session 40C)
 
 Follow-up to 40B's speculative-prevent refactor. Smoke testing revealed that fast human typing (multiple chars within 150 ms of each other, no Enter) was being dropped on timeout — 40B only re-dispatched the buffer when `length === 1`, silently eating anything longer.

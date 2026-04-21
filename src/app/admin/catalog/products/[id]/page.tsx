@@ -801,9 +801,9 @@ export default function ProductDetailPage() {
               <FormField label="Cost Price" error={errors.cost_price?.message} required htmlFor="cost_price">
                 <Input
                   id="cost_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   {...register('cost_price')}
                 />
               </FormField>
@@ -811,9 +811,9 @@ export default function ProductDetailPage() {
               <FormField label="Retail Price" error={errors.retail_price?.message} required htmlFor="retail_price">
                 <Input
                   id="retail_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   {...register('retail_price')}
                 />
               </FormField>
@@ -821,8 +821,9 @@ export default function ProductDetailPage() {
               <FormField label="Quantity on Hand" error={errors.quantity_on_hand?.message} htmlFor="quantity_on_hand">
                 <Input
                   id="quantity_on_hand"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   {...register('quantity_on_hand')}
                 />
               </FormField>
@@ -830,8 +831,9 @@ export default function ProductDetailPage() {
               <FormField label="Reorder Threshold" error={errors.reorder_threshold?.message} htmlFor="reorder_threshold" description="Alert when stock drops to this level">
                 <Input
                   id="reorder_threshold"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   {...register('reorder_threshold')}
                 />
               </FormField>
@@ -839,8 +841,9 @@ export default function ProductDetailPage() {
               <FormField label="Min Order Qty" error={errors.min_order_qty?.message} htmlFor="min_order_qty" description="Minimum quantity to order from vendor">
                 <Input
                   id="min_order_qty"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   {...register('min_order_qty')}
                   placeholder="e.g. 6"
                 />
@@ -1618,9 +1621,9 @@ function ProductSalePricingCard({
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   placeholder="No sale"
                   className={`pl-7 ${hasError ? 'border-red-500 focus:ring-red-500' : ''}`}
                   value={salePrice}
@@ -1733,9 +1736,9 @@ function ProductSaleDiscountControls({
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
             )}
             <Input
-              type="number"
-              min="0"
-              step={discountType === 'percentage' ? '1' : '0.01'}
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*\.?[0-9]*"
               placeholder="0"
               className={discountType === 'fixed' ? 'pl-7 pr-3' : 'pr-8'}
               value={discountValue}

@@ -29,11 +29,13 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Plus, Package, ImageOff, Sparkles } from 'lucide-react';
+import { Plus, Package, ImageOff, Sparkles, Pencil } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { ShieldAlert } from 'lucide-react';
 import { useTableState } from '@/lib/hooks/useTableState';
+import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
 import type { ColumnDef } from '@tanstack/react-table';
+import { QuickEditDrawer } from './components/quick-edit-drawer';
 
 type ProductWithRelations = Product & {
   product_categories: Pick<ProductCategory, 'id' | 'name'> | null;
@@ -75,6 +77,34 @@ export default function ProductsPage() {
   const [reactivatingId, setReactivatingId] = useState<string | null>(null);
   const [reactivateTarget, setReactivateTarget] = useState<ProductWithRelations | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<ProductWithRelations | null>(null);
+  const [quickEditTarget, setQuickEditTarget] = useState<Product | null>(null);
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+
+  useBarcodeScanner({
+    requireTargetAttribute: false,
+    onScan: async (barcode) => {
+      try {
+        const res = await adminFetch('/api/admin/products/barcode-lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ barcode }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          toast.error(json.error || 'Lookup failed');
+          return;
+        }
+        if (!json.product) {
+          toast.error(`No product matches barcode ${barcode}`);
+          return;
+        }
+        setQuickEditTarget(json.product as Product);
+        setQuickEditOpen(true);
+      } catch {
+        toast.error('Lookup failed');
+      }
+    },
+  });
 
   // Enrichment draft counts (for review link badge)
   const [pendingDraftCount, setPendingDraftCount] = useState(0);
@@ -527,10 +557,37 @@ export default function ProductsPage() {
         },
       ];
 
+  const quickEditColumn: ColumnDef<ProductWithRelations, unknown>[] = canEditProducts
+    ? [
+        {
+          id: 'quick_edit',
+          header: '',
+          size: 48,
+          cell: ({ row }) => (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setQuickEditTarget(row.original);
+                setQuickEditOpen(true);
+              }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-ui-text-dim hover:bg-ui-bg-hover hover:text-ui-text"
+              aria-label={`Quick edit ${row.original.name}`}
+              title="Quick edit"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          ),
+          enableSorting: false,
+        },
+      ]
+    : [];
+
   const columns: ColumnDef<ProductWithRelations, unknown>[] = [
     ...baseColumns,
     ...costColumns,
     ...stockColumns,
+    ...quickEditColumn,
   ];
 
   if (loadingViewPerm || loading) {
@@ -631,6 +688,22 @@ export default function ProductsPage() {
         }}
       />
 
+      {/* Quick Edit Drawer */}
+      <QuickEditDrawer
+        open={quickEditOpen}
+        product={quickEditTarget}
+        onOpenChange={(open) => {
+          setQuickEditOpen(open);
+          if (!open) setQuickEditTarget(null);
+        }}
+        onSaved={(updated) => {
+          setQuickEditTarget(updated);
+          setProducts((prev) =>
+            prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)),
+          );
+        }}
+      />
+
       {/* Reactivate Confirm Dialog */}
       <ConfirmDialog
         open={!!reactivateTarget}
@@ -666,7 +739,9 @@ export default function ProductsPage() {
             >
               <Input
                 id="adjustment"
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="-?[0-9]*"
                 {...register('adjustment')}
                 placeholder="e.g. +10 or -3"
               />

@@ -319,9 +319,9 @@ export default function NewProductPage() {
               <FormField label="Cost Price" error={errors.cost_price?.message} required htmlFor="cost_price">
                 <Input
                   id="cost_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   {...register('cost_price')}
                   placeholder="0.00"
                 />
@@ -330,9 +330,9 @@ export default function NewProductPage() {
               <FormField label="Retail Price" error={errors.retail_price?.message} required htmlFor="retail_price">
                 <Input
                   id="retail_price"
-                  type="number"
-                  step="0.01"
-                  min="0"
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
                   {...register('retail_price')}
                   placeholder="0.00"
                 />
@@ -341,8 +341,9 @@ export default function NewProductPage() {
               <FormField label="Quantity on Hand" error={errors.quantity_on_hand?.message} htmlFor="quantity_on_hand">
                 <Input
                   id="quantity_on_hand"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   {...register('quantity_on_hand')}
                 />
               </FormField>
@@ -350,8 +351,9 @@ export default function NewProductPage() {
               <FormField label="Reorder Threshold" error={errors.reorder_threshold?.message} htmlFor="reorder_threshold" description="Alert when stock drops to this level">
                 <Input
                   id="reorder_threshold"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   {...register('reorder_threshold')}
                   placeholder="e.g. 5"
                 />
@@ -360,8 +362,9 @@ export default function NewProductPage() {
               <FormField label="Min Order Qty" error={errors.min_order_qty?.message} htmlFor="min_order_qty" description="Minimum quantity to order from vendor">
                 <Input
                   id="min_order_qty"
-                  type="number"
-                  min="0"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   {...register('min_order_qty')}
                   placeholder="e.g. 6"
                 />

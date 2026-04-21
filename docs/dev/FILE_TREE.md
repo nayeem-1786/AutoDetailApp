@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-20 (Session 40A — scanner hook moved to src/lib/hooks/, wired per-page across POS)
+> **Last updated:** 2026-04-20 (Session 41B — Quick Edit drawer for admin products; admin barcode-lookup API)
 
 ---
 
@@ -52,6 +52,7 @@ src/app/api/admin/orders/route.ts
 src/app/api/admin/products/[id]/group/route.ts
 src/app/api/admin/products/[id]/variants/route.ts
 src/app/api/admin/products/group/route.ts
+src/app/api/admin/products/barcode-lookup/route.ts
 src/app/api/admin/photos/[id]/route.ts
 src/app/api/admin/photos/bulk/route.ts
 src/app/api/admin/photos/route.ts
@@ -530,6 +531,7 @@ src/app/admin/catalog/products/[id]/page.tsx
 src/app/admin/catalog/products/enrichment-review/page.tsx
 src/app/admin/catalog/products/new/page.tsx
 src/app/admin/catalog/products/page.tsx
+src/app/admin/catalog/products/components/quick-edit-drawer.tsx
 src/app/admin/catalog/services/[id]/page.tsx
 src/app/admin/catalog/services/new/page.tsx
 src/app/admin/catalog/services/page.tsx
