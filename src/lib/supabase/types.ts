@@ -452,6 +452,7 @@ export interface RefundItem {
   quantity: number;
   amount: number;
   restock: boolean;
+  disposition: 'restock' | 'damaged' | 'customer_retained' | null;
   created_at: string;
 }
 

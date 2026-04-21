@@ -299,12 +299,9 @@ export function RefundDialog({
                       maxRefundableQty={maxQty}
                       selected={!!selection}
                       refundQty={selection?.qty ?? 1}
-                      disposition={selection?.disposition ?? null}
-                      showPerLineDisposition={allDisposition === 'mixed'}
                       perUnitCents={perUnitCentsMap.get(item.id) ?? 0}
                       onToggle={() => toggleItem(item.id)}
                       onQtyChange={(qty) => updateQty(item.id, qty)}
-                      onDispositionChange={(d) => updateDisposition(item.id, d)}
                     />
                   );
                 })}
@@ -367,6 +364,7 @@ export function RefundDialog({
               allDisposition={allDisposition}
               onAllDispositionChange={setAllDisposition}
               hasProductItems={hasProductItems}
+              onDispositionChange={updateDisposition}
             />
           </div>
         )}

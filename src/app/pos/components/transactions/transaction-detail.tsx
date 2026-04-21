@@ -442,11 +442,25 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
                           >
                             <span>
                               {txItem?.item_name ?? 'Unknown Item'} x{ri.quantity}
-                              {ri.restock && (
-                                <span className="ml-1.5 rounded bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 text-blue-600 dark:text-blue-400">
-                                  restocked
-                                </span>
-                              )}
+                              {(() => {
+                                const disposition = ri.disposition ?? (ri.restock ? 'restock' : null);
+                                if (disposition === 'restock') return (
+                                  <span className="ml-1.5 rounded bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 text-blue-600 dark:text-blue-400">
+                                    restocked
+                                  </span>
+                                );
+                                if (disposition === 'damaged') return (
+                                  <span className="ml-1.5 rounded bg-red-50 dark:bg-red-900/30 px-1 py-0.5 text-red-600 dark:text-red-400">
+                                    damaged
+                                  </span>
+                                );
+                                if (disposition === 'customer_retained') return (
+                                  <span className="ml-1.5 rounded bg-gray-100 dark:bg-gray-700 px-1 py-0.5 text-gray-600 dark:text-gray-400">
+                                    kept
+                                  </span>
+                                );
+                                return null;
+                              })()}
                             </span>
                             <span className="tabular-nums">{formatCurrency(ri.amount)}</span>
                           </div>

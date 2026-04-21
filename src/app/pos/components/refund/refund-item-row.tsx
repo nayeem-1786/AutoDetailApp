@@ -3,20 +3,16 @@
 import { Minus, Plus } from 'lucide-react';
 import type { TransactionItem } from '@/lib/supabase/types';
 import { fromCents } from '@/lib/utils/refund-math';
-import type { RefundDisposition } from '@/lib/utils/validation';
 
 interface RefundItemRowProps {
   item: TransactionItem;
   maxRefundableQty: number;
   selected: boolean;
   refundQty: number;
-  disposition: RefundDisposition | null;
-  showPerLineDisposition: boolean;
   // Fractional cents per unit — display approximation only.
   perUnitCents: number;
   onToggle: () => void;
   onQtyChange: (qty: number) => void;
-  onDispositionChange: (disposition: RefundDisposition) => void;
 }
 
 const itemTypeBadgeColors: Record<string, string> = {
@@ -26,23 +22,14 @@ const itemTypeBadgeColors: Record<string, string> = {
   custom: 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
 };
 
-const DISPOSITIONS: { value: RefundDisposition; label: string }[] = [
-  { value: 'restock', label: 'Restock' },
-  { value: 'damaged', label: 'Damaged' },
-  { value: 'customer_retained', label: 'Kept' },
-];
-
 export function RefundItemRow({
   item,
   maxRefundableQty,
   selected,
   refundQty,
-  disposition,
-  showPerLineDisposition,
   perUnitCents,
   onToggle,
   onQtyChange,
-  onDispositionChange,
 }: RefundItemRowProps) {
   const disabled = maxRefundableQty <= 0;
   const displayAmount = selected
@@ -137,24 +124,6 @@ export function RefundItemRow({
           )}
         </div>
       </div>
-
-      {/* Per-line disposition radio — only for products in mixed mode */}
-      {selected && showPerLineDisposition && item.item_type === 'product' && (
-        <div className="mt-2 flex items-center gap-3 pl-7">
-          {DISPOSITIONS.map(({ value, label }) => (
-            <label key={value} className="flex cursor-pointer items-center gap-1.5">
-              <input
-                type="radio"
-                name={`disposition-${item.id}`}
-                checked={disposition === value}
-                onChange={() => onDispositionChange(value)}
-                className="h-3.5 w-3.5 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
-              />
-              <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
-            </label>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

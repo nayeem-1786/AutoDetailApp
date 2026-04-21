@@ -4,6 +4,17 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): inline refund disposition radios + complete chip display — 2026-04-20 (Session 38)
+
+- **Fix:** Mixed-mode refund disposition radios now render inline on the Review Refund summary (Step 2), eliminating the ping-pong between Step 1 and Step 2 that forced users to navigate back to set per-line dispositions.
+- **Fix:** Completed refund history now displays distinct chips for all dispositions: blue "restocked", red "damaged", gray "kept". Previously only restocked had a chip.
+- **Backwards compat:** Pre-Session-37 refund_items rows (disposition=null, restock=false) render no chip — unchanged behavior for legacy data.
+- Added `disposition` field to `RefundItem` TypeScript interface.
+
+Files changed: `src/app/pos/components/refund/refund-summary.tsx`, `src/app/pos/components/refund/refund-item-row.tsx`, `src/app/pos/components/refund/refund-dialog.tsx`, `src/app/pos/components/transactions/transaction-detail.tsx`, `src/lib/supabase/types.ts`, `docs/CHANGELOG.md`.
+
+---
+
 ## feat(inventory): unified stock_adjustments + refund disposition rework + shop-use tracking — 2026-04-20 (Session 37)
 
 **Three bundled features sharing one migration and overlapping code:**

@@ -24,6 +24,7 @@ interface RefundSummaryProps {
   allDisposition: AllItemsDisposition;
   onAllDispositionChange: (d: AllItemsDisposition) => void;
   hasProductItems: boolean;
+  onDispositionChange: (itemId: string, disposition: RefundDisposition) => void;
 }
 
 const DISPOSITION_OPTIONS: {
@@ -64,6 +65,12 @@ const DISPOSITION_BADGE: Record<string, { bg: string; text: string; label: strin
   customer_retained: { bg: 'bg-amber-50 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400', label: 'kept' },
 };
 
+const PER_LINE_DISPOSITIONS: { value: RefundDisposition; label: string }[] = [
+  { value: 'restock', label: 'Restock' },
+  { value: 'damaged', label: 'Damaged' },
+  { value: 'customer_retained', label: 'Kept' },
+];
+
 export function RefundSummary({
   items,
   tipRefund = 0,
@@ -76,6 +83,7 @@ export function RefundSummary({
   allDisposition,
   onAllDispositionChange,
   hasProductItems,
+  onDispositionChange,
 }: RefundSummaryProps) {
   const itemsTotalCents = items.reduce(
     (sum, entry) => sum + entry.amountCents,
@@ -101,31 +109,49 @@ export function RefundSummary({
       {/* Item list */}
       <div className="space-y-2">
         {items.map((entry) => {
+          const isProduct = entry.item.item_type === 'product';
           const resolvedDisposition =
-            entry.item.item_type !== 'product'
+            !isProduct
               ? null
               : allDisposition && allDisposition !== 'mixed'
                 ? allDisposition
                 : entry.disposition;
           const badge = resolvedDisposition ? DISPOSITION_BADGE[resolvedDisposition] : null;
+          const showPerLineRadio = isProduct && allDisposition === 'mixed';
 
           return (
-            <div
-              key={entry.item.id}
-              className="flex items-center justify-between text-sm"
-            >
-              <div className="min-w-0 flex-1">
-                <span className="text-gray-700 dark:text-gray-300">{entry.item.item_name}</span>
-                <span className="ml-1.5 text-gray-400 dark:text-gray-500">x{entry.quantity}</span>
-                {badge && (
-                  <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${badge.bg} ${badge.text}`}>
-                    {badge.label}
-                  </span>
-                )}
+            <div key={entry.item.id}>
+              <div className="flex items-center justify-between text-sm">
+                <div className="min-w-0 flex-1">
+                  <span className="text-gray-700 dark:text-gray-300">{entry.item.item_name}</span>
+                  <span className="ml-1.5 text-gray-400 dark:text-gray-500">x{entry.quantity}</span>
+                  {badge && (
+                    <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${badge.bg} ${badge.text}`}>
+                      {badge.label}
+                    </span>
+                  )}
+                </div>
+                <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                  ${fromCents(entry.amountCents).toFixed(2)}
+                </span>
               </div>
-              <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                ${fromCents(entry.amountCents).toFixed(2)}
-              </span>
+              {/* Per-line disposition radio — only for products in mixed mode */}
+              {showPerLineRadio && (
+                <div className="mt-1.5 flex items-center gap-3 pl-1">
+                  {PER_LINE_DISPOSITIONS.map(({ value, label }) => (
+                    <label key={value} className="flex cursor-pointer items-center gap-1.5">
+                      <input
+                        type="radio"
+                        name={`disposition-${entry.item.id}`}
+                        checked={entry.disposition === value}
+                        onChange={() => onDispositionChange(entry.item.id, value)}
+                        className="h-3.5 w-3.5 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      />
+                      <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -185,11 +211,6 @@ export function RefundSummary({
               </label>
             ))}
           </div>
-          {allDisposition === 'mixed' && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Set disposition on each product row above (Back to selection).
-            </p>
-          )}
         </div>
       )}
 
