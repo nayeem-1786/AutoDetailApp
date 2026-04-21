@@ -30,12 +30,11 @@ interface UseBarcodeOptions {
  *
  * Speculative-prevent strategy: every printable keydown is preventDefault'd
  * immediately and appended to a buffer. A release timer of maxKeystrokeGap
- * is (re)scheduled. If it fires with exactly one buffered character, that
- * character is synthesized into the focused input as human typing. Scan
- * bursts always end with Enter before the timer can fire, so their
- * characters never leak into the input — including the first char of the
- * burst, which previously reached the input before burst detection kicked
- * in.
+ * is (re)scheduled. If it fires with any buffered characters, they are
+ * synthesized into the focused input as human typing. Scan bursts always
+ * end with Enter (which clears this timer and dispatches via onScan) well
+ * before the release timer can fire, so their characters never leak into
+ * the input — including the first char of the burst.
  */
 export function useBarcodeScanner({
   onScan,
@@ -118,11 +117,11 @@ export function useBarcodeScanner({
         const buf = bufferRef.current;
         bufferRef.current = '';
         releaseTimerRef.current = null;
-        // A single speculatively-suppressed char with no follow-up is human
-        // typing — put it back. Multi-char buffers without Enter are treated
-        // as an aborted/incomplete burst and dropped (scans always end with
-        // Enter well before this timer fires).
-        if (buf.length === 1) {
+        // Any buffered keystrokes without a following Enter are human typing,
+        // not a scan — re-dispatch them. Scanners always send Enter before
+        // this timer fires (the Enter path clears this timer), so only human
+        // typing bursts reach here. Dropping them would silently eat input.
+        if (buf.length > 0) {
           releaseAsTyping(buf);
         }
       }, maxKeystrokeGap);

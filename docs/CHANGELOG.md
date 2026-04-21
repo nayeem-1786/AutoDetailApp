@@ -4,6 +4,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(scanner): release multi-char human typing on timeout — 2026-04-20 (Session 40C)
+
+Follow-up to 40B's speculative-prevent refactor. Smoke testing revealed that fast human typing (multiple chars within 150 ms of each other, no Enter) was being dropped on timeout — 40B only re-dispatched the buffer when `length === 1`, silently eating anything longer.
+
+**Fix:** release-timer callback now re-dispatches *any* non-empty buffer as typing, not just single-char buffers. Scanners always end with Enter (which clears this timer and routes through the `onScan` path), so only human typing bursts ever reach this branch — dropping them was the bug.
+
+`releaseAsTyping()` already handled multi-char strings correctly (it uses slice-based insertion and `start + ch.length` for cursor placement), so no changes needed there.
+
+**Tests added** (3 new, 280 total passing):
+1. Multi-char human typing released on timeout (e.g. "abc" fast with no Enter)
+2. Scanner burst + Enter still fires `onScan` after the change (regression)
+3. Typing → pause → typing releases in chunks, input accumulates correctly
+
+Files changed: `src/lib/hooks/use-barcode-scanner.ts`, `src/lib/hooks/__tests__/use-barcode-scanner.test.ts`, `docs/CHANGELOG.md`.
+
+---
+
 ## fix(scanner): suppress first-char leak in burst detection; preserve human typing — 2026-04-20 (Session 40B)
 
 Smoke testing Session 40A's transactions scan surfaced a visible one-character flash: scanning receipt "SD-006217" would briefly render "S" in the search input before the scan completed and navigated. Previously invisible on the register because its search input is programmatically cleared after each successful add.

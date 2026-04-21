@@ -143,4 +143,70 @@ describe('useBarcodeScanner — first-char leak suppression', () => {
     expect(onScan).not.toHaveBeenCalled();
     expect(input.value).toBe('');
   });
+
+  it('releases multi-char human typing when no Enter follows', () => {
+    const input = installTargetedInput();
+    const onScan = vi.fn();
+    renderHook(() => useBarcodeScanner({ onScan }));
+
+    // Three chars within maxKeystrokeGap of each other, no Enter.
+    pressKey('a');
+    vi.advanceTimersByTime(40);
+    pressKey('b');
+    vi.advanceTimersByTime(40);
+    pressKey('c');
+
+    // Still buffered — nothing in the input yet.
+    expect(input.value).toBe('');
+
+    // Silence for the full release window.
+    vi.advanceTimersByTime(200);
+
+    expect(input.value).toBe('abc');
+    expect(onScan).not.toHaveBeenCalled();
+  });
+
+  it('scanner burst with Enter still fires onScan after multi-char release change (regression)', () => {
+    const input = installTargetedInput();
+    const onScan = vi.fn();
+    renderHook(() => useBarcodeScanner({ onScan }));
+
+    for (const ch of ['S', 'D', '-', '9', '8', '7', '6', '5']) {
+      pressKey(ch);
+      vi.advanceTimersByTime(15);
+    }
+    pressKey('Enter');
+
+    expect(onScan).toHaveBeenCalledTimes(1);
+    expect(onScan).toHaveBeenCalledWith('SD-98765');
+    expect(input.value).toBe('');
+
+    // Release timer must not fire after Enter cleared it (would double-release).
+    vi.advanceTimersByTime(500);
+    expect(input.value).toBe('');
+    expect(onScan).toHaveBeenCalledTimes(1);
+  });
+
+  it('multi-char typing, pause, more typing — released in chunks, input accumulates', () => {
+    const input = installTargetedInput();
+    const onScan = vi.fn();
+    renderHook(() => useBarcodeScanner({ onScan }));
+
+    // First chunk: "ab" fast
+    pressKey('a');
+    vi.advanceTimersByTime(40);
+    pressKey('b');
+    // Pause > maxKeystrokeGap — first chunk releases.
+    vi.advanceTimersByTime(200);
+    expect(input.value).toBe('ab');
+
+    // Second chunk: "cd" fast
+    pressKey('c');
+    vi.advanceTimersByTime(40);
+    pressKey('d');
+    vi.advanceTimersByTime(200);
+
+    expect(input.value).toBe('abcd');
+    expect(onScan).not.toHaveBeenCalled();
+  });
 });
