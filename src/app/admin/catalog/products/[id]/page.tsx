@@ -210,6 +210,8 @@ export default function ProductDetailPage() {
         is_active: p.is_active,
         barcode: p.barcode || '',
         variant_label: p.variant_label || '',
+        vendor_sku: p.vendor_sku || '',
+        vendor_product_name: p.vendor_product_name || '',
         specs: (p.specs as Record<string, unknown>) ?? null,
       });
 
@@ -470,6 +472,8 @@ export default function ProductDetailPage() {
           is_active: data.is_active,
           barcode: data.barcode || null,
           variant_label: data.variant_label || null,
+          vendor_sku: data.vendor_sku || null,
+          vendor_product_name: data.vendor_product_name || null,
           specs: cleanSpecs,
         })
         .eq('id', productId);
@@ -797,6 +801,41 @@ export default function ProductDetailPage() {
                   ))}
                 </Select>
               </FormField>
+
+              <div className="md:col-span-2 mt-2 pt-4 border-t border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">
+                  Vendor Reorder Info
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  For ordering from the vendor. The vendor&apos;s internal SKU and their product name may differ from your scan code and display name.
+                </p>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <FormField
+                    label="Vendor SKU"
+                    error={errors.vendor_sku?.message}
+                    htmlFor="vendor_sku"
+                    description="Used on purchase orders. Leave blank if vendor uses UPC."
+                  >
+                    <Input
+                      id="vendor_sku"
+                      {...register('vendor_sku')}
+                      placeholder="e.g. M18-2804 or vendor's part number"
+                    />
+                  </FormField>
+                  <FormField
+                    label="Vendor Product Name"
+                    error={errors.vendor_product_name?.message}
+                    htmlFor="vendor_product_name"
+                    description="How the vendor refers to this product."
+                  >
+                    <Input
+                      id="vendor_product_name"
+                      {...register('vendor_product_name')}
+                      placeholder="e.g. P&S NF Interior Dressing - Pint"
+                    />
+                  </FormField>
+                </div>
+              </div>
 
               <FormField label="Cost Price" error={errors.cost_price?.message} required htmlFor="cost_price">
                 <Input

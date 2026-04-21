@@ -199,6 +199,8 @@ export interface Product {
   specs: Record<string, unknown> | null;
   product_group_id: string | null;
   variant_label: string | null;
+  vendor_sku: string | null;
+  vendor_product_name: string | null;
   created_at: string;
   updated_at: string;
   // Joined relations

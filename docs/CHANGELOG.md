@@ -4,6 +4,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(products): add vendor_sku and vendor_product_name for reorder metadata — 2026-04-21 (Session 42B)
+
+Adds two nullable TEXT columns to `products` for capturing vendor reorder identity, separate from the scan-code SKU and user-facing display name. Motivated by the Session 42A audit: ~90% of products are vendor-branded with the vendor UPC stored in `products.sku` (this is correct and unchanged); ~8-10% are white-labeled with short internal codes; some vendors use their own part numbers on POs rather than UPC, and their product names often differ from the user's display name. These fields live on the full edit page and new-product page only — Quick Edit drawer is unchanged (PO-prep scope, not daily ops).
+
+**Migration:** `supabase/migrations/20260421000001_add_vendor_reorder_fields.sql` — two `ADD COLUMN` statements, both nullable, with explanatory `COMMENT ON COLUMN` clauses. No backfill. Existing rows unaffected. Apply via Supabase SQL Editor per memory #28.
+
+**New:**
+- `products.vendor_sku TEXT` — vendor's internal part number for reordering.
+- `products.vendor_product_name TEXT` — vendor's name for the product as it appears on their invoices / POs.
+- "Vendor Reorder Info" subsection on `src/app/admin/catalog/products/[id]/page.tsx` (L812-842) and `src/app/admin/catalog/products/new/page.tsx` (L330-357) — appears directly below the Vendor dropdown, wrapped in `md:col-span-2` with a top border + short description so it's visually separated from the surrounding basic-info fields. Two-column grid of `Vendor SKU` + `Vendor Product Name` inputs.
+- Fields commit through the existing "Save Changes" / "Create Product" button paths — no new API routes, no new save surfaces.
+
+**Not touched (deliberate):**
+- Quick Edit drawer — vendor fields are PO-prep data, not daily operations.
+- Vendor detail page — deferred.
+- Square import scripts — vendor reorder info is internal metadata, not imported.
+- `src/lib/products/barcode-lookup.ts` — `vendor_sku` is NOT a scan-code fallback. POS scanner behavior unchanged.
+- The Session 42A §4.4.1 qty footgun, §4.4.2 dead `is_active` binding, or the two-save-buttons structure — all Session 42D scope.
+
+**Schema convention:** `vendor_sku` + `vendor_product_name` use the existing `optionalString` helper (`z.string().optional().nullable()`) to match `sku`, `description`, `barcode`, `variant_label`. No `.trim()` divergence. Empty string → null conversion at save time via the `|| null` pattern already used throughout.
+
+**Files changed:**
+- `supabase/migrations/20260421000001_add_vendor_reorder_fields.sql` (new)
+- `src/lib/utils/validation.ts` (schema extension)
+- `src/lib/supabase/types.ts` (`Product` interface extension)
+- `src/app/admin/catalog/products/[id]/page.tsx` (reset + onSubmit + subsection render)
+- `src/app/admin/catalog/products/new/page.tsx` (defaults + insert payload + subsection render)
+- `docs/dev/DB_SCHEMA.md` (two rows in products columns table)
+- `docs/dev/FILE_TREE.md` (new migration)
+- `docs/CHANGELOG.md` (this entry)
+
+Tests: 307 → 307 passing (no new tests; existing schema & form tests cover the additions). `tsc --noEmit` clean.
+
+---
+
 ## fix(products): unify barcode lookup across POS/admin; drawer barcode field — 2026-04-21 (Session 41C)
 
 **Observed bug:** admin scanner miss on real products (e.g. "Product Rack / Bottle Holder", `sku=1234119, barcode=null`). Those products hit on POS but miss on admin. Root cause: POS barcode-lookup queries `WHERE (barcode = :code OR sku = :code)` while the 41B admin endpoint only queries `WHERE barcode = :code`. Legacy Square imports stored scan codes in `sku`, so the admin drawer never opened for them.

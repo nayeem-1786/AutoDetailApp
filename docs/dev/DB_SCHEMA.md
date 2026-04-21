@@ -161,6 +161,8 @@ idx_vehicles_vehicle_category — btree (vehicle_category)
 | specs | JSONB | DEFAULT NULL | Structured product specs (overview, use_case, key_features, etc.) |
 | product_group_id | UUID | DEFAULT NULL | Shared ID linking size/color/pack variants of the same base product |
 | variant_label | TEXT | DEFAULT NULL | Variant descriptor (e.g. "16 oz", "1 Gallon", "Blue", "3 inch") |
+| vendor_sku | TEXT | | Vendor's internal part number for reordering. May differ from `sku` (which is the scan code / UPC). Added via `20260421000001` |
+| vendor_product_name | TEXT | | Vendor's name for the product (as it appears on their invoices / POs). May differ from `name`. Added via `20260421000001` |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
 

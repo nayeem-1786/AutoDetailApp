@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-21 (Session 41C — unified barcode/SKU lookup helper; drawer barcode field)
+> **Last updated:** 2026-04-21 (Session 42B — vendor_sku + vendor_product_name columns on products)
 
 ---
 
@@ -1461,6 +1461,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260418000002_extend_vehicle_size_class_enum.sql
 20260418000003_backfill_and_drop_specialty_flags.sql
 20260420000001_extend_stock_adjustments.sql
+20260421000001_add_vendor_reorder_fields.sql
 ```
 
 ## Scripts

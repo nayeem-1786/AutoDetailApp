@@ -123,6 +123,8 @@ export const productCreateSchema = z.object({
   barcode: optionalString,
   specs: specsSchema,
   variant_label: optionalString,
+  vendor_sku: optionalString,
+  vendor_product_name: optionalString,
 });
 
 export const productUpdateSchema = productCreateSchema.partial();
