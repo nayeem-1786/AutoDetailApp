@@ -148,6 +148,16 @@ export default function StockHistoryPage() {
             </button>
           );
         }
+        if (adj.reference_type === 'stock_count' && adj.reference_id) {
+          return (
+            <button
+              className="text-blue-600 hover:text-blue-800 hover:underline text-sm"
+              onClick={() => router.push(`/admin/inventory/counts/${adj.reference_id}`)}
+            >
+              View Count
+            </button>
+          );
+        }
         return <span className="text-gray-400">--</span>;
       },
       enableSorting: false,

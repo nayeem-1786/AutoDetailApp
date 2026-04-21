@@ -4,6 +4,70 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(inventory): count detail UI with scan-to-increment, review, commit flows — 2026-04-21 (Session 42D-2)
+
+Second of two sessions building the Inventory Count feature. 42D-1 shipped the schema + 6 API routes + minimal list page; this session ships the full counting experience at `/admin/inventory/counts/[id]`. The feature is now functionally complete.
+
+**New page** — `src/app/admin/inventory/counts/[id]/page.tsx`. Single client component, ~600 lines, renders four distinct views driven by `count.status`:
+
+- **`active`** — scan bar + editable items table + "Cancel" and "Move to Review" actions. `useBarcodeScanner` mounted with `enabled: count.status === 'active' && !loading && !acting`, `requireTargetAttribute: false` so any keystroke burst on the page fires the scan handler. Scan flow: barcode-lookup → items POST with `increment: 1` → toast "Added {name} — counted: {N}" → `loadCount()` refetch. Tap any counted value to inline-edit (numeric keypad on iPad), blur or Enter to save via items POST with `set_to: N`. Escape cancels the edit. Search bar filters by product name / SKU. Both the search input and the inline-edit input carry `data-barcode-scan-target="input"` (42D-interlude opt-out) so the scanner doesn't swallow manual typing in those fields.
+- **`review`** — same items table but scanner disabled (hook `enabled: false`), variance summary strip at top ("N products counted. X variances detected (+P over, -Q under, Z at expected)"), "Variances only" toggle (default ON — matches Square/Lightspeed convention where review defaults to surfacing deltas), "Cancel" and "Commit Count" actions. Manual qty edit still allowed so staff can fix a miscount during review.
+- **`committed`** — read-only items table with an additional "Adjustment" column showing the stock_adjustments delta each line produced (or "—" for zero-delta lines that weren't logged, per the RPC's skip-zero behavior). Header shows "Committed by {employee} on {timestamp}". **No audit-log link** in MVP — Stock History doesn't support `?reference_id=X` yet, and a broad `?type=recount` link would show every recount ever, not just this count's rows. A plain-text note under the table flags the follow-up: when the per-reference filter ships, this view will gain a focused "View audit trail" link.
+- **`cancelled`** — read-only view of whatever was counted before cancel. No commit affordance. Header shows "Cancelled by {employee} on {timestamp}".
+
+**Commit confirmation** uses the existing `ConfirmDialog` with JSX in the `description` prop: variance count sentence + top-5 variances preview list (sorted by absolute delta, colored green/red). `variant='default'` (commit is affirmative, not destructive). Cancel uses `variant='destructive'`. Both dialogs handle `loading={acting}` to show "Processing..." in the button during the mutation.
+
+**New API route** — `POST /api/admin/inventory/counts/[id]/transition`. Body: `{ target_status: 'review' }`. Validates count exists, current status is in the allow-list (only `'active'` → `'review'` for now), and target is valid. Same feature-flag + `getEmployeeFromSession` + `inventory.counts.manage` gates as the rest of the counts routes. Returns `{ count }`. Demotion (`review` → `active`) deliberately rejected — counts flow one direction; if staff need to scan more, they cancel and start over. Commit + cancel continue to use their dedicated endpoints.
+
+**Scope addition — Stock History reverse link.** In `src/app/admin/inventory/stock-history/page.tsx`, extended the Reference column to handle the newly-valid `reference_type='stock_count'` value. Branch mirrors the existing `'purchase_order'` case: six-line `else if` block renders a blue-underlined "View Count" button linking to `/admin/inventory/counts/{reference_id}`. This is NOT a filter — it's the reverse navigation from an adjustment row back to the count that produced it. The forward direction (count → filtered adjustment list) is still deferred.
+
+**Type hygiene** — `StockAdjustment.reference_type` in `src/lib/supabase/types.ts` was out of sync with the DB CHECK constraint (missing `'shop_use'` from Session 35 and `'stock_count'` from 42D-1). Updated to the full 5-value union.
+
+**Tests added** (6 new, 327 total passing):
+- Scan fires `POST /items` with `{ product_id, increment: 1 }` after barcode lookup
+- Manual qty edit blur fires `POST /items` with `{ product_id, set_to: 7 }`
+- Commit button opens the confirm modal with top-5 variance preview list visible
+- Commit confirm click fires `POST /commit` and refetches the count afterward
+- Review-status page does NOT mount the scanner (`enabled: false`), shows the "Commit Count" button, and hides the scan bar + "Move to Review" button
+- "Variances only" filter toggle (default ON in review) hides zero-variance rows; toggling OFF reveals them
+
+Tests mock `next/navigation`, `sonner`, `useBarcodeScanner` (captures the onScan callback so tests can simulate scans), and `adminFetch` (URL-keyed handler registry with a call log for assertions). No DB or real network.
+
+Tests: 321 → 327 passing. `tsc --noEmit` clean.
+
+**Manual smoke tests** (after `npm run dev`):
+
+1. Admin → Inventory → Counts → click into an active count (from 42D-1 smoke test list). Detail page loads instead of 404.
+2. Scan a product. Toast "Added {name} — counted: 1". Row appears with `expected_qty` = live quantity_on_hand at scan time, `counted_qty` = 1.
+3. Scan same product 2 more times. counted=3.
+4. Tap the counted value. Inline input. Type 5, blur. Row updates, counted=5.
+5. Search filters by name / SKU live.
+6. Click "Move to Review" → confirm modal → confirm. Status becomes Review. Scanner stops (scanning does nothing). Variance summary strip appears.
+7. Toggle "Variances only" off. All items visible. Toggle back on. Only off-count rows visible.
+8. Click "Commit Count" → modal shows top variances → confirm. Toast "Count committed — N adjustments written." Page becomes Committed view. Adjustment column visible.
+9. Navigate to Inventory → Stock History. New rows with `adjustment_type='recount'`, `reference_type='stock_count'`. Each row has a "View Count" link that navigates back to this count.
+10. Navigate to affected products; `quantity_on_hand` reflects the deltas.
+11. (Separate count) Click Cancel → confirm → redirects to list, status=Cancelled. Click back in: read-only items preserved, no edit affordances.
+
+**Files changed:**
+- `src/app/admin/inventory/counts/[id]/page.tsx` (new)
+- `src/app/api/admin/inventory/counts/[id]/transition/route.ts` (new)
+- `src/app/admin/inventory/counts/__tests__/detail-page.test.tsx` (new)
+- `src/app/admin/inventory/stock-history/page.tsx` (View Count reverse link)
+- `src/lib/supabase/types.ts` (StockAdjustment reference_type union fix)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/FILE_TREE.md` (new paths + last-updated line)
+
+**Deliberately not touched:** POS, drawer, Quick Edit scanner wiring, existing counts API routes from 42D-1 (unchanged), `logStockAdjustment` helper, the commit RPC function. No DB migrations, no new tables, no new columns.
+
+**Follow-ups noted (future session):**
+- `GET /api/admin/stock-adjustments` accepts a `?reference_id=<uuid>` filter. When this lands, the Committed view here should gain a "View audit trail" link that deep-links Stock History filtered to this count's adjustment rows.
+- "Add product manually" dialog for lines never yet scanned (edge case where a product isn't in the scan flow). Low priority — scanning is the primary entry point.
+- CSV export of committed counts.
+- Real-time sync for multi-device concurrent counting.
+
+---
+
 ## fix(inventory,drawer): scanner rescan in drawer, modal Enter submit, list row action — 2026-04-21 (Session 42D-interlude)
 
 Three small UX fixes shipped together before 42D-2 builds the counting UI.

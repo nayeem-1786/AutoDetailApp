@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-21 (Session 42D-1 — Inventory Count schema + API + minimal list page)
+> **Last updated:** 2026-04-21 (Session 42D-2 — Inventory Count detail UI + transition API)
 
 ---
 
@@ -71,6 +71,7 @@ src/app/api/admin/inventory/counts/[id]/route.ts
 src/app/api/admin/inventory/counts/[id]/items/route.ts
 src/app/api/admin/inventory/counts/[id]/commit/route.ts
 src/app/api/admin/inventory/counts/[id]/cancel/route.ts
+src/app/api/admin/inventory/counts/[id]/transition/route.ts
 src/app/api/admin/inventory/counts/__tests__/commit.test.ts
 src/app/api/admin/transactions/stats/route.ts
 src/app/api/admin/upload/content-image/route.ts
@@ -556,6 +557,8 @@ src/app/admin/customers/page.tsx
 src/app/admin/inventory/layout.tsx
 src/app/admin/inventory/page.tsx
 src/app/admin/inventory/counts/page.tsx
+src/app/admin/inventory/counts/[id]/page.tsx
+src/app/admin/inventory/counts/__tests__/detail-page.test.tsx
 src/app/admin/inventory/purchase-orders/[id]/page.tsx
 src/app/admin/inventory/purchase-orders/new/page.tsx
 src/app/admin/inventory/purchase-orders/page.tsx

@@ -496,7 +496,7 @@ export interface StockAdjustment {
   quantity_after: number;
   reason: string | null;
   reference_id: string | null;
-  reference_type: 'purchase_order' | 'transaction' | 'refund' | null;
+  reference_type: 'purchase_order' | 'transaction' | 'refund' | 'shop_use' | 'stock_count' | null;
   created_by: string | null;
   created_at: string;
   // Joined relations
