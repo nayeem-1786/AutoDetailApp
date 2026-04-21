@@ -27,9 +27,15 @@ interface UseBarcodeOptions {
  * Supports both USB (~10ms/char) and Bluetooth (~60-100ms/char) scanners.
  *
  * Works globally — attaches on `document` regardless of focus.
- * Uses timing threshold to distinguish scanner from human typing (200-400ms).
- * Once a rapid pair of characters is detected, ALL subsequent characters are
- * suppressed (preventDefault) until Enter fires or the idle timeout clears.
+ *
+ * Speculative-prevent strategy: every printable keydown is preventDefault'd
+ * immediately and appended to a buffer. A release timer of maxKeystrokeGap
+ * is (re)scheduled. If it fires with exactly one buffered character, that
+ * character is synthesized into the focused input as human typing. Scan
+ * bursts always end with Enter before the timer can fire, so their
+ * characters never leak into the input — including the first char of the
+ * burst, which previously reached the input before burst detection kicked
+ * in.
  */
 export function useBarcodeScanner({
   onScan,
@@ -39,35 +45,55 @@ export function useBarcodeScanner({
   requireTargetAttribute = true,
 }: UseBarcodeOptions) {
   const bufferRef = useRef('');
-  const lastKeystrokeRef = useRef(0);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const scanningRef = useRef(false);
+  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 
   useEffect(() => {
     if (!enabled) return;
 
-    function endScanSession() {
-      bufferRef.current = '';
-      scanningRef.current = false;
+    function clearReleaseTimer() {
+      if (releaseTimerRef.current !== null) {
+        clearTimeout(releaseTimerRef.current);
+        releaseTimerRef.current = null;
+      }
+    }
+
+    function releaseAsTyping(ch: string) {
+      const el = document.activeElement as
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | null;
+      if (!el || typeof (el as HTMLInputElement).value !== 'string') return;
+      // Contenteditable surfaces don't expose a `value` setter; bail out.
+      if ((el as HTMLElement).isContentEditable) return;
+
+      const start = el.selectionStart ?? el.value.length;
+      const end = el.selectionEnd ?? el.value.length;
+      const newValue = el.value.slice(0, start) + ch + el.value.slice(end);
+
+      // Native setter + bubbling input event so React's controlled-input
+      // onChange handlers fire (React overrides the `value` setter on the
+      // instance; we have to call the one on the prototype).
+      const proto = Object.getPrototypeOf(el);
+      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (nativeSetter) {
+        nativeSetter.call(el, newValue);
+      } else {
+        el.value = newValue;
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+
+      const newCursor = start + ch.length;
+      el.setSelectionRange?.(newCursor, newCursor);
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      const now = Date.now();
-      const gap = now - lastKeystrokeRef.current;
-
-      // If too much time passed since last keystroke, reset
-      if (gap > maxKeystrokeGap) {
-        endScanSession();
-      }
-      lastKeystrokeRef.current = now;
-
-      // Clear idle timer on every keystroke
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-
       if (e.key === 'Enter') {
+        clearReleaseTimer();
         const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
+        bufferRef.current = '';
+
         const activeEl = document.activeElement;
         const hasTarget = activeEl?.hasAttribute('data-barcode-target') ?? false;
         const gatePass = requireTargetAttribute ? hasTarget : true;
@@ -77,33 +103,36 @@ export function useBarcodeScanner({
           onScanRef.current(barcode);
           window.dispatchEvent(new Event('pos-scanner-detected'));
         }
-        endScanSession();
         return;
       }
 
-      // Only accumulate printable single characters
-      if (e.key.length === 1) {
-        bufferRef.current += e.key;
+      // Modifiers, arrows, function keys — let them through unchanged.
+      if (e.key.length !== 1) return;
 
-        // Once we see 2+ rapid characters, flag as scanning — suppress ALL chars
-        if (bufferRef.current.length >= 2) {
-          scanningRef.current = true;
+      e.preventDefault();
+      e.stopPropagation();
+      bufferRef.current += e.key;
+
+      clearReleaseTimer();
+      releaseTimerRef.current = setTimeout(() => {
+        const buf = bufferRef.current;
+        bufferRef.current = '';
+        releaseTimerRef.current = null;
+        // A single speculatively-suppressed char with no follow-up is human
+        // typing — put it back. Multi-char buffers without Enter are treated
+        // as an aborted/incomplete burst and dropped (scans always end with
+        // Enter well before this timer fires).
+        if (buf.length === 1) {
+          releaseAsTyping(buf);
         }
-
-        // Prevent character from echoing into focused inputs during scan
-        if (scanningRef.current) {
-          e.preventDefault();
-        }
-      }
-
-      // Idle timeout: clear buffer after maxKeystrokeGap + 50ms headroom
-      idleTimerRef.current = setTimeout(endScanSession, maxKeystrokeGap + 50);
+      }, maxKeystrokeGap);
     }
 
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      clearReleaseTimer();
+      bufferRef.current = '';
     };
   }, [enabled, maxKeystrokeGap, minLength, requireTargetAttribute]);
 }

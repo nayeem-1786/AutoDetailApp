@@ -4,6 +4,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(scanner): suppress first-char leak in burst detection; preserve human typing — 2026-04-20 (Session 40B)
+
+Smoke testing Session 40A's transactions scan surfaced a visible one-character flash: scanning receipt "SD-006217" would briefly render "S" in the search input before the scan completed and navigated. Previously invisible on the register because its search input is programmatically cleared after each successful add.
+
+**Root cause:** the old burst detection only called `preventDefault()` after the *second* keystroke of a burst, because it compared timing gaps per-keystroke. The first char always reached the focused input before the hook could classify the sequence as a scan.
+
+**Fix:** speculative-prevent. Every printable keydown now calls `preventDefault()` + `stopPropagation()` unconditionally and appends to the buffer. A release timer of `maxKeystrokeGap` ms is (re)scheduled on each key. If the timer fires with exactly one buffered char, it's re-dispatched into the focused input as human typing (native setter + bubbling `input` event so React controlled inputs pick it up). Scan bursts always end with Enter before the timer fires, so their chars never leak — including the first one.
+
+Human-typing UX preserved for single-char cadences (~150 ms of silence after each key → release). Multi-char buffers without Enter are dropped on timeout — scans always include Enter well before the timer; this only affects the rare fast-typist-without-Enter case.
+
+Hook public API unchanged. `minLength`, `requireTargetAttribute`, and the Enter gate behave exactly as before. No page/call-site changes.
+
+**Tests added** (`src/lib/hooks/__tests__/use-barcode-scanner.test.ts`):
+1. Single slow character released as typing after timeout
+2. Rapid burst fully suppressed; `onScan` fires on Enter; input stays empty
+3. First character of a burst never becomes visible
+4. Slow char then burst: slow char typed, burst fires onScan cleanly
+5. `enabled={false}` passes characters through, never calls onScan
+
+Tests: 272 → 277 passing. `tsc --noEmit` clean.
+
+Files changed: `src/lib/hooks/use-barcode-scanner.ts`, `src/lib/hooks/__tests__/use-barcode-scanner.test.ts` (new), `docs/CHANGELOG.md`.
+
+---
+
 ## fix(pos): scanner routing per-page; transactions auto-focus; quote builder scan support — 2026-04-20 (Session 40A)
 
 Session 33 audit identified that the BT/USB scanner hook was mounted once at POS shell level but always dispatched into `TicketProvider`, causing silent misroute whenever the cashier was on a non-register POS screen. On `/pos/transactions` specifically, the lack of auto-focus on the search input meant the scan burst's first character landed on an untargeted focused element, the hook's default gate dropped the scan, and the user saw only "S" — the first character.
