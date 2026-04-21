@@ -5,6 +5,7 @@ import { LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 
 /**
  * POST /api/pos/sync-offline-transaction
@@ -139,39 +140,43 @@ export async function POST(request: NextRequest) {
       console.error('Offline sync: payment insert error:', payError);
     }
 
-    // 4. Decrement product inventory
+    // 4. Decrement product inventory + log stock adjustments
     const productItems = (body.items ?? []).filter(
       (i: { item_type: string; product_id?: string | null }) =>
         i.item_type === 'product' && i.product_id
     );
 
     for (const item of productItems) {
-      const { error: invError } = await supabase.rpc(
-        'decrement_product_quantity',
-        {
-          p_product_id: item.product_id,
-          p_quantity: item.quantity,
-        }
-      );
+      const productId = item.product_id as string; // guaranteed by filter above
 
-      if (invError) {
-        const { data: prod } = await supabase
+      const { data: prod } = await supabase
+        .from('products')
+        .select('quantity_on_hand, cost_price')
+        .eq('id', productId)
+        .single();
+
+      if (prod) {
+        const quantityBefore = prod.quantity_on_hand;
+        const quantityAfter = Math.max(0, quantityBefore - item.quantity);
+
+        await supabase
           .from('products')
-          .select('quantity_on_hand')
-          .eq('id', item.product_id)
-          .single();
+          .update({ quantity_on_hand: quantityAfter })
+          .eq('id', productId);
 
-        if (prod) {
-          await supabase
-            .from('products')
-            .update({
-              quantity_on_hand: Math.max(
-                0,
-                prod.quantity_on_hand - item.quantity
-              ),
-            })
-            .eq('id', item.product_id);
-        }
+        await logStockAdjustment({
+          supabase,
+          product_id: productId,
+          adjustment_type: 'sold',
+          quantity_change: -(item.quantity),
+          quantity_before: quantityBefore,
+          quantity_after: quantityAfter,
+          reason: `Sold via POS (offline sync: ${transaction.receipt_number || transaction.id})`,
+          reference_id: transaction.id,
+          reference_type: 'transaction',
+          created_by: posEmployee.employee_id,
+          unit_cost: prod.cost_price ?? null,
+        });
       }
     }
 

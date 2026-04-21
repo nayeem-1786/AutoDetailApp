@@ -1,17 +1,18 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
+import { Loader2, RotateCcw, AlertTriangle, UserCheck, Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { TransactionItem } from '@/lib/supabase/types';
 import { fromCents, toCents } from '@/lib/utils/refund-math';
+import type { RefundDisposition } from '@/lib/utils/validation';
+import type { AllItemsDisposition } from './refund-dialog';
 
 interface RefundSummaryProps {
   items: Array<{
     item: TransactionItem;
     quantity: number;
-    // Integer cents (residual-distributed). Display via fromCents().
     amountCents: number;
-    restock: boolean;
+    disposition: RefundDisposition | null;
   }>;
   tipRefund?: number;
   reason: string;
@@ -20,7 +21,48 @@ interface RefundSummaryProps {
   loyaltyPointsRedeemed?: number;
   loyaltyPointsEarned?: number;
   couponCode?: string | null;
+  allDisposition: AllItemsDisposition;
+  onAllDispositionChange: (d: AllItemsDisposition) => void;
+  hasProductItems: boolean;
 }
+
+const DISPOSITION_OPTIONS: {
+  value: AllItemsDisposition;
+  label: string;
+  description: string;
+  icon: typeof RotateCcw;
+}[] = [
+  {
+    value: 'restock',
+    label: 'Restock all',
+    description: 'Put all refunded products back on the shelf',
+    icon: RotateCcw,
+  },
+  {
+    value: 'damaged',
+    label: 'Damaged all',
+    description: 'None are resellable — write off',
+    icon: AlertTriangle,
+  },
+  {
+    value: 'customer_retained',
+    label: 'Customer kept all',
+    description: 'Customer retained the items (goodwill refund)',
+    icon: UserCheck,
+  },
+  {
+    value: 'mixed',
+    label: 'Mixed',
+    description: 'Choose per line item below',
+    icon: Shuffle,
+  },
+];
+
+const DISPOSITION_BADGE: Record<string, { bg: string; text: string; label: string }> = {
+  restock: { bg: 'bg-blue-50 dark:bg-blue-900/30', text: 'text-blue-600 dark:text-blue-400', label: 'restock' },
+  damaged: { bg: 'bg-red-50 dark:bg-red-900/30', text: 'text-red-600 dark:text-red-400', label: 'damaged' },
+  customer_retained: { bg: 'bg-amber-50 dark:bg-amber-900/30', text: 'text-amber-600 dark:text-amber-400', label: 'kept' },
+};
 
 export function RefundSummary({
   items,
@@ -31,16 +73,25 @@ export function RefundSummary({
   loyaltyPointsRedeemed = 0,
   loyaltyPointsEarned = 0,
   couponCode,
+  allDisposition,
+  onAllDispositionChange,
+  hasProductItems,
 }: RefundSummaryProps) {
-  // All aggregation done in integer cents to match server recompute exactly.
   const itemsTotalCents = items.reduce(
     (sum, entry) => sum + entry.amountCents,
     0
   );
-  // boundary: tipRefund arrives in dollars from parent → cents
   const totalCents = itemsTotalCents + toCents(tipRefund);
-  // boundary: cents → dollars for display
   const totalAmount = fromCents(totalCents);
+
+  // Disposition readiness check
+  const dispositionReady = !hasProductItems || (
+    allDisposition !== null &&
+    (allDisposition !== 'mixed' ||
+      items.every(
+        (e) => e.item.item_type !== 'product' || e.disposition !== null
+      ))
+  );
 
   return (
     <div className="space-y-4">
@@ -49,25 +100,35 @@ export function RefundSummary({
 
       {/* Item list */}
       <div className="space-y-2">
-        {items.map((entry) => (
-          <div
-            key={entry.item.id}
-            className="flex items-center justify-between text-sm"
-          >
-            <div className="min-w-0 flex-1">
-              <span className="text-gray-700 dark:text-gray-300">{entry.item.item_name}</span>
-              <span className="ml-1.5 text-gray-400 dark:text-gray-500">x{entry.quantity}</span>
-              {entry.restock && (
-                <span className="ml-2 rounded bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 text-xs text-blue-600 dark:text-blue-400">
-                  restock
-                </span>
-              )}
+        {items.map((entry) => {
+          const resolvedDisposition =
+            entry.item.item_type !== 'product'
+              ? null
+              : allDisposition && allDisposition !== 'mixed'
+                ? allDisposition
+                : entry.disposition;
+          const badge = resolvedDisposition ? DISPOSITION_BADGE[resolvedDisposition] : null;
+
+          return (
+            <div
+              key={entry.item.id}
+              className="flex items-center justify-between text-sm"
+            >
+              <div className="min-w-0 flex-1">
+                <span className="text-gray-700 dark:text-gray-300">{entry.item.item_name}</span>
+                <span className="ml-1.5 text-gray-400 dark:text-gray-500">x{entry.quantity}</span>
+                {badge && (
+                  <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${badge.bg} ${badge.text}`}>
+                    {badge.label}
+                  </span>
+                )}
+              </div>
+              <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                ${fromCents(entry.amountCents).toFixed(2)}
+              </span>
             </div>
-            <span className="shrink-0 font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              ${fromCents(entry.amountCents).toFixed(2)}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Tip line */}
@@ -92,6 +153,45 @@ export function RefundSummary({
           ${totalAmount.toFixed(2)}
         </span>
       </div>
+
+      {/* Disposition picker — only when there are product items */}
+      {hasProductItems && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            What should happen to these items?
+          </p>
+          <div className="space-y-1.5">
+            {DISPOSITION_OPTIONS.map(({ value, label, description, icon: Icon }) => (
+              <label
+                key={value}
+                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+                  allDisposition === value
+                    ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
+                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="all-disposition"
+                  checked={allDisposition === value}
+                  onChange={() => onAllDispositionChange(value)}
+                  className="h-4 w-4 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+                <Icon className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+          {allDisposition === 'mixed' && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Set disposition on each product row above (Back to selection).
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Loyalty + coupon reversal info */}
       {(loyaltyPointsRedeemed > 0 || loyaltyPointsEarned > 0 || couponCode) && (
@@ -127,8 +227,9 @@ export function RefundSummary({
       <Button
         variant="destructive"
         className="w-full"
-        disabled={processing || items.length === 0}
+        disabled={processing || items.length === 0 || !dispositionReady}
         onClick={onConfirm}
+        title={!dispositionReady ? 'Choose a disposition for refunded items' : undefined}
       >
         {processing ? (
           <>

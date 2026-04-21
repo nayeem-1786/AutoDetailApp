@@ -13,6 +13,7 @@ import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { createShortLink } from '@/lib/utils/short-link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { getBusinessInfo } from '@/lib/data/business';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 
 export async function POST(request: NextRequest) {
   try {
@@ -179,46 +180,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Decrement product inventory
+    // 4. Decrement product inventory + log stock adjustments
     const productItems = (data.items ?? []).filter(
       (i: { item_type: string; product_id?: string | null; quantity: number }) =>
         i.item_type === 'product' && i.product_id
     );
 
     for (const item of productItems) {
-      const { error: invError } = await supabase.rpc('decrement_product_quantity', {
-        p_product_id: item.product_id,
-        p_quantity: item.quantity,
-      });
+      const productId = item.product_id as string; // guaranteed by filter above
 
-      // If RPC doesn't exist, fall back to manual update
-      if (invError) {
+      const { data: prod } = await supabase
+        .from('products')
+        .select('quantity_on_hand, cost_price')
+        .eq('id', productId)
+        .single();
+
+      if (prod) {
+        const quantityBefore = prod.quantity_on_hand;
+        const quantityAfter = Math.max(0, quantityBefore - item.quantity);
+
         await supabase
           .from('products')
-          .update({
-            quantity_on_hand: Math.max(
-              0,
-              // We do a raw decrement here — not ideal but functional
-              0 // Will be corrected by the select below
-            ),
-          })
-          .eq('id', item.product_id);
+          .update({ quantity_on_hand: quantityAfter })
+          .eq('id', productId);
 
-        // Fetch and decrement manually
-        const { data: prod } = await supabase
-          .from('products')
-          .select('quantity_on_hand')
-          .eq('id', item.product_id)
-          .single();
-
-        if (prod) {
-          await supabase
-            .from('products')
-            .update({
-              quantity_on_hand: Math.max(0, prod.quantity_on_hand - item.quantity),
-            })
-            .eq('id', item.product_id);
-        }
+        await logStockAdjustment({
+          supabase,
+          product_id: productId,
+          adjustment_type: 'sold',
+          quantity_change: -(item.quantity),
+          quantity_before: quantityBefore,
+          quantity_after: quantityAfter,
+          reason: `Sold via POS (${transaction.receipt_number || transaction.id})`,
+          reference_id: transaction.id,
+          reference_type: 'transaction',
+          created_by: posEmployee.employee_id,
+          unit_cost: prod.cost_price ?? null,
+        });
       }
     }
 

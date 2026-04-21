@@ -525,11 +525,16 @@ export const transactionCreateSchema = z.object({
 // POS Refund schemas
 // ---------------------------------------------------------------------------
 
+export const REFUND_DISPOSITIONS = ['restock', 'damaged', 'customer_retained'] as const;
+export type RefundDisposition = (typeof REFUND_DISPOSITIONS)[number];
+
 const refundItemSchema = z.object({
   transaction_item_id: z.string().uuid(),
   quantity: z.coerce.number().int().min(1),
   amount: positiveNumber,
-  restock: z.boolean().default(true),
+  disposition: z.enum(REFUND_DISPOSITIONS).optional(),
+  // Legacy field — kept for backwards-compat with cached PWA clients.
+  restock: z.boolean().optional(),
 });
 
 export const refundCreateSchema = z.object({
@@ -538,6 +543,18 @@ export const refundCreateSchema = z.object({
   tip_refund: z.coerce.number().min(0).default(0),
   reason: requiredString,
 });
+
+// ---------------------------------------------------------------------------
+// POS Shop Use schema
+// ---------------------------------------------------------------------------
+
+export const shopUseSchema = z.object({
+  product_id: z.string().uuid(),
+  quantity: z.coerce.number().int().min(1, 'Must use at least 1'),
+  note: z.string().max(500).optional(),
+});
+
+export type ShopUseInput = z.infer<typeof shopUseSchema>;
 
 // ---------------------------------------------------------------------------
 // Cash Drawer / End-of-Day schemas

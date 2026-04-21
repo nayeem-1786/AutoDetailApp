@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 
 interface ReceiveItem {
   item_id: string;
@@ -125,21 +126,21 @@ export async function POST(
         .update({ quantity_received: newReceived })
         .eq('id', poItem.id);
 
-      // Log stock adjustment
+      // Log stock adjustment via shared helper
       if (receiveItem.quantity_received > 0) {
-        await admin
-          .from('stock_adjustments')
-          .insert({
-            product_id: poItem.product_id,
-            adjustment_type: 'received',
-            quantity_change: receiveItem.quantity_received,
-            quantity_before: quantityBefore,
-            quantity_after: quantityAfter,
-            reason: `Received from ${po.po_number}`,
-            reference_id: po.id,
-            reference_type: 'purchase_order',
-            created_by: employee.id,
-          });
+        await logStockAdjustment({
+          supabase: admin,
+          product_id: poItem.product_id,
+          adjustment_type: 'received',
+          quantity_change: receiveItem.quantity_received,
+          quantity_before: quantityBefore,
+          quantity_after: quantityAfter,
+          reason: `Received from ${po.po_number}`,
+          reference_id: po.id,
+          reference_type: 'purchase_order',
+          created_by: employee.id,
+          unit_cost: poItem.unit_cost,
+        });
       }
     }
 

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { refundCreateSchema } from '@/lib/utils/validation';
+import type { RefundDisposition } from '@/lib/utils/validation';
 import Stripe from 'stripe';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import {
@@ -10,6 +11,8 @@ import {
   fromCents,
   toCents,
 } from '@/lib/utils/refund-math';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
+import type { AdjustmentType } from '@/lib/utils/stock-adjustments';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -35,6 +38,15 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+
+    // Normalize disposition: new clients send disposition directly;
+    // cached PWA clients may send legacy restock boolean instead.
+    const normalizedItems = data.items.map((item) => {
+      const disposition: RefundDisposition =
+        item.disposition ??
+        (item.restock === true ? 'restock' : 'customer_retained');
+      return { ...item, disposition };
+    });
 
     // Fetch the transaction with payments
     const { data: transaction, error: txError } = await supabase
@@ -221,12 +233,13 @@ export async function POST(request: NextRequest) {
 
     // 3. Insert refund items (server-computed amounts; client values were
     //    validated input only)
-    const refundItemRows = data.items.map((item, i) => ({
+    const refundItemRows = normalizedItems.map((item, i) => ({
       refund_id: refund.id,
       transaction_item_id: item.transaction_item_id,
       quantity: item.quantity,
       amount: fromCents(recomputed.lineAmountsCents[i]),
-      restock: item.restock,
+      restock: item.disposition === 'restock',
+      disposition: item.disposition,
     }));
 
     const { error: refundItemsError } = await supabase
@@ -237,34 +250,61 @@ export async function POST(request: NextRequest) {
       console.error('Refund items insert error:', refundItemsError);
     }
 
-    // 4. Restock products where applicable
-    for (const item of data.items) {
-      if (!item.restock) continue;
-
-      // Fetch the transaction item to get product_id
+    // 4. Inventory handling per disposition.
+    // - restock: increment products.quantity_on_hand, log 'returned' adjustment
+    // - damaged: no quantity change, log 'damaged' adjustment (quantity_change=0)
+    // - customer_retained: no quantity change, log 'customer_retained' adjustment (quantity_change=0)
+    // Non-product refund items skip this block entirely.
+    for (const item of normalizedItems) {
       const { data: txItem } = await supabase
         .from('transaction_items')
         .select('product_id')
         .eq('id', item.transaction_item_id)
         .single();
 
-      if (txItem?.product_id) {
-        // Fetch current quantity and increment
-        const { data: product } = await supabase
-          .from('products')
-          .select('quantity_on_hand')
-          .eq('id', txItem.product_id)
-          .single();
+      if (!txItem?.product_id) continue;
 
-        if (product) {
-          await supabase
-            .from('products')
-            .update({
-              quantity_on_hand: product.quantity_on_hand + item.quantity,
-            })
-            .eq('id', txItem.product_id);
-        }
+      const { data: prod } = await supabase
+        .from('products')
+        .select('quantity_on_hand, cost_price')
+        .eq('id', txItem.product_id)
+        .single();
+      if (!prod) continue;
+
+      const before = prod.quantity_on_hand;
+      let after = before;
+      let adjustmentType: AdjustmentType;
+      let reasonPrefix: string;
+
+      if (item.disposition === 'restock') {
+        after = before + item.quantity;
+        await supabase
+          .from('products')
+          .update({ quantity_on_hand: after })
+          .eq('id', txItem.product_id);
+        adjustmentType = 'returned';
+        reasonPrefix = 'Refund — restocked';
+      } else if (item.disposition === 'damaged') {
+        adjustmentType = 'damaged';
+        reasonPrefix = 'Refund — damaged / not resellable';
+      } else {
+        adjustmentType = 'customer_retained';
+        reasonPrefix = 'Refund — customer kept item';
       }
+
+      await logStockAdjustment({
+        supabase,
+        product_id: txItem.product_id,
+        adjustment_type: adjustmentType,
+        quantity_change: after - before,
+        quantity_before: before,
+        quantity_after: after,
+        reason: `${reasonPrefix} (refund ${refund.id})`,
+        reference_id: refund.id,
+        reference_type: 'refund',
+        created_by: posEmployee.employee_id,
+        unit_cost: prod.cost_price ?? null,
+      });
     }
 
     // 5. Adjust loyalty points if applicable

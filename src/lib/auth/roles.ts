@@ -123,6 +123,11 @@ export const SIDEBAR_NAV: NavItem[] = [
         icon: 'History',
       },
       {
+        label: 'Shop Expenses',
+        href: '/admin/inventory/shop-expenses',
+        icon: 'Receipt',
+      },
+      {
         label: 'Vendors',
         href: '/admin/inventory/vendors',
         icon: 'Truck',

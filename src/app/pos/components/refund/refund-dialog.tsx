@@ -23,6 +23,7 @@ import {
   computeTotalRefundCents,
   fromCents,
 } from '@/lib/utils/refund-math';
+import type { RefundDisposition } from '@/lib/utils/validation';
 
 interface RefundDialogProps {
   open: boolean;
@@ -34,9 +35,16 @@ interface RefundDialogProps {
   onRefunded: () => void;
 }
 
+export type AllItemsDisposition =
+  | 'restock'
+  | 'damaged'
+  | 'customer_retained'
+  | 'mixed'
+  | null;
+
 interface SelectedItemState {
   qty: number;
-  restock: boolean;
+  disposition: RefundDisposition | null;
 }
 
 export function RefundDialog({
@@ -51,6 +59,7 @@ export function RefundDialog({
   const [reason, setReason] = useState('');
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'select' | 'confirm'>('select');
+  const [allDisposition, setAllDisposition] = useState<AllItemsDisposition>(null);
 
   // Calculate max refundable quantity for each transaction item
   const maxRefundableQtyMap = useMemo(() => {
@@ -61,7 +70,6 @@ export function RefundDialog({
 
       if (transaction.refunds) {
         for (const refund of transaction.refunds) {
-          // Only count processed refunds toward already-refunded totals
           if (refund.status === 'failed') continue;
 
           for (const ri of refund.refund_items) {
@@ -88,7 +96,7 @@ export function RefundDialog({
         } else {
           const maxQty = maxRefundableQtyMap.get(itemId) ?? 0;
           if (maxQty > 0) {
-            next.set(itemId, { qty: maxQty, restock: false });
+            next.set(itemId, { qty: maxQty, disposition: null });
           }
         }
         return next;
@@ -109,23 +117,19 @@ export function RefundDialog({
     });
   }, []);
 
-  // Update restock for a selected item
-  const updateRestock = useCallback((itemId: string, restock: boolean) => {
+  // Update disposition for a selected item (used in mixed mode)
+  const updateDisposition = useCallback((itemId: string, disposition: RefundDisposition) => {
     setSelectedItems((prev) => {
       const next = new Map(prev);
       const entry = next.get(itemId);
       if (entry) {
-        next.set(itemId, { ...entry, restock });
+        next.set(itemId, { ...entry, disposition });
       }
       return next;
     });
   }, []);
 
   // Per-unit refundable amount for each item, in FRACTIONAL CENTS.
-  // Used by RefundItemRow for its pre-selection display approximation.
-  // The authoritative per-line refund amount comes from computeTotalRefundCents
-  // below (includes residual-cent distribution for multi-line discounted
-  // refunds). See src/lib/utils/refund-math.ts invariants.
   const perUnitCentsMap = useMemo(() => {
     const map = new Map<string, number>();
     const tx_subtotal = transaction.subtotal || 0;
@@ -146,8 +150,6 @@ export function RefundDialog({
   }, [transaction.items, transaction.subtotal, transaction.discount_amount]);
 
   // Authoritative refund line amounts (integer cents, residual-distributed).
-  // Payload sent to API uses fromCents() at the boundary — API contract is
-  // unchanged (accepts dollars).
   const summaryItems = useMemo(() => {
     const selectedEntries: Array<{
       item: TransactionItem;
@@ -173,16 +175,15 @@ export function RefundDialog({
         tax_amount: item.tax_amount || 0,
         refund_quantity: state.qty,
       })),
-      tip_refund: 0, // tip is added separately on the payload, not per-line
+      tip_refund: 0,
     });
 
     return selectedEntries.map(({ item, state }, i) => ({
       item,
       quantity: state.qty,
       amountCents: lineAmountsCents[i],
-      // boundary: cents → dollars for existing API contract
       amountDollars: fromCents(lineAmountsCents[i]),
-      restock: state.restock,
+      disposition: state.disposition,
     }));
   }, [
     selectedItems,
@@ -196,7 +197,7 @@ export function RefundDialog({
   const isFullRefund = useMemo(() => {
     for (const item of transaction.items) {
       const maxQty = maxRefundableQtyMap.get(item.id) ?? 0;
-      if (maxQty <= 0) continue; // already fully refunded, skip
+      if (maxQty <= 0) continue;
       const selection = selectedItems.get(item.id);
       if (!selection || selection.qty < maxQty) return false;
     }
@@ -206,6 +207,13 @@ export function RefundDialog({
   const tipRefund = isFullRefund ? (transaction.tip_amount || 0) : 0;
 
   const canProceed = selectedItems.size > 0 && reason.trim().length > 0;
+
+  // Check if any selected items are products (disposition only matters for products)
+  const hasProductItems = useMemo(
+    () =>
+      summaryItems.some((entry) => entry.item.item_type === 'product'),
+    [summaryItems]
+  );
 
   // Handle confirm refund submission
   async function handleConfirm() {
@@ -217,10 +225,13 @@ export function RefundDialog({
         items: summaryItems.map((entry) => ({
           transaction_item_id: entry.item.id,
           quantity: entry.quantity,
-          // boundary: cents → dollars for API contract (amountDollars is
-          // fromCents(amountCents); server recomputes and enforces exact match)
           amount: entry.amountDollars,
-          restock: entry.restock,
+          disposition:
+            entry.item.item_type !== 'product'
+              ? 'customer_retained'
+              : allDisposition && allDisposition !== 'mixed'
+                ? allDisposition
+                : entry.disposition,
         })),
         tip_refund: tipRefund,
         reason: reason.trim(),
@@ -257,6 +268,7 @@ export function RefundDialog({
     setReason('');
     setProcessing(false);
     setStep('select');
+    setAllDisposition(null);
     onClose();
   }
 
@@ -287,11 +299,12 @@ export function RefundDialog({
                       maxRefundableQty={maxQty}
                       selected={!!selection}
                       refundQty={selection?.qty ?? 1}
-                      restock={selection?.restock ?? false}
+                      disposition={selection?.disposition ?? null}
+                      showPerLineDisposition={allDisposition === 'mixed'}
                       perUnitCents={perUnitCentsMap.get(item.id) ?? 0}
                       onToggle={() => toggleItem(item.id)}
                       onQtyChange={(qty) => updateQty(item.id, qty)}
-                      onRestockChange={(rs) => updateRestock(item.id, rs)}
+                      onDispositionChange={(d) => updateDisposition(item.id, d)}
                     />
                   );
                 })}
@@ -351,6 +364,9 @@ export function RefundDialog({
               loyaltyPointsRedeemed={transaction.loyalty_points_redeemed}
               loyaltyPointsEarned={transaction.loyalty_points_earned}
               couponCode={transaction.coupon_code}
+              allDisposition={allDisposition}
+              onAllDispositionChange={setAllDisposition}
+              hasProductItems={hasProductItems}
             />
           </div>
         )}

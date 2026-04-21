@@ -3,19 +3,20 @@
 import { Minus, Plus } from 'lucide-react';
 import type { TransactionItem } from '@/lib/supabase/types';
 import { fromCents } from '@/lib/utils/refund-math';
+import type { RefundDisposition } from '@/lib/utils/validation';
 
 interface RefundItemRowProps {
   item: TransactionItem;
   maxRefundableQty: number;
   selected: boolean;
   refundQty: number;
-  restock: boolean;
-  // Fractional cents per unit — display approximation only. Authoritative
-  // line amount (with residual distribution) comes from RefundSummary.
+  disposition: RefundDisposition | null;
+  showPerLineDisposition: boolean;
+  // Fractional cents per unit — display approximation only.
   perUnitCents: number;
   onToggle: () => void;
   onQtyChange: (qty: number) => void;
-  onRestockChange: (restock: boolean) => void;
+  onDispositionChange: (disposition: RefundDisposition) => void;
 }
 
 const itemTypeBadgeColors: Record<string, string> = {
@@ -25,20 +26,25 @@ const itemTypeBadgeColors: Record<string, string> = {
   custom: 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
 };
 
+const DISPOSITIONS: { value: RefundDisposition; label: string }[] = [
+  { value: 'restock', label: 'Restock' },
+  { value: 'damaged', label: 'Damaged' },
+  { value: 'customer_retained', label: 'Kept' },
+];
+
 export function RefundItemRow({
   item,
   maxRefundableQty,
   selected,
   refundQty,
-  restock,
+  disposition,
+  showPerLineDisposition,
   perUnitCents,
   onToggle,
   onQtyChange,
-  onRestockChange,
+  onDispositionChange,
 }: RefundItemRowProps) {
   const disabled = maxRefundableQty <= 0;
-  // boundary: fractional cents → dollars for display only (approximate;
-  // confirm-step summary uses residual-distributed integer cents)
   const displayAmount = selected
     ? fromCents(perUnitCents * refundQty).toFixed(2)
     : fromCents(perUnitCents).toFixed(2);
@@ -57,7 +63,7 @@ export function RefundItemRow({
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
+      className={`rounded-lg border px-3 py-2.5 transition-colors ${
         disabled
           ? 'border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 opacity-50'
           : selected
@@ -65,83 +71,90 @@ export function RefundItemRow({
             : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-gray-300 dark:hover:border-gray-600'
       }`}
     >
-      {/* Selection checkbox */}
-      <input
-        type="checkbox"
-        checked={selected}
-        disabled={disabled}
-        onChange={onToggle}
-        className="h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 focus:ring-red-500 dark:focus:ring-red-400 disabled:cursor-not-allowed"
-      />
+      <div className="flex items-center gap-3">
+        {/* Selection checkbox */}
+        <input
+          type="checkbox"
+          checked={selected}
+          disabled={disabled}
+          onChange={onToggle}
+          className="h-4 w-4 shrink-0 cursor-pointer rounded border-gray-300 dark:border-gray-600 text-red-600 dark:text-red-400 focus:ring-red-500 dark:focus:ring-red-400 disabled:cursor-not-allowed"
+        />
 
-      {/* Item name + type badge */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-            {item.item_name}
-          </p>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-              itemTypeBadgeColors[item.item_type] ?? itemTypeBadgeColors.custom
-            }`}
-          >
-            {item.item_type}
-          </span>
+        {/* Item name + type badge */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+              {item.item_name}
+            </p>
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                itemTypeBadgeColors[item.item_type] ?? itemTypeBadgeColors.custom
+              }`}
+            >
+              {item.item_type}
+            </span>
+          </div>
+          {disabled && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">Fully refunded</p>
+          )}
         </div>
-        {disabled && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">Fully refunded</p>
+
+        {/* Quantity selector — only when selected */}
+        {selected && (
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={decrement}
+              disabled={refundQty <= 1}
+              className="flex h-[44px] w-[44px] items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 sm:h-8 sm:w-8"
+            >
+              <Minus className="h-4 w-4" />
+            </button>
+            <span className="w-8 text-center text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
+              {refundQty}
+            </span>
+            <button
+              type="button"
+              onClick={increment}
+              disabled={refundQty >= maxRefundableQty}
+              className="flex h-[44px] w-[44px] items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 sm:h-8 sm:w-8"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </div>
         )}
+
+        {/* Amount display */}
+        <div className="w-20 shrink-0 text-right">
+          <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
+            ${displayAmount}
+          </p>
+          {!selected && maxRefundableQty > 0 && (
+            <p className="text-xs tabular-nums text-gray-400 dark:text-gray-500">
+              max {maxRefundableQty}
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Quantity selector — only when selected */}
-      {selected && (
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={decrement}
-            disabled={refundQty <= 1}
-            className="flex h-[44px] w-[44px] items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 sm:h-8 sm:w-8"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
-          <span className="w-8 text-center text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
-            {refundQty}
-          </span>
-          <button
-            type="button"
-            onClick={increment}
-            disabled={refundQty >= maxRefundableQty}
-            className="flex h-[44px] w-[44px] items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 sm:h-8 sm:w-8"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+      {/* Per-line disposition radio — only for products in mixed mode */}
+      {selected && showPerLineDisposition && item.item_type === 'product' && (
+        <div className="mt-2 flex items-center gap-3 pl-7">
+          {DISPOSITIONS.map(({ value, label }) => (
+            <label key={value} className="flex cursor-pointer items-center gap-1.5">
+              <input
+                type="radio"
+                name={`disposition-${item.id}`}
+                checked={disposition === value}
+                onChange={() => onDispositionChange(value)}
+                className="h-3.5 w-3.5 border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
+            </label>
+          ))}
         </div>
       )}
-
-      {/* Restock toggle — only for product items when selected */}
-      {selected && item.item_type === 'product' && (
-        <label className="flex shrink-0 cursor-pointer items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={restock}
-            onChange={(e) => onRestockChange(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-gray-300 dark:border-gray-600 text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
-          />
-          <span className="text-xs text-gray-600 dark:text-gray-400">Restock</span>
-        </label>
-      )}
-
-      {/* Amount display */}
-      <div className="w-20 shrink-0 text-right">
-        <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
-          ${displayAmount}
-        </p>
-        {!selected && maxRefundableQty > 0 && (
-          <p className="text-xs tabular-nums text-gray-400 dark:text-gray-500">
-            max {maxRefundableQty}
-          </p>
-        )}
-      </div>
     </div>
   );
 }

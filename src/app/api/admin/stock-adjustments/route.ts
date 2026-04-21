@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 
 export async function GET(request: NextRequest) {
   try {
@@ -134,23 +135,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update stock' }, { status: 500 });
     }
 
-    // Log the adjustment
-    const { data: sa, error: saError } = await admin
-      .from('stock_adjustments')
-      .insert({
-        product_id,
-        adjustment_type: adjustment_type || 'manual',
-        quantity_change: adjustment,
-        quantity_before: quantityBefore,
-        quantity_after: quantityAfter,
-        reason: reason || null,
-        created_by: employee.id,
-      })
-      .select('*')
-      .single();
+    // Log the adjustment via shared helper
+    const saResult = await logStockAdjustment({
+      supabase: admin,
+      product_id,
+      adjustment_type: adjustment_type || 'manual',
+      quantity_change: adjustment,
+      quantity_before: quantityBefore,
+      quantity_after: quantityAfter,
+      reason: reason || null,
+      created_by: employee.id,
+    });
 
-    if (saError) {
-      console.error('Log stock adjustment error:', saError);
+    if (!saResult.ok) {
       // Stock was already updated — log error but don't fail
     }
 
@@ -173,7 +170,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        id: sa?.id,
+        id: saResult.ok ? saResult.id : null,
         product_id,
         quantity_before: quantityBefore,
         quantity_after: quantityAfter,

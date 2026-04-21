@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-20 (Session 36 — added refund-math.ts + test)
+> **Last updated:** 2026-04-20 (Session 37 — stock-adjustments helper, shop-use endpoint/dialog/report, refund disposition)
 
 ---
 
@@ -63,6 +63,7 @@ src/app/api/admin/purchase-orders/route.ts
 src/app/api/admin/quotes/route.ts
 src/app/api/admin/quotes/stats/route.ts
 src/app/api/admin/receipt-logo/route.ts
+src/app/api/admin/shop-expenses/export/route.ts
 src/app/api/admin/stock-adjustments/route.ts
 src/app/api/admin/transactions/stats/route.ts
 src/app/api/admin/upload/content-image/route.ts
@@ -405,6 +406,7 @@ src/app/api/pos/receipts/print-jobs/[id]/route.ts
 src/app/api/pos/receipts/print-server/route.ts
 src/app/api/pos/receipts/sms/route.ts
 src/app/api/pos/refunds/route.ts
+src/app/api/pos/shop-use/route.ts
 src/app/api/pos/services/check-prerequisites/route.ts
 src/app/api/pos/services/durations/route.ts
 src/app/api/pos/services/route.ts
@@ -548,6 +550,7 @@ src/app/admin/inventory/page.tsx
 src/app/admin/inventory/purchase-orders/[id]/page.tsx
 src/app/admin/inventory/purchase-orders/new/page.tsx
 src/app/admin/inventory/purchase-orders/page.tsx
+src/app/admin/inventory/shop-expenses/page.tsx
 src/app/admin/inventory/stock-history/page.tsx
 src/app/admin/inventory/vendors/[id]/page.tsx
 src/app/admin/inventory/vendors/page.tsx
@@ -1007,10 +1010,13 @@ src/lib/utils/ticker-sections.ts
 src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
 src/lib/utils/refund-math.ts
+src/lib/utils/stock-adjustments.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
 src/lib/utils/__tests__/constants.test.ts
 src/lib/utils/__tests__/refund-math.test.ts
+src/lib/utils/__tests__/stock-adjustments.test.ts
+src/lib/utils/__tests__/validation-refund-shopuse.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/webhook.ts
 ```
@@ -1202,6 +1208,7 @@ use-prerequisite-check.ts   — Service prerequisite check before adding to tick
 ```
 addon-suggestions.tsx       customer-type-badge.tsx      pos-workspace.tsx
 bottom-nav.tsx              customer-type-prompt.tsx     product-detail.tsx
+                                                        shop-use-dialog.tsx
 catalog-browser.tsx         customer-vehicle-summary.tsx promotions-tab.tsx
 catalog-card.tsx            eod/                        receipt-options.tsx
 catalog-grid.tsx            held-tickets-panel.tsx      refund/
@@ -1445,6 +1452,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260418000001_drop_service_floor_price_columns.sql
 20260418000002_extend_vehicle_size_class_enum.sql
 20260418000003_backfill_and_drop_specialty_flags.sql
+20260420000001_extend_stock_adjustments.sql
 ```
 
 ## Scripts

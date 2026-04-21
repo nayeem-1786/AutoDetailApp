@@ -18,9 +18,12 @@ import {
   Minimize2,
   Keyboard,
   ExternalLink,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosTheme } from '../context/pos-theme-context';
+import { usePosPermission } from '../context/pos-permission-context';
+import { ShopUseDialog } from './shop-use-dialog';
 
 interface BottomNavProps {
   onOpenShortcuts: () => void;
@@ -31,6 +34,8 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
   const { theme, setTheme } = usePosTheme();
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const [shopUseOpen, setShopUseOpen] = useState(false);
+  const { granted: canShopUse } = usePosPermission('inventory.shop_use');
 
   // Cash drawer status
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -278,6 +283,20 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
               </span>
             </Link>
 
+            {/* Log Shop Use */}
+            <button
+              onClick={() => {
+                setMoreOpen(false);
+                setShopUseOpen(true);
+              }}
+              disabled={!canShopUse}
+              title={!canShopUse ? "You don't have permission to log shop use" : undefined}
+              className="flex w-full items-center gap-3 px-4 py-3 min-h-[44px] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Wrench className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              Log Shop Use
+            </button>
+
             <div className="border-t border-gray-100 dark:border-gray-700" />
 
             {/* Conditional: Refresh App (PWA standalone only) */}
@@ -338,6 +357,7 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
           </div>
         )}
       </div>
+      <ShopUseDialog open={shopUseOpen} onClose={() => setShopUseOpen(false)} />
     </nav>
   );
 }

@@ -453,7 +453,8 @@ idx_refunds_transaction — btree (transaction_id)
 | transaction_item_id | UUID | NOT NULL, FK → transaction_items(id) ON DELETE RESTRICT | |
 | quantity | INTEGER | NOT NULL, DEFAULT 1 | |
 | amount | DECIMAL(10,2) | NOT NULL | |
-| restock | BOOLEAN | NOT NULL, DEFAULT false | Whether to return item to inventory |
+| restock | BOOLEAN | NOT NULL, DEFAULT false | Legacy — kept for backwards compat. True if disposition='restock'. |
+| disposition | TEXT | CHECK ('restock','damaged','customer_retained') | Refund disposition. Added via `20260420000001` |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
 **Indexes:**
@@ -831,11 +832,7 @@ idx_refund_items_refund — btree (refund_id)
 | status | po_status (enum) | NOT NULL, DEFAULT 'draft' | |
 | notes | TEXT | | |
 | ordered_at | TIMESTAMPTZ | | |
-| expected_at | TIMESTAMPTZ | | |
 | received_at | TIMESTAMPTZ | | |
-| subtotal | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
-| shipping_cost | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
-| total_amount | DECIMAL(10,2) | NOT NULL, DEFAULT 0 | |
 | created_by | UUID | FK → employees(id) | |
 | created_at | TIMESTAMPTZ | | |
 | updated_at | TIMESTAMPTZ | | |
@@ -856,15 +853,18 @@ idx_refund_items_refund — btree (refund_id)
 |--------|------|-------------|-------|
 | id | UUID | PK | |
 | product_id | UUID | NOT NULL, FK → products(id) | |
-| adjustment_type | TEXT | CHECK ('manual','received','sold','returned','damaged','recount') | |
+| adjustment_type | TEXT | CHECK ('manual','received','sold','returned','damaged','recount','shop_use','customer_retained') | |
 | quantity_change | INTEGER | NOT NULL | |
 | quantity_before | INTEGER | NOT NULL | |
 | quantity_after | INTEGER | NOT NULL | |
 | reason | TEXT | | |
 | reference_id | UUID | | |
-| reference_type | TEXT | CHECK ('purchase_order','transaction','refund') | |
+| reference_type | TEXT | CHECK ('purchase_order','transaction','refund','shop_use') | |
 | created_by | UUID | FK → employees(id) | |
+| unit_cost | NUMERIC(10,2) | DEFAULT NULL | Cost snapshot at time of adjustment. Used by expense reporting for shop_use; null for older rows. Added via `20260420000001` |
 | created_at | TIMESTAMPTZ | | |
+
+**Indexes:** `idx_stock_adjustments_type_created` on `(adjustment_type, created_at DESC)`. Added via `20260420000001`.
 
 ### vendors
 | Column | Type | Constraints | Notes |

@@ -4,6 +4,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(inventory): unified stock_adjustments + refund disposition rework + shop-use tracking — 2026-04-20 (Session 37)
+
+**Three bundled features sharing one migration and overlapping code:**
+
+### 1. Stock adjustments audit trail (P1 fix from Session 34 audit)
+- POS sales now write `stock_adjustments` rows with `adjustment_type='sold'`, `reference_type='transaction'`, and `unit_cost` snapshot.
+- POS refunds write disposition-appropriate rows (`returned` / `damaged` / `customer_retained`).
+- New shared helper `src/lib/utils/stock-adjustments.ts` (`logStockAdjustment()`) — all 5 call sites use it (manual, PO receive, sale, refund, shop-use). Removed all inline `stock_adjustments` inserts.
+- Stock History page now shows actual sale and refund events (previously empty for those types).
+
+### 2. Refund disposition rework
+- Replaced per-line restock checkbox with confirm-step radio: Restock all / Damaged all / Customer kept all / Mixed (per-line).
+- No default selected — Confirm button disabled until disposition chosen.
+- All dispositions write `stock_adjustments` audit rows. Only "restock" increments `quantity_on_hand`.
+- `refund_items.disposition` column added. Legacy `restock` boolean kept for backwards compat.
+- Backwards-compatible API: old PWA clients sending `restock: true/false` are normalized server-side.
+
+### 3. Shop-use feature
+- POS: "Log Shop Use" button in More menu. Product search, quantity picker, optional note. Permission: `inventory.shop_use` (all POS roles).
+- Admin: `/admin/inventory/shop-expenses` report page. Date presets, summary cards (Total Spend, Usage Events, Top Product), detail table, CSV export.
+- New API: `POST /api/pos/shop-use`, `GET /api/admin/shop-expenses/export`.
+- Captures `unit_cost` snapshot from `products.cost_price` at time of use.
+
+### Schema migration (`20260420000001`)
+- `stock_adjustments.adjustment_type` CHECK extended: `+ 'shop_use', 'customer_retained'`
+- `stock_adjustments.reference_type` CHECK extended: `+ 'shop_use'`
+- `stock_adjustments.unit_cost NUMERIC(10,2)` added (nullable)
+- `idx_stock_adjustments_type_created` index added
+- `refund_items.disposition TEXT` added with CHECK constraint
+
+### Other
+- DB_SCHEMA.md: removed 4 phantom PO columns (`expected_at`, `subtotal`, `shipping_cost`, `total_amount`), documented new fields.
+- 2 new permission keys: `inventory.shop_use` (all roles), `inventory.view_expense_report` (admin/super_admin).
+- Admin sidebar: "Shop Expenses" nav item under Inventory.
+
+**Tests: 247 → 272 passing.** `npm run typecheck` clean.
+
+Files changed: `supabase/migrations/20260420000001_extend_stock_adjustments.sql`, `src/lib/utils/stock-adjustments.ts` (new), `src/lib/utils/__tests__/stock-adjustments.test.ts` (new), `src/lib/utils/__tests__/validation-refund-shopuse.test.ts` (new), `src/app/api/admin/stock-adjustments/route.ts`, `src/app/api/admin/purchase-orders/[id]/receive/route.ts`, `src/app/api/pos/transactions/route.ts`, `src/app/api/pos/sync-offline-transaction/route.ts`, `src/app/api/pos/refunds/route.ts`, `src/app/api/pos/shop-use/route.ts` (new), `src/app/api/admin/shop-expenses/export/route.ts` (new), `src/lib/utils/validation.ts`, `src/lib/utils/role-defaults.ts`, `src/lib/auth/roles.ts`, `src/app/pos/components/refund/refund-dialog.tsx`, `src/app/pos/components/refund/refund-item-row.tsx`, `src/app/pos/components/refund/refund-summary.tsx`, `src/app/pos/components/bottom-nav.tsx`, `src/app/pos/components/shop-use-dialog.tsx` (new), `src/app/admin/inventory/shop-expenses/page.tsx` (new), `docs/dev/DB_SCHEMA.md`, `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`.
+
+---
+
 ## fix(pos): integer-cent refund math with residual distribution + server per-line recompute — 2026-04-20 (Session 36)
 
 **Problem:** Receipt SD-006211 showed a refund of -$71.39 against a $71.43 transaction — off by $0.04. Paper Mats (qty 40, unit $0.40, stored tax $1.64) refunded at $17.60 instead of $17.64. A sibling test transaction computed $0.02 OVER the original and hit the server's aggregate cap (+$0.01 tolerance) — blocking the refund entirely.
