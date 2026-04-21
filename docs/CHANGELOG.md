@@ -4,6 +4,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(products): unify barcode lookup across POS/admin; drawer barcode field — 2026-04-21 (Session 41C)
+
+**Observed bug:** admin scanner miss on real products (e.g. "Product Rack / Bottle Holder", `sku=1234119, barcode=null`). Those products hit on POS but miss on admin. Root cause: POS barcode-lookup queries `WHERE (barcode = :code OR sku = :code)` while the 41B admin endpoint only queries `WHERE barcode = :code`. Legacy Square imports stored scan codes in `sku`, so the admin drawer never opened for them.
+
+**Fix:** extracted a shared `lookupProductByScanCode()` helper at `src/lib/products/barcode-lookup.ts`. Both endpoints now call it — the SELECT column list and the `.or(barcode.eq.X,sku.eq.X)` filter live in exactly one place and can't drift again. Pre-existing asymmetry (POS returns 404 on miss, admin returns 200-with-null) is intentional and preserved — each route formats its own response shape, the helper stays agnostic. `BarcodeLookupResult` is a strict superset of the prior POS selection — added `reorder_threshold` so scanner-opened drawers render that field correctly.
+
+**Drawer barcode field:** the header's read-only "Barcode: xxx" line was replaced by a full editable Barcode input — now the first editable field in the drawer (above Price). Autosaves on blur, 5 s undo toast, empty string → `null`. Soft conflict check before writing (no DB unique constraint exists): pre-save `SELECT id, name FROM products WHERE barcode = :new AND id <> :self LIMIT 1`, and if another product owns the code, toast `"Barcode already assigned to {other.name}"` and revert the field. No DB constraint was added in this session — that requires a dedup audit we haven't scoped.
+
+**Tests added** (12 new, 307 total passing):
+- `src/lib/products/__tests__/barcode-lookup.test.ts` — 7: barcode match, **SKU match** (the exact bug regression), null-on-no-match, `is_active` filter applied, empty/whitespace input returns null without querying, trim behavior, error rethrown.
+- `src/app/admin/catalog/products/components/__tests__/quick-edit-drawer.test.tsx` — 5 new: barcode field populates from product, blur triggers trimmed update, empty saves as null, conflict check surfaces error + reverts without writing, undo reverts via second update. Existing test assertion updated (barcode moved out of the header meta line into its own field).
+- `src/app/api/admin/products/__tests__/barcode-lookup.test.ts` — mock loosened to shape-agnostic chain so the new helper's `.or().eq().limit().maybeSingle()` composition passes while preserving the 6 existing assertions.
+
+Tests: 295 → 307 passing. `tsc --noEmit` clean.
+
+Files changed: `src/lib/products/barcode-lookup.ts` (new), `src/lib/products/__tests__/barcode-lookup.test.ts` (new), `src/app/api/pos/products/barcode-lookup/route.ts` (refactor to helper), `src/app/api/admin/products/barcode-lookup/route.ts` (refactor to helper), `src/app/admin/catalog/products/components/quick-edit-drawer.tsx` (add barcode field), `src/app/admin/catalog/products/components/__tests__/quick-edit-drawer.test.tsx`, `src/app/api/admin/products/__tests__/barcode-lookup.test.ts`, `docs/dev/FILE_TREE.md`, `docs/CHANGELOG.md`.
+
+Scan-miss assignment dialog is deferred — no longer urgent now that admin lookup hits every product that POS does.
+
+---
+
 ## feat(admin): Quick Edit drawer for products with scanner + autosave + audit-preserving qty edits — 2026-04-20 (Session 41B)
 
 Scanner-driven Quick Edit workflow on the admin products list. Scan a printed barcode (or tap the pencil icon on a row) → slide-over drawer opens from the right with price / cost / reorder threshold / quantity fields. Three of them autosave on blur with a 5-second undo toast; quantity requires an explicit reason category before saving, and routes through the existing `/api/admin/stock-adjustments` endpoint so every change writes a `stock_adjustments` audit row + `audit_log` entry.

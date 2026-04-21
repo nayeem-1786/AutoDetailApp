@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-20 (Session 41B — Quick Edit drawer for admin products; admin barcode-lookup API)
+> **Last updated:** 2026-04-21 (Session 41C — unified barcode/SKU lookup helper; drawer barcode field)
 
 ---
 
@@ -917,6 +917,11 @@ src/app/api/admin/sms-templates/[slug]/route.ts
 src/app/api/admin/sms-templates/[slug]/reset/route.ts
 src/app/api/admin/sms-templates/[slug]/test/route.ts
 src/app/admin/settings/messaging/sms-templates/page.tsx
+```
+
+### Products
+```
+src/lib/products/barcode-lookup.ts          — Shared barcode/SKU lookup helper (POS + admin use this)
 ```
 
 ### Quotes

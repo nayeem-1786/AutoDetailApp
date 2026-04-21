@@ -5,6 +5,9 @@ import type { Product } from '@/lib/supabase/types';
 // Capture handles so individual tests can inspect and configure behavior.
 const supabaseUpdateEq = vi.fn(async (_patch: Record<string, unknown>) => ({ error: null as unknown }));
 const adminFetchMock = vi.fn();
+
+// Conflict-check mock (drawer barcode field does a pre-save SELECT)
+const conflictResponse = { data: null as { id: string; name: string } | null };
 const toastFns = {
   success: vi.fn(),
   error: vi.fn(),
@@ -17,9 +20,20 @@ const permissionFlags = { granted: true as boolean };
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: (_table: string) => ({
+      // Update path — price / cost / threshold / barcode writes all land here.
       update: (patch: Record<string, unknown>) => ({
         eq: async (_col: string, _id: string) => supabaseUpdateEq(patch),
       }),
+      // Select path — barcode conflict check: .select().eq().neq().limit().maybeSingle()
+      select: (_cols: string) => {
+        const chain = {
+          eq: () => chain,
+          neq: () => chain,
+          limit: () => chain,
+          maybeSingle: async () => ({ data: conflictResponse.data, error: null }),
+        };
+        return chain;
+      },
     }),
   }),
 }));
@@ -92,6 +106,7 @@ beforeEach(() => {
   toastFns.warning.mockReset();
   toastFns.default.mockReset();
   permissionFlags.granted = true;
+  conflictResponse.data = null;
 });
 
 afterEach(() => {
@@ -107,19 +122,20 @@ describe('QuickEditDrawer', () => {
         onOpenChange={vi.fn()}
       />,
     );
+    const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
     const priceInput = screen.getByLabelText('Price') as HTMLInputElement;
     const costInput = screen.getByLabelText('Cost') as HTMLInputElement;
     const thresholdInput = screen.getByLabelText(/Reorder Threshold/) as HTMLInputElement;
     const qtyInput = screen.getByLabelText('Quantity on Hand') as HTMLInputElement;
 
+    expect(barcodeInput.value).toBe('B-1');
     expect(priceInput.value).toBe('10.00');
     expect(costInput.value).toBe('5.00');
     expect(thresholdInput.value).toBe('3');
     expect(qtyInput.value).toBe('20');
-    // Title + SKU + barcode visible
+    // Title + SKU in header (barcode moved out of header → into its own field above)
     expect(screen.getByText('Test Product')).toBeDefined();
     expect(screen.getByText(/SKU-1/)).toBeDefined();
-    expect(screen.getByText(/B-1/)).toBeDefined();
   });
 
   it('hides the Cost field when inventory.view_costs is denied', () => {
@@ -293,5 +309,80 @@ describe('QuickEditDrawer', () => {
     expect(body.reason).toBe('Recount');
     expect(body.adjustment).toBe(5);
     expect(body.adjustment_type).toBe('recount');
+  });
+
+  // ---------- Session 41C — barcode field tests ----------
+
+  it('barcode field renders as first editable field and populates from the product', () => {
+    render(<QuickEditDrawer open={true} product={mockProduct()} onOpenChange={vi.fn()} />);
+    const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
+    expect(barcodeInput.value).toBe('B-1');
+  });
+
+  it('barcode blur triggers supabase update with the trimmed new value', async () => {
+    render(<QuickEditDrawer open={true} product={mockProduct()} onOpenChange={vi.fn()} />);
+    const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(barcodeInput, { target: { value: '  NEWCODE-999  ' } });
+      fireEvent.blur(barcodeInput);
+    });
+
+    expect(supabaseUpdateEq).toHaveBeenCalledTimes(1);
+    expect(supabaseUpdateEq).toHaveBeenCalledWith({ barcode: 'NEWCODE-999' });
+    expect(toastFns.success).toHaveBeenCalledTimes(1);
+    const [, opts] = toastFns.success.mock.calls[0] as [string, { action: { label: string } }];
+    expect(opts.action.label).toBe('Undo');
+  });
+
+  it('clearing the barcode saves null, not an empty string', async () => {
+    render(<QuickEditDrawer open={true} product={mockProduct()} onOpenChange={vi.fn()} />);
+    const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(barcodeInput, { target: { value: '' } });
+      fireEvent.blur(barcodeInput);
+    });
+
+    expect(supabaseUpdateEq).toHaveBeenCalledTimes(1);
+    expect(supabaseUpdateEq).toHaveBeenCalledWith({ barcode: null });
+  });
+
+  it('conflict check: another product owns the barcode → error toast, no update, field reverts', async () => {
+    // Conflict pre-check returns a hit.
+    conflictResponse.data = { id: 'p-other', name: 'Other Product' };
+
+    render(<QuickEditDrawer open={true} product={mockProduct()} onOpenChange={vi.fn()} />);
+    const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(barcodeInput, { target: { value: 'DUPLICATE' } });
+      fireEvent.blur(barcodeInput);
+    });
+
+    expect(toastFns.error).toHaveBeenCalledTimes(1);
+    expect(toastFns.error.mock.calls[0][0]).toBe('Barcode already assigned to Other Product');
+    // No UPDATE was issued.
+    expect(supabaseUpdateEq).not.toHaveBeenCalled();
+    // Field reverted to the prior barcode.
+    expect(barcodeInput.value).toBe('B-1');
+  });
+
+  it('undo reverts the barcode via a second supabase update', async () => {
+    render(<QuickEditDrawer open={true} product={mockProduct()} onOpenChange={vi.fn()} />);
+    const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
+
+    await act(async () => {
+      fireEvent.change(barcodeInput, { target: { value: 'SWAPPED' } });
+      fireEvent.blur(barcodeInput);
+    });
+
+    const [, opts] = toastFns.success.mock.calls[0] as [string, { action: { onClick: () => void | Promise<void> } }];
+    await act(async () => {
+      await opts.action.onClick();
+    });
+
+    expect(supabaseUpdateEq).toHaveBeenCalledTimes(2);
+    expect(supabaseUpdateEq.mock.calls[1][0]).toEqual({ barcode: 'B-1' });
   });
 });

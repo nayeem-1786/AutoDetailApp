@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { lookupProductByScanCode } from '@/lib/products/barcode-lookup';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,20 +28,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'barcode is required' }, { status: 400 });
     }
 
-    const { data: product, error } = await admin
-      .from('products')
-      .select('*')
-      .eq('barcode', barcode)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Admin barcode lookup error:', error);
+    try {
+      const product = await lookupProductByScanCode(admin, barcode);
+      return NextResponse.json({ product: product ?? null });
+    } catch (err) {
+      console.error('Admin barcode lookup error:', err);
       return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
     }
-
-    return NextResponse.json({ product: product ?? null });
   } catch (err) {
     console.error('POST /admin/products/barcode-lookup error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

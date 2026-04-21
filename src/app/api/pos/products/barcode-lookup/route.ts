@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { lookupProductByScanCode } from '@/lib/products/barcode-lookup';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,17 +19,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Look up by barcode first, then fall back to SKU
-    const { data: product, error } = await supabase
-      .from('products')
-      .select('id, name, sku, barcode, retail_price, cost_price, is_taxable, is_active, quantity_on_hand, image_url, category_id, is_loyalty_eligible, sale_price, sale_starts_at, sale_ends_at')
-      .or(`barcode.eq.${barcode},sku.eq.${barcode}`)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('[Barcode Lookup] Query error:', error);
+    let product;
+    try {
+      product = await lookupProductByScanCode(supabase, barcode);
+    } catch (err) {
+      console.error('[Barcode Lookup] Query error:', err);
       return NextResponse.json({ error: 'Lookup failed' }, { status: 500 });
     }
 

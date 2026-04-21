@@ -66,6 +66,7 @@ export function QuickEditDrawer({
   const [current, setCurrent] = useState<Product | null>(product);
 
   // Field draft strings (preserve trailing decimal / intermediate typing).
+  const [barcodeStr, setBarcodeStr] = useState('');
   const [priceStr, setPriceStr] = useState('');
   const [costStr, setCostStr] = useState('');
   const [thresholdStr, setThresholdStr] = useState('');
@@ -79,13 +80,14 @@ export function QuickEditDrawer({
   // Hydrate / rehydrate when the product prop changes.
   useEffect(() => {
     setCurrent(product);
+    setBarcodeStr(product?.barcode ?? '');
     setPriceStr(formatPrice(product?.retail_price));
     setCostStr(formatPrice(product?.cost_price));
     setThresholdStr(formatInt(product?.reorder_threshold));
     setQtyStr(formatInt(product?.quantity_on_hand));
     setQtyReason('');
     setQtyNotes('');
-  }, [product?.id, product?.retail_price, product?.cost_price, product?.reorder_threshold, product?.quantity_on_hand]);
+  }, [product?.id, product?.barcode, product?.retail_price, product?.cost_price, product?.reorder_threshold, product?.quantity_on_hand]);
 
   // Shared autosave helper for price/cost/threshold.
   const saveField = useCallback(
@@ -147,6 +149,76 @@ export function QuickEditDrawer({
     },
     [current, supabase, onSaved],
   );
+
+  async function handleBarcodeBlur() {
+    if (!current) return;
+    const raw = barcodeStr.trim();
+    const next = raw === '' ? null : raw;
+    const oldValue = current.barcode;
+    if (next === oldValue) {
+      // Normalize the input so lingering whitespace doesn't stay visible.
+      setBarcodeStr(oldValue ?? '');
+      return;
+    }
+
+    // Soft conflict check — no DB unique constraint exists, so another
+    // product could have this barcode. Surface it before writing.
+    if (next !== null) {
+      const { data: conflict } = await supabase
+        .from('products')
+        .select('id, name')
+        .eq('barcode', next)
+        .neq('id', current.id)
+        .limit(1)
+        .maybeSingle();
+      if (conflict) {
+        setBarcodeStr(oldValue ?? '');
+        toast.error(`Barcode already assigned to ${conflict.name}`);
+        return;
+      }
+    }
+
+    // Optimistic update.
+    setCurrent((prev) => (prev ? { ...prev, barcode: next } as Product : prev));
+
+    const { error } = await supabase
+      .from('products')
+      .update({ barcode: next })
+      .eq('id', current.id);
+
+    if (error) {
+      setCurrent((prev) => (prev ? { ...prev, barcode: oldValue } as Product : prev));
+      setBarcodeStr(oldValue ?? '');
+      toast.error(`Save failed: ${error.message}`);
+      return;
+    }
+
+    onSaved?.({ ...current, barcode: next } as Product);
+
+    const display = next === null ? 'cleared' : next;
+    toast.success(`Barcode updated — ${display}`, {
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          setCurrent((prev) => (prev ? { ...prev, barcode: oldValue } as Product : prev));
+          setBarcodeStr(oldValue ?? '');
+
+          const { error: undoErr } = await supabase
+            .from('products')
+            .update({ barcode: oldValue })
+            .eq('id', current.id);
+
+          if (undoErr) {
+            toast.error(`Undo failed: ${undoErr.message}`);
+            return;
+          }
+          onSaved?.({ ...current, barcode: oldValue } as Product);
+          toast(`Reverted to ${oldValue ?? 'no barcode'}`);
+        },
+      },
+    });
+  }
 
   async function handlePriceBlur() {
     const next = parsePrice(priceStr);
@@ -239,9 +311,20 @@ export function QuickEditDrawer({
             <h3 className="text-lg font-semibold text-ui-text truncate">{current.name}</h3>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ui-text-dim">
               {current.sku && <span>SKU: <span className="font-mono text-ui-text-muted">{current.sku}</span></span>}
-              {current.barcode && <span>Barcode: <span className="font-mono text-ui-text-muted">{current.barcode}</span></span>}
             </div>
           </div>
+
+          <FormField label="Barcode" htmlFor="quick-edit-barcode">
+            <Input
+              id="quick-edit-barcode"
+              type="text"
+              value={barcodeStr}
+              onChange={(e) => setBarcodeStr(e.target.value)}
+              onBlur={handleBarcodeBlur}
+              placeholder="Scan or type…"
+              autoComplete="off"
+            />
+          </FormField>
 
           <FormField label="Price" htmlFor="quick-edit-price">
             <div className="relative">

@@ -31,20 +31,23 @@ vi.mock('@/lib/supabase/admin', () => ({
         };
       }
       if (table === 'products') {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({
-                    data: state.lookupProduct,
-                    error: state.lookupError,
-                  }),
-                }),
-              }),
-            }),
-          }),
+        // Shape-agnostic chain: supports .select().or().eq().limit().maybeSingle()
+        // (the current query from @/lib/products/barcode-lookup helper) and any
+        // re-ordering. If the lookup throws, the helper rethrows and the route
+        // surfaces a 500.
+        const chain = {
+          select: () => chain,
+          or: () => chain,
+          eq: () => chain,
+          limit: () => chain,
+          maybeSingle: async () => {
+            if (state.lookupError) {
+              return { data: null, error: state.lookupError };
+            }
+            return { data: state.lookupProduct, error: null };
+          },
         };
+        return chain;
       }
       throw new Error(`Unexpected table: ${table}`);
     },
