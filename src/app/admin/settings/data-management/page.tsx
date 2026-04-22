@@ -4,12 +4,12 @@ import { useState, useCallback, useRef } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
-import { Search, X, Trash2, AlertTriangle, UserX } from 'lucide-react';
+import { X, Trash2, AlertTriangle, UserX } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 
 interface CustomerResult {
@@ -234,15 +234,11 @@ export default function DataManagementPage() {
           <CardTitle className="text-base">Search Customers</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search by name, phone, or email..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="pl-10 text-base sm:text-sm"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search by name, phone, or email..."
+            value={searchQuery}
+            onChange={handleSearch}
+          />
 
           {searching && (
             <div className="flex items-center gap-2 py-4 text-sm text-gray-500">

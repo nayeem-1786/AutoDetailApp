@@ -274,12 +274,10 @@ export default function CompliancePage() {
                   <label className="mb-1 block text-sm font-medium text-gray-700">
                     Search Customer
                   </label>
-                  <input
-                    type="text"
+                  <SearchInput
                     value={customerSearch}
-                    onChange={(e) => searchCustomers(e.target.value)}
+                    onChange={searchCustomers}
                     placeholder="Search by name or phone..."
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400"
                   />
                   {customerResults.length > 0 && !selectedCustomer && (
                     <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-gray-200 bg-white">

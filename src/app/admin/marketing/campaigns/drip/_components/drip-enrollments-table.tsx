@@ -9,6 +9,7 @@ import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Select } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -380,13 +381,11 @@ export function DripEnrollmentsTable({
             Search for a customer to enroll
           </p>
           <div className="flex gap-2">
-            <Input
+            <SearchInput
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={setSearchQuery}
               placeholder="Search by name, email, or phone..."
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSearch();
-              }}
+              onEnter={handleSearch}
               className="flex-1"
             />
             <Button

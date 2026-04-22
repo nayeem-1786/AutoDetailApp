@@ -16,6 +16,7 @@ import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1052,18 +1053,18 @@ export default function ProductDetailPage() {
                   {showGroupModal && (
                     <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
                       <p className="text-sm font-medium text-gray-700">Search for products to group with this one:</p>
-                      <Input
+                      <SearchInput
                         value={groupSearch}
-                        onChange={async (e) => {
-                          setGroupSearch(e.target.value);
-                          if (e.target.value.trim().length < 2) { setGroupSearchResults([]); return; }
+                        onChange={async (value) => {
+                          setGroupSearch(value);
+                          if (value.trim().length < 2) { setGroupSearchResults([]); return; }
                           const { data } = await supabase
                             .from('products')
                             .select('id, name, retail_price, vendors(name)')
                             .eq('is_active', true)
                             .is('product_group_id', null)
                             .neq('id', productId)
-                            .ilike('name', `%${e.target.value.trim()}%`)
+                            .ilike('name', `%${value.trim()}%`)
                             .limit(10);
                           setGroupSearchResults((data ?? []).map((p: Record<string, unknown>) => ({
                             id: p.id as string,
@@ -1072,8 +1073,8 @@ export default function ProductDetailPage() {
                             vendor_name: (p.vendors as { name: string } | null)?.name ?? null,
                           })));
                         }}
+                        onClear={() => setGroupSearchResults([])}
                         placeholder="Search by product name..."
-                        className="text-sm"
                       />
                       {groupSearchResults.length > 0 && (
                         <div className="divide-y rounded-lg border bg-white max-h-48 overflow-auto">

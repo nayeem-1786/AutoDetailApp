@@ -7,6 +7,7 @@ import type { Customer } from '@/lib/supabase/types';
 import { formatCurrency, formatPhone, formatRelativeDate, formatPoints } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
+import { SearchInput } from '@/components/ui/search-input';
 import { DataTable } from '@/components/ui/data-table';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -188,13 +189,11 @@ function TagFilterDropdown({
         {open && (
           <div className="absolute left-0 z-50 mt-1 w-64 rounded-lg border border-gray-200 bg-white shadow-lg">
             <div className="border-b border-gray-100 p-2">
-              <input
+              <SearchInput
                 autoFocus
-                type="text"
                 value={tagSearch}
-                onChange={(e) => setTagSearch(e.target.value)}
+                onChange={setTagSearch}
                 placeholder="Search tags..."
-                className="w-full rounded-md border border-gray-200 px-2.5 py-1.5 text-sm placeholder:text-gray-400 focus:border-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
               />
             </div>
             <div className="max-h-48 overflow-y-auto p-1">

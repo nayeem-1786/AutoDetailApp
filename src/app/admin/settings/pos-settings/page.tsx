@@ -7,12 +7,13 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
-import { X, Plus, Search } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   VEHICLE_CATEGORIES,
@@ -391,15 +392,12 @@ export default function PosSettingsPage() {
             <>
               {/* Search + Add row */}
               <div className="flex items-center gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <Input
-                    placeholder="Search makes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
+                <SearchInput
+                  placeholder="Search makes..."
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  className="flex-1"
+                />
                 <Button
                   type="button"
                   variant="outline"

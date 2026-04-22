@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { adminFetch } from '@/lib/utils/admin-fetch';
@@ -24,7 +25,6 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
-  Search,
 } from 'lucide-react';
 import type { PageContentBlock, ContentBlockType } from '@/lib/supabase/types';
 import { usePermission } from '@/lib/hooks/use-permission';
@@ -194,16 +194,12 @@ export default function GlobalBlocksPage() {
 
       {/* Actions bar */}
       <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search global blocks..."
-            className="block w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-          />
-        </div>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Search global blocks..."
+          className="flex-1 max-w-xs"
+        />
         <Button type="button" onClick={() => setShowCreateDialog(true)}>
           <Plus className="mr-1.5 h-4 w-4" />
           New Global Block

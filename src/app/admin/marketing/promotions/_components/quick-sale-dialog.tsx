@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FormField } from '@/components/ui/form-field';
@@ -18,7 +19,7 @@ import {
 import { formatCurrency } from '@/lib/utils/format';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
-import { Search, X, Wrench, ShoppingBag, AlertTriangle, Info } from 'lucide-react';
+import { X, Wrench, ShoppingBag, AlertTriangle, Info } from 'lucide-react';
 import type { PromotionItem, ServicePricingRow } from './promotion-row';
 
 // ─── Types ──────────────────────────────────────────────────
@@ -294,15 +295,11 @@ export function QuickSaleDialog({
 
         {/* Search to add items */}
         <FormField label="Select items">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search to add items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <SearchInput
+            placeholder="Search to add items..."
+            value={searchQuery}
+            onChange={setSearchQuery}
+          />
           {searching && <p className="mt-1 text-xs text-gray-400">Searching...</p>}
           {searchResults.length > 0 && (
             <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-gray-200">

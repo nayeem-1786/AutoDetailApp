@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { SITE_URL } from '@/lib/utils/constants';
@@ -12,7 +13,6 @@ import { ContentBlockEditor } from '@/components/admin/content/content-block-edi
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { PageSeo } from '@/lib/supabase/types';
 import {
-  Search,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -1606,16 +1606,12 @@ export default function SeoDashboardPage() {
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by path or title..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200"
-              />
-            </div>
+            <SearchInput
+              placeholder="Search by path or title..."
+              value={searchQuery}
+              onChange={setSearchQuery}
+              className="flex-1 min-w-[200px] max-w-sm"
+            />
             <select
               value={filterPageType}
               onChange={(e) => setFilterPageType(e.target.value)}

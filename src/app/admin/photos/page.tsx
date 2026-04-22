@@ -30,6 +30,7 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { SearchInput } from '@/components/ui/search-input';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils/cn';
 import {
@@ -637,13 +638,11 @@ export default function AdminPhotosPage() {
             {/* Customer search */}
             <div className="relative">
               <label className="mb-1 block text-xs font-medium text-gray-500">Customer</label>
-              <input
-                type="text"
+              <SearchInput
                 value={customerSearch}
-                onChange={(e) => handleCustomerSearchChange(e.target.value)}
+                onChange={handleCustomerSearchChange}
                 onFocus={() => customerResults.length > 0 && setShowCustomerDropdown(true)}
                 placeholder="Search customer..."
-                className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm"
               />
               {showCustomerDropdown && customerResults.length > 0 && (
                 <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-md border bg-white shadow-lg">
@@ -663,12 +662,10 @@ export default function AdminPhotosPage() {
             {/* Text search */}
             <div>
               <label className="mb-1 block text-xs font-medium text-gray-500">Search</label>
-              <input
-                type="text"
+              <SearchInput
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={setSearch}
                 placeholder="Customer name or vehicle..."
-                className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm"
               />
             </div>
 

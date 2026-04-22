@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SearchInput } from '@/components/ui/search-input';
 import type { VariableDefinition } from '@/lib/email/variables';
 
 interface VariableInserterProps {
@@ -51,12 +52,10 @@ export function VariableInserter({ variables, onInsert, label = 'Insert Variable
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-72 rounded-lg border border-gray-200 bg-white shadow-lg">
           <div className="border-b border-gray-100 p-2">
-            <input
-              type="text"
+            <SearchInput
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={setSearch}
               placeholder="Search variables..."
-              className="w-full rounded border border-gray-200 px-2 py-1 text-sm text-base sm:text-sm"
               autoFocus
             />
           </div>

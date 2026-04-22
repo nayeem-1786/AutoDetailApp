@@ -4,6 +4,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(admin): standardize search clear-X across admin pages — 2026-04-21 (Session 42E)
+
+Session 42D-patch flagged inconsistent clear-X affordances across admin search inputs as a follow-up for 42E. Phase 0 audit found the shared `SearchInput` component at `src/components/ui/search-input.tsx` already renders a conditional `<X>` button when `value.length > 0` and is already consumed by `TableToolbar` — every admin list page routed through the toolbar was already compliant. The gap was 11 holdout pages hand-rolling a bare `<input>` / `<Input>` with a `Search` icon and no clear affordance. Third-category check (bare input + hand-rolled clear-X pattern) returned zero hits, confirming the 11 holdouts as the complete migration scope.
+
+**Migrated to `SearchInput` (12 call sites across 11 files):**
+- `src/app/admin/catalog/products/[id]/page.tsx` — group-products search (forwards `onClear` to reset results)
+- `src/app/admin/customers/page.tsx` — `TagFilterDropdown` search
+- `src/app/admin/marketing/compliance/page.tsx` — opt-out dialog customer search
+- `src/app/admin/marketing/email-templates/_components/variable-inserter.tsx` — variable picker (preserves `autoFocus`)
+- `src/app/admin/marketing/promotions/_components/quick-sale-dialog.tsx` — item add search
+- `src/app/admin/marketing/campaigns/drip/_components/drip-enrollments-table.tsx` — manual enroll (wired to `onEnter`)
+- `src/app/admin/photos/page.tsx` — customer lookup AND text search (2 call sites)
+- `src/app/admin/settings/data-management/page.tsx` — customer purge search
+- `src/app/admin/settings/pos-settings/page.tsx` — vehicle makes filter
+- `src/app/admin/website/global-blocks/page.tsx` — blocks filter
+- `src/app/admin/website/seo/page.tsx` — SEO pages filter
+
+**New test file**: `src/components/ui/__tests__/search-input.test.tsx` — 8 tests covering empty/non-empty X visibility, typing, click-to-clear, `onClear` invocation, `onEnter` keyboard handling, prop forwarding (`autoFocus`, `data-barcode-scan-target`). This is the first unit test for the shared component.
+
+**Deliberately out of scope** (documented in audit): `src/app/admin/inventory/counts/[id]/page.tsx` (concurrent 42D-patch ownership); `src/app/admin/admin-shell.tsx` global command palette (X semantics = close modal, not clear query); `src/app/admin/marketing/coupons/new/page.tsx` custom `SearchableSelect`/`MultiSearchableSelect` widgets (keyboard-navigable typeahead with different contract); POS (`search-bar.tsx`, `customer-lookup.tsx`); public `product-search.tsx`. `customers/page.tsx` `BulkTagDialog` input also left alone — dual-purpose tag entry with ref-based focus and custom Enter-to-apply logic, not primarily a search affordance.
+
+Tests: 330 → 338 passing. `tsc --noEmit` clean.
+
+**Files changed:**
+- 11 admin pages migrated (see list above)
+- `src/components/ui/__tests__/search-input.test.tsx` (new)
+- `docs/audits/SEARCH_INPUT_AUDIT_SESSION42E.md` (new, committed separately in Phase 0)
+- `docs/dev/FILE_TREE.md` (index the new test file)
+- `docs/CHANGELOG.md` (this entry)
+
+---
+
 ## fix(inventory): count page scanner routing + iPad keypad + save-before-scan — 2026-04-21 (Session 42D-patch)
 
 Three fixes on the count detail page from Session 42D-2.

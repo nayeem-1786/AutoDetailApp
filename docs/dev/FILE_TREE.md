@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-21 (Session 42D-2 — Inventory Count detail UI + transition API)
+> **Last updated:** 2026-04-21 (Session 42E — Search input clear-X standardization)
 
 ---
 
@@ -1077,6 +1077,7 @@ src/components/ui/tabs.tsx
 src/components/ui/textarea.tsx
 src/components/ui/toggle-pill.tsx
 src/components/ui/vehicle-make-combobox.tsx
+src/components/ui/__tests__/search-input.test.tsx
 ```
 
 ### Admin Components
