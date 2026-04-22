@@ -352,3 +352,103 @@ describe('CountDetailPage', () => {
     expect(screen.getByText('Exact Widget')).toBeDefined();
   });
 });
+
+describe('CountDetailPage — 42D-patch fixes', () => {
+  // Scanning mid-edit triggers blur first (saves set_to) then the scanner's
+  // own increment POST. Two POSTs to /items in order.
+  it('scan during qty edit blurs first → set_to POSTs before increment POST', async () => {
+    let getCalls = 0;
+    fetchHandlers['GET /api/admin/inventory/counts/count-1'] = () => {
+      getCalls++;
+      return {
+        status: 200,
+        body: countResponse({
+          status: 'active',
+          items: [
+            { id: 'l1', product_id: 'p1', expected_qty: 3, counted_qty: 3, product_name: 'Widget' },
+          ],
+        }),
+      };
+    };
+    fetchHandlers['POST /api/admin/products/barcode-lookup'] = () => ({
+      status: 200,
+      body: { product: { id: 'p1', name: 'Widget' } },
+    });
+    fetchHandlers['POST /api/admin/inventory/counts/count-1/items'] = () => ({
+      status: 200,
+      body: {
+        item: {
+          id: 'l1',
+          product_id: 'p1',
+          expected_qty: 3,
+          counted_qty: 0, // mock doesn't matter for this test
+          last_updated_by: 'emp-1',
+          updated_at: '2026-04-21T10:05:00Z',
+          product: null,
+          last_updated_by_employee: null,
+        },
+      },
+    });
+
+    await renderAndWait();
+
+    // Enter edit mode on the qty cell, type a new value.
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    const input = screen.getByLabelText('Counted quantity for Widget') as HTMLInputElement;
+    input.focus();
+    fireEvent.change(input, { target: { value: '7' } });
+    expect(document.activeElement).toBe(input);
+
+    // Scan the same product BEFORE the user has blurred. The onScan handler
+    // should blur the input first (→ onBlur → commitEdit → set_to=7), then
+    // run the scan's own POST (increment=1).
+    await act(async () => {
+      await scannerState.onScan!('B-p1');
+    });
+
+    // Two POSTs to /items, both present, set_to BEFORE increment.
+    const itemsPosts = fetchCalls.filter(
+      (c) => c.url === '/api/admin/inventory/counts/count-1/items' && c.method === 'POST'
+    );
+    expect(itemsPosts.length).toBe(2);
+
+    const setToBody = itemsPosts[0].body as { product_id: string; set_to?: number };
+    expect(setToBody.product_id).toBe('p1');
+    expect(setToBody.set_to).toBe(7);
+
+    const incBody = itemsPosts[1].body as { product_id: string; increment?: number };
+    expect(incBody.product_id).toBe('p1');
+    expect(incBody.increment).toBe(1);
+  });
+
+  // Regression: removing data-barcode-scan-target from the search input means
+  // the rendered DOM no longer carries the opt-out attribute. The real hook
+  // test covers the routing behavior; this test verifies the attribute is gone
+  // at the page level so the hook sees a "normal" focused input.
+  it('search input does NOT carry data-barcode-scan-target', async () => {
+    stubGet({ status: 'active', items: [] });
+    await renderAndWait();
+
+    const searchInput = screen.getByPlaceholderText(/search by product name/i) as HTMLInputElement;
+    expect(searchInput.getAttribute('data-barcode-scan-target')).toBeNull();
+  });
+
+  // Inline qty edit input carries inputMode="numeric" so iPad opens the
+  // compact numeric keypad instead of full QWERTY (verified already present
+  // from 42D-2; this guards against future regression).
+  it('inline qty-edit input renders with inputMode="numeric"', async () => {
+    stubGet({
+      status: 'active',
+      items: [
+        { id: 'l1', product_id: 'p1', expected_qty: 3, counted_qty: 3, product_name: 'Widget' },
+      ],
+    });
+    await renderAndWait();
+
+    fireEvent.click(screen.getByRole('button', { name: '3' }));
+    const input = screen.getByLabelText('Counted quantity for Widget') as HTMLInputElement;
+    expect(input.getAttribute('inputmode')).toBe('numeric');
+    expect(input.getAttribute('pattern')).toBe('[0-9]*');
+    expect(input.dataset.qtyEditInput).toBe('true');
+  });
+});

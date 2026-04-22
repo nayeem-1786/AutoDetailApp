@@ -166,6 +166,19 @@ export default function CountDetailPage() {
     requireTargetAttribute: false,
     enabled: count?.status === 'active' && !loading && !acting,
     onScan: async (barcode) => {
+      // If the user is mid-edit on a qty cell, save that edit first by
+      // blurring the input. The onBlur handler fires commitEdit() which
+      // POSTs /items with set_to=N. The scan's own POST (increment=1)
+      // runs after. If both target the same line, last-write-wins per
+      // 42C §5 — acceptable for MVP.
+      const activeEl = document.activeElement;
+      if (
+        activeEl instanceof HTMLInputElement &&
+        activeEl.dataset.qtyEditInput === 'true'
+      ) {
+        activeEl.blur();
+      }
+
       try {
         const lookupRes = await adminFetch('/api/admin/products/barcode-lookup', {
           method: 'POST',
@@ -463,7 +476,6 @@ export default function CountDetailPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
-          data-barcode-scan-target="input"
         />
         {isReview && (
           <label className="flex items-center gap-2 text-sm text-ui-text">
@@ -566,7 +578,7 @@ export default function CountDetailPage() {
                           }}
                           className="w-20 text-right"
                           autoFocus
-                          data-barcode-scan-target="input"
+                          data-qty-edit-input="true"
                           aria-label={`Counted quantity for ${item.product?.name ?? 'product'}`}
                         />
                       ) : canEditQty ? (

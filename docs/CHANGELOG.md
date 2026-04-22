@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(inventory): count page scanner routing + iPad keypad + save-before-scan — 2026-04-21 (Session 42D-patch)
+
+Three fixes on the count detail page from Session 42D-2.
+
+**Fix 1 — Scanner routing when search input is focused.** 42D-2 added `data-barcode-scan-target="input"` to the count detail page's search input. That attribute is the 42D-interlude opt-out telling the scanner hook to let keystrokes flow natively to the focused input — which is correct for the Quick Edit drawer's Barcode field (scan-to-replace-barcode), but WRONG for the count page where scanning should always count the product regardless of which input has focus. Fix: remove the attribute from the search input and from the inline qty-edit input. The attribute now exists in exactly one place in application code (the drawer's Barcode input at `src/app/admin/catalog/products/components/quick-edit-drawer.tsx:326`), matching the 42D-interlude design intent.
+
+**Fix 2 — iPad numeric keypad (verification only, no edit).** `inputMode="numeric"` and `pattern="[0-9]*"` verified already present on the inline qty edit input (added during 42D-2). iPad "collapsed keyboard" symptom is NOT caused by missing attributes. Root cause is likely iOS HID-keyboard behavior: when a Bluetooth scanner is paired as a keyboard device, iOS collapses the on-screen keyboard to the accessory bar. Not fixable from application code. Workaround: tap the keyboard-toggle icon in the accessory bar to force the on-screen keypad. Proper fix would require a custom numeric keypad component overlay — deferred.
+
+**Fix 3 — Save-before-scan flow.** User workflow: tap a counted_qty cell, start typing a manual override, then scan a product (maybe the same one, maybe a different one). Before the patch, the scan fired immediately and the in-progress manual edit was abandoned (state cleared without saving). Fix: at the top of the scanner's `onScan` handler, check if `document.activeElement` is an `HTMLInputElement` with `data-qty-edit-input="true"`. If so, `.blur()` it first — the existing `onBlur={() => commitEdit(item)}` handler fires synchronously (the commit is a fetch that runs in the background), and the scanner's own fetch chain (barcode-lookup → items POST) runs after. Both mutations target `/api/admin/inventory/counts/[id]/items`; if they race on the same stock_count_item row the last write wins, which is the documented MVP semantics (Session 42C §5). The new `data-qty-edit-input="true"` marker is a DIFFERENT attribute from `data-barcode-scan-target` — purpose here is "identify a qty-edit input so the scanner can flush it before firing," not "opt out of scanner routing."
+
+**Tests added** (3 new, 330 total passing):
+- Scan during mid-edit blurs the qty input first — two POSTs to `/items` fire in order: `{set_to: 7}` then `{increment: 1}`.
+- Search input renders without `data-barcode-scan-target` (regression check that the removal stuck).
+- Inline qty-edit input renders with `inputMode="numeric"` + `pattern="[0-9]*"` + `data-qty-edit-input="true"` (guards against future regression).
+
+Tests: 327 → 330 passing. `tsc --noEmit` clean.
+
+**Files changed:**
+- `src/app/admin/inventory/counts/[id]/page.tsx` (remove 2 attributes, add save-before-scan, add qty-edit marker)
+- `src/app/admin/inventory/counts/__tests__/detail-page.test.tsx` (3 new tests in a new describe block)
+- `docs/CHANGELOG.md` (this entry)
+
+**Deliberately not touched:** POS, drawer, scanner hook itself, other inputs across admin. The "View Count" reverse link and `reference_type` union fix from 42D-2 stay as shipped. Clear-X consistency across admin search inputs (many admin pages use raw `<Input>` without the shared `SearchInput`'s clear button) is noted in this session's Phase 0 as a future audit item — deferred to Session 42E.
+
+---
+
 ## feat(inventory): count detail UI with scan-to-increment, review, commit flows — 2026-04-21 (Session 42D-2)
 
 Second of two sessions building the Inventory Count feature. 42D-1 shipped the schema + 6 API routes + minimal list page; this session ships the full counting experience at `/admin/inventory/counts/[id]`. The feature is now functionally complete.
