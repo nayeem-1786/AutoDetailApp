@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
+import { searchCustomers } from '@/lib/search/customer-search';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,30 +19,14 @@ export async function GET(request: NextRequest) {
     if (!posEmployee) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
     const supabase = createAdminClient();
 
-    const term = q.trim();
-    const digits = term.replace(/\D/g, '');
-    const isPhoneSearch = digits.length >= 2 && digits.length === term.replace(/[\s()-]/g, '').length;
-
-    let query = supabase
-      .from('customers')
-      .select('id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type')
-      .is('deleted_at', null)
-      .order('last_name')
-      .limit(10);
-
-    if (isPhoneSearch) {
-      // Phone search — partial match anywhere in the number
-      query = query.like('phone', `%${digits}%`);
-    } else {
-      // Name search — match first or last name (case-insensitive)
-      query = query.or(
-        `first_name.ilike.%${term}%,last_name.ilike.%${term}%`
-      );
-    }
-
-    const { data: customers, error } = await query;
+    const { data: customers, error } = await searchCustomers(supabase, q, {
+      select:
+        'id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type',
+      limit: 10,
+    });
 
     if (error) {
       console.error('Customer search error:', error);
@@ -51,7 +36,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ data: customers ?? [] });
+    return NextResponse.json({ data: customers });
   } catch (err) {
     console.error('Customer search route error:', err);
     return NextResponse.json(

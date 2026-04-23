@@ -246,7 +246,7 @@ export default function AdminPhotosPage() {
       return;
     }
     try {
-      const res = await adminFetch(`/api/admin/customers?search=${encodeURIComponent(term)}&limit=10`);
+      const res = await adminFetch(`/api/admin/customers/search?q=${encodeURIComponent(term)}`);
       if (res.ok) {
         const json = await res.json();
         const results = (json.data || []).map((c: { id: string; first_name: string; last_name: string }) => ({

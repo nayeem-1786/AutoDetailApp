@@ -4,6 +4,85 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(search): unified customer-search utility + 5 endpoint migrations + photos 405 fix — 2026-04-22 (Session 42H-rewrite-1)
+
+Implements Strategy B from the Session 42H audit (`docs/audits/SEARCH_UNIFICATION_SESSION42H.md`): a shared `searchCustomers` utility that replaces 4 broken per-column ILIKE endpoints and fixes the admin-photos 405 silent failure. Root-cause fix for the motivating bug — POS customer lookup for `"omar cuvias"` now returns Omar Cuvias.
+
+### New shared utility — `src/lib/search/`
+
+**`tokenize.ts`** — pure helpers extracted from `/api/admin/global-search/route.ts` (left in place there for now; migration deferred to 42H-rewrite-2).
+
+- `isMultiWord(query)` — `true` iff the query has more than one whitespace-separated word.
+- `firstWordPattern(query)` — returns `'%firstword%'` for a broad-fetch ILIKE pattern.
+- `multiWordMatch(items, query, fields, limit?)` — client-side filter that keeps only rows whose concatenation of `fields` contains every word in the query (order-independent).
+- `normalizePhoneDigits(raw)` — strips all non-digit characters.
+- `isPhoneQuery(query, minDigits=2)` — detects phone-shaped queries: ≥`minDigits` digits with only phone formatting chars (whitespace, parens, dots, dashes, plus) as non-digits.
+
+**`customer-search.ts`** — `searchCustomers(supabase, rawQuery, options)` with three code paths:
+
+1. **Phone branch** (`isPhoneQuery=true`): `.like('phone', '%digits%')` only — substring match on the phone column. Accepts any of `"310-756"`, `"(310) 756"`, `"310.756"`, `"+1 (310) 756-4789"` as equivalent.
+2. **Name single-word branch**: `.or()` ILIKE across `[first_name, last_name, email, phone]` ∪ `options.nameFields`.
+3. **Name multi-word branch**: broad-fetch first-word OR across the same field union up to `broadLimit` (default 50), then client-side intersect every word against the concatenation of the same field union. Order-independent: `"omar cuvias"` and `"cuvias omar"` return the same row.
+
+Intersect fields are always `[first_name, last_name, email, phone]` plus any caller-supplied `nameFields` — additive, never replacing. This makes mixed queries like `"omar 310"` AND reverse-order `"310 omar"` both find Omar Cuvias (broad-fetch includes `phone` for the reverse-order case).
+
+**Options**: `limit` (default 10), `broadLimit` (default 50), `includeDeleted` (default false), `select` (default `'id, first_name, last_name, phone, email'`), `nameFields` (default `[]` — additive to baseline).
+
+**48 tests** across tokenize + customer-search covering every branch, phone normalization, out-of-order multi-word, soft-delete toggle, limit/broadLimit, additive nameFields.
+
+### Migrated API endpoints (5)
+
+| Endpoint | What changed |
+|---|---|
+| `GET /api/pos/customers/search` | Replaced inline `.or()` with `searchCustomers(...)` using POS-specific select (`loyalty_points_balance, visit_count, tags, customer_type` preserved). POS 400-at-<2-chars contract preserved at the route layer. |
+| `GET /api/admin/customers/search` | Same swap; `?include_deleted=true` wired through `options.includeDeleted`. |
+| `GET /api/admin/jobs?search=...` | Customer-id lookup block now calls `searchCustomers(..., { select: 'id', limit: 500, broadLimit: 500, includeDeleted: true })`. Preserves two-step pattern; soft-deleted customers still reachable for job filters (unchanged). |
+| `GET /api/admin/photos?search=...` | Same pattern for the customer-id block. Vehicle-id block untouched (vehicle-search extraction deferred). |
+| `src/app/admin/photos/page.tsx` line 249 | **THE 405 BUG**: fetch URL changed from `/api/admin/customers?search=...` (route has no GET handler — silent 405) to `/api/admin/customers/search?q=...`. Admin Photos customer-name filter dropdown now functional for the first time. |
+
+### Behavior deltas
+
+All deltas additive — nothing that matched before stops matching:
+
+- **Multi-word customer search works** on POS, admin search, admin jobs filter, admin photos filter. `"omar cuvias"`, `"cuvias omar"`, `"omar 310"`, `"310 omar"` all find Omar Cuvias.
+- **Phone normalization unified**. `"310.756"` (period) and `"+3107564789"` (leading plus) now match phone branches on POS and admin (previously fell through to name branch and returned nothing).
+- **POS + jobs + photos name branch gains email column**. Typing `"omar@gmail.com"` on POS customer lookup now finds Omar; same for admin jobs and photos filters. Previously name branches were `first_name + last_name` only.
+
+### Migration — dead index dropped
+
+New migration: `supabase/migrations/20260422000001_drop_idx_customers_search.sql`
+
+```sql
+DROP INDEX IF EXISTS idx_customers_search;
+```
+
+The `idx_customers_search` GIN `to_tsvector` index from migration 36 was never consulted by any query. All customer searches use per-column ILIKE or the new utility, neither of which can use a tsvector index. Re-add with `pg_trgm` when volume growth justifies it (see audit §3a + Open Q6).
+
+**Apply manually in Supabase SQL Editor after deploy.**
+
+### Explicitly NOT migrated this session
+
+Per Session 42H audit scope split:
+
+**42H-rewrite-2 (next):**
+- `src/app/api/admin/global-search/route.ts` — customer block still has inline logic. Helpers will be imported from `src/lib/search/tokenize.ts`; customer block becomes `searchCustomers(...)`.
+- `src/app/admin/transactions/page.tsx` — direct-Supabase customer lookup.
+- `src/app/admin/marketing/compliance/page.tsx` — direct-Supabase opt-out picker.
+
+**42H-followup:**
+- `src/app/admin/appointments/page.tsx` — client-side single `.includes()` filter.
+- `src/lib/quotes/quote-service.ts` — post-fetch client filter.
+- `src/app/api/messaging/conversations/route.ts` — post-fetch client filter.
+
+### Quality gates
+
+- Typecheck: clean (`npx tsc --noEmit` → exit 0).
+- Tests: 393/393 passing across 21 files (48 new in `src/lib/search/__tests__/`).
+- URL verification: `grep` in `src/app/admin/photos/page.tsx` shows `/api/admin/customers/search?q=...` (not the broken bare-customers URL).
+- Utility imports: 4 API route files import `searchCustomers` (global-search intentionally not migrated this session).
+
+---
+
 ## feat(ui): Quick Edit drawer X buttons + POS Clear button always enabled — 2026-04-22 (Session 42G)
 
 Two small independent UX tweaks.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { searchCustomers } from '@/lib/search/customer-search';
 
 export async function GET(request: NextRequest) {
   const employee = await getEmployeeFromSession(request);
@@ -31,24 +32,13 @@ export async function GET(request: NextRequest) {
   // If searching by customer name/phone, find matching customer IDs first
   let searchCustomerIds: string[] | null = null;
   if (search && search.length >= 2) {
-    const isPhoneSearch = /^[\d\s\-\(\)\+]+$/.test(search);
-    if (isPhoneSearch) {
-      const digits = search.replace(/\D/g, '');
-      const { data: customers } = await admin
-        .from('customers')
-        .select('id')
-        .like('phone', `%${digits}%`);
-      searchCustomerIds = customers?.map((c) => c.id) || [];
-    } else {
-      const { data: customers } = await admin
-        .from('customers')
-        .select('id')
-        .or(
-          `first_name.ilike.%${search}%,last_name.ilike.%${search}%`
-        );
-      searchCustomerIds = customers?.map((c) => c.id) || [];
-    }
-    // If no customers matched, return empty
+    const { data: customers } = await searchCustomers(admin, search, {
+      select: 'id',
+      limit: 500,
+      broadLimit: 500,
+      includeDeleted: true,
+    });
+    searchCustomerIds = customers.map((c) => c.id);
     if (searchCustomerIds.length === 0) {
       return NextResponse.json({ jobs: [], total: 0, page, limit });
     }

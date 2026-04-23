@@ -941,6 +941,14 @@ src/lib/quotes/quote-service.ts
 src/lib/quotes/send-service.ts
 ```
 
+### Search
+```
+src/lib/search/customer-search.ts
+src/lib/search/tokenize.ts
+src/lib/search/__tests__/customer-search.test.ts
+src/lib/search/__tests__/tokenize.test.ts
+```
+
 ### SEO
 ```
 src/lib/seo/json-ld.ts

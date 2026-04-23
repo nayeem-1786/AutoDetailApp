@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { searchCustomers } from '@/lib/search/customer-search';
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,16 +39,18 @@ export async function GET(request: NextRequest) {
     if (search && search.length >= 2) {
       const term = `%${search}%`;
 
-      // Search customers by name
-      const { data: customers } = await supabase
-        .from('customers')
-        .select('id')
-        .or(`first_name.ilike.${term},last_name.ilike.${term}`)
-        .limit(100);
+      // Search customers by name / phone / email — unified via shared util.
+      const { data: customers } = await searchCustomers(supabase, search, {
+        select: 'id',
+        limit: 100,
+        broadLimit: 100,
+        includeDeleted: true,
+      });
+      searchCustomerIds = customers.map((c) => c.id);
 
-      searchCustomerIds = (customers || []).map((c) => c.id);
-
-      // Search vehicles by year/make/model
+      // Search vehicles by year/make/model — still per-column (out of scope
+      // for the customer-search utility; 42H-followup can extract a vehicle
+      // search utility if needed).
       const { data: vehicles } = await supabase
         .from('vehicles')
         .select('id')
