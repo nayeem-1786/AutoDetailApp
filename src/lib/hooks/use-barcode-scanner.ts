@@ -35,6 +35,17 @@ interface UseBarcodeOptions {
  * end with Enter (which clears this timer and dispatches via onScan) well
  * before the release timer can fire, so their characters never leak into
  * the input — including the first char of the burst.
+ *
+ * The `data-barcode-scan-target="input"` attribute serves two
+ * documented use cases:
+ * 1. Scan-consumer inputs that WANT to receive scanned chars
+ *    as typed text (e.g., Quick Edit drawer's Barcode field —
+ *    staff rescan here to update the stored barcode).
+ * 2. Inputs with controlled-reformat onChange transforms
+ *    (e.g., formatPhoneInput) that suffer cursor-reorder
+ *    regressions from the release-as-typing path. This is a
+ *    workaround pending the scanner hook rewrite documented
+ *    at docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md.
  */
 export function useBarcodeScanner({
   onScan,

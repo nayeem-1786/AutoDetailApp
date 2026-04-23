@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-21 (Session 42E — Search input clear-X standardization)
+> **Last updated:** 2026-04-21 (Session 42F-hotfix — POS customer-lookup phone input attribute opt-out)
 
 ---
 
@@ -1246,6 +1246,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         transactions/
                                                         vehicle-create-dialog.tsx
                                                         vehicle-selector.tsx
+                                                        __tests__/customer-lookup.test.tsx
                                                         __tests__/service-detail-dialog.test.tsx
                                                         __tests__/service-pricing-picker.test.tsx
                                                         utils/__tests__/pricing.test.ts
