@@ -368,22 +368,34 @@ before 42F-rewrite begins.
    window.__scanLog.slice(1).map((r, i) => Math.round(r.t - window.__scanLog[i].t))
    ```
 
-### Scenarios + target data
+### Scenarios + measured data
 
-| # | Scenario | Expected | Result (fill in) |
-|---|---|---|---|
-| A | USB scanner, 12-digit barcode | Tight burst, ~10–30 ms gaps | min __, max __, median __ |
-| B | iPad + BT scanner, same 12-digit barcode | Looser, ~20–60 ms gaps | min __, max __, median __ |
-| C | Fast human typing: `0123456789` as fast as you can | ~80–200 ms gaps | min __, max __, median __ |
-| D | Slow-deliberate typing same 10 digits | ~200–400 ms gaps | min __, max __, median __ |
+Measurements run 2026-04-22 on MBP with BT scanner paired directly.
 
-### Decision point
+**Test A — BT scanner, 12-digit barcode**
+- Gaps: `[7, 1, 7, 1, 8, 10, 7, 8, 27, 6, 0, 8]` ms
+- min: **0 ms** | max: **27 ms** | median: **7 ms**
 
-Compare the **max of B** against the **min of C**. If there's clean
-separation (e.g. B max = 55 ms, C min = 80 ms), the threshold goes in the
-gap. If they overlap — i.e. a fast typist on the iPad keyboard can rival
-the BT scanner's slowest emit — we need the fallback strategy in §8d
-("no clean separation" branch).
+**Test B — Fast typing `0123456789`**
+- Gaps: `[144, 187, 185, 241, 177, 217, 209, 296, 401]` ms
+- min: **144 ms** | max: **401 ms** | median: **209 ms**
+
+**Test C — Slow-deliberate typing (Backspace + `0123456789`)**
+- Gaps: `[1906, 790, 672, 994, 667, 876, 578, 694, 772, 890]` ms
+- min: **578 ms** | max: **1906 ms** | median: **790 ms**
+
+### Decision
+
+**Threshold locked 2026-04-22:**
+- `scanBurstMs = 50 ms`
+- `snapshotGapMs = 300 ms`
+
+Scanner max (27 ms) vs typing min (144 ms) = **117 ms clean empty band**.
+No overlap, no fallback strategy needed. The 50 ms threshold is above the
+scanner max (27 ms + margin) and well below fast-typing min (144 ms).
+The 300 ms snapshot gap is above the scanner's total burst duration
+(~100 ms for 12 chars) and below slow-typing min (578 ms), correctly
+marking "new burst window" without capturing mid-typing snapshots.
 
 ---
 
@@ -474,12 +486,22 @@ Scan-detected path:
      (Prevents accidental form submission; leaves other handlers alone.)
   b. Compose barcode = tail.map(k => k.key).join('').trim()
   c. Reset log and snapshot.
-  d. If focused element is a text-input-like element (input/textarea/
-     contenteditable):
-       If it carries data-scan-consumer: do nothing. Chars stay. (Opt-in.)
-       Else: restore from snapshot — native setter → 'input' event.
-  e. Emit window event `pos-scanner-detected`.
-  f. Call onScan(barcode).
+  d. If focused element is a text-input-like element AND carries
+     data-scan-consumer (opt-in for Quick Edit Barcode field):
+       - Chars stay in the input (no restore).
+       - Do NOT dispatch pos-scanner-detected.
+       - Do NOT call onScan.
+       - Return — the scan-consumer has "consumed" the scan by letting
+         the chars land; no page-level handler should fire.
+  e. Else, if focused element is a text-input-like element:
+       Restore from snapshot — native setter → 'input' event.
+  f. Emit window event `pos-scanner-detected`.
+  g. Call onScan(barcode).
+
+The scan-consumer early return in step (d) is the Quick Edit drawer
+semantics: "Barcode input wants the chars to land; page-level scanner
+must not also dispatch (or the drawer would reopen with a different
+product)." This matches §10a test 8 and §7e's stated purpose.
 
 Typing-terminated-by-Enter path:
   a. No scan detected. Reset log and snapshot.
@@ -621,13 +643,23 @@ on any fast-gap Enter-terminated burst anywhere on the page.
 
 ### admin/catalog/products page
 
+Behaviour change: **minor.** Previously `requireTargetAttribute: false`
+meant any Enter with ≥ `minLength` buffered chars fired onScan —
+including a barcode manually typed character-by-character. Under the new
+timing-based detection, slow-typed Enter no longer dispatches onScan.
+Manual barcode entry via keyboard on this page will no longer open the
+Quick Edit drawer. Acceptable — manual barcode typing is not a common
+workflow here; the Quick Edit drawer itself is available via row click.
 - Attribute removal: `data-barcode-scan-target="input"` on the Quick Edit
   drawer Barcode input (line 326) → replace with `data-scan-consumer=""`.
-- onScan behaviour unchanged: lookup → open drawer.
+- onScan behaviour unchanged for **actual scans**: lookup → open drawer.
 
 ### admin/inventory/counts/[id] page
 
-Behaviour change: **none intended.**
+Behaviour change: **minor.** Same timing-based gate as above — slow-typed
+barcode + Enter no longer auto-increments via the scan path. Acceptable:
+the page has an inline qty-edit flow for manual corrections; the scan
+path exists specifically to handle physical scanner bursts.
 - The onScan handler's "blur any `data-qty-edit-input` element first"
   logic is still correct and still needed — that attribute is
   page-local coordination and the new hook doesn't change how it works.
@@ -878,29 +910,31 @@ Split into multiple commits for bisectability:
 
 ## 12. Open Questions for Review
 
-1. **Phase 2 measurements** — please run the four scenarios in §6 and
-   paste numbers in. Implementation is blocked on this.
-2. **scanBurstMs default** — proposed 50 ms pending measurements. If
-   data says 60 or 70 is needed, adjust in 42F-rewrite PR.
-3. **data-scan-consumer name** — happy with that name? Alternatives:
+1. **data-scan-consumer name** — happy with that name? Alternatives:
    `data-scanner-owner`, `data-scan-passthrough`. Naming bikeshed, but
    the attribute's lifetime is "forever" since it's load-bearing for
    Quick Edit.
-4. **POS search bar's `pos-scanner-detected` event** — keep or remove?
+2. **POS search bar's `pos-scanner-detected` event** — keep or remove?
    Currently the search bar listens for it to clear itself after a
    scan. Under the new hook, scans that start focused on the search bar
    would have their chars landed-then-restored natively — the search bar
    effectively self-clears via the restore. The custom event becomes
    redundant. Recommendation: **remove the event dispatch and the
    listener in 42F-migration**; document the removal.
-5. **Should the new hook support contenteditable surfaces?** Current
+3. **Should the new hook support contenteditable surfaces?** Current
    hook explicitly bails on them. None of the 5 consumers use them. We
    can keep the bail-out for now.
-6. **Any other non-consumer pages that might mount the hook in the
+4. **Any other non-consumer pages that might mount the hook in the
    future?** Inventory count *list* page currently does not; planning
    docs for Phase 15 (Store Setup & Hardware) mention receipt-printer
    and copier integration — unlikely to need barcode scanning, but
    flagging so the hook's contract survives new consumers.
+
+**Resolved (2026-04-22):**
+- Phase 2 measurements — complete. See §6 Decision. `scanBurstMs=50`,
+  `snapshotGapMs=300` locked.
+- `scanBurstMs` default — 50 ms confirmed by measurements (scanner max
+  27 ms + 23 ms margin; typing min 144 ms).
 
 ---
 
