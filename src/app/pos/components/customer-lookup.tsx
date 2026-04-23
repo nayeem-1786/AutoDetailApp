@@ -115,13 +115,6 @@ export function CustomerLookup({
           {...enterSubmit}
           placeholder="Search by name or phone..."
           autoFocus
-          // data-barcode-scan-target="input" serves dual purposes:
-          // 1. opts this input OUT of the scanner hook's release-as-typing path
-          //    (prevents cursor-reorder regression from Session 40C)
-          // 2. preserves native typing behavior with formatPhoneInput controlled-reformat
-          // See docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md for the planned
-          // architectural fix.
-          data-barcode-scan-target="input"
           className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 dark:focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700"
         />
         {loading && (

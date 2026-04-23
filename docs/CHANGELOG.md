@@ -4,40 +4,6 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix(pos): customer-lookup phone input caret-reorder regression — 2026-04-21 (Session 42F-hotfix)
-
-Fixed: POS customer-lookup phone input caret-reorder bug. Typing a phone number now produces the expected formatted output instead of reordering digits around the opening paren.
-
-**Root cause:** scanner hook's release-as-typing path (added Session 40C, commit `a521c9d7`) dispatches buffered chars into the focused input via a native value setter + synthetic `input` event, then `setSelectionRange(start + ch.length)`. That cursor math is computed before React's controlled `onChange` runs and reformats the value — so when `formatPhoneInput` prepends `(` to a 1–2 digit value, the cursor is left between the `(` and the existing digit. Each subsequent release inserts at that stale position, producing the `3 → 31 → 103 → ...` reorder symptom.
-
-**Hotfix:** added `data-barcode-scan-target="input"` to the phone input in `src/app/pos/components/customer-lookup.tsx`, opting this one input out of the scanner hook's buffer/release path via the existing Session 42D-interlude early-return. Keystrokes flow natively to React; `formatPhoneInput` sees the same input stream it was originally designed for.
-
-**Scope:** surgical, one attribute, one input. The scanner hook's behavior is unchanged (JSDoc only added). An inline comment on the phone input and an appended JSDoc block on `useBarcodeScanner` document the attribute's dual-purpose semantics (scan-consumer inputs that WANT scanned chars as typed text vs. inputs that need to bypass the release-as-typing cursor bug).
-
-**Broader architectural fix** (observe-don't-capture rewrite of the scanner hook) is specced in `docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md` and deferred to a future dedicated session.
-
-**Tests:** 1 new test in `src/app/pos/components/__tests__/customer-lookup.test.tsx` asserting the phone input carries the attribute. 338 → 339 passing. `tsc --noEmit` clean. Existing scanner hook tests (8) and 42D-interlude override tests (3) continue to validate the underlying mechanism.
-
-**Files changed:**
-- `src/app/pos/components/customer-lookup.tsx` (+attribute + inline comment)
-- `src/lib/hooks/use-barcode-scanner.ts` (JSDoc-only; no behavior change)
-- `src/app/pos/components/__tests__/customer-lookup.test.tsx` (new)
-- `docs/dev/FILE_TREE.md` (index new test file)
-- `docs/CHANGELOG.md` (this entry)
-
-### Known-latent inputs
-
-Same release-as-typing cursor mechanism affects these; pending 42F scanner hook rewrite:
-
-- `src/app/pos/components/customer-create-dialog.tsx` — phone input with `formatPhoneInput`
-- `src/app/pos/components/coupon-input.tsx` — code input (likely uppercase-reformat)
-- `src/app/pos/components/checkout/*` — currency inputs (cash tender, tip, split-payment allocations)
-- `src/app/pos/components/vehicle-create-dialog.tsx` — VIN/year inputs (if they reformat)
-
-These inputs are **not fixed** in this hotfix. Workaround if the bug surfaces on any of them: add `data-barcode-scan-target="input"` to the affected input element. Proper fix: 42F scanner hook rewrite (see `docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md`).
-
----
-
 ## feat(admin): standardize search clear-X across admin pages — 2026-04-21 (Session 42E)
 
 Session 42D-patch flagged inconsistent clear-X affordances across admin search inputs as a follow-up for 42E. Phase 0 audit found the shared `SearchInput` component at `src/components/ui/search-input.tsx` already renders a conditional `<X>` button when `value.length > 0` and is already consumed by `TableToolbar` — every admin list page routed through the toolbar was already compliant. The gap was 11 holdout pages hand-rolling a bare `<input>` / `<Input>` with a `Search` icon and no clear affordance. Third-category check (bare input + hand-rolled clear-X pattern) returned zero hits, confirming the 11 holdouts as the complete migration scope.
