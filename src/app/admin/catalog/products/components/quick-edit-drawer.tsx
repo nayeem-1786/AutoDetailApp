@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
+import { X } from 'lucide-react';
 import { SlideOver } from '@/components/ui/slide-over';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -13,6 +14,16 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { formatCurrency } from '@/lib/utils/format';
 import type { Product } from '@/lib/supabase/types';
+
+// Shared props for the in-input clear-X button. `onMouseDown` preventDefault
+// is load-bearing: without it, clicking the button steals focus from the
+// input BEFORE our onClick fires, which triggers the input's onBlur handler
+// with the pre-click value — the onBlur save path would then persist the
+// not-yet-cleared value. preventDefault on mousedown keeps focus on the
+// input; onClick then mutates state; onBlur fires naturally when the user
+// next taps away.
+const CLEAR_BUTTON_CLASS =
+  'absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ui-text-dim hover:text-ui-text-muted';
 
 interface QuickEditDrawerProps {
   open: boolean;
@@ -315,16 +326,30 @@ export function QuickEditDrawer({
           </div>
 
           <FormField label="Barcode" htmlFor="quick-edit-barcode">
-            <Input
-              id="quick-edit-barcode"
-              type="text"
-              value={barcodeStr}
-              onChange={(e) => setBarcodeStr(e.target.value)}
-              onBlur={handleBarcodeBlur}
-              placeholder="Scan or type…"
-              autoComplete="off"
-              data-barcode-scan-target="input"
-            />
+            <div className="relative">
+              <Input
+                id="quick-edit-barcode"
+                type="text"
+                value={barcodeStr}
+                onChange={(e) => setBarcodeStr(e.target.value)}
+                onBlur={handleBarcodeBlur}
+                placeholder="Scan or type…"
+                autoComplete="off"
+                data-barcode-scan-target="input"
+                className="pr-8"
+              />
+              {barcodeStr && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setBarcodeStr('')}
+                  className={CLEAR_BUTTON_CLASS}
+                  aria-label="Clear Barcode"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </FormField>
 
           <FormField label="Price" htmlFor="quick-edit-price">
@@ -335,12 +360,23 @@ export function QuickEditDrawer({
                 type="text"
                 inputMode="decimal"
                 pattern="[0-9]*\.?[0-9]*"
-                className="pl-7"
+                className="pl-7 pr-8"
                 value={priceStr}
                 onChange={(e) => setPriceStr(e.target.value)}
                 onBlur={handlePriceBlur}
                 placeholder="0.00"
               />
+              {priceStr && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setPriceStr('')}
+                  className={CLEAR_BUTTON_CLASS}
+                  aria-label="Clear Price"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
           </FormField>
 
@@ -353,38 +389,82 @@ export function QuickEditDrawer({
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*\.?[0-9]*"
-                  className="pl-7"
+                  className="pl-7 pr-8"
                   value={costStr}
                   onChange={(e) => setCostStr(e.target.value)}
                   onBlur={handleCostBlur}
                   placeholder="0.00"
                 />
+                {costStr && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setCostStr('')}
+                    className={CLEAR_BUTTON_CLASS}
+                    aria-label="Clear Cost"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             </FormField>
           )}
 
           <FormField label="Reorder Threshold" htmlFor="quick-edit-threshold" description="Alert when stock drops to this level. Leave blank for no alert.">
-            <Input
-              id="quick-edit-threshold"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={thresholdStr}
-              onChange={(e) => setThresholdStr(e.target.value)}
-              onBlur={handleThresholdBlur}
-              placeholder="e.g. 5"
-            />
+            <div className="relative">
+              <Input
+                id="quick-edit-threshold"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={thresholdStr}
+                onChange={(e) => setThresholdStr(e.target.value)}
+                onBlur={handleThresholdBlur}
+                placeholder="e.g. 5"
+                className="pr-8"
+              />
+              {thresholdStr && (
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setThresholdStr('')}
+                  className={CLEAR_BUTTON_CLASS}
+                  aria-label="Clear Reorder Threshold"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </FormField>
 
           <FormField label="Quantity on Hand" htmlFor="quick-edit-qty">
-            <Input
-              id="quick-edit-qty"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={qtyStr}
-              onChange={(e) => setQtyStr(e.target.value)}
-            />
+            <div className="relative">
+              <Input
+                id="quick-edit-qty"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={qtyStr}
+                onChange={(e) => setQtyStr(e.target.value)}
+                className="pr-8"
+              />
+              {qtyStr && (
+                // Semantic differs from other fields: qty has no onBlur save
+                // (qty changes require a reason via the amber adjustment
+                // form). X here CANCELS an in-progress edit — setting the
+                // field to empty hides the amber adjustment box and keeps
+                // the saved DB qty untouched.
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setQtyStr('')}
+                  className={CLEAR_BUTTON_CLASS}
+                  aria-label="Cancel quantity edit"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </FormField>
 
           {qtyChanged && (

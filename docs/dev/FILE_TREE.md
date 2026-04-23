@@ -3,7 +3,7 @@
 > **Purpose:** Exact file paths for every route, page, lib module, component, and migration.
 > Claude Code prompts MUST reference this file instead of guessing paths.
 >
-> **Last updated:** 2026-04-22 (Session 42F-rewrite — scanner hook observe-don't-capture)
+> **Last updated:** 2026-04-22 (Session 42G — drawer X buttons + POS Clear button gate)
 
 ---
 
@@ -1249,6 +1249,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         __tests__/customer-lookup.test.tsx
                                                         __tests__/service-detail-dialog.test.tsx
                                                         __tests__/service-pricing-picker.test.tsx
+                                                        __tests__/ticket-actions.test.tsx
                                                         utils/__tests__/pricing.test.ts
                                                         quotes/
 ```

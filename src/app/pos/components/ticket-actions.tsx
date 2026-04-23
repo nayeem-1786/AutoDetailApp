@@ -26,10 +26,11 @@ export function TicketActions({ heldCount = 0, onRequireVehicle }: TicketActions
   const [processingLoyalty, setProcessingLoyalty] = useState(false);
 
   const hasItems = ticket.items.length > 0;
+  const hasAnyTicketState = hasItems || !!ticket.customer || !!ticket.vehicle;
   const isFullyPaidByLoyalty = hasItems && ticket.total === 0 && ticket.loyaltyDiscount > 0;
 
   function handleClearClick() {
-    if (!hasItems) return;
+    if (!hasAnyTicketState) return;
     setConfirmClearOpen(true);
   }
 
@@ -136,7 +137,7 @@ export function TicketActions({ heldCount = 0, onRequireVehicle }: TicketActions
         <Button
           variant="outline"
           className="flex-1"
-          disabled={!hasItems || !canCreateTickets}
+          disabled={!hasAnyTicketState || !canCreateTickets}
           onClick={handleClearClick}
           title={!canCreateTickets ? 'You do not have permission to create new tickets' : undefined}
         >
@@ -204,10 +205,10 @@ export function TicketActions({ heldCount = 0, onRequireVehicle }: TicketActions
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-2xl dark:shadow-gray-950/60">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Clear all items?
+              Clear ticket?
             </h3>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              This will remove all items from the current ticket.
+              This will remove all items, customer, and vehicle from the current ticket.
             </p>
             <div className="mt-6 flex gap-3">
               <button

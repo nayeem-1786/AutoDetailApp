@@ -125,7 +125,7 @@ describe('QuickEditDrawer', () => {
     const barcodeInput = screen.getByLabelText('Barcode') as HTMLInputElement;
     const priceInput = screen.getByLabelText('Price') as HTMLInputElement;
     const costInput = screen.getByLabelText('Cost') as HTMLInputElement;
-    const thresholdInput = screen.getByLabelText(/Reorder Threshold/) as HTMLInputElement;
+    const thresholdInput = screen.getByLabelText(/^Reorder Threshold$/) as HTMLInputElement;
     const qtyInput = screen.getByLabelText('Quantity on Hand') as HTMLInputElement;
 
     expect(barcodeInput.value).toBe('B-1');
@@ -145,7 +145,7 @@ describe('QuickEditDrawer', () => {
     );
     expect(screen.queryByLabelText('Cost')).toBeNull();
     expect(screen.getByLabelText('Price')).toBeDefined();
-    expect(screen.getByLabelText(/Reorder Threshold/)).toBeDefined();
+    expect(screen.getByLabelText(/^Reorder Threshold$/)).toBeDefined();
     expect(screen.getByLabelText('Quantity on Hand')).toBeDefined();
   });
 

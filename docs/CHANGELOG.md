@@ -4,6 +4,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(ui): Quick Edit drawer X buttons + POS Clear button always enabled — 2026-04-22 (Session 42G)
+
+Two small independent UX tweaks.
+
+### Quick Edit drawer — in-input clear-X affordance on 5 text fields
+
+`src/app/admin/catalog/products/components/quick-edit-drawer.tsx` — Barcode, Price, Cost, Reorder Threshold, and Quantity on Hand now each render a lucide `X` icon-button at the right edge when the field is non-empty. Tap X → field clears. Matches the shared `SearchInput` component's X position and sizing (`right-2`, `h-3.5 w-3.5`, same hover colors) for visual consistency, but is hand-rolled per field rather than adopting `SearchInput` (these are numeric/controlled-format inputs, not search inputs).
+
+**Focus-preservation pattern**: each X button uses `onMouseDown={(e) => e.preventDefault()}`. Without this, tapping the button steals focus from the input — which triggers the input's `onBlur` handler with the pre-click value, causing the auto-save path to persist a value the user was about to clear. `preventDefault` on mousedown cancels the focus change; `onClick` then mutates state; the next manual focus-out fires `onBlur` with the now-empty state and the existing save/restore logic takes over.
+
+**Per-field semantics:**
+- **Barcode**: clears to empty string. On next blur, `handleBarcodeBlur` persists `null` (field is nullable) with the standard optimistic + undo-toast flow.
+- **Price**: clears display only. `parsePrice('')` returns null → existing "invalid → restore to saved" path in `handlePriceBlur` bounces the field back to its saved value on blur. No DB write.
+- **Cost**: same as Price.
+- **Reorder Threshold**: clears and persists as `null` on blur via `handleThresholdBlur`'s explicit `raw === '' ? null` branch.
+- **Quantity on Hand**: different semantic — there is no auto-save on qty (changes require a Reason category via the amber adjustment form). X on qty CANCELS an in-progress edit: `setQtyStr('')` → `parseInteger('')` returns null → `qtyChanged` goes false → amber adjustment box disappears. Saved DB qty is untouched. Inline comment in the component explains this deviation.
+
+**Note:** `products.retail_price` is nullable in the DB schema (per `docs/dev/DB_SCHEMA.md:139`). A truer "clear to null" semantic for Price is possible as future work — would require teaching `handlePriceBlur` to accept empty as null. `products.cost_price` is `NOT NULL DEFAULT 0` so cost is not a candidate for null-clear.
+
+### POS Clear button — enables when customer or vehicle is selected
+
+`src/app/pos/components/ticket-actions.tsx` — previously disabled unless `ticket.items.length > 0`, which left staff with no way to clear a mistakenly-selected customer or vehicle without first adding and removing an item. New gate:
+
+```ts
+const hasAnyTicketState = hasItems || !!ticket.customer || !!ticket.vehicle;
+disabled={!hasAnyTicketState || !canCreateTickets}
+```
+
+`handleClearClick()`'s defensive `if (!hasItems) return;` is relaxed to `if (!hasAnyTicketState) return;` — the `disabled` prop is the primary gate; the function-level guard stays as defense in depth.
+
+**Modal copy updated** for accuracy across cases:
+- Title: "Clear all items?" → "Clear ticket?"
+- Body: "This will remove all items from the current ticket." → "This will remove all items, customer, and vehicle from the current ticket."
+
+The underlying `CLEAR_TICKET` reducer action already resets the full state (verified: `src/app/pos/context/ticket-reducer.ts:592` returns `{...initialTicketState}` which has `customer: null, vehicle: null`) — no reducer change required. All 8 existing `CLEAR_TICKET` dispatch sites keep working as before.
+
+### Tests
+
+- New: `src/app/pos/components/__tests__/ticket-actions.test.tsx` — 4 tests asserting the Clear button's disabled state across the four combinations of customer/vehicle/items presence.
+- Modified: `quick-edit-drawer.test.tsx` — `/Reorder Threshold/` regex tightened to `/^Reorder Threshold$/` so it no longer collides with the new X button's `aria-label="Clear Reorder Threshold"`.
+- Drawer X-buttons themselves: no tests (pure UX; no logic beyond "click clears the field"). Quality covered by typecheck + existing quick-edit-drawer tests that exercise the save paths (unchanged behavior on blur).
+
+**341 → 345 passing. `tsc --noEmit` clean.**
+
+**Files changed:**
+- `src/app/admin/catalog/products/components/quick-edit-drawer.tsx`
+- `src/app/pos/components/ticket-actions.tsx`
+- `src/app/pos/components/__tests__/ticket-actions.test.tsx` (new)
+- `src/app/admin/catalog/products/components/__tests__/quick-edit-drawer.test.tsx` (regex tightening)
+- `docs/dev/FILE_TREE.md`
+- `docs/CHANGELOG.md` (this entry)
+
+---
+
 ## feat(scanner): observe-don't-capture hook rewrite — 2026-04-22 (Session 42F-rewrite)
 
 Root-cause rewrite of `src/lib/hooks/use-barcode-scanner.ts` per the design in `docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md`. The capture-first model (speculatively `preventDefault` every printable key, buffer, then release-as-typing on timeout) is replaced with an observe-don't-capture model:
