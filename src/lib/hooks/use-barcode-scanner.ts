@@ -2,155 +2,260 @@
 
 import { useEffect, useRef } from 'react';
 
-interface UseBarcodeOptions {
-  /** Callback when a barcode is scanned */
+interface UseBarcodeScannerOptions {
+  /** Called when a scan is detected (fast burst + Enter terminator). */
   onScan: (barcode: string) => void;
-  /** Max time between keystrokes in ms (Bluetooth scanners need ~150ms) */
-  maxKeystrokeGap?: number;
-  /** Minimum barcode length to consider valid */
-  minLength?: number;
-  /** Whether scanning is enabled */
+
+  /** Hook mounts its listener only when true. Default: true. Reactive. */
   enabled?: boolean;
+
+  /** Minimum chars in the detected burst. Default: 4. */
+  minLength?: number;
+
   /**
-   * When true (default), Enter only fires `onScan` if the focused element
-   * carries `data-barcode-target`. This prevents the scanner from eating
-   * Enter in unrelated inputs (e.g. POS cash/tip fields).
-   *
-   * Set to false on pages that want any rapid keystroke burst to trigger
-   * a scan regardless of focus (e.g. a list view with no dedicated input).
+   * Max inter-key gap (ms) for adjacent chars to count as part of one scan
+   * burst. Default: 50. Hardware-validated 2026-04-22: BT scanner max gap
+   * 27 ms, fast typing min gap 144 ms, 117 ms clean separation band. See
+   * docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md §6.
+   */
+  scanBurstMs?: number;
+
+  /**
+   * Gap above which a new "burst window" begins — any inter-key gap above
+   * this triggers a fresh pre-burst snapshot of the focused input. Default:
+   * 300 (comfortably above the slowest scanner, well below slow typing).
+   */
+  snapshotGapMs?: number;
+
+  /**
+   * Ring-buffer cap for recent keystrokes. Default: 32. Log is capped at
+   * `maxBarcodeLength + 8` to tolerate the occasional dropped Enter.
+   */
+  maxBarcodeLength?: number;
+
+  /**
+   * @deprecated No-op under observe-don't-capture. Kept for source-compat
+   * during Session 42F-migration. Consumers can safely omit.
    */
   requireTargetAttribute?: boolean;
+
+  /**
+   * @deprecated Alias for `scanBurstMs` during 42F-migration. If both are
+   * provided, `scanBurstMs` wins. Remove once all consumers updated.
+   */
+  maxKeystrokeGap?: number;
+}
+
+interface KeyLogEntry {
+  key: string;
+  timestamp: number;
+}
+
+interface Snapshot {
+  el: HTMLInputElement | HTMLTextAreaElement;
+  value: string;
+  start: number;
+  end: number;
 }
 
 /**
- * Detects barcode scanner input (keyboard emulation mode).
- * Supports both USB (~10ms/char) and Bluetooth (~60-100ms/char) scanners.
+ * Barcode scanner detector (observe-don't-capture model — Session 42F).
  *
- * Works globally — attaches on `document` regardless of focus.
+ * Attaches a passive, capture-phase `keydown` listener at `document`.
+ * Printable keys are OBSERVED (logged with timestamps) and pass through
+ * NATIVELY — the hook does NOT `preventDefault` or `stopPropagation` on
+ * typing. On Enter, the hook walks the key log backwards to find the
+ * longest contiguous tail whose inter-key gaps are all `< scanBurstMs`.
+ * If that tail meets `minLength`, it's a scan: `preventDefault(Enter)`,
+ * restore the focused input to its pre-burst snapshot (erasing stray
+ * chars), and fire `onScan(barcode)`.
  *
- * Speculative-prevent strategy: every printable keydown is preventDefault'd
- * immediately and appended to a buffer. A release timer of maxKeystrokeGap
- * is (re)scheduled. If it fires with any buffered characters, they are
- * synthesized into the focused input as human typing. Scan bursts always
- * end with Enter (which clears this timer and dispatches via onScan) well
- * before the release timer can fire, so their characters never leak into
- * the input — including the first char of the burst.
+ * Scan-consumer opt-in: if the focused element carries `data-scan-consumer`
+ * (or, transitionally, `data-barcode-scan-target="input"`), scans are
+ * "consumed" by that input — chars stay, no restore, no event dispatch,
+ * no `onScan` call. Enter is still preventDefault'd to suppress form
+ * submission. Used by the Quick Edit drawer's Barcode field.
+ *
+ * Design notes:
+ * - Typing flows natively → no cursor-reorder bugs with controlled-reformat
+ *   inputs (formatPhoneInput, currency formatters, etc.). Fixes the Session
+ *   42F motivating regression.
+ * - Scan detection is purely timing-based → no per-input opt-in required.
+ * - Capture phase → the Enter preventDefault wins against browser
+ *   form-submission before bubble-phase handlers can commit.
+ * - NO stopPropagation → React onKeyDown handlers (useEnterSubmit, etc.)
+ *   still observe Enter. Intentional design choice; consumers that need
+ *   stricter isolation can add their own guards.
+ *
+ * Behavior changes from the pre-42F capture-first model:
+ * - `requireTargetAttribute: false` consumers: slow-typed Enter no longer
+ *   dispatches onScan. Scan detection is strictly timing-gated.
+ * - `data-barcode-target` focus gate is retired. onScan is no longer gated
+ *   by focus attribute on Enter — only by timing.
+ *
+ * See docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md for the full design,
+ * hardware timing measurements, and per-consumer migration semantics.
  */
-export function useBarcodeScanner({
-  onScan,
-  maxKeystrokeGap = 150,
-  minLength = 4,
-  enabled = true,
-  requireTargetAttribute = true,
-}: UseBarcodeOptions) {
-  const bufferRef = useRef('');
-  const releaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function useBarcodeScanner(options: UseBarcodeScannerOptions): void {
+  const {
+    onScan,
+    enabled = true,
+    minLength = 4,
+    snapshotGapMs = 300,
+    maxBarcodeLength = 32,
+  } = options;
+
+  // Deprecated alias resolution — read from raw options so "explicit 50" is
+  // distinguishable from "default 50" (no scanBurstMs: 50 ambiguity).
+  const scanBurstMs = options.scanBurstMs ?? options.maxKeystrokeGap ?? 50;
+
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
+
+  const logRef = useRef<KeyLogEntry[]>([]);
+  const snapshotRef = useRef<Snapshot | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
 
-    function clearReleaseTimer() {
-      if (releaseTimerRef.current !== null) {
-        clearTimeout(releaseTimerRef.current);
-        releaseTimerRef.current = null;
-      }
-    }
+    const maxLogSize = maxBarcodeLength + 8;
 
-    function releaseAsTyping(ch: string) {
-      const el = document.activeElement as
-        | HTMLInputElement
-        | HTMLTextAreaElement
-        | null;
-      if (!el || typeof (el as HTMLInputElement).value !== 'string') return;
-      // Contenteditable surfaces don't expose a `value` setter; bail out.
-      if ((el as HTMLElement).isContentEditable) return;
-
-      const start = el.selectionStart ?? el.value.length;
-      const end = el.selectionEnd ?? el.value.length;
-      const newValue = el.value.slice(0, start) + ch + el.value.slice(end);
-
-      // Native setter + bubbling input event so React's controlled-input
-      // onChange handlers fire (React overrides the `value` setter on the
-      // instance; we have to call the one on the prototype).
-      const proto = Object.getPrototypeOf(el);
-      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
-      if (nativeSetter) {
-        nativeSetter.call(el, newValue);
-      } else {
-        el.value = newValue;
-      }
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-
-      const newCursor = start + ch.length;
-      el.setSelectionRange?.(newCursor, newCursor);
-    }
-
-    function isScanTargetInput(): boolean {
+    function captureSnapshot(): void {
       const el = document.activeElement;
-      return (
-        el instanceof HTMLInputElement &&
-        el.getAttribute('data-barcode-scan-target') === 'input'
-      );
+      if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+        snapshotRef.current = null;
+        return;
+      }
+      if ((el as HTMLElement).isContentEditable) {
+        snapshotRef.current = null;
+        return;
+      }
+      snapshotRef.current = {
+        el,
+        value: el.value,
+        start: el.selectionStart ?? el.value.length,
+        end: el.selectionEnd ?? el.value.length,
+      };
     }
 
-    function handleKeyDown(e: KeyboardEvent) {
-      // Target-override: when the focused input opts in via
-      // data-barcode-scan-target="input", bypass the hook entirely and let
-      // keystrokes (including Enter) flow natively. Used by the Quick Edit
-      // drawer's Barcode field so staff can rescan without the page-level
-      // scanner hook reopening the drawer with a different product.
-      if (isScanTargetInput()) {
-        clearReleaseTimer();
-        bufferRef.current = '';
-        return;
-      }
+    function restoreSnapshot(): void {
+      const snap = snapshotRef.current;
+      if (!snap) return;
+      const proto = Object.getPrototypeOf(snap.el);
+      const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+      if (nativeSetter) nativeSetter.call(snap.el, snap.value);
+      else snap.el.value = snap.value;
+      snap.el.dispatchEvent(new Event('input', { bubbles: true }));
+      snap.el.setSelectionRange?.(snap.start, snap.end);
+    }
 
-      if (e.key === 'Enter') {
-        clearReleaseTimer();
-        const barcode = bufferRef.current.replace(/[\r\n]/g, '').trim();
-        bufferRef.current = '';
+    function isScanConsumer(el: Element | null): boolean {
+      if (!(el instanceof HTMLElement)) return false;
+      // Preferred opt-in attribute (post-42F-migration).
+      if (el.hasAttribute('data-scan-consumer')) return true;
+      // Legacy alias from Session 42D-interlude. Recognised during the
+      // 42F-rewrite → 42F-migration transition so the Quick Edit drawer's
+      // rescan flow keeps working. Remove once 42F-migration swaps the
+      // attribute on quick-edit-drawer.tsx.
+      if (el.getAttribute('data-barcode-scan-target') === 'input') return true;
+      return false;
+    }
 
-        const activeEl = document.activeElement;
-        const hasTarget = activeEl?.hasAttribute('data-barcode-target') ?? false;
-        const gatePass = requireTargetAttribute ? hasTarget : true;
-        if (barcode.length >= minLength && gatePass) {
-          e.preventDefault();
-          e.stopPropagation();
-          onScanRef.current(barcode);
-          window.dispatchEvent(new Event('pos-scanner-detected'));
+    function detectScanTail(): KeyLogEntry[] | null {
+      const log = logRef.current;
+      if (log.length < minLength) return null;
+
+      let tailStart = log.length - 1;
+      for (let i = log.length - 1; i > 0; i--) {
+        const gap = log[i].timestamp - log[i - 1].timestamp;
+        if (gap < scanBurstMs) {
+          tailStart = i - 1;
+        } else {
+          break;
         }
+      }
+      const tail = log.slice(tailStart);
+      if (tail.length < minLength) return null;
+      return tail;
+    }
+
+    function handleKeyDown(e: KeyboardEvent): void {
+      // Modifiers, arrows, function keys — flow through untouched.
+      if (e.key !== 'Enter' && e.key.length !== 1) return;
+
+      const now = performance.now();
+      const log = logRef.current;
+      const lastEntry = log[log.length - 1];
+      const gap = lastEntry ? now - lastEntry.timestamp : Infinity;
+
+      if (e.key !== 'Enter') {
+        // Refresh snapshot on a new burst window. Unconditional overwrite
+        // on gap > snapshotGapMs — a stale snapshot is always less useful
+        // than a fresh one.
+        if (gap > snapshotGapMs) {
+          captureSnapshot();
+        }
+
+        // Focus invalidation: if activeElement changed since the snapshot
+        // was captured, nothing meaningful remains to restore onto.
+        if (
+          snapshotRef.current &&
+          document.activeElement !== snapshotRef.current.el
+        ) {
+          snapshotRef.current = null;
+        }
+
+        log.push({ key: e.key, timestamp: now });
+        while (log.length > maxLogSize) log.shift();
+
+        // NO preventDefault. NO stopPropagation. Keystroke flows natively.
         return;
       }
 
-      // Modifiers, arrows, function keys — let them through unchanged.
-      if (e.key.length !== 1) return;
+      // Enter — classify as scan or typing-terminated.
+      const scanTail = detectScanTail();
 
+      if (!scanTail) {
+        // Typing-terminated Enter: reset state, let Enter flow natively
+        // (form submit, useEnterSubmit handler, newline, etc.).
+        logRef.current = [];
+        snapshotRef.current = null;
+        return;
+      }
+
+      // Scan detected.
       e.preventDefault();
-      e.stopPropagation();
-      bufferRef.current += e.key;
+      // Do NOT stopPropagation — React handlers (useEnterSubmit, etc.) can
+      // still observe this Enter. See hook JSDoc for rationale.
 
-      clearReleaseTimer();
-      releaseTimerRef.current = setTimeout(() => {
-        const buf = bufferRef.current;
-        bufferRef.current = '';
-        releaseTimerRef.current = null;
-        // Any buffered keystrokes without a following Enter are human typing,
-        // not a scan — re-dispatch them. Scanners always send Enter before
-        // this timer fires (the Enter path clears this timer), so only human
-        // typing bursts reach here. Dropping them would silently eat input.
-        if (buf.length > 0) {
-          releaseAsTyping(buf);
-        }
-      }, maxKeystrokeGap);
+      const barcode = scanTail.map((k) => k.key).join('').trim();
+
+      // Reset log before dispatch so reentrant onScan starts fresh.
+      logRef.current = [];
+
+      const consumerOptIn = isScanConsumer(document.activeElement);
+
+      if (consumerOptIn) {
+        // Scan-consumer semantics: chars stay in the input (no restore),
+        // no pos-scanner-detected dispatch, no onScan call. The focused
+        // input has "consumed" the scan by letting chars land.
+        snapshotRef.current = null;
+        return;
+      }
+
+      // Standard path: restore input, dispatch event, fire onScan.
+      restoreSnapshot();
+      snapshotRef.current = null;
+
+      window.dispatchEvent(new Event('pos-scanner-detected'));
+      onScanRef.current(barcode);
     }
 
     document.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
       document.removeEventListener('keydown', handleKeyDown, { capture: true });
-      clearReleaseTimer();
-      bufferRef.current = '';
+      logRef.current = [];
+      snapshotRef.current = null;
     };
-  }, [enabled, maxKeystrokeGap, minLength, requireTargetAttribute]);
+  }, [enabled, minLength, scanBurstMs, snapshotGapMs, maxBarcodeLength]);
 }

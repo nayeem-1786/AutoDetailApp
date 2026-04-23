@@ -4,6 +4,72 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(scanner): observe-don't-capture hook rewrite — 2026-04-22 (Session 42F-rewrite)
+
+Root-cause rewrite of `src/lib/hooks/use-barcode-scanner.ts` per the design in `docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md`. The capture-first model (speculatively `preventDefault` every printable key, buffer, then release-as-typing on timeout) is replaced with an observe-don't-capture model:
+
+- Passive, capture-phase `keydown` listener at `document`.
+- Printable keys are **observed** (logged with timestamps) — never `preventDefault`'d, never `stopPropagation`'d. Typing flows natively through React's controlled-input reconciliation.
+- On Enter, the hook walks the key log backwards for the longest contiguous tail whose inter-key gaps are all `< scanBurstMs`. If that tail meets `minLength`, it's a scan: `preventDefault(Enter)`, restore the focused input to its pre-burst snapshot, fire `onScan(barcode)`.
+- Scan-consumer opt-in (`data-scan-consumer`, with `data-barcode-scan-target="input"` as transitional alias): chars stay in the input, no restore, no event dispatch, no `onScan`. Enter is still `preventDefault`'d. Used by Quick Edit drawer's Barcode field.
+
+**Hardware-validated thresholds** (measured 2026-04-22 on MBP with paired BT scanner):
+- BT scanner inter-key gap: 0–27 ms (median 7)
+- Fast typing inter-key gap: 144–401 ms (median 209)
+- Clean 117 ms separation band → `scanBurstMs = 50 ms` (locked)
+- `snapshotGapMs = 300 ms` (above scanner burst duration, below slow-typing min of 578 ms)
+
+**Root-cause fix for:**
+- POS customer-lookup phone input caret-reorder (the motivating bug).
+- Any controlled input with a reformatting `onChange` handler (customer-create-dialog phone, coupon-input, checkout currency inputs, etc.) — all share the same latent interaction with the old release-as-typing path.
+
+**Behavior changes (intentional):**
+1. **Enter no longer uses `stopPropagation`** on scan dispatch. React `onKeyDown` handlers — including `useEnterSubmit` — now fire alongside the scanner's `onScan`. In practice, consumers with empty or short inputs (e.g., customer-lookup after restore) no-op gracefully (their guards bail on `length < 2`). Consumers needing stricter isolation must add their own guards. This is an explicit design choice (see hook JSDoc).
+2. **`requireTargetAttribute: false` consumers no longer auto-scan on slow-typed Enter.** Scan detection is strictly timing-based. Manual barcode typing + Enter on the admin products list or admin inventory counts pages will not trigger `onScan`. Acceptable — manual barcode entry is not a common workflow there; the pages' other flows are unaffected.
+3. **`data-barcode-target` focus gate retired.** Previously required on e.g. POS search bar to gate `onScan` dispatch. Now timing handles gating. Attribute still exists in a few places; will be removed in 42F-migration alongside the `requireTargetAttribute` option.
+
+**API compat (source-compat during migration window):**
+- `requireTargetAttribute` — deprecated no-op; kept so all 5 call sites compile unchanged.
+- `maxKeystrokeGap` — deprecated alias for `scanBurstMs`; resolved via `options.scanBurstMs ?? options.maxKeystrokeGap ?? 50`.
+- Legacy `data-barcode-scan-target="input"` attribute still recognized as scan-consumer opt-in. **This prevents a regression window between 42F-rewrite and 42F-migration** — Quick Edit drawer's existing attribute keeps working during the transition. Removed alongside the attribute swap in 42F-migration.
+
+**Tests** — `src/lib/hooks/__tests__/use-barcode-scanner.test.ts` fully rewritten. 13 tests (12 per audit §10a + 1 covering the legacy attribute alias):
+1. Passive typing (no preventDefault on non-Enter)
+2. Fast-burst scan + Enter (onScan fires, restore works)
+3. Slow typing + Enter (no scan, Enter flows natively)
+4. Mixed slow-then-fast (snapshot refreshes on gap > snapshotGapMs; restore returns to post-slow state)
+5. minLength respected
+6. enabled=false (listener never attaches)
+7. enabled flips mid-burst (burst discarded)
+8. `data-scan-consumer` opt-in (no onScan, no restore, Enter preventDefault'd)
+8b. Legacy `data-barcode-scan-target="input"` alias (same consumer semantics)
+9. Focus change mid-burst (snapshot invalidated; scan still detected; no restore)
+10. Non-input focused (body) — scan fires, nothing to restore
+11. Ring buffer cap (50 fast chars → log capped at 40; onScan with tail only)
+12. Cleanup on unmount (listener removed, no dispatches after)
+
+Plus a new **integration regression test** at `src/app/pos/components/__tests__/customer-lookup.test.tsx` that renders `<CustomerLookup>` inside a scanner-hook harness, types `5551234567` at 60 ms intervals, and asserts the input reaches `(555) 123-4567` with no reorder. Motivating-bug guard.
+
+**Tests: 338 → 341 passing. `tsc --noEmit` clean.**
+
+**Not in this session (42F-migration, next):**
+- Remove `data-barcode-scan-target="input"` from `quick-edit-drawer.tsx:326`; add `data-scan-consumer=""` in its place.
+- Remove `data-barcode-target` from `search-bar.tsx` and `transaction-list.tsx` (retired focus gate).
+- Remove `requireTargetAttribute: false` from admin/catalog/products and admin/inventory/counts consumers.
+- Remove `requireTargetAttribute` and `maxKeystrokeGap` deprecated options from the hook's type.
+- Remove the legacy `data-barcode-scan-target="input"` branch from `isScanConsumer`.
+
+**Files changed:**
+- `src/lib/hooks/use-barcode-scanner.ts` (full rewrite)
+- `src/lib/hooks/__tests__/use-barcode-scanner.test.ts` (full rewrite, 13 tests)
+- `src/app/pos/components/__tests__/customer-lookup.test.tsx` (new, integration regression)
+- `docs/dev/FILE_TREE.md` (index the new integration test)
+- `docs/CHANGELOG.md` (this entry)
+
+**Audit doc updated separately** in commit `a2a945ca` (§7b/§10a contradiction resolved; §6 measurements locked; §8 per-consumer behavior-change claims corrected; §12 resolved open questions removed).
+
+---
+
 ## chore: revert Session 42F-hotfix — 2026-04-22
 
 Reverted commit `9c6e7007` (Session 42F-hotfix — per-input `data-barcode-scan-target="input"` opt-out on POS customer-lookup). Owner principle: root-cause fixes only, no patches. The hotfix would have papered over a scanner-hook bug on one input while leaving the same latent defect on every other controlled-reformat input across POS.
