@@ -4,6 +4,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## chore: revert Session 42F-hotfix — 2026-04-22
+
+Reverted commit `9c6e7007` (Session 42F-hotfix — per-input `data-barcode-scan-target="input"` opt-out on POS customer-lookup). Owner principle: root-cause fixes only, no patches. The hotfix would have papered over a scanner-hook bug on one input while leaving the same latent defect on every other controlled-reformat input across POS.
+
+Proper fix is tracked in `docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md` — the observe-don't-capture rewrite of `src/lib/hooks/use-barcode-scanner.ts` that removes the release-as-typing path entirely, eliminating the cursor-reorder regression for all consumers at the source. That rewrite is the next session.
+
+Tests back to 338 passing. `tsc --noEmit` clean. Audit doc retained.
+
+---
+
 ## feat(admin): standardize search clear-X across admin pages — 2026-04-21 (Session 42E)
 
 Session 42D-patch flagged inconsistent clear-X affordances across admin search inputs as a follow-up for 42E. Phase 0 audit found the shared `SearchInput` component at `src/components/ui/search-input.tsx` already renders a conditional `<X>` button when `value.length > 0` and is already consumed by `TableToolbar` — every admin list page routed through the toolbar was already compliant. The gap was 11 holdout pages hand-rolling a bare `<input>` / `<Input>` with a `Search` icon and no clear affordance. Third-category check (bare input + hand-rolled clear-X pattern) returned zero hits, confirming the 11 holdouts as the complete migration scope.
