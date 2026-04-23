@@ -10,12 +10,30 @@ interface DialogProps {
   children: React.ReactNode;
   /** When true, backdrop click does not close the dialog (Escape key still works) */
   modal?: boolean;
+  /**
+   * Extra classes for the centering/positioning container (fixed inset-0,
+   * flex, items-center, justify-center). Use for alignment overrides — e.g.
+   * top-anchoring on narrow-height viewports to avoid the iOS keyboard.
+   */
+  wrapperClassName?: string;
+  /**
+   * Extra classes for the inner panel (rounded-lg bg-ui-bg shadow-ui-lg).
+   * Use for per-consumer size or radius tweaks.
+   */
+  contentClassName?: string;
 }
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-function Dialog({ open, onOpenChange, children, modal }: DialogProps) {
+function Dialog({
+  open,
+  onOpenChange,
+  children,
+  modal,
+  wrapperClassName,
+  contentClassName,
+}: DialogProps) {
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
 
@@ -87,14 +105,20 @@ function Dialog({ open, onOpenChange, children, modal }: DialogProps) {
       {/* Backdrop (visual only — pointer-events-none ensures touch events pass through to clickable layer) */}
       <div className="fixed inset-0 bg-black/50 pointer-events-none" />
       <div
-        className="fixed inset-0 flex items-center justify-center p-4 cursor-pointer"
+        className={cn(
+          'fixed inset-0 flex items-center justify-center p-4 cursor-pointer',
+          wrapperClassName
+        )}
         onClick={modal ? undefined : () => onOpenChange(false)}
         onTouchEnd={modal ? undefined : (e) => { e.preventDefault(); onOpenChange(false); }}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
         <div
           ref={dialogRef}
-          className="relative z-50 w-full max-w-lg rounded-lg bg-ui-bg shadow-ui-lg cursor-auto"
+          className={cn(
+            'relative z-50 w-full max-w-lg rounded-lg bg-ui-bg shadow-ui-lg cursor-auto',
+            contentClassName
+          )}
           onClick={(e) => e.stopPropagation()}
           onTouchEnd={(e) => e.stopPropagation()}
         >

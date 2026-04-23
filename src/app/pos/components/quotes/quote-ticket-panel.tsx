@@ -722,8 +722,16 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         )}
       </div>
 
-      {/* Customer Lookup Dialog */}
-      <Dialog open={customerLookupOpen} onOpenChange={setCustomerLookupOpen}>
+      {/* Customer Lookup Dialog
+        * Narrow-height wrapperClassName top-anchors the modal on iPad
+        * landscape and similar viewports so the auto-focused search input
+        * isn't hidden behind the iOS keyboard. Desktop (height > 768px)
+        * stays centered. */}
+      <Dialog
+        open={customerLookupOpen}
+        onOpenChange={setCustomerLookupOpen}
+        wrapperClassName="[@media(max-height:768px)]:items-start [@media(max-height:768px)]:pt-[25vh]"
+      >
         <DialogClose onClose={() => setCustomerLookupOpen(false)} className="hidden pointer-fine:flex items-center justify-center h-8 w-8" />
         <DialogHeader>
           <DialogTitle>Find Customer</DialogTitle>

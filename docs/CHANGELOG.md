@@ -4,6 +4,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(ui): add contentClassName/wrapperClassName props to Dialog; top-anchor customer-lookup on narrow viewports — 2026-04-23 (Session 42J)
+
+**Fixed:** POS customer-lookup modal was centered vertically, causing the lower half to be hidden behind the iOS keyboard on iPad landscape. When the modal opens and the search input auto-focuses, the iOS keyboard slides up and covers the modal's bottom half (including the results list and the "Guest"/"New Customer" action buttons).
+
+**Fix:** On narrow-height viewports (max-height ≤ 768px — covers iPad landscape, iPhones, and small laptop windows), the modal is now top-anchored at 25% from the top of the viewport. Desktop (height > 768px) stays centered.
+
+### Shared Dialog component — new optional props
+
+`src/components/ui/dialog.tsx` gains two optional string props:
+
+- `wrapperClassName?: string` — extra classes merged (via `cn()` → `twMerge`) onto the centering/positioning container (the `fixed inset-0 flex items-center justify-center p-4` div). This is where viewport-conditional alignment overrides belong.
+- `contentClassName?: string` — extra classes merged onto the inner panel (the `rounded-lg bg-ui-bg shadow-ui-lg` div). For per-consumer size or radius tweaks.
+
+Both props are optional, default behavior unchanged.
+
+### Call sites wired (2)
+
+`src/app/pos/components/ticket-panel.tsx` and `src/app/pos/components/quotes/quote-ticket-panel.tsx` — both wrap `CustomerLookup` in `Dialog`. Each now passes:
+
+```tsx
+wrapperClassName="[@media(max-height:768px)]:items-start [@media(max-height:768px)]:pt-[25vh]"
+```
+
+Tailwind v4 arbitrary-variant syntax. Compiled CSS (verified in `.next/static/css/*.css`):
+
+```css
+@media (max-height:768px){
+  .\[\@media\(max-height\:768px\)\]\:items-start{align-items:flex-start}
+  .\[\@media\(max-height\:768px\)\]\:pt-\[25vh\]{padding-top:25vh}
+}
+```
+
+`twMerge` preserved both the default `items-center` and the `[@media(max-height:768px)]:items-start` variant override on the same element — confirmed by unit test and build output.
+
+### Deferred
+
+`src/app/pos/jobs/components/job-detail.tsx` — the "Edit Customer" modal at line 1419 is **hand-rolled** (not using the shared `Dialog` component) with a bottom-sheet-on-mobile / centered-on-desktop design (`items-end justify-center ... sm:items-center`). iPad landscape exhibits the same keyboard-overlap issue via its `sm:items-center` branch. Fix is a 3–4 line local edit (swap `sm:items-center` for `sm:items-center max-h-[768px]:sm:items-start max-h-[768px]:sm:pt-[25vh]` or equivalent). **Address in a follow-up session if the user reports the bug in the Jobs → Edit Customer flow.**
+
+### Tests
+
+`src/components/ui/__tests__/dialog.test.tsx` (new, 4 tests):
+- `wrapperClassName` lands on the centering container (alongside `flex items-center`).
+- `contentClassName` lands on the inner panel (alongside `rounded-lg bg-ui-bg`).
+- Passing `wrapperClassName` with a variant override preserves the default `items-center` (twMerge doesn't strip).
+- Omitting both props leaves defaults intact.
+
+### Quality gates
+
+- Typecheck: clean (`npx tsc --noEmit` → exit 0).
+- Tests: 403/403 passing across 22 files (up from 399; +4 new in `dialog.test.tsx`).
+- Production build: `npx next build` → success. Narrow-height CSS rule verified in emitted CSS.
+
+---
+
 ## fix(pos): remove phone auto-format from customer-lookup search — 2026-04-23 (Session 42I)
 
 **Fixed:** POS customer-lookup search failed for phone-first mixed queries like `"424 omar"`. Typing digits first triggered `formatPhoneInput`, which added an opening paren at digit 1. When the user then tried to type a space to pivot to a name fragment, the formatter re-classified the input as phone-shaped (digits plus formatting chars minus the space) and the space was lost/mangled — the final query became `"(424omar"`, which the backend couldn't match. `"omar 424"` (name-first) worked because letter-first input never entered phone-format mode.
