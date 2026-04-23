@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Search, UserPlus, UserX, Loader2 } from 'lucide-react';
 import { posFetch } from '../lib/pos-fetch';
 import { Button } from '@/components/ui/button';
-import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
+import { formatPhone } from '@/lib/utils/format';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { CustomerTypeBadge } from './customer-type-badge';
 import { CustomerCompleteProfileDialog } from './customer-complete-profile-dialog';
@@ -74,20 +74,9 @@ export function CustomerLookup({
   }, searchInput.trim().length >= 2);
 
   function handleInputChange(value: string) {
-    // If it looks like a phone number, format it
-    const digits = value.replace(/\D/g, '');
-    const isPhone = digits.length > 0 && digits.length === value.replace(/[\s()-]/g, '').length;
-
-    if (isPhone) {
-      const formatted = formatPhoneInput(value);
-      setSearchInput(formatted);
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => searchCustomers(digits), 300);
-    } else {
-      setSearchInput(value);
-      clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => searchCustomers(value.trim()), 300);
-    }
+    setSearchInput(value);
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => searchCustomers(value.trim()), 300);
   }
 
   function handleSelectResult(result: SearchResult) {
@@ -102,18 +91,17 @@ export function CustomerLookup({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Phone input */}
+      {/* Search input */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
         <input
           ref={inputRef}
           type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
+          inputMode="search"
           value={searchInput}
           onChange={(e) => handleInputChange(e.target.value)}
           {...enterSubmit}
-          placeholder="Search by name or phone..."
+          placeholder="Search by name, phone, or email"
           autoFocus
           className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 pl-9 pr-3 text-sm text-gray-900 dark:text-gray-100 focus:border-gray-400 dark:focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-gray-700"
         />

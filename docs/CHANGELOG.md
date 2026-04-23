@@ -4,6 +4,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): remove phone auto-format from customer-lookup search — 2026-04-23 (Session 42I)
+
+**Fixed:** POS customer-lookup search failed for phone-first mixed queries like `"424 omar"`. Typing digits first triggered `formatPhoneInput`, which added an opening paren at digit 1. When the user then tried to type a space to pivot to a name fragment, the formatter re-classified the input as phone-shaped (digits plus formatting chars minus the space) and the space was lost/mangled — the final query became `"(424omar"`, which the backend couldn't match. `"omar 424"` (name-first) worked because letter-first input never entered phone-format mode.
+
+**Root cause:** `formatPhoneInput` was wired to a *search* input. It was designed for phone-number data-entry fields (admin customer edit, booking signup, etc.) where the user commits to entering a phone and the progressive formatter improves UX. Search is different — the user might type a name, a phone fragment, an email substring, or a mix. Input formatting fights with natural typing on these.
+
+**Fix:** `src/app/pos/components/customer-lookup.tsx` — removed `formatPhoneInput` from the search field's `handleInputChange`. The input is now plain text; whatever the user types is exactly what lands in state and is sent to the API (debounced 300ms, `.trim()`'d). The Session 42H-rewrite-1 `searchCustomers` utility already handles every phone format — `"4243532792"`, `"424-353-2792"`, `"(424) 353-2792"`, `"+1 (424) 353-2792"` all strip to the same digit string at the DB layer via `normalizePhoneDigits`.
+
+**Other changes in the same file:**
+- `inputMode` changed from `numeric` → `search` (HTML5 — surfaces the keyboard's regular Return/Go key instead of a number pad, right for a free-text search field).
+- `pattern="[0-9]*"` removed (digits-only pattern is wrong for a field that accepts any text).
+- Placeholder: `"Search by name or phone..."` → `"Search by name, phone, or email"` (reflects the name-branch email inclusion shipped in 42H-rewrite-1, decision D2).
+- Comment `{/* Phone input */}` → `{/* Search input */}`.
+- `formatPhoneInput` import removed (no other use in the file). `formatPhone` (display-only, formats results list phones) is kept.
+
+**Not touched:** `formatPhoneInput` is still used correctly in 11 other data-entry fields across admin/customers, admin/staff, admin/vendors, admin/settings, pos/customer-create-dialog, pos/receipt-options, booking, customer-auth signin, and account profile. Removal is localized to this one search input.
+
+**Tests:** `src/app/pos/components/__tests__/customer-lookup.test.tsx`
+
+- Existing Session 42F scanner-hook regression test kept with updated expected value (`'5551234567'` raw instead of `'(555) 123-4567'` — test purpose unchanged, only the formatter expectation changed because the formatter was removed).
+- 6 new tests under "search input is pass-through (Session 42I)": preserves `"424 omar"`, `"omar 424"`, `"omar cuvias"`, `"(310) 756-4789"` verbatim; sends `.trim()`'d value to API after debounce; typing `"424"` does not produce `"(424"`.
+
+**Quality gates:** `npx tsc --noEmit` → exit 0. Test suite 399/399 passing across 21 files (up from 393).
+
+---
+
 ## feat(search): unified customer-search utility + 5 endpoint migrations + photos 405 fix — 2026-04-22 (Session 42H-rewrite-1)
 
 Implements Strategy B from the Session 42H audit (`docs/audits/SEARCH_UNIFICATION_SESSION42H.md`): a shared `searchCustomers` utility that replaces 4 broken per-column ILIKE endpoints and fixes the admin-photos 405 silent failure. Root-cause fix for the motivating bug — POS customer lookup for `"omar cuvias"` now returns Omar Cuvias.
