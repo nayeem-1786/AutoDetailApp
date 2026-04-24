@@ -335,7 +335,7 @@ export function QuickEditDrawer({
                 onBlur={handleBarcodeBlur}
                 placeholder="Scan or type…"
                 autoComplete="off"
-                data-barcode-scan-target="input"
+                data-scan-consumer=""
                 className="pr-8"
               />
               {barcodeStr && (

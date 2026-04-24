@@ -4,6 +4,62 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(scanner): remove Session 42F deprecated compat shims — 2026-04-23 (Session 42F-migration)
+
+Closes out the 42F scanner hook story (rewrite `adedc326` + this migration). Removes every transitional shim the rewrite left for source-compat, plus two vestigial renders of a pre-42F attribute that no consumer has read since the rewrite shipped.
+
+### Removed (all four deprecated/vestigial items)
+
+1. **`requireTargetAttribute?: boolean`** — no-op option kept for source-compat. Interface field and JSDoc deleted from `src/lib/hooks/use-barcode-scanner.ts`.
+2. **`maxKeystrokeGap?: number`** — alias for `scanBurstMs`. Interface field, JSDoc, and the runtime alias-resolution (`options.scanBurstMs ?? options.maxKeystrokeGap ?? 50`) deleted. Destructure now reads `scanBurstMs = 50` directly.
+3. **`data-barcode-scan-target="input"`** — legacy consumer-opt-in attribute from Session 42D-interlude. Recognition branch removed from `isScanConsumer()`. The hook now accepts only `data-scan-consumer`.
+4. **`data-barcode-target`** — pre-42F focus-gate attribute that the rewrite retired but left two vestigial renders of. Removed from `src/app/pos/components/search-bar.tsx:83` and `src/app/pos/components/transactions/transaction-list.tsx:249`. Neither render was consulted by any mechanism — pure dead code.
+
+### Consumer migrations
+
+- `src/app/admin/catalog/products/page.tsx:84` — removed `requireTargetAttribute: false`.
+- `src/app/admin/inventory/counts/[id]/page.tsx:166` — removed `requireTargetAttribute: false`.
+- `src/app/admin/catalog/products/components/quick-edit-drawer.tsx:338` — swapped `data-barcode-scan-target="input"` → `data-scan-consumer=""`. This is the Quick Edit Barcode field — the one real scan-consumer in app code.
+
+### Test updates
+
+- `src/lib/hooks/__tests__/use-barcode-scanner.test.ts` — deleted Test 8b (the legacy `data-barcode-scan-target="input"` alias test). Test 8 (`data-scan-consumer`) is now the sole consumer-opt-in coverage.
+- `src/app/admin/inventory/counts/__tests__/detail-page.test.tsx:36` — removed `requireTargetAttribute?: boolean` from the scanner-hook mock type.
+- `src/app/admin/inventory/counts/__tests__/detail-page.test.tsx:428` — flipped the negative-assertion regression test from `data-barcode-scan-target` → `data-scan-consumer` (keeps the regression coverage; updates the attribute name).
+- `src/components/ui/__tests__/search-input.test.tsx:69,73` — the prop-pass-through test's example attribute swapped from `data-barcode-scan-target="input"` to `data-scan-consumer=""`. Test still verifies SearchInput forwards arbitrary `data-*` props; example is now grounded in a real live codebase attribute.
+
+### Hook JSDoc
+
+- Removed the `(or, transitionally, data-barcode-scan-target="input")` parenthetical from the consumer-opt-in description.
+- Removed the "Behavior changes from the pre-42F capture-first model" bullet block — no live pre-42F caller remains to warn.
+- Added a pointer to `docs/audits/SCANNER_MIGRATION_SESSION42F.md` (the design audit for this cleanup).
+
+### Runtime behavior
+
+**Unchanged.** Observe-don't-capture, ring buffer, snapshot restore, consumer opt-in routing, and all timing thresholds are identical. This is a pure API cleanup.
+
+### Grep verification
+
+After the cleanup:
+
+```
+grep -rn 'data-barcode-scan-target\|data-barcode-target\|requireTargetAttribute\|maxKeystrokeGap' src/
+→ zero hits
+```
+
+### Quality gates
+
+- Typecheck: clean (`npx tsc --noEmit` → exit 0).
+- Tests: 402/402 passing across 22 files (down from 403; –1 for deleted Test 8b, no other count changes).
+
+### Cross-reference
+
+Design audits for the closed-out scanner story:
+- `docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md` — the 42F-rewrite (observe-don't-capture model, hardware timing, behavior contracts).
+- `docs/audits/SCANNER_MIGRATION_SESSION42F.md` — this migration's plan (inventory, ordering, file-by-file edits).
+
+---
+
 ## feat(ui): add contentClassName/wrapperClassName props to Dialog; top-anchor customer-lookup on narrow viewports — 2026-04-23 (Session 42J)
 
 **Fixed:** POS customer-lookup modal was centered vertically, causing the lower half to be hidden behind the iOS keyboard on iPad landscape. When the modal opens and the search input auto-focuses, the iOS keyboard slides up and covers the modal's bottom half (including the results list and the "Guest"/"New Customer" action buttons).

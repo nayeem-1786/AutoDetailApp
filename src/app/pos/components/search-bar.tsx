@@ -80,7 +80,6 @@ export function SearchBar({
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
       <input
         ref={inputRef}
-        data-barcode-target
         type="text"
         value={local}
         onChange={(e) => handleChange(e.target.value)}

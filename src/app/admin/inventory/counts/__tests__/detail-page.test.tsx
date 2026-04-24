@@ -33,7 +33,6 @@ vi.mock('@/lib/hooks/use-barcode-scanner', () => ({
   useBarcodeScanner: (opts: {
     onScan: (barcode: string) => void | Promise<void>;
     enabled?: boolean;
-    requireTargetAttribute?: boolean;
   }) => {
     scannerState.enabled = opts.enabled !== false;
     scannerState.onScan = scannerState.enabled ? opts.onScan : null;
@@ -421,16 +420,17 @@ describe('CountDetailPage — 42D-patch fixes', () => {
     expect(incBody.increment).toBe(1);
   });
 
-  // Regression: removing data-barcode-scan-target from the search input means
-  // the rendered DOM no longer carries the opt-out attribute. The real hook
-  // test covers the routing behavior; this test verifies the attribute is gone
-  // at the page level so the hook sees a "normal" focused input.
-  it('search input does NOT carry data-barcode-scan-target', async () => {
+  // Regression: the inventory-count search input must not opt in as a scan
+  // consumer. The real hook test covers the routing behavior; this test
+  // verifies the attribute is absent at the page level so the hook treats
+  // the search input as a normal focused input (scans reset it via restore
+  // + dispatch rather than depositing chars).
+  it('search input does NOT carry data-scan-consumer', async () => {
     stubGet({ status: 'active', items: [] });
     await renderAndWait();
 
     const searchInput = screen.getByPlaceholderText(/search by product name/i) as HTMLInputElement;
-    expect(searchInput.getAttribute('data-barcode-scan-target')).toBeNull();
+    expect(searchInput.getAttribute('data-scan-consumer')).toBeNull();
   });
 
   // Inline qty edit input carries inputMode="numeric" so iPad opens the

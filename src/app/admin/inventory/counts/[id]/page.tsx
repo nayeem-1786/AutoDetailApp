@@ -163,7 +163,6 @@ export default function CountDetailPage() {
 
   // --- Scanner ---------------------------------------------------------
   useBarcodeScanner({
-    requireTargetAttribute: false,
     enabled: count?.status === 'active' && !loading && !acting,
     onScan: async (barcode) => {
       // If the user is mid-edit on a qty cell, save that edit first by

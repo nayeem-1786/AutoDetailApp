@@ -81,7 +81,6 @@ export default function ProductsPage() {
   const [quickEditOpen, setQuickEditOpen] = useState(false);
 
   useBarcodeScanner({
-    requireTargetAttribute: false,
     onScan: async (barcode) => {
       try {
         const res = await adminFetch('/api/admin/products/barcode-lookup', {

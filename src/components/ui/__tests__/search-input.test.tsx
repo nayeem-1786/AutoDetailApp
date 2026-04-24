@@ -66,11 +66,11 @@ describe('SearchInput', () => {
         onChange={() => {}}
         placeholder="p"
         autoFocus
-        data-barcode-scan-target="input"
+        data-scan-consumer=""
       />
     );
     const input = screen.getByPlaceholderText('p') as HTMLInputElement;
-    expect(input.getAttribute('data-barcode-scan-target')).toBe('input');
+    expect(input.getAttribute('data-scan-consumer')).toBe('');
     expect(document.activeElement).toBe(input);
   });
 });

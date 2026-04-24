@@ -32,18 +32,6 @@ interface UseBarcodeScannerOptions {
    * `maxBarcodeLength + 8` to tolerate the occasional dropped Enter.
    */
   maxBarcodeLength?: number;
-
-  /**
-   * @deprecated No-op under observe-don't-capture. Kept for source-compat
-   * during Session 42F-migration. Consumers can safely omit.
-   */
-  requireTargetAttribute?: boolean;
-
-  /**
-   * @deprecated Alias for `scanBurstMs` during 42F-migration. If both are
-   * provided, `scanBurstMs` wins. Remove once all consumers updated.
-   */
-  maxKeystrokeGap?: number;
 }
 
 interface KeyLogEntry {
@@ -70,11 +58,10 @@ interface Snapshot {
  * restore the focused input to its pre-burst snapshot (erasing stray
  * chars), and fire `onScan(barcode)`.
  *
- * Scan-consumer opt-in: if the focused element carries `data-scan-consumer`
- * (or, transitionally, `data-barcode-scan-target="input"`), scans are
- * "consumed" by that input — chars stay, no restore, no event dispatch,
- * no `onScan` call. Enter is still preventDefault'd to suppress form
- * submission. Used by the Quick Edit drawer's Barcode field.
+ * Scan-consumer opt-in: if the focused element carries `data-scan-consumer`,
+ * scans are "consumed" by that input — chars stay, no restore, no event
+ * dispatch, no `onScan` call. Enter is still preventDefault'd to suppress
+ * form submission. Used by the Quick Edit drawer's Barcode field.
  *
  * Design notes:
  * - Typing flows natively → no cursor-reorder bugs with controlled-reformat
@@ -87,27 +74,20 @@ interface Snapshot {
  *   still observe Enter. Intentional design choice; consumers that need
  *   stricter isolation can add their own guards.
  *
- * Behavior changes from the pre-42F capture-first model:
- * - `requireTargetAttribute: false` consumers: slow-typed Enter no longer
- *   dispatches onScan. Scan detection is strictly timing-gated.
- * - `data-barcode-target` focus gate is retired. onScan is no longer gated
- *   by focus attribute on Enter — only by timing.
- *
- * See docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md for the full design,
- * hardware timing measurements, and per-consumer migration semantics.
+ * See docs/audits/SCANNER_HOOK_REWRITE_SESSION42F.md for the full design
+ * and hardware timing measurements. See
+ * docs/audits/SCANNER_MIGRATION_SESSION42F.md for the compat-shim cleanup
+ * that finalized this API.
  */
 export function useBarcodeScanner(options: UseBarcodeScannerOptions): void {
   const {
     onScan,
     enabled = true,
     minLength = 4,
+    scanBurstMs = 50,
     snapshotGapMs = 300,
     maxBarcodeLength = 32,
   } = options;
-
-  // Deprecated alias resolution — read from raw options so "explicit 50" is
-  // distinguishable from "default 50" (no scanBurstMs: 50 ambiguity).
-  const scanBurstMs = options.scanBurstMs ?? options.maxKeystrokeGap ?? 50;
 
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
@@ -151,14 +131,7 @@ export function useBarcodeScanner(options: UseBarcodeScannerOptions): void {
 
     function isScanConsumer(el: Element | null): boolean {
       if (!(el instanceof HTMLElement)) return false;
-      // Preferred opt-in attribute (post-42F-migration).
-      if (el.hasAttribute('data-scan-consumer')) return true;
-      // Legacy alias from Session 42D-interlude. Recognised during the
-      // 42F-rewrite → 42F-migration transition so the Quick Edit drawer's
-      // rescan flow keeps working. Remove once 42F-migration swaps the
-      // attribute on quick-edit-drawer.tsx.
-      if (el.getAttribute('data-barcode-scan-target') === 'input') return true;
-      return false;
+      return el.hasAttribute('data-scan-consumer');
     }
 
     function detectScanTail(): KeyLogEntry[] | null {

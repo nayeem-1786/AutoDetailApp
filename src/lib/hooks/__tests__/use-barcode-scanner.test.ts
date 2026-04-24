@@ -212,23 +212,6 @@ describe('useBarcodeScanner — observe-don\'t-capture', () => {
     expect(input.value).toBe('SD-1234');
   });
 
-  // Test 8b — legacy data-barcode-scan-target="input" as transitional alias
-  it('legacy data-barcode-scan-target="input" alias — same consumer semantics as data-scan-consumer', () => {
-    const input = installInput({ 'data-barcode-scan-target': 'input' });
-    const onScan = vi.fn();
-    renderHook(() => useBarcodeScanner({ onScan }));
-
-    for (const ch of ['A', 'B', 'C', '1', '2', '3', '4']) {
-      typeKey(input, ch);
-      vi.advanceTimersByTime(15);
-    }
-    const enterEvent = pressKey('Enter');
-
-    expect(onScan).not.toHaveBeenCalled();
-    expect(enterEvent.defaultPrevented).toBe(true);
-    expect(input.value).toBe('ABC1234');
-  });
-
   // Test 9 — focus change mid-burst
   it('focus change mid-burst — snapshot invalidated; scan still detected; no restore attempted', () => {
     const input1 = installInput();
