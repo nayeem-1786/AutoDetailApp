@@ -73,6 +73,7 @@ beforeEach(() => {
 describe('POST /api/admin/inventory/counts/[id]/revert', () => {
   it('returns 200 on a clean revert (no drift)', async () => {
     state.rpcResult = {
+      status: 'success',
       count_id: 'count-1',
       reversals_created: 3,
       drift_count: 0,
@@ -88,6 +89,7 @@ describe('POST /api/admin/inventory/counts/[id]/revert', () => {
 
   it('passes confirmed_drift through to the RPC', async () => {
     state.rpcResult = {
+      status: 'success',
       count_id: 'count-1',
       reversals_created: 2,
       drift_count: 5,
@@ -102,6 +104,7 @@ describe('POST /api/admin/inventory/counts/[id]/revert', () => {
 
   it('defaults confirmed_drift to false when omitted from body', async () => {
     state.rpcResult = {
+      status: 'success',
       count_id: 'count-1',
       reversals_created: 1,
       drift_count: 0,
@@ -109,6 +112,37 @@ describe('POST /api/admin/inventory/counts/[id]/revert', () => {
     };
     await POST(req({}), params);
     expect(rpcCalls[0].args.p_confirmed_drift).toBe(false);
+  });
+
+  it('returns 409 with problem_products when RPC returns structured NEGATIVE_QUANTITY error', async () => {
+    state.rpcResult = {
+      status: 'error',
+      error_code: 'NEGATIVE_QUANTITY',
+      problem_products: [
+        {
+          product_id: '9b1c8e2a-1111-2222-3333-444455556666',
+          name: 'Widget A',
+          sku: 'W-A',
+          current_qty: 2,
+          target_qty: -3,
+        },
+      ],
+    };
+    const res = await POST(req({ confirmed_drift: true }), params);
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe('NEGATIVE_QUANTITY');
+    expect(Array.isArray(json.problem_products)).toBe(true);
+    expect(json.problem_products[0].product_id).toBe('9b1c8e2a-1111-2222-3333-444455556666');
+    expect(json.problem_products[0].name).toBe('Widget A');
+    expect(json.problem_products[0].current_qty).toBe(2);
+    expect(json.problem_products[0].target_qty).toBe(-3);
+  });
+
+  it('returns 500 when RPC result has unknown status', async () => {
+    state.rpcResult = { status: 'mystery' };
+    const res = await POST(req(), params);
+    expect(res.status).toBe(500);
   });
 
   it('returns 400 with requires_confirmation when drift detected and not confirmed', async () => {
@@ -122,18 +156,6 @@ describe('POST /api/admin/inventory/counts/[id]/revert', () => {
     expect(json.requires_confirmation).toBe(true);
     expect(json.drift_count).toBe(5);
     expect(json.drift_products).toBe(2);
-  });
-
-  it('returns 400 with product_id when revert would cause negative quantity', async () => {
-    state.rpcError = {
-      message:
-        'Revert would set negative quantity for product 9b1c8e2a-1111-2222-3333-444455556666',
-    };
-    const res = await POST(req({ confirmed_drift: true }), params);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toBe('Revert would set negative quantity');
-    expect(json.product_id).toBe('9b1c8e2a-1111-2222-3333-444455556666');
   });
 
   it('returns 409 when count is not in committed status', async () => {

@@ -4,6 +4,105 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(inventory): revert modal UX — CONFIRM phrase + negative-qty error banner + auto-refetch on tab focus + stale-modal handling — 2026-04-24 (Session 42K-patch-1)
+
+Smoke testing of Session 42K surfaced two real UX issues:
+
+1. Section labels are cumbersome to type on iPad as a confirmation phrase (e.g. `"Smoke Test 42K-2"`). Data Management's purge flow already uses a short uppercase phrase (`"PURGE"`); inventory revert now follows suit.
+2. When the RPC's negative-quantity guard tripped, users saw a toast with a UUID and a modal with no path forward — no way to know which product was the blocker, no way to act on it, no way to retry without closing and re-opening.
+
+This patch fixes both, and folds in a stale-modal escape hatch for the cross-tab edge case.
+
+### New migration (apply manually)
+
+`supabase/migrations/20260424000002_revert_stock_count_structured_errors.sql`
+
+`CREATE OR REPLACE FUNCTION revert_stock_count(...)` with three behavioral changes vs. the 20260424000001 version:
+
+1. **Two-pass structure with structured negative-qty error.** A FIRST PASS pre-computes which products would go negative and aggregates them into a JSONB array. If non-empty, the function `RETURN`s a structured error object — no `RAISE`, no rollback because nothing was written. SECOND PASS does the writes only after the validation succeeds.
+2. **Lock all affected products at the top** via `PERFORM 1 FROM products ... FOR UPDATE`. Without this, a concurrent POS sale could squeeze between the FIRST PASS verdict and the SECOND PASS write, invalidating the validation. This makes the pre-check binding through to the write.
+3. **Ordering decision: negative-qty checked BEFORE drift.** Negative-qty is a hard blocker — the revert physically cannot complete. Drift is a soft warning that's only meaningful if the action is possible. If problem products exist, return structured error immediately without evaluating drift. UI never sees a misleading drift banner over an impossible action.
+
+The success return now includes `"status": "success"` so callers can branch on a single field cleanly:
+
+- Success: `{status: "success", count_id, reversals_created, drift_count, drift_products}`
+- Negative-qty error: `{status: "error", error_code: "NEGATIVE_QUANTITY", problem_products: [{product_id, name, sku, current_qty, target_qty}, ...]}`
+
+Drift rejection still uses `RAISE EXCEPTION` (and maps to HTTP 400 in the API route as before) — only negative-qty switched to structured return.
+
+**⚠️ Apply manually in Supabase SQL Editor.** `CREATE OR REPLACE FUNCTION` swaps atomically; no downtime.
+
+### API route updates
+
+**`POST /api/admin/inventory/counts/[id]/revert`** — inspects `rpcResult.status` first. If `'error'` with `error_code: 'NEGATIVE_QUANTITY'`, returns HTTP 409 with the full `problem_products` array. The old single-uuid 400 path is gone.
+
+**`GET /api/admin/inventory/counts/[id]/revert-preview`** — adds `projected_negative_products: ProjectedNegativeProduct[]` to the response. Computed in the route (not the RPC) by joining the count's adjustment rows with current `products.quantity_on_hand` and filtering rows where `quantity_on_hand - quantity_change < 0`. Lets the UI render the actionable error banner without waiting for a 409 from `/revert`.
+
+### Shared `ConfirmDialog` component — new optional prop
+
+`src/components/ui/confirm-dialog.tsx` gains:
+
+```ts
+interface ConfirmDialogProps {
+  // ...existing
+  /** When true, type-to-confirm input is hidden and confirm button
+   *  is disabled regardless of typed text. Used when external state
+   *  blocks confirmation. Defaults to false. */
+  blockedByExternalError?: boolean;
+}
+```
+
+Behavior:
+- `blockedByExternalError=true` → input hidden, confirm button disabled
+- `blockedByExternalError=false|undefined` → existing behavior unchanged
+
+All ~70+ existing consumers pass nothing for this prop, so they're unaffected. Only the new revert flow uses it.
+
+### Count detail page — state machine + auto-refetch + new banners
+
+`src/app/admin/inventory/counts/[id]/page.tsx`:
+
+- **Confirmation phrase changed from `count.section_label` to `"CONFIRM"`** (matches the customer-purge precedent). Description renders a centered mono-font bold callout pattern modeled on the customer-archive flow at `admin/customers/[id]/page.tsx:2035-2039`:
+  ```
+  Type to confirm:
+        CONFIRM
+  ```
+- **Modal mode state machine:** `'loading' | 'error' | 'normal' | 'blocked-negative' | 'blocked-stale'`. Derived from preview state. Drives banner content, button labels, and the `blockedByExternalError` prop on `ConfirmDialog`.
+- **Red banner for `blocked-negative`** (`XOctagon` icon, `red-50/200/600/800` colors mirroring the amber drift banner pattern). Lists every product that would go negative with current → target qty. Each product name is a `<Link target="_blank" rel="noopener">` to its detail page so the admin can adjust stock in another tab. Inline `Recheck` button triggers an immediate preview re-fetch.
+- **Gray info banner for `blocked-stale`** — when preview returns `revertable=false` (count flipped status in another session). Cancel button relabels to `"Close"`. Type-to-confirm input is hidden via `blockedByExternalError`.
+- **Auto-refetch on tab visibility change** with 2-second debounce. When the modal is open and the user returns to the tab, preview re-fetches automatically — covers the "fix qty in another tab, switch back" workflow without requiring a manual recheck click.
+- **409 NEGATIVE_QUANTITY response handling** in `handleRevert`: parses `problem_products` from the response body, injects them into preview state so the modal re-renders in `blocked-negative` mode without closing. Toast says "Cannot revert — product quantities would go negative. See modal for details."
+
+### Tests
+
+- `src/components/ui/__tests__/confirm-dialog.test.tsx` (new, 6 tests) — covers the new `blockedByExternalError` prop: hides the type-to-confirm input, disables the confirm button regardless of typed text, doesn't fire `onConfirm` when blocked, preserves normal gating when prop is undefined.
+- `src/app/api/admin/inventory/counts/__tests__/revert.test.ts` — updated to match new `{status: 'success', ...}` shape; new test for `{status: 'error', error_code: 'NEGATIVE_QUANTITY'}` → 409 with `problem_products`; new test for unknown status → 500. Old "Revert would set negative quantity" RAISE-based test removed (the RPC no longer takes that path).
+- `src/app/api/admin/inventory/counts/__tests__/revert-preview.test.ts` — new tests for `projected_negative_products` (populated when reversal would push qty below 0; empty when all reversals are safe). Existing drifted-preview test updated to add `quantity_on_hand` to fixture products.
+- `src/app/admin/inventory/counts/__tests__/revert-flow.test.tsx` — updated all `Shelf A` → `CONFIRM` typed-phrase assertions. New tests for blocked-negative mode (red banner, Recheck button triggers re-fetch, transition to normal mode after fix, product link `target="_blank"` + correct href, 409 response re-renders banner) and blocked-stale mode (gray info, Close button, hidden input, disabled confirm).
+
+### Quality gates
+
+- Typecheck: clean (`npx tsc --noEmit` → exit 0)
+- Tests: 448/448 passing across 26 files (up from 433; +15 new: 6 ConfirmDialog + 2 revert + 2 revert-preview + 5 revert-flow patch additions, minus 1 deleted obsolete test)
+
+### Files changed (8)
+
+- `supabase/migrations/20260424000002_revert_stock_count_structured_errors.sql` (new)
+- `src/components/ui/confirm-dialog.tsx` (new optional prop)
+- `src/app/api/admin/inventory/counts/[id]/revert/route.ts` (structured-error branch)
+- `src/app/api/admin/inventory/counts/[id]/revert-preview/route.ts` (projected_negative_products)
+- `src/app/admin/inventory/counts/[id]/page.tsx` (state machine + new banners + auto-refetch + CONFIRM phrase)
+- `src/components/ui/__tests__/confirm-dialog.test.tsx` (new)
+- `src/app/api/admin/inventory/counts/__tests__/revert.test.ts` (updated)
+- `src/app/api/admin/inventory/counts/__tests__/revert-preview.test.ts` (updated)
+- `src/app/admin/inventory/counts/__tests__/revert-flow.test.tsx` (updated)
+
+### Cross-reference
+
+Original feature: Session 42K (commit `b0716bed`).
+
+---
+
 ## feat(inventory): revert committed stock counts with drift warning — 2026-04-24 (Session 42K)
 
 **New feature.** Committed inventory counts can now be reverted from the count detail page. Reversal restores `products.quantity_on_hand` to pre-commit values, writes inverse `stock_adjustments` rows for a complete audit trail, and flips `stock_counts.status` to `cancelled`. When non-count activity (POS sales, refunds, PO receipts, shop-use) has touched the same products since commit, an amber drift warning is shown in the confirmation modal with a top-5 list of drifted products; the revert still proceeds on user confirmation.

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import {
   AlertTriangle,
   ArrowLeft,
@@ -12,6 +13,7 @@ import {
   ShieldCheck,
   Undo2,
   XCircle,
+  XOctagon,
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
@@ -79,6 +81,14 @@ interface TopDriftedProduct {
   net_change: number;
 }
 
+interface ProjectedNegativeProduct {
+  product_id: string;
+  name: string | null;
+  sku: string | null;
+  current_qty: number;
+  target_qty: number;
+}
+
 interface RevertPreview {
   revertable: boolean;
   reason?: string;
@@ -88,7 +98,10 @@ interface RevertPreview {
   drift_adjustments: number;
   drift_products: number;
   top_drifted: TopDriftedProduct[];
+  projected_negative_products: ProjectedNegativeProduct[];
 }
+
+type RevertMode = 'loading' | 'error' | 'normal' | 'blocked-negative' | 'blocked-stale';
 
 function employeeName(emp: EmployeeRef | null | undefined): string {
   if (!emp) return '—';
@@ -356,31 +369,64 @@ export default function CountDetailPage() {
     }
   }
 
-  // Fetch the revert preview each time the dialog opens. Preview is advisory —
-  // the RPC re-checks drift authoritatively before applying.
+  // Fetch the revert preview. Stable reference so the visibility-change
+  // effect can re-trigger it. Preview is advisory — the RPC re-checks
+  // every condition (negative-qty + drift) authoritatively before applying.
+  const fetchRevertPreview = useCallback(async () => {
+    setRevertPreviewLoading(true);
+    try {
+      const res = await adminFetch(`/api/admin/inventory/counts/${countId}/revert-preview`);
+      const json = await res.json();
+      if (json && typeof json === 'object' && 'revertable' in json) {
+        setRevertPreview(json as RevertPreview);
+      }
+    } catch (err) {
+      console.error('Revert preview error:', err);
+      toast.error('Failed to load revert preview');
+    } finally {
+      setRevertPreviewLoading(false);
+    }
+  }, [countId]);
+
+  // Initial preview fetch on dialog open.
   useEffect(() => {
     if (!revertOpen) return;
-    let cancelled = false;
-    setRevertPreviewLoading(true);
     setRevertPreview(null);
-    adminFetch(`/api/admin/inventory/counts/${countId}/revert-preview`)
-      .then((r) => r.json())
-      .then((json) => {
-        if (cancelled) return;
-        if (json && typeof json === 'object' && 'revertable' in json) {
-          setRevertPreview(json as RevertPreview);
-        }
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error('Revert preview error:', err);
-        toast.error('Failed to load revert preview');
-      })
-      .finally(() => {
-        if (!cancelled) setRevertPreviewLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [revertOpen, countId]);
+    fetchRevertPreview();
+  }, [revertOpen, fetchRevertPreview]);
+
+  // Auto-refetch on tab visibility change (debounced 2s).
+  // Use case: user clicks a product link, adjusts quantity in another tab,
+  // returns to the revert modal — preview should reflect the new state
+  // without requiring a manual recheck click.
+  useEffect(() => {
+    if (!revertOpen) return;
+    let lastRefetch = Date.now();
+    function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastRefetch < 2000) return;
+      lastRefetch = Date.now();
+      fetchRevertPreview();
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [revertOpen, fetchRevertPreview]);
+
+  // Derive the modal mode from preview state. Loading → loading; missing
+  // preview → error; revertable=false → blocked-stale (count flipped
+  // status elsewhere); projected_negative_products non-empty →
+  // blocked-negative (hard blocker, must resolve before revert); else
+  // normal (drift may be present and needs confirmation, but that's
+  // surfaced via the amber banner inside `normal` mode).
+  const revertMode: RevertMode = (() => {
+    if (revertPreviewLoading) return 'loading';
+    if (!revertPreview) return 'error';
+    if (revertPreview.revertable === false) return 'blocked-stale';
+    if (revertPreview.projected_negative_products.length > 0) return 'blocked-negative';
+    return 'normal';
+  })();
+
+  const revertBlocked = revertMode === 'blocked-negative' || revertMode === 'blocked-stale';
 
   async function handleRevert() {
     setActing(true);
@@ -393,7 +439,21 @@ export default function CountDetailPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Revert failed');
+      if (!res.ok) {
+        // 409 NEGATIVE_QUANTITY: the RPC's structured error path. Inject
+        // problem products into preview state so the modal re-renders in
+        // blocked-negative mode without closing.
+        if (res.status === 409 && json?.error === 'NEGATIVE_QUANTITY' && Array.isArray(json.problem_products)) {
+          setRevertPreview((prev) =>
+            prev
+              ? { ...prev, projected_negative_products: json.problem_products }
+              : prev
+          );
+          toast.error('Cannot revert — product quantities would go negative. See modal for details.');
+          return;
+        }
+        throw new Error(json.error || 'Revert failed');
+      }
       const n = json.reversals_created ?? 0;
       toast.success(
         n === 0
@@ -805,14 +865,75 @@ export default function CountDetailPage() {
         title="Revert Inventory Count"
         description={
           <div className="space-y-3">
-            {revertPreviewLoading ? (
+            {revertMode === 'loading' && (
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <Spinner className="h-4 w-4" />
                 Loading preview…
               </div>
-            ) : !revertPreview ? (
+            )}
+
+            {revertMode === 'error' && (
               <p className="text-sm text-gray-500">Preview unavailable.</p>
-            ) : (
+            )}
+
+            {revertMode === 'blocked-stale' && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  This count is no longer in a revertable state. It may have been
+                  reverted in another session. Close this dialog to see the current
+                  state.
+                </p>
+              </div>
+            )}
+
+            {revertMode === 'blocked-negative' && revertPreview && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-700 dark:bg-red-900/20">
+                <div className="flex gap-3">
+                  <XOctagon className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <div className="flex-1 space-y-2 text-sm text-red-900 dark:text-red-200">
+                    <p className="font-medium">
+                      Cannot revert — {revertPreview.projected_negative_products.length} product
+                      {revertPreview.projected_negative_products.length === 1 ? '' : 's'} would have negative quantity
+                    </p>
+                    <ul className="space-y-1">
+                      {revertPreview.projected_negative_products.map((p) => (
+                        <li key={p.product_id}>
+                          <Link
+                            href={`/admin/catalog/products/${p.product_id}`}
+                            target="_blank"
+                            rel="noopener"
+                            className="underline text-red-900 hover:text-red-700 dark:text-red-200 dark:hover:text-red-100"
+                          >
+                            {p.name ?? 'Unknown product'}
+                          </Link>
+                          {' — current '}
+                          <span className="font-mono">{p.current_qty}</span>
+                          {', would set '}
+                          <span className="font-mono">{p.target_qty}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-xs">
+                      Adjust quantities in a new tab, then return here. The modal
+                      will re-check automatically when you switch back, or click
+                      Recheck below.
+                    </p>
+                    <div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={fetchRevertPreview}
+                        disabled={revertPreviewLoading}
+                      >
+                        {revertPreviewLoading ? 'Checking…' : 'Recheck'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {revertMode === 'normal' && revertPreview && (
               <>
                 <p>
                   This will inverse{' '}
@@ -871,14 +992,23 @@ export default function CountDetailPage() {
                     </div>
                   </div>
                 )}
+
+                <div className="rounded-md bg-gray-50 p-3 text-center dark:bg-gray-800/50">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">Type to confirm:</p>
+                  <p className="mt-1 font-mono text-lg font-bold text-gray-900 dark:text-gray-100">
+                    CONFIRM
+                  </p>
+                </div>
               </>
             )}
           </div>
         }
         confirmLabel="Revert Count"
+        cancelLabel={revertMode === 'blocked-stale' ? 'Close' : 'Cancel'}
         variant="destructive"
         loading={acting}
-        requireConfirmText={count.section_label || count.id.slice(0, 8)}
+        requireConfirmText="CONFIRM"
+        blockedByExternalError={revertBlocked}
         onConfirm={handleRevert}
       />
 

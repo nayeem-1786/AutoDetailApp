@@ -1090,6 +1090,8 @@ src/components/ui/tabs.tsx
 src/components/ui/textarea.tsx
 src/components/ui/toggle-pill.tsx
 src/components/ui/vehicle-make-combobox.tsx
+src/components/ui/__tests__/confirm-dialog.test.tsx
+src/components/ui/__tests__/dialog.test.tsx
 src/components/ui/__tests__/search-input.test.tsx
 ```
 
@@ -1491,6 +1493,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260421000002_create_stock_counts.sql
 20260422000001_drop_idx_customers_search.sql
 20260424000001_revert_stock_count.sql
+20260424000002_revert_stock_count_structured_errors.sql
 ```
 
 ## Scripts

@@ -18,6 +18,7 @@ interface ProductRow {
   id: string;
   name: string;
   sku: string | null;
+  quantity_on_hand?: number;
 }
 
 const state = {
@@ -175,6 +176,10 @@ describe('GET /api/admin/inventory/counts/[id]/revert-preview', () => {
       { product_id: 'p2', quantity_change: -1 },
     ];
     state.driftRows = [];
+    state.products = [
+      { id: 'p1', name: 'Widget A', sku: 'W-A', quantity_on_hand: 10 },
+      { id: 'p2', name: 'Widget B', sku: 'W-B', quantity_on_hand: 5 },
+    ];
     const res = await GET(req(), params);
     expect(res.status).toBe(200);
     const json = await res.json();
@@ -185,6 +190,51 @@ describe('GET /api/admin/inventory/counts/[id]/revert-preview', () => {
     expect(json.drift_adjustments).toBe(0);
     expect(json.drift_products).toBe(0);
     expect(json.top_drifted).toEqual([]);
+    expect(json.projected_negative_products).toEqual([]);
+  });
+
+  it('returns projected_negative_products when reversal would push qty below 0', async () => {
+    // p1: original delta +5, current qty 2 → reversal would set 2-5 = -3
+    // p2: original delta -1, current qty 5 → reversal would set 5-(-1) = 6 (safe)
+    // p3: original delta +3, current qty 10 → reversal would set 10-3 = 7 (safe)
+    state.originalAdjustments = [
+      { product_id: 'p1', quantity_change: 5 },
+      { product_id: 'p2', quantity_change: -1 },
+      { product_id: 'p3', quantity_change: 3 },
+    ];
+    state.driftRows = [];
+    state.products = [
+      { id: 'p1', name: 'Widget A', sku: 'W-A', quantity_on_hand: 2 },
+      { id: 'p2', name: 'Widget B', sku: 'W-B', quantity_on_hand: 5 },
+      { id: 'p3', name: 'Widget C', sku: 'W-C', quantity_on_hand: 10 },
+    ];
+    const res = await GET(req(), params);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.projected_negative_products).toHaveLength(1);
+    expect(json.projected_negative_products[0]).toMatchObject({
+      product_id: 'p1',
+      name: 'Widget A',
+      sku: 'W-A',
+      current_qty: 2,
+      target_qty: -3,
+    });
+  });
+
+  it('returns empty projected_negative_products when all reversals are safe', async () => {
+    state.originalAdjustments = [
+      { product_id: 'p1', quantity_change: 1 },
+      { product_id: 'p2', quantity_change: -2 },
+    ];
+    state.driftRows = [];
+    state.products = [
+      { id: 'p1', name: 'Widget A', sku: 'W-A', quantity_on_hand: 100 },
+      { id: 'p2', name: 'Widget B', sku: 'W-B', quantity_on_hand: 100 },
+    ];
+    const res = await GET(req(), params);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.projected_negative_products).toEqual([]);
   });
 
   it('returns drift preview with top drifted products', async () => {
@@ -198,8 +248,8 @@ describe('GET /api/admin/inventory/counts/[id]/revert-preview', () => {
       { id: 'a3', product_id: 'p2', quantity_change: 2, reference_type: 'purchase_order' },
     ];
     state.products = [
-      { id: 'p1', name: 'Widget A', sku: 'W-A' },
-      { id: 'p2', name: 'Widget B', sku: 'W-B' },
+      { id: 'p1', name: 'Widget A', sku: 'W-A', quantity_on_hand: 100 },
+      { id: 'p2', name: 'Widget B', sku: 'W-B', quantity_on_hand: 100 },
     ];
     const res = await GET(req(), params);
     expect(res.status).toBe(200);
@@ -215,5 +265,7 @@ describe('GET /api/admin/inventory/counts/[id]/revert-preview', () => {
     expect(json.top_drifted[1].product_id).toBe('p2');
     expect(json.top_drifted[1].adjustment_count).toBe(1);
     expect(json.top_drifted[1].net_change).toBe(2);
+    // Live qty 100 covers both reversals → no projected negative.
+    expect(json.projected_negative_products).toEqual([]);
   });
 });

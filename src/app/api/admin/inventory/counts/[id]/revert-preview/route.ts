@@ -15,6 +15,14 @@ interface TopDriftedProduct {
   net_change: number;
 }
 
+interface ProjectedNegativeProduct {
+  product_id: string;
+  name: string | null;
+  sku: string | null;
+  current_qty: number;
+  target_qty: number;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -66,11 +74,66 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to load preview' }, { status: 500 });
     }
 
+    const originalRows = (originalAdjustments ?? []) as Array<{
+      product_id: string;
+      quantity_change: number;
+    }>;
     const affectedProductIds = Array.from(
-      new Set((originalAdjustments ?? []).map((r) => r.product_id as string))
+      new Set(originalRows.map((r) => r.product_id))
     );
     const originalProducts = affectedProductIds.length;
-    const reversalsCount = (originalAdjustments ?? []).length;
+    const reversalsCount = originalRows.length;
+
+    // Compute projected_negative_products: which products would go below 0
+    // after reversal? Same math the RPC's first pass uses; surfaced in the
+    // preview so the UI can render an actionable error banner without
+    // waiting for a 409 from the revert call.
+    let projectedNegative: ProjectedNegativeProduct[] = [];
+    if (affectedProductIds.length > 0) {
+      const { data: liveProducts, error: prodErr } = await admin
+        .from('products')
+        .select('id, name, sku, quantity_on_hand')
+        .in('id', affectedProductIds);
+
+      if (prodErr) {
+        console.error('[counts/:id/revert-preview] products query error:', prodErr);
+        return NextResponse.json({ error: 'Failed to load product quantities' }, { status: 500 });
+      }
+
+      const liveMap = new Map(
+        (liveProducts ?? []).map((p) => [
+          p.id as string,
+          {
+            name: (p.name as string | null) ?? null,
+            sku: (p.sku as string | null) ?? null,
+            current: (p.quantity_on_hand as number) ?? 0,
+          },
+        ])
+      );
+
+      // A single product may be referenced by multiple original adjustment
+      // rows in theory; the ledger uses one row per (count, product) so
+      // sum is functionally identity. We sum defensively anyway.
+      const perProduct = new Map<string, number>();
+      for (const r of originalRows) {
+        perProduct.set(r.product_id, (perProduct.get(r.product_id) ?? 0) + r.quantity_change);
+      }
+
+      for (const [pid, totalChange] of perProduct.entries()) {
+        const live = liveMap.get(pid);
+        if (!live) continue;
+        const target = live.current - totalChange;
+        if (target < 0) {
+          projectedNegative.push({
+            product_id: pid,
+            name: live.name,
+            sku: live.sku,
+            current_qty: live.current,
+            target_qty: target,
+          });
+        }
+      }
+    }
 
     let driftAdjustments = 0;
     let driftedProducts = 0;
@@ -143,6 +206,7 @@ export async function GET(
       drift_adjustments: driftAdjustments,
       drift_products: driftedProducts,
       top_drifted: topDrifted,
+      projected_negative_products: projectedNegative,
     });
   } catch (err) {
     console.error('[counts/:id/revert-preview] unexpected:', err);

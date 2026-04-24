@@ -7,6 +7,30 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 
 const PERMISSION_KEY = 'inventory.counts.revert';
 
+interface ProblemProduct {
+  product_id: string;
+  name: string | null;
+  sku: string | null;
+  current_qty: number;
+  target_qty: number;
+}
+
+interface RpcSuccess {
+  status: 'success';
+  count_id: string;
+  reversals_created: number;
+  drift_count: number;
+  drift_products: number;
+}
+
+interface RpcError {
+  status: 'error';
+  error_code: 'NEGATIVE_QUANTITY';
+  problem_products: ProblemProduct[];
+}
+
+type RpcResult = RpcSuccess | RpcError;
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -61,28 +85,29 @@ export async function POST(
           { status: 400 }
         );
       }
-      if (message.includes('Revert would set negative quantity')) {
-        const match = message.match(/for product ([a-f0-9-]+)/i);
-        const productId = match ? match[1] : null;
-        return NextResponse.json(
-          {
-            error: 'Revert would set negative quantity',
-            product_id: productId,
-          },
-          { status: 400 }
-        );
-      }
 
       console.error('[counts/:id/revert] rpc error:', rpcErr);
       return NextResponse.json({ error: 'Failed to revert count' }, { status: 500 });
     }
 
-    const result = rpcResult as {
-      count_id: string;
-      reversals_created: number;
-      drift_count: number;
-      drift_products: number;
-    };
+    const result = rpcResult as RpcResult | null;
+
+    // Structured error path: negative-qty pre-check failed.
+    if (result?.status === 'error' && result.error_code === 'NEGATIVE_QUANTITY') {
+      return NextResponse.json(
+        {
+          error: 'NEGATIVE_QUANTITY',
+          message: 'Revert would set negative quantity for one or more products',
+          problem_products: result.problem_products,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (result?.status !== 'success') {
+      console.error('[counts/:id/revert] unexpected rpc result:', rpcResult);
+      return NextResponse.json({ error: 'Failed to revert count' }, { status: 500 });
+    }
 
     const { data: count } = await admin
       .from('stock_counts')
@@ -92,9 +117,9 @@ export async function POST(
 
     return NextResponse.json({
       count,
-      reversals_created: result?.reversals_created ?? 0,
-      drift_count: result?.drift_count ?? 0,
-      drift_products: result?.drift_products ?? 0,
+      reversals_created: result.reversals_created ?? 0,
+      drift_count: result.drift_count ?? 0,
+      drift_products: result.drift_products ?? 0,
     });
   } catch (err) {
     console.error('[counts/:id/revert] unexpected:', err);

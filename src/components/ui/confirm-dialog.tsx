@@ -18,6 +18,13 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   /** If provided, user must type this text to enable the confirm button */
   requireConfirmText?: string;
+  /**
+   * When true, the type-to-confirm input is hidden and the confirm button
+   * is disabled regardless of typed text. Used when external state (e.g.
+   * a precondition failure surfaced via preview) blocks confirmation
+   * until the caller resolves it. Defaults to false.
+   */
+  blockedByExternalError?: boolean;
 }
 
 function ConfirmDialog({
@@ -31,6 +38,7 @@ function ConfirmDialog({
   loading = false,
   onConfirm,
   requireConfirmText,
+  blockedByExternalError = false,
 }: ConfirmDialogProps) {
   const [confirmInput, setConfirmInput] = useState('');
 
@@ -41,7 +49,10 @@ function ConfirmDialog({
     }
   }, [open]);
 
-  const isConfirmDisabled = loading || Boolean(requireConfirmText && confirmInput !== requireConfirmText);
+  const isConfirmDisabled =
+    loading ||
+    blockedByExternalError ||
+    Boolean(requireConfirmText && confirmInput !== requireConfirmText);
   const enterSubmit = useEnterSubmit(onConfirm, !isConfirmDisabled);
 
   return (
@@ -51,7 +62,7 @@ function ConfirmDialog({
       </DialogHeader>
       <DialogContent>
         <div className="text-sm text-ui-text-muted">{description}</div>
-        {requireConfirmText && (
+        {requireConfirmText && !blockedByExternalError && (
           <div className="mt-4">
             <Input
               placeholder={`Type "${requireConfirmText}" to confirm`}

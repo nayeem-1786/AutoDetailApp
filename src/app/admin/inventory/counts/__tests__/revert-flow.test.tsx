@@ -139,6 +139,7 @@ function cleanPreviewResponse() {
     drift_adjustments: 0,
     drift_products: 0,
     top_drifted: [],
+    projected_negative_products: [],
   };
 }
 
@@ -154,6 +155,37 @@ function driftedPreviewResponse() {
     top_drifted: [
       { product_id: 'p1', product_name: 'Widget A', sku: 'W-A', adjustment_count: 3, net_change: -2 },
     ],
+    projected_negative_products: [],
+  };
+}
+
+function negativePreviewResponse() {
+  return {
+    count: { id: 'count-1', status: 'committed', section_label: 'Shelf A', committed_at: '2026-04-20T12:00:00Z' },
+    revertable: true,
+    reversals_count: 2,
+    original_products: 2,
+    has_drift: false,
+    drift_adjustments: 0,
+    drift_products: 0,
+    top_drifted: [],
+    projected_negative_products: [
+      {
+        product_id: 'p1',
+        name: 'Widget A',
+        sku: 'W-A',
+        current_qty: 2,
+        target_qty: -3,
+      },
+    ],
+  };
+}
+
+function stalePreviewResponse() {
+  return {
+    count: { id: 'count-1', status: 'cancelled', section_label: 'Shelf A', committed_at: '2026-04-20T12:00:00Z' },
+    revertable: false,
+    reason: 'Count is cancelled',
   };
 }
 
@@ -288,7 +320,7 @@ describe('Revert flow — preview fetch (Session 42K)', () => {
 });
 
 describe('Revert flow — type-to-confirm + submission (Session 42K)', () => {
-  it('confirm button is disabled until section_label is typed exactly', async () => {
+  it('confirm button is disabled until "CONFIRM" is typed exactly', async () => {
     fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => ({
       status: 200,
       body: cleanPreviewResponse(),
@@ -308,9 +340,9 @@ describe('Revert flow — type-to-confirm + submission (Session 42K)', () => {
     const confirmBtn = buttons[buttons.length - 1];
     expect((confirmBtn as HTMLButtonElement).disabled).toBe(true);
 
-    const phraseInput = screen.getByPlaceholderText(/Type "Shelf A" to confirm/i) as HTMLInputElement;
+    const phraseInput = screen.getByPlaceholderText(/Type "CONFIRM" to confirm/i) as HTMLInputElement;
     act(() => {
-      fireEvent.change(phraseInput, { target: { value: 'Shelf A' } });
+      fireEvent.change(phraseInput, { target: { value: 'CONFIRM' } });
     });
     expect((confirmBtn as HTMLButtonElement).disabled).toBe(false);
   });
@@ -340,8 +372,8 @@ describe('Revert flow — type-to-confirm + submission (Session 42K)', () => {
 
     act(() => {
       fireEvent.change(
-        screen.getByPlaceholderText(/Type "Shelf A" to confirm/i),
-        { target: { value: 'Shelf A' } }
+        screen.getByPlaceholderText(/Type "CONFIRM" to confirm/i),
+        { target: { value: 'CONFIRM' } }
       );
     });
 
@@ -388,8 +420,8 @@ describe('Revert flow — type-to-confirm + submission (Session 42K)', () => {
 
     act(() => {
       fireEvent.change(
-        screen.getByPlaceholderText(/Type "Shelf A" to confirm/i),
-        { target: { value: 'Shelf A' } }
+        screen.getByPlaceholderText(/Type "CONFIRM" to confirm/i),
+        { target: { value: 'CONFIRM' } }
       );
     });
 
@@ -432,8 +464,8 @@ describe('Revert flow — type-to-confirm + submission (Session 42K)', () => {
     });
     act(() => {
       fireEvent.change(
-        screen.getByPlaceholderText(/Type "Shelf A" to confirm/i),
-        { target: { value: 'Shelf A' } }
+        screen.getByPlaceholderText(/Type "CONFIRM" to confirm/i),
+        { target: { value: 'CONFIRM' } }
       );
     });
     const buttons = screen.getAllByRole('button', { name: /revert count/i });
@@ -478,5 +510,167 @@ describe('Cancelled view — notes display (Session 42K)', () => {
     // instead assert that no paragraph with the known reversal prefix is
     // present.
     expect(screen.queryByText(/Reverted/)).toBeNull();
+  });
+});
+
+describe('Revert flow — blocked-negative mode (Session 42K-patch-1)', () => {
+  it('renders red banner with product list and Recheck button when projected_negative_products is non-empty', async () => {
+    fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => ({
+      status: 200,
+      body: negativePreviewResponse(),
+    });
+    await renderAndWait();
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /revert count/i }));
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/Cannot revert/i)).not.toBeNull();
+    });
+    expect(screen.queryByText(/would have negative quantity/i)).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /^Recheck$/i })).not.toBeNull();
+    // Disabled "Revert Count" confirm button + Cancel button
+    const buttons = screen.getAllByRole('button', { name: /revert count/i });
+    const confirmBtn = buttons[buttons.length - 1] as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBe(true);
+    // Type-to-confirm input is hidden in blocked mode.
+    expect(screen.queryByPlaceholderText(/Type "CONFIRM" to confirm/i)).toBeNull();
+  });
+
+  it('product link in red banner has target="_blank" and correct href', async () => {
+    fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => ({
+      status: 200,
+      body: negativePreviewResponse(),
+    });
+    await renderAndWait();
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /revert count/i }));
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/Cannot revert/i)).not.toBeNull();
+    });
+    const link = screen.getByRole('link', { name: /Widget A/i }) as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('/admin/catalog/products/p1');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noopener');
+  });
+
+  it('Recheck button triggers a fresh preview fetch', async () => {
+    let previewCallCount = 0;
+    fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => {
+      previewCallCount += 1;
+      return { status: 200, body: negativePreviewResponse() };
+    };
+    await renderAndWait();
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /revert count/i }));
+    });
+    await waitFor(() => {
+      expect(previewCallCount).toBe(1);
+    });
+    const recheck = screen.getByRole('button', { name: /^Recheck$/i });
+    act(() => {
+      fireEvent.click(recheck);
+    });
+    await waitFor(() => {
+      expect(previewCallCount).toBe(2);
+    });
+  });
+
+  it('transitions to normal mode when Recheck returns clean preview after admin fixes quantities', async () => {
+    let call = 0;
+    fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => {
+      call += 1;
+      return {
+        status: 200,
+        body: call === 1 ? negativePreviewResponse() : cleanPreviewResponse(),
+      };
+    };
+    await renderAndWait();
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /revert count/i }));
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/Cannot revert/i)).not.toBeNull();
+    });
+    const recheck = screen.getByRole('button', { name: /^Recheck$/i });
+    act(() => {
+      fireEvent.click(recheck);
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/Cannot revert/i)).toBeNull();
+      expect(screen.queryByText(/This will inverse/i)).not.toBeNull();
+    });
+    // Type-to-confirm input is back.
+    expect(screen.queryByPlaceholderText(/Type "CONFIRM" to confirm/i)).not.toBeNull();
+  });
+
+  it('handles 409 NEGATIVE_QUANTITY response from /revert by re-rendering banner', async () => {
+    fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => ({
+      status: 200,
+      body: cleanPreviewResponse(),
+    });
+    fetchHandlers['POST /api/admin/inventory/counts/count-1/revert'] = () => ({
+      status: 409,
+      body: {
+        error: 'NEGATIVE_QUANTITY',
+        message: 'Revert would set negative quantity',
+        problem_products: [
+          {
+            product_id: 'p1',
+            name: 'Widget A',
+            sku: 'W-A',
+            current_qty: 2,
+            target_qty: -3,
+          },
+        ],
+      },
+    });
+
+    await renderAndWait();
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /revert count/i }));
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/This will inverse/i)).not.toBeNull();
+    });
+    act(() => {
+      fireEvent.change(
+        screen.getByPlaceholderText(/Type "CONFIRM" to confirm/i),
+        { target: { value: 'CONFIRM' } }
+      );
+    });
+    const buttons = screen.getAllByRole('button', { name: /revert count/i });
+    act(() => {
+      fireEvent.click(buttons[buttons.length - 1]);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Cannot revert/i)).not.toBeNull();
+    });
+    expect(toastFns.error).toHaveBeenCalled();
+  });
+});
+
+describe('Revert flow — blocked-stale mode (Session 42K-patch-1)', () => {
+  it('renders gray info message when preview returns revertable=false', async () => {
+    fetchHandlers['/api/admin/inventory/counts/count-1/revert-preview'] = () => ({
+      status: 200,
+      body: stalePreviewResponse(),
+    });
+    await renderAndWait();
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /revert count/i }));
+    });
+    await waitFor(() => {
+      expect(screen.queryByText(/no longer in a revertable state/i)).not.toBeNull();
+    });
+    // Cancel button label is "Close" in stale mode.
+    expect(screen.queryByRole('button', { name: /^Close$/i })).not.toBeNull();
+    // Type-to-confirm input is hidden.
+    expect(screen.queryByPlaceholderText(/Type "CONFIRM" to confirm/i)).toBeNull();
+    // Confirm button is disabled.
+    const buttons = screen.getAllByRole('button', { name: /revert count/i });
+    const confirmBtn = buttons[buttons.length - 1] as HTMLButtonElement;
+    expect(confirmBtn.disabled).toBe(true);
   });
 });
