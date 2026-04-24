@@ -914,7 +914,9 @@ Per-product line within a stock count. `expected_qty` is snapshotted on first-to
 
 **RPC — `commit_stock_count(p_count_id UUID, p_employee_id UUID) RETURNS JSONB`:** atomic commit. Locks the count header and each affected product row (`FOR UPDATE`), skips zero-delta items, aborts if any product would go negative, writes one `stock_adjustments` row per non-zero delta (with `adjustment_type='recount'` and `reference_type='stock_count'`, `reference_id=<count_id>`), and flips `stock_counts.status` to `'committed'`. Returns `{count_id, adjustments_created}`. Defined in `20260421000002`.
 
-**Permission:** `inventory.counts.manage` (sort_order 507) — gated at the API layer on all six `/api/admin/inventory/counts/*` routes.
+**RPC — `revert_stock_count(p_count_id UUID, p_user_id UUID, p_confirmed_drift BOOLEAN) RETURNS JSONB`:** atomic reversal of a committed count. Walks `stock_adjustments` rows where `reference_type='stock_count' AND reference_id=<count_id>` (excluding prior reversals via `reason NOT LIKE 'Reversal of%'`), writes an inverse row per original with `adjustment_type='recount'`, updates `products.quantity_on_hand` back to pre-commit values, and flips `stock_counts.status` to `'cancelled'` with `cancelled_by/at` populated and a drift-context line appended to `notes`. Authoritatively checks drift (`stock_adjustments` on affected products with `created_at > committed_at` and `reference_type IS DISTINCT FROM 'stock_count'`); if drift exists and `p_confirmed_drift=false`, raises without side effects. Aborts if any product would go negative after reversal. Returns `{count_id, reversals_created, drift_count, drift_products}`. Defined in `20260424000001`.
+
+**Permissions:** `inventory.counts.manage` (sort_order 507) gates commit/cancel/transition/items/read routes. `inventory.counts.revert` (sort_order 508, super_admin+admin=true, others=false) gates the revert routes specifically. Both enforced at the API layer.
 
 ### vendors
 | Column | Type | Constraints | Notes |

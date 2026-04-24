@@ -72,7 +72,12 @@ src/app/api/admin/inventory/counts/[id]/items/route.ts
 src/app/api/admin/inventory/counts/[id]/commit/route.ts
 src/app/api/admin/inventory/counts/[id]/cancel/route.ts
 src/app/api/admin/inventory/counts/[id]/transition/route.ts
+src/app/api/admin/inventory/counts/[id]/revert/route.ts
+src/app/api/admin/inventory/counts/[id]/revert-preview/route.ts
 src/app/api/admin/inventory/counts/__tests__/commit.test.ts
+src/app/api/admin/inventory/counts/__tests__/revert.test.ts
+src/app/api/admin/inventory/counts/__tests__/revert-preview.test.ts
+src/app/admin/inventory/counts/__tests__/revert-flow.test.tsx
 src/app/api/admin/transactions/stats/route.ts
 src/app/api/admin/upload/content-image/route.ts
 ```
@@ -1484,6 +1489,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260420000001_extend_stock_adjustments.sql
 20260421000001_add_vendor_reorder_fields.sql
 20260421000002_create_stock_counts.sql
+20260422000001_drop_idx_customers_search.sql
+20260424000001_revert_stock_count.sql
 ```
 
 ## Scripts

@@ -4,6 +4,88 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(inventory): revert committed stock counts with drift warning — 2026-04-24 (Session 42K)
+
+**New feature.** Committed inventory counts can now be reverted from the count detail page. Reversal restores `products.quantity_on_hand` to pre-commit values, writes inverse `stock_adjustments` rows for a complete audit trail, and flips `stock_counts.status` to `cancelled`. When non-count activity (POS sales, refunds, PO receipts, shop-use) has touched the same products since commit, an amber drift warning is shown in the confirmation modal with a top-5 list of drifted products; the revert still proceeds on user confirmation.
+
+Root-cause trigger: Session 42K-diagnostic (2026-04-24) discovered committed test counts leaked into the active DB with no in-app undo path. Rather than patch via ad-hoc SQL, adds a proper reversal feature.
+
+### New migration (apply manually)
+
+`supabase/migrations/20260424000001_revert_stock_count.sql`
+
+- Seeds permission `inventory.counts.revert` at **sort_order 508** (next after `.manage=507`). Default role grants: `super_admin=true`, `admin=true`, others=false. Can be tightened via Admin > Roles UI post-launch.
+- Creates `revert_stock_count(p_count_id UUID, p_user_id UUID, p_confirmed_drift BOOLEAN) RETURNS JSONB` RPC.
+
+**⚠️ Apply manually in Supabase SQL Editor.** Inert until app code calls it, so safe to apply before or after deploy.
+
+### RPC design — mirrors `commit_stock_count`
+
+- `LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp` (adds search_path pinning that commit_stock_count lacks — minor security hardening)
+- Row-locks the count header (`FOR UPDATE`) and each affected product (`FOR UPDATE OF p`) — serializes cleanly with concurrent POS sales
+- Drift check is authoritative inside the RPC (prevents TOCTOU between preview and confirm): if `v_drift_count > 0 AND NOT p_confirmed_drift` → `RAISE EXCEPTION 'Drift detected: ...'`
+- Loops the original `stock_adjustments` rows (filtered by `reference_type='stock_count' AND reference_id=<count> AND reason NOT LIKE 'Reversal of%'`), inverts `quantity_change`, writes new rows with `reason = 'Reversal of stock count: <section_label>'`
+- Negative-quantity guard: aborts if reversal would push any product below 0 (happens when post-commit sales consumed stock the count added)
+- Appends drift context to `stock_counts.notes` on success
+
+### API routes (2 new)
+
+- `POST /api/admin/inventory/counts/[id]/revert` — body `{confirmed_drift: boolean}`. Maps RPC errors to HTTP codes: `'Count not found'` → 404, `'not in revertable status'` → 409, `'Drift detected'` → 400 (with `drift_count`, `drift_products`, `requires_confirmation: true`), `'Revert would set negative quantity'` → 400 (with `product_id`).
+- `GET /api/admin/inventory/counts/[id]/revert-preview` — returns `{revertable, reversals_count, original_products, has_drift, drift_adjustments, drift_products, top_drifted}` where `top_drifted` is up to 5 entries with `{product_id, product_name, sku, adjustment_count, net_change}`. Advisory only; RPC re-checks authoritatively.
+
+Both routes gated on `inventory.counts.revert` permission + `FEATURE_FLAGS.INVENTORY_MANAGEMENT`. Auth via `getEmployeeFromSession(request)`.
+
+### UI — count detail page
+
+`src/app/admin/inventory/counts/[id]/page.tsx`:
+
+- Imports `usePermission` hook (first use on this page — previously permission checking happened only at the API layer)
+- `isCommitted && canRevert` renders a **Revert Count** button in the existing action bar (outline variant with red `Undo2` icon — matches the existing Cancel button's destructive-intent-but-not-primary-weight pattern)
+- Button opens a `<ConfirmDialog variant="destructive">` using the existing shared component with `requireConfirmText={count.section_label || count.id.slice(0, 8)}` — matches the customer-archive precedent of forcing the admin to read and type the specific identifier being acted on
+- Dialog description fetches `/revert-preview` on open, renders either clean-revert copy or an amber drift warning block with the top-5 drifted list
+- Submit calls `POST /revert` with `{confirmed_drift: preview.has_drift}` — whatever the preview said drives the flag (RPC re-verifies)
+- On success: toast + re-fetch count data in-place. Page renders the cancelled state immediately (status badge flips, cancelled-by metadata appears, drift notes visible). No redirect.
+- Cancelled view now renders `count.notes` in a muted italic paragraph **for all cancelled counts with notes** (not just reverted) — consistency fix. Previously the notes column was never displayed anywhere.
+
+### Bundled bug fix
+
+`src/lib/utils/stock-adjustments.ts:13-18` — `ReferenceType` TS union type was missing `'stock_count'`. DB CHECK has allowed this value since migration `20260421000002`; the TS type drift meant any future app-layer code trying to write stock_count-typed rows via `logStockAdjustment` would have a type error. Fixed inline as a one-line amendment bundled with this session.
+
+### Tests
+
+- `src/app/api/admin/inventory/counts/__tests__/revert.test.ts` (11 tests) — auth/permission gating, happy path, confirmed_drift pass-through, every RPC error mapping, feature flag disabled
+- `src/app/api/admin/inventory/counts/__tests__/revert-preview.test.ts` (6 tests) — auth/permission, missing count, non-committed count, clean preview, drift preview with top-5 aggregation + sorting
+- `src/app/admin/inventory/counts/__tests__/revert-flow.test.tsx` (13 tests) — button gating by permission + status, preview fetch on dialog open, clean vs. drifted description rendering, type-to-confirm enable/disable, submit with correct `confirmed_drift`, error toast on 400, cancelled-view notes display
+
+**Deferred: DB-backed RPC unit tests.** API-route tests mock the RPC to validate error mapping; RPC internals rely on manual smoke testing for this release. Adding a Postgres integration-test runner is a future infrastructure investment, not scoped here. Manual smoke scenarios:
+1. Clean revert (no drift) — quantities restored, count cancelled, audit rows inserted
+2. Drifted revert with `confirmed_drift=true` — success + drift logged to notes
+3. Drifted revert with `confirmed_drift=false` — RPC raises, nothing changes
+
+### Quality gates
+
+- Typecheck: clean (`npx tsc --noEmit` → exit 0)
+- Tests: 433/433 passing across 25 files (up from 402; +31 new: 30 revert suite + 1 TS-fix side effect)
+
+### Files changed (10)
+
+- `supabase/migrations/20260424000001_revert_stock_count.sql` (new)
+- `src/app/api/admin/inventory/counts/[id]/revert/route.ts` (new)
+- `src/app/api/admin/inventory/counts/[id]/revert-preview/route.ts` (new)
+- `src/app/api/admin/inventory/counts/__tests__/revert.test.ts` (new)
+- `src/app/api/admin/inventory/counts/__tests__/revert-preview.test.ts` (new)
+- `src/app/admin/inventory/counts/__tests__/revert-flow.test.tsx` (new)
+- `src/app/admin/inventory/counts/[id]/page.tsx` (revert button + modal + preview fetch + notes display + usePermission import)
+- `src/lib/utils/stock-adjustments.ts` (ReferenceType TS fix)
+- `docs/dev/DB_SCHEMA.md` (revert_stock_count RPC + permissions block)
+- `docs/dev/FILE_TREE.md` (new migration + API routes + tests)
+
+### Cross-reference
+
+Design: `docs/audits/REVERT_STOCK_COUNT_SESSION42K.md`
+
+---
+
 ## refactor(scanner): remove Session 42F deprecated compat shims — 2026-04-23 (Session 42F-migration)
 
 Closes out the 42F scanner hook story (rewrite `adedc326` + this migration). Removes every transitional shim the rewrite left for source-compat, plus two vestigial renders of a pre-42F attribute that no consumer has read since the rewrite shipped.

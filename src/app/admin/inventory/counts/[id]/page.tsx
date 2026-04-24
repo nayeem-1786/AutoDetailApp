@@ -4,15 +4,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
+  AlertTriangle,
   ArrowLeft,
   PackageCheck,
   PackageSearch,
   Send,
   ShieldCheck,
+  Undo2,
   XCircle,
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
+import { usePermission } from '@/lib/hooks/use-permission';
 import { formatDateTime } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -68,6 +71,25 @@ interface CountItem {
   last_updated_by_employee: EmployeeRef | null;
 }
 
+interface TopDriftedProduct {
+  product_id: string;
+  product_name: string;
+  sku: string | null;
+  adjustment_count: number;
+  net_change: number;
+}
+
+interface RevertPreview {
+  revertable: boolean;
+  reason?: string;
+  reversals_count: number;
+  original_products: number;
+  has_drift: boolean;
+  drift_adjustments: number;
+  drift_products: number;
+  top_drifted: TopDriftedProduct[];
+}
+
 function employeeName(emp: EmployeeRef | null | undefined): string {
   if (!emp) return '—';
   return `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || '—';
@@ -99,6 +121,11 @@ export default function CountDetailPage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [commitOpen, setCommitOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [revertPreview, setRevertPreview] = useState<RevertPreview | null>(null);
+  const [revertPreviewLoading, setRevertPreviewLoading] = useState(false);
+
+  const { granted: canRevert } = usePermission('inventory.counts.revert');
 
   const loadCount = useCallback(async () => {
     try {
@@ -329,6 +356,60 @@ export default function CountDetailPage() {
     }
   }
 
+  // Fetch the revert preview each time the dialog opens. Preview is advisory —
+  // the RPC re-checks drift authoritatively before applying.
+  useEffect(() => {
+    if (!revertOpen) return;
+    let cancelled = false;
+    setRevertPreviewLoading(true);
+    setRevertPreview(null);
+    adminFetch(`/api/admin/inventory/counts/${countId}/revert-preview`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        if (json && typeof json === 'object' && 'revertable' in json) {
+          setRevertPreview(json as RevertPreview);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Revert preview error:', err);
+        toast.error('Failed to load revert preview');
+      })
+      .finally(() => {
+        if (!cancelled) setRevertPreviewLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [revertOpen, countId]);
+
+  async function handleRevert() {
+    setActing(true);
+    try {
+      const res = await adminFetch(`/api/admin/inventory/counts/${countId}/revert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          confirmed_drift: revertPreview?.has_drift === true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Revert failed');
+      const n = json.reversals_created ?? 0;
+      toast.success(
+        n === 0
+          ? 'Count reverted (no adjustments to inverse)'
+          : `Count reverted — ${n} adjustment${n === 1 ? '' : 's'} inversed`
+      );
+      setRevertOpen(false);
+      await loadCount();
+    } catch (err) {
+      console.error('Revert error:', err);
+      toast.error(err instanceof Error ? err.message : 'Revert failed');
+    } finally {
+      setActing(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -432,8 +513,28 @@ export default function CountDetailPage() {
               </Button>
             </>
           )}
+          {isCommitted && canRevert && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setRevertOpen(true)}
+              disabled={acting}
+            >
+              <Undo2 className="h-4 w-4 text-red-500" />
+              Revert Count
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Cancelled notes — rendered for any cancelled count with notes */}
+      {isCancelled && count.notes && count.notes.trim().length > 0 && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+          <p className="whitespace-pre-wrap text-sm italic text-gray-600 dark:text-gray-400">
+            {count.notes}
+          </p>
+        </div>
+      )}
 
       {/* Review summary strip */}
       {isReview && (
@@ -695,6 +796,90 @@ export default function CountDetailPage() {
         variant="destructive"
         loading={acting}
         onConfirm={handleCancel}
+      />
+
+      {/* Revert confirm */}
+      <ConfirmDialog
+        open={revertOpen}
+        onOpenChange={setRevertOpen}
+        title="Revert Inventory Count"
+        description={
+          <div className="space-y-3">
+            {revertPreviewLoading ? (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Spinner className="h-4 w-4" />
+                Loading preview…
+              </div>
+            ) : !revertPreview ? (
+              <p className="text-sm text-gray-500">Preview unavailable.</p>
+            ) : (
+              <>
+                <p>
+                  This will inverse{' '}
+                  <strong>
+                    {revertPreview.reversals_count} stock adjustment
+                    {revertPreview.reversals_count === 1 ? '' : 's'}
+                  </strong>{' '}
+                  across{' '}
+                  <strong>
+                    {revertPreview.original_products} product
+                    {revertPreview.original_products === 1 ? '' : 's'}
+                  </strong>
+                  , restoring pre-commit quantities. The count will move to{' '}
+                  <strong>cancelled</strong>.
+                </p>
+
+                {revertPreview.has_drift && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-900/20">
+                    <div className="flex gap-2">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div className="space-y-2 text-sm text-amber-900 dark:text-amber-200">
+                        <p className="font-medium">
+                          {revertPreview.drift_adjustments} non-count adjustment
+                          {revertPreview.drift_adjustments === 1 ? '' : 's'} on{' '}
+                          {revertPreview.drift_products} product
+                          {revertPreview.drift_products === 1 ? '' : 's'} since commit
+                        </p>
+                        <p>
+                          Reversal math is still correct — it subtracts this count&apos;s
+                          delta from live quantities. But subsequent sales, refunds, or
+                          receipts on these products will remain in place. The final
+                          quantities may no longer match physical stock.
+                        </p>
+                        {revertPreview.top_drifted.length > 0 && (
+                          <div>
+                            <div className="mb-1 text-xs font-medium uppercase tracking-wide">
+                              Top drifted products
+                            </div>
+                            <ul className="space-y-0.5">
+                              {revertPreview.top_drifted.map((d) => (
+                                <li
+                                  key={d.product_id}
+                                  className="flex justify-between gap-4 text-xs"
+                                >
+                                  <span className="truncate">{d.product_name}</span>
+                                  <span className="font-mono">
+                                    {d.adjustment_count} adj · net{' '}
+                                    {d.net_change > 0 ? `+${d.net_change}` : d.net_change}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        }
+        confirmLabel="Revert Count"
+        variant="destructive"
+        loading={acting}
+        requireConfirmText={count.section_label || count.id.slice(0, 8)}
+        onConfirm={handleRevert}
       />
 
       {isCommitted && (
