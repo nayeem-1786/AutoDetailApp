@@ -4,6 +4,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## audit: complete SMS inventory & chip-migration verdicts — 2026-04-24 (Session 42Z-audit)
+
+Read-only diagnostic. The driving question: should every customer-facing SMS go through the admin-editable chip (`sms_templates`) system, or stay hardcoded for some? To answer it, this audit enumerates every SMS-firing site in `src/` and assigns each a chip-migration verdict.
+
+### Method
+
+Two greps located all SMS-firing code: `sendSms|sendMarketingSms|smsService|twilio\.messages|client\.messages` (47 callsites across 32 files) and `renderSmsTemplate|renderTemplate` (which uses the chip engine). Cross-referencing identified which sends already go through chips vs. construct bodies inline. Each site was traced for variable shape, recipient, MMS use, and length constraints.
+
+### Population (~36 distinct SMS events / 23 surfaces)
+
+- **16 already chip-driven** (11 customer + 5 staff). Model implementation, no action.
+- **2 in DB but NOT seeded by migration** — `payment_receipt`, `loyalty_milestone`. Operator-authored via SQL editor; missing from `SMS_TEMPLATE_VARIABLES` registry so admin UI shows zero chips for these. Must seed regardless of global decision.
+- **2 trivial migrations** — `addon_authorization_expired` (zero-variable static, sent twice from `webhooks/twilio/inbound`), `transaction_voided` (5 chips, body short and stable). Both have source comments saying "doesn't justify template overhead" — that judgment is now stale because the user is asking the inverse question.
+- **6 standard migrations** — 3 quote SMS variants (admin/postcall/midcall), 2 addon authorization variants, plus the 6 voice-info sub-types (counted as 6 net new slugs because each carries different chips). Engineering bounded.
+- **1 truncation-aware migration** — `receipt_sms` does strict 160-char vehicle-name truncation. Engine has no length budget feature; simplest path is caller-side fit-then-substitute (compute the truncated `summary_line` chip value before calling `renderSmsTemplate`).
+- **3 free-text two-way** — operator inbox (`/messaging/send`, `/messaging/conversations/[id]/messages`) and AI auto-reply (`webhooks/twilio/inbound:894`). Cannot migrate — a chip body would degenerate to `{message_body}`, providing zero authoring value.
+- **4 marketing/lifecycle/drip senders** — already chip-templated, but in `campaigns.sms_template` / `lifecycle_rules.sms_template_id` / `drip_steps.sms_template`, not `sms_templates`. Parallel system. Out of scope for the global decision; recommend keeping separate (different lifecycles) and documenting the parallel structure.
+- **2 silent gaps** — POS refund (`/api/pos/refunds`) and admin order refund (`/api/admin/orders/[id]/refund`) send no SMS at all. Verified by zero-hit grep. Not a migration question — net new functionality, ship as chip from day one.
+
+### Recommendation: chip-by-default with three named exemptions
+
+Every SMS goes through `renderSmsTemplate()` with a slug-keyed row in `sms_templates`, except: (1) free-text bodies authored at runtime by humans/AI, (2) marketing campaign/lifecycle/drip bodies (already chip-templated, different storage), (3) engine-feature gaps (currently only `receipt_sms`'s strict truncation, which can be solved caller-side).
+
+Pre-requisite before mass migration: **fix the engine's noun-phrase fallback collision** (Session 42W Phase 6 step 2 — the "your your vehicle" root cause). Without that, every new template using `{vehicle_description}` etc. inherits the same risk surface that produced the SD-006223 incident.
+
+### Engineering scope if accepted
+
+~14 new templates seeded + ~14 new entries in `SMS_TEMPLATE_VARIABLES` + ~14 callsite refactors. Sequenced: engine fallback fix → seed unseeded templates → trivial migrations → refund gaps → standard migrations → voice-info batch → `receipt_sms` last. Each step independently shippable.
+
+### Open questions (7)
+
+Surfaced in the audit doc, including: should marketing/transactional chip systems merge (recommend: no), should engine grow conditional rendering (recommend: no, caller-built conditional chips work), should `UNSAFE_SMS_TEMPLATES` be renamed (recommend: yes — current name predisposes future readers to think the chip system is dangerous), should new SMS sites be blocked from adding to the hardcoded population during the migration sprint (recommend: codify the rule in CONVENTIONS.md before migration begins).
+
+### Files
+
+- New: `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md` (488 lines)
+- No code changes
+- Cross-references `docs/audits/SMS_TEMPLATE_ROOT_CAUSE_SESSION42W.md`
+
+---
+
 ## fix(pos): inline iPad-friendly disabled message on void button — 2026-04-24 (Session 42Q-followup)
 
 Session 42Q shipped the card-payment void block with a tooltip on the disabled Void button via the project's standard pattern — the native HTML `title` attribute. Smoke testing on iPad (the actual POS device) revealed the gap: **`title` only fires on hover-with-mouse**, so on the production touch device the button is silently disabled with no explanation. The reason text was technically present in the DOM, just unreachable.
