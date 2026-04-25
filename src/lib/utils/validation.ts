@@ -129,6 +129,11 @@ export const productCreateSchema = z.object({
 
 export const productUpdateSchema = productCreateSchema.partial();
 
+// Edit form omits quantity_on_hand: stock changes must go through the
+// audited /api/admin/stock-adjustments endpoint (Quick Edit drawer), not
+// the product detail form. See docs/audits/INVENTORY_LOG_INTEGRITY_SESSION42O.md.
+export const productEditSchema = productCreateSchema.omit({ quantity_on_hand: true });
+
 // Vendor schemas
 export const vendorSchema = z.object({
   name: requiredString,
@@ -699,6 +704,7 @@ export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 export type ProductCreateInput = z.infer<typeof productCreateSchema>;
 export type ProductUpdateInput = z.infer<typeof productUpdateSchema>;
+export type ProductEditInput = z.infer<typeof productEditSchema>;
 export type VendorInput = z.infer<typeof vendorSchema>;
 export type ServiceCreateInput = z.infer<typeof serviceCreateSchema>;
 export type ServiceUpdateInput = z.infer<typeof serviceUpdateSchema>;

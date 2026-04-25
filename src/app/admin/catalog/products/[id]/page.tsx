@@ -7,10 +7,10 @@ import { useForm, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
-import { productCreateSchema, type ProductCreateInput } from '@/lib/utils/validation';
-import { WATER_SKU } from '@/lib/utils/constants';
-import type { Product, ProductCategory, ProductImage, Vendor } from '@/lib/supabase/types';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { productEditSchema, type ProductEditInput } from '@/lib/utils/validation';
+import { WATER_SKU, STOCK_ADJUSTMENT_TYPE_LABELS } from '@/lib/utils/constants';
+import type { Product, ProductCategory, ProductImage, Vendor, StockAdjustment } from '@/lib/supabase/types';
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
@@ -26,9 +26,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Spinner } from '@/components/ui/spinner';
-import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, DollarSign, Trash2, X, Plus, Link2, Unlink, Sparkles, Eye, EyeOff, Pencil, History, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { MultiImageUpload } from '@/app/admin/catalog/components/multi-image-upload';
+import { QuickEditDrawer } from '../components/quick-edit-drawer';
+import { DataTable } from '@/components/ui/data-table';
+import { ReceiptDialog } from '@/components/admin/receipt-dialog';
+import type { ColumnDef } from '@tanstack/react-table';
 import {
   getSaleStatus,
   getTierSaleInfo,
@@ -88,6 +92,9 @@ export default function ProductDetailPage() {
   const [pendingDraftId, setPendingDraftId] = useState<string | null>(null);
   const [acceptingEnrichment, setAcceptingEnrichment] = useState(false);
 
+  // Quick Edit drawer for stock-audited qty changes (Session 42R).
+  const [quickEditOpen, setQuickEditOpen] = useState(false);
+
   // Specs form state (managed separately from react-hook-form for tag inputs)
   const [specKeyFeatures, setSpecKeyFeatures] = useState<string[]>([]);
   const [specSurfaceCompat, setSpecSurfaceCompat] = useState<string[]>([]);
@@ -111,8 +118,8 @@ export default function ProductDetailPage() {
     setValue,
     reset,
     formState: { errors },
-  } = useForm<ProductCreateInput>({
-    resolver: formResolver(productCreateSchema),
+  } = useForm<ProductEditInput>({
+    resolver: formResolver(productEditSchema),
   });
 
   const watchSku = watch('sku');
@@ -194,6 +201,8 @@ export default function ProductDetailPage() {
       setOriginalCategoryId(p.category_id);
 
       // Populate form
+      // quantity_on_hand intentionally NOT in this payload — qty changes
+      // require an audit row and must go through Quick Edit (Session 42R).
       reset({
         name: p.name,
         slug: p.slug,
@@ -203,7 +212,6 @@ export default function ProductDetailPage() {
         vendor_id: p.vendor_id || null,
         cost_price: p.cost_price,
         retail_price: p.retail_price,
-        quantity_on_hand: p.quantity_on_hand,
         reorder_threshold: p.reorder_threshold ?? null,
         min_order_qty: p.min_order_qty ?? null,
         is_taxable: p.is_taxable,
@@ -421,7 +429,7 @@ export default function ProductDetailPage() {
     await Promise.all(updates);
   }
 
-  async function onSubmit(data: ProductCreateInput) {
+  async function onSubmit(data: ProductEditInput) {
     setSaving(true);
     try {
       const newSlug = data.slug || originalSlug;
@@ -465,7 +473,6 @@ export default function ProductDetailPage() {
           vendor_id: data.vendor_id || null,
           cost_price: data.cost_price,
           retail_price: data.retail_price,
-          quantity_on_hand: data.quantity_on_hand,
           reorder_threshold: data.reorder_threshold ?? null,
           min_order_qty: data.min_order_qty ?? null,
           is_taxable: data.is_taxable,
@@ -858,14 +865,30 @@ export default function ProductDetailPage() {
                 />
               </FormField>
 
-              <FormField label="Quantity on Hand" error={errors.quantity_on_hand?.message} htmlFor="quantity_on_hand">
-                <Input
-                  id="quantity_on_hand"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  {...register('quantity_on_hand')}
-                />
+              <FormField
+                label="Quantity on Hand"
+                htmlFor="quantity_on_hand"
+                description="Quantity changes require an audit trail. Use Quick Edit to adjust — the change is logged with reason and reference in stock history."
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    id="quantity_on_hand"
+                    aria-readonly="true"
+                    className="flex h-10 flex-1 items-center rounded-md border border-ui-border bg-ui-bg-muted px-3 text-sm text-ui-text"
+                  >
+                    {product.quantity_on_hand}
+                  </div>
+                  {canEditProduct && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setQuickEditOpen(true)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Quick Edit
+                    </Button>
+                  )}
+                </div>
               </FormField>
 
               <FormField label="Reorder Threshold" error={errors.reorder_threshold?.message} htmlFor="reorder_threshold" description="Alert when stock drops to this level">
@@ -1273,7 +1296,6 @@ export default function ProductDetailPage() {
                                 vendor_id: p.vendor_id || null,
                                 cost_price: p.cost_price,
                                 retail_price: p.retail_price,
-                                quantity_on_hand: p.quantity_on_hand,
                                 reorder_threshold: p.reorder_threshold ?? null,
                                 min_order_qty: p.min_order_qty ?? null,
                                 is_taxable: p.is_taxable,
@@ -1545,6 +1567,9 @@ export default function ProductDetailPage() {
         <CostMarginCard product={product} costHistory={costHistory} />
       )}
 
+      {/* Stock History Card — permission-gated */}
+      <StockHistoryCard productId={productId} />
+
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
@@ -1565,6 +1590,15 @@ export default function ProductDetailPage() {
         variant="destructive"
         loading={savingSale}
         onConfirm={clearSalePricing}
+      />
+
+      <QuickEditDrawer
+        open={quickEditOpen}
+        product={product as Product}
+        onOpenChange={setQuickEditOpen}
+        onSaved={(updated) => {
+          setProduct((prev) => (prev ? { ...prev, ...updated } : prev));
+        }}
       />
     </div>
   );

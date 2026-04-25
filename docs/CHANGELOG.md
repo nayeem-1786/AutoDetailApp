@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(catalog): make product edit form qty read-only with audit trail enforcement — 2026-04-24 (Session 42R)
+
+Closes the silent inventory mutation path identified in Session 42O (`docs/audits/INVENTORY_LOG_INTEGRITY_SESSION42O.md` Phase 1.1 #9): the product edit form at `/admin/catalog/products/[id]` previously sent `quantity_on_hand` as part of its UPDATE payload, allowing direct browser-side `supabase.from('products').update(...)` to silently mutate stock with no `stock_adjustments` audit row.
+
+### Changes
+
+- **Schema-level removal:** added `productEditSchema = productCreateSchema.omit({ quantity_on_hand: true })` and `ProductEditInput` in `src/lib/utils/validation.ts`. `productCreateSchema` is unchanged so the new-product page (which legitimately sets initial stock) keeps working. Future contributors who try to add `quantity_on_hand` back to the edit form will get a TypeScript error.
+- **Detail page:** `src/app/admin/catalog/products/[id]/page.tsx` switched from `productCreateSchema` → `productEditSchema`, dropped `quantity_on_hand` from both `reset()` payloads (initial load + AI-enrichment apply) and from the UPDATE payload, and replaced the `<Input>` with a read-only display panel + "Quick Edit" button that opens the existing audited `<QuickEditDrawer>`.
+- **Help text:** the qty FormField now reads "Quantity changes require an audit trail. Use Quick Edit to adjust — the change is logged with reason and reference in stock history."
+- **Quick Edit drawer mounted in-context:** the user no longer has to navigate back to the products list to adjust stock — the drawer renders directly on the detail page and writes through `POST /api/admin/stock-adjustments` (the canonical audited path), keeping the user in flow.
+
+### Quality gates
+
+- `tsc --noEmit`: pass.
+- `eslint`: clean on changed files.
+- `vitest`: 460/460 pass (incl. 14 quick-edit-drawer tests verifying the audit-row write path is unchanged).
+
+### Files
+
+- `src/lib/utils/validation.ts` — added `productEditSchema` + `ProductEditInput`.
+- `src/app/admin/catalog/products/[id]/page.tsx` — schema swap, qty removed from form payload (3 sites), read-only display + Quick Edit button, drawer mount.
+
+### Out of scope (still open)
+
+The other silent paths from Session 42O Phase 1.4 (admin orders refund, Stripe webhook, POS void) remain untouched in this commit. Those are tracked separately under the Track A roll-out.
+
+---
+
 ## audit: refund flow comprehensive read-only audit — 2026-04-24 (Session 42N-audit)
 
 Read-only deep audit of the refund flow, written before the void inventory fix is designed so the void mirror copies the right things and skips the wrong things. Companion to `VOID_INVENTORY_BUG_SESSION42M.md`.
