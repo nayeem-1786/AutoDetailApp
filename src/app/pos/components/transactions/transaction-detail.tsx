@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Ban, Loader2 } from 'lucide-react';
+import { ArrowLeft, Ban, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
@@ -518,22 +518,33 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
               </Button>
             )}
             {voidEligible && (
-              <Button
-                variant="outline"
-                className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-400"
-                onClick={() => setShowVoidConfirm(true)}
-                disabled={!hasVoidPerm || hasCardPayment}
-                title={
-                  !hasVoidPerm
-                    ? "You don't have permission to perform this action"
-                    : hasCardPayment
-                      ? cardBlockTooltip
-                      : undefined
-                }
-              >
-                <Ban className="mr-1.5 h-4 w-4" />
-                Void Transaction
-              </Button>
+              <div className="flex flex-col items-start gap-1">
+                <Button
+                  variant="outline"
+                  className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-400"
+                  onClick={() => setShowVoidConfirm(true)}
+                  disabled={!hasVoidPerm || hasCardPayment}
+                  title={
+                    !hasVoidPerm
+                      ? "You don't have permission to perform this action"
+                      : hasCardPayment
+                        ? cardBlockTooltip
+                        : undefined
+                  }
+                >
+                  <Ban className="mr-1.5 h-4 w-4" />
+                  Void Transaction
+                </Button>
+                {hasCardPayment && (
+                  <p
+                    role="note"
+                    className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400"
+                  >
+                    <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" aria-hidden="true" />
+                    Card sales must be refunded, not voided.
+                  </p>
+                )}
+              </div>
             )}
           </div>
         )}

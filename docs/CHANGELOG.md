@@ -4,6 +4,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): inline iPad-friendly disabled message on void button — 2026-04-24 (Session 42Q-followup)
+
+Session 42Q shipped the card-payment void block with a tooltip on the disabled Void button via the project's standard pattern — the native HTML `title` attribute. Smoke testing on iPad (the actual POS device) revealed the gap: **`title` only fires on hover-with-mouse**, so on the production touch device the button is silently disabled with no explanation. The reason text was technically present in the DOM, just unreachable.
+
+### Fix — scoped, one button only
+
+In `src/app/pos/components/transactions/transaction-detail.tsx`, when `hasCardPayment` is true, render a small inline message directly under the Void button:
+
+> ⚠ Card sales must be refunded, not voided.
+
+- Wrapped in a `flex flex-col items-start gap-1` column so the Refund button to the left stays inline at the top.
+- `text-xs text-gray-500 dark:text-gray-400` (matches the muted text convention used throughout the POS — `transaction-list.tsx` uses the same gray-400/500 pair).
+- `AlertCircle` icon (lucide) prefixes the text for affordance; `aria-hidden` because the message itself is the announce-target via `role="note"`.
+- Conditional: rendered only when `hasCardPayment` is true. On cash-only sales the void button stands alone with no message.
+- The existing `title=` attribute is preserved as the desktop-mouse fallback. Harmless on iPad, useful on a connected mouse.
+
+### Why we did NOT retrofit the other 8 POS sites
+
+This fix is **scoped to the Void button only**. The same iPad-invisibility issue applies to 8 other places in the POS that use `title=` for disabled-button explanations: `bottom-nav.tsx`, `ticket-actions.tsx` (×2), `customer-vehicle-summary.tsx` (×2), `ticket-item-row.tsx` (×2), `offline-queue-badge.tsx`. We deliberately did not retrofit those in this followup because:
+
+1. The Void button is the highest-stakes interaction surfaced by the bug — a confused operator could call support thinking the system is broken; on the others (e.g. "Hold ticket" disabled when cart is empty) the UI state is already obvious without text.
+2. A consistent retrofit deserves a shared `<DisabledHint>` component (or equivalent) so the visual treatment, icon choice, and a11y semantics don't drift across 9 sites. That extraction is not appropriate while there's only one consumer — the project convention is to verify need with at least two real consumers before factoring.
+3. A future session can do the audit-and-roll-out in one pass, with the shared component, once a second site adopts this pattern.
+
+### Tests
+
+Updated `__tests__/transaction-detail-void.test.tsx`:
+
+- Cash-only sale: existing test now also asserts the inline message is **not** rendered.
+- Card sale: keeps the title-attribute assertion (desktop fallback preserved); adds an assertion that the inline message is rendered.
+- Split-tender sale: now also asserts the inline message renders (split = includes card by definition).
+
+7/7 tests in this file pass; full vitest suite remains green at 484/484. `npm run build` clean. `npx tsc --noEmit` clean.
+
+---
+
 ## fix(catalog): move StockHistoryCard to dedicated component file to fix Next.js build — 2026-04-24 (Session 42T-followup)
 
 Session 42T (commit `ca88589d`) shipped `StockHistoryCard` as a **named export** from `src/app/admin/catalog/products/[id]/page.tsx` so the colocated test file could import it directly. That fixed the test import problem but broke the Next.js production build:

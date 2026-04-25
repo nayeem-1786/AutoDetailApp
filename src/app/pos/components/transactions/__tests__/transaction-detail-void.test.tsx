@@ -85,6 +85,8 @@ describe('TransactionDetail — void button card block', () => {
     await screen.findByRole('button', { name: /void transaction/i });
     const voidBtn = getVoidButtonOnPage();
     expect(voidBtn.disabled).toBe(false);
+    // Inline disabled-state message must NOT render when void is allowed.
+    expect(screen.queryByText(/Card sales must be refunded, not voided\./i)).toBeNull();
   });
 
   it('disables the void button when payment includes a card', async () => {
@@ -95,9 +97,14 @@ describe('TransactionDetail — void button card block', () => {
     await screen.findByRole('button', { name: /void transaction/i });
     const voidBtn = getVoidButtonOnPage();
     expect(voidBtn.disabled).toBe(true);
+    // Desktop hover fallback — preserved.
     expect(voidBtn.title).toBe(
       'This sale included a card payment. Card transactions must be refunded, not voided.'
     );
+    // iPad-friendly inline message — visible whenever the card-payment block applies.
+    expect(
+      screen.getByText(/Card sales must be refunded, not voided\./i),
+    ).toBeDefined();
   });
 
   it('disables the void button for split-tender sales', async () => {
@@ -108,6 +115,10 @@ describe('TransactionDetail — void button card block', () => {
     await screen.findByRole('button', { name: /void transaction/i });
     const voidBtn = getVoidButtonOnPage();
     expect(voidBtn.disabled).toBe(true);
+    // Split tender includes a card by definition — inline message renders.
+    expect(
+      screen.getByText(/Card sales must be refunded, not voided\./i),
+    ).toBeDefined();
   });
 });
 
