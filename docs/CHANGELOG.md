@@ -4,6 +4,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## audit: refund flow comprehensive read-only audit — 2026-04-24 (Session 42N-audit)
+
+Read-only deep audit of the refund flow, written before the void inventory fix is designed so the void mirror copies the right things and skips the wrong things. Companion to `VOID_INVENTORY_BUG_SESSION42M.md`.
+
+**Deliverable:** `docs/audits/REFUND_FLOW_DEEP_AUDIT_SESSION42N.md`. No code or migration changes.
+
+### Scope
+
+- Phase 1: full quote of the POS refund POST handler (`/api/pos/refunds/route.ts`), 20-step order of operations, 11 DB writes table, rollback story per failure point, external-service-call position.
+- Phase 2: partial refund math — full vs. partial detection (two definitions, slight divergence noted), tax pro-ration, tip flat-not-pro-rated, loyalty `Math.floor` semantics, money-math invariants from `refund-math.ts`. Worked examples for both no-discount and with-discount cases.
+- Phase 3: Stripe interaction — Stripe-before-DB ordering, no idempotency key (real defect, retries can double-refund), Terminal vs CNP both via `payment_intent`, mixed-payment edge case (only first card payment refunded via Stripe).
+- Phase 4: disposition logic — UI two-layer selection (all-items + per-line in mixed mode), legacy `restock` boolean still written for backwards-compat, no API to edit disposition post-creation.
+- Phase 5: coupon + campaign reversal — only on full refund (`newStatus === 'refunded'`), partials leave coupon `use_count` untouched. No multi-coupon support (schema is single `coupon_id`).
+- Phase 6: loyalty reversal — proportional clawback/restore via `Math.floor(points × totalRefundAmount / total_amount)`, `loyalty_ledger` rows linked by `transaction_id` only (no `refund_id` column — forensic friction flagged).
+- Phase 7: admin online-order refund (`/api/admin/orders/[id]/refund`) — separate route because orders use cents/different schema, but has 4 defects: silent qty mutation (no `stock_adjustments` row), no disposition, no loyalty/coupon/campaign reversal, partial refunds restore 100% of inventory regardless of refund amount.
+- Phase 8: refund-vs-void differences matrix (20+ rows) annotated mirror exactly / mirror with modification / skip / new — the spec for the future void fix.
+- Phase 9: 8 open questions for void fix design — disposition, Stripe-on-void, partial-refund-then-void, job/appointment cascade, customer lifetime spend reversal, RPC vs JS atomicity, Stripe idempotency, refund non-atomicity follow-ups.
+
+### Headline findings
+
+| Finding | Status |
+|---|---|
+| POS refund follows Stripe-before-DB pattern correctly | Working |
+| Single-rounding money math with residual-cent redistribution | Working |
+| Server-side recompute with exact-match enforcement | Working |
+| Per-line disposition with audit rows for every disposition (incl. damaged/kept) | Working |
+| No SQL transaction wrapper — partial-failure leaves orphans (DB drift after Stripe debit) | Defect, low frequency |
+| No Stripe idempotency key — rapid retries can double-refund | Defect, low frequency |
+| Coupon/campaign reversal skipped on partial refunds | Behavioral choice, flagged |
+| Admin online-order refund: silent qty mutation, no audit row | Defect (companion to void bug) |
+| Admin online-order refund: 100% qty restore even on partial | Defect |
+| Admin online-order refund: no loyalty/coupon/campaign reversal | Defect |
+| `customer.lifetime_spend` and `visit_count` never reversed (refund or void) | Defect, separate ticket |
+
+No code changes. Future work tracked via Phase 9 open questions.
+
+---
+
 ## fix(inventory): revert modal UX — CONFIRM phrase + negative-qty error banner + auto-refetch on tab focus + stale-modal handling — 2026-04-24 (Session 42K-patch-1)
 
 Smoke testing of Session 42K surfaced two real UX issues:
