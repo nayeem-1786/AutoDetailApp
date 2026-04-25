@@ -542,6 +542,7 @@ src/app/admin/appointments/waitlist/page.tsx
 ```
 src/app/admin/catalog/categories/page.tsx
 src/app/admin/catalog/products/[id]/page.tsx
+src/app/admin/catalog/products/[id]/_components/stock-history-card.tsx
 src/app/admin/catalog/products/[id]/__tests__/stock-history-card.test.tsx
 src/app/admin/catalog/products/enrichment-review/page.tsx
 src/app/admin/catalog/products/new/page.tsx

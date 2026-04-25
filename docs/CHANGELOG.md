@@ -4,6 +4,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(catalog): move StockHistoryCard to dedicated component file to fix Next.js build — 2026-04-24 (Session 42T-followup)
+
+Session 42T (commit `ca88589d`) shipped `StockHistoryCard` as a **named export** from `src/app/admin/catalog/products/[id]/page.tsx` so the colocated test file could import it directly. That fixed the test import problem but broke the Next.js production build:
+
+```
+Type error: Page "src/app/admin/catalog/products/[id]/page.tsx" does not match
+the required types of a Next.js Page. "StockHistoryCard" is not a valid Page
+export field.
+```
+
+**Root cause.** Next.js App Router `page.tsx` files only accept a default export plus a small allow-list of metadata exports (`metadata`, `generateMetadata`, `viewport`, `dynamic`, `revalidate`, etc.). Any other named export fails the page-export validator at build time. `tsc --noEmit` and `vitest run` both pass — only `next build` enforces this rule, which is why 42T's quality gates did not catch it.
+
+**Fix.** Extract the component into its own file under the project's documented `_components/` route-folder convention (5 existing precedents in `src/app/admin/marketing/...` and `src/app/admin/website/...`):
+
+- New: `src/app/admin/catalog/products/[id]/_components/stock-history-card.tsx` — default export, owns its own `STOCK_HISTORY_PAGE_SIZE = 50` constant and all imports it needs (DataTable, ReceiptDialog, ColumnDef, History/ChevronLeft/ChevronRight icons, formatDateTime, STOCK_ADJUSTMENT_TYPE_LABELS, StockAdjustment).
+- `page.tsx` — removed the inline component definition (250 lines) and dropped the now-unused imports. Added `import StockHistoryCard from './_components/stock-history-card';`. Mount line at the JSX call site is unchanged.
+- `__tests__/stock-history-card.test.tsx` — single-line import swap from `import { StockHistoryCard } from '../page'` to `import StockHistoryCard from '../_components/stock-history-card'`. Test cases unchanged.
+
+Behavior identical to 42T. Quality gates added to this fix:
+
+- `npm run build` — succeeds (compiled successfully, 780/780 static pages generated).
+- `npx tsc --noEmit` — clean.
+- `npx vitest run` — 484/484 tests pass (all 5 StockHistoryCard cases unchanged).
+
+**Lesson.** For App Router projects, `npm run build` is the canonical quality gate — `tsc` and `vitest` alone don't enforce Next.js's per-file export contract. Future component-export-from-page-tsx mistakes will be caught the same way.
+
+---
+
 ## feat(pos): void inventory restoration with job cascade — 2026-04-24 (Session 42Q)
 
 Closes the silent void-inventory bug present since launch (Session 42M audit). Replaces the JS-based void handler with an atomic `void_transaction` RPC that mirrors the `commit_stock_count` / `revert_stock_count` pattern (single PG transaction, `FOR UPDATE` row locks, structured JSONB returns).

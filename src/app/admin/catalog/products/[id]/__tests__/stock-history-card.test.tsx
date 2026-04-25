@@ -64,7 +64,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 // Import AFTER mocks are registered.
-import { StockHistoryCard } from '../page';
+import StockHistoryCard from '../_components/stock-history-card';
 
 function makeAdjustment(overrides: Partial<StockAdjustment> = {}): StockAdjustment {
   return {
