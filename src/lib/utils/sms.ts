@@ -303,26 +303,32 @@ export async function buildAppointmentConfirmationSms(params: {
   detailerFirstName?: string;
 }): Promise<string | null> {
   const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
-  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total, detailerFirstName } = params;
-  const greeting = customerFirstName ? `Hi ${customerFirstName}, your` : 'Your';
-  const serviceLine = serviceName ? `${serviceName}\n` : '';
-  const totalLine = total ? `Total: ${total}\n` : '';
+  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
+
+  // Session 42AB: build {appointment_summary} caller-side composite chip.
+  // Template body is now "{business_name} — Appointment Confirmed\n\nHi
+  // {first_name}!\n{appointment_summary}\n\nQuestions? Call {business_phone}".
+  // Caller owns the conditional service/total lines; template owns only the
+  // structural skeleton.
+  const summaryLines: string[] = ['Your appointment is scheduled:'];
+  if (serviceName) summaryLines.push(serviceName);
+  summaryLines.push(`${date} at ${time}`);
+  if (total) summaryLines.push(`Total: ${total}`);
+  const appointmentSummary = summaryLines.join('\n');
+
+  const firstName = customerFirstName || 'there';
 
   const fallback =
     `${businessName} — Appointment Confirmed\n\n` +
-    `${greeting} appointment is scheduled:\n` +
-    serviceLine +
-    `${date} at ${time}\n` +
-    totalLine +
-    `\nQuestions? Call ${businessPhone}`;
+    `Hi ${firstName}!\n` +
+    `${appointmentSummary}\n\n` +
+    `Questions? Call ${businessPhone}`;
 
   const result = await renderSmsTemplate('appointment_confirmed', {
-    first_name: customerFirstName,
-    service_name: serviceName,
-    appointment_date: date,
-    appointment_time: time,
-    service_total: total,
-    detailer_first_name: detailerFirstName,
+    business_name: businessName,
+    first_name: firstName,
+    appointment_summary: appointmentSummary,
+    business_phone: businessPhone,
   }, fallback);
 
   return result.isActive ? result.body : null;

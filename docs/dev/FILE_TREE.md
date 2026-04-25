@@ -940,6 +940,7 @@ src/app/api/admin/sms-templates/[slug]/reset/route.ts
 src/app/api/admin/sms-templates/[slug]/test/route.ts
 src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts
 src/app/api/pos/jobs/[id]/complete/__tests__/job-complete-vehicle-literal.test.ts
+src/lib/utils/__tests__/sms-build-appointment-confirmation.test.ts
 src/app/admin/settings/messaging/sms-templates/page.tsx
 ```
 

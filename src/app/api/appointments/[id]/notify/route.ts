@@ -292,20 +292,22 @@ Thank you for choosing ${business.name}!`;
     if (appointment.employee_id && employee?.phone) {
       try {
         const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+        // Session 42AB: build {job_summary} caller-side composite chip.
+        // Template body is now "New job assigned: {job_summary}\n{appointment_date}
+        // at {appointment_time}\n{address}\nTotal: {service_total}". Caller owns
+        // the services + optional " – vehicle" prose; template owns the skeleton.
+        const jobSummary = vehicle ? `${serviceNames} – ${vehicleStr}` : serviceNames;
         const detailerFallback =
-          `New job assigned: ${serviceNames}` +
-          (vehicle ? ` – ${vehicleStr}` : '') +
+          `New job assigned: ${jobSummary}` +
           `\n${dateStr} at ${displayTime}` +
           (appointment.mobile_address ? `\n${appointment.mobile_address}` : '') +
           `\nTotal: ${formatCurrency(appointment.total_amount)}`;
         const detailerResult = await renderSmsTemplate('detailer_job_assigned', {
-          services: serviceNames,
-          vehicle_description: vehicle ? vehicleStr : undefined,
+          job_summary: jobSummary,
           appointment_date: dateStr,
           appointment_time: displayTime,
-          address: appointment.mobile_address || undefined,
+          address: appointment.mobile_address || '',
           service_total: formatCurrency(appointment.total_amount),
-          detailer_first_name: employee?.first_name || undefined,
         }, detailerFallback);
         if (!detailerResult.isActive) throw new Error('skip');
         const smsResult = await sendSms(employee.phone, detailerResult.body);
