@@ -932,10 +932,13 @@ src/lib/email/drip-engine.ts
 ```
 src/lib/sms/render-sms-template.ts
 src/lib/sms/sms-template-variables.ts
+src/lib/sms/__tests__/render-sms-template.test.ts
 src/app/api/admin/sms-templates/route.ts
 src/app/api/admin/sms-templates/[slug]/route.ts
+src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts
 src/app/api/admin/sms-templates/[slug]/reset/route.ts
 src/app/api/admin/sms-templates/[slug]/test/route.ts
+src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts
 src/app/admin/settings/messaging/sms-templates/page.tsx
 ```
 

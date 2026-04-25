@@ -67,13 +67,79 @@ export async function PUT(
     updated_by: employee.auth_user_id,
   };
 
-  // Validate body_template — required variables must be present
+  // Validate body_template — required variables must be present + placeholder syntax must be well-formed
   if (body.body_template !== undefined) {
-    const variables = (template.variables as Array<{ key: string; required: boolean }>) ?? [];
-    const missing = variables
-      .filter((v) => v.required && !body.body_template.includes(`{${v.key}}`))
-      .map((v) => v.key);
+    const newBody: string = body.body_template;
 
+    // Normalize the variable registry the same way render-sms-template.ts does:
+    // production stores a flat string[] of keys, legacy migrations store object form.
+    // Treat every listed variable as required (per Session 42X-1 schema clarification).
+    const rawVars: unknown = template.variables;
+    const allowedKeys: string[] = Array.isArray(rawVars)
+      ? rawVars
+          .map((entry) => {
+            if (typeof entry === 'string') return entry;
+            if (entry && typeof entry === 'object' && 'key' in entry) {
+              return (entry as { key: string }).key;
+            }
+            return null;
+          })
+          .filter((k): k is string => typeof k === 'string')
+      : [];
+
+    // 1. Reject doubled-brace patterns ({{key}} — common operator typo)
+    //    Match doubled-brace tokens before the single-brace scan strips them.
+    const doubledBraceMatch = newBody.match(/\{\{[^}]+\}\}/);
+    if (doubledBraceMatch) {
+      return NextResponse.json(
+        {
+          error: `Doubled braces are not supported. Found "${doubledBraceMatch[0]}". Use single braces: ${doubledBraceMatch[0].replace(/^\{\{/, '{').replace(/\}\}$/, '}')}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. Scan {…} placeholders for valid syntax + known keys.
+    //    The render engine substitutes /\{(\w+)\}/g and the post-render scan uses
+    //    /\{([a-z_]+)\}/g — placeholders outside the lowercase-letters-and-underscore
+    //    pattern would never substitute and would leak as raw text. Reject them here.
+    const placeholderRegex = /\{([^}]*)\}/g;
+    const validKeyPattern = /^[a-z][a-z0-9_]*$/;
+    let match: RegExpExecArray | null;
+    const offendersUnknown: string[] = [];
+    const offendersMalformed: string[] = [];
+    while ((match = placeholderRegex.exec(newBody)) !== null) {
+      const inner = match[1];
+      if (!validKeyPattern.test(inner)) {
+        offendersMalformed.push(match[0]);
+        continue;
+      }
+      if (!allowedKeys.includes(inner)) {
+        offendersUnknown.push(match[0]);
+      }
+    }
+    if (offendersMalformed.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Malformed placeholder: ${offendersMalformed.join(', ')}. Use lowercase letters, digits, and underscores only; must start with a letter.`,
+          malformed: offendersMalformed,
+        },
+        { status: 400 }
+      );
+    }
+    if (offendersUnknown.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Unknown placeholder: ${offendersUnknown.join(', ')}. Valid variables for this template: ${allowedKeys.length > 0 ? allowedKeys.map((k) => `{${k}}`).join(', ') : '(none)'}.`,
+          unknown: offendersUnknown,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Required-variables-present check (existing behavior preserved).
+    //    Schema clarification: every listed variable is treated as required.
+    const missing = allowedKeys.filter((key) => !newBody.includes(`{${key}}`));
     if (missing.length > 0) {
       return NextResponse.json(
         { error: 'Missing required variables', missing },
@@ -81,7 +147,7 @@ export async function PUT(
       );
     }
 
-    updates.body_template = body.body_template;
+    updates.body_template = newBody;
   }
 
   // Validate is_active toggle — can_silence check

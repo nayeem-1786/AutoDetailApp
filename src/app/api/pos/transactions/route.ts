@@ -462,6 +462,39 @@ export async function POST(request: NextRequest) {
             return;
           }
 
+          // Session 42X-1 (D): status interlock — re-fetch transaction status before sending.
+          // If the operator voided/refunded during the 30s window, skip the send.
+          // This query is hoisted from its previous position (post-vehicle-lookup) so we can
+          // exit early without paying for the customer/vehicle/short-link work. The single
+          // SELECT now returns both status and loyalty_points_earned (used downstream).
+          const { data: txRefresh } = await admin
+            .from('transactions')
+            .select('status, loyalty_points_earned')
+            .eq('id', autoReceiptTxId)
+            .single();
+
+          const skipStatuses: ReadonlyArray<string> = ['voided', 'refunded', 'partial_refund'];
+          if (!txRefresh || skipStatuses.includes(txRefresh.status)) {
+            const observedStatus = txRefresh?.status ?? 'not_found';
+            console.log(`[AutoReceipt] Skipped — status=${observedStatus} for transaction ${autoReceiptTxId}`);
+            try {
+              await admin.from('audit_log').insert({
+                action: 'auto_receipt_skipped',
+                entity_type: 'transaction',
+                entity_id: autoReceiptTxId,
+                source: 'system',
+                details: {
+                  reason: 'auto_receipt_skipped_due_to_status_change',
+                  original_status: observedStatus,
+                  skipped_at: new Date().toISOString(),
+                },
+              });
+            } catch (auditErr) {
+              console.error('[AutoReceipt] audit_log insert failed:', auditErr);
+            }
+            return;
+          }
+
           // Fetch customer phone
           const { data: cust } = await admin
             .from('customers')
@@ -486,13 +519,9 @@ export async function POST(request: NextRequest) {
             if (veh) vehicleDesc = cleanVehicleDescription(veh);
           }
 
-          // Fetch loyalty points earned (updated after insert)
-          const { data: txRefresh } = await admin
-            .from('transactions')
-            .select('loyalty_points_earned')
-            .eq('id', autoReceiptTxId)
-            .single();
-          const pointsEarned = txRefresh?.loyalty_points_earned ?? 0;
+          // Loyalty points earned came from the txRefresh query above (status interlock).
+          // txRefresh is non-null here (status check returned early on null).
+          const pointsEarned = txRefresh.loyalty_points_earned ?? 0;
 
           const businessInfo = await getBusinessInfo();
 

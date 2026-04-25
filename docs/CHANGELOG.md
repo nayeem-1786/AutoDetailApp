@@ -4,6 +4,101 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(sms): engine fallbacks + required hard-skip + PUT validation + auto-receipt interlock — 2026-04-25 (Session 42X-1)
+
+Engine-level fixes for the SMS template system, scoped per the architectural decisions locked in `docs/audits/SMS_TEMPLATE_ROOT_CAUSE_SESSION42W.md` and `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md`. No template bodies, no new templates, no callsite refactors, no admin POST endpoint — those are all later sessions (42AA, 42AB, 42AC–42AF, 42AG, 42AH).
+
+### Four changes
+
+**C1 — emptied 11 noun-phrase fallbacks in `DEFAULT_VARIABLE_FALLBACKS`** (`src/lib/sms/render-sms-template.ts:178-196`).
+
+The engine used to fabricate prose noun-phrases ("your vehicle", "Valued Customer", "your scheduled date") for missing variables. That fabrication collided with template prose: a body like `"Your {vehicle_description}"` plus a missing `vehicle_description` produced `"Your your vehicle"` — the "smoking gun" from Session 42W's incident SD-006223. The fix empties those 11 entries so the existing `\x00REMOVE_LINE\x00` sentinel + `split('\n').filter(...)` path strips the entire line containing the missing key, rather than fabricating a noun. The 6 already-empty entries (`service_total`, `gallery_link`, `short_url`, `hours_line`, `address`, `deposit_info`) are unchanged.
+
+**C2 — required-variable hard skip** (`src/lib/sms/render-sms-template.ts:262-281`).
+
+Previously a `console.warn` only — and it never actually fired in production because the variable-shape check accessed `.required` on flat strings. The fix:
+
+- Cache loader (`loadTemplates`) normalizes `sms_templates.variables` into `{key, description, required}` shape, handling both the production schema (flat `string[]`) and legacy migrations (`[{key, description, required}]`). Per Session 42X-1 + 42Z-audit Phase 5 Q schema-reform tracking, every listed variable is treated as required (production has no required/optional distinction).
+- Render pre-check iterates `template.variables`. If any value is `undefined` or `''`, return `{body: '', isActive: false, skipped: true, skipReason: 'missing_required_variable', missingVars}`. Caller's existing `if (!rendered.isActive) return;` contract handles the skip.
+- `RenderResult` extended with optional `skipped`, `skipReason`, `missingVars` fields. Existing call sites unchanged.
+
+**C4 — admin PUT placeholder validation** (`src/app/api/admin/sms-templates/[slug]/route.ts:70-151`).
+
+PUT now rejects three classes of authoring mistake before the body hits the cache:
+
+1. **Doubled braces** (`{{first_name}}`) — common operator typo. Rejected with a single-brace correction in the error message.
+2. **Malformed placeholders** — empty `{}`, uppercase, leading digit (`{1stName}`), dot/hyphen separators (`{first.name}`, `{first-name}`), internal whitespace (`{ first_name }`). Validator regex: `/^[a-z][a-z0-9_]*$/`.
+3. **Unknown placeholders** — any `{key}` where `key` isn't in this template's `variables` registry. Error message lists the valid variables for the slug.
+
+The existing required-variables-present check is preserved and tightened: it now requires every listed variable to appear in the body (was a no-op for production flat-string data because it filtered on `.required` on strings, which is always undefined).
+
+**D — auto-receipt status interlock** (`src/app/api/pos/transactions/route.ts:465-496`).
+
+The 30-second `setTimeout` that fires the auto-receipt SMS now re-fetches the transaction's status before sending. If the operator voided/refunded during the window, the send is skipped and an `audit_log` row is written for forensic traceability.
+
+- Status check runs **after** the dedup query (no audit-log noise for receipts that were already sent), **before** the customer-phone lookup (early exit, saves a roundtrip).
+- The existing `txRefresh` query is hoisted to this position and extended to return `status` alongside `loyalty_points_earned` — single SELECT serves both purposes.
+- Skip condition: `txRefresh` is null (deleted transaction) OR `status ∈ {voided, refunded, partial_refund}`.
+- `audit_log` insert: `action='auto_receipt_skipped'`, `entity_type='transaction'`, `entity_id=<tx UUID>`, `source='system'` (verified `audit_log.source` has no CHECK constraint — `'system'` is accurate for setTimeout-fired internal automation), `details={reason, original_status, skipped_at}`.
+- Audit-log insert is wrapped in try/catch; failure to write the row never blocks the skip itself.
+
+### Templates needing body audit in 42AB
+
+C1's empty-fallback line-removal interacts with each seeded template body. Phase 1 audited every body in `supabase/migrations/20260327000001_sms_template_system.sql` and `20260410000001_staff_notification_sms_template.sql` against the 11 emptied keys (`first_name`, `customer_name`, `appointment_date`, `appointment_time`, `service_name`, `services`, `vehicle_description`, `vehicle_type`, `item_name`, `quote_number`, `detailer_first_name`).
+
+Behavior under C1+C2 combined: **required vars hard-skip the entire send** (Phase 2 protection). The classifications below describe the residual risk for **optional variables** (those whose `required:false` flag exists in the seed migrations even though Phase 2 treats every var as required at runtime — a 42AB body audit would synchronize the body authoring intent with the runtime contract).
+
+**HIGH risk — line contains prose + emptied key marked optional in seed; line-removal silently loses surrounding context if the optional key is missing:**
+
+- `appointment_confirmed` — line `Hi {first_name}, your appointment is scheduled:` (`first_name` `required:false`). If first_name missing, the line drops, losing the "your appointment is scheduled:" context. Body file: `20260327000001_sms_template_system.sql:38`.
+- `appointment_confirmed_postcall` — entire body is one line `Thanks for calling {business_name}, {first_name}! Your appointment is confirmed. Questions? Call {business_phone}` (`first_name` `required:false`). If first_name missing, the entire body line drops — message degrades to caller-side fallback. Body file: `20260327000001_sms_template_system.sql:49`.
+- `detailer_job_assigned` — line `New job assigned: {services} – {vehicle_description}` (`vehicle_description` `required:false`). If vehicle_description missing, the line drops and the operator loses the `{services}` content as well. Body file: `20260327000001_sms_template_system.sql:204`.
+- `payment_receipt` (UNSEEDED, user-authored via SQL editor — must be seeded by 42AB) — likely body prefixes `{vehicle_description}` with `Your`, the original "your your vehicle" smoking gun. Phase 1 closes that bug at the engine level; Phase 2 hard-skip closes it again at runtime. 42AB rewrite should remove the prose-prefix anti-pattern entirely.
+
+**MEDIUM risk — line is just label + placeholder; line-removal is the intended graceful behavior:**
+
+- `appointment_confirmed` — standalone `{service_name}` line. Clean drop on missing.
+- `booking_confirmed` — `Vehicle: {vehicle_description}` line (`vehicle_description` `required:false`). Clean drop.
+- `staff_notification` — `Customer: {customer_name}` line (`customer_name` `required:false`). Clean drop.
+
+**SAFE — required:true under seed migrations (Phase 2 hard-skip protection for any caller-side miss):**
+
+- `appointment_cancelled`, `quote_accepted_single`, `quote_accepted_multi`, `quote_accepted_staff_notify`, `booking_reminder`, `quote_reminder`, `quote_viewed_followup`, `job_complete`, `addon_approved`, `addon_declined`, `booking_staff_notify`, plus the all-required parts of `appointment_confirmed` / `booking_confirmed` / `detailer_job_assigned`.
+
+Session 42AB will rewrite the HIGH-risk bodies to either include literal prose ("your vehicle" written into the body, not fabricated) or restructure the line so the optional placeholder stands alone (MEDIUM-style). It should also seed `payment_receipt` and `loyalty_milestone` (currently DB-as-source-of-truth from 42W audit) and add their entries to `SMS_TEMPLATE_VARIABLES`.
+
+### Tests
+
+Three new test files, 32 new test cases, 516/516 total passing:
+
+- `src/lib/sms/__tests__/render-sms-template.test.ts` (12 cases) — C1 empty-fallback line removal, "your your vehicle" smoking-gun regression, C2 hard-skip on flat-string schema, hard-skip on legacy object schema, business-name auto-injection unaffected.
+- `src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts` (12 cases) — C4 unknown placeholder, malformed placeholder (uppercase/leading-digit/dot/hyphen/whitespace/empty), doubled braces, all-required body presence, legacy object-shape registry handling, is_active toggle pass-through.
+- `src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts` (7 cases) — voided/refunded/partial_refund/null-tx-refresh skip + audit_log write, completed/open send, dedup short-circuit BEFORE status check (no audit-log noise).
+
+### Quality gates
+
+- `npm run build` — ✓ clean
+- `npx tsc --noEmit` — ✓ clean
+- `npx vitest run` — ✓ 516/516 (was 484; +32)
+
+### Files
+
+- Modified: `src/lib/sms/render-sms-template.ts` (cache normalization + empty fallbacks + hard-skip + extended RenderResult)
+- Modified: `src/app/api/admin/sms-templates/[slug]/route.ts` (placeholder validation)
+- Modified: `src/app/api/pos/transactions/route.ts` (status interlock at lines 465-496 of the auto-receipt setTimeout)
+- New: `src/lib/sms/__tests__/render-sms-template.test.ts`
+- New: `src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts`
+- New: `src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts`
+- Updated: `docs/dev/FILE_TREE.md` (3 new test paths)
+
+### Cross-references
+
+- `docs/audits/SMS_TEMPLATE_ROOT_CAUSE_SESSION42W.md` — root-cause audit that drove C1+D
+- `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md` — chip-migration verdicts that contextualize C2+C4
+- Pending follow-ups (NOT in this session): 42AA (engine conditional rendering), 42AB (template body rewrites + seed `payment_receipt`/`loyalty_milestone`), 42AC–42AF (template migrations from `UNSAFE_SMS_TEMPLATES`), 42AG (admin POST endpoint), 42AH (admin UI conditionals).
+
+---
+
 ## audit: complete SMS inventory & chip-migration verdicts — 2026-04-24 (Session 42Z-audit)
 
 Read-only diagnostic. The driving question: should every customer-facing SMS go through the admin-editable chip (`sms_templates`) system, or stay hardcoded for some? To answer it, this audit enumerates every SMS-firing site in `src/` and assigns each a chip-migration verdict.
