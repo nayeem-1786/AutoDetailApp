@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendRefundEmail } from '@/lib/utils/order-emails';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
@@ -79,20 +80,45 @@ export async function POST(
       created_by: employee.id,
     });
 
-    // Restore stock for each order item
-    const items = order.order_items || [];
-    for (const item of items) {
-      if (item.product_id) {
-        const { data: product } = await admin
-          .from('products')
-          .select('quantity_on_hand')
-          .eq('id', item.product_id)
-          .single();
-        if (product) {
-          await admin
+    // Restore stock only on full refunds. Partial refunds are monetary-only:
+    // the route accepts a single aggregate `body.amount` with no per-line
+    // refund quantity, so we cannot tell whether a partial $X refund covers a
+    // returned unit or is a goodwill adjustment. Restoring 100% on every
+    // partial (the previous behavior) silently inflated inventory on every
+    // goodwill refund. Restoring 0% errs on the side of preserving stock
+    // accuracy. To restock specific units on a partial, use the POS refund
+    // route, which supports per-line dispositions.
+    if (isFullRefund) {
+      const items = order.order_items || [];
+      for (const item of items) {
+        if (item.product_id) {
+          const { data: product } = await admin
             .from('products')
-            .update({ quantity_on_hand: product.quantity_on_hand + item.quantity })
-            .eq('id', item.product_id);
+            .select('quantity_on_hand, cost_price')
+            .eq('id', item.product_id)
+            .single();
+          if (product) {
+            const before = product.quantity_on_hand;
+            const after = before + item.quantity;
+            await admin
+              .from('products')
+              .update({ quantity_on_hand: after })
+              .eq('id', item.product_id);
+
+            await logStockAdjustment({
+              supabase: admin,
+              product_id: item.product_id,
+              adjustment_type: 'returned',
+              quantity_change: item.quantity,
+              quantity_before: before,
+              quantity_after: after,
+              reason: `Online order refund (full) — Stripe ${refund.id}`,
+              reference_id: id,
+              reference_type: 'order',
+              created_by: employee.id,
+              unit_cost: product.cost_price ?? null,
+            });
+          }
         }
       }
     }

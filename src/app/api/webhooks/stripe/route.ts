@@ -5,6 +5,8 @@ import { generateOrderNumber } from '@/lib/utils/order-number';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
+import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
+import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -74,22 +76,39 @@ export async function POST(request: NextRequest) {
 
       if (!order) break;
 
-      // 4. Decrement stock for each item
+      // 4. Decrement stock for each item + write audit row.
+      // created_by uses the seeded SYSTEM_EMPLOYEE_ID (see system-actors.ts)
+      // because webhooks have no authenticated user context.
       const orderItems = (order as { order_items: Array<{ product_id: string; quantity: number }> }).order_items;
       for (const item of orderItems) {
         if (item.product_id) {
           const { data: prod } = await admin
             .from('products')
-            .select('quantity_on_hand')
+            .select('quantity_on_hand, cost_price')
             .eq('id', item.product_id)
             .single();
 
           if (prod) {
-            const newQty = Math.max(0, prod.quantity_on_hand - item.quantity);
+            const before = prod.quantity_on_hand;
+            const after = Math.max(0, before - item.quantity);
             await admin
               .from('products')
-              .update({ quantity_on_hand: newQty })
+              .update({ quantity_on_hand: after })
               .eq('id', item.product_id);
+
+            await logStockAdjustment({
+              supabase: admin,
+              product_id: item.product_id,
+              adjustment_type: 'sold',
+              quantity_change: after - before,
+              quantity_before: before,
+              quantity_after: after,
+              reason: 'Online order paid',
+              reference_id: orderId,
+              reference_type: 'order',
+              created_by: SYSTEM_EMPLOYEE_ID,
+              unit_cost: prod.cost_price ?? null,
+            });
           }
         }
       }

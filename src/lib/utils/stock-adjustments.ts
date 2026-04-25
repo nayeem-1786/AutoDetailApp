@@ -16,6 +16,7 @@ export type ReferenceType =
   | 'refund'
   | 'shop_use'
   | 'stock_count'
+  | 'order'
   | null;
 
 export interface StockAdjustmentInput {

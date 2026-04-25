@@ -47,6 +47,7 @@ src/app/api/admin/messaging/[conversationId]/summary/route.ts
 src/app/api/admin/notification-recipients/[id]/route.ts
 src/app/api/admin/notification-recipients/route.ts
 src/app/api/admin/orders/[id]/refund/route.ts
+src/app/api/admin/orders/[id]/refund/__tests__/refund.test.ts
 src/app/api/admin/orders/[id]/route.ts
 src/app/api/admin/orders/route.ts
 src/app/api/admin/products/[id]/group/route.ts
@@ -474,6 +475,7 @@ src/app/api/staff/schedules/route.ts
 src/app/api/webhooks/mailgun/route.ts
 src/app/api/webhooks/elevenlabs/call-complete/route.ts
 src/app/api/webhooks/stripe/route.ts
+src/app/api/webhooks/stripe/__tests__/payment-intent-succeeded.test.ts
 src/app/api/webhooks/twilio/inbound/route.ts
 src/app/api/webhooks/twilio/status/route.ts
 src/app/api/webhooks/twilio/voice/route.ts
@@ -1042,6 +1044,7 @@ src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
 src/lib/utils/refund-math.ts
 src/lib/utils/stock-adjustments.ts
+src/lib/utils/system-actors.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
 src/lib/utils/__tests__/constants.test.ts
@@ -1494,6 +1497,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260422000001_drop_idx_customers_search.sql
 20260424000001_revert_stock_count.sql
 20260424000002_revert_stock_count_structured_errors.sql
+20260424000004_extend_stock_adjustments_for_orders.sql
 ```
 
 ## Scripts

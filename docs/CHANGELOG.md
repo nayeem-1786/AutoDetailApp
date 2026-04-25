@@ -4,6 +4,58 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(orders): plug silent inventory mutations on order paid + refund — 2026-04-24 (Session 42S)
+
+Closes the two silent inventory paths catalogued in Session 42O (Phase 7) and Session 42N (Phase 7) for online orders. After this change, every code path that mutates `products.quantity_on_hand` writes a companion `stock_adjustments` audit row — except for the two read-only forms-of-truth paths (`commit_stock_count` / `revert_stock_count`) which are atomic RPCs by design.
+
+### New migration (apply manually)
+
+`supabase/migrations/20260424000004_extend_stock_adjustments_for_orders.sql`
+
+1. Extend `stock_adjustments_reference_type_check` to include `'order'`. Both online-order paid (Stripe webhook) and online-order refund use this single value; direction is conveyed by `adjustment_type` (`'sold'` for paid, `'returned'` for refund). Decision per Session 42O Phase 8 Q4 — one combined value beats `'order'`+`'order_refund'` because the adjustment_type already disambiguates.
+
+2. Seed a non-loginable system employee at deterministic UUID `00000000-0000-0000-0000-000000000001` for use as `created_by` on audit rows written from contexts without an authenticated user (Stripe webhook today; future cron-driven inventory writes). The row has `auth_user_id = NULL` so no Supabase Auth login is possible. `role = 'detailer'` is the lowest-privilege built-in `user_role` enum value (the column is NOT NULL, but the role is never evaluated since the employee never authenticates). `bookable_for_appointments = false` keeps it out of detailer pickers. `ON CONFLICT (email) DO NOTHING` makes the migration idempotent.
+
+### Code changes
+
+- `src/lib/utils/system-actors.ts` (new) — exports `SYSTEM_EMPLOYEE_ID`, `SYSTEM_EMPLOYEE_EMAIL`, and `verifySystemEmployee()` for boot-time sanity checks. The constant is the deterministic UUID seeded by the migration above; `verifySystemEmployee` warns if the live row's id has drifted from the constant (for environments where the email pre-existed under a different id).
+
+- `src/lib/utils/stock-adjustments.ts` — added `'order'` to `ReferenceType` union.
+
+- `src/app/api/admin/orders/[id]/refund/route.ts` — wraps the inventory-restore loop in `if (isFullRefund)` and adds a `logStockAdjustment` call per restocked line. Writes `adjustment_type='returned'`, `reference_type='order'`, `reference_id=<order UUID>`, `created_by=<admin employee>`, `unit_cost=<product.cost_price snapshot>`, reason text including the Stripe refund id (e.g. `'Online order refund (full) — Stripe re_xxx'`).
+
+- `src/app/api/webhooks/stripe/route.ts` (`payment_intent.succeeded` handler) — adds `logStockAdjustment` call after each stock decrement. Writes `adjustment_type='sold'`, `reference_type='order'`, `reference_id=<order UUID>`, `created_by=SYSTEM_EMPLOYEE_ID`, `unit_cost=<product.cost_price snapshot>`, reason `'Online order paid'`. The recorded `quantity_change` reflects the actual delta (clamped at 0, never below) — not the requested decrement — so the audit row matches what was written.
+
+### Behavioral change: partial refunds now restore 0% inventory (was 100%)
+
+The pre-fix admin orders refund route restored 100% of every order line's inventory regardless of whether the refund was full or partial. This silently inflated stock on every goodwill partial refund (e.g. a $5 partial refund on a $50 order with 5 units in stock would restock all 5 units even though the customer kept everything).
+
+After this fix:
+- **Full refunds** (`body.amount` omitted, or `>= order.total`): restore 100% of every line + write audit rows.
+- **Partial refunds** (`body.amount < order.total`): restore 0% + write no `stock_adjustments` rows. Order status flips to `'partially_refunded'` and the Stripe refund processes as before, but inventory is unchanged.
+
+**Tradeoff.** The route accepts only a single aggregate `body.amount` — there is no per-line refund quantity input. Without that, the route cannot distinguish "$5 = price of one returned unit" from "$5 = goodwill adjustment, customer keeps everything." Restoring 0% errs on the side of not silently inflating stock; the alternative (restoring 100% as before) was the documented defect from Session 42N Phase 7. To restock specific units on a partial refund, use the POS refund route, which supports per-line dispositions (`restock` / `damaged` / `customer_retained`).
+
+### Tests
+
+- `src/app/api/admin/orders/[id]/refund/__tests__/refund.test.ts` — 6 cases: full-refund stock restore + audit rows; partial-refund stock UNCHANGED; product_id-null lines skipped; already-refunded 400; Stripe failure 500 with no DB writes; unauthenticated 401.
+- `src/app/api/webhooks/stripe/__tests__/payment-intent-succeeded.test.ts` — 6 cases: stock decrement + audit row with `SYSTEM_EMPLOYEE_ID`; quantity floor at 0 (never negative) with `quantity_change` reflecting actual delta; product_id-null lines skipped; booking-deposit PI (no order_id) does nothing; invalid signature 400; missing signature header 400.
+
+All 12 tests pass. Full project typecheck clean.
+
+### Files inspected but NOT modified (per session scope)
+
+- POS routes (`/api/pos/transactions/[id]/route.ts`, `/api/pos/refunds/route.ts`) — POS void inventory restoration is the Session 42M/42P workstream.
+- Admin product edit form silent qty path — addressed in Session 42R (above).
+- Other Stripe webhook handlers (`payment_intent.payment_failed`, `payment_intent.canceled`) — only the success handler had silent inventory writes; the failed/canceled handlers only flip `payment_status`.
+- Coupon `use_count` increment + `customer.lifetime_spend` increment in the same Stripe handler — also "silent" in the sense of writing to mutable state without audit rows, but they're not stock mutations and out of scope per prompt.
+
+### Documentation gap noted
+
+`docs/dev/DB_SCHEMA.md`'s `orders` table block omits `payment_status`, `paid_at`, `stripe_payment_intent_id`, `stripe_charge_id`, and `fulfillment_method` — all real columns referenced by the routes. Not fixed in this session; flag for a future docs pass.
+
+---
+
 ## fix(catalog): make product edit form qty read-only with audit trail enforcement — 2026-04-24 (Session 42R)
 
 Closes the silent inventory mutation path identified in Session 42O (`docs/audits/INVENTORY_LOG_INTEGRITY_SESSION42O.md` Phase 1.1 #9): the product edit form at `/admin/catalog/products/[id]` previously sent `quantity_on_hand` as part of its UPDATE payload, allowing direct browser-side `supabase.from('products').update(...)` to silently mutate stock with no `stock_adjustments` audit row.
