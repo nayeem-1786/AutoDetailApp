@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeft, Ban, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
@@ -26,12 +27,18 @@ interface TransactionDetailProps {
   onBack: () => void;
 }
 
+interface LinkedJob {
+  id: string;
+  status: string;
+}
+
 type FullTransaction = Transaction & {
   items: TransactionItem[];
   payments: Payment[];
   refunds: (Refund & { refund_items: RefundItem[] })[];
   customer: Customer | null;
   employee: Employee | null;
+  jobs: LinkedJob[] | null;
 };
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
@@ -104,6 +111,17 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
 
   const voidEligible = transaction.status === 'completed';
   const _canVoid = hasVoidPerm && voidEligible;
+
+  const hasCardPayment = (transaction.payments ?? []).some(
+    (p) => p.method === 'card' || p.method === 'split'
+  );
+  const cardBlockTooltip =
+    'This sale included a card payment. Card transactions must be refunded, not voided.';
+
+  const linkedJob = (transaction.jobs ?? []).find((j) => j.status !== 'cancelled') ?? null;
+  const customerName = transaction.customer
+    ? `${transaction.customer.first_name} ${transaction.customer.last_name}`.trim() || 'the customer'
+    : 'the customer';
 
   const showReceipt =
     transaction.status === 'completed' ||
@@ -504,8 +522,14 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
                 variant="outline"
                 className="border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-400"
                 onClick={() => setShowVoidConfirm(true)}
-                disabled={!hasVoidPerm}
-                title={!hasVoidPerm ? "You don't have permission to perform this action" : undefined}
+                disabled={!hasVoidPerm || hasCardPayment}
+                title={
+                  !hasVoidPerm
+                    ? "You don't have permission to perform this action"
+                    : hasCardPayment
+                      ? cardBlockTooltip
+                      : undefined
+                }
               >
                 <Ban className="mr-1.5 h-4 w-4" />
                 Void Transaction
@@ -515,43 +539,47 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
         )}
       </div>
 
-      {/* Void Confirmation Modal */}
-      {showVoidConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-6 shadow-xl dark:shadow-gray-950/50">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Void Transaction</h3>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Are you sure you want to void this transaction? This action is irreversible
-              and will mark the transaction as voided.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowVoidConfirm(false)}
-                disabled={voiding}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleVoid}
-                disabled={voiding}
-              >
-                {voiding ? (
-                  <>
-                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    Voiding...
-                  </>
-                ) : (
-                  'Void Transaction'
-                )}
-              </Button>
+      {/* Void Confirmation Dialog */}
+      <ConfirmDialog
+        open={showVoidConfirm}
+        onOpenChange={(open) => !open && !voiding && setShowVoidConfirm(false)}
+        title={linkedJob ? 'Void will cancel job and notify customer' : 'Void Transaction'}
+        description={
+          linkedJob ? (
+            <div className="space-y-3">
+              <p>This transaction is linked to a scheduled job. Voiding will:</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Restore inventory for any product items</li>
+                <li>Cancel the linked job (status &rarr; cancelled)</li>
+                <li>Send a cancellation notification to {customerName}</li>
+              </ul>
+              <p>The customer will receive an SMS or email letting them know.</p>
+              <p className="font-medium text-red-600 dark:text-red-400">
+                This cannot be undone.
+              </p>
             </div>
-          </div>
-        </div>
-      )}
+          ) : (
+            <div className="space-y-3">
+              <p>Voiding this transaction will:</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Restore inventory for any product items</li>
+                <li>Reverse loyalty points and coupon usage</li>
+                <li>Mark the transaction as voided</li>
+              </ul>
+              <p className="font-medium text-red-600 dark:text-red-400">
+                This cannot be undone.
+              </p>
+            </div>
+          )
+        }
+        confirmLabel="Void Transaction"
+        cancelLabel="Cancel"
+        variant="destructive"
+        loading={voiding}
+        requireConfirmText="VOID"
+        onConfirm={handleVoid}
+      />
+
 
       {/* Refund Dialog */}
       {showRefundDialog && (

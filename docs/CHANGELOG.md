@@ -4,6 +4,124 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pos): void inventory restoration with job cascade — 2026-04-24 (Session 42Q)
+
+Closes the silent void-inventory bug present since launch (Session 42M audit). Replaces the JS-based void handler with an atomic `void_transaction` RPC that mirrors the `commit_stock_count` / `revert_stock_count` pattern (single PG transaction, `FOR UPDATE` row locks, structured JSONB returns).
+
+### New migration (apply manually)
+
+`supabase/migrations/20260424000003_void_transaction_rpc.sql`
+
+1. Extends `stock_adjustments.adjustment_type` CHECK constraint to include `'voided'` — a new audit type written by the void RPC, distinct from refund's `'returned'` so stock-history can disambiguate.
+2. Creates `void_transaction(p_transaction_id UUID, p_user_id UUID, p_reason TEXT DEFAULT NULL) RETURNS JSONB`:
+   - **Status guard**: only `'completed'` voidable. `'partial_refund'` returns `{status: 'error', error_code: 'NOT_VOIDABLE', current_status}`. Mirrors revert_stock_count's structured-error shape.
+   - **Inventory**: walks `transaction_items` with `product_id IS NOT NULL`, locks all affected products `FOR UPDATE` upfront, increments `quantity_on_hand`, writes one `stock_adjustments` row per item with `adjustment_type='voided'`, `reference_type='transaction'`, `reference_id=<tx>`, `unit_cost` from `products.cost_price` snapshot.
+   - **Loyalty**: always full reversal (void is never partial). Restores `loyalty_points_redeemed`, claws back `loyalty_points_earned`, writes `loyalty_ledger` rows + a single `customers.loyalty_points_balance` update clamped at 0.
+   - **Coupon + campaign**: always reversed. Decrements `coupons.use_count`, `campaigns.redeemed_count`, `campaigns.revenue_attributed` clamped at 0. (Refund only does this for full refunds; void is always full so no gate.)
+   - **Customer stats**: decrements `customers.lifetime_spend` and `visit_count` clamped at 0. Closes the gap left by `tr_update_customer_stats` being INSERT-only.
+   - **Job cascade**: cancels any non-cancelled `jobs.transaction_id`-linked job — sets `status='cancelled'`, `cancelled_at=now()`, `cancelled_by=p_user_id`, `cancellation_reason='Transaction voided[: <reason>]'`.
+   - **Status flip**: last step. `transactions.status = 'voided'` so any earlier failure rolls everything back via the implicit transaction wrapper.
+   - Returns `{status: 'success', transaction_id, items_restored, units_restored, loyalty_restored, loyalty_clawed, coupon_reversed, campaign_reversed, job_cancelled, job_id, customer_id}`.
+
+**⚠️ Apply manually in Supabase SQL Editor.** `CREATE OR REPLACE FUNCTION` swaps atomically. The CHECK constraint extension is a single `DROP CONSTRAINT` + `ADD CONSTRAINT` pair — no downtime; `'voided'` rows do not exist yet.
+
+### API route refactor
+
+**`PATCH /api/pos/transactions/[id]` (action=`void`)** — replaces the inline JS implementation (status flip + JS loyalty reversal + audit log) with a single `supabase.rpc('void_transaction', ...)` call. Maps RPC responses:
+- `status='success'` → 200 with `{ data: <transaction>, void_result: {...} }`
+- `status='error', error_code='NOT_FOUND'` → 404
+- `status='error', error_code='NOT_VOIDABLE'` → 400 with `current_status`
+- RPC throw → 500
+
+After RPC success, fires `notifyTransactionVoided(...)` fire-and-forget when `customer_id` is non-null AND `job_cancelled=true`. The `logAudit` call now records the structured `void_result` summary (`items_restored`, `units_restored`, etc.) for forensic visibility.
+
+**`GET /api/pos/transactions/[id]`** — adds `jobs(id, status)` to the select so the UI can show cascade language without a second fetch.
+
+### New helper: `notifyTransactionVoided`
+
+`src/lib/email/send-void-notification.ts` — co-located with `send-cancellation-email.ts`. Operates on `customer_id` (not `appointment_id`) because voids may not have appointment context. Hardcoded copy (no DB templates) — voids don't justify the template-management overhead. Independent skip rules: no email → still tries SMS; no phone → still tries email. Returns `{ emailSent, smsSent }`. Never throws.
+
+### TS union updates
+
+- `src/lib/utils/stock-adjustments.ts:AdjustmentType` — added `'voided'`.
+- `src/lib/supabase/types.ts:StockAdjustmentType` — added `'shop_use'`, `'customer_retained'`, `'voided'` (the type was stale; the migration-side CHECK already had the first two).
+
+### UI changes
+
+`src/app/pos/components/transactions/transaction-detail.tsx`:
+
+1. **Card-payment void block** — Void button is `disabled` when any payment row has `method` of `'card'` or `'split'`. Tooltip: `"This sale included a card payment. Card transactions must be refunded, not voided."` Refund button stays available. Cash-only sales remain voidable.
+2. **`ConfirmDialog` migration** — replaces the bespoke inline modal with the shared `ConfirmDialog` (matches the inventory revert pattern). Adds `requireConfirmText="VOID"` per the new uppercase-phrase convention from Session 42K-patch-1.
+3. **Cascade modal language** — when `transaction.jobs[]` contains a non-cancelled job, dialog title becomes `"Void will cancel job and notify customer"` and body lists the three side-effects (restore inventory, cancel job, notify customer). Already-cancelled jobs and walk-in transactions get the simpler default copy.
+
+### Tests
+
+- `src/app/api/pos/transactions/[id]/__tests__/void.test.ts` — 12 tests covering RPC arg passthrough, success response shape, notification fire-and-forget conditions (job_cancelled+customer_id), error code mapping (NOT_FOUND → 404, NOT_VOIDABLE → 400 with current_status), auth/permission guards, unknown action.
+- `src/app/pos/components/transactions/__tests__/transaction-detail-void.test.tsx` — 7 tests covering button disable for card/split, modal language variants (cascade vs non-cascade vs cancelled-job), and VOID-phrase confirmation gating.
+
+### Rationale: why RPC over JS
+
+Mirrors the precedent set by `commit_stock_count` (Session 42D) and `revert_stock_count` v2 (Session 42K-patch-1). Single PG transaction provides true atomicity — partial failures (network blip, DB error mid-loop) roll back everything cleanly instead of leaving the inconsistencies the JS-based refund route is known to leave (Session 42N audit: Stripe-debited-then-DB-failed orphan rows). `FOR UPDATE` row locks on the transaction row, every affected product, the customer, and the coupon serialise the void with concurrent POS sales / refunds.
+
+### Rationale: 'voided' as a new adjustment_type
+
+Refund-restock writes `'returned'` and void-restock writes `'voided'`. Both restore inventory, but distinguishing them in stock-history lets reporting answer "which voids restored inventory?" vs. "which refunds restored inventory?" without joining back to source rows.
+
+### Backfill (deferred to a follow-up)
+
+Session 42M Phase 7 catalogued 9 historical voids that silently corrupted inventory since launch. This change prevents new drift; the historical reconciliation requires a separate migration that walks each pre-fix voided transaction and emits a `'voided'` `stock_adjustments` row with a `'Backfill: missed void restoration for <receipt>'` reason. Not in scope for this commit — flagged as `Phase 16` cleanup work for the launch prep window.
+
+---
+
+## feat(catalog): per-product stock history tab + label gaps fix — 2026-04-24 (Session 42T)
+
+Session 42O flagged that `GET /api/admin/stock-adjustments` already supports `?product_id=` but no admin UI exposes the filter. Forensic questions like "what did the void of SD-006223 do to White Wall Tire Cleaner?" required hand-crafted SQL or URL hacking. This session adds a per-product drilldown directly on the product detail page so any inventory-drift question can be answered in one scroll.
+
+### New section on product detail page
+
+`src/app/admin/catalog/products/[id]/page.tsx` — exports a new `StockHistoryCard` named alongside the default `ProductDetailPage` export. The card mounts after `CostMarginCard` (gated on `usePermission('inventory.view_stock')`) and renders:
+
+- A type filter dropdown driven by `STOCK_ADJUSTMENT_TYPE_LABELS` (matches the global stock-history page).
+- A 7-column `DataTable`: Date · Type (Badge) · Change (signed, colored) · Stock Level (before→after) · Reason · Reference · By.
+- The Reference column links to source where applicable: PO → `/admin/inventory/purchase-orders/<id>`, stock count → `/admin/inventory/counts/<id>`, transaction → opens shared `<ReceiptDialog>` with the transaction id, refund renders "Refund" text (no admin refund detail page exists), shop_use renders `--`.
+- Pagination (Prev/Next, 50 rows per page) when total > 50.
+- Calls `adminFetch('/api/admin/stock-adjustments?product_id=<id>&limit=50&offset=<n>&type=<filter>')`. No API change — the route already supported `product_id`.
+
+The component is colocated in `page.tsx` (no new file) but exported as a named export so the test suite can import it directly without rendering the full product form.
+
+### Label gaps fix
+
+`src/lib/utils/constants.ts` — `STOCK_ADJUSTMENT_TYPE_LABELS` was missing entries for `shop_use` and `customer_retained` (both already valid `AdjustmentType` values written by `/api/pos/shop-use` and `/api/pos/refunds`), causing the global stock-history page and the new per-product card to render the raw underscore strings. Added all three labels in one pass:
+
+- `shop_use` → "Shop Use"
+- `customer_retained` → "Customer Retained"
+- `voided` → "Voided" (preempts the `'voided'` adjustment_type that lands with the Session 42Q void-fix RPC migration)
+
+No DB change — the migration that extends the `stock_adjustments_adjustment_type_check` constraint with `'voided'` lands separately.
+
+### Tests
+
+`src/app/admin/catalog/products/[id]/__tests__/stock-history-card.test.tsx` — five cases:
+
+1. Renders one row per fetched adjustment with the correct labels, including the new `Shop Use` label.
+2. Selecting a type filter re-fetches with `type=<value>` and `product_id=<id>` in the query string.
+3. Clicking "Next" pagination increments the fetch `offset` by 50 and updates "Page X of Y" text.
+4. Permission denied (`inventory.view_stock` ungranted) returns null and never calls the API.
+5. Reference column: PO row navigates to PO detail, stock_count row navigates to count detail, transaction row opens the receipt dialog with the correct id, shop_use row renders `--`.
+
+### Files
+
+- Modified: `src/app/admin/catalog/products/[id]/page.tsx` (+250 lines for `StockHistoryCard`, mount, and three new imports)
+- Modified: `src/lib/utils/constants.ts` (+3 label entries)
+- New: `src/app/admin/catalog/products/[id]/__tests__/stock-history-card.test.tsx` (5 tests, all passing — full suite still green at 484/484)
+
+### Constraints honored
+
+- No changes to `/admin/inventory/stock-history` (global page) — it keeps its own column copy. No shared component extracted; if a third consumer appears, factor then.
+- No changes to `/api/admin/stock-adjustments` — the existing GET handler covers all needs.
+
+---
+
 ## fix(orders): plug silent inventory mutations on order paid + refund — 2026-04-24 (Session 42S)
 
 Closes the two silent inventory paths catalogued in Session 42O (Phase 7) and Session 42N (Phase 7) for online orders. After this change, every code path that mutates `products.quantity_on_hand` writes a companion `stock_adjustments` audit row — except for the two read-only forms-of-truth paths (`commit_stock_count` / `revert_stock_count`) which are atomic RPCs by design.

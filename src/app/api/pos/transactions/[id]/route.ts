@@ -5,6 +5,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { notifyTransactionVoided } from '@/lib/email/send-void-notification';
 
 /**
  * Authenticate request via POS HMAC token or admin session.
@@ -50,7 +51,8 @@ export async function GET(
         employee:employees(id, first_name, last_name),
         items:transaction_items(*),
         payments(*),
-        refunds(*, refund_items(*))
+        refunds(*, refund_items(*)),
+        jobs(id, status)
       `)
       .eq('id', id)
       .single();
@@ -105,66 +107,72 @@ export async function PATCH(
     if (action === 'void') {
       const denied = await requirePermission(employeeId, 'pos.void_transactions');
       if (denied) return denied;
-      const { data: transaction, error } = await supabase
-        .from('transactions')
-        .update({ status: 'voided' })
-        .eq('id', id)
-        .eq('status', 'completed')
-        .select('*')
-        .single();
 
-      if (error || !transaction) {
+      const reason = typeof body.reason === 'string' ? body.reason : null;
+
+      const { data: rpcResult, error: rpcError } = await supabase.rpc('void_transaction', {
+        p_transaction_id: id,
+        p_user_id: employeeId,
+        p_reason: reason,
+      });
+
+      if (rpcError) {
+        console.error('void_transaction RPC error:', rpcError);
         return NextResponse.json(
-          { error: 'Transaction not found or already voided' },
-          { status: 400 }
+          { error: 'Failed to void transaction' },
+          { status: 500 }
         );
       }
 
-      // Restore loyalty points on void
-      if (transaction.customer_id) {
-        const { data: custForLoyalty } = await supabase
-          .from('customers')
-          .select('loyalty_points_balance')
-          .eq('id', transaction.customer_id)
-          .single();
+      const result = rpcResult as {
+        status: 'success' | 'error';
+        error_code?: string;
+        current_status?: string;
+        transaction_id?: string;
+        items_restored?: number;
+        units_restored?: number;
+        loyalty_restored?: number;
+        loyalty_clawed?: number;
+        coupon_reversed?: boolean;
+        campaign_reversed?: boolean;
+        job_cancelled?: boolean;
+        job_id?: string | null;
+        customer_id?: string | null;
+      } | null;
 
-        if (custForLoyalty) {
-          let currentBalance = custForLoyalty.loyalty_points_balance ?? 0;
-
-          // Restore redeemed points
-          if (transaction.loyalty_points_redeemed > 0) {
-            currentBalance += transaction.loyalty_points_redeemed;
-            await supabase.from('loyalty_ledger').insert({
-              customer_id: transaction.customer_id,
-              transaction_id: id,
-              action: 'adjusted',
-              points_change: transaction.loyalty_points_redeemed,
-              points_balance: currentBalance,
-              description: `Void: restored ${transaction.loyalty_points_redeemed} redeemed pts`,
-            });
-          }
-
-          // Reverse earned points
-          if (transaction.loyalty_points_earned > 0) {
-            currentBalance = Math.max(0, currentBalance - transaction.loyalty_points_earned);
-            await supabase.from('loyalty_ledger').insert({
-              customer_id: transaction.customer_id,
-              transaction_id: id,
-              action: 'adjusted',
-              points_change: -transaction.loyalty_points_earned,
-              points_balance: currentBalance,
-              description: `Void: reversed ${transaction.loyalty_points_earned} earned pts`,
-            });
-          }
-
-          // Update customer balance
-          if (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0) {
-            await supabase
-              .from('customers')
-              .update({ loyalty_points_balance: currentBalance })
-              .eq('id', transaction.customer_id);
-          }
+      if (!result || result.status === 'error') {
+        if (result?.error_code === 'NOT_FOUND') {
+          return NextResponse.json(
+            { error: 'Transaction not found' },
+            { status: 404 }
+          );
         }
+        if (result?.error_code === 'NOT_VOIDABLE') {
+          return NextResponse.json(
+            {
+              error: `Transaction cannot be voided (status: ${result.current_status ?? 'unknown'})`,
+              current_status: result?.current_status,
+            },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'Failed to void transaction' },
+          { status: 500 }
+        );
+      }
+
+      // Fire-and-forget customer notification when a job was cancelled
+      // by the cascade. Walk-in / no-customer voids skip this.
+      if (result.customer_id && result.job_cancelled) {
+        notifyTransactionVoided({
+          customerId: result.customer_id,
+          transactionId: id,
+          jobCancelled: true,
+          reason,
+        }).catch((err) =>
+          console.error('[void notification] failed:', err)
+        );
       }
 
       logAudit({
@@ -175,12 +183,38 @@ export async function PATCH(
         entityType: 'transaction',
         entityId: id,
         entityLabel: `Transaction #${id.slice(0, 8)}`,
-        details: body.reason ? { reason: body.reason } : undefined,
+        details: {
+          reason: reason ?? undefined,
+          items_restored: result.items_restored,
+          units_restored: result.units_restored,
+          loyalty_restored: result.loyalty_restored,
+          loyalty_clawed: result.loyalty_clawed,
+          coupon_reversed: result.coupon_reversed,
+          campaign_reversed: result.campaign_reversed,
+          job_cancelled: result.job_cancelled,
+        },
         ipAddress: getRequestIp(request),
         source: 'pos',
       });
 
-      return NextResponse.json({ data: transaction });
+      const { data: transaction } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      return NextResponse.json({
+        data: transaction,
+        void_result: {
+          items_restored: result.items_restored ?? 0,
+          units_restored: result.units_restored ?? 0,
+          loyalty_restored: result.loyalty_restored ?? 0,
+          loyalty_clawed: result.loyalty_clawed ?? 0,
+          coupon_reversed: result.coupon_reversed ?? false,
+          campaign_reversed: result.campaign_reversed ?? false,
+          job_cancelled: result.job_cancelled ?? false,
+        },
+      });
     }
 
     return NextResponse.json(

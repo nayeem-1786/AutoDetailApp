@@ -542,6 +542,7 @@ src/app/admin/appointments/waitlist/page.tsx
 ```
 src/app/admin/catalog/categories/page.tsx
 src/app/admin/catalog/products/[id]/page.tsx
+src/app/admin/catalog/products/[id]/__tests__/stock-history-card.test.tsx
 src/app/admin/catalog/products/enrichment-review/page.tsx
 src/app/admin/catalog/products/new/page.tsx
 src/app/admin/catalog/products/page.tsx
@@ -920,6 +921,7 @@ src/lib/email/photo-resolver.ts
 src/lib/email/template-resolver.ts
 src/lib/email/send-cancellation-email.ts
 src/lib/email/send-templated-email.ts
+src/lib/email/send-void-notification.ts
 src/lib/email/send-welcome-email.ts
 src/lib/email/variables.ts
 src/lib/email/drip-engine.ts
@@ -1497,6 +1499,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260422000001_drop_idx_customers_search.sql
 20260424000001_revert_stock_count.sql
 20260424000002_revert_stock_count_structured_errors.sql
+20260424000003_void_transaction_rpc.sql
 20260424000004_extend_stock_adjustments_for_orders.sql
 ```
 

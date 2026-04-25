@@ -8,7 +8,8 @@ export type AdjustmentType =
   | 'damaged'
   | 'recount'
   | 'shop_use'
-  | 'customer_retained';
+  | 'customer_retained'
+  | 'voided';
 
 export type ReferenceType =
   | 'purchase_order'
