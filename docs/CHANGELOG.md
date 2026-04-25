@@ -4,6 +4,71 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): drop caller-side 'your vehicle' literals in chip-system callers — 2026-04-25 (Session 42X-1-followup)
+
+Smoke-test follow-up to Session 42X-1 (commit `b4696619`). The engine-side fallback fix (Session 42X-1, change C1) emptied `DEFAULT_VARIABLE_FALLBACKS.vehicle_description` to `''`, expecting the engine's `\x00REMOVE_LINE\x00` sentinel + line-removal pass to handle missing data gracefully. But two **callers** were still passing the literal `'your vehicle'` into `vars.vehicle_description`, which the engine substitutes verbatim (no fallback ever fires because the value is non-empty), reproducing the original "Your your vehicle" SD-006223 incident regardless of the engine fix.
+
+This session plugs the caller-side counterpart at the two chip-system callers.
+
+### Two surgical fixes
+
+**1. `src/app/api/pos/transactions/route.ts:535`** — auto-receipt `payment_receipt` chip
+```diff
+- vehicle_description: vehicleDesc || 'your vehicle',
++ vehicle_description: vehicleDesc || '',
+```
+
+**2. `src/app/api/pos/jobs/[id]/complete/route.ts:249`** — `job_complete` chip
+```diff
+- vehicle_description: vehicleDisplay,
++ vehicle_description: vehicleMakeModel || '',
+```
+
+Site #2 is surgical: line 233's `vehicleDisplay = vehicleMakeModel || 'your vehicle'` is **preserved** because the same variable feeds the disaster-recovery `smsFallback` string at line 241 (used only when the chip template is missing/inactive — disaster-recovery prose where the literal "your vehicle" reads correctly). Only the chip-call site (line 249) swaps to empty.
+
+### Sibling patterns — all deferred (classified in Phase 0)
+
+A grep for `'your vehicle'|'your service'|'your appointment'|'your scheduled'|'your selected'|'your detailer'|'your quote'|'Valued Customer'` surfaced 5 other patterns. None are caller-side literals into the `sms_templates` chip system; each was classified and deferred:
+
+- **Known: `src/app/api/pos/jobs/[id]/addons/route.ts:194-195`** has the same `'your your vehicle'` bug class but in a hardcoded SMS body (the `addon_authorization` template, listed in `UNSAFE_SMS_TEMPLATES`). The fix requires prose restructuring, not a one-line change. Will be resolved when this template migrates to the chip system in Session 42AC. Restructuring the prose now would be a non-trivial change to a deferred-anyway path.
+- `src/app/api/pos/jobs/[id]/addons/route.ts:189` — `'Your detailer'` literal in the same hardcoded body. Same scope as above — defer to 42AC.
+- `src/app/api/cron/lifecycle-engine/route.ts:688` — `'your service'` for the marketing/lifecycle chip system (`renderTemplate`, NOT `renderSmsTemplate`). The marketing engine has different fallback semantics and does NOT do line removal. Emptying the literal would produce broken prose in marketing messages. Out of scope for the engine-side fix.
+- `src/app/api/webhooks/twilio/inbound/route.ts:627` — `'your vehicle'` in a free-text autoReply path (Cluster F per `SMS_COMPLETE_INVENTORY_SESSION42Z.md`). Not chip system; literal is a legitimate safety net for prose construction.
+- `src/app/pos/jobs/components/flag-issue-flow.tsx:151` — `'your vehicle'` in a client-side staff UI message-template renderer. Not the SMS chip system at all.
+
+### Tests
+
+Added regression tests at the vars level for both fixed callsites. Body-level "no `your your`" assertion is included for the auto-receipt path (whose disaster-recovery fallback prose doesn't contain the bug pattern) but intentionally **omitted** for `job_complete` (whose `smsFallback` legitimately uses `vehicleDisplay` with the literal — fires only in the rare disaster-recovery path, kept by design).
+
+- `src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts` — extended with 3 new cases (vars empty when no vehicle, vars correct when attached, body never contains "your your"). Existing 7 cases unchanged.
+- `src/app/api/pos/jobs/[id]/complete/__tests__/job-complete-vehicle-literal.test.ts` — NEW file, 2 cases (vars empty when no vehicle, vars correct make+model when attached).
+
+### Quality gates
+
+- `npm run build` — ✓ clean
+- `npx tsc --noEmit` — ✓ clean
+- `npx vitest run` — ✓ 521/521 (was 516; +5)
+
+### Files
+
+- Modified: `src/app/api/pos/transactions/route.ts:535` (one-line fix + comment)
+- Modified: `src/app/api/pos/jobs/[id]/complete/route.ts:249` (one-line fix + comment)
+- Modified: `src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts` (extended)
+- New: `src/app/api/pos/jobs/[id]/complete/__tests__/job-complete-vehicle-literal.test.ts`
+- Updated: `docs/dev/FILE_TREE.md` (1 new test path)
+
+### Future-state note
+
+This change becomes throwaway when Session 42AB rewrites `payment_receipt` and `job_complete` template bodies to use composite caller-built chips (e.g., `{vehicle_line}` instead of `Your {vehicle_description}`). Until then, this surgical caller-side fix resolves the user-visible bug immediately and removes the only known "your your vehicle" trigger paths in the chip-system callers.
+
+### Cross-references
+
+- Engine-side fix: Session 42X-1 (commit `b4696619`)
+- Root-cause audit: `docs/audits/SMS_TEMPLATE_ROOT_CAUSE_SESSION42W.md` Phase 4
+- Inventory + chip-migration verdicts: `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md`
+
+---
+
 ## fix(sms): engine fallbacks + required hard-skip + PUT validation + auto-receipt interlock — 2026-04-25 (Session 42X-1)
 
 Engine-level fixes for the SMS template system, scoped per the architectural decisions locked in `docs/audits/SMS_TEMPLATE_ROOT_CAUSE_SESSION42W.md` and `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md`. No template bodies, no new templates, no callsite refactors, no admin POST endpoint — those are all later sessions (42AA, 42AB, 42AC–42AF, 42AG, 42AH).

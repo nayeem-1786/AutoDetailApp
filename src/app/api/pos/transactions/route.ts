@@ -532,7 +532,11 @@ export async function POST(request: NextRequest) {
 
           const vars: Record<string, string> = {
             first_name: cust.first_name || '',
-            vehicle_description: vehicleDesc || 'your vehicle',
+            // Session 42X-1-followup: pass empty string when no vehicle attached.
+            // Engine fallback (also empty) triggers REMOVE_LINE for any line containing
+            // {vehicle_description}. Previous literal 'your vehicle' produced "Your your
+            // vehicle is all set" when paired with template prose "Your {vehicle_description}".
+            vehicle_description: vehicleDesc || '',
             transaction_greeting: greeting,
             loyalty_points_earned: String(pointsEarned),
             receipt_link: receiptLink,

@@ -15,11 +15,13 @@ import { NextRequest } from 'next/server';
 
 interface AuditLogRow { action: string; entity_type: string; entity_id: string; source: string; details: Record<string, unknown> }
 interface MessageInsert { conversation_id?: string; body: string; metadata?: Record<string, unknown> }
+interface RenderInvocation { slug: string; vars: Record<string, string | undefined> }
 
 const recorder = {
   auditLogInserts: [] as AuditLogRow[],
   smsSendCalls: [] as Array<{ to: string; body: string }>,
   messagesInserts: [] as MessageInsert[],
+  renderInvocations: [] as RenderInvocation[],
 };
 
 const state = {
@@ -27,6 +29,7 @@ const state = {
   txRefreshReturnsNull: false,
   alreadySent: null as { id: string } | null,
   loyaltyPointsEarned: 0,
+  vehicleAttached: true,
 };
 
 // ───── Mocks ─────────────────────────────────────────────────────────────────
@@ -72,13 +75,16 @@ vi.mock('@/lib/utils/sms', () => ({
 }));
 
 vi.mock('@/lib/sms/render-sms-template', () => ({
-  renderSmsTemplate: async (_slug: string, _vars: Record<string, string>, fallback: string) => ({
-    body: fallback,
-    isActive: true,
-    canSilence: true,
-    recipientType: 'customer' as const,
-    recipientPhones: null,
-  }),
+  renderSmsTemplate: async (slug: string, vars: Record<string, string | undefined>, fallback: string) => {
+    recorder.renderInvocations.push({ slug, vars });
+    return {
+      body: fallback,
+      isActive: true,
+      canSilence: true,
+      recipientType: 'customer' as const,
+      recipientPhones: null,
+    };
+  },
 }));
 
 vi.mock('@/lib/utils/short-link', () => ({
@@ -135,7 +141,11 @@ function makeBuilder(table: string): unknown {
         };
       }
       if (table === 'customers') return { data: { phone: '+15558881111', first_name: 'Sarah' }, error: null };
-      if (table === 'vehicles') return { data: { year: 2024, make: 'Tesla', model: 'Model 3' }, error: null };
+      if (table === 'vehicles') {
+        return state.vehicleAttached
+          ? { data: { year: 2024, make: 'Tesla', model: 'Model 3' }, error: null }
+          : { data: null, error: null };
+      }
       if (table === 'employees') return { data: { id: 'emp-1', role: 'cashier' }, error: null };
       if (table === 'messages') return { data: state.alreadySent, error: null };
       if (table === 'jobs') return { data: null, error: null };
@@ -222,10 +232,10 @@ function makeAdminClient() {
 
 // ───── Test fixture: build a valid transaction-create POST request ───────────
 
-function makeRequest(): NextRequest {
-  const body = {
+function makeRequest(opts: { withVehicle?: boolean } = {}): NextRequest {
+  const withVehicle = opts.withVehicle ?? true;
+  const body: Record<string, unknown> = {
     customer_id: '11111111-1111-4111-8111-111111111111',
-    vehicle_id: '22222222-2222-4222-8222-222222222222',
     payment_method: 'cash',
     items: [
       {
@@ -245,6 +255,9 @@ function makeRequest(): NextRequest {
     total_amount: 100,
     payments: [{ method: 'cash', amount: 100 }],
   };
+  if (withVehicle) {
+    body.vehicle_id = '22222222-2222-4222-8222-222222222222';
+  }
   return new NextRequest('http://localhost/api/pos/transactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -259,10 +272,12 @@ beforeEach(() => {
   recorder.auditLogInserts = [];
   recorder.smsSendCalls = [];
   recorder.messagesInserts = [];
+  recorder.renderInvocations = [];
   state.txStatus = 'completed';
   state.txRefreshReturnsNull = false;
   state.alreadySent = null;
   state.loyaltyPointsEarned = 0;
+  state.vehicleAttached = true;
   vi.useFakeTimers();
 });
 
@@ -369,3 +384,51 @@ describe('Auto-receipt status interlock (Session 42X-1, Phase 4 D)', () => {
     expect(skipRows).toHaveLength(0);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Session 42X-1-followup: caller-side literal regression
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe("Auto-receipt vehicle_description caller-side literal (Session 42X-1-followup)", () => {
+  it("passes empty string (not 'your vehicle' literal) when no vehicle attached", async () => {
+    state.vehicleAttached = false;
+
+    await POST(makeRequest({ withVehicle: false }));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    // Auto-receipt template invocation must have happened
+    const paymentReceiptCall = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
+    expect(paymentReceiptCall).toBeDefined();
+
+    // The bug: caller used to pass literal 'your vehicle' here, which collided with
+    // the template body prose "Your {vehicle_description} is all set" → "Your your vehicle".
+    // Post-fix: pass empty string so engine line-removal strips the entire line.
+    expect(paymentReceiptCall!.vars.vehicle_description).toBe('');
+    expect(paymentReceiptCall!.vars.vehicle_description).not.toBe('your vehicle');
+  });
+
+  it("passes the real vehicle description when vehicle is attached (happy path unchanged)", async () => {
+    state.vehicleAttached = true;
+
+    await POST(makeRequest({ withVehicle: true }));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    const paymentReceiptCall = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
+    expect(paymentReceiptCall).toBeDefined();
+    // From the mocked vehicles table: { year: 2024, make: 'Tesla', model: 'Model 3' }
+    expect(paymentReceiptCall!.vars.vehicle_description).toBe('2024 Tesla Model 3');
+  });
+
+  it("auto-receipt SMS body never contains the 'your your' double-noun signature", async () => {
+    state.vehicleAttached = false;
+
+    await POST(makeRequest({ withVehicle: false }));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(recorder.smsSendCalls.length).toBeGreaterThanOrEqual(1);
+    const body = recorder.smsSendCalls[0].body;
+    // Defensive: catch any future caller-side literal regression
+    expect(body.toLowerCase()).not.toContain('your your');
+  });
+});
+

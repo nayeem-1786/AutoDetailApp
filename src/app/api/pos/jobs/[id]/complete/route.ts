@@ -243,7 +243,10 @@ async function sendCompletionNotifications(
     const assignedEmp = (job.assigned_employee as { id: string; first_name: string } | null);
     const smsResult = await renderSmsTemplate('job_complete', {
       first_name: customer.first_name,
-      vehicle_description: vehicleDisplay,
+      // Session 42X-1-followup: pass empty string into the chip when no vehicle attached.
+      // vehicleDisplay (with 'your vehicle' fallback) is preserved for the smsFallback
+      // disaster-recovery prose at line 241; only the chip-call site swaps to empty.
+      vehicle_description: vehicleMakeModel || '',
       gallery_link: galleryLink,
       hours_line: hoursLine,
       detailer_first_name: assignedEmp?.first_name || undefined,
