@@ -148,6 +148,9 @@ export const STOCK_ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
   returned: 'Returned',
   damaged: 'Damaged',
   recount: 'Recount',
+  shop_use: 'Shop Use',
+  customer_retained: 'Customer Retained',
+  voided: 'Voided',
 } as const;
 
 // Quote status labels
