@@ -4,6 +4,128 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(sms): cheap-add wave — 41 optional chip-adds + legacy variables clean rebuild — 2026-04-26 (Session 2D)
+
+**Cheap-add wave.** Optional chips (`last_name`, `customer_email`, `customer_phone`, `vehicle_description`, plus `first_name` where missing) added to the 18 chip-driven slug contracts; callers wired across 14 source files / 22 callsites. **All 18 slugs render byte-identically to pre-2D** — bodies are unchanged, the cheap-adds become observable when operators reference the new chips in body text via admin UI. Sets up Session 2E's universal palette work and gives operators per-message personalization without engineering changes. The legacy `variables` JSONB column was cleanly rebuilt for all 18 slugs as a side effect, resolving multiple pre-existing drift issues.
+
+### Total cheap-adds (41 across 18 slugs)
+
+| Chip | # of slug-adds |
+|---|---|
+| `last_name` | 18 |
+| `vehicle_description` | 12 |
+| `first_name` | 4 (only where currently absent) |
+| `customer_email` | 4 |
+| `customer_phone` | 2 |
+
+Audience rule applied: customer-facing slugs gain `last_name` + `vehicle_description` (where applicable); staff-facing slugs gain all four. "Where applicable" excludes (a) chips already present, (b) composite-redundant cases (`vehicle_description` skipped for slugs whose `job_summary` / `transaction_greeting` composite already includes vehicle context), and (c) semantic mismatches (`vehicle_description` skipped for non-service slugs like loyalty milestone, generic post-call, multi-item quote acceptance, generic staff alert).
+
+### Legacy `variables` JSONB clean rebuild — pre-existing drift resolved
+
+Per CLAUDE.md rule 9 (two-source-of-truth window), the admin UI continues to read the legacy `variables` JSONB column. To make the cheap-add chips immediately usable in admin UI without waiting for Session 2E, the migration REPLACES each touched slug's legacy `variables` array with a freshly-computed shape sourced from `required_variables ∪ optional_variables`. Algorithm: required-first (alphabetical within), then optional (alphabetical within). Description per chip sourced verbatim from `sms-contracts.source.ts` chip metadata.
+
+The clean rebuild fixed multiple pre-existing drift issues as a side effect:
+- **`loyalty_milestone`** had `[null,null,null,null,null]` — entirely broken, admin save would have failed body validation against any chip key. Now well-formed with 4 required + 2 optional entries.
+- **Duplicate `first_name`** entries in `addon_approved`, `addon_declined`, `booking_reminder` — deduped.
+- **Duplicate `detailer_first_name`** entries in `appointment_confirmed`, `job_complete`, `booking_confirmed` — deduped (and correctly excluded from contracts that don't actually use it).
+- **Stray `business_name` entry** in `staff_notification` (legacy carryover from a removed body chip) — removed.
+
+**Memory #30**'s duplicate-key drift item is now resolved across all 18 slugs. The clean-rebuild algorithm has no way to preserve drift; drift dies because the algorithm produces correct output deterministically.
+
+### `booking_confirmed.vehicle_description` chip-add — clarification (no bug fix)
+
+The Phase 0 plan had framed this as a "contract-drift bug fix" — a body line being silently REMOVE_LINE'd. Phase 4 verification revealed the framing was incorrect: the operator-edited `body_template` for `booking_confirmed` does NOT reference `{vehicle_description}` (the operator removed the line at some point). The engine reads `body_template`, not `default_body`. So no line is being silently stripped today.
+
+What the chip-add actually does:
+- Makes `vehicle_description` available in the `booking_confirmed` admin UI variable picker (via the legacy `variables` rebuild).
+- Means `book/route.ts` now passes the value, so if the operator re-adds `{vehicle_description}` to the body via admin UI later (or resets to `default_body`, which DOES reference it), the chip will populate from the customer's vehicle.
+- Aligns the contract with `default_body`'s shape.
+
+**No render change today** for `booking_confirmed` (or any other slug). The chip-add is forward-looking infrastructure.
+
+### Phase 0 audit-bug transparency note
+
+Phase 0's body-uses audit script combined `body_template` and `default_body` chips into a single Set, leading to an over-reported claim that `booking_confirmed`'s body included `{vehicle_description}`. The engine reads `body_template` (operator-active), not `default_body` (seed). Caught during Phase 4 verification before shipping. **Future similar audits should query `body_template` specifically and treat `default_body` separately.**
+
+A belt-and-suspenders body-divergence audit was run across all 18 slugs as part of Phase 4. Two divergences exist between `body_template` and `default_body`:
+- `booking_confirmed`: default has `vehicle_description`, body doesn't (the documented case above).
+- `quote_accepted_staff_notify`: body has `customer_phone`, default doesn't (operator added an in-contract chip to the body — exactly the operator workflow 2D's cheap-adds enable for other chips going forward).
+
+Neither divergence flags a contract gap. **No body chip in any of the 18 slugs is referenced outside its contract. Render output is byte-identical for all 18 slugs.**
+
+### Per-slug summary
+
+| Slug | Audience | Cheap-adds | Render change |
+|---|---|---|---|
+| `addon_approved` | customer | first_name, last_name, vehicle_description | None |
+| `addon_declined` | customer | first_name, last_name, vehicle_description | None |
+| `appointment_cancelled` | customer | last_name, vehicle_description | None |
+| `appointment_confirmed` | customer | last_name, vehicle_description | None |
+| `appointment_confirmed_postcall` | customer | last_name | None |
+| `booking_confirmed` | customer | first_name, last_name, vehicle_description | None (see clarification above) |
+| `booking_reminder` | customer | first_name, last_name, vehicle_description | None |
+| `booking_staff_notify` | staff | customer_email, customer_phone, last_name, vehicle_description | None |
+| `detailer_job_assigned` | staff | customer_email, customer_phone, last_name | None |
+| `job_complete` | customer | last_name | None |
+| `loyalty_milestone` | customer | last_name | None |
+| `payment_receipt` | customer | last_name | None |
+| `quote_accepted_multi` | customer | last_name | None |
+| `quote_accepted_single` | customer | last_name, vehicle_description | None |
+| `quote_accepted_staff_notify` | staff | customer_email, last_name, vehicle_description | None |
+| `quote_reminder` | customer | last_name, vehicle_description | None |
+| `quote_viewed_followup` | customer | last_name, vehicle_description | None |
+| `staff_notification` | staff | customer_email, last_name, vehicle_description | None |
+
+### Phase 1.5 — gap caller SELECT expansions
+
+Three callers had narrow customer SELECTs from before the SMS-chip-system era. Expanded to Tier 1 parity (added `last_name`, `email`):
+- `src/lib/services/job-addons.ts` — both `approveAddon` and `declineAddon` SELECTs (and their typed casts).
+- `src/app/api/pos/transactions/route.ts:308-312` (loyalty_milestone customer fetch).
+- `src/app/api/pos/transactions/route.ts:500-504` (payment_receipt customer fetch).
+
+The fourth gap caller (`src/app/api/voice-agent/notify-staff/route.ts`) has no DB customer record loaded (request-body params only); per the agreed Path B decision, it passes `undefined` for cheap-add chips at the SMS callsite — out of 2D scope to introduce a phone-based customer fetch.
+
+### Caller wire-up scope (14 files / 22 callsites)
+
+- **Helper**: `src/lib/utils/sms.ts` — `buildAppointmentConfirmationSms` gains `customerLastName?` and `vehicleDescription?` params; forwards as `last_name` and `vehicle_description` chips. 4 helper callers updated to pass values where in scope.
+- **Direct chip callers**: `appointments/[id]/notify/route.ts` (helper + detailer_job_assigned), `pos/appointments/[id]/notify/route.ts` (helper + detailer_job_assigned), `voice-agent/appointments/route.ts` (helper × 2 paths), `book/route.ts` (booking_confirmed + booking_staff_notify), `cron/booking-reminders/route.ts`, `cron/quote-reminders/route.ts` (quote_reminder + quote_viewed_followup), `pos/jobs/[id]/complete/route.ts`, `pos/jobs/[id]/cancel/route.ts`, `pos/transactions/route.ts` (loyalty_milestone + payment_receipt), `quotes/[id]/accept/route.ts` (3 slugs), `lib/email/send-cancellation-email.ts`, `lib/services/voice-post-call.ts`, `lib/services/job-addons.ts` (× 2), `voice-agent/notify-staff/route.ts`.
+- **`@ts-expect-error` sites**: `webhooks/twilio/inbound/route.ts` (staff_notification) and `public/specialty-callback/route.ts` (booking_staff_notify) — both wired with the cheap-add chips from already-in-scope locals (Session 2C had set up the data scope). The `@ts-expect-error` markers STAY at count 2; the underlying required-chip gap is unchanged. Session 2F resolves both via slug splits (`staff_notification_inbound_specialty`, `booking_staff_notify_specialty`).
+
+### Architecture / scope discipline
+
+- **Zero body rewrites.** No body_template content was modified.
+- **Zero required-vs-optional changes** for any existing chip. Cheap-adds are pure additions to `optional_variables`.
+- **Zero new templates seeded.**
+- **Zero hardcoded slug migrations.**
+- **Zero admin UI work.** (2E continues that work.)
+- The cheap-adds become observable when operators reference the new chips in body text via admin UI — the legacy `variables` clean rebuild makes this immediately possible.
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run lint` zero new issues — Session 2C baseline preserved (13 errors / 44 warnings unchanged)
+- `npm run build` clean (full SSG output succeeded; typed signature gate satisfied — all 22 callsites satisfy their slugs' new `RenderVarsBySlug` shapes)
+- `npx vitest run` 533/533 pass across 36 test files
+- `supabase db push --linked --dry-run` reports "Remote database is up to date" (migration 20260427000003 tracked)
+- Per-slug strict verification (contracts match expected, legacy variables well-formed: no nulls, no duplicates, all have descriptions, required flags match contract membership) → all 18 PASS
+- Body-divergence audit across all 18 slugs (Phase 4 belt-and-suspenders) → no body chip referenced outside its contract; only 2 divergences between body_template and default_body (both documented above, neither flags a real issue)
+
+### Files
+
+- Modified (5 SMS-chip infrastructure): `src/lib/sms/sms-contracts.source.ts` (source-of-truth), `src/lib/sms/palette.ts` (regen, byte-equivalent), `src/lib/sms/generated-contracts.ts` (regen), `src/lib/utils/sms.ts` (helper signature)
+- Modified (13 callers): `src/app/api/appointments/[id]/notify/route.ts`, `src/app/api/pos/appointments/[id]/notify/route.ts`, `src/app/api/voice-agent/appointments/route.ts`, `src/app/api/book/route.ts`, `src/app/api/cron/booking-reminders/route.ts`, `src/app/api/cron/quote-reminders/route.ts`, `src/app/api/pos/jobs/[id]/complete/route.ts`, `src/app/api/pos/jobs/[id]/cancel/route.ts`, `src/app/api/pos/transactions/route.ts`, `src/app/api/quotes/[id]/accept/route.ts`, `src/lib/email/send-cancellation-email.ts`, `src/lib/services/voice-post-call.ts`, `src/lib/services/job-addons.ts`, `src/app/api/voice-agent/notify-staff/route.ts`, `src/app/api/webhooks/twilio/inbound/route.ts`, `src/app/api/public/specialty-callback/route.ts`
+- New: `supabase/migrations/20260427000003_cheap_add_wave_optional_chips.sql`
+- Docs: `docs/dev/DB_SCHEMA.md` (regen), `docs/dev/FILE_TREE.md`, `docs/CHANGELOG.md`
+
+### What remains for the SMS chip migration roadmap
+
+- **Session 2E** — retire the legacy `variables` JSONB column and the `SMS_TEMPLATE_VARIABLES` TS const (the two-source-of-truth window collapses to engine-only); admin UI universal palette work.
+- **Session 2F** — sub-slug splits for `booking_staff_notify` (→ `booking_staff_notify_specialty`) and `staff_notification` (→ `staff_notification_inbound_specialty`); resolves both `@ts-expect-error` markers.
+- **Session 3C** — `receipt_sms` hardcoded → chip-driven; uses Site 3 customer scope from Session 2C.
+- **Session 3D** — voice-agent hardcoded slugs (`quote_sms_midcall`, `quote_sms_postcall`, 6× `voice_info_*`) hardcoded → chip-driven; uses scope established by Sessions 2B + 2C.
+
+---
+
 ## refactor(sms): Tier 1 non-voice caller refactors + specialty-callback email field — 2026-04-26 (Session 2C)
 
 **Tier 1 non-voice caller refactors.** Data scope expanded across 4 caller files in preparation for Session 3C (`receipt_sms` hardcoded → chip-driven), Session 3D (voice-info-quote and other hardcoded → chip-driven), and Session 2F (sub-slug splits for `booking_staff_notify_specialty` and `staff_notification_inbound_specialty`). Specialty-callback form now collects an optional email field; `customer_email` is available in local scope at the SMS callsite for Session 2F's slug-split contract. **Zero contract changes, zero chip-pass changes** for any of the 4 chip-driven slug callsites whose contracts were already satisfied. **Zero new migrations.** **Zero admin-UI work.**

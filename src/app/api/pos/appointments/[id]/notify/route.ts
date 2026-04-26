@@ -260,6 +260,8 @@ Thank you for choosing ${business.name}!`;
           time: displayTime,
           serviceName: serviceNames || undefined,
           customerFirstName: customer.first_name || undefined,
+          customerLastName: customer.last_name || undefined,
+          vehicleDescription: vehicle ? vehicleStr : undefined,
           total: formatCurrency(appointment.total_amount),
           detailerFirstName: employee?.first_name || undefined,
         });
@@ -298,6 +300,10 @@ Thank you for choosing ${business.name}!`;
           service_total: formatCurrency(appointment.total_amount),
           mobile_service_address: appointment.mobile_address || undefined,
           detailer_first_name: employee?.first_name || undefined,
+          // Session 2D cheap-adds: customer contact info for the detailer.
+          customer_email: customer.email || undefined,
+          customer_phone: customer.phone || undefined,
+          last_name: customer.last_name || undefined,
         }, detailerFallback);
         if (!detailerResult.isActive) throw new Error('skip');
         const smsResult = await sendSms(employee.phone, detailerResult.body);

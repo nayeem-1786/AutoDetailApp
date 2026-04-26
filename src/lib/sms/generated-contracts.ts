@@ -49,24 +49,24 @@ export interface SmsContract {
 }
 
 export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
-  addon_approved: { required: ["service_name"], optional: [] },
-  addon_declined: { required: ["service_name"], optional: [] },
-  appointment_cancelled: { required: ["business_name", "business_phone"], optional: ["first_name", "services", "appointment_date", "appointment_time"] },
-  appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time", "business_name", "business_phone"], optional: ["first_name", "service_total"] },
-  appointment_confirmed_postcall: { required: ["business_name", "business_phone"], optional: ["first_name"] },
-  booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total", "business_name", "business_phone"], optional: [] },
-  booking_reminder: { required: ["service_name", "appointment_time", "business_name", "business_phone"], optional: [] },
-  booking_staff_notify: { required: ["customer_name", "services", "appointment_date", "appointment_time", "deposit_info"], optional: [] },
-  detailer_job_assigned: { required: ["job_summary", "appointment_date", "appointment_time", "service_total"], optional: ["mobile_service_address", "detailer_first_name"] },
-  job_complete: { required: ["gallery_link", "business_name", "business_address", "business_phone", "hours_line"], optional: ["first_name", "vehicle_description"] },
-  loyalty_milestone: { required: ["loyalty_points_balance", "loyalty_cash_value", "booking_link", "business_name"], optional: ["first_name"] },
-  payment_receipt: { required: ["transaction_greeting", "receipt_link", "business_name"], optional: ["first_name"] },
-  quote_accepted_multi: { required: [], optional: ["first_name"] },
-  quote_accepted_single: { required: ["item_name"], optional: ["first_name"] },
-  quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone"] },
-  quote_reminder: { required: ["first_name", "short_url"], optional: [] },
-  quote_viewed_followup: { required: ["first_name", "short_url"], optional: [] },
-  staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: [] },
+  addon_approved: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
+  addon_declined: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
+  appointment_cancelled: { required: ["business_name", "business_phone"], optional: ["first_name", "services", "appointment_date", "appointment_time", "last_name", "vehicle_description"] },
+  appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time", "business_name", "business_phone"], optional: ["first_name", "service_total", "last_name", "vehicle_description"] },
+  appointment_confirmed_postcall: { required: ["business_name", "business_phone"], optional: ["first_name", "last_name"] },
+  booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total", "business_name", "business_phone"], optional: ["first_name", "last_name", "vehicle_description"] },
+  booking_reminder: { required: ["service_name", "appointment_time", "business_name", "business_phone"], optional: ["first_name", "last_name", "vehicle_description"] },
+  booking_staff_notify: { required: ["customer_name", "services", "appointment_date", "appointment_time", "deposit_info"], optional: ["customer_email", "customer_phone", "last_name", "vehicle_description"] },
+  detailer_job_assigned: { required: ["job_summary", "appointment_date", "appointment_time", "service_total"], optional: ["mobile_service_address", "detailer_first_name", "customer_email", "customer_phone", "last_name"] },
+  job_complete: { required: ["gallery_link", "business_name", "business_address", "business_phone", "hours_line"], optional: ["first_name", "vehicle_description", "last_name"] },
+  loyalty_milestone: { required: ["loyalty_points_balance", "loyalty_cash_value", "booking_link", "business_name"], optional: ["first_name", "last_name"] },
+  payment_receipt: { required: ["transaction_greeting", "receipt_link", "business_name"], optional: ["first_name", "last_name"] },
+  quote_accepted_multi: { required: [], optional: ["first_name", "last_name"] },
+  quote_accepted_single: { required: ["item_name"], optional: ["first_name", "last_name", "vehicle_description"] },
+  quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone", "customer_email", "last_name", "vehicle_description"] },
+  quote_reminder: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
+  quote_viewed_followup: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
+  staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: ["customer_email", "last_name", "vehicle_description"] },
 };
 
 // ── Per-slug render-vars types ─────────────────────────────────────────────
@@ -74,12 +74,18 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
 export interface RenderVarsBySlug {
   addon_approved: {
     service_name: string;
+    first_name?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   addon_declined: {
     service_name: string;
+    first_name?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -91,6 +97,8 @@ export interface RenderVarsBySlug {
     services?: string | undefined;
     appointment_date?: string | undefined;
     appointment_time?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_address?: string | undefined;
   };
   appointment_confirmed: {
@@ -101,12 +109,15 @@ export interface RenderVarsBySlug {
     business_phone?: string | undefined;
     first_name?: string | undefined;
     service_total?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_address?: string | undefined;
   };
   appointment_confirmed_postcall: {
     business_name?: string | undefined;
     business_phone?: string | undefined;
     first_name?: string | undefined;
+    last_name?: string | undefined;
     business_address?: string | undefined;
   };
   booking_confirmed: {
@@ -116,6 +127,9 @@ export interface RenderVarsBySlug {
     service_total: string;
     business_name?: string | undefined;
     business_phone?: string | undefined;
+    first_name?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_address?: string | undefined;
   };
   booking_reminder: {
@@ -123,6 +137,9 @@ export interface RenderVarsBySlug {
     appointment_time: string;
     business_name?: string | undefined;
     business_phone?: string | undefined;
+    first_name?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_address?: string | undefined;
   };
   booking_staff_notify: {
@@ -131,6 +148,10 @@ export interface RenderVarsBySlug {
     appointment_date: string;
     appointment_time: string;
     deposit_info: string;
+    customer_email?: string | undefined;
+    customer_phone?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -142,6 +163,9 @@ export interface RenderVarsBySlug {
     service_total: string;
     mobile_service_address?: string | undefined;
     detailer_first_name?: string | undefined;
+    customer_email?: string | undefined;
+    customer_phone?: string | undefined;
+    last_name?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -154,6 +178,7 @@ export interface RenderVarsBySlug {
     business_phone?: string | undefined;
     first_name?: string | undefined;
     vehicle_description?: string | undefined;
+    last_name?: string | undefined;
   };
   loyalty_milestone: {
     loyalty_points_balance: string;
@@ -161,6 +186,7 @@ export interface RenderVarsBySlug {
     booking_link: string;
     business_name?: string | undefined;
     first_name?: string | undefined;
+    last_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };
@@ -169,11 +195,13 @@ export interface RenderVarsBySlug {
     receipt_link: string;
     business_name?: string | undefined;
     first_name?: string | undefined;
+    last_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   quote_accepted_multi: {
     first_name?: string | undefined;
+    last_name?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -181,6 +209,8 @@ export interface RenderVarsBySlug {
   quote_accepted_single: {
     item_name: string;
     first_name?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -191,6 +221,9 @@ export interface RenderVarsBySlug {
     services: string;
     service_total: string;
     customer_phone?: string | undefined;
+    customer_email?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -198,6 +231,8 @@ export interface RenderVarsBySlug {
   quote_reminder: {
     first_name: string;
     short_url: string;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -205,6 +240,8 @@ export interface RenderVarsBySlug {
   quote_viewed_followup: {
     first_name: string;
     short_url: string;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -214,6 +251,9 @@ export interface RenderVarsBySlug {
     customer_name: string;
     details: string;
     customer_phone: string;
+    customer_email?: string | undefined;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;

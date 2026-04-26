@@ -216,6 +216,10 @@ export async function POST(
                 services: serviceNames,
                 appointment_date: dateStr,
                 appointment_time: displayTime,
+                // Session 2D cheap-adds: last_name. Vehicle not loaded by this
+                // route's appointment SELECT — vehicle_description stays undefined.
+                last_name: customer.last_name || undefined,
+                vehicle_description: undefined,
               }, smsFallback);
 
               if (smsTemplateResult.isActive) {

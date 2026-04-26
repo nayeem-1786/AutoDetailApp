@@ -91,6 +91,13 @@ export async function POST(request: NextRequest) {
         customer_phone: displayPhone,
         reason_label: reasonLabel,
         details: details.trim(),
+        // Session 2D cheap-adds: this caller has only request-body params
+        // (no DB customer record loaded — out of 2D scope per Q1 Path B);
+        // pass undefined so REMOVE_LINE handles missing values cleanly if
+        // operators reference these chips in body.
+        customer_email: undefined,
+        last_name: undefined,
+        vehicle_description: undefined,
       }, fallbackBody),
       getBusinessInfo(),
     ]);

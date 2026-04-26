@@ -248,6 +248,8 @@ async function sendCompletionNotifications(
       vehicle_description: vehicleMakeModel || '',
       gallery_link: galleryLink,
       hours_line: hoursLine,
+      // Session 2D cheap-add (loaded by job.customer SELECT).
+      last_name: customer.last_name || undefined,
     }, smsFallback);
 
     if (smsResult.isActive) {

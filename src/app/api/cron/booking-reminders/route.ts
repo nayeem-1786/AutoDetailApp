@@ -76,6 +76,11 @@ export async function GET(request: NextRequest) {
         const smsResult = await renderSmsTemplate('booking_reminder', {
           service_name: serviceName,
           appointment_time: displayTime,
+          // Session 2D cheap-adds: customer name. Vehicle not loaded by this
+          // cron query — vehicle_description stays undefined.
+          first_name: customer.first_name || undefined,
+          last_name: customer.last_name || undefined,
+          vehicle_description: undefined,
         }, smsFallback);
         if (smsResult.isActive) {
           await sendSms(customer.phone, smsResult.body, {

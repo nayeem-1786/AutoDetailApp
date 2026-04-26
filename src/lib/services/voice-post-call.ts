@@ -351,6 +351,8 @@ export async function processVoiceCallEnd(
       const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
       const templateResult = await renderSmsTemplate('appointment_confirmed_postcall', {
         first_name: customer.first_name || undefined,
+        // Session 2D cheap-add (loaded by 2B's customer SELECT expansion).
+        last_name: customer.last_name || undefined,
       }, smsFallback);
       const smsBody = templateResult.isActive ? templateResult.body : null;
       if (!smsBody) {

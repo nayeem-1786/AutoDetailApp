@@ -90,7 +90,7 @@ export async function approveAddon(addonId: string): Promise<AddonActionResult> 
       *,
       job:jobs!job_addons_job_id_fkey(
         id,
-        customer:customers!jobs_customer_id_fkey(id, first_name, phone)
+        customer:customers!jobs_customer_id_fkey(id, first_name, last_name, email, phone)
       ),
       service:services!job_addons_service_id_fkey(name),
       product:products!job_addons_product_id_fkey(name)
@@ -136,13 +136,21 @@ export async function approveAddon(addonId: string): Promise<AddonActionResult> 
   }
 
   // Send confirmation SMS to customer
-  const job = addon.job as { id: string; customer: { id: string; first_name: string; phone: string | null } | null } | null;
+  const job = addon.job as { id: string; customer: { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null } | null } | null;
   const customerPhone = job?.customer?.phone;
   const serviceName = getAddonName(addon);
 
   if (customerPhone) {
     const fallback = `Great! Your add-on (${serviceName}) has been approved. We'll get started right away!`;
-    const result = await renderSmsTemplate('addon_approved', { service_name: serviceName }, fallback);
+    // Session 2D cheap-adds: customer name (loaded by Phase 1.5 SELECT
+    // expansion). Vehicle not loaded by this caller — vehicle_description
+    // stays undefined.
+    const result = await renderSmsTemplate('addon_approved', {
+      service_name: serviceName,
+      first_name: job?.customer?.first_name || undefined,
+      last_name: job?.customer?.last_name || undefined,
+      vehicle_description: undefined,
+    }, fallback);
     if (result.isActive) {
       await sendSms(customerPhone, result.body, {
         logToConversation: true,
@@ -171,7 +179,7 @@ export async function declineAddon(addonId: string): Promise<AddonActionResult> 
       *,
       job:jobs!job_addons_job_id_fkey(
         id,
-        customer:customers!jobs_customer_id_fkey(id, first_name, phone)
+        customer:customers!jobs_customer_id_fkey(id, first_name, last_name, email, phone)
       ),
       service:services!job_addons_service_id_fkey(name),
       product:products!job_addons_product_id_fkey(name)
@@ -207,13 +215,20 @@ export async function declineAddon(addonId: string): Promise<AddonActionResult> 
   }
 
   // Send confirmation SMS to customer
-  const job = addon.job as { id: string; customer: { id: string; first_name: string; phone: string | null } | null } | null;
+  const job = addon.job as { id: string; customer: { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null } | null } | null;
   const customerPhone = job?.customer?.phone;
   const serviceName = getAddonName(addon);
 
   if (customerPhone) {
     const fallback = `No problem! We've noted ${serviceName} as a recommendation for your next visit.`;
-    const result = await renderSmsTemplate('addon_declined', { service_name: serviceName }, fallback);
+    // Session 2D cheap-adds: customer name (loaded by Phase 1.5 SELECT
+    // expansion). Vehicle not loaded — vehicle_description stays undefined.
+    const result = await renderSmsTemplate('addon_declined', {
+      service_name: serviceName,
+      first_name: job?.customer?.first_name || undefined,
+      last_name: job?.customer?.last_name || undefined,
+      vehicle_description: undefined,
+    }, fallback);
     if (result.isActive) {
       await sendSms(customerPhone, result.body, {
         logToConversation: true,

@@ -602,6 +602,15 @@ export async function POST(request: NextRequest) {
           appointment_time: timeStr,
           services: serviceNames,
           service_total: total,
+          // Session 2D cheap-adds. NOTE: vehicle_description here resolves
+          // a long-standing contract drift — the body has long included
+          // {vehicle_description} but the chip wasn't in the contract, so
+          // the engine REMOVE_LINE'd that line silently. Adding to the
+          // contract + wiring here makes the operator-authored body line
+          // render the customer's vehicle as intended (CHANGELOG bug-fix).
+          first_name: data.customer.first_name || undefined,
+          last_name: data.customer.last_name || undefined,
+          vehicle_description: vehicleStr || undefined,
         }, customerSmsFallback).then((result) => {
           if (result.isActive) {
             sendSms(e164Phone, result.body, {
@@ -659,6 +668,11 @@ export async function POST(request: NextRequest) {
           appointment_date: dateStr,
           appointment_time: timeStr,
           deposit_info: depositInfo,
+          // Session 2D cheap-adds: customer contact + last_name + vehicle for staff.
+          customer_email: data.customer.email || undefined,
+          customer_phone: e164Phone || undefined,
+          last_name: data.customer.last_name || undefined,
+          vehicle_description: vehicleStr || undefined,
         }, staffFallback).then((result) => {
           if (result.isActive) {
             const phones = result.recipientPhones?.length ? result.recipientPhones : (biz.phone ? [biz.phone] : []);

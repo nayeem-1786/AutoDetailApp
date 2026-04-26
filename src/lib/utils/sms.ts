@@ -299,12 +299,14 @@ export async function buildAppointmentConfirmationSms(params: {
   time: string;
   serviceName?: string;
   customerFirstName?: string;
+  customerLastName?: string;
+  vehicleDescription?: string;
   total?: string;
   detailerFirstName?: string;
 }): Promise<string | null> {
   const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
   const { buildAppointmentSummary } = await import('@/lib/sms/composites');
-  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
+  const { businessName, businessPhone, date, time, serviceName, customerFirstName, customerLastName, vehicleDescription, total } = params;
 
   // Guard: serviceName is required by contract; missing returns null. Total
   // is OPTIONAL post-Session 2B (voice-agent ad-hoc bookings don't know total
@@ -320,12 +322,19 @@ export async function buildAppointmentConfirmationSms(params: {
     buildAppointmentSummary({ date, time, serviceName, total, firstName: customerFirstName }) +
     `\nQuestions? Call ${businessPhone}`;
 
+  // Session 2D: forward last_name + vehicle_description cheap-adds when caller
+  // provides them. Bodies don't reference these chips today; REMOVE_LINE
+  // gracefully drops missing values. Operators can introduce {last_name} or
+  // {vehicle_description} into the body via admin UI without any further
+  // engineering work.
   const result = await renderSmsTemplate('appointment_confirmed', {
     first_name: customerFirstName,
+    last_name: customerLastName,
     service_name: serviceName,
     appointment_date: date,
     appointment_time: time,
     service_total: total,
+    vehicle_description: vehicleDescription,
   }, fallback);
 
   return result.isActive ? result.body : null;

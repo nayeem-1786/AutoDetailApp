@@ -657,8 +657,19 @@ export async function POST(request: NextRequest) {
                 // loaded at L527-530's customer SELECT (prior AI-context buildout); no
                 // SELECT expansion needed. specialtyVehicleDesc + customerMessageExcerpt
                 // hoisted above as named locals for 2F's chip wiring.
+                // Session 2D wired cheap-adds (last_name, customer_email,
+                // vehicle_description) at this callsite from already-in-scope locals.
+                // The required-chip gap (reason_label, details missing) and resulting
+                // engine hard-skip → fallback-prose flow are unchanged; 2F's slug split
+                // is still the right resolution for the @ts-expect-error.
                 // @ts-expect-error — see Session 2F note above
-                renderSmsTemplate('staff_notification', { customer_name: custName, customer_phone: normalizedPhone }, staffMsg),
+                renderSmsTemplate('staff_notification', {
+                  customer_name: custName,
+                  customer_phone: normalizedPhone,
+                  customer_email: customerCtx?.email || undefined,
+                  last_name: undefined,
+                  vehicle_description: specialtyVehicleDesc || undefined,
+                }, staffMsg),
                 getBusinessInfo(),
               ]);
               const smsBody = templateResult?.body || staffMsg;

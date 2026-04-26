@@ -101,8 +101,11 @@ export async function GET(request: NextRequest) {
       const rendered = await renderSmsTemplate('quote_reminder', {
         first_name: firstName,
         short_url: shortUrl,
+        // Session 2D cheap-adds: last_name + vehicle_description (loaded by 2C).
+        last_name: customer.last_name || undefined,
+        vehicle_description: vehicleDescription,
       }, fallbackMsg);
-      void vehicleDescription; void servicesList; // Loaded for 2F / 3D; unused at this callsite today.
+      void servicesList; // Loaded for 3D's voice-info-quote chip-wiring; unused at this callsite today.
 
       if (!rendered.isActive) continue;
       const message = rendered.body;
@@ -220,7 +223,11 @@ export async function GET(request: NextRequest) {
         const rendered = await renderSmsTemplate('quote_viewed_followup', {
           first_name: firstName,
           short_url: shortUrl,
+          // Session 2D cheap-adds: last_name + vehicle_description (loaded by 2C).
+          last_name: customer.last_name || undefined,
+          vehicle_description: vehicleDescription,
         }, fallbackMsg);
+        void servicesList; // Loaded for 3D's voice-info-quote chip-wiring; unused at this callsite today.
         void vehicleDescription; void servicesList; // Loaded for 2F / 3D; unused at this callsite today.
 
         if (!rendered.isActive) continue;

@@ -81,13 +81,19 @@ export async function POST(
       // The single and multi slugs have different contracts (single: item_name
       // required; multi: no required chips), so the literal-union shape can't
       // satisfy both — split into two narrowed calls instead.
+      // Session 2D cheap-adds: last_name (loaded by customer SELECT). Vehicle
+      // not loaded here (quote.vehicle_id not joined) — vehicle_description
+      // stays undefined for quote_accepted_single.
       const result = items.length === 1 && items[0]?.item_name
         ? await renderSmsTemplate('quote_accepted_single', {
             first_name: customer.first_name,
             item_name: items[0].item_name,
+            last_name: customer.last_name || undefined,
+            vehicle_description: undefined,
           }, `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`)
         : await renderSmsTemplate('quote_accepted_multi', {
             first_name: customer.first_name,
+            last_name: customer.last_name || undefined,
           }, `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`);
 
       if (result.isActive) {
@@ -125,6 +131,12 @@ export async function POST(
         service_total: formatCurrency(Number(quote.total_amount)),
         services: serviceList,
         customer_phone: customer?.phone || '',
+        // Session 2D cheap-adds: customer_email + last_name. Vehicle not
+        // loaded here (quote.vehicle_id not joined) — vehicle_description
+        // stays undefined.
+        customer_email: customer?.email || undefined,
+        last_name: customer?.last_name || undefined,
+        vehicle_description: undefined,
       }, staffFallback);
 
       if (staffResult.isActive) {

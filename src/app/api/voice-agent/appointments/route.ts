@@ -295,6 +295,13 @@ export async function POST(request: NextRequest) {
       perf.mark('fetch:getBusinessInfo', t);
 
       if (hasSmsConsent && e164Phone) {
+        // Session 2D: pass last_name cheap-add (loaded into scope by 2B's
+        // existingCustomer SELECT expansion). Vehicle data is intentionally
+        // not loaded in this voice-agent path (per Session 2B Q2 — contract
+        // had no vehicle_description chip at that time; now it does as an
+        // optional cheap-add but loading vehicle is out of scope for 2D —
+        // vehicleDescription stays undefined here, REMOVE_LINE'd if/when
+        // operators reference it in body).
         const smsBody = await buildAppointmentConfirmationSms({
           businessName: biz.name,
           businessPhone: biz.phone,
@@ -302,6 +309,8 @@ export async function POST(request: NextRequest) {
           time: formattedTime,
           serviceName: serviceNames,
           customerFirstName: existingCustomer?.first_name || undefined,
+          customerLastName: existingCustomer?.last_name || undefined,
+          vehicleDescription: undefined,
           total: Number(appointment.total_amount) > 0
             ? formatCurrency(Number(appointment.total_amount))
             : undefined,
@@ -539,6 +548,11 @@ export async function POST(request: NextRequest) {
       // REMOVE_LINEs the {service_total} line cleanly (per Session 2B contract
       // change demoting service_total to optional — migrations 20260427000001
       // + 20260427000002).
+      // Session 2D: pass last_name cheap-add (loaded by 2B's customer SELECT
+      // expansion). vehicleDescription stays undefined per Session 2B Q2's
+      // skip-vehicle-load decision; if operators reference {vehicle_description}
+      // in body, REMOVE_LINE drops the line cleanly.
+      const customerLastName = existingCustomer?.last_name || undefined;
       const smsBody = await buildAppointmentConfirmationSms({
         businessName: biz.name,
         businessPhone: biz.phone,
@@ -546,6 +560,8 @@ export async function POST(request: NextRequest) {
         time: formattedTime,
         serviceName: service.name,
         customerFirstName,
+        customerLastName,
+        vehicleDescription: undefined,
         total: Number(appointment.total_amount) > 0
           ? formatCurrency(Number(appointment.total_amount))
           : undefined,

@@ -157,75 +157,75 @@ export const SMS_CONTRACTS_SOURCE = {
   slugs: {
     addon_approved: {
       required: ['service_name'],
-      optional: [],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     addon_declined: {
       required: ['service_name'],
-      optional: [],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     appointment_cancelled: {
       required: ['business_name', 'business_phone'],
-      optional: ['first_name', 'services', 'appointment_date', 'appointment_time'],
+      optional: ['first_name', 'services', 'appointment_date', 'appointment_time', 'last_name', 'vehicle_description'],
     },
     appointment_confirmed: {
       required: ['service_name', 'appointment_date', 'appointment_time', 'business_name', 'business_phone'],
-      optional: ['first_name', 'service_total'],
+      optional: ['first_name', 'service_total', 'last_name', 'vehicle_description'],
     },
     appointment_confirmed_postcall: {
       required: ['business_name', 'business_phone'],
-      optional: ['first_name'],
+      optional: ['first_name', 'last_name'],
     },
     booking_confirmed: {
       required: ['services', 'appointment_date', 'appointment_time', 'service_total', 'business_name', 'business_phone'],
-      optional: [],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     booking_reminder: {
       required: ['service_name', 'appointment_time', 'business_name', 'business_phone'],
-      optional: [],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     booking_staff_notify: {
       required: ['customer_name', 'services', 'appointment_date', 'appointment_time', 'deposit_info'],
-      optional: [],
+      optional: ['customer_email', 'customer_phone', 'last_name', 'vehicle_description'],
     },
     detailer_job_assigned: {
       required: ['job_summary', 'appointment_date', 'appointment_time', 'service_total'],
-      optional: ['mobile_service_address', 'detailer_first_name'],
+      optional: ['mobile_service_address', 'detailer_first_name', 'customer_email', 'customer_phone', 'last_name'],
     },
     job_complete: {
       required: ['gallery_link', 'business_name', 'business_address', 'business_phone', 'hours_line'],
-      optional: ['first_name', 'vehicle_description'],
+      optional: ['first_name', 'vehicle_description', 'last_name'],
     },
     loyalty_milestone: {
       required: ['loyalty_points_balance', 'loyalty_cash_value', 'booking_link', 'business_name'],
-      optional: ['first_name'],
+      optional: ['first_name', 'last_name'],
     },
     payment_receipt: {
       required: ['transaction_greeting', 'receipt_link', 'business_name'],
-      optional: ['first_name'],
+      optional: ['first_name', 'last_name'],
     },
     quote_accepted_multi: {
       required: [],
-      optional: ['first_name'],
+      optional: ['first_name', 'last_name'],
     },
     quote_accepted_single: {
       required: ['item_name'],
-      optional: ['first_name'],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     quote_accepted_staff_notify: {
       required: ['customer_name', 'quote_number', 'services', 'service_total'],
-      optional: ['customer_phone'],
+      optional: ['customer_phone', 'customer_email', 'last_name', 'vehicle_description'],
     },
     quote_reminder: {
       required: ['first_name', 'short_url'],
-      optional: [],
+      optional: ['last_name', 'vehicle_description'],
     },
     quote_viewed_followup: {
       required: ['first_name', 'short_url'],
-      optional: [],
+      optional: ['last_name', 'vehicle_description'],
     },
     staff_notification: {
       required: ['reason_label', 'customer_name', 'details', 'customer_phone'],
-      optional: [],
+      optional: ['customer_email', 'last_name', 'vehicle_description'],
     },
   },
 } as const;

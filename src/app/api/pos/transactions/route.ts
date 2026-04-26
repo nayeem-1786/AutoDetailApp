@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
             try {
               const { data: custMilestone } = await supabase
                 .from('customers')
-                .select('phone, first_name')
+                .select('phone, first_name, last_name, email')
                 .eq('id', data.customer_id!)
                 .single();
               if (!custMilestone?.phone) return;
@@ -323,6 +323,8 @@ export async function POST(request: NextRequest) {
                 loyalty_cash_value: cashValue,
                 booking_link: bookingLink,
                 business_name: bizInfo.name,
+                // Session 2D cheap-add (loaded by Phase 1.5 SELECT expansion).
+                last_name: custMilestone.last_name || undefined,
               };
 
               const fallback = `Great news ${vars.first_name}! You now have ${currentBalance} loyalty points — that's ${cashValue} off your next visit! Book now: ${bookingLink}\n\n${bizInfo.name}`;
@@ -496,10 +498,11 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          // Fetch customer phone
+          // Fetch customer phone (Session 2D: SELECT expanded with last_name/email
+          // for cheap-add chip wiring at the payment_receipt callsite below).
           const { data: cust } = await admin
             .from('customers')
-            .select('phone, first_name')
+            .select('phone, first_name, last_name, email')
             .eq('id', autoReceiptCustomerId)
             .single();
           if (!cust?.phone) return;
@@ -534,6 +537,8 @@ export async function POST(request: NextRequest) {
             transaction_greeting: greeting,
             receipt_link: receiptLink,
             business_name: businessInfo.name,
+            // Session 2D cheap-add (loaded by Phase 1.5 SELECT expansion).
+            last_name: cust.last_name || undefined,
           };
 
           const pointsLine = pointsEarned > 0 ? ` You earned ${pointsEarned} loyalty points today.` : '';
