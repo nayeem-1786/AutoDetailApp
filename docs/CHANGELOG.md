@@ -10,6 +10,75 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## fix(voice-agent): accept quote_id in both UUID and quote_number formats — 2026-04-26 (Session 2D.1)
+
+**Voice-agent quote-to-appointment conversion fix.** Routes that accept `quote_id` from the voice agent now tolerate both UUID format and `quote_number` format (`Q-NNNN`). Pre-existing bug, exposed by production smoke testing of Session 2B's Path A quote-conversion path. The voice agent's text context (built at `voice-agent/initiation/route.ts:183`) presents quotes by `quote_number`, so when the customer says "I'd like to book Q-23" the agent passes the `quote_number` it saw — not a UUID it never had access to. The route at `voice-agent/appointments/route.ts` previously looked up by `id` only, returning 404. Now resolves to UUID before downstream lookups.
+
+### Implementation
+
+`src/app/api/voice-agent/appointments/route.ts` — inline resolver at the top of the `if (quote_id)` branch (Path A, quote-conversion):
+
+```ts
+let resolvedQuoteId = quote_id;
+if (/^Q-\d+$/i.test(quote_id)) {
+  const { data: quoteByNumber } = await supabase
+    .from('quotes')
+    .select('id')
+    .eq('quote_number', quote_id.toUpperCase())
+    .is('deleted_at', null)
+    .maybeSingle();
+  if (!quoteByNumber) {
+    return NextResponse.json({ error: `Quote ${quote_id} not found` }, { status: 404 });
+  }
+  resolvedQuoteId = quoteByNumber.id;
+}
+```
+
+Used in place of the original `quote_id` for both downstream calls:
+- `quote_items` SELECT (was L234, now L261) — `quote_items.quote_id` FK is UUID
+- `convertQuote()` (was L261, now L288) — `quotes.id` is UUID
+
+Lookup by `quote_number` is unique-indexed (`quotes_quote_number_key`); cost is one round-trip and cleanly tolerates lowercase agent transcription via uppercase normalize on the lookup value.
+
+The L333 response field `converted_from_quote: quote_id` deliberately echoes the **original input** (not the resolved UUID) for log-correlation diagnostics — the agent and any consumer of the response payload think in `quote_number` terms.
+
+### Behavior matrix
+
+| Input shape | Result | Comparison to pre-2D.1 |
+|---|---|---|
+| `Q-0023` (valid, exists) | 201 created, appointment | Was 404 |
+| `Q-9999` (matches regex, doesn't exist) | 404 with friendly error | Was 404 (different path) |
+| `q-0023` (lowercase) | 201 created (case-insensitive regex + uppercase normalize) | Was 404 |
+| Real UUID | 201 created — regression-free | Was 201 |
+| Garbage string | 404 (UUID-shaped lookup falls through, misses) | Was 404 (no regression) |
+
+### Scope
+
+Single-route fix. Comprehensive grep confirmed no other voice-agent route receives `quote_id` from the agent (other voice-agent routes either return `quote_id`, look up by `customer_id`, or only SELECT `quote_number` for agent context).
+
+The boundary is intentional: dual-format tolerance is scoped to the voice-agent route's request-body parsing — `convertQuote()` itself still receives a UUID after resolution. Admin/POS callers of `convertQuote()` always pass UUIDs from their own UI; no shared helper extraction needed.
+
+### Deferred to post-Session 3D
+
+The redundant SMS pairs (`appointment_confirmed` + `appointment_confirmed_postcall`; `quote_sms_midcall` + `quote_sms_postcall` — both arriving within seconds of each other for a single voice-agent customer touchpoint) are NOT addressed in 2D.1. Deferred until after Session 3D migrates the hardcoded voice-agent slugs to chip-driven, at which point the operator can manage redundancy via admin UI slug-active toggles (no engineering change required).
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run lint` 57/13/44 — Session 2D baseline preserved (1 transient `prefer-const` error on the new resolver caught and fixed before commit)
+- `npm run build` clean
+- `npx vitest run` 533/533 pass across 36 test files
+- `supabase db push --linked --dry-run` "Remote database is up to date" (no migration in this session)
+- Local cURL test skipped per user instruction (no dev server running, no guaranteed `Q-NNNN` in local DB); production smoke after deploy is the confirmation
+
+### Files
+
+- Modified: `src/app/api/voice-agent/appointments/route.ts`
+- Docs: `docs/CHANGELOG.md`
+- No migrations, no `CLAUDE.md` changes, no `FILE_TREE.md` changes.
+
+---
+
 ## refactor(sms): cheap-add wave — 41 optional chip-adds + legacy variables clean rebuild — 2026-04-26 (Session 2D)
 
 **Cheap-add wave.** Optional chips (`last_name`, `customer_email`, `customer_phone`, `vehicle_description`, plus `first_name` where missing) added to the 18 chip-driven slug contracts; callers wired across 14 source files / 22 callsites. **All 18 slugs render byte-identically to pre-2D** — bodies are unchanged, the cheap-adds become observable when operators reference the new chips in body text via admin UI. Sets up Session 2E's universal palette work and gives operators per-message personalization without engineering changes. The legacy `variables` JSONB column was cleanly rebuilt for all 18 slugs as a side effect, resolving multiple pre-existing drift issues.

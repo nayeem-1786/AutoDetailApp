@@ -208,6 +208,33 @@ export async function POST(request: NextRequest) {
     // This ensures the correct service appears in SMS (not LLM-hallucinated).
     // -----------------------------------------------------------------------
     if (quote_id) {
+      // Session 2D.1: resolve incoming quote_id to a UUID. The voice agent
+      // presents quotes to the customer by quote_number ("Q-0023") because
+      // the agent's text context is built from voice-agent/initiation/route.ts:183
+      // which formats each quote as `${q.quote_number}: …`. When the customer
+      // says "I'd like to book Q-23", the agent passes the quote_number it
+      // saw — not a UUID it never had access to. Both downstream calls below
+      // (quote_items SELECT, convertQuote) require the UUID, so resolve once
+      // here. Lookups by quote_number are unique-indexed (quotes_quote_number_key).
+      let resolvedQuoteId = quote_id;
+      if (/^Q-\d+$/i.test(quote_id)) {
+        const tResolve = perf.now();
+        const { data: quoteByNumber } = await supabase
+          .from('quotes')
+          .select('id')
+          .eq('quote_number', quote_id.toUpperCase())
+          .is('deleted_at', null)
+          .maybeSingle();
+        perf.mark('query:quotes_resolve_by_number', tResolve);
+        if (!quoteByNumber) {
+          return NextResponse.json(
+            { error: `Quote ${quote_id} not found` },
+            { status: 404 }
+          );
+        }
+        resolvedQuoteId = quoteByNumber.id;
+      }
+
       // Look up customer for SMS consent (convertQuote uses the quote's customer_id).
       // Session 2B: SELECT expanded with last_name/email/phone — last_name and
       // email aren't consumed by the appointment_confirmed contract today, but
@@ -231,7 +258,7 @@ export async function POST(request: NextRequest) {
       const { data: quoteItems } = await supabase
         .from('quote_items')
         .select('service_id')
-        .eq('quote_id', quote_id)
+        .eq('quote_id', resolvedQuoteId)
         .not('service_id', 'is', null);
       perf.mark('query:quote_items', t);
 
@@ -258,7 +285,7 @@ export async function POST(request: NextRequest) {
       t = perf.now();
       const result = await convertQuote(
         supabase,
-        quote_id,
+        resolvedQuoteId,
         { date, time: normalizedTime, duration_minutes: totalDuration },
         { appointmentStatus: 'pending', channel: 'phone' }
       );
