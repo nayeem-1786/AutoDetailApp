@@ -306,14 +306,12 @@ export async function buildAppointmentConfirmationSms(params: {
   const { buildAppointmentSummary } = await import('@/lib/sms/composites');
   const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
 
-  // Session 2A.5: appointment_confirmed contract requires service_name and
-  // service_total (non-optional, non-auto-inject). When either is missing the
-  // engine hard-skips and returns isActive:false anyway — short-circuit here so
-  // the typed signature below sees narrowed string types.
-  // Session 2B will refactor voice-agent callers to load and pass total. Until
-  // then, voice-booked appointments silently skip confirmation SMS (preserves
-  // pre-2A.5 runtime behavior; the engine would hard-skip anyway).
-  if (!serviceName || !total) {
+  // Guard: serviceName is required by contract; missing returns null. Total
+  // is OPTIONAL post-Session 2B (voice-agent ad-hoc bookings don't know total
+  // at booking time — appointment.total_amount is 0 by design and the caller
+  // passes service_total: undefined; engine REMOVE_LINEs the {service_total}
+  // line cleanly, see migration 20260427000001).
+  if (!serviceName) {
     return null;
   }
 

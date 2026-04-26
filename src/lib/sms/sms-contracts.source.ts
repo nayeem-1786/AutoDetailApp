@@ -168,8 +168,8 @@ export const SMS_CONTRACTS_SOURCE = {
       optional: ['first_name', 'services', 'appointment_date', 'appointment_time'],
     },
     appointment_confirmed: {
-      required: ['service_name', 'appointment_date', 'appointment_time', 'service_total', 'business_name', 'business_phone'],
-      optional: ['first_name'],
+      required: ['service_name', 'appointment_date', 'appointment_time', 'business_name', 'business_phone'],
+      optional: ['first_name', 'service_total'],
     },
     appointment_confirmed_postcall: {
       required: ['business_name', 'business_phone'],

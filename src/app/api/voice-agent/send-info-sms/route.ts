@@ -50,11 +50,17 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient();
     const infoType = type as InfoType;
 
-    // Look up customer for conversation logging
+    // Look up customer for conversation logging.
+    // Session 2B: SELECT expanded with first_name/last_name/email/phone — none
+    // are consumed by today's 6 hardcoded case branches, but they're loaded
+    // once into scope so Session 3D can chip-wire each sub-slug
+    // (voice_info_*) without per-branch SELECT round-trips. The phone-fallback
+    // lookup in the quote_link branch (line ~295) stays as-is for now; 3D
+    // decides whether to consolidate it.
     let t = perf.now();
     const { data: customer } = await admin
       .from('customers')
-      .select('id')
+      .select('id, first_name, last_name, email, phone')
       .eq('phone', normalizedPhone)
       .is('deleted_at', null)
       .limit(1)

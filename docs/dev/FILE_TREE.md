@@ -1515,6 +1515,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260425000003_universal_palette_contracts.sql
 20260425000004_align_detailer_variables.sql
 20260425000005_drop_detailer_first_name_from_variables.sql
+20260427000001_appointment_confirmed_service_total_optional.sql
+20260427000002_appointment_confirmed_body_split_lines.sql
 ```
 
 ## Scripts

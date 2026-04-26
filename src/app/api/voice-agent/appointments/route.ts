@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
-import { normalizePhone, formatTime, normalizeTimeTo24h } from '@/lib/utils/format';
+import { normalizePhone, formatTime, normalizeTimeTo24h, formatCurrency } from '@/lib/utils/format';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -208,11 +208,15 @@ export async function POST(request: NextRequest) {
     // This ensures the correct service appears in SMS (not LLM-hallucinated).
     // -----------------------------------------------------------------------
     if (quote_id) {
-      // Look up customer for SMS consent (convertQuote uses the quote's customer_id)
+      // Look up customer for SMS consent (convertQuote uses the quote's customer_id).
+      // Session 2B: SELECT expanded with last_name/email/phone — last_name and
+      // email aren't consumed by the appointment_confirmed contract today, but
+      // they're loaded into scope so Session 3D can chip-wire any future caller
+      // refactor without a second SELECT round-trip.
       let t = perf.now();
       const { data: existingCustomer } = await supabase
         .from('customers')
-        .select('id, first_name, sms_consent')
+        .select('id, first_name, last_name, email, phone, sms_consent')
         .eq('phone', e164Phone)
         .is('deleted_at', null)
         .limit(1)
@@ -275,6 +279,7 @@ export async function POST(request: NextRequest) {
         status: string;
         channel: string;
         customer_id: string;
+        total_amount: number;
       };
       const serviceNames = result.serviceNames;
 
@@ -296,6 +301,10 @@ export async function POST(request: NextRequest) {
           date: formattedDate,
           time: formattedTime,
           serviceName: serviceNames,
+          customerFirstName: existingCustomer?.first_name || undefined,
+          total: Number(appointment.total_amount) > 0
+            ? formatCurrency(Number(appointment.total_amount))
+            : undefined,
         });
         if (smsBody) {
           sendSms(e164Phone, smsBody, {
@@ -380,10 +389,16 @@ export async function POST(request: NextRequest) {
     let customerId: string;
     let isNewCustomer = false;
 
+    // Session 2B: SELECT expanded with first_name/last_name/email/phone — only
+    // first_name is consumed by the appointment_confirmed contract today, but
+    // the rest are loaded into scope so Session 3D can chip-wire downstream
+    // refactors without an additional SELECT round-trip. New-customer SELECT
+    // below mirrors the same shape so both branches converge on a uniform
+    // customer record.
     t = perf.now();
     const { data: existingCustomer } = await supabase
       .from('customers')
-      .select('id, sms_consent')
+      .select('id, first_name, last_name, email, phone, sms_consent')
       .eq('phone', e164Phone)
       .is('deleted_at', null)
       .limit(1)
@@ -391,6 +406,7 @@ export async function POST(request: NextRequest) {
     perf.mark('query:customers_find', t);
 
     let hasSmsConsent = false;
+    let customerFirstName: string | undefined = existingCustomer?.first_name || undefined;
 
     if (existingCustomer) {
       customerId = existingCustomer.id;
@@ -405,7 +421,7 @@ export async function POST(request: NextRequest) {
           phone: e164Phone,
           sms_consent: true, // Implied consent — customer initiated phone call
         })
-        .select('id')
+        .select('id, first_name, last_name, email, phone')
         .single();
       perf.mark('query:customers_create', t);
       hasSmsConsent = true;
@@ -419,6 +435,7 @@ export async function POST(request: NextRequest) {
       }
 
       customerId = newCustomer.id;
+      customerFirstName = newCustomer.first_name || firstName || undefined;
       isNewCustomer = true;
     }
 
@@ -473,7 +490,7 @@ export async function POST(request: NextRequest) {
         job_notes: [mismatchWarning, notes].filter(Boolean).join('\n') || null,
       })
       .select(
-        'id, scheduled_date, scheduled_start_time, scheduled_end_time, status, channel'
+        'id, scheduled_date, scheduled_start_time, scheduled_end_time, status, channel, total_amount'
       )
       .single();
     perf.mark('query:appointments_create', t);
@@ -517,12 +534,21 @@ export async function POST(request: NextRequest) {
     perf.mark('fetch:getBusinessInfo', t);
 
     if (hasSmsConsent) {
+      // total_amount is 0 here by design — voice-agent ad-hoc bookings don't
+      // price the service at booking time. Pass total: undefined so the engine
+      // REMOVE_LINEs the {service_total} line cleanly (per Session 2B contract
+      // change demoting service_total to optional — migrations 20260427000001
+      // + 20260427000002).
       const smsBody = await buildAppointmentConfirmationSms({
         businessName: biz.name,
         businessPhone: biz.phone,
         date: formattedDate,
         time: formattedTime,
         serviceName: service.name,
+        customerFirstName,
+        total: Number(appointment.total_amount) > 0
+          ? formatCurrency(Number(appointment.total_amount))
+          : undefined,
       });
       if (smsBody) {
         sendSms(e164Phone, smsBody, {

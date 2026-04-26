@@ -4,6 +4,79 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(sms): Tier 1 voice-agent caller refactors + appointment_confirmed contract demotion — 2026-04-26 (Session 2B)
+
+**Voice-agent appointment confirmation SMS now sends end-to-end.** The latent gap surfaced in Session 2A.5 (helper early-returned `null` when `total` was missing — voice-agent paths never passed `total`) is closed via a contract-level fix rather than caller-side workarounds: `service_total` is demoted from required to optional for `appointment_confirmed`, the body is rewritten to put `{appointment_time}` and `{service_total}` on separate lines (so REMOVE_LINE on missing total doesn't strip the time), and the helper's N1a guard is relaxed to early-return only on missing `serviceName`. Caller data scope is expanded across all 4 voice-agent SMS-touching files in preparation for Session 3D's hardcoded → chip-driven migration of voice-agent sites.
+
+### Contract change — `appointment_confirmed.service_total`: required → optional
+
+- **Why:** voice-agent ad-hoc bookings (`/api/voice-agent/appointments` POST direct-booking path) don't price the service at booking time; `appointment.total_amount` is `0` by design and staff price the job later. The previous required-`service_total` assumption was incompatible with that path — the engine would hard-skip and the helper would return `null`, so no confirmation SMS went out at all. Path A (quote-conversion, total known via `quote.total_amount`) was unaffected because it had real pricing data.
+- **After 2B:** Path A still renders fully with both time AND total. Path B now passes `service_total: undefined`; the engine substitutes `''` from `DEFAULT_VARIABLE_FALLBACKS` and REMOVE_LINE strips the `{service_total}` line cleanly, leaving the time line intact.
+- **Source-of-truth update:** `src/lib/sms/sms-contracts.source.ts` — `service_total` moved from `required` to `optional` for `appointment_confirmed`. Both `palette.ts` and `generated-contracts.ts` regenerated via `npx tsx scripts/regen-sms-contracts.ts` (codegen ritual from Session 1B/2A.5). The typed `RenderVarsBySlug['appointment_confirmed'].service_total` is now `string | undefined`.
+
+### Body rewrite — operator-edit override (documented divergence)
+
+- The pre-2B production `body_template` for `appointment_confirmed` was operator-edited away from `default_body` (single-line `at {appointment_time} - {service_total}`). With the new optional `service_total` contract, REMOVE_LINE on missing total would have stripped both the time AND the total from that shared line — a UX regression.
+- Migration `20260427000002_appointment_confirmed_body_split_lines.sql` **explicitly bypasses the standard `WHERE body_template = default_body` operator-edit safety guard** for this slug. Justification documented inline in the migration: the operator's single-line layout is structurally incompatible with the new contract; the rewrite is a structural correction, not a styling change.
+- New layout preserves all other operator preferences: no `{first_name}` greeting, "Need to make a change?" footer, trailing newlines. Only the time/total line is split. Both `body_template` and `default_body` are updated together so the standard guard re-engages cleanly for future migrations.
+- **Visual diff when total IS present:** the prior `at 10:00 AM - $99.00` becomes `at 10:00 AM` newline `$99.00` — one extra line break. Substantively identical.
+- **Lesson for future sessions:** operator-edit safety guards in migrations protect against accidental overrides, but contract-level changes that affect body rendering may legitimately require override. Future migrations touching slugs with operator-edited bodies must explicitly evaluate whether the operator's preference is compatible with the contract change AND document the override decision in CHANGELOG. (Captured as a feedback memory in `~/.claude/.../memory/feedback_sms_contract_changes_vs_operator_edits.md`.)
+
+### Helper update — `buildAppointmentConfirmationSms`
+
+`src/lib/utils/sms.ts:295-332`. N1a guard now early-returns only on missing `serviceName`. `total` is allowed to flow through as `undefined`; the engine handles the absent value via REMOVE_LINE. Inline comment updated to reflect that Session 2B closed the voice-agent gap and reference the migration files.
+
+### Caller data scope expansion (4 files, 7 SELECTs total)
+
+The 4 voice-agent files that send SMS today were audited for which customer/appointment/vehicle fields are loaded into scope at the SMS callsite. Each SELECT was expanded with `last_name`, `email`, `phone` (and `first_name` where missing) so Session 3D's hardcoded → chip-driven migration of voice-agent sites can wire chips without per-callsite SELECT round-trips. **Zero current SMS output changes** at the hardcoded callsites; the data is loaded for future use.
+
+- **Site 1** `src/app/api/voice-agent/appointments/route.ts`:
+  - Path A (quote-conversion ~L213): `existingCustomer` SELECT `id, first_name, sms_consent` → `id, first_name, last_name, email, phone, sms_consent`. Typed `appointment` cast extended with `total_amount: number`. Helper now passes `customerFirstName` + `total: Number(appointment.total_amount) > 0 ? formatCurrency(...) : undefined`.
+  - Path B (ad-hoc ~L398): both customer SELECTs (existing-load + new-customer-create) expanded for shape parity. Appointment SELECT extended with `total_amount`. Unified `customerFirstName` variable computed across both branches. Helper called with the same conditional `total` expression. Vehicle load skipped per Q2 — `appointment_confirmed` contract has no `vehicle_description` chip.
+- **Site 2** `src/lib/services/voice-post-call.ts`:
+  - Outer `processVoiceCallEnd` SELECT at L99: expanded.
+  - Inner `autoGenerateQuote` find-or-create SELECT at L503: expanded.
+  - Inner `autoGenerateQuote` `custCheck` SELECT at L607: expanded from `sms_consent` only to the full shape — closes the scope gap surfaced during Phase 2 verification (the L503 expansion alone didn't reach the L614 SMS callsite because `existing` was inside a closed conditional block).
+  - Callsite #347 (`appointment_confirmed_postcall`): chip pass unchanged — contract is `{ first_name? }` only and the caller already satisfies it.
+  - Callsite #614 (hardcoded `quote_sms_postcall`): SMS body unchanged. Data in scope at `custCheck` for 3D.
+- **Site 3** `src/app/api/voice-agent/send-quote-sms/route.ts`: both customer SELECTs (existing + new-create) expanded. SMS body unchanged.
+- **Site 4** `src/app/api/voice-agent/send-info-sms/route.ts`: single top-of-route SELECT expanded from `id` to `id, first_name, last_name, email, phone`. None of the 6 hardcoded `voice_info_*` case branches reference the new fields today — purely additive. Phone-fallback at L295 (in the `quote_link` case) deliberately untouched per Q4 minimal interpretation; 3D decides whether to consolidate it.
+
+### Decisions deferred to Session 3D
+
+- **`voice-post-call.ts` L614 first-name source ambiguity.** After the L607 expansion, `custCheck.first_name` is in scope at the SMS callsite from the DB record. The local `firstName` derived from `customerName?.trim().split(/\s+/)[0]` at L615 (parsed from the call-context param) also remains in scope. These have different reliability characteristics — the DB-authoritative value is more stable; the param-derived value reflects what the caller said on the current call (potentially upgraded if names diverged). Session 3D's chip-wiring of `quote_sms_postcall` decides which to use (or how to combine).
+- **Site 4 phone-fallback consolidation.** The `quote_link` case branch's per-branch `customers`-by-phone lookup at L295 stays as-is. Session 3D can consolidate it into the top-of-route SELECT or leave it as a per-branch concern.
+
+### Migrations
+
+- `supabase/migrations/20260427000001_appointment_confirmed_service_total_optional.sql` — contract update (idempotent via `WHERE required_variables ? 'service_total'`). Body-rewrite UPDATE in this same file was guarded by `body_template = default_body` and skipped (operator had already edited the body away from default).
+- `supabase/migrations/20260427000002_appointment_confirmed_body_split_lines.sql` — sibling follow-up that explicitly bypasses the operator-edit guard to apply the line split. Both `body_template` and `default_body` updated together; future migrations using the standard guard will work correctly.
+- `variables` JSONB column NOT touched — `service_total` was already in the column and stays there (per CLAUDE.md rule 9, demoting required→optional in the new contract columns doesn't require an alignment migration since no chip is added or removed).
+- `DB_SCHEMA.md` regenerated.
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run lint` zero new issues across all Session 2B-touched files (Session 2A.5 baseline preserved — 13 pre-existing errors / 44 pre-existing warnings unchanged)
+- `npm run build` clean (full SSG output succeeded; typed signature gate satisfied — no caller fails the per-slug contract)
+- `npx vitest run` 533/533 pass across 36 test files (no test additions or modifications — purely caller-side data loading + contract demotion + body rewrite, none of which any existing test asserts on)
+- `supabase db push --linked --dry-run` reports "Remote database is up to date" (both new migrations tracked)
+- DB row state for `appointment_confirmed` post-migration verified directly: `required_variables` has 5 entries (service_total removed), `optional_variables` has 2 entries (service_total added), `body_template === default_body`, body uses split-line layout.
+
+### Files
+
+- Modified (engine + contract source): `src/lib/sms/sms-contracts.source.ts`, `src/lib/sms/palette.ts` (regen), `src/lib/sms/generated-contracts.ts` (regen), `src/lib/utils/sms.ts`
+- Modified (Tier 1 voice-agent callers): `src/app/api/voice-agent/appointments/route.ts`, `src/lib/services/voice-post-call.ts`, `src/app/api/voice-agent/send-quote-sms/route.ts`, `src/app/api/voice-agent/send-info-sms/route.ts`
+- New (migrations): `supabase/migrations/20260427000001_appointment_confirmed_service_total_optional.sql`, `supabase/migrations/20260427000002_appointment_confirmed_body_split_lines.sql`
+- Docs: `docs/dev/DB_SCHEMA.md` (regen), `docs/CHANGELOG.md`
+
+### What remains for Phase 2 of the SMS chip migration (Session 2C onward)
+
+- Tier 1 non-voice caller refactors per the audit chain — specialty-callback email field expansion, receipts customer fetch, quote reminders vehicle join, twilio inbound expansion. All independent of voice-agent paths.
+- Sessions 2C–2E continue chip-driven migrations site-by-site; Session 2F resolves the two `@ts-expect-error` deferrals from Session 2A.5 (`booking_staff_notify` specialty-callback split, `staff_notification` inbound-twilio split). Session 3D migrates the voice-agent hardcoded slugs (`quote_sms_midcall`, `quote_sms_postcall`, 6× `voice_info_*`) using the data scope established here.
+
+---
+
 ## refactor(sms): typed contract codegen + generic engine signature — 2026-04-26 (Session 2A.5)
 
 **Structural enforcement layer for SMS chip contracts.** Single source-of-truth file (`src/lib/sms/sms-contracts.source.ts`) drives both palette and per-slug typed contracts via codegen. `renderSmsTemplate` signature now generic; callers can no longer drift from contracts at compile time. Three drift classes that Session 2A's runtime-only enforcement could only catch in production logs are now structural compile errors.

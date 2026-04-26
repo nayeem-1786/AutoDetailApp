@@ -95,10 +95,14 @@ export async function processVoiceCallEnd(
     }
   }
 
-  // Find customer by phone
+  // Find customer by phone.
+  // Session 2B: SELECT expanded with last_name/email/phone — only first_name is
+  // consumed by the appointment_confirmed_postcall contract today (the L347
+  // chip pass), but the rest are loaded into scope so Session 3D can chip-wire
+  // any downstream caller refactor without an additional SELECT round-trip.
   const { data: customer } = await admin
     .from('customers')
-    .select('id, first_name, sms_consent, customer_type')
+    .select('id, first_name, last_name, email, phone, sms_consent, customer_type')
     .eq('phone', normalizedPhone)
     .is('deleted_at', null)
     .limit(1)
@@ -497,12 +501,16 @@ async function autoGenerateQuote(
     return customerId;
   }
 
-  // Find or create customer
+  // Find or create customer.
+  // Session 2B: SELECT expanded with last_name/email/phone for shape parity with
+  // the outer processVoiceCallEnd customer SELECT — Session 3D will use these
+  // fields when the hardcoded quote_sms_postcall send (line ~614 below) migrates
+  // to chip-driven.
   let custId = customerId;
   if (!custId) {
     const { data: existing } = await admin
       .from('customers')
-      .select('id, first_name')
+      .select('id, first_name, last_name, email, phone')
       .eq('phone', phone)
       .is('deleted_at', null)
       .limit(1)
@@ -595,10 +603,17 @@ async function autoGenerateQuote(
     let linkUrl = quoteUrl;
     try { linkUrl = await createShortLink(quoteUrl); } catch { /* use full URL */ }
 
-    // Send SMS if customer has consent
+    // Send SMS if customer has consent.
+    // Session 2B: SELECT expanded with first_name/last_name/email/phone — only
+    // sms_consent is consumed today (the hardcoded body uses customerName from
+    // params instead), but the rest are loaded into scope so Session 3D can
+    // chip-wire when this hardcoded send migrates to renderSmsTemplate. The
+    // local `firstName` derived from `customerName` (line ~610) stays as-is —
+    // 3D decides whether to keep using the param-derived value or switch to
+    // custCheck.first_name from the DB record.
     const { data: custCheck } = await admin
       .from('customers')
-      .select('sms_consent')
+      .select('id, first_name, last_name, email, phone, sms_consent')
       .eq('id', custId)
       .single();
 

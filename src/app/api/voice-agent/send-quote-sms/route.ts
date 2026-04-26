@@ -107,12 +107,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find or create customer
+    // Find or create customer.
+    // Session 2B: SELECT expanded with last_name/email/phone — none of these
+    // are consumed by today's hardcoded SMS body (line ~256), but they're
+    // loaded into scope so Session 3D can chip-wire when quote_sms_midcall
+    // migrates from a hardcoded send to renderSmsTemplate.
     let customerId: string | null = null;
     t = perf.now();
     const { data: existingCustomer } = await admin
       .from('customers')
-      .select('id, first_name, sms_consent')
+      .select('id, first_name, last_name, email, phone, sms_consent')
       .eq('phone', normalizedPhone)
       .is('deleted_at', null)
       .limit(1)
@@ -161,7 +165,7 @@ export async function POST(request: NextRequest) {
           phone: normalizedPhone,
           sms_consent: true,
         })
-        .select('id, sms_consent')
+        .select('id, first_name, last_name, email, phone, sms_consent')
         .single();
       perf.mark('query:customers_create', t);
 

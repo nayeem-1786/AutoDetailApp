@@ -52,7 +52,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   addon_approved: { required: ["service_name"], optional: [] },
   addon_declined: { required: ["service_name"], optional: [] },
   appointment_cancelled: { required: ["business_name", "business_phone"], optional: ["first_name", "services", "appointment_date", "appointment_time"] },
-  appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time", "service_total", "business_name", "business_phone"], optional: ["first_name"] },
+  appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time", "business_name", "business_phone"], optional: ["first_name", "service_total"] },
   appointment_confirmed_postcall: { required: ["business_name", "business_phone"], optional: ["first_name"] },
   booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total", "business_name", "business_phone"], optional: [] },
   booking_reminder: { required: ["service_name", "appointment_time", "business_name", "business_phone"], optional: [] },
@@ -97,10 +97,10 @@ export interface RenderVarsBySlug {
     service_name: string;
     appointment_date: string;
     appointment_time: string;
-    service_total: string;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     first_name?: string | undefined;
+    service_total?: string | undefined;
     business_address?: string | undefined;
   };
   appointment_confirmed_postcall: {
