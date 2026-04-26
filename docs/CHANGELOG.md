@@ -4,6 +4,73 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## chore(db): repair Supabase CLI tracking; regenerate DB_SCHEMA.md; add regen script — 2026-04-26 (Session 1B)
+
+Foundation work for upcoming sessions that need clean `supabase db push` (Sessions 2A, 2F). Two long-standing infra problems fixed: (1) the CLI's `supabase_migrations.schema_migrations` tracking table was out of sync with the repo's `supabase/migrations/` directory because recent migrations had been applied via the Supabase SQL Editor instead of `db push`, and (2) `docs/dev/DB_SCHEMA.md` had drifted from the live database (e.g., `orders` had 23 missing columns including `payment_status`, `paid_at`, all `stripe_*`, all `fulfillment_*`, all `shipping_*`, all `tracking_*`).
+
+### Phase 1 — CLI sync repair
+
+Inventory found **14 untracked migrations** (Apr 10 → Apr 24, 2026), not the 170+ feared by an older project memory. The earlier 215 migrations were correctly tracked. Each of the 14 was verified as fully applied to the live DB (spot-checks against `vehicles.size_class` enum, `stock_counts` table, `void_transaction` function, `idx_customers_search` drop, etc.) before any repair action.
+
+Per-version `supabase migration repair --linked --status applied <version>` in chronological order, with a single-row schema_migrations check after each command. All 14 succeeded:
+
+```
+20260410000001  staff_notification_sms_template
+20260417000001  vehicle_exotic_classic_flags
+20260417000002  service_exotic_classic_floor_prices
+20260418000001  drop_service_floor_price_columns
+20260418000002  extend_vehicle_size_class_enum
+20260418000003  backfill_and_drop_specialty_flags
+20260420000001  extend_stock_adjustments
+20260421000001  add_vendor_reorder_fields
+20260421000002  create_stock_counts
+20260422000001  drop_idx_customers_search
+20260424000001  revert_stock_count
+20260424000002  revert_stock_count_structured_errors
+20260424000003  void_transaction_rpc
+20260424000004  extend_stock_adjustments_for_orders
+```
+
+Pre-repair snapshot of `schema_migrations` saved to `supabase/.repair-backup-1B.txt` (gitignored via new `supabase/.repair-backup-*.txt` pattern). Tracking row count: 215 → 229. Files-vs-tracked gap: 14 → 0. Reverse gap: 0 throughout. Canonical sync gate (`supabase db push --linked --dry-run`): **"Remote database is up to date."**
+
+### Phase 2 — DB_SCHEMA.md regeneration + regen script
+
+New `scripts/regen-db-schema.ts` introspects the linked project's live schema via `supabase db query --linked --agent=no --output json` and rebuilds `docs/dev/DB_SCHEMA.md` from scratch each run. Eight metadata queries cover tables, columns, PK/UNIQUE constraints, FKs (`pg_get_constraintdef`), CHECK constraints, indexes, and enum values. Renders to a per-table `## <name>` heading + Column/Type/Constraints/Notes table + CHECK + Indexes blocks; single-column FKs are inlined into the Constraints column, composite FKs/UNIQUEs are broken out into their own subsections.
+
+Implementation notes:
+- Validates `NEXT_PUBLIC_SUPABASE_URL` (or `SUPABASE_URL`) and `SUPABASE_SERVICE_ROLE_KEY` from `.env.local` as a project-context guard, parses the project ref, and re-checks the CLI is linked to that exact ref before running queries (prevents accidental regen against the wrong project).
+- Resolves the `supabase` CLI binary explicitly: `npx tsx` prepends `node_modules/.bin/` to PATH, picking up the project's vendored CLI (v2.74.5) which predates the `db query` subcommand. The script searches PATH while skipping `node_modules/.bin`, falling back to `/opt/homebrew/bin/supabase` and `/usr/local/bin/supabase`, and verifies each candidate supports `db query --help` before using it.
+- Exits non-zero with a clear error on missing env vars, missing/incompatible CLI, query failure, or non-array JSON response.
+- Auto-generated header line at the top of the doc warns against hand-editing.
+
+Regen results: **107 tables, 1431 columns, 162 PK/UNIQUE, 173 FKs, 80 CHECKs, 416 indexes, 102 enum values.** Doc grew from 1721 → 3177 lines (+84.6%) — well above the 20% size-drop guard. Spot-checks confirmed all previously missing columns are now documented:
+- `orders`: 14 → 37 columns (added `payment_status`, `paid_at`, `stripe_payment_intent_id`, `stripe_charge_id`, `fulfillment_status`, `fulfillment_method`, all `shipping_*`, `customer_notes`, `internal_notes`, all `tracking_*`, `label_url`, `shippo_rate_id`, etc.)
+- `employees`: 11 → 16 columns (added `square_employee_id`, `pin_code`, `hourly_rate`, `bookable_for_appointments`, `avatar_url`)
+- `transactions`: added `coupon_code`, `qbo_*`, `offline_id`, `access_token`, `deposit_credit`
+
+Trade-off: the regenerated doc loses the prior version's hand-curated narrative paragraphs (receipt-system architecture, jsonb shape descriptions, per-column commentary). Those were never accurate to the same degree as the auto-derived metadata anyway, and the schema doc is the wrong place for cross-cutting documentation. Future cross-cutting docs should live in `docs/dev/ARCHITECTURE.md` or topic-specific files under `docs/dev/`.
+
+### Documentation updates
+
+- `CLAUDE.md`: Added rule 6 under "Rules for Database Changes" — `npx tsx scripts/regen-db-schema.ts` should run at the end of any session that adds/modifies tables or columns.
+- `docs/dev/FILE_TREE.md`: Added `scripts/regen-db-schema.ts` entry.
+- `.gitignore`: Added `supabase/.repair-backup-*.txt` pattern.
+
+### Verification
+
+- `npx tsc --noEmit` on the new script: clean.
+- `npm run lint`: zero new errors introduced (13 pre-existing errors all in `src/`, untouched by this session).
+- `npm run build`: succeeded.
+- `npx vitest run`: 521 tests passed.
+- `supabase db push --linked --dry-run`: "Remote database is up to date."
+- `git status`: only the 5 expected modified/new files (`.gitignore`, `CLAUDE.md`, `docs/dev/DB_SCHEMA.md`, `docs/dev/FILE_TREE.md`, `scripts/regen-db-schema.ts`) plus a pre-existing untracked audit doc not related to this session.
+
+### Out of scope (Sessions 2A, 2F)
+
+This session deliberately did not touch `src/`, `supabase/migrations/`, or any application DB row. The contract-column migration and seed migration that need clean `db push` are Session 2A's and 2F's work.
+
+---
+
 ## fix(sms): revert 42AB; fix 5 live SMS template contract bugs — 2026-04-25 (Session 1A)
 
 Recovery session. Session 42AB (commit `4b3fd219`) shipped a coordinated migration + caller change for the chip system, but the two new migrations (`20260425000001_seed_payment_receipt_loyalty.sql`, `20260425000002_rewrite_high_risk_template_bodies.sql`) were **never applied** to the live DB — they were checked in expecting manual application via Supabase SQL Editor, which never happened. The result was 5 live contract mismatches between code (post-42AB) and DB (pre-42AB) that broke production SMS sends. This session reverts 42AB and fixes the 5 mismatches by aligning DB to the **post-revert** caller contract (not the post-42AB caller contract — that's Session 2A's job).

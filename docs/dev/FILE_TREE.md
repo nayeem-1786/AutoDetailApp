@@ -1512,6 +1512,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 
 ```
 scripts/import-square-data.mjs
+scripts/regen-db-schema.ts
 scripts/seed-admin.ts
 scripts/seed-data.ts
 ```

@@ -78,6 +78,7 @@ The full database schema is documented in `docs/dev/DB_SCHEMA.md`. This file con
 3. **If a new table IS needed**, document it fully in `docs/dev/DB_SCHEMA.md` with all columns, types, constraints, and notes.
 4. **JSONB fields** (like `receipt_config`, `business_settings.value`) should be extended before creating new columns — check if the data logically belongs in an existing JSONB structure.
 5. **Never guess** what fields exist — always verify against `docs/dev/DB_SCHEMA.md` or the actual migrations.
+6. **Regenerate the schema doc after schema changes**: run `npx tsx scripts/regen-db-schema.ts` at the end of any session that adds/modifies tables or columns. The doc is auto-generated from the live database — do not hand-edit it (changes will be overwritten on the next regen).
 
 ## Key Patterns
 
