@@ -232,24 +232,22 @@ function makeAdminClient() {
 
 // ───── Test fixture: build a valid transaction-create POST request ───────────
 
-function makeRequest(opts: { withVehicle?: boolean; withService?: boolean } = {}): NextRequest {
+function makeRequest(opts: { withVehicle?: boolean } = {}): NextRequest {
   const withVehicle = opts.withVehicle ?? true;
-  const withService = opts.withService ?? false;
-  const items: Array<Record<string, unknown>> = [
-    {
-      item_type: withService ? 'service' : 'product',
-      item_name: withService ? 'Test Service' : 'Test Product',
-      quantity: 1,
-      unit_price: 100,
-      total_price: 100,
-      tax_amount: 0,
-      is_taxable: false,
-    },
-  ];
   const body: Record<string, unknown> = {
     customer_id: '11111111-1111-4111-8111-111111111111',
     payment_method: 'cash',
-    items,
+    items: [
+      {
+        item_type: 'product',
+        item_name: 'Test Product',
+        quantity: 1,
+        unit_price: 100,
+        total_price: 100,
+        tax_amount: 0,
+        is_taxable: false,
+      },
+    ],
     subtotal: 100,
     tax_amount: 0,
     tip_amount: 0,
@@ -388,135 +386,49 @@ describe('Auto-receipt status interlock (Session 42X-1, Phase 4 D)', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Session 42AB: payment_receipt composite-chip contract
-//
-// The chip body is now "Thank you {first_name}! {transaction_greeting} View your
-// receipt: {receipt_link}\n\n{business_name}" with 4 required vars. The template
-// no longer fabricates prose around {vehicle_description}; the caller assembles
-// {transaction_greeting} as a complete grammatical sentence in all 3 states
-// (services+vehicle, services-only, product-only) plus optional loyalty suffix.
-//
-// vehicle_description and loyalty_points_earned are NO LONGER passed as vars —
-// both have been folded into the caller-built {transaction_greeting} composite.
-// This section locks the new contract via vars-shape assertions plus body-prose
-// regression checks.
+// Session 42X-1-followup: caller-side literal regression
 // ──────────────────────────────────────────────────────────────────────────────
 
-function getPaymentReceiptVars() {
-  const call = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
-  expect(call).toBeDefined();
-  return call!.vars;
-}
-
-describe('Auto-receipt payment_receipt composite-chip contract (Session 42AB)', () => {
-  it('product-only sale (no service items, no vehicle) → transaction_greeting = "We appreciate your purchase."', async () => {
+describe("Auto-receipt vehicle_description caller-side literal (Session 42X-1-followup)", () => {
+  it("passes empty string (not 'your vehicle' literal) when no vehicle attached", async () => {
     state.vehicleAttached = false;
 
-    await POST(makeRequest({ withVehicle: false, withService: false }));
+    await POST(makeRequest({ withVehicle: false }));
     await vi.advanceTimersByTimeAsync(30_000);
 
-    const vars = getPaymentReceiptVars();
-    expect(vars.transaction_greeting).toBe('We appreciate your purchase.');
+    // Auto-receipt template invocation must have happened
+    const paymentReceiptCall = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
+    expect(paymentReceiptCall).toBeDefined();
+
+    // The bug: caller used to pass literal 'your vehicle' here, which collided with
+    // the template body prose "Your {vehicle_description} is all set" → "Your your vehicle".
+    // Post-fix: pass empty string so engine line-removal strips the entire line.
+    expect(paymentReceiptCall!.vars.vehicle_description).toBe('');
+    expect(paymentReceiptCall!.vars.vehicle_description).not.toBe('your vehicle');
   });
 
-  it('service sale with vehicle → transaction_greeting = "Your <year make model> is all set."', async () => {
+  it("passes the real vehicle description when vehicle is attached (happy path unchanged)", async () => {
     state.vehicleAttached = true;
 
-    await POST(makeRequest({ withVehicle: true, withService: true }));
+    await POST(makeRequest({ withVehicle: true }));
     await vi.advanceTimersByTimeAsync(30_000);
 
-    const vars = getPaymentReceiptVars();
-    expect(vars.transaction_greeting).toBe('Your 2024 Tesla Model 3 is all set.');
+    const paymentReceiptCall = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
+    expect(paymentReceiptCall).toBeDefined();
+    // From the mocked vehicles table: { year: 2024, make: 'Tesla', model: 'Model 3' }
+    expect(paymentReceiptCall!.vars.vehicle_description).toBe('2024 Tesla Model 3');
   });
 
-  it('service sale without vehicle → transaction_greeting = "Your service is complete."', async () => {
+  it("auto-receipt SMS body never contains the 'your your' double-noun signature", async () => {
     state.vehicleAttached = false;
 
-    await POST(makeRequest({ withVehicle: false, withService: true }));
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    const vars = getPaymentReceiptVars();
-    expect(vars.transaction_greeting).toBe('Your service is complete.');
-  });
-
-  it('loyalty points earned → " You earned X loyalty points today." appended to greeting', async () => {
-    state.vehicleAttached = true;
-    state.loyaltyPointsEarned = 23;
-
-    await POST(makeRequest({ withVehicle: true, withService: true }));
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    const vars = getPaymentReceiptVars();
-    expect(vars.transaction_greeting).toBe('Your 2024 Tesla Model 3 is all set. You earned 23 loyalty points today.');
-  });
-
-  it('zero loyalty points → no loyalty suffix appended', async () => {
-    state.vehicleAttached = true;
-    state.loyaltyPointsEarned = 0;
-
-    await POST(makeRequest({ withVehicle: true, withService: true }));
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    const vars = getPaymentReceiptVars();
-    expect(vars.transaction_greeting).not.toContain('loyalty points');
-    expect(vars.transaction_greeting).toBe('Your 2024 Tesla Model 3 is all set.');
-  });
-
-  it('vars contract: exactly 4 keys (first_name, transaction_greeting, receipt_link, business_name); no vehicle_description or loyalty_points_earned', async () => {
-    await POST(makeRequest({ withVehicle: true, withService: true }));
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    const vars = getPaymentReceiptVars();
-    expect(Object.keys(vars).sort()).toEqual([
-      'business_name',
-      'first_name',
-      'receipt_link',
-      'transaction_greeting',
-    ]);
-    // Removed by 42AB — folded into composite {transaction_greeting}
-    expect(vars).not.toHaveProperty('vehicle_description');
-    expect(vars).not.toHaveProperty('loyalty_points_earned');
-  });
-
-  it('first_name defaults to "there" when customer record has no first_name (defensive — engine would otherwise hard-skip)', async () => {
-    // The mocked customer always returns first_name='Sarah', so this test mainly
-    // documents the caller-side default that prevents hard-skip on missing names.
-    // The actual default kicks in when cust.first_name is null/empty — covered by
-    // the `cust.first_name || 'there'` expression in the route. We assert the var
-    // is always non-empty regardless.
-    await POST(makeRequest({ withVehicle: true, withService: true }));
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    const vars = getPaymentReceiptVars();
-    expect(vars.first_name).toBeTruthy();
-    expect(vars.first_name!.length).toBeGreaterThan(0);
-  });
-
-  it('regression: auto-receipt SMS body never contains the "your your" double-noun signature (SD-006223 origin)', async () => {
-    state.vehicleAttached = false;
-
-    await POST(makeRequest({ withVehicle: false, withService: false }));
+    await POST(makeRequest({ withVehicle: false }));
     await vi.advanceTimersByTimeAsync(30_000);
 
     expect(recorder.smsSendCalls.length).toBeGreaterThanOrEqual(1);
     const body = recorder.smsSendCalls[0].body;
+    // Defensive: catch any future caller-side literal regression
     expect(body.toLowerCase()).not.toContain('your your');
-    // Defensive: also catch the original "Your  is all set." double-space artifact
-    expect(body).not.toMatch(/Your\s{2,}is all set/);
-  });
-
-  it('regression: product-only sale body has no orphan punctuation or double spaces from the new composite', async () => {
-    state.vehicleAttached = false;
-
-    await POST(makeRequest({ withVehicle: false, withService: false }));
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    const body = recorder.smsSendCalls[0].body;
-    // Disaster-recovery fallback path (engine returns fallback when template missing) —
-    // the test mock always returns the fallback as body. Validate it's clean.
-    expect(body).toContain('We appreciate your purchase.');
-    expect(body).not.toMatch(/  /); // no double spaces
-    expect(body).not.toMatch(/[!?.] [.?!]/); // no orphan punctuation pairs
   });
 });
 

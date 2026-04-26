@@ -4,113 +4,71 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix(sms): foundation — seed unseeded templates, body rewrites, chip-by-default convention — 2026-04-25 (Session 42AB)
+## fix(sms): revert 42AB; fix 5 live SMS template contract bugs — 2026-04-25 (Session 1A)
 
-Foundation layer of the SMS template migration sprint (session 3 of 9: 42X-1 → 42X-1-followup → **42AB** → 42AC...42AH). This session formalizes the two unseeded chip templates as git-source-of-truth, rewrites HIGH-risk template bodies using the composite-caller-built-chips pattern, renames `UNSAFE_SMS_TEMPLATES` to remove its predisposing label, and codifies the chip-by-default rule as CLAUDE.md Rule 20.
+Recovery session. Session 42AB (commit `4b3fd219`) shipped a coordinated migration + caller change for the chip system, but the two new migrations (`20260425000001_seed_payment_receipt_loyalty.sql`, `20260425000002_rewrite_high_risk_template_bodies.sql`) were **never applied** to the live DB — they were checked in expecting manual application via Supabase SQL Editor, which never happened. The result was 5 live contract mismatches between code (post-42AB) and DB (pre-42AB) that broke production SMS sends. This session reverts 42AB and fixes the 5 mismatches by aligning DB to the **post-revert** caller contract (not the post-42AB caller contract — that's Session 2A's job).
 
-### Two new migrations (apply manually in Supabase SQL Editor — disable `ensure_rls` first)
+### Phase 1 — revert 4b3fd219
 
-**`20260425000001_seed_payment_receipt_loyalty.sql`** — INSERT...ON CONFLICT (slug) DO UPDATE pattern with CASE-preserve-user-edits clauses. Seeds `payment_receipt` and `loyalty_milestone` (both previously DB-as-source-of-truth, authored via the user's manual SQL — see `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md` Cluster C). Production state captured 2026-04-25 in the migration's header comment for rollback reference. Variables column shape normalized from production's flat `string[]` to the object `[{key,description,required}]` shape used by the other 16 seeded templates — the cache loader at `src/lib/sms/render-sms-template.ts` (Session 42X-1) accepts both shapes at runtime, so this overwrite is zero-risk.
+`git revert --no-commit 4b3fd219`. Verified `git diff HEAD~1 --stat` is empty (revert is exactly clean against `afc0e2fb`, no extraneous side effects). The revert restored:
 
-**`20260425000002_rewrite_high_risk_template_bodies.sql`** — UPDATE with CASE-preserve clauses for the 3 HIGH-risk seeded templates flagged in Session 42X-1's CHANGELOG hand-off list. If production matches the original seed text from `20260327000001`, body upgrades to the new composite-chip skeleton; if operator-edited via the admin SlideOver, the edit is preserved (and the operator must reconcile against the new variables contract on next save — 42X-1's C4 PUT validator enforces this).
+- 7 modified TS files (`src/lib/utils/sms.ts`, `src/lib/sms/sms-template-variables.ts`, 2 appointments-notify routes, `pos/transactions/route.ts`, 2 test files)
+- 2 deleted SQL migrations (the never-applied ones)
+- 1 deleted test file (`src/lib/utils/__tests__/sms-build-appointment-confirmation.test.ts` — was new in 42AB, gone with revert)
+- 3 docs files (CLAUDE.md Rule 20, FILE_TREE.md entry, the prior 42AB CHANGELOG entry)
 
-### Body rewrites — composite caller-built chips
+Also deleted abandoned `.CLAUDE.md.swp` swap file.
 
-The old engine fabricated noun-phrase fallbacks ("your vehicle", "your scheduled date") that collided with template prose patterns like `"Your {vehicle_description}"`. Session 42X-1 emptied those fallbacks; this session restructures the bodies so the caller owns context-aware prose and the template owns only the structural skeleton.
+### Phase 2 — 5 live-bug fixes
 
-| Template | Old body shape | New body shape | New required vars |
+| Bug | Slug | Symptom | Fix |
 |---|---|---|---|
-| `payment_receipt` (unseeded) | `Thank you {first_name}! Your {vehicle_description} is all set. You earned {loyalty_points_earned} loyalty points today. View your receipt: {receipt_link}\n\n{business_name}` | `Thank you {first_name}! {transaction_greeting} View your receipt: {receipt_link}\n\n{business_name}` | first_name, transaction_greeting, receipt_link, business_name |
-| `loyalty_milestone` (unseeded) | (clean — no rewrite, just formalized) | (unchanged) | first_name, loyalty_points_balance, loyalty_cash_value, booking_link, business_name |
-| `appointment_confirmed` | `{business_name} — Appointment Confirmed\n\nHi {first_name}, your appointment is scheduled:\n{service_name}\n{appointment_date} at {appointment_time}\nTotal: {service_total}\n\nQuestions? Call {business_phone}` | `{business_name} — Appointment Confirmed\n\nHi {first_name}!\n{appointment_summary}\n\nQuestions? Call {business_phone}` | business_name, first_name, appointment_summary, business_phone |
-| `appointment_confirmed_postcall` | `Thanks for calling {business_name}, {first_name}! Your appointment is confirmed. Questions? Call {business_phone}` | (unchanged — required-var hard-skip protects the orphan-comma case) | business_name, first_name, business_phone |
-| `detailer_job_assigned` | `New job assigned: {services} – {vehicle_description}\n{appointment_date} at {appointment_time}\n{address}\nTotal: {service_total}` | `New job assigned: {job_summary}\n{appointment_date} at {appointment_time}\n{address}\nTotal: {service_total}` | job_summary, appointment_date, appointment_time, address, service_total |
+| 1 | `quote_accepted_staff_notify` | DB body had `{customer_phone}` chip, caller didn't pass it, key missing from `variables` JSONB. Engine silently stripped it; staff SMS shipped with trailing whitespace where phone should be. | Added `customer_phone: customer?.phone ?? ''` to caller at `src/app/api/quotes/[id]/accept/route.ts:124`. Appended `customer_phone` (`required:true`) to DB `variables` JSONB. |
+| 2 | `payment_receipt` | DB body still referenced `{vehicle_description}` and `{loyalty_points_earned}` (old seed); post-42AB caller passed `{transaction_greeting}` instead. Engine REMOVE_LINE'd `vehicle_description`, silent-stripped `loyalty_points_earned`, and the caller's `transaction_greeting` had no template slot. SMS reduced to bare "Thank you Bob! View your receipt: …". | DB UPDATE: `body_template` and `default_body` rewritten to `Thank you {first_name}!\n{transaction_greeting}\nView your receipt: {receipt_link}\n\n{business_name}`. `variables` JSONB rewritten to 4 entries (all required). Operator-edit safety check: `body_template` matched `default_body` and matched expected old seed → safe to overwrite. The post-revert `afc0e2fb` caller is dual-contract (passes both old + new vars) so no caller change needed. |
+| 3 | `detailer_job_assigned` | DB body required `{services}` (old seed); post-42AB caller passed `{job_summary}` instead. Engine hard-skipped on missing required `services` → no detailer SMS sent at all. | **DEFERRED to Session 2A** — body rewrite requires coordinated caller update which is out of Session 1A's MUST-NOT-MODIFY scope (the two notify routes). Pre-fix state restored; detailer SMS sends correctly via old contract. After Phase 1 revert, caller passes `services`+`vehicle_description` again → matches pre-existing seed body → works. (Initial Bug 3 DB UPDATE was applied during execution, then rolled back when this scope conflict was discovered.) |
+| 4 | `staff_notification` | Inbound twilio webhook caller at `webhooks/twilio/inbound/route.ts:642` passes only 2 of 4 contract chips (`reason_label` and `details` are required for the staff-action use case but don't apply to specialty-vehicle inbound texts). Engine hard-skips → caller's hardcoded `staffMsg` fallback string fires → SMS still goes out. | Comment-only interim. Slug-split deferred to Session 2F (split into `staff_notification_inbound_specialty` with a contract that matches what specialty-vehicle inbound texts actually have available). |
+| 5 | `booking_staff_notify` | Specialty-callback caller at `public/specialty-callback/route.ts` passes only 2 of 5 required chips (the other 3 don't apply to a specialty-vehicle callback request — there's no appointment scheduled yet). Engine hard-skips → fallback string fires → SMS still goes out. | Comment-only interim. Slug-split deferred to Session 2F (split into `booking_staff_notify_specialty` with a contract matching the callback-request shape, not the confirmed-booking shape). |
 
-### Caller updates — composite chips assembled before `renderSmsTemplate()`
+### Phase 3 — no-op (registry sync auto-resolved by revert)
 
-- **`src/app/api/pos/transactions/route.ts:528-548`** — auto-receipt setTimeout. New `transactionGreeting` builder covers all 3 product/service/vehicle states with optional loyalty suffix:
-  - services + vehicle → `"Your {vehicle_description} is all set."`
-  - services only → `"Your service is complete."`
-  - product-only → `"We appreciate your purchase."`
-  - if `pointsEarned > 0` → ` " You earned {N} loyalty points today."` appended
-  - `vehicle_description` and `loyalty_points_earned` removed from vars (folded into composite)
-  - `first_name` defaults to `'there'` caller-side (avoids hard-skip on missing customer name; the engine no longer fabricates 'there' itself per 42X-1 C1)
+Phase 3 was originally designed against the post-42AB registry state (which had rewritten `appointment_confirmed` and `detailer_job_assigned` arrays as 4-/5-entry composites that dropped `detailer_first_name`). The Phase 1 revert restored the pre-42AB registry, which **already includes** `detailer_first_name` in both arrays. The registry-vs-DB drift Phase 3 was intended to close was a drift introduced by 42AB itself; reverting 42AB closed it without further action.
 
-- **`src/lib/utils/sms.ts:295` `buildAppointmentConfirmationSms`** — assembles `appointment_summary` as a multi-line block with `serviceName`, `date at time`, and optional `Total: ...` line. Function signature unchanged (callers in POS notify, admin notify, and voice-agent appointments unchanged); `detailerFirstName` param now ignored internally (template body no longer uses it).
+The `detailer_first_name` asymmetry between `appointment_confirmed` (DB ×2, registry ×1 — known duplicate, deferred) and `detailer_job_assigned` (DB excludes, registry includes — correct palette-vs-contract semantic: caller passes the value, body can use it, but it's not required-enforced in the DB) is the intended state and will be formalized in Session 2A's universal palette refactor.
 
-- **`src/app/api/pos/appointments/[id]/notify/route.ts:282-301`** AND **`src/app/api/appointments/[id]/notify/route.ts:291-309`** — identical inline edits at both detailer-notify sites. Caller assembles `jobSummary = vehicle ? \`${serviceNames} – ${vehicleStr}\` : serviceNames` and passes it as `job_summary`; drops `services`, `vehicle_description`, `detailer_first_name` from vars. Memory #15 + Phase 0 decision: do NOT extract a shared helper — two-callsite duplication is acceptable for this session, future cleanup if it grows.
+### CLAUDE.md Rule 20
 
-- **`src/lib/services/voice-post-call.ts:347` `appointment_confirmed_postcall`** — no caller change needed. The existing `templateResult.isActive ? templateResult.body : null` pattern correctly handles the new hard-skip-on-missing-first_name contract (skip rather than send `"Thanks for calling X, ! ..."`).
-
-### Renamed: `UNSAFE_SMS_TEMPLATES` → `INTENTIONALLY_HARDCODED_SMS`
-
-Per Session 42Z-audit Q5. The "unsafe" framing predisposed readers to think the chip system was dangerous — the inverse is true. Renamed at `src/lib/sms/sms-template-variables.ts:134` (the only definition site; Phase 0 grep verified zero importers). Doc-comment block above the array now documents the 3 exemption classes:
-- (a) free-text two-way conversations (operator inbox + AI auto-reply — body IS the variable)
-- (b) marketing/lifecycle/drip parallel chip system (`campaigns.sms_template`, `lifecycle_rules.sms_template_id`, `drip_steps.sms_template`)
-- (c) engine-feature gaps (currently only `receipt_sms`'s strict 160-char truncation)
-
-### CLAUDE.md Rule 20 — chip-by-default convention
-
-> **SMS chip-by-default**: All new customer-facing SMS sends MUST use `renderSmsTemplate()` with a slug-keyed row in `sms_templates` UNLESS the message falls into a documented exemption class. See `INTENTIONALLY_HARDCODED_SMS` in `src/lib/sms/sms-template-variables.ts` (3 exemption classes: free-text two-way, marketing/lifecycle/drip parallel system, engine-feature gaps) and `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md` for the canonical inventory. New non-chip senders must justify the exemption class in code comments.
-
-Added as Rule 20 (numbered list end). Terse one-liner; long-form prose lives in the doc-comment block of `INTENTIONALLY_HARDCODED_SMS`.
-
-### Registry updates (`src/lib/sms/sms-template-variables.ts` `SMS_TEMPLATE_VARIABLES`)
-
-Mirrors the migration's variables contract. The registry powers the admin UI's chip palette inserter — without these entries, Q42-1's PUT validator would reject any operator edit that uses the new composite chips, and the SlideOver editor would show zero chips for `payment_receipt` and `loyalty_milestone` (the gap from Session 42W audit line 108).
-
-- New: `payment_receipt`, `loyalty_milestone` (full 4/5-chip palettes).
-- Modified: `appointment_confirmed` (4 chips, replaces 8), `detailer_job_assigned` (5 chips, replaces 9), `appointment_confirmed_postcall` (unchanged at 3 chips).
-
-### Tests — 13 new cases (534/534 total)
-
-- **`src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts`** — 9 new cases under "Auto-receipt payment_receipt composite-chip contract (Session 42AB)": 5 transaction_greeting branches (product-only, service+vehicle, service-only, with loyalty, zero loyalty), vars-shape contract (exactly 4 keys, no `vehicle_description`/`loyalty_points_earned`), first_name default, "your your" body regression, orphan-punctuation regression. The original 7 interlock + 3 followup tests removed (3 followup tests obsoleted by the new contract — `vehicle_description` no longer in vars).
-- **`src/lib/utils/__tests__/sms-build-appointment-confirmation.test.ts`** — NEW file, 7 cases: appointment_summary composite across all conditional combos (full/no-service/no-total/minimal), first_name default, vars-shape contract (exactly 4 keys, no service_name/date/time/total/detailer_first_name), disaster-recovery fallback shape.
+Removed by the revert. **Not re-added.** The chip-by-default convention is still architecturally correct, but the rule it referenced (`INTENTIONALLY_HARDCODED_SMS` constant) was reverted alongside the rule, leaving a dangling reference if re-added now. Session 2A will reintroduce both the constant rename and the rule together when it formalizes the chip-by-default architecture properly.
 
 ### Quality gates
 
-- `npm run build` — ✓ clean (Next.js 15.3.3 production build, all routes compiled)
-- `npx tsc --noEmit` — ✓ clean
-- `npx vitest run` — ✓ 534/534 (was 521; +13)
+- `npm run build` — ✓ clean
+- `npm run lint` — ✓ 13 pre-existing errors in unrelated files (booking-wizard, admin pages, voice-agent routes, hardware scripts), **zero new errors** in any Session 1A-touched file
+- `npx vitest run` — ✓ 521/521 (back to post-42X-1 baseline; 42AB's +13 tests gone with revert)
+- DB verification: 7 assertions pass against the 3 modified slugs (`quote_accepted_staff_notify`, `payment_receipt`, `detailer_job_assigned`)
 
 ### Files
 
-- New: `supabase/migrations/20260425000001_seed_payment_receipt_loyalty.sql`
-- New: `supabase/migrations/20260425000002_rewrite_high_risk_template_bodies.sql`
-- New: `src/lib/utils/__tests__/sms-build-appointment-confirmation.test.ts`
-- Modified: `src/lib/sms/sms-template-variables.ts` (5 registry entries updated/added; constant renamed; doc-comment block added)
-- Modified: `src/app/api/pos/transactions/route.ts` (transactionGreeting composite builder; vars trimmed)
-- Modified: `src/lib/utils/sms.ts` (buildAppointmentConfirmationSms — appointment_summary composite)
-- Modified: `src/app/api/pos/appointments/[id]/notify/route.ts` (job_summary composite)
-- Modified: `src/app/api/appointments/[id]/notify/route.ts` (job_summary composite)
-- Modified: `src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts` (followup section rewritten for new contract; +9 cases)
-- Modified: `CLAUDE.md` (Rule 20 added)
-- Updated: `docs/dev/FILE_TREE.md` (1 new test path)
+- Modified (Phase 2 code): `src/app/api/quotes/[id]/accept/route.ts`, `src/app/api/webhooks/twilio/inbound/route.ts`, `src/app/api/public/specialty-callback/route.ts`
+- DB UPDATEs (Phase 2): `sms_templates` rows for `quote_accepted_staff_notify` (variables JSONB append) and `payment_receipt` (body + default + variables rewrite)
+- DB no-op via roll-forward-then-rollback: `sms_templates` row for `detailer_job_assigned` was briefly rewritten then restored to seed (clean state without the pre-existing duplicate `detailer_first_name` entries that had been drifted in via the admin SlideOver)
+- Reverted: 12 files from commit `4b3fd219` (see Phase 1 list above)
+- Deleted: `.CLAUDE.md.swp` (abandoned vim swap)
 
-### Migration application order
+### Schema discrepancy noted (vs `docs/dev/DB_SCHEMA.md`)
 
-After deploy of code, in Supabase SQL Editor:
-1. Disable `ensure_rls` trigger
-2. Apply `20260425000001_seed_payment_receipt_loyalty.sql`
-3. Apply `20260425000002_rewrite_high_risk_template_bodies.sql`
-4. Re-enable `ensure_rls` trigger
-
-### Smoke tests after deploy
-
-- POS sale (cash, no vehicle, no service items, with customer attached) → wait 30s → verify SMS arrives, body contains "We appreciate your purchase.", no "Your is all set" or double-space artifacts.
-- POS sale (cash, with vehicle, with service items) → wait 30s → verify "Your <year make model> is all set." with optional loyalty suffix.
-- POS sale (cash, no customer attached) → no SMS arrives (unchanged behavior).
-- POS appointment notification → verify SMS uses new "Hi {first_name}!\n{appointment_summary}" body shape.
-- Voice agent post-call SMS → verify postcall confirmation still works for named callers (skip for unnamed callers is acceptable per locked Phase 0 design).
-- Detailer SMS for a mobile job with vehicle attached → verify "New job assigned: <services> – <vehicle>" line.
+`sms_templates.variables` returns mixed shapes per row at runtime: flat `string[]` for `loyalty_milestone`, `[{key,description,required}]` for the others. The cache loader at `src/lib/sms/render-sms-template.ts:84-108` normalizes both shapes. `docs/dev/DB_SCHEMA.md` should be checked for whether this dual-shape reality is documented; the schema-reform task to enforce a single shape is tracked under Session 42Z-audit Phase 5 Q.
 
 ### Cross-references
 
-- `docs/audits/SMS_TEMPLATE_ROOT_CAUSE_SESSION42W.md` — root-cause investigation (Phase 6 + 7)
-- `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md` — chip-migration verdicts (Cluster C unseeded; Q5 rename)
-- Session 42X-1 (commit `b4696619`) — engine fixes (empty fallbacks, hard-skip, PUT validator, auto-receipt interlock)
-- Session 42X-1-followup (commit `afc0e2fb`) — caller-side `'your vehicle'` literal cleanup
-- Pending: 42AC (migrate addon_authorization_*), 42AD (migrate quote_sms_*), 42AE/F (refund gaps + voice-info), 42AG (admin POST endpoint), 42AH (admin UI conditionals)
+- Reverted commit: `4b3fd219` (Session 42AB)
+- Last clean commit before 42AB: `afc0e2fb` (Session 42X-1-followup)
+- Original audit informing 42AB: `docs/audits/SMS_COMPLETE_INVENTORY_SESSION42Z.md`
+- Engine-side primitives (still in place): `src/lib/sms/render-sms-template.ts` (Session 42X-1)
+- Working artifact for Session 2A: `docs/audits/variable_each_caller_passes.md` (untracked, untouched)
+
+### Future-state note
+
+Session 2A will: (a) complete the chip-by-default architecture by updating both detailer-notify callers to pass `{job_summary}`, (b) rewrite `detailer_job_assigned` body to use the composite, (c) re-rename `UNSAFE_SMS_TEMPLATES` → `INTENTIONALLY_HARDCODED_SMS` with the 3-class doc-comment, (d) re-add CLAUDE.md Rule 20, and (e) add the contract columns deferred from this session. Session 2F will separately handle the slug splits for `staff_notification` and `booking_staff_notify` (Bugs 4 and 5 above).
 
 ---
 

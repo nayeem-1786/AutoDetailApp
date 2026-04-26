@@ -63,6 +63,16 @@ export async function POST(request: NextRequest) {
     try {
       const staffMessage = `Specialty vehicle callback request!\n${name} (${phone}) wants a quote for their ${vehicleWord} ${vehicleDesc}.${preferred_time ? `\nBest time: ${preferred_time}` : ''}\n\nFrom online booking.`;
 
+      // Session 1A interim: this caller passes only 2 of booking_staff_notify's
+      // 5 required chips. The other 3 ({appointment_date}, {appointment_time},
+      // {deposit_info}) don't apply to a specialty-vehicle callback request —
+      // there's no appointment scheduled yet, just a request to call back.
+      // renderSmsTemplate hard-skips on the missing required vars and returns
+      // isActive:false; the staffMessage fallback string above is what actually
+      // goes out. Session 2F will split this slug into booking_staff_notify_specialty
+      // with a contract that matches the specialty-callback shape (callback request,
+      // not confirmed booking). Do not "fix" this by synthesizing date/time/deposit
+      // values — the slug split is the right answer.
       const [templateResult, biz] = await Promise.all([
         renderSmsTemplate('booking_staff_notify', {
           customer_name: name,

@@ -638,6 +638,15 @@ export async function POST(request: NextRequest) {
               const staffMsg = `Specialty vehicle SMS inquiry!\n${custName} (${normalizedPhone}) texted about their ${specialtyVehicleWord} ${specialtyVehicleDesc}.\nLast message: "${body.slice(0, 100)}"\n\nRequires custom quote — please follow up.`;
               const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
               const { getBusinessInfo } = await import('@/lib/data/business');
+              // Session 1A interim: this caller passes only 2 of staff_notification's
+              // 4 contract chips ({reason_label} and {details} are required, not
+              // provided here — they don't apply to inbound-SMS specialty escalation).
+              // renderSmsTemplate hard-skips on missing required vars, so templateResult
+              // returns isActive:false and the staffMsg fallback string below is what
+              // actually goes out. Session 2F will split this slug into
+              // staff_notification_inbound_specialty with a contract that matches what
+              // an inbound specialty text actually has available. Do not "fix" this by
+              // synthesizing reason_label/details — the slug split is the right answer.
               const [templateResult, biz] = await Promise.all([
                 renderSmsTemplate('staff_notification', { customer_name: custName, customer_phone: normalizedPhone }, staffMsg),
                 getBusinessInfo(),

@@ -121,6 +121,7 @@ export async function POST(
         quote_number: quote.quote_number,
         service_total: formatCurrency(Number(quote.total_amount)),
         services: serviceList,
+        customer_phone: customer?.phone || '',
       }, staffFallback);
 
       if (staffResult.isActive) {

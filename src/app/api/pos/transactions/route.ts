@@ -525,34 +525,26 @@ export async function POST(request: NextRequest) {
 
           const businessInfo = await getBusinessInfo();
 
-          // Session 42AB: build {transaction_greeting} caller-side composite chip.
-          // Template body is now "Thank you {first_name}! {transaction_greeting} View
-          // your receipt: {receipt_link}\n\n{business_name}" — the greeting MUST be
-          // a complete grammatical sentence in all 3 product/service/vehicle states,
-          // since the template no longer fabricates prose. The 4-key vars contract
-          // is locked: first_name, transaction_greeting, receipt_link, business_name.
-          let transactionGreeting: string;
-          if (autoReceiptHasServices && vehicleDesc) {
-            transactionGreeting = `Your ${vehicleDesc} is all set.`;
-          } else if (autoReceiptHasServices) {
-            transactionGreeting = 'Your service is complete.';
-          } else {
-            transactionGreeting = 'We appreciate your purchase.';
-          }
-          if (pointsEarned > 0) {
-            transactionGreeting += ` You earned ${pointsEarned} loyalty points today.`;
-          }
-
-          const firstName = cust.first_name || 'there';
+          // Build context-aware greeting
+          const greeting = autoReceiptHasServices && vehicleDesc
+            ? `Your ${vehicleDesc} is looking great.`
+            : 'We appreciate your purchase.';
 
           const vars: Record<string, string> = {
-            first_name: firstName,
-            transaction_greeting: transactionGreeting,
+            first_name: cust.first_name || '',
+            // Session 42X-1-followup: pass empty string when no vehicle attached.
+            // Engine fallback (also empty) triggers REMOVE_LINE for any line containing
+            // {vehicle_description}. Previous literal 'your vehicle' produced "Your your
+            // vehicle is all set" when paired with template prose "Your {vehicle_description}".
+            vehicle_description: vehicleDesc || '',
+            transaction_greeting: greeting,
+            loyalty_points_earned: String(pointsEarned),
             receipt_link: receiptLink,
             business_name: businessInfo.name,
           };
 
-          const fallback = `Thank you ${firstName}! ${transactionGreeting} View your receipt: ${receiptLink}\n\n${businessInfo.name}`;
+          const pointsLine = pointsEarned > 0 ? ` You earned ${pointsEarned} loyalty points today.` : '';
+          const fallback = `Thank you ${vars.first_name}! ${greeting}${pointsLine} View your receipt: ${receiptLink}\n\n${businessInfo.name}`;
 
           const rendered = await renderSmsTemplate('payment_receipt', vars, fallback);
           if (!rendered.isActive) return;
