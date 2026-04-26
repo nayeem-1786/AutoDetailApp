@@ -31,13 +31,17 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // Fetch transaction with vehicle and access_token for the short SMS
+    // Fetch transaction with vehicle and access_token for the short SMS.
+    // Session 2C: added customer_id to support the conditional customer fetch
+    // below (loaded into scope for Session 3C's hardcoded → chip-driven
+    // migration of receipt_sms).
     const { data: transaction, error } = await supabase
       .from('transactions')
       .select(`
         access_token,
         total_amount,
         tip_amount,
+        customer_id,
         vehicle:vehicles(year, make, model)
       `)
       .eq('id', transaction_id)
@@ -46,6 +50,24 @@ export async function POST(request: NextRequest) {
     if (error || !transaction) {
       throw new Error('Transaction not found');
     }
+
+    // Session 2C: conditional customer fetch (handles guest-checkout where
+    // transaction.customer_id is null). .maybeSingle() also tolerates the
+    // theoretical case where customer_id references a deleted record. Result
+    // (customer | null) is loaded into local scope at the SMS callsite below;
+    // chip-pass is unchanged in 2C — Session 3C's chip-wiring of receipt_sms
+    // will use this customer object and MUST handle the null case (receipts
+    // still send for guests, just without customer-personalized chips).
+    let customer: { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null } | null = null;
+    if (transaction.customer_id) {
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select('id, first_name, last_name, email, phone')
+        .eq('id', transaction.customer_id)
+        .maybeSingle();
+      customer = customerData;
+    }
+    void customer; // Loaded for 3C; unused at this hardcoded callsite today.
 
     const businessInfo = await getBusinessInfo();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

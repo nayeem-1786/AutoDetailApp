@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     const {
       name,
       phone,
+      email,
       preferred_time,
       vehicle_year,
       vehicle_make,
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
     } = body as {
       name: string;
       phone: string;
+      email?: string | null;
       preferred_time?: string | null;
       vehicle_year?: number | null;
       vehicle_make?: string | null;
@@ -49,6 +51,7 @@ export async function POST(request: NextRequest) {
         event: 'specialty_callback_requested',
         customer_name: name,
         customer_phone: phone,
+        customer_email: email || null,
         preferred_time: preferred_time || null,
         vehicle_year,
         vehicle_make,
@@ -61,24 +64,26 @@ export async function POST(request: NextRequest) {
 
     // Send staff notification SMS
     try {
+      // Session 2C: customer_email composed as a named local for Session 2F's
+      // slug split into booking_staff_notify_specialty. The form (specialty-vehicle-block.tsx)
+      // now collects email as an optional field; when the customer leaves it
+      // empty, customerEmail is undefined and 2F's contract will treat it as
+      // optional (REMOVE_LINE on absence) per the established pattern.
+      const customerEmail = email || undefined;
+      void customerEmail; // Loaded for 2F; unused at this @ts-expect-error'd callsite today.
+
       const staffMessage = `Specialty vehicle callback request!\n${name} (${phone}) wants a quote for their ${vehicleWord} ${vehicleDesc}.${preferred_time ? `\nBest time: ${preferred_time}` : ''}\n\nFrom online booking.`;
 
-      // Session 1A interim: this caller passes only 2 of booking_staff_notify's
-      // 5 required chips. The other 3 ({appointment_date}, {appointment_time},
-      // {deposit_info}) don't apply to a specialty-vehicle callback request —
-      // there's no appointment scheduled yet, just a request to call back.
-      // renderSmsTemplate hard-skips on the missing required vars and returns
-      // isActive:false; the staffMessage fallback string above is what actually
-      // goes out. Session 2F will split this slug into booking_staff_notify_specialty
-      // with a contract that matches the specialty-callback shape (callback request,
-      // not confirmed booking). Do not "fix" this by synthesizing date/time/deposit
-      // values — the slug split is the right answer.
       const [templateResult, biz] = await Promise.all([
         // Session 2F: slug split pending; this caller intentionally satisfies only 2
         // of 5 required chips and relies on engine hard-skip + caller fallback prose.
         // Do not synthesize missing values. The slug split into
         // booking_staff_notify_specialty (with a contract that matches the
         // callback-request shape) is the right answer.
+        // Session 2C added the optional email field to the form (customer_email
+        // now in scope as customerEmail above) so 2F's split contract can
+        // include customer_email as an optional chip without a follow-up data
+        // expansion. Audit log details JSONB also captures customer_email.
         // @ts-expect-error — see Session 2F note above
         renderSmsTemplate('booking_staff_notify', {
           customer_name: name,

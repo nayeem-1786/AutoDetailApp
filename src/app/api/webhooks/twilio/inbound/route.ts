@@ -635,24 +635,28 @@ export async function POST(request: NextRequest) {
             // Fire staff notification
             try {
               const custName = customerCtx?.name || 'Unknown customer';
-              const staffMsg = `Specialty vehicle SMS inquiry!\n${custName} (${normalizedPhone}) texted about their ${specialtyVehicleWord} ${specialtyVehicleDesc}.\nLast message: "${body.slice(0, 100)}"\n\nRequires custom quote — please follow up.`;
+              // Session 2C: locals composed for Session 2F's slug split into
+              // staff_notification_inbound_specialty. specialtyVehicleDesc (already in
+              // scope from L627) will be wired as the vehicle_description chip;
+              // customerMessageExcerpt below will be wired as the customer_message_excerpt
+              // chip (or whatever 2F names it). customerCtx.email / .last_name (loaded
+              // at L527-530's customer SELECT, no expansion needed) will be wired as
+              // customer_email / last_name chips. Chip pass to renderSmsTemplate below
+              // is unchanged — 2F splits the slug, 2C only readies the data scope.
+              const customerMessageExcerpt = body.slice(0, 100);
+              const staffMsg = `Specialty vehicle SMS inquiry!\n${custName} (${normalizedPhone}) texted about their ${specialtyVehicleWord} ${specialtyVehicleDesc}.\nLast message: "${customerMessageExcerpt}"\n\nRequires custom quote — please follow up.`;
               const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
               const { getBusinessInfo } = await import('@/lib/data/business');
-              // Session 1A interim: this caller passes only 2 of staff_notification's
-              // 4 contract chips ({reason_label} and {details} are required, not
-              // provided here — they don't apply to inbound-SMS specialty escalation).
-              // renderSmsTemplate hard-skips on missing required vars, so templateResult
-              // returns isActive:false and the staffMsg fallback string below is what
-              // actually goes out. Session 2F will split this slug into
-              // staff_notification_inbound_specialty with a contract that matches what
-              // an inbound specialty text actually has available. Do not "fix" this by
-              // synthesizing reason_label/details — the slug split is the right answer.
               const [templateResult, biz] = await Promise.all([
                 // Session 2F: slug split pending; this caller intentionally satisfies only 2
                 // of 4 required chips and relies on engine hard-skip + caller fallback prose.
                 // Do not synthesize missing values. The slug split into
                 // staff_notification_inbound_specialty (with a contract that matches what an
                 // inbound specialty text actually has available) is the right answer.
+                // Session 2C verified data scope is already complete: last_name + email
+                // loaded at L527-530's customer SELECT (prior AI-context buildout); no
+                // SELECT expansion needed. specialtyVehicleDesc + customerMessageExcerpt
+                // hoisted above as named locals for 2F's chip wiring.
                 // @ts-expect-error — see Session 2F note above
                 renderSmsTemplate('staff_notification', { customer_name: custName, customer_phone: normalizedPhone }, staffMsg),
                 getBusinessInfo(),

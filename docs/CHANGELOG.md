@@ -4,6 +4,72 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(sms): Tier 1 non-voice caller refactors + specialty-callback email field — 2026-04-26 (Session 2C)
+
+**Tier 1 non-voice caller refactors.** Data scope expanded across 4 caller files in preparation for Session 3C (`receipt_sms` hardcoded → chip-driven), Session 3D (voice-info-quote and other hardcoded → chip-driven), and Session 2F (sub-slug splits for `booking_staff_notify_specialty` and `staff_notification_inbound_specialty`). Specialty-callback form now collects an optional email field; `customer_email` is available in local scope at the SMS callsite for Session 2F's slug-split contract. **Zero contract changes, zero chip-pass changes** for any of the 4 chip-driven slug callsites whose contracts were already satisfied. **Zero new migrations.** **Zero admin-UI work.**
+
+### Per-site summary
+
+- **Site 1 — `src/app/api/cron/quote-reminders/route.ts`** (2 callsites, `quote_reminder` + `quote_viewed_followup`):
+  - Customer SELECT (nested via `!inner`) expanded to Tier 1 parity at both callsites: `customers!inner(id, first_name, last_name, email, phone, sms_consent)` (was `first_name, phone, sms_consent`). Both `customer` typed casts updated to the full shape.
+  - Quote SELECT expanded with `quote_number`, `total_amount`, `valid_until`, `sent_at`. Note: `valid_until` (TIMESTAMPTZ) is the per-quote source of truth — `validity_days` does not exist as a `quotes` column (the global default lives in `business_settings.quote_validity_days` and is not needed at render time).
+  - Vehicle LEFT JOIN added: `vehicle:vehicles(year, make, model)` via `quote.vehicle_id` FK.
+  - `quote_items` JOIN added: `items:quote_items(item_name)` for service-name composition.
+  - Locals composed at both callsites: `vehicleDescription` (via `cleanVehicleDescription`), `servicesList` (comma-joined `item_name`s). Both `undefined` when absent. `void` suppressions document the loaded-but-unused intent for Sessions 2F / 3D.
+  - **Chip-pass to `renderSmsTemplate` UNCHANGED** at both callsites: still `{ first_name, short_url }` exactly. SMS sends are byte-identical to pre-2C.
+- **Site 2 — `src/app/api/webhooks/twilio/inbound/route.ts`** (1 callsite, hardcoded `staff_notification` with `@ts-expect-error`):
+  - Phase 0 finding: customer SELECT for AI context at L527-530 already loads `last_name + email` (and many other fields) from a prior AI-context buildout. **No SELECT expansion needed.**
+  - Reduced-scope changes: hoisted `body.slice(0, 100)` into a named local `customerMessageExcerpt` (Session 2F's likely chip name). `specialtyVehicleDesc` left as-is (already a clear semantic local) with a comment that 2F will wire it as the `vehicle_description` chip.
+  - `@ts-expect-error` comment updated to record the Phase 0 finding (data scope already complete) and document the named locals (`specialtyVehicleDesc`, `customerMessageExcerpt`) ready for 2F's chip-wiring.
+  - SMS body byte-identical pre/post-2C (`staffMsg` template literal still uses the same expression, just via the named local).
+- **Site 3 — `src/app/api/pos/receipts/sms/route.ts`** (1 callsite, hardcoded `receipt_sent` notification with no `renderSmsTemplate` today — slug `receipt_sms` migrates to chip-driven in Session 3C):
+  - Transaction SELECT extended with `customer_id` to support the new conditional customer fetch.
+  - Conditional customer fetch added immediately after transaction validation: only runs when `transaction.customer_id` is non-null (handles guest-checkout cleanly); uses `.maybeSingle()` to also tolerate the theoretical case where `customer_id` references a deleted record.
+  - Customer SELECT shape: `id, first_name, last_name, email, phone` (Tier 1 parity, omitting `sms_consent` since receipts go to whoever paid and aren't subject to marketing consent).
+  - Local result type: `customer: { ... } | null` — null for guests, populated for known customers. Session 3C's chip-wiring will use this and MUST handle the null case (receipts must still send for guests, just without customer-personalized chips).
+  - Hardcoded SMS body construction at L82-89 unchanged.
+- **Site 4 — `src/app/api/public/specialty-callback/route.ts` + `src/components/booking/specialty-vehicle-block.tsx`** (1 callsite, hardcoded `booking_staff_notify` with `@ts-expect-error`):
+  - **Form** (`specialty-vehicle-block.tsx`): added optional `Email` input field between Phone and "Best time to reach you". `<Input type="email">` for browser format hint, no `required` attribute, `callbackEmail` `useState('')` matching the existing field pattern. Submit handler includes `email: callbackEmail.trim() || null` matching the `null`-on-empty pattern of `preferred_time`.
+  - **Route** (`specialty-callback/route.ts`): added `email?: string \| null` to the destructuring (plain destructuring pattern preserved per Q3 — no Zod introduced for a single field). `audit_log.details` JSONB now captures `customer_email: email \|\| null` (no DB migration needed since `details` is already JSONB; CLAUDE.md rule 4 on JSONB extension applies).
+  - `customerEmail` local composed at the SMS callsite for 2F's chip-wiring readiness; `void` suppression documents the loaded-but-unused intent.
+  - `@ts-expect-error` comment updated to record that 2C added the email field, `customerEmail` is now in scope, and 2F's `booking_staff_notify_specialty` contract can include `customer_email` as an optional chip without a follow-up data expansion.
+  - SMS body unchanged (`staffMessage` fallback prose doesn't reference email).
+
+### `@ts-expect-error` markers — count unchanged
+
+The 2 markers at `webhooks/twilio/inbound/route.ts` (Site 2) and `public/specialty-callback/route.ts` (Site 4) remain. Their comments now reflect Session 2C's scope expansion — Session 2F's slug splits resolve both markers.
+
+### Architecture / scope discipline
+
+- **Zero contract changes** for any of the 18 chip-driven slugs.
+- **Zero chip-pass changes** for any of the 4 chip-driven slug callsites whose contracts were already satisfied (Site 1's `quote_reminder` + `quote_viewed_followup`, Site 2's `staff_notification` `@ts-expect-error`'d call, Site 4's `booking_staff_notify` `@ts-expect-error`'d call).
+- **The cheap-add wave** (`last_name`/`customer_email`/`customer_phone` chips added to contracts and vars-passes) **remains deferred to Session 2D**. 2C only loaded the data into local scope; 2D will introduce the chips.
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run lint` zero new issues across all Session 2C-touched files (Session 2B baseline preserved — 13 pre-existing errors / 44 pre-existing warnings unchanged)
+- `npm run build` clean (full SSG output succeeded; typed signature gate satisfied — no caller fails the per-slug contract)
+- `npx vitest run` 533/533 pass across 36 test files (no test additions or modifications — zero tests cover any of the 4 sites today, per Phase 0 finding)
+- `supabase db push --linked --dry-run` reports "Remote database is up to date" (no new migrations in 2C)
+
+### Files
+
+- Modified (4 caller files): `src/app/api/cron/quote-reminders/route.ts`, `src/app/api/webhooks/twilio/inbound/route.ts`, `src/app/api/pos/receipts/sms/route.ts`, `src/app/api/public/specialty-callback/route.ts`
+- Modified (1 form component): `src/components/booking/specialty-vehicle-block.tsx`
+- Docs: `docs/CHANGELOG.md`
+- No new files. No migrations. No `CLAUDE.md` changes (no architectural / structural / critical-rule changes). No `FILE_TREE.md` changes (no files added).
+
+### What remains for the SMS chip migration roadmap
+
+- **Session 2D** — cheap-add wave: introduce `last_name`/`customer_email`/`customer_phone` as optional chips on every transactional contract where they make sense; expand vars-passes at every caller where the data is already loaded into scope (per Sessions 2B / 2C).
+- **Session 2E** — retire the legacy `variables` JSONB column and the `SMS_TEMPLATE_VARIABLES` TS const (per CLAUDE.md rule 9's two-source-of-truth window).
+- **Session 2F** — sub-slug splits for `booking_staff_notify` (→ `booking_staff_notify_specialty`) and `staff_notification` (→ `staff_notification_inbound_specialty`); resolves both `@ts-expect-error` markers.
+- **Session 3C** — `receipt_sms` hardcoded → chip-driven; uses Site 3's `customer` local.
+- **Session 3D** — voice-agent hardcoded slugs (`quote_sms_midcall`, `quote_sms_postcall`, 6× `voice_info_*`) hardcoded → chip-driven; uses the data scope established in Session 2B (voice-agent sites) and Session 2C (Site 1's `vehicleDescription` + `servicesList` for voice-info-quote).
+
+---
+
 ## refactor(sms): Tier 1 voice-agent caller refactors + appointment_confirmed contract demotion — 2026-04-26 (Session 2B)
 
 **Voice-agent appointment confirmation SMS now sends end-to-end.** The latent gap surfaced in Session 2A.5 (helper early-returned `null` when `total` was missing — voice-agent paths never passed `total`) is closed via a contract-level fix rather than caller-side workarounds: `service_total` is demoted from required to optional for `appointment_confirmed`, the body is rewritten to put `{appointment_time}` and `{service_total}` on separate lines (so REMOVE_LINE on missing total doesn't strip the time), and the helper's N1a guard is relaxed to early-return only on missing `serviceName`. Caller data scope is expanded across all 4 voice-agent SMS-touching files in preparation for Session 3D's hardcoded → chip-driven migration of voice-agent sites.

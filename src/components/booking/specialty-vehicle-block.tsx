@@ -44,6 +44,7 @@ export function SpecialtyVehicleBlock({
 
   const [callbackName, setCallbackName] = useState('');
   const [callbackPhone, setCallbackPhone] = useState('');
+  const [callbackEmail, setCallbackEmail] = useState('');
   const [callbackTime, setCallbackTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -66,6 +67,7 @@ export function SpecialtyVehicleBlock({
         body: JSON.stringify({
           name: callbackName.trim(),
           phone: callbackPhone.trim(),
+          email: callbackEmail.trim() || null,
           preferred_time: callbackTime.trim() || null,
           vehicle_year: vehicle.year,
           vehicle_make: vehicle.make,
@@ -141,6 +143,15 @@ export function SpecialtyVehicleBlock({
               onChange={(e) => setCallbackPhone(e.target.value)}
               placeholder="(555) 555-5555"
               required
+              className="text-base sm:text-sm"
+            />
+          </FormField>
+          <FormField label="Email">
+            <Input
+              type="email"
+              value={callbackEmail}
+              onChange={(e) => setCallbackEmail(e.target.value)}
+              placeholder="you@example.com"
               className="text-base sm:text-sm"
             />
           </FormField>

@@ -4,6 +4,7 @@ import { sendMarketingSms } from '@/lib/utils/sms';
 import { createShortLink } from '@/lib/utils/short-link';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { findOrCreateConversation } from '@/lib/utils/conversation-helpers';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 /**
  * Quote follow-up reminder cron endpoint.
@@ -25,14 +26,29 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  // Find quotes that were sent 24+ hours ago, never viewed, not deleted
+  // Find quotes that were sent 24+ hours ago, never viewed, not deleted.
+  // Session 2C: SELECT expanded with quote_number/total_amount/valid_until/sent_at
+  // and joined vehicle + quote_items. None of these are consumed by today's
+  // {first_name, short_url} chip pass — they're loaded into local scope so
+  // Session 2F (potential quote_reminder/quote_viewed_followup contract
+  // expansion) and Session 3D (voice-info-quote chip-driven migration) have
+  // the data available without per-callsite round-trips.
+  // Note: validity_days is NOT a column on quotes; valid_until (TIMESTAMPTZ)
+  // is the per-quote source of truth. business_settings.quote_validity_days
+  // holds the global default and is not needed at render time.
   const { data: quotes, error: queryError } = await admin
     .from('quotes')
     .select(`
       id,
       access_token,
       customer_id,
-      customer:customers!inner(first_name, phone, sms_consent)
+      quote_number,
+      total_amount,
+      valid_until,
+      sent_at,
+      customer:customers!inner(id, first_name, last_name, email, phone, sms_consent),
+      vehicle:vehicles(year, make, model),
+      items:quote_items(item_name)
     `)
     .eq('status', 'sent')
     .lt('sent_at', twentyFourHoursAgo)
@@ -66,8 +82,15 @@ export async function GET(request: NextRequest) {
     // Skip if reminder already sent
     if (alreadyReminded.has(quote.id)) continue;
 
-    const customer = quote.customer as unknown as { first_name: string; phone: string | null; sms_consent: boolean };
+    const customer = quote.customer as unknown as { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null; sms_consent: boolean };
     if (!customer?.phone || !customer.sms_consent || !quote.access_token) continue;
+
+    // Session 2C: locals composed for Session 2F / 3D chip-wiring.
+    // Chip pass to renderSmsTemplate below is unchanged (still {first_name, short_url}).
+    const vehicle = quote.vehicle as unknown as { year: number | null; make: string | null; model: string | null } | null;
+    const vehicleDescription = vehicle ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || undefined : undefined;
+    const items = quote.items as unknown as { item_name: string }[] | null;
+    const servicesList = (items ?? []).map((i) => i.item_name).filter(Boolean).join(', ') || undefined;
 
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -79,6 +102,7 @@ export async function GET(request: NextRequest) {
         first_name: firstName,
         short_url: shortUrl,
       }, fallbackMsg);
+      void vehicleDescription; void servicesList; // Loaded for 2F / 3D; unused at this callsite today.
 
       if (!rendered.isActive) continue;
       const message = rendered.body;
@@ -135,13 +159,20 @@ export async function GET(request: NextRequest) {
   // ── Phase 2: Viewed-but-not-accepted follow-up (48h after view) ──────────
   const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
 
+  // Session 2C: same SELECT expansion as the L29 query — see comment there.
   const { data: viewedQuotes, error: viewedError } = await admin
     .from('quotes')
     .select(`
       id,
       access_token,
       customer_id,
-      customer:customers!inner(first_name, phone, sms_consent)
+      quote_number,
+      total_amount,
+      valid_until,
+      sent_at,
+      customer:customers!inner(id, first_name, last_name, email, phone, sms_consent),
+      vehicle:vehicles(year, make, model),
+      items:quote_items(item_name)
     `)
     .eq('status', 'viewed')
     .lt('viewed_at', fortyEightHoursAgo)
@@ -170,8 +201,15 @@ export async function GET(request: NextRequest) {
     for (const quote of viewedQuotes) {
       if (alreadyFollowedUp.has(quote.id)) continue;
 
-      const customer = quote.customer as unknown as { first_name: string; phone: string | null; sms_consent: boolean };
+      const customer = quote.customer as unknown as { id: string; first_name: string; last_name: string | null; email: string | null; phone: string | null; sms_consent: boolean };
       if (!customer?.phone || !customer.sms_consent || !quote.access_token) continue;
+
+      // Session 2C: locals composed for Session 2F / 3D chip-wiring.
+      // Chip pass to renderSmsTemplate below is unchanged (still {first_name, short_url}).
+      const vehicle = quote.vehicle as unknown as { year: number | null; make: string | null; model: string | null } | null;
+      const vehicleDescription = vehicle ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || undefined : undefined;
+      const items = quote.items as unknown as { item_name: string }[] | null;
+      const servicesList = (items ?? []).map((i) => i.item_name).filter(Boolean).join(', ') || undefined;
 
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -183,6 +221,7 @@ export async function GET(request: NextRequest) {
           first_name: firstName,
           short_url: shortUrl,
         }, fallbackMsg);
+        void vehicleDescription; void servicesList; // Loaded for 2F / 3D; unused at this callsite today.
 
         if (!rendered.isActive) continue;
         const message = rendered.body;
