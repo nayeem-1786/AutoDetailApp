@@ -4,6 +4,12 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Deployed to production 2026-04-26
+
+Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed contract codegen), 2B (voice-agent caller refactors + voice-booked confirmation SMS now sends), 2C (non-voice caller refactors + specialty-callback email field), 2D (cheap-add wave + legacy variables clean rebuild).
+
+---
+
 ## refactor(sms): cheap-add wave — 41 optional chip-adds + legacy variables clean rebuild — 2026-04-26 (Session 2D)
 
 **Cheap-add wave.** Optional chips (`last_name`, `customer_email`, `customer_phone`, `vehicle_description`, plus `first_name` where missing) added to the 18 chip-driven slug contracts; callers wired across 14 source files / 22 callsites. **All 18 slugs render byte-identically to pre-2D** — bodies are unchanged, the cheap-adds become observable when operators reference the new chips in body text via admin UI. Sets up Session 2E's universal palette work and gives operators per-message personalization without engineering changes. The legacy `variables` JSONB column was cleanly rebuilt for all 18 slugs as a side effect, resolving multiple pre-existing drift issues.
