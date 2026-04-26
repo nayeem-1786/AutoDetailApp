@@ -598,15 +598,10 @@ export async function POST(request: NextRequest) {
         ].filter(Boolean).join('\n');
 
         renderSmsTemplate('booking_confirmed', {
-          first_name: data.customer.first_name || undefined,
           appointment_date: dateStr,
           appointment_time: timeStr,
           services: serviceNames,
-          vehicle_description: vehicleStr || undefined,
           service_total: total,
-          deposit_amount: depositAmountFormatted || undefined,
-          balance_due: balanceDueFormatted || undefined,
-          payment_info: paymentInfo,
         }, customerSmsFallback).then((result) => {
           if (result.isActive) {
             sendSms(e164Phone, result.body, {

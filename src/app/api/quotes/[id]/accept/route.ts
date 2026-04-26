@@ -77,15 +77,18 @@ export async function POST(
     const customer = quote.customer as { id: string; first_name: string; last_name: string; phone: string | null; email: string | null } | null;
     if (customer?.phone) {
       const items = (quote.items as Array<{ item_name: string }>) ?? [];
-      const slug = items.length === 1 ? 'quote_accepted_single' : 'quote_accepted_multi';
-      const fallback = items.length === 1
-        ? `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`
-        : `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`;
-
-      const result = await renderSmsTemplate(slug, {
-        first_name: customer.first_name,
-        item_name: items[0]?.item_name,
-      }, fallback);
+      // Session 2A.5: per-slug typed signature requires per-branch render calls.
+      // The single and multi slugs have different contracts (single: item_name
+      // required; multi: no required chips), so the literal-union shape can't
+      // satisfy both — split into two narrowed calls instead.
+      const result = items.length === 1 && items[0]?.item_name
+        ? await renderSmsTemplate('quote_accepted_single', {
+            first_name: customer.first_name,
+            item_name: items[0].item_name,
+          }, `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`)
+        : await renderSmsTemplate('quote_accepted_multi', {
+            first_name: customer.first_name,
+          }, `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`);
 
       if (result.isActive) {
         const smsResult = await sendSms(customer.phone, result.body, {

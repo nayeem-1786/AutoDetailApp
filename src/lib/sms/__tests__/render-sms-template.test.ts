@@ -52,7 +52,7 @@ vi.mock('@/lib/data/business', () => ({
   }),
 }));
 
-import { renderSmsTemplate, invalidateSmsTemplateCache } from '../render-sms-template';
+import { __renderSmsTemplateForTesting as renderSmsTemplate, invalidateSmsTemplateCache } from '../render-sms-template';
 
 beforeEach(() => {
   state.templates = [];

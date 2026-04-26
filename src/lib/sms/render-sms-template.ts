@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { renderTemplate } from '@/lib/utils/template';
 import { getBusinessInfo } from '@/lib/data/business';
 import { parseContractFromRow, ContractValidationError } from './contract';
+import type { SmsSlug, RenderVarsBySlug } from './generated-contracts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -222,16 +223,31 @@ const DEFAULT_VARIABLE_FALLBACKS: Record<string, string> = {
 /**
  * Render an SMS template from the database.
  *
+ * Generic over SmsSlug (Session 2A.5): the slug parameter narrows to one of the
+ * 18 known slugs from generated-contracts.ts, and `variables` is statically
+ * checked against that slug's contract. Required chips (per the slug's contract
+ * minus auto-injected business chips) are required string properties; optional
+ * chips and auto-inject chips are optional. Extra-key passes are compile errors.
+ *
+ * Runtime logic is unchanged from pre-2A.5: the engine still reads contracts
+ * from the DB cache, hard-skips on missing required, REMOVE_LINEs on absent
+ * optional, and auto-injects business_name/phone/address before the pre-check.
+ *
  * @param slug - Template slug (e.g. 'appointment_confirmed')
- * @param variables - Key-value pairs to inject into the template
+ * @param variables - Key-value pairs to inject into the template, typed per
+ *                    the slug's contract via RenderVarsBySlug.
  * @param fallback - Pre-rendered hardcoded string used when template is inactive,
  *                   missing, or DB is unreachable. This is the disaster-recovery path.
  */
-export async function renderSmsTemplate(
-  slug: string,
-  variables: Record<string, string | undefined>,
-  fallback: string
+export async function renderSmsTemplate<S extends SmsSlug>(
+  slug: S,
+  variables: RenderVarsBySlug[S],
+  fallback: string,
 ): Promise<RenderResult> {
+  // Internal logic uses a generic record view of variables — slug-specific
+  // narrowing isn't useful inside the function body since the engine loops
+  // over the contract chip names dynamically.
+  const vars = variables as Record<string, string | undefined>;
   const templates = await loadTemplates();
   const template = templates.get(slug);
 
@@ -259,7 +275,7 @@ export async function renderSmsTemplate(
   }
 
   // Auto-inject business variables
-  const enriched = { ...variables };
+  const enriched: Record<string, string | undefined> = { ...vars };
   try {
     const biz = await getBusinessInfo();
     if (!enriched.business_name) enriched.business_name = biz.name;
@@ -364,3 +380,20 @@ export async function renderSmsTemplate(
     recipientPhones: template.recipientPhones,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Test-only export
+// ---------------------------------------------------------------------------
+
+/**
+ * Test-only: widened signature for exercising engine behavior with synthetic
+ * slugs and contracts that are not registered in the production
+ * SMS_CONTRACTS_SOURCE / generated-contracts.ts. Production code MUST use
+ * renderSmsTemplate (the typed signature) to get caller-vs-contract
+ * enforcement at compile time. Behavior is identical at runtime.
+ */
+export const __renderSmsTemplateForTesting = renderSmsTemplate as (
+  slug: string,
+  variables: Record<string, string | undefined>,
+  fallback: string,
+) => Promise<RenderResult>;

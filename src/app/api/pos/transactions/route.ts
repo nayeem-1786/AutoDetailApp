@@ -317,7 +317,7 @@ export async function POST(request: NextRequest) {
               const bookingLink = await createShortLink(`${appUrl}/book`);
               const cashValue = `$${(currentBalance * LOYALTY.REDEEM_RATE).toFixed(2)}`;
 
-              const vars: Record<string, string> = {
+              const vars = {
                 first_name: custMilestone.first_name || '',
                 loyalty_points_balance: String(currentBalance),
                 loyalty_cash_value: cashValue,
@@ -529,15 +529,9 @@ export async function POST(request: NextRequest) {
           // Build context-aware greeting
           const greeting = buildTransactionGreeting({ hasServices: autoReceiptHasServices, vehicleDesc });
 
-          const vars: Record<string, string> = {
+          const vars = {
             first_name: cust.first_name || '',
-            // Session 42X-1-followup: pass empty string when no vehicle attached.
-            // Engine fallback (also empty) triggers REMOVE_LINE for any line containing
-            // {vehicle_description}. Previous literal 'your vehicle' produced "Your your
-            // vehicle is all set" when paired with template prose "Your {vehicle_description}".
-            vehicle_description: vehicleDesc || '',
             transaction_greeting: greeting,
-            loyalty_points_earned: String(pointsEarned),
             receipt_link: receiptLink,
             business_name: businessInfo.name,
           };

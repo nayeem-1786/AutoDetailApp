@@ -930,9 +930,11 @@ src/lib/email/drip-engine.ts
 
 ### SMS Template System
 ```
-src/lib/sms/render-sms-template.ts
+src/lib/sms/render-sms-template.ts          # Generic over SmsSlug (Session 2A.5); test-only __renderSmsTemplateForTesting export
 src/lib/sms/sms-template-variables.ts
-src/lib/sms/palette.ts                      # SMS_PALETTE chip catalog (Session 2A)
+src/lib/sms/sms-contracts.source.ts         # Hand-edited single source of truth (Session 2A.5)
+src/lib/sms/palette.ts                      # AUTO-GENERATED from sms-contracts.source.ts (Session 2A.5; was hand-edited 2A)
+src/lib/sms/generated-contracts.ts          # AUTO-GENERATED — SmsSlug, SMS_SLUGS, CONTRACTS_BY_SLUG, RenderVarsBySlug (Session 2A.5)
 src/lib/sms/contract.ts                     # Zod contract schema + validators (Session 2A)
 src/lib/sms/composites.ts                   # Caller-built composite chip builders (Session 2A)
 src/lib/sms/__tests__/render-sms-template.test.ts
@@ -1520,6 +1522,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 ```
 scripts/import-square-data.mjs
 scripts/regen-db-schema.ts
+scripts/regen-sms-contracts.ts              # Codegen: SMS palette + per-slug typed contracts (Session 2A.5)
 scripts/seed-admin.ts
 scripts/seed-data.ts
 ```

@@ -240,7 +240,6 @@ async function sendCompletionNotifications(
   if (customer.phone) {
     const smsFallback = `Hi ${customer.first_name}, your ${vehicleDisplay} is looking great and ready for pickup! \u{1F389}\nView your before & after photos: ${galleryLink}\n${businessInfo.name}\n${businessInfo.address || ''}\n${businessInfo.phone || ''}\n${hoursLine}`;
 
-    const assignedEmp = (job.assigned_employee as { id: string; first_name: string } | null);
     const smsResult = await renderSmsTemplate('job_complete', {
       first_name: customer.first_name,
       // Session 42X-1-followup: pass empty string into the chip when no vehicle attached.
@@ -249,7 +248,6 @@ async function sendCompletionNotifications(
       vehicle_description: vehicleMakeModel || '',
       gallery_link: galleryLink,
       hours_line: hoursLine,
-      detailer_first_name: assignedEmp?.first_name || undefined,
     }, smsFallback);
 
     if (smsResult.isActive) {

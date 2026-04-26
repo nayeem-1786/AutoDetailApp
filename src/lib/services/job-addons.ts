@@ -141,9 +141,8 @@ export async function approveAddon(addonId: string): Promise<AddonActionResult> 
   const serviceName = getAddonName(addon);
 
   if (customerPhone) {
-    const customerFirstName = job?.customer?.first_name || undefined;
     const fallback = `Great! Your add-on (${serviceName}) has been approved. We'll get started right away!`;
-    const result = await renderSmsTemplate('addon_approved', { service_name: serviceName, first_name: customerFirstName }, fallback);
+    const result = await renderSmsTemplate('addon_approved', { service_name: serviceName }, fallback);
     if (result.isActive) {
       await sendSms(customerPhone, result.body, {
         logToConversation: true,
@@ -213,9 +212,8 @@ export async function declineAddon(addonId: string): Promise<AddonActionResult> 
   const serviceName = getAddonName(addon);
 
   if (customerPhone) {
-    const customerFirstName = job?.customer?.first_name || undefined;
     const fallback = `No problem! We've noted ${serviceName} as a recommendation for your next visit.`;
-    const result = await renderSmsTemplate('addon_declined', { service_name: serviceName, first_name: customerFirstName }, fallback);
+    const result = await renderSmsTemplate('addon_declined', { service_name: serviceName }, fallback);
     if (result.isActive) {
       await sendSms(customerPhone, result.body, {
         logToConversation: true,

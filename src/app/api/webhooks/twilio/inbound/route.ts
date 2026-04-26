@@ -648,6 +648,12 @@ export async function POST(request: NextRequest) {
               // an inbound specialty text actually has available. Do not "fix" this by
               // synthesizing reason_label/details — the slug split is the right answer.
               const [templateResult, biz] = await Promise.all([
+                // Session 2F: slug split pending; this caller intentionally satisfies only 2
+                // of 4 required chips and relies on engine hard-skip + caller fallback prose.
+                // Do not synthesize missing values. The slug split into
+                // staff_notification_inbound_specialty (with a contract that matches what an
+                // inbound specialty text actually has available) is the right answer.
+                // @ts-expect-error — see Session 2F note above
                 renderSmsTemplate('staff_notification', { customer_name: custName, customer_phone: normalizedPhone }, staffMsg),
                 getBusinessInfo(),
               ]);

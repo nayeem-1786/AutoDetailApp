@@ -389,25 +389,25 @@ describe('Auto-receipt status interlock (Session 42X-1, Phase 4 D)', () => {
 // Session 42X-1-followup: caller-side literal regression
 // ──────────────────────────────────────────────────────────────────────────────
 
-describe("Auto-receipt vehicle_description caller-side literal (Session 42X-1-followup)", () => {
-  it("passes empty string (not 'your vehicle' literal) when no vehicle attached", async () => {
+describe("Auto-receipt vehicle_description caller-side literal (Session 42X-1-followup, updated 2A.5)", () => {
+  // Session 2A.5 update: vehicle_description is no longer in payment_receipt's
+  // contract (per CONTRACTS_BY_SLUG / DB), so the caller no longer passes the
+  // chip at all. The Session 42X-1 'your vehicle' literal regression is
+  // structurally impossible now — the typed signature would refuse the chip.
+  // These tests are kept as anti-regression coverage in case payment_receipt's
+  // contract is ever extended to include vehicle_description again.
+  it("does not pass vehicle_description in vars (no longer in payment_receipt contract)", async () => {
     state.vehicleAttached = false;
 
     await POST(makeRequest({ withVehicle: false }));
     await vi.advanceTimersByTimeAsync(30_000);
 
-    // Auto-receipt template invocation must have happened
     const paymentReceiptCall = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
     expect(paymentReceiptCall).toBeDefined();
-
-    // The bug: caller used to pass literal 'your vehicle' here, which collided with
-    // the template body prose "Your {vehicle_description} is all set" → "Your your vehicle".
-    // Post-fix: pass empty string so engine line-removal strips the entire line.
-    expect(paymentReceiptCall!.vars.vehicle_description).toBe('');
-    expect(paymentReceiptCall!.vars.vehicle_description).not.toBe('your vehicle');
+    expect(paymentReceiptCall!.vars).not.toHaveProperty('vehicle_description');
   });
 
-  it("passes the real vehicle description when vehicle is attached (happy path unchanged)", async () => {
+  it("does not pass vehicle_description in vars even when vehicle is attached", async () => {
     state.vehicleAttached = true;
 
     await POST(makeRequest({ withVehicle: true }));
@@ -415,8 +415,7 @@ describe("Auto-receipt vehicle_description caller-side literal (Session 42X-1-fo
 
     const paymentReceiptCall = recorder.renderInvocations.find((i) => i.slug === 'payment_receipt');
     expect(paymentReceiptCall).toBeDefined();
-    // From the mocked vehicles table: { year: 2024, make: 'Tesla', model: 'Model 3' }
-    expect(paymentReceiptCall!.vars.vehicle_description).toBe('2024 Tesla Model 3');
+    expect(paymentReceiptCall!.vars).not.toHaveProperty('vehicle_description');
   });
 
   it("auto-receipt SMS body never contains the 'your your' double-noun signature", async () => {

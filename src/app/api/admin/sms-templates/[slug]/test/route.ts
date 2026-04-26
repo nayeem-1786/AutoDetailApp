@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { SMS_SLUGS, type SmsSlug, type RenderVarsBySlug } from '@/lib/sms/generated-contracts';
 import { sendSms } from '@/lib/utils/sms';
 import { SMS_TEMPLATE_VARIABLES } from '@/lib/sms/sms-template-variables';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
@@ -19,6 +20,15 @@ export async function POST(
   if (denied) return denied;
 
   const { slug } = await params;
+
+  // Session 2A.5: renderSmsTemplate is generic over SmsSlug. This admin test
+  // endpoint receives an arbitrary string from the URL — guard at runtime so
+  // the cast to SmsSlug below is safe.
+  if (!SMS_SLUGS.includes(slug as SmsSlug)) {
+    return NextResponse.json({ error: `Unknown SMS slug: ${slug}` }, { status: 400 });
+  }
+  const typedSlug = slug as SmsSlug;
+
   const admin = createAdminClient();
 
   // Get test phone number from business_settings
@@ -126,8 +136,16 @@ export async function POST(
     }
   }
 
-  // Render and send
-  const result = await renderSmsTemplate(slug, variables, 'Test SMS — template fallback');
+  // Render and send.
+  // Session 2A.5: vars are built from request-driven sample data sourced from
+  // the legacy SMS_TEMPLATE_VARIABLES map; per-slug typed shape can't be
+  // statically inferred here. Cast at the boundary — the engine still validates
+  // the contract at runtime and hard-skips on missing required chips.
+  const result = await renderSmsTemplate(
+    typedSlug,
+    variables as RenderVarsBySlug[typeof typedSlug] & Record<string, string>,
+    'Test SMS — template fallback',
+  );
 
   const smsResult = await sendSms(testPhone, result.body);
 

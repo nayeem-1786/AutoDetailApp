@@ -20,6 +20,13 @@
 // Contracts that fail validation cause the engine to fail-safe (treat the
 // template as is_active:false). This prevents a malformed migration from
 // silently producing broken SMS bodies.
+//
+// Source-of-truth note (Session 2A.5): palette.ts is now auto-generated from
+// src/lib/sms/sms-contracts.source.ts via scripts/regen-sms-contracts.ts.
+// The membership check below is therefore validated against the same single
+// source of truth that drives the codegen-generated typed render-vars contracts
+// in generated-contracts.ts. Drift between palette and contracts is impossible
+// once both generated files are committed in sync.
 
 import { z } from 'zod';
 import { SMS_PALETTE } from './palette';

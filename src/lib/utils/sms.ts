@@ -304,7 +304,18 @@ export async function buildAppointmentConfirmationSms(params: {
 }): Promise<string | null> {
   const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
   const { buildAppointmentSummary } = await import('@/lib/sms/composites');
-  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total, detailerFirstName } = params;
+  const { businessName, businessPhone, date, time, serviceName, customerFirstName, total } = params;
+
+  // Session 2A.5: appointment_confirmed contract requires service_name and
+  // service_total (non-optional, non-auto-inject). When either is missing the
+  // engine hard-skips and returns isActive:false anyway — short-circuit here so
+  // the typed signature below sees narrowed string types.
+  // Session 2B will refactor voice-agent callers to load and pass total. Until
+  // then, voice-booked appointments silently skip confirmation SMS (preserves
+  // pre-2A.5 runtime behavior; the engine would hard-skip anyway).
+  if (!serviceName || !total) {
+    return null;
+  }
 
   const fallback =
     `${businessName} — Appointment Confirmed\n\n` +
@@ -317,7 +328,6 @@ export async function buildAppointmentConfirmationSms(params: {
     appointment_date: date,
     appointment_time: time,
     service_total: total,
-    detailer_first_name: detailerFirstName,
   }, fallback);
 
   return result.isActive ? result.body : null;

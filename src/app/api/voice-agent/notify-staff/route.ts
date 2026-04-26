@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
         customer_name: displayName,
         customer_phone: displayPhone,
         reason_label: reasonLabel,
-        reason_code: reason,
         details: details.trim(),
       }, fallbackBody),
       getBusinessInfo(),

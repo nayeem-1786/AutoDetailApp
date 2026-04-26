@@ -4,6 +4,77 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(sms): typed contract codegen + generic engine signature — 2026-04-26 (Session 2A.5)
+
+**Structural enforcement layer for SMS chip contracts.** Single source-of-truth file (`src/lib/sms/sms-contracts.source.ts`) drives both palette and per-slug typed contracts via codegen. `renderSmsTemplate` signature now generic; callers can no longer drift from contracts at compile time. Three drift classes that Session 2A's runtime-only enforcement could only catch in production logs are now structural compile errors.
+
+### What's new
+
+- `src/lib/sms/sms-contracts.source.ts` — hand-edited single source of truth for the 86 chip metadata entries and the 18 per-slug `required` / `optional` arrays. Byte-exact mirror of `sms_templates.required_variables` / `optional_variables` for every row currently in DB.
+- `src/lib/sms/generated-contracts.ts` — auto-generated; exports `SmsSlug`, `SMS_SLUGS`, `CONTRACTS_BY_SLUG`, `RenderVarsBySlug`, and the `SmsRenderVars<S>` ergonomic helper. `RenderVarsBySlug` is the per-slug shape the engine signature is generic over.
+- `scripts/regen-sms-contracts.ts` — codegen script. Run via `npx tsx scripts/regen-sms-contracts.ts` (or `npm run regen:sms-contracts`). Validates source-file integrity (no slug references unknown chips; no `composite + autoInject` overlap; no within-array duplicates; no required/optional overlap). Idempotent — running twice produces byte-identical output.
+- `palette.ts` is now auto-generated from the same source (DO NOT EDIT header; same exports preserved — `SMS_PALETTE`, `SMS_PALETTE_KEYS`, `ChipMetadata`). Existing imports across the codebase don't change. Runtime-equivalent to the pre-2A.5 hand-written file (verified via runtime dictionary comparison: all 86 chips' metadata byte-identical).
+- `renderSmsTemplate` — generic signature: `renderSmsTemplate<S extends SmsSlug>(slug: S, vars: RenderVarsBySlug[S], fallback)`. Internal logic unchanged; only the type narrows. Auto-inject chips (`business_name`, `business_phone`, `business_address`) are typed as optional in every slug's render-vars regardless of whether the slug's contract lists them as required, matching engine runtime behavior.
+- `__renderSmsTemplateForTesting` — test-only widened helper (re-exported from the same module) for synthetic-slug unit tests. Production code MUST use the typed signature.
+
+### Drift cleanup applied (zero behavior change at runtime)
+
+- 8 Class A callers had dead chip-pass entries removed (engine was silently dropping them at the post-render scan; type system now refuses them at compile time):
+  - `addon_approved` / `addon_declined` — dropped `first_name`
+  - `appointment_confirmed` (via `buildAppointmentConfirmationSms`) — dropped `detailer_first_name`
+  - `booking_confirmed` (`book/route.ts`) — dropped 5 entries (`first_name`, `vehicle_description`, `deposit_amount`, `balance_due`, `payment_info`); upstream `hasDeposit` / `depositAmountFormatted` / `balanceDueFormatted` / `paymentInfo` computations preserved per email-branch usage
+  - `booking_reminder` — dropped `first_name`
+  - `job_complete` — dropped `detailer_first_name`
+  - `payment_receipt` — dropped `vehicle_description`, `loyalty_points_earned`
+  - `staff_notification` — dropped `reason_code`
+- 2 callers (`job-addons.ts` × 2, `pos/jobs/[id]/complete/route.ts`) also got dead-local cleanups (variables only used to populate the now-removed chip).
+- 2 caller-side `Record<string, string>` annotations dropped (`pos/transactions/route.ts` lines 320, 532). TypeScript now infers the per-slug shape from the typed signature.
+- 1 dynamic-slug callsite split into per-branch calls (`quotes/[id]/accept/route.ts`) for explicit per-contract typing. The implicit literal-union acceptance was a typing quirk, not intent; explicit per-branch typing protects against future contract changes.
+- 2 `auto-receipt-interlock.test.ts` tests rewritten to assert the post-2A.5 reality (`vehicle_description` property absent from vars). The third test in the same describe block (rendered body never contains 'your your') is unchanged and continues to assert end-to-end correctness — the anti-regression coverage from Session 42X-1-followup is preserved.
+
+### Deferred via `@ts-expect-error` with Session 2F notes
+
+- `public/specialty-callback/route.ts` — `booking_staff_notify` caller satisfies only 2 of 5 required chips (specialty-vehicle callback shape doesn't have `appointment_date` / `appointment_time` / `deposit_info`); relies on engine hard-skip + caller fallback prose.
+- `webhooks/twilio/inbound/route.ts` — `staff_notification` caller satisfies only 2 of 4 required chips (inbound-SMS specialty escalation doesn't have `reason_label` / `details`); same pattern.
+
+Both `@ts-expect-error` comments name Session 2F explicitly and describe the slug split that will resolve them.
+
+### Latent voice-agent gap made explicit
+
+`buildAppointmentConfirmationSms` now early-returns `null` when `serviceName` or `total` is missing. Preserves pre-2A.5 runtime behavior — the engine would hard-skip and the helper would return `null` anyway, so no SMS goes out. Voice-agent appointment-confirmation paths B/C continue to skip until Session 2B refactors those callers to load and pass `total`. Comment at the guard explicitly references Session 2B as the proper fix.
+
+### Dev-experience changes
+
+- New `package.json` script: `regen:sms-contracts` (alias for `tsx scripts/regen-sms-contracts.ts`).
+- `contract.ts` annotated to flag that its `SMS_PALETTE` import target is now generated (no functional change — palette.ts is at the same path with the same exports).
+
+### Operational notes
+
+- **Migration session ritual now includes** `npx tsx scripts/regen-sms-contracts.ts` after any `sms_templates.required_variables` / `optional_variables` change. Same shape as the `DB_SCHEMA.md` regen ritual from Session 1B. Codegen exits non-zero on integrity violations so commits with stale generated files fail the dev loop.
+- Server-log "unknown placeholder" warnings will stop firing for the specific chip keys removed in Class A cleanup (`first_name`, `detailer_first_name`, `vehicle_description`, `deposit_amount`, `balance_due`, `payment_info`, `loyalty_points_earned`, `reason_code` for the affected slugs). Anyone watching server logs for those warnings will notice their absence — the chips are no longer being passed at all, so the post-render scan never sees them.
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run lint` zero new issues (Session 2A baseline preserved)
+- `npm run build` clean (full SSG output succeeded)
+- `npx vitest run` 533/533 pass across 36 test files
+- Codegen idempotent (md5 unchanged after 2nd consecutive run)
+- `supabase db push --linked --dry-run` reports "Remote database is up to date"
+
+### Files
+
+- New: `src/lib/sms/sms-contracts.source.ts`, `src/lib/sms/generated-contracts.ts`, `scripts/regen-sms-contracts.ts`
+- Modified (engine + types): `src/lib/sms/render-sms-template.ts`, `src/lib/sms/contract.ts`, `src/lib/sms/palette.ts` (regenerated content), `package.json`
+- Modified (Class A callers): `src/lib/services/job-addons.ts`, `src/lib/utils/sms.ts`, `src/app/api/book/route.ts`, `src/app/api/cron/booking-reminders/route.ts`, `src/app/api/pos/jobs/[id]/complete/route.ts`, `src/app/api/pos/transactions/route.ts`, `src/app/api/voice-agent/notify-staff/route.ts`
+- Modified (Class B callers): `src/app/api/public/specialty-callback/route.ts`, `src/app/api/webhooks/twilio/inbound/route.ts`
+- Modified (Class C callers): `src/app/api/quotes/[id]/accept/route.ts`, `src/app/api/admin/sms-templates/[slug]/test/route.ts`
+- Modified (Class D test files): `src/lib/sms/__tests__/render-sms-template.test.ts`, `src/lib/sms/__tests__/render-sms-template-contract.test.ts`
+- Modified (test cleanup): `src/app/api/pos/transactions/__tests__/auto-receipt-interlock.test.ts`
+- Docs: `CLAUDE.md`, `docs/dev/FILE_TREE.md`, `docs/CHANGELOG.md`
+
+---
+
 ## feat(sms): universal chip palette + per-slug contract columns; engine refactor — 2026-04-26 (Session 2A)
 
 **Architecture spine for Path B.** Universal SMS chip palette (`SMS_PALETTE`, 86 chips) + per-slug `required_variables` / `optional_variables` JSONB columns on `sms_templates`. Engine reads contracts from the new columns; admin UI continues reading the legacy `variables` column until Session 2E retires it (two-source-of-truth window — see learnings below). Composite-chip builders extracted to `src/lib/sms/composites.ts`. Bit-identical render preserved for all sends that currently succeed.

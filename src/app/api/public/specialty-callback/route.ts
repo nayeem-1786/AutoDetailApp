@@ -74,6 +74,12 @@ export async function POST(request: NextRequest) {
       // not confirmed booking). Do not "fix" this by synthesizing date/time/deposit
       // values — the slug split is the right answer.
       const [templateResult, biz] = await Promise.all([
+        // Session 2F: slug split pending; this caller intentionally satisfies only 2
+        // of 5 required chips and relies on engine hard-skip + caller fallback prose.
+        // Do not synthesize missing values. The slug split into
+        // booking_staff_notify_specialty (with a contract that matches the
+        // callback-request shape) is the right answer.
+        // @ts-expect-error — see Session 2F note above
         renderSmsTemplate('booking_staff_notify', {
           customer_name: name,
           services: `${vehicleWord.charAt(0).toUpperCase() + vehicleWord.slice(1)} vehicle quote — ${vehicleDesc}`,

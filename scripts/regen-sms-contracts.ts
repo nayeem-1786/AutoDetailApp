@@ -1,0 +1,262 @@
+// Regenerate src/lib/sms/palette.ts and src/lib/sms/generated-contracts.ts
+// from src/lib/sms/sms-contracts.source.ts.
+//
+// Usage:   npx tsx scripts/regen-sms-contracts.ts
+// Auth:    none (pure code transformation; no DB access)
+// Output:  overwrites the two generated files with auto-generated banners.
+// Exit:    non-zero on any source-file integrity violation (unknown chip
+//          referenced by a slug; composite+autoInject conflict).
+//
+// Design notes:
+//   - Idempotent: running twice produces byte-identical output.
+//   - Generated palette.ts retains the same exports (SMS_PALETTE,
+//     SMS_PALETTE_KEYS, ChipMetadata) and shape that production code already
+//     imports — no churn at any callsite.
+//   - generated-contracts.ts exports SmsSlug, SMS_SLUGS, CONTRACTS_BY_SLUG, and
+//     the per-slug RenderVarsBySlug map that drives the typed renderSmsTemplate
+//     signature.
+//
+// Auto-inject typing rule (matches engine runtime in render-sms-template.ts):
+//   For each chip with `autoInject: true`, that chip is OPTIONAL in every slug's
+//   render-vars type, regardless of whether the slug's contract lists it as
+//   required. The engine fills it from getBusinessInfo() before the hard-skip
+//   pre-check, so callers never need to plumb the value through. Currently 3
+//   chips: business_name, business_phone, business_address.
+
+import { writeFileSync } from 'fs';
+import { resolve } from 'path';
+import { SMS_CONTRACTS_SOURCE, type SmsSlug } from '../src/lib/sms/sms-contracts.source';
+
+const ROOT = resolve(__dirname, '..');
+const PALETTE_PATH = resolve(ROOT, 'src/lib/sms/palette.ts');
+const CONTRACTS_PATH = resolve(ROOT, 'src/lib/sms/generated-contracts.ts');
+
+function fail(msg: string): never {
+  console.error(`✗ regen-sms-contracts: ${msg}`);
+  process.exit(1);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Validation
+// ──────────────────────────────────────────────────────────────────────────────
+
+const chipKeys = new Set(Object.keys(SMS_CONTRACTS_SOURCE.chips));
+
+// 1. composite+autoInject is illegal — they're disjoint roles. Composite chips
+//    are caller-built strings; auto-inject chips are engine-filled. A chip
+//    can't be both.
+for (const [key, meta] of Object.entries(SMS_CONTRACTS_SOURCE.chips)) {
+  const m = meta as { composite?: boolean; autoInject?: boolean };
+  if (m.composite && m.autoInject) {
+    fail(`Chip "${key}" has both composite:true and autoInject:true — these roles are mutually exclusive.`);
+  }
+}
+
+// 2. Every chip referenced by any slug's required/optional must exist in chips.
+for (const [slug, contract] of Object.entries(SMS_CONTRACTS_SOURCE.slugs)) {
+  const c = contract as { required: readonly string[]; optional: readonly string[] };
+  for (const k of c.required) {
+    if (!chipKeys.has(k)) {
+      fail(`Slug "${slug}" required_variables references unknown chip "${k}". Add it to SMS_CONTRACTS_SOURCE.chips first.`);
+    }
+  }
+  for (const k of c.optional) {
+    if (!chipKeys.has(k)) {
+      fail(`Slug "${slug}" optional_variables references unknown chip "${k}". Add it to SMS_CONTRACTS_SOURCE.chips first.`);
+    }
+  }
+  // Sanity: slug-internal duplicate / overlap. Same checks the Zod validator
+  // does at runtime — fail at codegen so the source file is the canonical
+  // shape and runtime validation never has to reject it.
+  const reqSet = new Set(c.required);
+  if (reqSet.size !== c.required.length) {
+    fail(`Slug "${slug}" required_variables contains duplicates.`);
+  }
+  const optSet = new Set(c.optional);
+  if (optSet.size !== c.optional.length) {
+    fail(`Slug "${slug}" optional_variables contains duplicates.`);
+  }
+  for (const k of c.optional) {
+    if (reqSet.has(k)) {
+      fail(`Slug "${slug}" lists chip "${k}" in BOTH required and optional.`);
+    }
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Helpers — emit canonical TS literal for a chip metadata object
+// ──────────────────────────────────────────────────────────────────────────────
+
+function jsonString(s: string): string {
+  // Use JSON.stringify for safe escape semantics (handles \n, quotes, etc.)
+  return JSON.stringify(s);
+}
+
+function emitChipLiteral(key: string, meta: Record<string, unknown>): string {
+  const parts: string[] = [`key: ${jsonString(key)}`, `description: ${jsonString(meta.description as string)}`, `sample: ${jsonString(meta.sample as string)}`];
+  if (meta.format !== undefined) parts.push(`format: ${jsonString(meta.format as string)}`);
+  if (meta.composite === true) parts.push('composite: true');
+  if (meta.autoInject === true) parts.push('autoInject: true');
+  return `{ ${parts.join(', ')} }`;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// palette.ts generator
+// ──────────────────────────────────────────────────────────────────────────────
+
+function renderPalette(): string {
+  const lines: string[] = [];
+  lines.push('// AUTO-GENERATED by scripts/regen-sms-contracts.ts. DO NOT EDIT BY HAND.');
+  lines.push('// Source: src/lib/sms/sms-contracts.source.ts');
+  lines.push('// To refresh: npx tsx scripts/regen-sms-contracts.ts');
+  lines.push('//');
+  lines.push('// Universal SMS chip palette. Single flat record of every chip the SMS engine');
+  lines.push('// can recognize. The Zod contract validator in src/lib/sms/contract.ts rejects');
+  lines.push('// any DB contract referencing a chip not listed here.');
+  lines.push('//');
+  lines.push('// Conventions:');
+  lines.push('//   - `format` is a display hint for the admin UI preview. The engine itself');
+  lines.push('//     does no formatting.');
+  lines.push('//   - `composite: true` flags chips built by helpers in src/lib/sms/composites.ts.');
+  lines.push('//   - `autoInject: true` flags chips the engine fills from getBusinessInfo()');
+  lines.push('//     before the hard-skip pre-check.');
+  lines.push('');
+  lines.push('export interface ChipMetadata {');
+  lines.push('  /** Chip key as it appears in template body: {key} */');
+  lines.push('  key: string;');
+  lines.push('  /** Human-readable description for admin UI tooltips */');
+  lines.push('  description: string;');
+  lines.push('  /** Sample value for admin UI preview rendering */');
+  lines.push('  sample: string;');
+  lines.push('  /** Display format hint */');
+  lines.push("  format?: 'currency' | 'date' | 'time' | 'phone' | 'url' | 'plain';");
+  lines.push('  /** Caller-built composite (built by helpers in composites.ts) */');
+  lines.push('  composite?: boolean;');
+  lines.push('  /** Engine auto-injects from getBusinessInfo() (callers may omit) */');
+  lines.push('  autoInject?: boolean;');
+  lines.push('}');
+  lines.push('');
+  lines.push('export const SMS_PALETTE: Record<string, ChipMetadata> = {');
+  for (const [key, meta] of Object.entries(SMS_CONTRACTS_SOURCE.chips)) {
+    lines.push(`  ${key}: ${emitChipLiteral(key, meta as Record<string, unknown>)},`);
+  }
+  lines.push('};');
+  lines.push('');
+  lines.push('/** Total chip count exposed by the palette. */');
+  lines.push('export const SMS_PALETTE_KEYS: readonly string[] = Object.keys(SMS_PALETTE);');
+  lines.push('');
+  return lines.join('\n');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// generated-contracts.ts generator
+// ──────────────────────────────────────────────────────────────────────────────
+
+function autoInjectChipKeys(): string[] {
+  return Object.entries(SMS_CONTRACTS_SOURCE.chips)
+    .filter(([, m]) => (m as { autoInject?: boolean }).autoInject === true)
+    .map(([k]) => k);
+}
+
+function renderContracts(): string {
+  const autoInject = new Set(autoInjectChipKeys());
+  const slugs = Object.keys(SMS_CONTRACTS_SOURCE.slugs);
+
+  const lines: string[] = [];
+  lines.push('// AUTO-GENERATED by scripts/regen-sms-contracts.ts. DO NOT EDIT BY HAND.');
+  lines.push('// Source: src/lib/sms/sms-contracts.source.ts');
+  lines.push('// To refresh: npx tsx scripts/regen-sms-contracts.ts');
+  lines.push('//');
+  lines.push('// Per-slug typed render-vars contract for renderSmsTemplate.');
+  lines.push('//');
+  lines.push('// CONTRACTS_BY_SLUG mirrors the DB shape exactly (same arrays as');
+  lines.push('// sms_templates.required_variables / optional_variables). RenderVarsBySlug');
+  lines.push('// is the type the engine signature is generic over — for each slug, an');
+  lines.push('// object type where required chips are required string properties and');
+  lines.push('// optional chips are `string | undefined` optional properties.');
+  lines.push('//');
+  lines.push('// Auto-inject override: chips with `autoInject: true` in the palette are');
+  lines.push('// always typed as OPTIONAL in every slug, even when the slug contract lists');
+  lines.push('// them as required. The engine fills them before the hard-skip pre-check, so');
+  lines.push('// callers never need to plumb the value through. Currently 3 chips:');
+  lines.push(`//   ${[...autoInject].join(', ')}`);
+  lines.push('');
+  lines.push('// ── Slug enum ──────────────────────────────────────────────────────────────');
+  lines.push('');
+  lines.push('export const SMS_SLUGS = [');
+  for (const slug of slugs) lines.push(`  ${jsonString(slug)},`);
+  lines.push('] as const;');
+  lines.push('');
+  lines.push('export type SmsSlug = (typeof SMS_SLUGS)[number];');
+  lines.push('');
+  lines.push('// ── Raw contracts (DB mirror) ──────────────────────────────────────────────');
+  lines.push('');
+  lines.push('export interface SmsContract {');
+  lines.push('  readonly required: readonly string[];');
+  lines.push('  readonly optional: readonly string[];');
+  lines.push('}');
+  lines.push('');
+  lines.push('export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {');
+  for (const slug of slugs) {
+    const c = SMS_CONTRACTS_SOURCE.slugs[slug as SmsSlug] as { required: readonly string[]; optional: readonly string[] };
+    const reqArr = c.required.map(jsonString).join(', ');
+    const optArr = c.optional.map(jsonString).join(', ');
+    lines.push(`  ${slug}: { required: [${reqArr}], optional: [${optArr}] },`);
+  }
+  lines.push('};');
+  lines.push('');
+  lines.push('// ── Per-slug render-vars types ─────────────────────────────────────────────');
+  lines.push('');
+  lines.push('export interface RenderVarsBySlug {');
+  for (const slug of slugs) {
+    const c = SMS_CONTRACTS_SOURCE.slugs[slug as SmsSlug] as { required: readonly string[]; optional: readonly string[] };
+
+    const requiredEmit: string[] = [];
+    const optionalEmit: string[] = [];
+    const seen = new Set<string>();
+
+    for (const k of c.required) {
+      if (autoInject.has(k)) {
+        if (!seen.has(k)) { optionalEmit.push(k); seen.add(k); }
+      } else {
+        if (!seen.has(k)) { requiredEmit.push(k); seen.add(k); }
+      }
+    }
+    for (const k of c.optional) {
+      if (!seen.has(k)) { optionalEmit.push(k); seen.add(k); }
+    }
+    for (const k of autoInject) {
+      if (!seen.has(k)) { optionalEmit.push(k); seen.add(k); }
+    }
+
+    lines.push(`  ${slug}: {`);
+    for (const k of requiredEmit) lines.push(`    ${k}: string;`);
+    for (const k of optionalEmit) lines.push(`    ${k}?: string | undefined;`);
+    lines.push('  };');
+  }
+  lines.push('}');
+  lines.push('');
+  lines.push('/** Ergonomic per-slug render-vars helper. */');
+  lines.push('export type SmsRenderVars<S extends SmsSlug> = RenderVarsBySlug[S];');
+  lines.push('');
+  return lines.join('\n');
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Main
+// ──────────────────────────────────────────────────────────────────────────────
+
+function main() {
+  console.log('→ Regenerating SMS palette + per-slug contracts from sms-contracts.source.ts…');
+  const paletteOut = renderPalette();
+  const contractsOut = renderContracts();
+  writeFileSync(PALETTE_PATH, paletteOut, 'utf-8');
+  writeFileSync(CONTRACTS_PATH, contractsOut, 'utf-8');
+  console.log(`✓ Wrote ${PALETTE_PATH} (${paletteOut.split('\n').length} lines)`);
+  console.log(`✓ Wrote ${CONTRACTS_PATH} (${contractsOut.split('\n').length} lines)`);
+  console.log(`  · ${Object.keys(SMS_CONTRACTS_SOURCE.chips).length} chips`);
+  console.log(`  · ${Object.keys(SMS_CONTRACTS_SOURCE.slugs).length} slugs`);
+  console.log(`  · ${autoInjectChipKeys().length} auto-injected chips`);
+}
+
+main();
