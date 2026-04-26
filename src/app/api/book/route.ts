@@ -18,6 +18,7 @@ import { categoryToCompatibilityKey } from '@/lib/utils/vehicle-categories';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { buildPaymentInfo, buildDepositInfo } from '@/lib/sms/composites';
 
 export async function POST(request: NextRequest) {
   try {
@@ -580,9 +581,11 @@ export async function POST(request: NextRequest) {
       const balanceDueFormatted = hasDeposit
         ? formatCurrency(Number(appointment.total_amount) - data.deposit_amount!)
         : '';
-      const paymentInfo = hasDeposit
-        ? `Deposit paid: ${depositAmountFormatted}. Balance due at service: ${balanceDueFormatted}.`
-        : 'Payment due at time of service.';
+      const paymentInfo = buildPaymentInfo({
+        hasDeposit,
+        depositAmount: depositAmountFormatted,
+        balanceDue: balanceDueFormatted,
+      });
 
       // G2 — Customer confirmation SMS
       if (e164Phone) {
@@ -653,7 +656,7 @@ export async function POST(request: NextRequest) {
 
       // G3 — Staff notification SMS
       {
-        const depositInfo = data.payment_intent_id ? 'Deposit paid.' : 'Pay on site.';
+        const depositInfo = buildDepositInfo({ hasPayment: !!data.payment_intent_id });
         const staffFallback = `New online booking! ${customerName} — ${serviceNames} on ${dateStr} at ${timeStr}. ${depositInfo}`;
         renderSmsTemplate('booking_staff_notify', {
           customer_name: customerName,

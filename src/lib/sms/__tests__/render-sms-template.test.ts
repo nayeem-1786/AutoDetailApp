@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mocked Supabase template rows — adjust per-test
+// Mocked Supabase template rows — adjust per-test.
+// Session 2A: variables column → required_variables + optional_variables.
+// Engine no longer reads the variables column.
 type MockTemplate = {
   slug: string;
   body_template: string;
@@ -8,7 +10,8 @@ type MockTemplate = {
   can_silence: boolean;
   recipient_type: 'customer' | 'staff' | 'detailer';
   recipient_phones: string[] | null;
-  variables: unknown;
+  required_variables: unknown;
+  optional_variables: unknown;
 };
 
 const state = {
@@ -58,7 +61,9 @@ beforeEach(() => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// C1 — empty fallbacks + line removal
+// C1 — empty fallbacks + line removal (post-render fallback pass)
+// Engine still has the post-render scan; tests use empty contracts so the scan
+// is exercised on body chips that aren't in required/optional.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('C1 — empty noun-phrase fallbacks', () => {
@@ -70,7 +75,8 @@ describe('C1 — empty noun-phrase fallbacks', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: [],  // empty registry — engine post-render scan handles fallback
+      required_variables: [],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_multi', {}, 'fb');
@@ -90,7 +96,8 @@ describe('C1 — empty noun-phrase fallbacks', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: [],  // empty registry — bypass C2 hard-skip to exercise C1 alone
+      required_variables: [],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('payment_receipt', {
@@ -114,7 +121,8 @@ describe('C1 — empty noun-phrase fallbacks', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: [],
+      required_variables: [],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_total', {}, 'fb');
@@ -129,7 +137,8 @@ describe('C1 — empty noun-phrase fallbacks', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: [],
+      required_variables: [],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_normal', {
@@ -143,10 +152,12 @@ describe('C1 — empty noun-phrase fallbacks', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // C2 — required-variable hard skip
+// Session 2A: source-of-truth is required_variables column. Tests below assert
+// the same semantic against the new column.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('C2 — required-variable hard skip', () => {
-  it('hard-skips and returns isActive:false when a required variable (flat string[] schema) is missing', async () => {
+  it('hard-skips and returns isActive:false when a required variable is missing', async () => {
     state.templates = [{
       slug: 't_required',
       body_template: 'Hi {first_name}, your service is confirmed.',
@@ -154,7 +165,8 @@ describe('C2 — required-variable hard skip', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: ['first_name'],  // production flat string[] shape
+      required_variables: ['first_name'],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_required', {}, 'fb');
@@ -173,7 +185,8 @@ describe('C2 — required-variable hard skip', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: ['first_name'],
+      required_variables: ['first_name'],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_empty_string', { first_name: '' }, 'fb');
@@ -190,7 +203,8 @@ describe('C2 — required-variable hard skip', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: ['first_name'],
+      required_variables: ['first_name'],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_undef', { first_name: undefined }, 'fb');
@@ -206,7 +220,8 @@ describe('C2 — required-variable hard skip', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: ['first_name', 'vehicle_description'],
+      required_variables: ['first_name', 'vehicle_description'],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_ok', {
@@ -227,7 +242,8 @@ describe('C2 — required-variable hard skip', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: ['first_name', 'vehicle_description', 'appointment_date'],
+      required_variables: ['first_name', 'vehicle_description', 'appointment_date'],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_multi_missing', {
@@ -239,44 +255,8 @@ describe('C2 — required-variable hard skip', () => {
     expect(result.missingVars).toEqual(['vehicle_description', 'appointment_date']);
   });
 
-  it('handles legacy object-shape variables (with .key, .required) the same way', async () => {
-    state.templates = [{
-      slug: 't_legacy',
-      body_template: 'Hi {first_name}!',
-      is_active: true,
-      can_silence: true,
-      recipient_type: 'customer',
-      recipient_phones: null,
-      variables: [{ key: 'first_name', description: 'Customer first name', required: true }],
-    }];
-
-    const result = await renderSmsTemplate('t_legacy', {}, 'fb');
-    expect(result.isActive).toBe(false);
-    expect(result.missingVars).toEqual(['first_name']);
-  });
-
-  it('treats every legacy entry as required even when .required is missing', async () => {
-    // Per Session 42X-1 schema clarification: production flat string[] has no
-    // required/optional distinction. The legacy normalization defaults missing
-    // .required to true to match.
-    state.templates = [{
-      slug: 't_legacy_optional',
-      body_template: 'Hi {first_name}!',
-      is_active: true,
-      can_silence: true,
-      recipient_type: 'customer',
-      recipient_phones: null,
-      variables: [{ key: 'first_name', description: '' }],  // no .required field
-    }];
-
-    const result = await renderSmsTemplate('t_legacy_optional', {}, 'fb');
-    expect(result.isActive).toBe(false);
-    expect(result.missingVars).toEqual(['first_name']);
-  });
-
   it('does not skip when business_name is auto-injected but not passed by caller', async () => {
-    // Auto-injection at lines 241-255 of render-sms-template.ts populates
-    // business_name/phone/address before the hard-skip check runs.
+    // Auto-injection populates business_name/phone/address before the hard-skip check runs.
     state.templates = [{
       slug: 't_business',
       body_template: '{business_name} — Hi {first_name}!',
@@ -284,7 +264,8 @@ describe('C2 — required-variable hard skip', () => {
       can_silence: true,
       recipient_type: 'customer',
       recipient_phones: null,
-      variables: ['business_name', 'first_name'],
+      required_variables: ['business_name', 'first_name'],
+      optional_variables: [],
     }];
 
     const result = await renderSmsTemplate('t_business', { first_name: 'Sarah' }, 'fb');

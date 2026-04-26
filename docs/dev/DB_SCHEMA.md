@@ -2639,6 +2639,8 @@ CREATE UNIQUE INDEX sms_delivery_log_pkey ON public.sms_delivery_log USING btree
 | recipient_phones | TEXT[] | — |  |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |  |
 | updated_by | UUID | FK → auth.users(id) ON DELETE SET NULL |  |
+| required_variables | JSONB | NOT NULL, DEFAULT '[]'::jsonb |  |
+| optional_variables | JSONB | NOT NULL, DEFAULT '[]'::jsonb |  |
 
 **CHECK constraints:**
 - `sms_templates_category_check`: `CHECK ((category = ANY (ARRAY['booking'::text, 'quote'::text, 'transactional'::text, 'reminder'::text, 'system'::text])))`

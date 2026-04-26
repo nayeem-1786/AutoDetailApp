@@ -10,6 +10,7 @@ import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { sendSms } from '@/lib/utils/sms';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { buildTransactionGreeting } from '@/lib/sms/composites';
 import { createShortLink } from '@/lib/utils/short-link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -526,9 +527,7 @@ export async function POST(request: NextRequest) {
           const businessInfo = await getBusinessInfo();
 
           // Build context-aware greeting
-          const greeting = autoReceiptHasServices && vehicleDesc
-            ? `Your ${vehicleDesc} is looking great.`
-            : 'We appreciate your purchase.';
+          const greeting = buildTransactionGreeting({ hasServices: autoReceiptHasServices, vehicleDesc });
 
           const vars: Record<string, string> = {
             first_name: cust.first_name || '',

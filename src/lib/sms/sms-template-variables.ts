@@ -1,8 +1,23 @@
 import type { VariableDefinition } from '@/lib/email/variables';
 
+// Session 2A barrel re-exports: future imports may come through this file as a
+// stable path. Session 2E will retire this module entirely once admin code
+// migrates off of SMS_TEMPLATE_VARIABLES (which still lives below).
+export { SMS_PALETTE, SMS_PALETTE_KEYS } from './palette';
+export type { ChipMetadata } from './palette';
+
 // ---------------------------------------------------------------------------
-// SMS template variable definitions (per slug)
-// Used by the admin UI to render variable inserter chips
+// SMS template variable definitions (per slug) — LEGACY admin-side reader.
+//
+// Engine no longer reads this map (Session 2A engine refactor cut the engine
+// over to required_variables + optional_variables DB columns). Retained because:
+//   - src/app/admin/settings/messaging/sms-templates/page.tsx imports it for
+//     the chip-picker preview rendering
+//   - src/app/api/admin/sms-templates/[slug]/test/route.ts imports it for
+//     filling test-SMS variable defaults from `sample`
+//
+// Both consumers are out of scope for 2A (admin UI redesign is Session 2E).
+// This map will be removed in 2E along with the variables DB column drop.
 // ---------------------------------------------------------------------------
 
 export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
@@ -127,11 +142,16 @@ export const SMS_TEMPLATE_VARIABLES: Record<string, VariableDefinition[]> = {
 };
 
 // ---------------------------------------------------------------------------
-// Unsafe templates — these stay hardcoded, no DB rows
-// Documentary only — listed here so the admin UI can reference them
+// Hardcoded templates — these stay hardcoded, no DB rows.
+// Documentary only — listed here so the admin UI can reference them.
+//
+// Renamed from UNSAFE_SMS_TEMPLATES in Session 2A: "intentionally hardcoded"
+// is the accurate framing (these slugs are not safe-to-templateify because
+// they need crypto tokens, length-aware truncation, MMS attachments, etc.).
+// Migrating them is the task of Sessions 2B–2F + 3A–3D.
 // ---------------------------------------------------------------------------
 
-export const UNSAFE_SMS_TEMPLATES = [
+export const INTENTIONALLY_HARDCODED_SMS = [
   'addon_authorization',        // src/app/api/pos/jobs/[id]/addons/route.ts — HMAC crypto token URL
   'addon_authorization_resend', // src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts — fresh token + MMS photo
   'addon_authorization_expired', // src/app/api/webhooks/twilio/inbound/route.ts:819,831 — static "authorization expired" (2 identical sends, zero variables)

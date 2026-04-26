@@ -1,11 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 import { renderTemplate } from '@/lib/utils/template';
 import { getBusinessInfo } from '@/lib/data/business';
+import { parseContractFromRow, ContractValidationError } from './contract';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Legacy chip-definition shape exported for any pre-2A consumer that imported
+ * it. Engine itself reads required_variables + optional_variables from the new
+ * DB columns instead. Retained as a re-export only.
+ */
 export interface SmsTemplateVariable {
   key: string;
   description: string;
@@ -38,7 +44,10 @@ interface CachedTemplate {
   canSilence: boolean;
   recipientType: 'customer' | 'staff' | 'detailer';
   recipientPhones: string[] | null;
-  variables: SmsTemplateVariable[];
+  /** Chips that hard-skip the send when missing/empty. Loaded from required_variables column. */
+  required: string[];
+  /** Chips whose referencing line is REMOVE_LINE'd when missing/empty. Loaded from optional_variables column. */
+  optional: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -71,9 +80,12 @@ async function loadTemplates(): Promise<Map<string, CachedTemplate>> {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    // Session 2A: engine reads contract from required_variables + optional_variables
+    // (added by migration 20260425000003). Legacy `variables` column is retained for
+    // admin UI / PUT validation compatibility but is NOT read by the engine.
     const { data, error } = await supabase
       .from('sms_templates')
-      .select('slug, body_template, is_active, can_silence, recipient_type, recipient_phones, variables');
+      .select('slug, body_template, is_active, can_silence, recipient_type, recipient_phones, required_variables, optional_variables');
 
     if (error) {
       console.error('[SmsTemplate] Cache load failed:', error.message);
@@ -82,30 +94,37 @@ async function loadTemplates(): Promise<Map<string, CachedTemplate>> {
 
     const map = new Map<string, CachedTemplate>();
     for (const row of data ?? []) {
-      // Normalize variables to consistent {key, description, required} shape.
-      // Production sms_templates.variables is stored as string[] (flat array of
-      // variable keys). Some legacy seed migrations store [{key, description, required}].
-      // Per Session 42X-1 + Session 42Z-audit Phase 5 Q schema-reform tracking, treat
-      // every listed variable as required for hard-skip purposes — schema reform
-      // (distinguishing required vs optional in the column itself) is deferred.
-      const rawVars: unknown = row.variables;
-      const normalizedVars: SmsTemplateVariable[] = Array.isArray(rawVars)
-        ? rawVars.map((entry) => {
-            if (typeof entry === 'string') {
-              return { key: entry, description: '', required: true };
-            }
-            if (entry && typeof entry === 'object' && 'key' in entry) {
-              const obj = entry as { key: string; description?: string; required?: boolean };
-              return {
-                key: obj.key,
-                description: obj.description ?? '',
-                required: obj.required ?? true,
-              };
-            }
-            console.error(`[SmsTemplate] Unrecognized variable entry shape in slug "${row.slug}":`, entry);
-            return null;
-          }).filter((v): v is SmsTemplateVariable => v !== null)
-        : [];
+      // Validate contract on load. parseContractFromRow throws on invalid shape,
+      // overlap, duplicates, or unknown chip keys (not in SMS_PALETTE). Fail-safe:
+      // mark the template inactive so callers fall through to their fallback prose.
+      let required: string[];
+      let optional: string[];
+      try {
+        const contract = parseContractFromRow({
+          slug: row.slug,
+          required_variables: row.required_variables,
+          optional_variables: row.optional_variables,
+        });
+        required = contract.required_variables;
+        optional = contract.optional_variables;
+      } catch (err) {
+        if (err instanceof ContractValidationError) {
+          console.error(`[SmsTemplate] Invalid contract for slug "${row.slug}" — treating as inactive (fail-safe):`, err.message);
+        } else {
+          console.error(`[SmsTemplate] Contract parse error for slug "${row.slug}" — treating as inactive (fail-safe):`, err);
+        }
+        map.set(row.slug, {
+          slug: row.slug,
+          bodyTemplate: row.body_template,
+          isActive: false,
+          canSilence: row.can_silence,
+          recipientType: row.recipient_type as CachedTemplate['recipientType'],
+          recipientPhones: row.recipient_phones,
+          required: [],
+          optional: [],
+        });
+        continue;
+      }
 
       map.set(row.slug, {
         slug: row.slug,
@@ -114,7 +133,8 @@ async function loadTemplates(): Promise<Map<string, CachedTemplate>> {
         canSilence: row.can_silence,
         recipientType: row.recipient_type as CachedTemplate['recipientType'],
         recipientPhones: row.recipient_phones,
-        variables: normalizedVars,
+        required,
+        optional,
       });
     }
 
@@ -254,16 +274,14 @@ export async function renderSmsTemplate(
     // Business info unavailable — variables stay as passed by caller
   }
 
-  // Session 42X-1 (C2): hard-skip on missing required variables.
+  // Session 42X-1 (C2) + Session 2A: hard-skip on missing required variables.
   // Runs BEFORE rendering so we don't waste work on a doomed message.
-  // Per cache-load normalization above, every template variable is treated as
-  // required (production schema is flat string[] with no required/optional flag).
   // Empty string and undefined both count as missing — both produce malformed output.
   const missingVars: string[] = [];
-  for (const v of template.variables) {
-    const val = enriched[v.key];
+  for (const key of template.required) {
+    const val = enriched[key];
     if (val === undefined || val === '') {
-      missingVars.push(v.key);
+      missingVars.push(key);
     }
   }
   if (missingVars.length > 0) {
@@ -280,13 +298,26 @@ export async function renderSmsTemplate(
     };
   }
 
+  // Session 2A: pre-render REMOVE_LINE marker for absent/empty optional chips.
+  // For each optional chip whose value is undefined or empty in the passed vars,
+  // pre-substitute the REMOVE_LINE sentinel so the post-render line-strip pass
+  // (below) removes the line. This must happen BEFORE renderTemplate so the
+  // sentinel is in the output where the {key} placeholder would have been.
+  for (const key of template.optional) {
+    const val = enriched[key];
+    if (val === undefined || val === '') {
+      enriched[key] = '\x00REMOVE_LINE\x00';
+    }
+  }
+
   // Render template
   let rendered = renderTemplate(template.bodyTemplate, enriched);
 
   // Post-render fallback pass: replace any remaining {variable} placeholders.
-  // After C2 hard-skip above, this should rarely fire — survives only when a
-  // template body references a variable not declared in template.variables
-  // (i.e. the body and variable registry are out of sync). Empty fallback
+  // After hard-skip + optional pre-marker above, this should rarely fire —
+  // survives only when a template body references a variable that is neither
+  // required nor optional in the contract (i.e., body and contract are out of
+  // sync — operator added a chip without registering it). Empty fallback
   // strips the whole line via the REMOVE_LINE sentinel; unknown keys (not in
   // DEFAULT_VARIABLE_FALLBACKS) get silently stripped with a warning.
   rendered = rendered.replace(/\{([a-z_]+)\}/g, (_match, key: string) => {

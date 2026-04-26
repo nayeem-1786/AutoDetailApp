@@ -284,19 +284,19 @@ Thank you for choosing ${business.name}!`;
     if (appointment.employee_id && employee?.phone) {
       try {
         const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+        const { buildJobSummary } = await import('@/lib/sms/composites');
+        const jobSummary = buildJobSummary({ serviceNames, vehicleStr: vehicle ? vehicleStr : undefined });
         const detailerFallback =
-          `New job assigned: ${serviceNames}` +
-          (vehicle ? ` – ${vehicleStr}` : '') +
+          `New job assigned: ${jobSummary}` +
           `\n${dateStr} at ${displayTime}` +
           (appointment.mobile_address ? `\n${appointment.mobile_address}` : '') +
           `\nTotal: ${formatCurrency(appointment.total_amount)}`;
         const detailerResult = await renderSmsTemplate('detailer_job_assigned', {
-          services: serviceNames,
-          vehicle_description: vehicle ? vehicleStr : undefined,
+          job_summary: jobSummary,
           appointment_date: dateStr,
           appointment_time: displayTime,
-          address: appointment.mobile_address || undefined,
           service_total: formatCurrency(appointment.total_amount),
+          mobile_service_address: appointment.mobile_address || undefined,
           detailer_first_name: employee?.first_name || undefined,
         }, detailerFallback);
         if (!detailerResult.isActive) throw new Error('skip');

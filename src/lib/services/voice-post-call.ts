@@ -7,6 +7,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { buildFirstNameGreeting } from '@/lib/sms/composites';
 
 // ---------------------------------------------------------------------------
 // Shared post-call processing logic
@@ -341,7 +342,7 @@ export async function processVoiceCallEnd(
       // confirmation SMS with date/time/service during the call. This post-call
       // message is a brief follow-up.
       const biz = await getBusinessInfo();
-      const name = customer.first_name ? `, ${customer.first_name}` : '';
+      const name = buildFirstNameGreeting(customer.first_name);
       const smsFallback = `Thanks for calling ${biz.name}${name}! Your appointment is confirmed. Questions? Call ${biz.phone}`;
       const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
       const templateResult = await renderSmsTemplate('appointment_confirmed_postcall', {
@@ -604,7 +605,7 @@ async function autoGenerateQuote(
     if (custCheck?.sms_consent) {
       const biz = await getBusinessInfo();
       const firstName = customerName?.trim().split(/\s+/)[0];
-      const nameGreeting = firstName ? `, ${firstName}` : '';
+      const nameGreeting = buildFirstNameGreeting(firstName);
       const quoteSmsBody = `Thanks for calling ${biz.name}${nameGreeting}! Here's a quote for what we discussed: ${linkUrl}`;
       const smsResult = await sendSms(phone, quoteSmsBody, {
         logToConversation: true,

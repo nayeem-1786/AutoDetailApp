@@ -4,6 +4,105 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(sms): universal chip palette + per-slug contract columns; engine refactor — 2026-04-26 (Session 2A)
+
+**Architecture spine for Path B.** Universal SMS chip palette (`SMS_PALETTE`, 86 chips) + per-slug `required_variables` / `optional_variables` JSONB columns on `sms_templates`. Engine reads contracts from the new columns; admin UI continues reading the legacy `variables` column until Session 2E retires it (two-source-of-truth window — see learnings below). Composite-chip builders extracted to `src/lib/sms/composites.ts`. Bit-identical render preserved for all sends that currently succeed.
+
+This session resolves Bug 3 from Session 1A (detailer_job_assigned chip migration) end-to-end, plus 5 latent drift bugs surfaced during Phase 0.5 four-way caller verification. Two pre-existing latent bugs are explicitly NOT fixed here and are sequenced into Session 2B (see "Out of scope" below).
+
+### Phase 0 + 0.5 — investigation & four-way caller verification
+
+Phase 0.5 produced 18 four-way agreement tables (body chips × DB variables JSONB × TS registry × actual caller pass behavior) with 48 named decision points across 6 structural categories. Three phase-0.5 verdicts AGREE clean; 15 DRIFT. Two architectural decisions were locked before resolution: (Decision 1) the legacy `variables` column is retained, not dropped — engine cuts over to new columns but admin readers stay on the old column until 2E; (Decision 2) contracts are derived per Path X four-way verification rather than blanket audit-aligned. Resolutions applied per the user's Phase 0.5 sign-off, including a revised D-3 making `appointment_cancelled` all four content chips optional (customer-facing transactional alerts should fall back rather than fail to send).
+
+### Phase 1 — composite extraction
+
+New `src/lib/sms/composites.ts` (192 lines, 9 builders): `buildJobSummary`, `buildTransactionGreeting`, `buildPaymentInfo`, `buildDepositInfo`, `buildSummaryLine` (length-aware, owns the 160-char SMS budget for `receipt_sms`), `buildFirstNameGreeting`, `buildJobCancelledLine`, `buildReasonLine`, `buildAppointmentSummary`. Lifted from inline code at 10 sites across 7 files (admin notify, POS notify, pos/transactions, pos/receipts/sms, book, voice-post-call×2, send-void-notification, sms.ts/buildAppointmentConfirmationSms). Two builders had byte-identical inline duplicates (`buildJobSummary` ×2 notify-route sites, `buildFirstNameGreeting` ×2 voice-post-call sites). Extraction is intentionally byte-identical with the original inline behavior — no user-visible changes.
+
+One non-obvious gotcha discovered during integration: dynamic `await import()` of `composites` inside `pos/transactions/route.ts` broke 5 `auto-receipt-interlock.test.ts` tests because the file's other helpers (`renderSmsTemplate`) are statically imported and the test's `vi.advanceTimersByTimeAsync` doesn't flush the extra dynamic-import microtask. Fix: convert that one site's import to static. Other notify routes use dynamic imports throughout, so dynamic-import composite is consistent there.
+
+### Phase 2 — palette + contract infrastructure
+
+`src/lib/sms/palette.ts` exports `SMS_PALETTE` (86 chips: customer, vehicle, business auto-inject, transaction, appointment, mobile-service-address, job, quote, urls, composites, escalation, product/category/service routing). `ChipMetadata` shape: `{ key, description, sample, format?, composite?, autoInject? }`.
+
+`src/lib/sms/contract.ts` exports `SmsTemplateContract` Zod schema, `validateContract` (4 business-rule checks: no required-vs-optional overlap, no duplicates within either array, every key in `SMS_PALETTE`), `parseContractFromRow` (combined parse+validate), `isChipValidForSlug` (helper for future Session 2E admin warnings), and a `ContractValidationError` class.
+
+### Phase 3 — additive DB migration (`20260425000003_universal_palette_contracts.sql`)
+
+`ALTER TABLE sms_templates ADD COLUMN required_variables jsonb NOT NULL DEFAULT '[]'`, same for `optional_variables`. **Variables column NOT dropped** per Decision 1. 18 per-slug `UPDATE` statements with `WHERE required_variables = '[]'::jsonb` idempotency guards. Atomic Phase 5 body rewrite for `detailer_job_assigned` included in same migration with operator-edit guard (DO block: aborts if `body_template != default_body`). All wrapped in `BEGIN; / COMMIT;`. Applied via `supabase db push --linked`.
+
+### Phase 4 — engine refactor
+
+`src/lib/sms/render-sms-template.ts`:
+- Cache loader SELECT: `variables` removed, `required_variables` + `optional_variables` added.
+- Dual-shape normalization (object[] vs string[]) deleted — new columns have a single canonical shape.
+- `parseContractFromRow` validation on cache load. Invalid contracts (overlap, dup, unknown chip) → fail-safe: template marked `isActive: false`.
+- Hard-skip pre-check now iterates `template.required` (was `template.variables`).
+- New optional pre-render pass: any `optional` chip with undefined or empty value gets the `\x00REMOVE_LINE\x00` sentinel substituted into enriched vars; existing post-render line-strip removes the line.
+- Existing post-render `DEFAULT_VARIABLE_FALLBACKS` scan retained as defense-in-depth.
+- `business_*` auto-injection unchanged.
+
+`src/lib/sms/sms-template-variables.ts`: `SMS_TEMPLATE_VARIABLES` retained (admin consumers); `UNSAFE_SMS_TEMPLATES` renamed to `INTENTIONALLY_HARDCODED_SMS`; `DEFAULT_VARIABLE_FALLBACKS` retained; barrel re-exports of `SMS_PALETTE`/`SMS_PALETTE_KEYS`/`ChipMetadata` added.
+
+New tests: `src/lib/sms/__tests__/render-sms-template-contract.test.ts` (14 tests across 6 groups: required hard-skip, optional REMOVE_LINE, full render, fail-safe on invalid contract, business auto-inject preserved, caller business_name override). Existing engine tests migrated minimally — 2 legacy-shape tests deleted (they tested removed dual-shape normalization).
+
+### Phase 5 — atomic detailer_job_assigned migration (Bug 3 from Session 1A)
+
+DB body rewrite (Phase 3 migration): `New job assigned: {services} – {vehicle_description}\n{appointment_date} at {appointment_time}\n{address}\nTotal: {service_total}` → `New job assigned: {job_summary}\n{appointment_date} at {appointment_time}\n{mobile_service_address}\nTotal: {service_total}`.
+
+Both notify-route callers (`appointments/[id]/notify/route.ts`, `pos/appointments/[id]/notify/route.ts`) updated to pass the new chip set: `job_summary` (from `buildJobSummary`), `appointment_date`, `appointment_time`, `service_total`, `mobile_service_address`, `detailer_first_name`. The `services`/`vehicle_description` chips are dropped (now folded into `job_summary` composite). The `address` chip is renamed to `mobile_service_address`. Detailer-SMS try blocks are byte-identical between admin and POS twins post-update (verified via `diff`).
+
+### Drift-bug fixes shipping in this session
+
+| Slug | What changed in production |
+|---|---|
+| `booking_confirmed` | Online booking confirmation SMS now sends. Was hard-skipping every send because `detailer_first_name` was required in the registry but the caller never passed it (latent bug). Fix: dropped `detailer_first_name` from contract entirely (per D-4.1 resolution; chip wasn't in body anyway). |
+| `addon_approved`, `addon_declined` | Now send for first-name-less customers (caller's `customerFirstName \|\| undefined` no longer hard-skips). Pattern A drop. |
+| `job_complete` | Now sends for vehicleless jobs (`vehicle_description` is optional → REMOVE_LINE strips the "your X is looking great" line; restores Session 42X-1-followup intent that was intercepted by the hard-skip pre-check). Also now sends for first-name-less customers and jobs without an assigned detailer. |
+| `payment_receipt`, `loyalty_milestone` | Now send for first-name-less customers (`first_name` is optional). |
+| `appointment_cancelled` | Now sends for null-`scheduled_start_time` edge cases. All four content chips (`first_name`, `services`, `appointment_date`, `appointment_time`) are optional per revised D-3 resolution; if any are missing, REMOVE_LINE strips the body to empty → fallback prose fires; customer always gets notified. |
+| `detailer_job_assigned` (Bug 3) | Body now uses `{job_summary}` composite + `{mobile_service_address}` rename. Both notify-route callers pass the new chip set. End-to-end resolution of Bug 3 from Session 1A. |
+
+### Out of scope — fixes deferred to Session 2B
+
+**voice-agent `appointment_confirmed` paths B & C** (`voice-agent/appointments/route.ts:293` + `:520`) **still hard-skip** post-2A. Latent bug surfaced in Phase 0.5: those callers don't pass `customerFirstName`, `total`, or `detailerFirstName` — they construct the SMS via `buildAppointmentConfirmationSms` with only date/time/serviceName. The new contract keeps `service_total` required (D-1.4 resolution: voice-path service_total fix sequenced into Session 2B caller refactor when those routes get the lookup work to populate it). Until Session 2B ships, voice-booked appointment confirmations continue hard-skipping. This is a known and documented preservation of pre-2A behavior, not a regression.
+
+### Two-source-of-truth window between Sessions 2A and 2E
+
+Engine reads `required_variables` + `optional_variables` from new DB columns. Admin UI consumers read the legacy `variables` column (and the legacy `SMS_TEMPLATE_VARIABLES` TS const). Both legacy reads will be retired in Session 2E. During this window:
+
+- Operator chip-list edits via admin UI write to `variables` only — engine doesn't see them. Operators rarely edit chip lists, so this is acceptable.
+- **Body rewrites in this window must include corrective migrations to align the `variables` column for the changed slug.** Without alignment, the admin save endpoint rejects the rewritten body because its validation reads `variables` and treats every entry as required (regardless of `required: false` flags within entries).
+
+This learning was discovered during Phase 5 of this session: the initial Phase 3 migration rewrote `detailer_job_assigned`'s body but left `variables` stale, breaking admin save for that slug. Two corrective migrations followed: `20260425000004_align_detailer_variables.sql` (variables column shape now matches new body chips) + `20260425000005_drop_detailer_first_name_from_variables.sql` (drops the only remaining mismatch — `detailer_first_name` is in optional contract but not in body, and the admin's "every-listed-is-required" assumption tripped on it).
+
+**Future body rewrites in Sessions 2B–2F should plan for this from the start:** any body chip change requires a corresponding `variables` JSONB rewrite to keep admin save functional, AND any chip introduced as optional (not in body today) must be omitted from the admin-side `variables` registry to avoid the admin's "every listed = required" assumption.
+
+### Files
+
+**Created:** `src/lib/sms/composites.ts`, `src/lib/sms/palette.ts`, `src/lib/sms/contract.ts`, `src/lib/sms/__tests__/render-sms-template-contract.test.ts`.
+
+**Modified:** `src/lib/sms/render-sms-template.ts` (engine refactor), `src/lib/sms/sms-template-variables.ts` (rename + barrel re-exports), `src/lib/sms/__tests__/render-sms-template.test.ts` (mock-shape migration; 2 legacy tests deleted), `src/lib/utils/sms.ts` (Phase 1 composite), `src/app/api/appointments/[id]/notify/route.ts` (Phase 1 + Phase 5), `src/app/api/pos/appointments/[id]/notify/route.ts` (Phase 1 + Phase 5), `src/app/api/pos/transactions/route.ts` (Phase 1), `src/app/api/book/route.ts` (Phase 1, two composites), `src/app/api/pos/receipts/sms/route.ts` (Phase 1), `src/lib/services/voice-post-call.ts` (Phase 1, two sites), `src/lib/email/send-void-notification.ts` (Phase 1, two composites).
+
+**New migrations (3):** `supabase/migrations/20260425000003_universal_palette_contracts.sql`, `20260425000004_align_detailer_variables.sql`, `20260425000005_drop_detailer_first_name_from_variables.sql`.
+
+### Verification
+
+- `npm run lint` — 13/44 baseline (Session 1B baseline; zero new issues, none in modified SMS files).
+- `npm run build` — clean.
+- `npx vitest run` — 533/533 passing (521 pre-2A + 14 new contract tests − 2 deleted legacy-shape tests).
+- `supabase db push --linked --dry-run` — "Remote database is up to date." `schema_migrations` row count: 229 → 232.
+- All 18 contracts re-queried post-apply: match Phase 0.5 approval exactly, including revised D-3 set.
+- DB_SCHEMA.md regenerated; reflects new columns + retained legacy column.
+
+### Files NOT modified (out of scope)
+
+- `src/app/admin/settings/messaging/sms-templates/page.tsx` — admin UI; reads `SMS_TEMPLATE_VARIABLES`. Session 2E.
+- `src/app/api/admin/sms-templates/[slug]/route.ts` — admin PUT; reads `variables` column. Session 2E.
+- `src/app/api/admin/sms-templates/[slug]/test/route.ts` — admin test endpoint; reads `SMS_TEMPLATE_VARIABLES`. Session 2E.
+- All 14 hardcoded SMS callers — Sessions 2B–2F + 3A–3D.
+
+---
+
 ## chore(db): repair Supabase CLI tracking; regenerate DB_SCHEMA.md; add regen script — 2026-04-26 (Session 1B)
 
 Foundation work for upcoming sessions that need clean `supabase db push` (Sessions 2A, 2F). Two long-standing infra problems fixed: (1) the CLI's `supabase_migrations.schema_migrations` tracking table was out of sync with the repo's `supabase/migrations/` directory because recent migrations had been applied via the Supabase SQL Editor instead of `db push`, and (2) `docs/dev/DB_SCHEMA.md` had drifted from the live database (e.g., `orders` had 23 missing columns including `payment_status`, `paid_at`, all `stripe_*`, all `fulfillment_*`, all `shipping_*`, all `tracking_*`).

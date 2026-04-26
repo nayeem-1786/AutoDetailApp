@@ -303,17 +303,12 @@ export async function buildAppointmentConfirmationSms(params: {
   detailerFirstName?: string;
 }): Promise<string | null> {
   const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+  const { buildAppointmentSummary } = await import('@/lib/sms/composites');
   const { businessName, businessPhone, date, time, serviceName, customerFirstName, total, detailerFirstName } = params;
-  const greeting = customerFirstName ? `Hi ${customerFirstName}, your` : 'Your';
-  const serviceLine = serviceName ? `${serviceName}\n` : '';
-  const totalLine = total ? `Total: ${total}\n` : '';
 
   const fallback =
     `${businessName} — Appointment Confirmed\n\n` +
-    `${greeting} appointment is scheduled:\n` +
-    serviceLine +
-    `${date} at ${time}\n` +
-    totalLine +
+    buildAppointmentSummary({ date, time, serviceName, total, firstName: customerFirstName }) +
     `\nQuestions? Call ${businessPhone}`;
 
   const result = await renderSmsTemplate('appointment_confirmed', {

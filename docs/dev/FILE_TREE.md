@@ -932,7 +932,11 @@ src/lib/email/drip-engine.ts
 ```
 src/lib/sms/render-sms-template.ts
 src/lib/sms/sms-template-variables.ts
+src/lib/sms/palette.ts                      # SMS_PALETTE chip catalog (Session 2A)
+src/lib/sms/contract.ts                     # Zod contract schema + validators (Session 2A)
+src/lib/sms/composites.ts                   # Caller-built composite chip builders (Session 2A)
 src/lib/sms/__tests__/render-sms-template.test.ts
+src/lib/sms/__tests__/render-sms-template-contract.test.ts
 src/app/api/admin/sms-templates/route.ts
 src/app/api/admin/sms-templates/[slug]/route.ts
 src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts
@@ -1506,6 +1510,9 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260424000002_revert_stock_count_structured_errors.sql
 20260424000003_void_transaction_rpc.sql
 20260424000004_extend_stock_adjustments_for_orders.sql
+20260425000003_universal_palette_contracts.sql
+20260425000004_align_detailer_variables.sql
+20260425000005_drop_detailer_first_name_from_variables.sql
 ```
 
 ## Scripts

@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
 import { sendSms } from '@/lib/utils/sms';
+import { buildJobCancelledLine, buildReasonLine } from '@/lib/sms/composites';
 
 interface VoidNotificationResult {
   emailSent: boolean;
@@ -52,7 +53,7 @@ export async function notifyTransactionVoided(
     .single();
 
   const receiptNumber = transaction?.receipt_number ?? input.transactionId.slice(0, 8);
-  const reasonSuffix = input.reason ? ` Reason: ${input.reason}.` : '';
+  const reasonSuffix = buildReasonLine(input.reason ?? undefined);
 
   // --- Email ---
   if (customer.email) {
@@ -136,9 +137,7 @@ export async function notifyTransactionVoided(
   // --- SMS ---
   if (customer.phone) {
     try {
-      const jobLine = input.jobCancelled
-        ? ' Your scheduled service has been cancelled.'
-        : '';
+      const jobLine = buildJobCancelledLine(input.jobCancelled);
       const smsBody =
         `Hi ${customer.first_name}, transaction #${receiptNumber} at ${business.name} has been voided.${jobLine}` +
         ` Questions? Call ${business.phone}.`;

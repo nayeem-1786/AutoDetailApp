@@ -5,7 +5,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { sendSms } from '@/lib/utils/sms';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
-import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { buildSummaryLine } from '@/lib/sms/composites';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,23 +56,15 @@ export async function POST(request: NextRequest) {
     const grandTotal = Number(transaction.total_amount) + Number(transaction.tip_amount || 0);
     const total = `$${grandTotal.toFixed(2)}`;
 
-    // Build SMS body — vehicle line or "Your total"
+    // Build SMS body — vehicle line or "Your total" (length-aware)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const vehicle = transaction.vehicle as any;
-    let summaryLine: string;
-    if (vehicle?.year || vehicle?.make || vehicle?.model) {
-      const vehicleStr = cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model });
-      summaryLine = `${vehicleStr} — ${total}`;
-      // If the full message would exceed 160 chars, truncate vehicle info
-      const testMsg = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
-      if (testMsg.length > 160) {
-        const maxVehicle = 160 - businessInfo.name.length - total.length - shortUrl.length - 30; // account for fixed text
-        const truncated = vehicleStr.slice(0, Math.max(10, maxVehicle)) + '...';
-        summaryLine = `${truncated} — ${total}`;
-      }
-    } else {
-      summaryLine = `Your total — ${total}`;
-    }
+    const summaryLine = buildSummaryLine({
+      vehicle,
+      total,
+      businessName: businessInfo.name,
+      shortUrl,
+    });
 
     const smsBody = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
 
