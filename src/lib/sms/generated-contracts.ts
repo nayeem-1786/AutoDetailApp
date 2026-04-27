@@ -51,16 +51,16 @@ export interface SmsContract {
 export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   addon_approved: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   addon_declined: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
-  appointment_cancelled: { required: ["business_name", "business_phone"], optional: ["first_name", "services", "appointment_date", "appointment_time", "last_name", "vehicle_description"] },
-  appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time", "business_name", "business_phone"], optional: ["first_name", "service_total", "last_name", "vehicle_description"] },
-  appointment_confirmed_postcall: { required: ["business_name", "business_phone"], optional: ["first_name", "last_name"] },
-  booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total", "business_name", "business_phone"], optional: ["first_name", "last_name", "vehicle_description"] },
-  booking_reminder: { required: ["service_name", "appointment_time", "business_name", "business_phone"], optional: ["first_name", "last_name", "vehicle_description"] },
+  appointment_cancelled: { required: [], optional: ["first_name", "services", "appointment_date", "appointment_time", "last_name", "vehicle_description", "business_name", "business_phone"] },
+  appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time"], optional: ["first_name", "service_total", "last_name", "vehicle_description", "business_name", "business_phone"] },
+  appointment_confirmed_postcall: { required: [], optional: ["first_name", "last_name", "business_name", "business_phone"] },
+  booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total"], optional: ["first_name", "last_name", "vehicle_description", "business_name", "business_phone"] },
+  booking_reminder: { required: ["service_name", "appointment_time"], optional: ["first_name", "last_name", "vehicle_description", "business_name", "business_phone"] },
   booking_staff_notify: { required: ["customer_name", "services", "appointment_date", "appointment_time", "deposit_info"], optional: ["customer_email", "customer_phone", "last_name", "vehicle_description"] },
   detailer_job_assigned: { required: ["job_summary", "appointment_date", "appointment_time", "service_total"], optional: ["mobile_service_address", "detailer_first_name", "customer_email", "customer_phone", "last_name"] },
-  job_complete: { required: ["gallery_link", "business_name", "business_address", "business_phone", "hours_line"], optional: ["first_name", "vehicle_description", "last_name"] },
-  loyalty_milestone: { required: ["loyalty_points_balance", "loyalty_cash_value", "booking_link", "business_name"], optional: ["first_name", "last_name"] },
-  payment_receipt: { required: ["transaction_greeting", "receipt_link", "business_name"], optional: ["first_name", "last_name"] },
+  job_complete: { required: ["gallery_link", "hours_line"], optional: ["first_name", "vehicle_description", "last_name", "business_name", "business_phone", "business_address"] },
+  loyalty_milestone: { required: ["loyalty_points_balance", "loyalty_cash_value", "booking_link"], optional: ["first_name", "last_name", "business_name"] },
+  payment_receipt: { required: ["transaction_greeting", "receipt_link"], optional: ["first_name", "last_name", "business_name"] },
   quote_accepted_multi: { required: [], optional: ["first_name", "last_name"] },
   quote_accepted_single: { required: ["item_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone", "customer_email", "last_name", "vehicle_description"] },
@@ -91,33 +91,33 @@ export interface RenderVarsBySlug {
     business_address?: string | undefined;
   };
   appointment_cancelled: {
-    business_name?: string | undefined;
-    business_phone?: string | undefined;
     first_name?: string | undefined;
     services?: string | undefined;
     appointment_date?: string | undefined;
     appointment_time?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   appointment_confirmed: {
     service_name: string;
     appointment_date: string;
     appointment_time: string;
-    business_name?: string | undefined;
-    business_phone?: string | undefined;
     first_name?: string | undefined;
     service_total?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   appointment_confirmed_postcall: {
-    business_name?: string | undefined;
-    business_phone?: string | undefined;
     first_name?: string | undefined;
     last_name?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   booking_confirmed: {
@@ -125,21 +125,21 @@ export interface RenderVarsBySlug {
     appointment_date: string;
     appointment_time: string;
     service_total: string;
-    business_name?: string | undefined;
-    business_phone?: string | undefined;
     first_name?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   booking_reminder: {
     service_name: string;
     appointment_time: string;
-    business_name?: string | undefined;
-    business_phone?: string | undefined;
     first_name?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   booking_staff_notify: {
@@ -173,29 +173,29 @@ export interface RenderVarsBySlug {
   job_complete: {
     gallery_link: string;
     hours_line: string;
-    business_name?: string | undefined;
-    business_address?: string | undefined;
-    business_phone?: string | undefined;
     first_name?: string | undefined;
     vehicle_description?: string | undefined;
     last_name?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
   };
   loyalty_milestone: {
     loyalty_points_balance: string;
     loyalty_cash_value: string;
     booking_link: string;
-    business_name?: string | undefined;
     first_name?: string | undefined;
     last_name?: string | undefined;
+    business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };
   payment_receipt: {
     transaction_greeting: string;
     receipt_link: string;
-    business_name?: string | undefined;
     first_name?: string | undefined;
     last_name?: string | undefined;
+    business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };

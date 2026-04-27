@@ -10,6 +10,78 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): demote business identity chips from required to optional — 2026-04-26 (Session 2D.3)
+
+**Demotion of business identity chips.** `business_name`, `business_phone`, and `business_address` demoted from required to optional across all chip-driven slugs where they appeared in required (9 contract demotions across 8 slugs). Operator-raised flexibility — operators can now write SMS bodies with shortened business names, omit office number when sender ID provides callback path, omit business address from completion messages when not needed, and otherwise control template content without forced inclusion of business identity chips.
+
+**Architecture.** All three demoted chips have `autoInject: true` in `SMS_PALETTE`; runtime auto-injection (engine fills from `getBusinessInfo()` before the missing-required check) is unchanged. The demotion is purely an admin-UX change — admin save validation no longer 400-rejects bodies that omit these placeholders. Customer-facing SMS rendering is unaffected when bodies retain the placeholders. The render-vars TypeScript type signature (`RenderVarsBySlug[S]`) for these chips was already `string | undefined` regardless of the contract designation (per the codegen rule that auto-inject chips type as optional), so no caller code needs to change.
+
+**Affected slugs (8):**
+- Group A (6 slugs, both `business_name` + `business_phone`): `appointment_cancelled`, `appointment_confirmed`, `appointment_confirmed_postcall`, `booking_confirmed`, `booking_reminder`, `job_complete`
+- Group B (2 slugs, `business_name` only): `loyalty_milestone`, `payment_receipt`
+- Group C (1 slug, `business_address`): `job_complete` (folded into the Group A run)
+
+### Phase 0 — verification (read-only)
+
+Audited `sms-contracts.source.ts` for chip placement. Confirmed:
+- All 3 chips have `autoInject: true` (`palette.ts:44-46`); runtime fills them from `getBusinessInfo()` regardless of contract designation.
+- Some callers (`appointments/[id]/notify`, `pos/appointments/[id]/notify`, `marketing/campaigns`, `email-templates/{preview,test-send}`) pass these chips manually; when not passed, the engine fills them. Either path satisfies any contract designation.
+- Neither chip already exists in `optional_variables` for any of the 8 affected slugs — clean append in the migration; no de-dup needed.
+- Test fixtures use synthetic slugs and ad-hoc `required_variables` arrays independent of production contracts. No fixture updates needed.
+
+### Phase 1 — implementation
+
+**`src/lib/sms/sms-contracts.source.ts`** — 8 slug entries edited per the after-state contracts:
+
+```ts
+appointment_cancelled:        required: [], optional: [..existing.., 'business_name', 'business_phone']
+appointment_confirmed:        required: ['service_name', 'appointment_date', 'appointment_time'], optional: [..existing.., 'business_name', 'business_phone']
+appointment_confirmed_postcall: required: [], optional: [..existing.., 'business_name', 'business_phone']
+booking_confirmed:            required: ['services', 'appointment_date', 'appointment_time', 'service_total'], optional: [..existing.., 'business_name', 'business_phone']
+booking_reminder:             required: ['service_name', 'appointment_time'], optional: [..existing.., 'business_name', 'business_phone']
+job_complete:                 required: ['gallery_link', 'hours_line'], optional: [..existing.., 'business_name', 'business_phone', 'business_address']
+loyalty_milestone:            required: ['loyalty_points_balance', 'loyalty_cash_value', 'booking_link'], optional: [..existing.., 'business_name']
+payment_receipt:              required: ['transaction_greeting', 'receipt_link'], optional: [..existing.., 'business_name']
+```
+
+`appointment_cancelled` and `appointment_confirmed_postcall` end up with **empty `required` arrays**. The render engine handles this gracefully (engine pre-existing pattern: `quote_accepted_multi` already had `required: []`).
+
+**Codegen** — `npx tsx scripts/regen-sms-contracts.ts` regenerated `palette.ts` (byte-equivalent — chip metadata unchanged) and `generated-contracts.ts` (CONTRACTS_BY_SLUG arrays for 8 slugs reflect the demotion).
+
+**Migration** — `supabase/migrations/20260427000005_demote_business_chips_to_optional.sql`. 9 idempotent UPDATE statements, each gated on the chip's presence in `required_variables` for safety on re-run:
+
+```sql
+-- Group A pattern (×6 slugs)
+UPDATE sms_templates
+SET required_variables = required_variables - 'business_name' - 'business_phone',
+    optional_variables = optional_variables || '["business_name","business_phone"]'::jsonb,
+    updated_at = now()
+WHERE slug = '<slug>' AND required_variables ? 'business_name';
+
+-- Group B pattern (×2 slugs) — business_name only
+-- Group C pattern (×1) — business_address on job_complete
+```
+
+JSONB minus operator (`jsonb - text`) removes top-level array elements by string match. Postgres-native, well-defined.
+
+### Verification
+
+- `npx tsc --noEmit` clean (exit 0)
+- `npm run lint` zero new issues (Session 2E.2 baseline preserved: 13 errors / 44 warnings, all pre-existing in unrelated files)
+- `npm run build` clean (after `rm -rf .next`)
+- `npx vitest run` 535/535 pass across 36 test files — no test fixture changes needed
+- `supabase db push --linked --dry-run` reports "Remote database is up to date" after migration applied
+- Manual UAT confirmed across 7 steps: `appointment_confirmed` chip picker shows `business_name`/`business_phone` in Optional (not Required); editing body to remove `{business_name}` saves successfully (was 400 pre-demotion); removing `{appointment_date}` still hard-rejects with "Missing required variables"; affected slugs (`appointment_cancelled`, `appointment_confirmed_postcall`, `job_complete`, `loyalty_milestone`, `payment_receipt`) show updated required/optional sections; unaffected slugs (`quote_reminder`) unchanged; runtime test send via "Send Test" button still includes business name in rendered body (auto-injection from settings works).
+
+### Files
+
+- New: `supabase/migrations/20260427000005_demote_business_chips_to_optional.sql`
+- Modified: `src/lib/sms/sms-contracts.source.ts` (8 slug edits), `src/lib/sms/generated-contracts.ts` (codegen output)
+- Unchanged (codegen byte-equivalent): `src/lib/sms/palette.ts`
+- Docs: `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`, `docs/dev/DB_SCHEMA.md` (regenerated; 0-line diff — JSONB column data changes don't surface in schema doc)
+
+---
+
 ## refactor(sms): drop legacy variables column + delete sms-template-variables.ts (final 2E session) — 2026-04-26 (Session 2E.2)
 
 **Final 2E series session.** Drops the legacy `sms_templates.variables` JSONB column and deletes `src/lib/sms/sms-template-variables.ts`. Closes the cutover from legacy chip metadata to typed contracts (`required_variables` ∪ `optional_variables` ∪ `SMS_PALETTE`).

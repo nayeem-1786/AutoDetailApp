@@ -164,24 +164,24 @@ export const SMS_CONTRACTS_SOURCE = {
       optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     appointment_cancelled: {
-      required: ['business_name', 'business_phone'],
-      optional: ['first_name', 'services', 'appointment_date', 'appointment_time', 'last_name', 'vehicle_description'],
+      required: [],
+      optional: ['first_name', 'services', 'appointment_date', 'appointment_time', 'last_name', 'vehicle_description', 'business_name', 'business_phone'],
     },
     appointment_confirmed: {
-      required: ['service_name', 'appointment_date', 'appointment_time', 'business_name', 'business_phone'],
-      optional: ['first_name', 'service_total', 'last_name', 'vehicle_description'],
+      required: ['service_name', 'appointment_date', 'appointment_time'],
+      optional: ['first_name', 'service_total', 'last_name', 'vehicle_description', 'business_name', 'business_phone'],
     },
     appointment_confirmed_postcall: {
-      required: ['business_name', 'business_phone'],
-      optional: ['first_name', 'last_name'],
+      required: [],
+      optional: ['first_name', 'last_name', 'business_name', 'business_phone'],
     },
     booking_confirmed: {
-      required: ['services', 'appointment_date', 'appointment_time', 'service_total', 'business_name', 'business_phone'],
-      optional: ['first_name', 'last_name', 'vehicle_description'],
+      required: ['services', 'appointment_date', 'appointment_time', 'service_total'],
+      optional: ['first_name', 'last_name', 'vehicle_description', 'business_name', 'business_phone'],
     },
     booking_reminder: {
-      required: ['service_name', 'appointment_time', 'business_name', 'business_phone'],
-      optional: ['first_name', 'last_name', 'vehicle_description'],
+      required: ['service_name', 'appointment_time'],
+      optional: ['first_name', 'last_name', 'vehicle_description', 'business_name', 'business_phone'],
     },
     booking_staff_notify: {
       required: ['customer_name', 'services', 'appointment_date', 'appointment_time', 'deposit_info'],
@@ -192,16 +192,16 @@ export const SMS_CONTRACTS_SOURCE = {
       optional: ['mobile_service_address', 'detailer_first_name', 'customer_email', 'customer_phone', 'last_name'],
     },
     job_complete: {
-      required: ['gallery_link', 'business_name', 'business_address', 'business_phone', 'hours_line'],
-      optional: ['first_name', 'vehicle_description', 'last_name'],
+      required: ['gallery_link', 'hours_line'],
+      optional: ['first_name', 'vehicle_description', 'last_name', 'business_name', 'business_phone', 'business_address'],
     },
     loyalty_milestone: {
-      required: ['loyalty_points_balance', 'loyalty_cash_value', 'booking_link', 'business_name'],
-      optional: ['first_name', 'last_name'],
+      required: ['loyalty_points_balance', 'loyalty_cash_value', 'booking_link'],
+      optional: ['first_name', 'last_name', 'business_name'],
     },
     payment_receipt: {
-      required: ['transaction_greeting', 'receipt_link', 'business_name'],
-      optional: ['first_name', 'last_name'],
+      required: ['transaction_greeting', 'receipt_link'],
+      optional: ['first_name', 'last_name', 'business_name'],
     },
     quote_accepted_multi: {
       required: [],

@@ -1520,6 +1520,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260427000002_appointment_confirmed_body_split_lines.sql
 20260427000003_cheap_add_wave_optional_chips.sql
 20260427000004_drop_sms_templates_variables_column.sql
+20260427000005_demote_business_chips_to_optional.sql
 ```
 
 ## Scripts
