@@ -7,12 +7,11 @@
 //
 // Session 3A migrated `addon_authorization_expired` and `quote_sms_postcall`.
 // Session 3B migrated `addon_authorization` and `addon_authorization_resend`.
-// 3 hardcoded slugs remain.
+// Session 3C migrated `quote_sms_admin` and `quote_sms_midcall`.
+// 1 hardcoded slug remains: receipt_sms (scheduled for 3D).
 //
 // Source-of-truth pointers — keep in sync with the actual sendSms callsite
 // when the body changes. Cross-checked at Session 2E.1b Phase 0:
-//   quote_sms_admin              src/lib/quotes/send-service.ts
-//   quote_sms_midcall            src/app/api/voice-agent/send-quote-sms/route.ts
 //   receipt_sms                  src/app/api/pos/receipts/sms/route.ts
 //
 // `INTENTIONALLY_HARDCODED_SMS` is derived from this list (Session 2E.2).
@@ -30,18 +29,6 @@ export interface HardcodedMessageEntry {
 }
 
 export const HARDCODED_SMS_MESSAGES: HardcodedMessageEntry[] = [
-  {
-    slug: 'quote_sms_admin',
-    name: 'Quote — Sent from Admin',
-    description: 'Sent when a quote is delivered to the customer from the admin Quotes page; includes the quote PDF as an MMS attachment when possible.',
-    sampleBody: 'Estimate {quote_number} from {business_name}\nTotal: {total_amount}\n\nView Your Estimate: {short_url}',
-  },
-  {
-    slug: 'quote_sms_midcall',
-    name: 'Quote — Voice Agent Mid-Call',
-    description: 'Sent to the customer mid-call when the voice agent delivers a quote during the conversation.',
-    sampleBody: "Here's your quote from {business_name} for {services}: {short_url}",
-  },
   {
     slug: 'receipt_sms',
     name: 'POS Receipt',

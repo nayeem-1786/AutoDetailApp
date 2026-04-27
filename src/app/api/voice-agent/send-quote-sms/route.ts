@@ -9,6 +9,7 @@ import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resol
 import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 /**
  * POST /api/voice-agent/send-quote-sms
@@ -108,10 +109,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or create customer.
-    // Session 2B: SELECT expanded with last_name/email/phone — none of these
-    // are consumed by today's hardcoded SMS body (line ~256), but they're
-    // loaded into scope so Session 3D can chip-wire when quote_sms_midcall
-    // migrates from a hardcoded send to renderSmsTemplate.
+    // Session 2B: SELECT expanded with last_name/email/phone for forward
+    // compatibility. Session 3C migrated quote_sms_midcall to chip-driven
+    // (see line ~260 below) but today's contract only requires services +
+    // short_url; the additional customer fields remain available for any
+    // future operator-driven body edits without further engineering.
     let customerId: string | null = null;
     t = perf.now();
     const { data: existingCustomer } = await admin
@@ -256,15 +258,29 @@ export async function POST(request: NextRequest) {
     const biz = await getBusinessInfo();
     perf.mark('fetch:getBusinessInfo', t);
 
+    // Session 3C: migrated from hardcoded body to chip-driven slug
+    // `quote_sms_midcall`. `services` is a composite-style chip — caller
+    // pre-builds the comma-joined string and passes verbatim. Engine treats
+    // as opaque. business_name auto-injected.
     const serviceList = quoteItems.map((i) => i.item_name).join(', ');
-    const smsBody = `Here's your quote from ${biz.name} for ${serviceList}: ${linkUrl}`;
+    const fallback = `Here's your quote from ${biz.name} for ${serviceList}: ${linkUrl}`;
+
+    const tpl = await renderSmsTemplate('quote_sms_midcall', {
+      services: serviceList,
+      short_url: linkUrl,
+    }, fallback);
+
     t = perf.now();
-    await sendSms(normalizedPhone, smsBody, {
-      logToConversation: true,
-      customerId: customerId || undefined,
-      notificationType: 'voice_quote_sent',
-      contextId: quoteRecord.id,
-    });
+    if (tpl.isActive && tpl.body) {
+      await sendSms(normalizedPhone, tpl.body, {
+        logToConversation: true,
+        customerId: customerId || undefined,
+        notificationType: 'voice_quote_sent',
+        contextId: quoteRecord.id,
+      });
+    } else {
+      console.log('[SendQuoteSMS] quote_sms_midcall template disabled — skipping SMS');
+    }
     perf.mark('fetch:sendSms', t);
 
     // Log quote communication

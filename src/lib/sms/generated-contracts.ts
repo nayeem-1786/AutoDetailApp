@@ -39,6 +39,8 @@ export const SMS_SLUGS = [
   "quote_accepted_single",
   "quote_accepted_staff_notify",
   "quote_reminder",
+  "quote_sms_admin",
+  "quote_sms_midcall",
   "quote_sms_postcall",
   "quote_viewed_followup",
   "staff_notification",
@@ -75,6 +77,8 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   quote_accepted_single: { required: ["item_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone", "customer_email", "last_name", "vehicle_description"] },
   quote_reminder: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
+  quote_sms_admin: { required: ["quote_number", "total_amount", "short_url"], optional: [] },
+  quote_sms_midcall: { required: ["services", "short_url"], optional: [] },
   quote_sms_postcall: { required: ["short_url"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_viewed_followup: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
   staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: ["customer_email", "last_name", "vehicle_description"] },
@@ -280,6 +284,21 @@ export interface RenderVarsBySlug {
     short_url: string;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  quote_sms_admin: {
+    quote_number: string;
+    total_amount: string;
+    short_url: string;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  quote_sms_midcall: {
+    services: string;
+    short_url: string;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;

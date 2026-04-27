@@ -235,6 +235,14 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['first_name', 'short_url'],
       optional: ['last_name', 'vehicle_description'],
     },
+    quote_sms_admin: {
+      required: ['quote_number', 'total_amount', 'short_url'],
+      optional: [],
+    },
+    quote_sms_midcall: {
+      required: ['services', 'short_url'],
+      optional: [],
+    },
     quote_sms_postcall: {
       required: ['short_url'],
       optional: ['first_name', 'last_name', 'vehicle_description'],

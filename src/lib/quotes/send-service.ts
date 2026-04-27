@@ -7,6 +7,7 @@ import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 interface QuoteCustomer {
   id: string;
@@ -208,44 +209,62 @@ export async function sendQuote(
       errors.push('SMS with PDF requires a public URL. Set NEXT_PUBLIC_APP_URL to your production domain.');
     } else {
       try {
-        const smsBody =
+        // Session 3C: migrated from hardcoded body to chip-driven slug
+        // `quote_sms_admin`. Currency rendering uses Path B (caller passes
+        // formatCurrency() output with $; template body has no literal $),
+        // matching the established convention for service_total/total_amount
+        // chips in 4 existing chip-driven slugs. PDF mediaUrl flow stays
+        // caller-side: built only when isProductionUrl, passed as sendSms
+        // option after rendering.
+        const fallback =
           `Estimate ${quote.quote_number} from ${business.name}\n` +
           `Total: ${formatCurrency(quote.total_amount)}\n\n` +
           `View Your Estimate: ${shortLink}`;
 
-        // Only attach PDF for production domains (ngrok free tier blocks MMS fetches)
-        const isProductionUrl = !appUrl.includes('ngrok') && !appUrl.includes('localhost');
-        const mediaUrl = isProductionUrl
-          ? `${appUrl}/api/quotes/${quoteId}/pdf?token=${quote.access_token}`
-          : undefined;
+        const tpl = await renderSmsTemplate('quote_sms_admin', {
+          quote_number: quote.quote_number,
+          total_amount: formatCurrency(quote.total_amount),
+          short_url: shortLink,
+        }, fallback);
 
-        const smsResult = await sendSms(customer.phone, smsBody, {
-          mediaUrl,
-          logToConversation: true,
-          customerId: customer.id,
-          notificationType: 'quote_sent',
-          contextId: quoteId,
-        });
-
-        if (smsResult.success) {
-          sentVia.push('sms');
-          const { error: commErr } = await supabase.from('quote_communications').insert({
-            quote_id: quoteId,
-            channel: 'sms',
-            sent_to: customer.phone,
-            status: 'sent',
-          });
-          if (commErr) console.error('Failed to record communication:', commErr.message);
+        if (!tpl.isActive || !tpl.body) {
+          // Template inactive (operator silenced) — skip SMS, no error
+          console.log('[SendQuote] quote_sms_admin template disabled — skipping SMS');
         } else {
-          errors.push(smsResult.error);
-          const { error: commErr } = await supabase.from('quote_communications').insert({
-            quote_id: quoteId,
-            channel: 'sms',
-            sent_to: customer.phone,
-            status: 'failed',
-            error_message: smsResult.error,
+          // Only attach PDF for production domains (ngrok free tier blocks MMS fetches)
+          const isProductionUrl = !appUrl.includes('ngrok') && !appUrl.includes('localhost');
+          const mediaUrl = isProductionUrl
+            ? `${appUrl}/api/quotes/${quoteId}/pdf?token=${quote.access_token}`
+            : undefined;
+
+          const smsResult = await sendSms(customer.phone, tpl.body, {
+            mediaUrl,
+            logToConversation: true,
+            customerId: customer.id,
+            notificationType: 'quote_sent',
+            contextId: quoteId,
           });
-          if (commErr) console.error('Failed to record communication:', commErr.message);
+
+          if (smsResult.success) {
+            sentVia.push('sms');
+            const { error: commErr } = await supabase.from('quote_communications').insert({
+              quote_id: quoteId,
+              channel: 'sms',
+              sent_to: customer.phone,
+              status: 'sent',
+            });
+            if (commErr) console.error('Failed to record communication:', commErr.message);
+          } else {
+            errors.push(smsResult.error);
+            const { error: commErr } = await supabase.from('quote_communications').insert({
+              quote_id: quoteId,
+              channel: 'sms',
+              sent_to: customer.phone,
+              status: 'failed',
+              error_message: smsResult.error,
+            });
+            if (commErr) console.error('Failed to record communication:', commErr.message);
+          }
         }
       } catch (smsErr) {
         console.error('SMS send error:', smsErr);

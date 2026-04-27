@@ -10,6 +10,51 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): quote SMS migration — 2026-04-27 (Session 3C)
+
+**Session 3C — quote SMS migration.** Migrates `quote_sms_admin` and `quote_sms_midcall` from hardcoded `sendSms` calls to chip-driven `renderSmsTemplate`. Short-link/URL generation preserved caller-side; chip-driven engine handles body rendering only. MMS PDF attachment flow for admin variant preserved unchanged. Localhost/ngrok guard preserving SMS-with-PDF requirement for public URLs preserved unchanged.
+
+**Architecture.** 26 chip-driven slugs total (was 24); 1 hardcoded slug remaining (`receipt_sms`, scheduled for 3D). Path B nearly complete — after 3D, all SMS sends in the codebase will route through the chip-driven engine with operator-editable bodies.
+
+### Slugs migrated
+
+**`quote_sms_admin`** — Sent when a quote is delivered to the customer from the admin Quotes page. Source: `src/lib/quotes/send-service.ts`. Body: 4 lines, 3 chips (`quote_number`, `total_amount`, `short_url`) all REQUIRED — every chip carries critical info; no decorative chips. `business_name` auto-injected. PDF MMS attachment via `mediaUrl` stays caller-side (built only when `isProductionUrl`, i.e., excludes localhost and ngrok); no chip for the PDF URL itself. `category=quote`, `recipient_type=customer`, `is_active=true`, `can_silence=true` (silencing leaves email channel intact).
+
+**`quote_sms_midcall`** — Sent mid-call when the voice agent generates a quote during a customer conversation. Source: `src/app/api/voice-agent/send-quote-sms/route.ts`. Single-line body, 2 chips REQUIRED (`services`, `short_url`); `business_name` auto-injected. The `services` chip is composite-style: caller pre-builds the comma-joined string from `quoteItems.map(i => i.item_name).join(', ')` and passes verbatim. `category=quote`, `recipient_type=customer`, `is_active=true`, `can_silence=true` (the post-call SMS `quote_sms_postcall` serves as a follow-up if mid-call is silenced).
+
+### Path B currency convention reinforced
+
+`total_amount` uses Path B: caller passes `formatCurrency(quote.total_amount)` (returning `"$175.00"` with `$` baked in via `Intl.NumberFormat`); template body has NO literal `$` before the `{total_amount}` placeholder. Matches the chip's documented sample (`$329.45`) and the established convention used by 4 existing chip-driven slugs that reference `service_total` (`appointment_confirmed`, `booking_confirmed`, `quote_accepted_staff_notify`, `detailer_job_assigned`). Operators editing any of these bodies in admin see the same convention everywhere.
+
+### Deferred — 3B `final_price` Path A inconsistency
+
+Flagged earlier (Phase 0 of 3C, surfaced in this CHANGELOG for visibility): 3B's `addon_authorization` body uses Path A — literal `${final_price}` in the template with caller passing numeric `"25.00"`. Internally inconsistent with the `final_price` chip's documented sample (`$65.00`) and with the Path B convention used everywhere else. Works correctly today (the literal `$` provides the prefix, output is `"$25.00"`), but the chip's sample documentation conflicts with the actual caller pattern. Future cleanup pass could either (a) update 3B's body to drop the literal `$` and have caller pass `formatCurrency(price - discount_amount)`, OR (b) update the `final_price` chip's sample to `"65.00"` (no `$`) to make Path A internally consistent. Both viable; both require caller-doc updates explaining the chosen convention. Defer until SMS template editor has chip-format-aware UI that can disambiguate "raw numeric" vs "formatted with currency symbol" chip values to operators.
+
+### Files changed
+
+**Source-of-truth:**
+- `src/lib/sms/sms-contracts.source.ts` — added `quote_sms_admin` and `quote_sms_midcall` to the `slugs` map (alphabetical position between `quote_reminder` and `quote_sms_postcall`).
+
+**Auto-generated (regenerated via `npx tsx scripts/regen-sms-contracts.ts`):**
+- `src/lib/sms/palette.ts` — no chip changes (no diff).
+- `src/lib/sms/generated-contracts.ts` — `SmsSlug` widens 24 → 26; new `RenderVarsBySlug` and `CONTRACTS_BY_SLUG` entries.
+
+**Migration:**
+- `supabase/migrations/20260428000003_seed_3c_chip_driven_slugs.sql` — two `INSERT INTO sms_templates` statements with `ON CONFLICT (slug) DO NOTHING`. Bodies byte-identical to today's hardcoded prose.
+
+**Caller updates:**
+- `src/lib/quotes/send-service.ts` — added `renderSmsTemplate` import. Replaced hardcoded `smsBody` template-literal + `sendSms` call with chip-driven render flow. Caller passes `total_amount: formatCurrency(quote.total_amount)` (Path B). PDF `mediaUrl` + `isProductionUrl` guard preserved unchanged inside the `if (tpl.isActive && tpl.body)` branch. Quote-communication insert path preserved on both success and failure branches. Inactive-template branch logs and skips cleanly without touching the errors array (operator silenced ≠ send failure).
+- `src/app/api/voice-agent/send-quote-sms/route.ts` — added `renderSmsTemplate` import. Replaced hardcoded body+`sendSms` with chip-driven render flow. `services` chip receives caller-built comma-joined string. Updated the Session 2B comment block (lines ~111–114) to record that 3C consumed the SELECT expansion. `perf.mark('fetch:sendSms', t)` retained outside the conditional so timing telemetry stays consistent whether template is active or silenced.
+
+**Hardcoded list:**
+- `src/lib/sms/hardcoded-messages.ts` — removed the 2 migrated entries from `HARDCODED_SMS_MESSAGES` (count 3 → 1). Last remaining: `receipt_sms`. Header updated to record 3C migration.
+
+### Verification
+
+5 gates green: `tsc --noEmit` clean (SmsSlug widening 24 → 26, both new slug names typecheck against `RenderVarsBySlug`), lint clean on 3C-touched files (project-wide 57 problems baseline preserved from 3B — all in unrelated files), `npm run build` succeeded after `rm -rf .next`, all 535 vitest tests pass, `db push --linked --dry-run` reports "Remote database is up to date." Manual UAT confirmed: admin Templates page shows 26 chip-driven + 1 hardcoded; both new slugs editable with correct Required/Optional sections; warning-gate ConfirmDialog renders on top of slide-over (3A's `z-[60]` fix). Localhost guard preserved correctly — admin quote send from localhost dev still pushes "SMS with PDF requires a public URL..." to errors array and skips the SMS attempt entirely (chip-driven render branch bypassed before execution per the lines 207–208 guard). Production behavior to be verified post-deploy.
+
+---
+
 ## refactor(sms): addon authorization slug migration — 2026-04-26 (Session 3B)
 
 **Session 3B — addon authorization slug migration.** Migrates `addon_authorization` and `addon_authorization_resend` from hardcoded `sendSms` calls to chip-driven `renderSmsTemplate`. Random-UUID token generation and URL composition preserved caller-side; chip-driven engine handles body rendering only. MMS attachment flow for resend preserved unchanged.
