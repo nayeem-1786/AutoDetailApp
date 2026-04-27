@@ -19,6 +19,7 @@ import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
 import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -868,13 +869,22 @@ export async function POST(request: NextRequest) {
     if (autoReply) {
       const { authorizeIds, declineIds, cleanedMessage } = extractAddonActions(autoReply);
 
+      // Session 3A: chip-driven (slug `addon_authorization_expired`). Body has
+      // zero chips; engine returns either the rendered body or — if operator
+      // toggled the slug off — isActive:false and we skip. Conversation
+      // logging intentionally NOT enabled here to preserve pre-3A behavior;
+      // see CHANGELOG note flagging this for future operator decision.
+      const expiredFallback = 'That authorization has expired. Would you like us to send a new one?';
+
       // Process authorizations
       for (const addonId of authorizeIds) {
         try {
           const result = await approveAddon(addonId);
           if (!result.success && result.expired) {
-            // Addon expired during reply — notify customer
-            await sendSms(normalizedPhone, 'That authorization has expired. Would you like us to send a new one?');
+            const tpl = await renderSmsTemplate('addon_authorization_expired', {}, expiredFallback);
+            if (tpl.isActive && tpl.body) {
+              await sendSms(normalizedPhone, tpl.body);
+            }
           }
         } catch (err) {
           console.error(`[AddonAuth] Failed to approve addon ${addonId}:`, err);
@@ -886,7 +896,10 @@ export async function POST(request: NextRequest) {
         try {
           const result = await declineAddon(addonId);
           if (!result.success && result.expired) {
-            await sendSms(normalizedPhone, 'That authorization has expired. Would you like us to send a new one?');
+            const tpl = await renderSmsTemplate('addon_authorization_expired', {}, expiredFallback);
+            if (tpl.isActive && tpl.body) {
+              await sendSms(normalizedPhone, tpl.body);
+            }
           }
         } catch (err) {
           console.error(`[AddonAuth] Failed to decline addon ${addonId}:`, err);

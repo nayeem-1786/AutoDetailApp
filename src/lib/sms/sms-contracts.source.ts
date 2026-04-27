@@ -159,6 +159,10 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['service_name'],
       optional: ['first_name', 'last_name', 'vehicle_description'],
     },
+    addon_authorization_expired: {
+      required: [],
+      optional: [],
+    },
     addon_declined: {
       required: ['service_name'],
       optional: ['first_name', 'last_name', 'vehicle_description'],
@@ -222,6 +226,10 @@ export const SMS_CONTRACTS_SOURCE = {
     quote_reminder: {
       required: ['first_name', 'short_url'],
       optional: ['last_name', 'vehicle_description'],
+    },
+    quote_sms_postcall: {
+      required: ['short_url'],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
     },
     quote_viewed_followup: {
       required: ['first_name', 'short_url'],

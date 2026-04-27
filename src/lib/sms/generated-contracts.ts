@@ -20,6 +20,7 @@
 
 export const SMS_SLUGS = [
   "addon_approved",
+  "addon_authorization_expired",
   "addon_declined",
   "appointment_cancelled",
   "appointment_confirmed",
@@ -36,6 +37,7 @@ export const SMS_SLUGS = [
   "quote_accepted_single",
   "quote_accepted_staff_notify",
   "quote_reminder",
+  "quote_sms_postcall",
   "quote_viewed_followup",
   "staff_notification",
   "staff_notification_inbound_specialty",
@@ -52,6 +54,7 @@ export interface SmsContract {
 
 export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   addon_approved: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
+  addon_authorization_expired: { required: [], optional: [] },
   addon_declined: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   appointment_cancelled: { required: [], optional: ["first_name", "services", "appointment_date", "appointment_time", "last_name", "vehicle_description", "business_name", "business_phone"] },
   appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time"], optional: ["first_name", "service_total", "last_name", "vehicle_description", "business_name", "business_phone"] },
@@ -68,6 +71,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   quote_accepted_single: { required: ["item_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone", "customer_email", "last_name", "vehicle_description"] },
   quote_reminder: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
+  quote_sms_postcall: { required: ["short_url"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_viewed_followup: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
   staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: ["customer_email", "last_name", "vehicle_description"] },
   staff_notification_inbound_specialty: { required: ["customer_name", "customer_phone", "vehicle_description"], optional: ["customer_email", "size_class", "customer_message_excerpt"] },
@@ -81,6 +85,11 @@ export interface RenderVarsBySlug {
     first_name?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  addon_authorization_expired: {
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -246,6 +255,15 @@ export interface RenderVarsBySlug {
   quote_reminder: {
     first_name: string;
     short_url: string;
+    last_name?: string | undefined;
+    vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  quote_sms_postcall: {
+    short_url: string;
+    first_name?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
     business_name?: string | undefined;

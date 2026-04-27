@@ -1522,6 +1522,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260427000004_drop_sms_templates_variables_column.sql
 20260427000005_demote_business_chips_to_optional.sql
 20260427000006_seed_specialty_sub_slugs.sql
+20260428000001_seed_3a_chip_driven_slugs.sql
 ```
 
 ## Scripts

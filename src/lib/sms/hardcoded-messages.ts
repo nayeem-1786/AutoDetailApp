@@ -1,17 +1,19 @@
 // Static display list for the admin SMS Templates page (Session 2E.1b).
 // Each entry corresponds to a hardcoded SMS body in the codebase that
 // hasn't yet migrated to the chip-driven contract model. Sessions 3A-3D
-// will eventually migrate these to sms_templates rows; until then the
-// admin UI surfaces them as read-only entries so operators see they exist
-// and understand they're not yet customizable.
+// migrate these to sms_templates rows; until then the admin UI surfaces
+// them as read-only entries so operators see they exist and understand
+// they're not yet customizable.
+//
+// Session 3A migrated `addon_authorization_expired` and `quote_sms_postcall`
+// to chip-driven slugs in sms_templates (entries removed from this list);
+// 5 hardcoded slugs remain.
 //
 // Source-of-truth pointers — keep in sync with the actual sendSms callsite
 // when the body changes. Cross-checked at Session 2E.1b Phase 0:
 //   addon_authorization          src/app/api/pos/jobs/[id]/addons/route.ts
 //   addon_authorization_resend   src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts
-//   addon_authorization_expired  src/app/api/webhooks/twilio/inbound/route.ts
 //   quote_sms_admin              src/lib/quotes/send-service.ts
-//   quote_sms_postcall           src/lib/services/voice-post-call.ts
 //   quote_sms_midcall            src/app/api/voice-agent/send-quote-sms/route.ts
 //   receipt_sms                  src/app/api/pos/receipts/sms/route.ts
 //
@@ -49,22 +51,10 @@ export const HARDCODED_SMS_MESSAGES: HardcodedMessageEntry[] = [
     sampleBody: '{message_to_customer}\n\nApprove or decline here: {authorize_url}\n\n— {business_name}',
   },
   {
-    slug: 'addon_authorization_expired',
-    name: 'Add-on Authorization Expired',
-    description: 'Auto-reply when a customer responds to an add-on request after the authorization link has expired.',
-    sampleBody: 'That authorization has expired. Would you like us to send a new one?',
-  },
-  {
     slug: 'quote_sms_admin',
     name: 'Quote — Sent from Admin',
     description: 'Sent when a quote is delivered to the customer from the admin Quotes page; includes the quote PDF as an MMS attachment when possible.',
     sampleBody: 'Estimate {quote_number} from {business_name}\nTotal: {total_amount}\n\nView Your Estimate: {short_url}',
-  },
-  {
-    slug: 'quote_sms_postcall',
-    name: 'Quote — Voice Agent Post-Call',
-    description: 'Sent to the customer right after a voice-agent call when the agent generated a quote during the call.',
-    sampleBody: "Thanks for calling {business_name}{name_greeting}! Here's a quote for what we discussed: {short_url}",
   },
   {
     slug: 'quote_sms_midcall',

@@ -10,6 +10,65 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): first hardcoded slug migration — addon_authorization_expired + quote_sms_postcall — 2026-04-26 (Session 3A)
+
+**First hardcoded slug migration.** Migrates `addon_authorization_expired` and `quote_sms_postcall` from hardcoded `sendSms` calls to chip-driven `renderSmsTemplate`. Establishes the migration pattern for Sessions 3B–3D.
+
+**Architecture.** 22 chip-driven slugs total (was 20); 5 hardcoded slugs remaining (was 7). Both new slugs follow the existing chip-driven contract model — no engine changes, no new chips. The two new contracts mirror precedents already in production: `addon_authorization_expired` parallels the static-body, zero-chip shape; `quote_sms_postcall` mirrors `appointment_confirmed_postcall`'s optional-`first_name` + REMOVE_LINE-falls-through-to-fallback pattern.
+
+### Slugs migrated
+
+**`addon_authorization_expired`** — Auto-reply to a customer who answers an addon authorization SMS after the link has expired. Source: `src/app/api/webhooks/twilio/inbound/route.ts` (two byte-identical sites inside the `authorizeIds` and `declineIds` loops). Body: `That authorization has expired. Would you like us to send a new one?` Zero chips. `category=transactional`, `recipient_type=customer`, `recipient_phones=NULL`, `is_active=true`, `can_silence=true`. Per-site shape: bare `sendSms(phone, body)` — NOT logged to conversation thread (preserved-for-now; see "Preserved-for-now" below).
+
+**`quote_sms_postcall`** — Sent right after a voice-agent call when the agent generated a quote. Source: `src/lib/services/voice-post-call.ts:647`. Body: `Thanks for calling {business_name}, {first_name}! Here's a quote for what we discussed: {short_url}`. Required: `short_url`. Optional: `first_name`, `last_name`, `vehicle_description` (latter two cheap-adds — already in scope from Session 2B's SELECT expansion, body doesn't reference them today, available to operators via admin UI without further engineering). `business_name` auto-injected. `category=quote`, `recipient_type=customer`, `recipient_phones=NULL`, `is_active=true`, `can_silence=true`. Caller continues to log to conversation thread with `notificationType: 'voice_quote_sent'`.
+
+### Why approach X-precedent (raw `{first_name}`) instead of the `first_name_greeting` composite
+
+Phase 0 surfaced an engine semantic that ruled out the composite path: `render-sms-template.ts:322–327` equates empty-string with REMOVE_LINE for optional chips. A composite that legitimately renders as `''` (the no-name case) would convert to a line-strip sentinel, and since the body is a single line carrying `{business_name}` + `{short_url}` alongside the name, REMOVE_LINE would strip the entire line — defeating the composite. There's no "render-as-literal-empty" semantic in the engine today; adding one is an engine change deferred beyond 3A's scope.
+
+Mirroring the `appointment_confirmed_postcall` precedent: body uses raw `{first_name}` as an optional chip; when absent, REMOVE_LINE strips the line, body renders empty, engine returns the caller's pre-built `fallback` string. The fallback uses `buildFirstNameGreeting()` to handle the no-name case cleanly without an orphan comma. UX trade-off (also present in `appointment_confirmed_postcall`): when first_name is absent, operator's body edits are bypassed and fallback prose runs — acceptable because (a) precedent already exists, (b) the absent-name case is rare for a customer who just had a phone conversation, (c) the composite path doesn't actually solve the problem in the current engine.
+
+### Caller-side change in voice-post-call.ts
+
+`firstName` source switched from agent-transcribed `customerName?.trim().split(/\s+/)[0]` to `custCheck?.first_name || customerName?.trim().split(/\s+/)[0]`. DB record is more reliable than agent transcription; param-derived value preserved as fallback to avoid behavioral regression when the customer record lacks first_name. `buildFirstNameGreeting` retained for fallback prose construction.
+
+### Files changed
+
+**Source-of-truth:**
+- `src/lib/sms/sms-contracts.source.ts` — added `addon_authorization_expired` (between `addon_approved` and `addon_declined` alphabetically) and `quote_sms_postcall` (between `quote_reminder` and `quote_viewed_followup`) to the `slugs` object.
+
+**Auto-generated (regenerated via `npx tsx scripts/regen-sms-contracts.ts`):**
+- `src/lib/sms/palette.ts` — no chip changes (no diff).
+- `src/lib/sms/generated-contracts.ts` — `SmsSlug` widens 20 → 22; new `RenderVarsBySlug` entries; new `CONTRACTS_BY_SLUG` entries.
+
+**Migration:**
+- `supabase/migrations/20260428000001_seed_3a_chip_driven_slugs.sql` — two `INSERT INTO sms_templates` statements with `ON CONFLICT (slug) DO NOTHING` for idempotency. Body templates byte-match the source-of-truth contracts.
+
+**Caller updates:**
+- `src/app/api/webhooks/twilio/inbound/route.ts` — added `renderSmsTemplate` import; replaced both expiry-reply sites with `renderSmsTemplate('addon_authorization_expired', {}, fallback)` followed by `sendSms` when `tpl.isActive && tpl.body`. `logToConversation` intentionally NOT enabled (see Preserved-for-now).
+- `src/lib/services/voice-post-call.ts` — replaced hardcoded `quoteSmsBody` construction with `renderSmsTemplate('quote_sms_postcall', { first_name, last_name, short_url }, fallback)`. `firstName` source switched to DB-record-preferred. `sendSms` options shape (logToConversation, conversationId, customerId, notificationType, contextId) preserved.
+
+**Hardcoded list:**
+- `src/lib/sms/hardcoded-messages.ts` — removed the 2 migrated entries from `HARDCODED_SMS_MESSAGES` (count 7 → 5). `INTENTIONALLY_HARDCODED_SMS` derived export shrinks automatically. Header comment updated to record the 3A migration.
+
+### Bug fix folded in: ConfirmDialog z-index
+
+ConfirmDialog rendered behind SlideOver due to a z-index tie (both `z-50`) compounded by SlideOver portaling to `document.body` while Dialog renders inline. With both at `z-50`, DOM order decides paint order; portaled SlideOver sits later in the body and won the tie. Bumped Dialog wrapper to `z-[60]` (`src/components/ui/dialog.tsx:104`). Single-line change.
+
+Bug present since Session 2E.1a deployed the warning gate (commit `98b25087`); the unclickable-dialog scenario was reachable in production for any operator typing in-palette-but-not-in-contract chips. 3A's chip-free `addon_authorization_expired` made the bug trivially reproducible during UAT — typing any palette chip into a zero-contract slug always triggers the warning gate.
+
+Future hardening: portal Dialog to `document.body` to remove the inline-vs-portal asymmetry and eliminate the entire class of stacking-context bugs across the app. Deferred beyond 3A — requires updating 4 test cases in `src/components/ui/__tests__/dialog.test.tsx` that use `container.querySelector(...)` (would return null after portaling). Worth doing as a dedicated maintenance pass.
+
+### Preserved-for-now: addon_authorization_expired conversation logging
+
+The hardcoded sends today don't pass `logToConversation: true` — these expiry messages don't appear in the conversation thread and didn't pre-3A. Migration preserves this behavior. A future session may decide they should be logged for audit trail completeness; surface for operator decision when convenient.
+
+### Verification
+
+5 gates green: `tsc --noEmit` clean, lint clean on 3A-touched files (project-wide errors are pre-existing baseline in unrelated files), `npm run build` succeeded after `rm -rf .next`, all 535 vitest tests pass (full Session 2F baseline preserved), `db push --linked --dry-run` reports "Remote database is up to date." Manual UAT confirmed: admin Templates page now shows 22 chip-driven + 5 hardcoded entries; both new slugs editable with correct Required/Optional sections; warning-gate ConfirmDialog now renders on top of slide-over with clickable buttons.
+
+---
+
 ## refactor(sms): sub-slug splits for specialty flows — closes @ts-expect-error markers — 2026-04-26 (Session 2F)
 
 **Sub-slug splits.** Closes the two `@ts-expect-error` markers from Sessions 2A/2C via sub-slug splits. New chip-driven slugs `booking_staff_notify_specialty` (specialty-callback flow) and `staff_notification_inbound_specialty` (inbound twilio webhook flow) replace the type-mismatched uses of their parent slugs.

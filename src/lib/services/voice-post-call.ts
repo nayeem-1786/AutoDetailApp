@@ -627,13 +627,14 @@ async function autoGenerateQuote(
     try { linkUrl = await createShortLink(quoteUrl); } catch { /* use full URL */ }
 
     // Send SMS if customer has consent.
-    // Session 2B: SELECT expanded with first_name/last_name/email/phone — only
-    // sms_consent is consumed today (the hardcoded body uses customerName from
-    // params instead), but the rest are loaded into scope so Session 3D can
-    // chip-wire when this hardcoded send migrates to renderSmsTemplate. The
-    // local `firstName` derived from `customerName` (line ~610) stays as-is —
-    // 3D decides whether to keep using the param-derived value or switch to
-    // custCheck.first_name from the DB record.
+    // Session 3A: migrated from hardcoded body to chip-driven slug
+    // `quote_sms_postcall`. Mirrors the appointment_confirmed_postcall pattern
+    // — first_name is OPTIONAL; when missing, REMOVE_LINE strips the body's
+    // single line and the engine returns our `fallback` string (built with
+    // buildFirstNameGreeting so the no-name case reads cleanly without an
+    // orphan comma). short_url is the only required chip. last_name +
+    // vehicle_description are cheap-adds (already loaded; body doesn't
+    // reference them today, but operators can introduce via admin UI).
     const { data: custCheck } = await admin
       .from('customers')
       .select('id, first_name, last_name, email, phone, sms_consent')
@@ -642,17 +643,32 @@ async function autoGenerateQuote(
 
     if (custCheck?.sms_consent) {
       const biz = await getBusinessInfo();
-      const firstName = customerName?.trim().split(/\s+/)[0];
+      // Prefer DB-record first_name (Session 2B SELECT expansion); fall back
+      // to the agent-provided customerName param to preserve pre-3A behavior
+      // when the DB record is missing first_name.
+      const firstName = custCheck.first_name || customerName?.trim().split(/\s+/)[0] || undefined;
       const nameGreeting = buildFirstNameGreeting(firstName);
-      const quoteSmsBody = `Thanks for calling ${biz.name}${nameGreeting}! Here's a quote for what we discussed: ${linkUrl}`;
-      const smsResult = await sendSms(phone, quoteSmsBody, {
-        logToConversation: true,
-        conversationId,
-        customerId: custId || undefined,
-        notificationType: 'voice_quote_sent',
-        contextId: quoteRecord.id,
-      });
-      console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
+      const fallback = `Thanks for calling ${biz.name}${nameGreeting}! Here's a quote for what we discussed: ${linkUrl}`;
+
+      const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
+      const tpl = await renderSmsTemplate('quote_sms_postcall', {
+        first_name: firstName,
+        last_name: custCheck.last_name || undefined,
+        short_url: linkUrl,
+      }, fallback);
+
+      if (tpl.isActive && tpl.body) {
+        const smsResult = await sendSms(phone, tpl.body, {
+          logToConversation: true,
+          conversationId,
+          customerId: custId || undefined,
+          notificationType: 'voice_quote_sent',
+          contextId: quoteRecord.id,
+        });
+        console.log(`[VoicePostCall] SMS send result: ${smsResult.success ? 'success' : 'failure — ' + ('error' in smsResult ? smsResult.error : 'unknown')}`);
+      } else {
+        console.log(`[VoicePostCall] SMS send result: skipped — quote_sms_postcall template disabled`);
+      }
     } else {
       console.log(`[VoicePostCall] SMS send result: skipped — no SMS consent (customer: ${custId})`);
     }

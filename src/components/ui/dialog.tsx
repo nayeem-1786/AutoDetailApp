@@ -101,7 +101,7 @@ function Dialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-[60]">
       {/* Backdrop (visual only — pointer-events-none ensures touch events pass through to clickable layer) */}
       <div className="fixed inset-0 bg-black/50 pointer-events-none" />
       <div
