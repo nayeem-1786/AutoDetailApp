@@ -937,6 +937,7 @@ src/lib/sms/palette.ts                      # AUTO-GENERATED from sms-contracts.
 src/lib/sms/generated-contracts.ts          # AUTO-GENERATED — SmsSlug, SMS_SLUGS, CONTRACTS_BY_SLUG, RenderVarsBySlug (Session 2A.5)
 src/lib/sms/contract.ts                     # Zod contract schema + validators (Session 2A)
 src/lib/sms/composites.ts                   # Caller-built composite chip builders (Session 2A)
+src/lib/sms/dedup.ts                        # isRecentDuplicateSms — messages-log dedup helper (Session 2D.2)
 src/lib/sms/__tests__/render-sms-template.test.ts
 src/lib/sms/__tests__/render-sms-template-contract.test.ts
 src/app/api/admin/sms-templates/route.ts

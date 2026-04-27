@@ -37,12 +37,16 @@ export async function POST(request: NextRequest) {
     }
 
     const body = JSON.parse(rawBody);
+    // Session 2D.2: ElevenLabs's webhook payload uses `conversation_id`, not
+    // `call_id`. The mismatch caused this path to never write a voice_call_log
+    // row (Phase 0 evidence: 33 rows ever, 0 with source='webhook'). Renaming
+    // the destructure restores the elevenlabsConversationId dedup.
     const {
       phone,
       transcript,
       summary,
       duration_seconds,
-      call_id,
+      conversation_id,
       outcome,
       services_discussed,
       appointment_booked,
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
       transcript?: string;
       summary?: string;
       duration_seconds?: number;
-      call_id?: string;
+      conversation_id?: string;
       outcome?: string;
       services_discussed?: string;
       appointment_booked?: boolean | string;
@@ -89,7 +93,7 @@ export async function POST(request: NextRequest) {
       appointmentBooked,
       customerInterest: customer_interest,
       durationSeconds: duration_seconds,
-      elevenlabsConversationId: call_id,
+      elevenlabsConversationId: conversation_id,
       source: 'webhook',
     });
 
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
 
     console.log(
       `[ElevenLabs Webhook] Call logged for ${phone}` +
-      (call_id ? ` (call_id: ${call_id})` : '') +
+      (conversation_id ? ` (conversation_id: ${conversation_id})` : '') +
       (result.skipped ? ' (dedup — already processed)' : '') +
       (duration_seconds ? ` — ${duration_seconds}s` : '')
     );

@@ -8,6 +8,7 @@ import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resol
 import { getBusinessInfo } from '@/lib/data/business';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { buildFirstNameGreeting } from '@/lib/sms/composites';
+import { isRecentDuplicateSms } from '@/lib/sms/dedup';
 
 // ---------------------------------------------------------------------------
 // Shared post-call processing logic
@@ -48,6 +49,26 @@ export async function processVoiceCallEnd(
 
   if (!normalizedPhone) {
     return { success: false, reason: 'Invalid phone number' };
+  }
+
+  // Session 2D.2: cross-check the messages-log for a recent duplicate postcall
+  // SMS, before the elevenlabsConversationId dedup runs. Catches the case where
+  // finalize-call (tool) doesn't pass elevenlabs_conversation_id and the
+  // primary dedup is bypassed entirely — see voice_call_log evidence in the
+  // 2D.2 Phase 0 report (33 rows ever, all source='poll'). Gated on
+  // params.appointmentBooked because 'voice_followup' is only sent in that
+  // branch; the auto-quote path uses a different notificationType and is not
+  // subject to the same triple-source duplicate risk.
+  if (params.appointmentBooked === true) {
+    const isDuplicate = await isRecentDuplicateSms({
+      phone: normalizedPhone,
+      notificationType: 'voice_followup',
+      supabase: admin,
+    });
+    if (isDuplicate) {
+      console.log('[VoicePostCall] dedup-by-sms-log: skipping postcall SMS, recent send detected');
+      return { success: true, skipped: true, reason: 'duplicate_sms_recently_sent' };
+    }
   }
 
   // Dedup check: skip if this conversation was already processed or is in progress

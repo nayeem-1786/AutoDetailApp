@@ -89,7 +89,11 @@ export async function GET(request: NextRequest) {
           .limit(5),
         supabase
           .from('quotes')
-          .select('quote_number, status, total_amount, valid_until, created_at')
+          // Session 2D.2: vehicle JOIN added so the agent's recent_quotes payload
+          // carries per-quote vehicle attribution. Pairs with the formatting
+          // change in voice-agent/initiation/route.ts so both context surfaces
+          // expose the same data shape to the agent.
+          .select('quote_number, status, total_amount, valid_until, created_at, vehicle:vehicles!quotes_vehicle_id_fkey(id, year, make, model, color)')
           .eq('customer_id', customer.id)
           .is('deleted_at', null)
           .order('created_at', { ascending: false })

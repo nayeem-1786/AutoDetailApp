@@ -10,6 +10,59 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## fix(voice-agent): per-quote vehicle attribution + duplicate-postcall-SMS dedup — 2026-04-26 (Session 2D.2)
+
+**Voice-agent UX fixes.** Two unrelated bugs surfaced from a real call test.
+
+**Issue A** — Agent asks "which vehicle is this quote for?" when converting a quote that already has a vehicle attached. Phase 0 confirmed the route is structurally correct (`convertQuote` uses `quote.vehicle_id`); the gap was in the agent's context — `voice-agent/initiation/route.ts` formatted the agent's quote inventory without per-quote vehicle attribution, so the agent had no way to know which vehicle a quote belonged to.
+
+**Issue B** — Duplicate `appointment_confirmed_postcall` SMS for one booking action. Phase 0 traced root cause to `voice-post-call.ts:54`: the entire `voice_call_log` dedup block is conditional on `params.elevenlabsConversationId`. The finalize-call (tool) path doesn't reliably pass it, and the call-complete webhook path was destructuring `call_id` from the payload while ElevenLabs's actual field name is `conversation_id`. Result: both bypass paths skip dedup entirely, only the polling cron path correctly populates `voice_call_log`. Smoking-gun evidence: 33 rows ever in `voice_call_log`, **all with source='poll', zero with source='tool' or 'webhook'**.
+
+### Issue A fix — quote context vehicle attribution
+
+- `src/app/api/voice-agent/initiation/route.ts` (line ~106 quote SELECT, line ~178 RECENT QUOTES formatter): added `vehicle:vehicles!quotes_vehicle_id_fkey(year, make, model, color)` JOIN. Formatter now appends `for {vehicleStr}` (via existing `cleanVehicleDescription` helper) when the quote has an attached vehicle. Agent's `customer_summary` line for Q-0023 now reads: `Q-0023: Engine Bay Detail for 2016 Silver Honda Accord — $175 (Sent Apr 26)`. Quotes without an attached vehicle render unchanged.
+- `src/app/api/voice-agent/context/route.ts` (line ~95 quote SELECT): same JOIN. This route returns structured JSON; consumers receive `vehicle` nested under each quote in `recent_quotes`. No formatter exists in this route.
+- FK constraint name `quotes_vehicle_id_fkey` confirmed via `pg_constraint` query before relying on the Supabase select hint.
+
+### Issue B fix — reusable dedup helper + webhook field rename
+
+- **Created** `src/lib/sms/dedup.ts` exporting `isRecentDuplicateSms({ phone, notificationType, withinMinutes?=5, supabase })`. Returns `true` when a recent matching outbound `messages` row exists for that phone within the lookback window; `false` otherwise. Defensive on errors (returns `false` on any query failure — better duplicate than missed send when the dedup query itself can't run).
+  - **Architecture note (clarification of original framing):** the original session prompt described this as querying `sms_delivery_log`. That table has no `notification_type` column — its `source` field is too coarse (`'transactional'` would match unrelated sends). `notificationType` actually lives in `messages.metadata->>'notificationType'`, with a dedicated index `idx_messages_metadata_notification_type`. The helper queries the `messages` log via that index, joined to `conversations` to filter by phone. Caller requirement: original `sendSms()` call must use `logToConversation: true` (so the `messages` row exists for the helper to find).
+  - Future call sites: Session 3D voice-info-* slug migrations are likely consumers (same retry/poll-backup duplicate-send risk pattern).
+- **Wired** at `voice-post-call.ts` top of `processVoiceCallEnd`, before the existing `if (params.elevenlabsConversationId)` block. Gated on `params.appointmentBooked === true` because `voice_followup` is only sent in that branch — the auto-quote path uses a different notificationType (`voice_quote_sent`) and isn't subject to the same triple-source duplicate risk. On dedup match, returns `{ success: true, skipped: true, reason: 'duplicate_sms_recently_sent' }` with log line `[VoicePostCall] dedup-by-sms-log: skipping postcall SMS, recent send detected`. Existing `voice_call_log` dedup block remains as a secondary check.
+- **Webhook field rename** at `src/app/api/webhooks/elevenlabs/call-complete/route.ts`: `call_id` → `conversation_id` in the body destructure, type annotation, `processVoiceCallEnd` call, and log line. Restores the dedup block's ability to function for the webhook path.
+
+### Verification of fix
+
+Live SQL smoke test against production data reproducing the helper's query path returned the exact two duplicate `voice_followup` sends from the Phase 0 bug report (23:31:21 + 23:32:02 — same phone, same notificationType, both within the 5-min window). With the helper wired, the second `processVoiceCallEnd` run at ~23:32:01 (poll path) would have found the t=3.5sec messages row and returned early before sending the second SMS.
+
+### sendSms callsite count clarification
+
+The original prompt referenced "all four voice-post-call SMS sends." The actual count in `voice-post-call.ts` is 2: one at line 361 (`voice_followup`, the postcall path) and one at line 627 (`voice_quote_sent`, in `autoGenerateQuote`). Both use `logToConversation: true`, so the helper's data-source contract is satisfied for every callsite this session touches.
+
+### Post-2D.2 todos
+
+- **(a) Apply ElevenLabs agent system prompt update** (Owner: Nayeem, ElevenLabs dashboard, after deploy): "When the customer references a quote by Q-number, do not ask for vehicle details — the quote already has them attached and they're now visible in your context. Only confirm vehicle if the customer expresses ambiguity (multiple vehicles or quote has no vehicle attached)." This is the Layer 2 piece of Issue A — the route now provides the data; the agent's prompt needs to teach the agent to use it.
+- **(b) Investigate ElevenLabs tool-calling for conversation_id injection** (Owner: separate post-2D.2 session): can the tool schema declare `conversation_id` as a required parameter that ElevenLabs auto-injects from the active call context? If yes, route-side enforcement (require `elevenlabs_conversation_id` at finalize-call and call-complete endpoints, reject with 400 if missing) becomes safe to add as a structural cleanup. The dedup helper would still serve as belt-and-suspenders.
+- **Dual mid-call + post-call SMS pattern** (separate redundancy issue affecting `appointment_confirmed` mid-call + `appointment_confirmed_postcall` post-call pair): explicitly out of scope for 2D.2. Deferred to post-Session-3D when both code paths are visible in admin UI and operator can manage redundancy via slug-active toggles.
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npm run lint` zero new issues (Session 2A.5 baseline preserved: 13 errors / 44 warnings, all pre-existing in unrelated files)
+- `npm run build` clean (full SSG output succeeded)
+- `npx vitest run` 533/533 pass across 36 test files (no test changes this session)
+- `supabase db push --linked --dry-run` reports "Remote database is up to date"
+
+### Files
+
+- New: `src/lib/sms/dedup.ts`
+- Modified (Issue A): `src/app/api/voice-agent/initiation/route.ts`, `src/app/api/voice-agent/context/route.ts`
+- Modified (Issue B): `src/lib/services/voice-post-call.ts`, `src/app/api/webhooks/elevenlabs/call-complete/route.ts`
+- Docs: `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`
+
+---
+
 ## fix(voice-agent): accept quote_id in both UUID and quote_number formats — 2026-04-26 (Session 2D.1)
 
 **Voice-agent quote-to-appointment conversion fix.** Routes that accept `quote_id` from the voice agent now tolerate both UUID format and `quote_number` format (`Q-NNNN`). Pre-existing bug, exposed by production smoke testing of Session 2B's Path A quote-conversion path. The voice agent's text context (built at `voice-agent/initiation/route.ts:183`) presents quotes by `quote_number`, so when the customer says "I'd like to book Q-23" the agent passes the `quote_number` it saw — not a UUID it never had access to. The route at `voice-agent/appointments/route.ts` previously looked up by `id` only, returning 404. Now resolves to UUID before downstream lookups.

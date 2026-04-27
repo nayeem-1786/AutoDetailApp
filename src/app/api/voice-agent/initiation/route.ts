@@ -100,7 +100,11 @@ export async function POST(request: NextRequest) {
         .limit(5),
       supabase
         .from('quotes')
-        .select('quote_number, status, total_amount, created_at, quote_items(item_name)')
+        // Session 2D.2: vehicle JOIN added so per-quote vehicle attribution is
+        // visible in the agent's RECENT QUOTES context. Without this, the agent
+        // had to ask "which vehicle is this quote for?" during conversion even
+        // when the quote already had a vehicle attached.
+        .select('quote_number, status, total_amount, created_at, quote_items(item_name), vehicle:vehicles!quotes_vehicle_id_fkey(year, make, model, color)')
         .eq('customer_id', customer.id)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -176,11 +180,18 @@ export async function POST(request: NextRequest) {
         const items = ((q.quote_items as Array<{ item_name: string }>) || [])
           .map((i) => i.item_name).filter(Boolean);
         const serviceStr = items.length > 0 ? items.join(' + ') : 'Services';
+        // Session 2D.2: append "for {vehicle}" when the quote has an attached
+        // vehicle, so the agent can associate quote → vehicle without asking.
+        const vehicle = q.vehicle as { year?: number | null; color?: string | null; make?: string | null; model?: string | null } | null;
+        const vehicleStr = vehicle
+          ? cleanVehicleDescription({ year: vehicle.year, color: vehicle.color, make: vehicle.make, model: vehicle.model })
+          : '';
+        const serviceClause = vehicleStr ? `${serviceStr} for ${vehicleStr}` : serviceStr;
         const statusDate = new Date(q.created_at).toLocaleDateString('en-US', {
           month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles',
         });
         const statusLabel = q.status.charAt(0).toUpperCase() + q.status.slice(1);
-        return `  ${q.quote_number}: ${serviceStr} — $${Number(q.total_amount).toFixed(0)} (${statusLabel} ${statusDate})`;
+        return `  ${q.quote_number}: ${serviceClause} — $${Number(q.total_amount).toFixed(0)} (${statusLabel} ${statusDate})`;
       });
       sections.push(`RECENT QUOTES:\n${quoteLines.join('\n')}`);
     }
