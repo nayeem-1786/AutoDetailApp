@@ -27,6 +27,7 @@ export const SMS_SLUGS = [
   "booking_confirmed",
   "booking_reminder",
   "booking_staff_notify",
+  "booking_staff_notify_specialty",
   "detailer_job_assigned",
   "job_complete",
   "loyalty_milestone",
@@ -37,6 +38,7 @@ export const SMS_SLUGS = [
   "quote_reminder",
   "quote_viewed_followup",
   "staff_notification",
+  "staff_notification_inbound_specialty",
 ] as const;
 
 export type SmsSlug = (typeof SMS_SLUGS)[number];
@@ -57,6 +59,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total"], optional: ["first_name", "last_name", "vehicle_description", "business_name", "business_phone"] },
   booking_reminder: { required: ["service_name", "appointment_time"], optional: ["first_name", "last_name", "vehicle_description", "business_name", "business_phone"] },
   booking_staff_notify: { required: ["customer_name", "services", "appointment_date", "appointment_time", "deposit_info"], optional: ["customer_email", "customer_phone", "last_name", "vehicle_description"] },
+  booking_staff_notify_specialty: { required: ["customer_name", "customer_phone", "vehicle_description"], optional: ["customer_email", "size_class", "preferred_time"] },
   detailer_job_assigned: { required: ["job_summary", "appointment_date", "appointment_time", "service_total"], optional: ["mobile_service_address", "detailer_first_name", "customer_email", "customer_phone", "last_name"] },
   job_complete: { required: ["gallery_link", "hours_line"], optional: ["first_name", "vehicle_description", "last_name", "business_name", "business_phone", "business_address"] },
   loyalty_milestone: { required: ["loyalty_points_balance", "loyalty_cash_value", "booking_link"], optional: ["first_name", "last_name", "business_name"] },
@@ -67,6 +70,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   quote_reminder: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
   quote_viewed_followup: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
   staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: ["customer_email", "last_name", "vehicle_description"] },
+  staff_notification_inbound_specialty: { required: ["customer_name", "customer_phone", "vehicle_description"], optional: ["customer_email", "size_class", "customer_message_excerpt"] },
 };
 
 // ── Per-slug render-vars types ─────────────────────────────────────────────
@@ -152,6 +156,17 @@ export interface RenderVarsBySlug {
     customer_phone?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  booking_staff_notify_specialty: {
+    customer_name: string;
+    customer_phone: string;
+    vehicle_description: string;
+    customer_email?: string | undefined;
+    size_class?: string | undefined;
+    preferred_time?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
@@ -254,6 +269,17 @@ export interface RenderVarsBySlug {
     customer_email?: string | undefined;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  staff_notification_inbound_specialty: {
+    customer_name: string;
+    customer_phone: string;
+    vehicle_description: string;
+    customer_email?: string | undefined;
+    size_class?: string | undefined;
+    customer_message_excerpt?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;

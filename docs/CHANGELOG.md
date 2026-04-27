@@ -10,6 +10,105 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): sub-slug splits for specialty flows — closes @ts-expect-error markers — 2026-04-26 (Session 2F)
+
+**Sub-slug splits.** Closes the two `@ts-expect-error` markers from Sessions 2A/2C via sub-slug splits. New chip-driven slugs `booking_staff_notify_specialty` (specialty-callback flow) and `staff_notification_inbound_specialty` (inbound twilio webhook flow) replace the type-mismatched uses of their parent slugs.
+
+**Architecture.** This is the structural completion of Path B Phase 2's pending technical debt. All chip-driven SMS sends now have type-safe call sites with no `@ts-expect-error` suppressions. Net: 2 new template rows, 2 new contracts in source-of-truth, 2 caller updates, 0 markers remaining.
+
+### Why sub-slugs and not chip relaxation
+
+The two flows tried to reuse parent slugs whose contracts didn't fit the call-site data scope:
+
+- `/api/public/specialty-callback` was passing `booking_staff_notify`, but the parent contract requires `appointment_date`, `appointment_time`, `deposit_info` — none of which exist in a callback-request flow. The previous workaround synthesized a fake `services: '${vehicleWord} vehicle quote — ${vehicleDesc}'` string and relied on engine hard-skip + caller fallback prose. The `@ts-expect-error` suppressed the missing-required type errors.
+- `/api/webhooks/twilio/inbound` was passing `staff_notification`, but the parent contract requires `reason_label` and `details` — voice-agent escalation chips that don't apply to inbound SMS triage. Same hard-skip + fallback-prose workaround.
+
+Sub-slug splits give each flow a contract that matches its actual data scope. The engine renders the chip-driven body cleanly; the caller's manually-composed `staffMessage` / `staffMsg` strings stay in place as defense-in-depth fallbacks (used when the template is inactive or fails to render).
+
+### Phase 0 — verification (read-only)
+
+- Read both call sites in full. Confirmed data scope: name + phone + email + preferred_time + vehicle attributes for specialty-callback; customerCtx + normalizedPhone + body excerpt + specialtyVehicle locals for twilio-inbound.
+- Read parent slug contracts (`booking_staff_notify`, `staff_notification`) — both are `category=system`, `recipient_type=staff`, `recipient_phones=NULL` (defaults to business phone).
+- Verified `customer_message_excerpt` chip pre-exists in `palette.ts` from prior session work; no palette additions needed in 2F.
+- Verified zero existing tests on either route or these slugs.
+
+### Phase 1 — implementation
+
+**`src/lib/sms/sms-contracts.source.ts`** — added two new entries to the `slugs` object:
+
+```ts
+booking_staff_notify_specialty: {
+  required: ['customer_name', 'customer_phone', 'vehicle_description'],
+  optional: ['customer_email', 'size_class', 'preferred_time'],
+},
+staff_notification_inbound_specialty: {
+  required: ['customer_name', 'customer_phone', 'vehicle_description'],
+  optional: ['customer_email', 'size_class', 'customer_message_excerpt'],
+},
+```
+
+Both drop `last_name` (form/webhook context can't populate it cleanly — was always `undefined` before). The specialty-callback variant gains `preferred_time` and `size_class` as optional chips. The twilio-inbound variant gains `size_class` and `customer_message_excerpt`. Both reuse the existing palette `size_class` chip (the canonical 5-value taxonomy) to convey 'exotic' vs 'classic' — runtime values are gated by call-site context.
+
+**Codegen** — `npx tsx scripts/regen-sms-contracts.ts` regenerated:
+- `palette.ts` — byte-equivalent (no chip metadata changes)
+- `generated-contracts.ts` — gained 2 entries in `CONTRACTS_BY_SLUG`, 2 entries in `RenderVarsBySlug`, `SmsSlug` widened from 18-member union to 20
+
+**Migration** — `supabase/migrations/20260427000006_seed_specialty_sub_slugs.sql`. Two `INSERT INTO sms_templates ...` statements with `ON CONFLICT (slug) DO NOTHING` for idempotency. Both new rows seeded with `is_active=true`, `can_silence=true`, `category=system`, `recipient_type=staff`, `recipient_phones=NULL`. Body templates use the bell-emoji-prefixed labeled-field format consistent with the existing `staff_notification` body, with each optional chip on its own line so REMOVE_LINE on absence doesn't strip required content.
+
+**Body templates seeded:**
+
+```
+🔔 Specialty vehicle callback request
+{customer_name} ({customer_phone})
+Vehicle: {vehicle_description}
+Type: {size_class}
+Email: {customer_email}
+Best time: {preferred_time}
+
+From online booking.
+```
+
+```
+🔔 Specialty vehicle SMS inquiry
+{customer_name} ({customer_phone})
+Vehicle: {vehicle_description}
+Type: {size_class}
+Email: {customer_email}
+Last message: "{customer_message_excerpt}"
+
+Requires custom quote — please follow up.
+```
+
+**Caller updates:**
+
+`src/app/api/public/specialty-callback/route.ts` — slug switched to `booking_staff_notify_specialty`; `@ts-expect-error` removed; the synthesized `services` chip dropped; `last_name: undefined` dropped; `size_class` and `preferred_time` newly wired from already-in-scope locals. The `vehicleWord` local stays in place for the prose fallback `staffMessage`. Net: -39/+13 lines (caller slimmer; many bridging comments from Sessions 2C/2D removed since they referenced the now-resolved deferral).
+
+`src/app/api/webhooks/twilio/inbound/route.ts` — slug switched to `staff_notification_inbound_specialty`; `@ts-expect-error` removed; `last_name: undefined` dropped; `size_class` newly wired from `specialtyVehicleWord`; `customer_message_excerpt` newly wired from the locally-hoisted excerpt. The `staffMsg` prose fallback stays. Net: -35/+9 lines.
+
+**Both `@ts-expect-error` markers fully removed** — verified via grep across both route directories.
+
+### Phase 2 — verification
+
+- `npx tsc --noEmit` clean (exit 0). Confirms both markers were genuinely needed before, and the new contracts match the chip passes exactly. Removing them without the contract switch would have failed compilation.
+- `npm run lint` zero new issues (Session 2D.3 baseline preserved: 13 errors / 44 warnings in unrelated files).
+- `npm run build` clean (after `rm -rf .next`).
+- `npx vitest run` 535/535 pass across 36 test files. No fixture changes needed.
+- `supabase db push --linked --dry-run` reports "Remote database is up to date" after migration applied.
+- Manual UAT: admin templates page now shows 20 chip-driven slugs (was 18). Both new sub-slugs appear in SYSTEM category with the right Required/Optional chip splits. Staff recipient pill shows on both. No-op edits save 200. Step 7 (end-to-end smoke via real specialty-callback form submit) deferred to production.
+
+### Files
+
+- New: `supabase/migrations/20260427000006_seed_specialty_sub_slugs.sql`
+- Modified: `src/lib/sms/sms-contracts.source.ts` (+8 lines), `src/lib/sms/generated-contracts.ts` (+26 lines, codegen output), `src/app/api/public/specialty-callback/route.ts` (-39/+13), `src/app/api/webhooks/twilio/inbound/route.ts` (-35/+9)
+- Unchanged (codegen byte-equivalent): `src/lib/sms/palette.ts`
+- Docs: `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`, `docs/dev/DB_SCHEMA.md` (regenerated; 0-line diff — only sms_templates row data changed)
+
+### Forward path
+
+`SmsSlug` is now a 20-member union. Path B Phase 2 architectural cycle is fully closed — engine, admin UI, contracts, callers all type-safe with no suppressions. Sessions 3A-3D will migrate the 7 hardcoded slugs (`addon_authorization` variants, `quote_sms_*` variants, `receipt_sms`) to the chip-driven model on the same foundation.
+
+---
+
 ## refactor(sms): demote business identity chips from required to optional — 2026-04-26 (Session 2D.3)
 
 **Demotion of business identity chips.** `business_name`, `business_phone`, and `business_address` demoted from required to optional across all chip-driven slugs where they appeared in required (9 contract demotions across 8 slugs). Operator-raised flexibility — operators can now write SMS bodies with shortened business names, omit office number when sender ID provides callback path, omit business address from completion messages when not needed, and otherwise control template content without forced inclusion of business identity chips.

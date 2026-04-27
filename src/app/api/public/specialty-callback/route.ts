@@ -64,41 +64,22 @@ export async function POST(request: NextRequest) {
 
     // Send staff notification SMS
     try {
-      // Session 2C: customer_email composed as a named local for Session 2F's
-      // slug split into booking_staff_notify_specialty. The form (specialty-vehicle-block.tsx)
-      // now collects email as an optional field; when the customer leaves it
-      // empty, customerEmail is undefined and 2F's contract will treat it as
-      // optional (REMOVE_LINE on absence) per the established pattern.
       const customerEmail = email || undefined;
-      void customerEmail; // Loaded for 2F; unused at this @ts-expect-error'd callsite today.
-
       const staffMessage = `Specialty vehicle callback request!\n${name} (${phone}) wants a quote for their ${vehicleWord} ${vehicleDesc}.${preferred_time ? `\nBest time: ${preferred_time}` : ''}\n\nFrom online booking.`;
 
       const [templateResult, biz] = await Promise.all([
-        // Session 2F: slug split pending; this caller intentionally satisfies only 2
-        // of 5 required chips and relies on engine hard-skip + caller fallback prose.
-        // Do not synthesize missing values. The slug split into
-        // booking_staff_notify_specialty (with a contract that matches the
-        // callback-request shape) is the right answer.
-        // Session 2C added the optional email field to the form (customer_email
-        // now in scope as customerEmail above) so 2F's split contract can
-        // include customer_email as an optional chip without a follow-up data
-        // expansion. Audit log details JSONB also captures customer_email.
-        // Session 2D wired cheap-adds (customer_email, customer_phone,
-        // vehicle_description) at this callsite from already-in-scope locals
-        // (form fields + vehicleDesc). last_name stays undefined — the form
-        // collects only `name` (no separate last_name field). The required-chip
-        // gap (appointment_date/time/deposit_info missing) and resulting engine
-        // hard-skip → fallback-prose flow are unchanged; 2F's slug split is
-        // still the right resolution for the @ts-expect-error.
-        // @ts-expect-error — see Session 2F note above
-        renderSmsTemplate('booking_staff_notify', {
+        // Session 2F: chip-driven send via dedicated sub-slug whose contract
+        // matches the callback-request data scope (no appointment_date /
+        // appointment_time / deposit_info — those don't apply to a callback
+        // request). Engine renders the body; staffMessage above stays as
+        // defense-in-depth fallback when template is inactive or unrendered.
+        renderSmsTemplate('booking_staff_notify_specialty', {
           customer_name: name,
-          services: `${vehicleWord.charAt(0).toUpperCase() + vehicleWord.slice(1)} vehicle quote — ${vehicleDesc}`,
+          customer_phone: phone,
+          vehicle_description: vehicleDesc,
           customer_email: customerEmail,
-          customer_phone: phone || undefined,
-          last_name: undefined,
-          vehicle_description: vehicleDesc || undefined,
+          size_class: size_class || undefined,
+          preferred_time: preferred_time || undefined,
         }, staffMessage),
         getBusinessInfo(),
       ]);

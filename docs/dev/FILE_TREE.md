@@ -1521,6 +1521,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260427000003_cheap_add_wave_optional_chips.sql
 20260427000004_drop_sms_templates_variables_column.sql
 20260427000005_demote_business_chips_to_optional.sql
+20260427000006_seed_specialty_sub_slugs.sql
 ```
 
 ## Scripts

@@ -187,6 +187,10 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['customer_name', 'services', 'appointment_date', 'appointment_time', 'deposit_info'],
       optional: ['customer_email', 'customer_phone', 'last_name', 'vehicle_description'],
     },
+    booking_staff_notify_specialty: {
+      required: ['customer_name', 'customer_phone', 'vehicle_description'],
+      optional: ['customer_email', 'size_class', 'preferred_time'],
+    },
     detailer_job_assigned: {
       required: ['job_summary', 'appointment_date', 'appointment_time', 'service_total'],
       optional: ['mobile_service_address', 'detailer_first_name', 'customer_email', 'customer_phone', 'last_name'],
@@ -226,6 +230,10 @@ export const SMS_CONTRACTS_SOURCE = {
     staff_notification: {
       required: ['reason_label', 'customer_name', 'details', 'customer_phone'],
       optional: ['customer_email', 'last_name', 'vehicle_description'],
+    },
+    staff_notification_inbound_specialty: {
+      required: ['customer_name', 'customer_phone', 'vehicle_description'],
+      optional: ['customer_email', 'size_class', 'customer_message_excerpt'],
     },
   },
 } as const;

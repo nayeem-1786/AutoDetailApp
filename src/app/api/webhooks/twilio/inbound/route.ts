@@ -635,40 +635,23 @@ export async function POST(request: NextRequest) {
             // Fire staff notification
             try {
               const custName = customerCtx?.name || 'Unknown customer';
-              // Session 2C: locals composed for Session 2F's slug split into
-              // staff_notification_inbound_specialty. specialtyVehicleDesc (already in
-              // scope from L627) will be wired as the vehicle_description chip;
-              // customerMessageExcerpt below will be wired as the customer_message_excerpt
-              // chip (or whatever 2F names it). customerCtx.email / .last_name (loaded
-              // at L527-530's customer SELECT, no expansion needed) will be wired as
-              // customer_email / last_name chips. Chip pass to renderSmsTemplate below
-              // is unchanged — 2F splits the slug, 2C only readies the data scope.
               const customerMessageExcerpt = body.slice(0, 100);
               const staffMsg = `Specialty vehicle SMS inquiry!\n${custName} (${normalizedPhone}) texted about their ${specialtyVehicleWord} ${specialtyVehicleDesc}.\nLast message: "${customerMessageExcerpt}"\n\nRequires custom quote — please follow up.`;
               const { renderSmsTemplate } = await import('@/lib/sms/render-sms-template');
               const { getBusinessInfo } = await import('@/lib/data/business');
               const [templateResult, biz] = await Promise.all([
-                // Session 2F: slug split pending; this caller intentionally satisfies only 2
-                // of 4 required chips and relies on engine hard-skip + caller fallback prose.
-                // Do not synthesize missing values. The slug split into
-                // staff_notification_inbound_specialty (with a contract that matches what an
-                // inbound specialty text actually has available) is the right answer.
-                // Session 2C verified data scope is already complete: last_name + email
-                // loaded at L527-530's customer SELECT (prior AI-context buildout); no
-                // SELECT expansion needed. specialtyVehicleDesc + customerMessageExcerpt
-                // hoisted above as named locals for 2F's chip wiring.
-                // Session 2D wired cheap-adds (last_name, customer_email,
-                // vehicle_description) at this callsite from already-in-scope locals.
-                // The required-chip gap (reason_label, details missing) and resulting
-                // engine hard-skip → fallback-prose flow are unchanged; 2F's slug split
-                // is still the right resolution for the @ts-expect-error.
-                // @ts-expect-error — see Session 2F note above
-                renderSmsTemplate('staff_notification', {
+                // Session 2F: chip-driven send via dedicated sub-slug whose
+                // contract matches the inbound-specialty data scope (no
+                // reason_label / details — those are voice-agent escalation
+                // chips). Engine renders the body; staffMsg above stays as
+                // defense-in-depth fallback.
+                renderSmsTemplate('staff_notification_inbound_specialty', {
                   customer_name: custName,
                   customer_phone: normalizedPhone,
+                  vehicle_description: specialtyVehicleDesc,
                   customer_email: customerCtx?.email || undefined,
-                  last_name: undefined,
-                  vehicle_description: specialtyVehicleDesc || undefined,
+                  size_class: specialtyVehicleWord,
+                  customer_message_excerpt: customerMessageExcerpt || undefined,
                 }, staffMsg),
                 getBusinessInfo(),
               ]);
