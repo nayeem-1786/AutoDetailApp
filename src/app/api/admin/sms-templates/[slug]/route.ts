@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { invalidateSmsTemplateCache } from '@/lib/sms/render-sms-template';
+import { SMS_PALETTE_KEYS } from '@/lib/sms/palette';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/sms-templates/[slug] — Get single template
@@ -51,7 +52,6 @@ export async function PUT(
   const body = await request.json();
   const admin = createAdminClient();
 
-  // Fetch current template
   const { data: template, error: fetchErr } = await admin
     .from('sms_templates')
     .select('*')
@@ -67,28 +67,29 @@ export async function PUT(
     updated_by: employee.auth_user_id,
   };
 
-  // Validate body_template — required variables must be present + placeholder syntax must be well-formed
+  // Validate body_template — placeholder syntax + palette membership + contract scope.
   if (body.body_template !== undefined) {
     const newBody: string = body.body_template;
 
-    // Normalize the variable registry the same way render-sms-template.ts does:
-    // production stores a flat string[] of keys, legacy migrations store object form.
-    // Treat every listed variable as required (per Session 42X-1 schema clarification).
-    const rawVars: unknown = template.variables;
-    const allowedKeys: string[] = Array.isArray(rawVars)
-      ? rawVars
-          .map((entry) => {
-            if (typeof entry === 'string') return entry;
-            if (entry && typeof entry === 'object' && 'key' in entry) {
-              return (entry as { key: string }).key;
-            }
-            return null;
-          })
-          .filter((k): k is string => typeof k === 'string')
+    // Session 2E.1a: chip classification reads the new contract columns.
+    // - inPalette: every chip declared in the universal palette (typo gate).
+    // - inContract: chips declared on this slug's contract (required ∪ optional).
+    // Chips outside inPalette are typos → hard reject.
+    // Chips in inPalette but not in inContract are unsupplied → 409 warning gate.
+    const requiredKeys: string[] = Array.isArray(template.required_variables)
+      ? (template.required_variables as unknown[]).filter(
+          (k): k is string => typeof k === 'string'
+        )
       : [];
+    const optionalKeys: string[] = Array.isArray(template.optional_variables)
+      ? (template.optional_variables as unknown[]).filter(
+          (k): k is string => typeof k === 'string'
+        )
+      : [];
+    const inContract = new Set<string>([...requiredKeys, ...optionalKeys]);
+    const inPalette = new Set<string>(SMS_PALETTE_KEYS);
 
-    // 1. Reject doubled-brace patterns ({{key}} — common operator typo)
-    //    Match doubled-brace tokens before the single-brace scan strips them.
+    // 1. Reject doubled-brace patterns ({{key}} — common operator typo).
     const doubledBraceMatch = newBody.match(/\{\{[^}]+\}\}/);
     if (doubledBraceMatch) {
       return NextResponse.json(
@@ -99,23 +100,25 @@ export async function PUT(
       );
     }
 
-    // 2. Scan {…} placeholders for valid syntax + known keys.
-    //    The render engine substitutes /\{(\w+)\}/g and the post-render scan uses
-    //    /\{([a-z_]+)\}/g — placeholders outside the lowercase-letters-and-underscore
-    //    pattern would never substitute and would leak as raw text. Reject them here.
+    // 2. Scan {…} placeholders, classify into malformed / unknown / warning / OK.
     const placeholderRegex = /\{([^}]*)\}/g;
     const validKeyPattern = /^[a-z][a-z0-9_]*$/;
-    let match: RegExpExecArray | null;
-    const offendersUnknown: string[] = [];
     const offendersMalformed: string[] = [];
+    const offendersUnknown: string[] = [];
+    const warningChips = new Set<string>();
+    let match: RegExpExecArray | null;
     while ((match = placeholderRegex.exec(newBody)) !== null) {
       const inner = match[1];
       if (!validKeyPattern.test(inner)) {
         offendersMalformed.push(match[0]);
         continue;
       }
-      if (!allowedKeys.includes(inner)) {
+      if (!inPalette.has(inner)) {
         offendersUnknown.push(match[0]);
+        continue;
+      }
+      if (!inContract.has(inner)) {
+        warningChips.add(inner);
       }
     }
     if (offendersMalformed.length > 0) {
@@ -128,22 +131,38 @@ export async function PUT(
       );
     }
     if (offendersUnknown.length > 0) {
+      const validChips = [...requiredKeys, ...optionalKeys];
       return NextResponse.json(
         {
-          error: `Unknown placeholder: ${offendersUnknown.join(', ')}. Valid variables for this template: ${allowedKeys.length > 0 ? allowedKeys.map((k) => `{${k}}`).join(', ') : '(none)'}.`,
+          error: `Unknown placeholder: ${offendersUnknown.join(', ')}. These chips don't exist in the universal palette. Valid chips for this template: ${validChips.length > 0 ? validChips.map((k) => `{${k}}`).join(', ') : '(none)'}.`,
           unknown: offendersUnknown,
         },
         { status: 400 }
       );
     }
 
-    // 3. Required-variables-present check (existing behavior preserved).
-    //    Schema clarification: every listed variable is treated as required.
-    const missing = allowedKeys.filter((key) => !newBody.includes(`{${key}}`));
+    // 3. Required-presence check — every chip in required_variables must
+    //    appear as {key} in the body, else the message is incoherent.
+    const missing = requiredKeys.filter((key) => !newBody.includes(`{${key}}`));
     if (missing.length > 0) {
       return NextResponse.json(
         { error: 'Missing required variables', missing },
         { status: 400 }
+      );
+    }
+
+    // 4. Warning gate (409) — chips in palette but not in this slug's contract.
+    //    Mirrors the confirm_silence pattern at line 161 below: client receives
+    //    409 with the warning list, displays a confirm dialog, then re-POSTs
+    //    with confirm_warnings: true to commit.
+    if (warningChips.size > 0 && !body.confirm_warnings) {
+      const warningList = Array.from(warningChips);
+      return NextResponse.json(
+        {
+          warnings: warningList,
+          message: `The following chip(s) are in the universal palette but aren't supplied to this slug by callers: ${warningList.map((k) => `{${k}}`).join(', ')}. Lines containing them will be removed from rendered SMS.`,
+        },
+        { status: 409 }
       );
     }
 

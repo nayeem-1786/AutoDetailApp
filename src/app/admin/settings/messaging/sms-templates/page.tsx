@@ -9,7 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { SlideOver } from '@/components/ui/slide-over';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { VariableInserter } from '@/app/admin/marketing/email-templates/_components/variable-inserter';
-import { SMS_TEMPLATE_VARIABLES } from '@/lib/sms/sms-template-variables';
+import { SMS_PALETTE } from '@/lib/sms/palette';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
@@ -29,7 +29,8 @@ interface SmsTemplate {
   category: string;
   body_template: string;
   default_body: string;
-  variables: Array<{ key: string; description: string; required: boolean }>;
+  required_variables: string[];
+  optional_variables: string[];
   is_active: boolean;
   can_silence: boolean;
   recipient_type: 'customer' | 'staff' | 'detailer';
@@ -69,25 +70,25 @@ interface BusinessInfo {
 }
 
 function buildSampleVars(
-  variables: Array<{ key: string; description: string; required: boolean }>,
-  slug: string,
+  required: string[],
+  optional: string[],
   bizInfo: BusinessInfo | null
 ): Record<string, string> {
-  const defs = SMS_TEMPLATE_VARIABLES[slug] ?? [];
   const result: Record<string, string> = {};
-  for (const v of variables) {
-    const def = defs.find((d) => d.key === v.key);
-    const sample = def?.sample;
-    if (v.key === 'business_name' && bizInfo?.name) {
-      result[v.key] = bizInfo.name;
-    } else if (v.key === 'business_phone' && bizInfo?.phone) {
-      result[v.key] = bizInfo.phone;
-    } else if (v.key === 'business_address' && bizInfo?.address) {
-      result[v.key] = bizInfo.address;
+  for (const key of [...required, ...optional]) {
+    const meta = SMS_PALETTE[key];
+    const sample = meta?.sample;
+    const description = meta?.description ?? key;
+    if (key === 'business_name' && bizInfo?.name) {
+      result[key] = bizInfo.name;
+    } else if (key === 'business_phone' && bizInfo?.phone) {
+      result[key] = bizInfo.phone;
+    } else if (key === 'business_address' && bizInfo?.address) {
+      result[key] = bizInfo.address;
     } else if (sample && !sample.startsWith('[')) {
-      result[v.key] = sample;
+      result[key] = sample;
     } else {
-      result[v.key] = `[${v.description}]`;
+      result[key] = `[${description}]`;
     }
   }
   return result;
@@ -110,6 +111,7 @@ export default function SmsTemplatesPage() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [confirmSilenceSlug, setConfirmSilenceSlug] = useState<string | null>(null);
+  const [warningChips, setWarningChips] = useState<string[] | null>(null);
   const [bizInfo, setBizInfo] = useState<BusinessInfo | null>(null);
 
   // Loaded values for dirty detection
@@ -221,13 +223,14 @@ export default function SmsTemplatesPage() {
   }
 
   // Save template
-  async function handleSave() {
+  async function handleSave(confirmWarnings: boolean = false) {
     if (!editTemplate) return;
 
-    // Client-side required variable validation
-    const missing = editTemplate.variables
-      .filter((v) => v.required && !editBody.includes(`{${v.key}}`))
-      .map((v) => v.key);
+    // Client-side required variable validation — every chip in the slug's
+    // required_variables contract must appear as {key} in the body.
+    const missing = editTemplate.required_variables.filter(
+      (key) => !editBody.includes(`{${key}}`)
+    );
 
     if (missing.length > 0) {
       toast.error(`Missing required variables: ${missing.join(', ')}`);
@@ -240,12 +243,23 @@ export default function SmsTemplatesPage() {
       if (editTemplate.recipient_type === 'staff') {
         payload.recipient_phones = editPhones;
       }
+      if (confirmWarnings) {
+        payload.confirm_warnings = true;
+      }
 
       const res = await adminFetch(`/api/admin/sms-templates/${editTemplate.slug}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
+      // Warning gate — chip in palette but not in this slug's contract.
+      // Surface in confirm dialog; on confirm, re-call handleSave(true).
+      if (res.status === 409) {
+        const data = await res.json();
+        setWarningChips(Array.isArray(data.warnings) ? data.warnings : []);
+        return;
+      }
 
       if (!res.ok) {
         const data = await res.json();
@@ -261,6 +275,7 @@ export default function SmsTemplatesPage() {
       setTemplates((prev) => prev.map((t) => t.slug === updated.slug ? updated : t));
       setLoadedBody(updated.body_template);
       setLoadedPhones(updated.recipient_phones ?? []);
+      setWarningChips(null);
       toast.success('Template saved. Changes take effect within 60 seconds.');
     } catch {
       toast.error('Failed to save template');
@@ -343,18 +358,27 @@ export default function SmsTemplatesPage() {
   }
 
   // Preview rendering
-  const sampleVars = editTemplate ? buildSampleVars(editTemplate.variables, editTemplate.slug, bizInfo) : {};
+  const sampleVars = editTemplate
+    ? buildSampleVars(editTemplate.required_variables, editTemplate.optional_variables, bizInfo)
+    : {};
   const previewText = editTemplate ? renderTemplate(editBody, sampleVars) : '';
   const { chars, segments } = countSegments(previewText);
 
-  // Build variable definitions for the inserter (add * for required)
-  const variableDefs: VariableDefinition[] = editTemplate
-    ? editTemplate.variables.map((v) => ({
-        key: v.key,
-        description: v.required ? `${v.description} *` : v.description,
-        sample: SMS_TEMPLATE_VARIABLES[editTemplate.slug]?.find((d) => d.key === v.key)?.sample ?? '',
-      }))
-    : [];
+  // Build sectioned variable definitions for the inserter — Required/Optional
+  // headers convey requirement status (no * marker needed). Description and
+  // sample come from the universal palette.
+  function chipDef(key: string): VariableDefinition {
+    const meta = SMS_PALETTE[key];
+    return {
+      key,
+      description: meta?.description ?? key,
+      sample: meta?.sample ?? '',
+    };
+  }
+  const variableSections = {
+    required: editTemplate ? editTemplate.required_variables.map(chipDef) : [],
+    optional: editTemplate ? editTemplate.optional_variables.map(chipDef) : [],
+  };
 
   // Group templates by category
   const grouped = CATEGORY_ORDER.map((cat) => ({
@@ -499,7 +523,7 @@ export default function SmsTemplatesPage() {
             {/* Body editor */}
             <div className="mb-1 flex items-center justify-between">
               <label className="text-xs font-medium text-gray-700">Message</label>
-              <VariableInserter variables={variableDefs} onInsert={insertVariable} />
+              <VariableInserter sections={variableSections} onInsert={insertVariable} />
             </div>
             <textarea
               ref={textareaRef}
@@ -561,7 +585,7 @@ export default function SmsTemplatesPage() {
                   Reset to Default
                 </Button>
                 <div className="flex-1" />
-                <Button onClick={handleSave} disabled={saving || !isDirty}>
+                <Button onClick={() => handleSave()} disabled={saving || !isDirty}>
                   {saving ? 'Saving...' : 'Save'}
                 </Button>
               </div>
@@ -583,6 +607,34 @@ export default function SmsTemplatesPage() {
             performToggle(confirmSilenceSlug, false, true);
             setConfirmSilenceSlug(null);
           }
+        }}
+      />
+
+      {/* Confirm dialog for chips in palette but not in this slug's contract */}
+      <ConfirmDialog
+        open={warningChips !== null}
+        onOpenChange={(open) => { if (!open) setWarningChips(null); }}
+        title="Save with Unsupplied Chips?"
+        description={
+          <div className="space-y-2">
+            <p>
+              The following {(warningChips?.length ?? 0) === 1 ? 'chip is' : 'chips are'} in the universal palette but {(warningChips?.length ?? 0) === 1 ? "isn't" : "aren't"} supplied to this slug by callers:
+            </p>
+            <ul className="list-disc pl-5 font-mono text-xs">
+              {(warningChips ?? []).map((k) => (
+                <li key={k}>{`{${k}}`}</li>
+              ))}
+            </ul>
+            <p>
+              Lines containing them will be removed from rendered SMS. Continue saving?
+            </p>
+          </div>
+        }
+        confirmLabel="Save Anyway"
+        loading={saving}
+        onConfirm={() => {
+          setWarningChips(null);
+          void handleSave(true);
         }}
       />
     </div>

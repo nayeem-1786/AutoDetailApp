@@ -65,7 +65,12 @@ beforeEach(() => {
     category: 'booking',
     body_template: 'Hi {first_name}, your booking is confirmed.',
     default_body: 'Hi {first_name}, your booking is confirmed.',
-    variables: ['first_name', 'business_name'],  // production flat string[] shape
+    // Session 2E.1a: PUT now reads required_variables + optional_variables
+    // (DB columns added in Session 2A) and SMS_PALETTE_KEYS instead of the
+    // legacy `variables` JSONB. Tests use a synthetic minimal contract to
+    // keep body templates short.
+    required_variables: ['first_name', 'business_name'],
+    optional_variables: [],
     is_active: true,
     can_silence: false,
     recipient_type: 'customer',
@@ -178,25 +183,41 @@ describe('PUT /api/admin/sms-templates/[slug] — placeholder validation (C4)', 
     expect(json.missing).toEqual(['business_name']);
   });
 
-  it('handles legacy object-shape variables in template registry', async () => {
-    state.template!.variables = [
-      { key: 'first_name', description: '', required: true },
-      { key: 'business_name', description: '', required: true },
-    ];
-
-    const okRes = await PUT(
-      makeReq({ body_template: 'Hi {first_name} from {business_name}!' }),
+  it('warns (409) when chip is in the universal palette but not in this slug contract', async () => {
+    // customer_email is a real palette chip but not in our fixture's contract
+    // (required_variables: [first_name, business_name], optional_variables: []).
+    const res = await PUT(
+      makeReq({ body_template: 'Hi {first_name} from {business_name}, contact {customer_email}!' }),
       ctx
     );
-    expect(okRes.status).toBe(200);
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.warnings).toEqual(['customer_email']);
+    expect(json.message).toContain('{customer_email}');
+    expect(json.message).toContain("aren't supplied");
+  });
 
-    const unknownRes = await PUT(
-      makeReq({ body_template: 'Hi {first_name} {business_name} {unknown}!' }),
+  it('commits (200) on retry when 409 warning is confirmed via confirm_warnings', async () => {
+    const res = await PUT(
+      makeReq({
+        body_template: 'Hi {first_name} from {business_name}, contact {customer_email}!',
+        confirm_warnings: true,
+      }),
       ctx
     );
-    expect(unknownRes.status).toBe(400);
-    const j = await unknownRes.json();
-    expect(j.unknown).toEqual(['{unknown}']);
+    expect(res.status).toBe(200);
+  });
+
+  it('treats optional contract chips as not-required (presence not enforced)', async () => {
+    state.template!.required_variables = ['first_name'];
+    state.template!.optional_variables = ['last_name'];
+
+    // {last_name} omitted — should not trigger missing-required (it's optional).
+    const res = await PUT(
+      makeReq({ body_template: 'Hi {first_name}!' }),
+      ctx
+    );
+    expect(res.status).toBe(200);
   });
 });
 

@@ -3,9 +3,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
-import { SMS_SLUGS, type SmsSlug, type RenderVarsBySlug } from '@/lib/sms/generated-contracts';
+import { SMS_SLUGS, type SmsSlug, type RenderVarsBySlug, CONTRACTS_BY_SLUG } from '@/lib/sms/generated-contracts';
 import { sendSms } from '@/lib/utils/sms';
-import { SMS_TEMPLATE_VARIABLES } from '@/lib/sms/sms-template-variables';
+import { SMS_PALETTE } from '@/lib/sms/palette';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function POST(
@@ -128,11 +128,14 @@ export async function POST(
     console.error('[SmsTemplateTest] Customer data fetch error:', err);
   }
 
-  // Fill remaining gaps with sample values from variable definitions
-  const templateVars = SMS_TEMPLATE_VARIABLES[slug] ?? [];
-  for (const v of templateVars) {
-    if (!variables[v.key] && v.sample && !v.sample.startsWith('[')) {
-      variables[v.key] = v.sample;
+  // Fill remaining gaps with sample values from the universal palette,
+  // scoped to chips in this slug's contract (required ∪ optional).
+  const contract = CONTRACTS_BY_SLUG[typedSlug];
+  for (const key of [...contract.required, ...contract.optional]) {
+    if (variables[key]) continue;
+    const meta = SMS_PALETTE[key];
+    if (meta?.sample && !meta.sample.startsWith('[')) {
+      variables[key] = meta.sample;
     }
   }
 

@@ -10,6 +10,90 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): admin UI universal palette cutover (part 1 of 3) — 2026-04-26 (Session 2E.1a)
+
+**Admin UI universal palette work (part 1 of 3).** Chip picker now reads from `required_variables` + `optional_variables` columns and joins against `SMS_PALETTE` for descriptions/samples; sectioned dropdown layout with Required/Optional headers and red asterisk markers; content-driven width sizing (280-360px); PUT validation rewritten to distinguish typos (hard reject) from in-palette-but-not-in-contract chips (warn + allow via 409 + `confirm_warnings` round-trip mirroring the existing `confirm_silence` pattern); test endpoint sample lookups migrated to `SMS_PALETTE`.
+
+**Architecture.** This session completes the operator-side cutover from the legacy `sms_templates.variables` JSONB column to `required_variables` + `optional_variables` + `SMS_PALETTE`. The admin UI no longer reads the legacy column at all. Column itself stays in DB; drop deferred to Session 2E.2. Per the 2E.1a/2E.1b/2E.2 split agreed in this session: hardcoded messages section is deferred to 2E.1b; legacy column drop is 2E.2; 2E.1b and 2E.2 can ship in either order or in parallel after 2E.1a is verified in production.
+
+**Hardcoded slug count clarification.** Phase 0 investigation surfaced that `INTENTIONALLY_HARDCODED_SMS` in `src/lib/sms/sms-template-variables.ts` actually contains 7 slugs (`addon_authorization`, `addon_authorization_resend`, `addon_authorization_expired`, `quote_sms_admin`, `quote_sms_postcall`, `quote_sms_midcall`, `receipt_sms`), not 14 as previously framed. Session 2E.1b will surface these 7 read-only entries as the "Hardcoded Messages" section in the admin UI.
+
+### Phase 1 — chip picker source migration + sectioned/two-line UX redesign
+
+**`src/app/admin/marketing/email-templates/_components/variable-inserter.tsx`** — extended the shared component (used by both email and SMS templates) with an optional `sections: { required, optional }` prop:
+
+- New `sections` prop renders Required/Optional small-caps headers with chips grouped underneath. Empty sections (header) are hidden when their array is empty after search filtering.
+- Sectioned mode uses a two-line row layout: chip key in monospace `<code>` on line 1; description below in muted text with `break-words leading-tight` so long descriptions wrap gracefully instead of overflowing.
+- Required-section rows include a red asterisk (`text-red-500 font-semibold` with `aria-label="required"`) inline next to the chip key — section header is the primary cue, the per-row asterisk is belt-and-suspenders for row-level scanning.
+- Width changed from fixed `w-72` (288px) to content-driven `min-w-[280px] max-w-[360px]` so the dropdown sizes to the longest chip key/description without runaway widening on long composite chip descriptions.
+- Flat-list mode (existing `variables` prop, used by all 5 email-template callsites in `block-properties.tsx` and `email-templates/[id]/page.tsx`) is preserved exactly: single-line rows, no headers, no asterisks. Only visible change for email is the wider dropdown.
+
+**`src/app/admin/settings/messaging/sms-templates/page.tsx`** — chip picker source migrated:
+
+- Removed `import { SMS_TEMPLATE_VARIABLES } from '@/lib/sms/sms-template-variables'`; replaced with `import { SMS_PALETTE } from '@/lib/sms/palette'`. Legacy const file is unread now but stays in place (deletion deferred to 2E.2).
+- `SmsTemplate` interface dropped legacy `variables: Array<{key, description, required}>`; replaced with `required_variables: string[]; optional_variables: string[]`.
+- `buildSampleVars()` rewritten to take `(required, optional, bizInfo)` and look up samples from `SMS_PALETTE` directly. Auto-inject business chip overrides preserved.
+- Client-side missing-required check now walks `editTemplate.required_variables` only (was: every entry in legacy `variables` array, treated as required).
+- New `variableSections = { required, optional }` build joins `required_variables`/`optional_variables` against `SMS_PALETTE` for description+sample. No `*` suffix on description (section header conveys it).
+
+### Phase 2 — PUT endpoint validation rewrite + warning gate + test endpoint migration
+
+**`src/app/api/admin/sms-templates/[slug]/route.ts`** — body validation rewritten end-to-end:
+
+- Reads `template.required_variables` and `template.optional_variables` from the DB row (was: `template.variables` legacy JSONB).
+- Imports `SMS_PALETTE_KEYS` from `palette.ts` and builds two sets: `inPalette` (every chip in the universal palette) and `inContract` (this slug's required ∪ optional).
+- Existing checks preserved: doubled-brace `{{key}}` rejection (400); malformed-syntax rejection for uppercase/leading-digit/dot/hyphen/whitespace/empty placeholders (400).
+- **NEW typo classification**: chips outside `inPalette` are 400 hard rejects with `error: "Unknown placeholder: {x}. These chips don't exist in the universal palette. Valid chips for this template: …"`.
+- Required-presence check now reads `requiredKeys` only (was: every listed variable in legacy column, treated as required regardless of per-entry `required` flag).
+- **NEW warning gate**: chips in `inPalette` but not in `inContract` accumulate into a warning set. If non-empty AND request body lacks `confirm_warnings: true`, returns 409 with `warnings: string[]` and a human-readable `message`. Mirrors the existing `confirm_silence` pattern at the same route.
+- Hard checks (typo, malformed, missing required) all run BEFORE the 409 warning gate so severe failures aren't masked by warnings.
+
+**`src/app/api/admin/sms-templates/[slug]/test/route.ts`** — sample-fill source migrated:
+
+- Removed `import { SMS_TEMPLATE_VARIABLES }`; added `import { SMS_PALETTE }` and `CONTRACTS_BY_SLUG` from `generated-contracts.ts`.
+- Sample-gap fill loop now iterates over `CONTRACTS_BY_SLUG[typedSlug].required ∪ optional` and reads samples from `SMS_PALETTE[key].sample`. Same `[…]`-prefix skip behavior preserved (auto-inject samples like `[From Settings]` are bypassed when bizInfo is unavailable).
+
+**`src/app/admin/settings/messaging/sms-templates/page.tsx`** — client warning flow:
+
+- New state: `warningChips: string[] | null`. Non-null = dialog open.
+- `handleSave(confirmWarnings: boolean = false)` accepts a flag passed in the payload as `confirm_warnings: true` on retry.
+- Save handler catches 409, populates `warningChips`, returns without toasting; `ConfirmDialog` opens with title "Save with Unsupplied Chips?" and a JSX description listing each warning chip in monospace. "Save Anyway" button calls `handleSave(true)`; "Cancel" closes.
+- Save button click now wraps in `() => handleSave()` (was `onClick={handleSave}` which would have passed the React MouseEvent as `confirmWarnings: true` after this signature change — caught during implementation review).
+
+### Tests
+
+Three new tests added in `src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts`; one legacy test removed:
+
+- **NEW** "warns (409) when chip is in the universal palette but not in this slug contract" — body `'… contact {customer_email}!'` with fixture contract excluding `customer_email` → 409 with `warnings: ['customer_email']` and message containing `aren't supplied`.
+- **NEW** "commits (200) on retry when 409 warning is confirmed via confirm_warnings" — same body + `confirm_warnings: true` → 200.
+- **NEW** "treats optional contract chips as not-required (presence not enforced)" — chip in `optional_variables` can be omitted from body without triggering missing-required.
+- **REMOVED** "handles legacy object-shape variables in template registry" — Phase 2 cuts the route off from the legacy column entirely, so the parser-handling test is no longer meaningful.
+- Test fixture `beforeEach` updated: dropped reliance on `state.template.variables`; added `required_variables: ['first_name', 'business_name']` and `optional_variables: []` for synthetic minimal contract.
+
+### Verification
+
+- `npx tsc --noEmit` clean (exit 0)
+- `npm run lint` zero new issues (Session 2D.2 baseline preserved: 13 errors / 44 warnings, all pre-existing in unrelated files)
+- `npm run build` clean (after `rm -rf .next` to clear stale cache)
+- `npx vitest run` 535/535 pass across 36 test files (was 533; +3 new warning-gate tests, -1 removed legacy test)
+- Manual UAT: 7-step browser checklist confirmed across two iterations (initial + post-redesign + post-Phase-2): chip picker filters per slug; long chip names like `mobile_service_address` fully visible at 360px cap; Required/Optional sections render correctly; sparse slugs like `quote_accepted_multi` show only Optional section; valid save → 200; typo `{garbage_chip_xyz}` → 400 hard reject; in-palette-not-in-contract `{customer_email}` on `appointment_confirmed` → 409 → ConfirmDialog → "Save Anyway" → 200; "Cancel" aborts cleanly; missing required chip → 400; email-templates dropdown unchanged structurally (just wider).
+
+### Files
+
+- Modified: `src/app/admin/marketing/email-templates/_components/variable-inserter.tsx` (sections prop, two-line/sectioned mode, width range)
+- Modified: `src/app/admin/settings/messaging/sms-templates/page.tsx` (chip picker source migration, warning dialog flow)
+- Modified: `src/app/api/admin/sms-templates/[slug]/route.ts` (PUT validation rewrite + 409 warning gate)
+- Modified: `src/app/api/admin/sms-templates/[slug]/test/route.ts` (sample fill via SMS_PALETTE/CONTRACTS_BY_SLUG)
+- Modified: `src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts` (3 new tests, 1 legacy test removed, fixture migration)
+- Docs: `docs/CHANGELOG.md`, `CLAUDE.md` (Rule 9 updated to reflect closed two-source-of-truth window)
+
+### Deferred to follow-up sessions
+
+- **Session 2E.1b**: Hardcoded Messages read-only section in admin UI for the 7 slugs in `INTENTIONALLY_HARDCODED_SMS`. Independent of column state; can ship anytime after 2E.1a is verified in production.
+- **Session 2E.2**: Drop legacy `sms_templates.variables` JSONB column + delete `src/lib/sms/sms-template-variables.ts`. Independent of 2E.1b; can ship anytime after 2E.1a is verified.
+
+---
+
 ## fix(voice-agent): per-quote vehicle attribution + duplicate-postcall-SMS dedup — 2026-04-26 (Session 2D.2)
 
 **Voice-agent UX fixes.** Two unrelated bugs surfaced from a real call test.
