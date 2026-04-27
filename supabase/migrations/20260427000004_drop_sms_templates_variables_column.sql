@@ -1,0 +1,21 @@
+-- Session 2E.2 — Final session in the 2E series.
+--
+-- Drops the legacy `sms_templates.variables` JSONB column. This column
+-- previously stored per-slug chip metadata (key/description/required tuples)
+-- read by the admin UI for chip-picker preview and PUT save validation.
+--
+-- Cutover history:
+--   Session 2A   — engine cut over to required_variables + optional_variables
+--                  columns added by migration 20260425000003. Engine no longer
+--                  reads `variables` from this point onward.
+--   Session 2E.1a — admin UI (chip picker, PUT validation, test endpoint, save
+--                   flow) all migrated to read from required_variables ∪
+--                   optional_variables ∪ SMS_PALETTE_KEYS. Admin no longer reads
+--                   `variables` from this point onward.
+--   Session 2E.2  — this migration. Drops the column. No remaining readers.
+--
+-- IF EXISTS makes this migration idempotent — re-running on an already-dropped
+-- DB is a no-op. The associated COMMENT (set in 20260425000003) is auto-removed
+-- when the column drops.
+
+ALTER TABLE public.sms_templates DROP COLUMN IF EXISTS variables;

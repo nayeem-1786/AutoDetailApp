@@ -10,6 +10,84 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): drop legacy variables column + delete sms-template-variables.ts (final 2E session) — 2026-04-26 (Session 2E.2)
+
+**Final 2E series session.** Drops the legacy `sms_templates.variables` JSONB column and deletes `src/lib/sms/sms-template-variables.ts`. Closes the cutover from legacy chip metadata to typed contracts (`required_variables` ∪ `optional_variables` ∪ `SMS_PALETTE`).
+
+**Architecture.** Completes Path B Phase 2 architectural work. The chip-driven SMS architecture is now fully realized in DB schema and code structure: engine reads typed contracts (Session 2A), admin UI reads typed contracts + `SMS_PALETTE` (Session 2E.1a), hardcoded slugs are surfaced read-only (Session 2E.1b), and the legacy chip metadata storage is gone (this session). Net diff this session: +21 / -172 lines — architectural cleanup ratio.
+
+**Forward path.** Sessions 2F (template seeds + sub-slug splits), 3A-3D (migrate the 7 hardcoded slugs to chip-driven), and the 2D.3 required-chip rationalization (raised by operator) build on this foundation.
+
+### Phase 0 — verification (read-only)
+
+Confirmed via grep:
+- Zero active imports of `@/lib/sms/sms-template-variables` (Session 2E.1a closed all of them).
+- Zero consumed reads of `sms_templates.variables` column. Several `select('*')` passthrough sites (admin GET/PUT/reset) ship the column over the wire but no client reads it; the engine's explicit column list at `src/lib/sms/render-sms-template.ts:88` excludes `variables`.
+- No constraints, foreign keys, indexes, views, or triggers depend on `variables`. Single COMMENT (set in `20260425000003`) auto-removed when column drops.
+- `INTENTIONALLY_HARDCODED_SMS` had zero active code consumers — pure documentary list. Tuple-literal narrowing was unused.
+
+### Phase 1 — implementation
+
+**`INTENTIONALLY_HARDCODED_SMS` placement (Option B — derived).** Moved to `src/lib/sms/hardcoded-messages.ts`:
+
+```ts
+export const INTENTIONALLY_HARDCODED_SMS: readonly string[] = HARDCODED_SMS_MESSAGES.map((e) => e.slug);
+```
+
+Drift between the slug-list export and the rich `HARDCODED_SMS_MESSAGES` data structure (added in Session 2E.1b) is structurally impossible — the slug list is a `.map()` of the array. Documentary surface preserved for code search; tuple-literal narrowing intentionally not preserved (no caller used it). If a future caller needs literal narrowing, hand-maintain a parallel `as const` tuple at that point.
+
+**File deletion.** `src/lib/sms/sms-template-variables.ts` removed entirely (162 LOC). Contained:
+- `SMS_TEMPLATE_VARIABLES` const — last reader (admin test endpoint) migrated to `SMS_PALETTE` in Session 2E.1a.
+- Barrel re-exports of `SMS_PALETTE` / `SMS_PALETTE_KEYS` / `ChipMetadata` — never used; every active consumer imports `from '@/lib/sms/palette'` directly.
+- `INTENTIONALLY_HARDCODED_SMS` as `readonly ['addon_authorization', ...] as const` — moved (derived) per above.
+
+**Stale comment refresh.** Updated comment at `src/app/api/admin/sms-templates/[slug]/test/route.ts:144` (was: "vars are built from request-driven sample data sourced from the legacy `SMS_TEMPLATE_VARIABLES` map") to reflect the actual current source: `SMS_PALETTE` keyed by the slug's contract chips. Updated comment at `src/lib/sms/hardcoded-messages.ts:18` (was: "Slug names mirror src/lib/sms/sms-template-variables.ts INTENTIONALLY_HARDCODED_SMS") to reference the new home.
+
+**Migration.** `supabase/migrations/20260427000004_drop_sms_templates_variables_column.sql`:
+
+```sql
+ALTER TABLE public.sms_templates DROP COLUMN IF EXISTS variables;
+```
+
+`IF EXISTS` makes the migration idempotent. The migration file's header documents the cutover history (Session 2A engine cutover → 2E.1a admin cutover → 2E.2 column drop) for future archaeologists.
+
+**Schema doc regenerated** via `npx tsx scripts/regen-db-schema.ts`. `sms_templates` row count drops from 14 columns to 13 in `docs/dev/DB_SCHEMA.md`.
+
+**CLAUDE.md Rule 9 update.** Rewrote the "Admin UI cutover (Session 2E.1a)" subsection in present tense as "Admin UI validation". Dropped 3 stale clauses:
+- "The legacy `sms_templates.variables` JSONB column and `SMS_TEMPLATE_VARIABLES` TS const ... both still exist but are unread by engine and admin" — both gone now.
+- "drop deferred to Session 2E.2" — done.
+- "Body rewrites no longer need corrective migrations to the legacy `variables` column" — historically accurate guard for sessions 2A-2E.1a; trivially true with no legacy column.
+
+The validation-tier description (typo → 400 hard reject; in-palette-not-in-contract → 409 + `confirm_warnings` round-trip) preserved verbatim — that's load-bearing forward guidance for future SMS work.
+
+### Verification
+
+- `npx tsc --noEmit` clean (exit 0)
+- `npm run lint` zero new issues (Session 2E.1b baseline preserved: 13 errors / 44 warnings, all pre-existing in unrelated files)
+- `npm run build` clean (after `rm -rf .next`)
+- `npx vitest run` 535/535 pass across 36 test files (no test changes; route.test.ts fixture was already migrated off `variables` in Session 2E.1a)
+- `supabase db push --linked --dry-run` reports "Remote database is up to date" after migration applied
+- Manual UAT confirmed: page loads with all 18 editable templates and the Hardcoded Messages section; chip picker and warning flow work; network tab confirms GET `/api/admin/sms-templates` response no longer contains `variables` field on each template
+
+### Files
+
+- New: `supabase/migrations/20260427000004_drop_sms_templates_variables_column.sql`
+- Deleted: `src/lib/sms/sms-template-variables.ts`
+- Modified: `src/lib/sms/hardcoded-messages.ts` (added derived `INTENTIONALLY_HARDCODED_SMS`; refreshed file-level comment), `src/app/api/admin/sms-templates/[slug]/test/route.ts` (refreshed stale comment)
+- Docs: `CLAUDE.md` (Rule 9 rewrite), `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`, `docs/dev/DB_SCHEMA.md` (auto-regenerated)
+
+### Closes the 2E series
+
+| Session | Description |
+|---|---|
+| 2E.1a (commit 98b25087) | Admin chip picker + PUT validation cutover; warning gate via 409 + confirm_warnings round-trip |
+| 2E.1b (commit b3ac2b53) | Hardcoded messages read-only section in admin UI |
+| 2E.2 (this session) | Drop legacy `variables` column + delete legacy const file |
+
+Path B Phase 2 architectural cycle complete. Two-source-of-truth window closed.
+
+---
+
 ## feat(sms): admin UI hardcoded messages section (part 2 of 3) — 2026-04-26 (Session 2E.1b)
 
 **Admin UI hardcoded messages section.** Read-only display of 7 hardcoded SMS slugs (`addon_authorization` variants, `quote_sms_*` variants, `receipt_sms`) with explanatory text setting expectations that they'll be editable after Sessions 3A-3D migrate them to chip-driven.

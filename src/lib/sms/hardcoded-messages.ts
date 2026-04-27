@@ -15,7 +15,8 @@
 //   quote_sms_midcall            src/app/api/voice-agent/send-quote-sms/route.ts
 //   receipt_sms                  src/app/api/pos/receipts/sms/route.ts
 //
-// Slug names mirror src/lib/sms/sms-template-variables.ts INTENTIONALLY_HARDCODED_SMS.
+// `INTENTIONALLY_HARDCODED_SMS` is derived from this list (Session 2E.2).
+// Previously lived in src/lib/sms/sms-template-variables.ts (now deleted).
 
 export interface HardcodedMessageEntry {
   /** Slug identifier (parallels chip-driven slugs in sms_templates). */
@@ -78,3 +79,14 @@ export const HARDCODED_SMS_MESSAGES: HardcodedMessageEntry[] = [
     sampleBody: '{business_name}\n{summary_line}\nThank you! View receipt:\n{short_url}',
   },
 ];
+
+/**
+ * Slug list of hardcoded SMS sends — derived from `HARDCODED_SMS_MESSAGES`.
+ * Documentary surface preserved for code search; structurally impossible to
+ * drift from `HARDCODED_SMS_MESSAGES` because it's a `.map()` of the same array.
+ *
+ * Pre-2E.2: hand-maintained `as const` tuple in `sms-template-variables.ts`.
+ * Post-2E.2: derived. Tuple-literal narrowing (e.g. switch on individual slug
+ * literals) was unused; intentionally not preserved.
+ */
+export const INTENTIONALLY_HARDCODED_SMS: readonly string[] = HARDCODED_SMS_MESSAGES.map((e) => e.slug);

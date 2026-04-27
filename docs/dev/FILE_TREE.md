@@ -931,14 +931,13 @@ src/lib/email/drip-engine.ts
 ### SMS Template System
 ```
 src/lib/sms/render-sms-template.ts          # Generic over SmsSlug (Session 2A.5); test-only __renderSmsTemplateForTesting export
-src/lib/sms/sms-template-variables.ts
 src/lib/sms/sms-contracts.source.ts         # Hand-edited single source of truth (Session 2A.5)
 src/lib/sms/palette.ts                      # AUTO-GENERATED from sms-contracts.source.ts (Session 2A.5; was hand-edited 2A)
 src/lib/sms/generated-contracts.ts          # AUTO-GENERATED — SmsSlug, SMS_SLUGS, CONTRACTS_BY_SLUG, RenderVarsBySlug (Session 2A.5)
 src/lib/sms/contract.ts                     # Zod contract schema + validators (Session 2A)
 src/lib/sms/composites.ts                   # Caller-built composite chip builders (Session 2A)
 src/lib/sms/dedup.ts                        # isRecentDuplicateSms — messages-log dedup helper (Session 2D.2)
-src/lib/sms/hardcoded-messages.ts           # Static read-only display list for admin UI Hardcoded Messages section (Session 2E.1b)
+src/lib/sms/hardcoded-messages.ts           # Static read-only display list for admin UI; also exports derived INTENTIONALLY_HARDCODED_SMS slug list (Sessions 2E.1b, 2E.2)
 src/lib/sms/__tests__/render-sms-template.test.ts
 src/lib/sms/__tests__/render-sms-template-contract.test.ts
 src/app/api/admin/sms-templates/route.ts
@@ -1520,6 +1519,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260427000001_appointment_confirmed_service_total_optional.sql
 20260427000002_appointment_confirmed_body_split_lines.sql
 20260427000003_cheap_add_wave_optional_chips.sql
+20260427000004_drop_sms_templates_variables_column.sql
 ```
 
 ## Scripts

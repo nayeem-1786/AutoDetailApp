@@ -141,9 +141,9 @@ export async function POST(
 
   // Render and send.
   // Session 2A.5: vars are built from request-driven sample data sourced from
-  // the legacy SMS_TEMPLATE_VARIABLES map; per-slug typed shape can't be
-  // statically inferred here. Cast at the boundary — the engine still validates
-  // the contract at runtime and hard-skips on missing required chips.
+  // SMS_PALETTE keyed by the slug's contract chips; per-slug typed shape can't
+  // be statically inferred here. Cast at the boundary — the engine still
+  // validates the contract at runtime and hard-skips on missing required chips.
   const result = await renderSmsTemplate(
     typedSlug,
     variables as RenderVarsBySlug[typeof typedSlug] & Record<string, string>,
