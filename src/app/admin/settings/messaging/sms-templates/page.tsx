@@ -10,6 +10,7 @@ import { SlideOver } from '@/components/ui/slide-over';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { VariableInserter } from '@/app/admin/marketing/email-templates/_components/variable-inserter';
 import { SMS_PALETTE } from '@/lib/sms/palette';
+import { HARDCODED_SMS_MESSAGES } from '@/lib/sms/hardcoded-messages';
 import { useUnsavedChanges } from '@/lib/hooks/use-unsaved-changes';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
@@ -463,6 +464,37 @@ export default function SmsTemplatesPage() {
           </Card>
         </div>
       ))}
+
+      {/* Hardcoded messages — read-only display of slugs not yet migrated to chip-driven */}
+      <div>
+        <div className="mb-2 flex items-center gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            Hardcoded Messages
+          </h3>
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+            {HARDCODED_SMS_MESSAGES.length}
+          </span>
+        </div>
+        <p className="mb-2 text-xs text-gray-500">
+          These messages are sent but not yet customizable. They&apos;ll be editable after the next platform update.
+        </p>
+        <Card>
+          <CardContent className="divide-y divide-gray-100 p-0">
+            {HARDCODED_SMS_MESSAGES.map((entry) => (
+              <div key={entry.slug} className="flex items-start gap-4 px-4 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900">{entry.name}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{entry.description}</p>
+                  <pre className="mt-2 whitespace-pre-wrap rounded bg-gray-50 px-2 py-1.5 font-mono text-xs text-gray-700">{entry.sampleBody}</pre>
+                </div>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                  Read-only
+                </span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Slide-over editor */}
       <SlideOver open={!!editSlug} onClose={closeEditor} title={editTemplate?.name || ''} width="xl">

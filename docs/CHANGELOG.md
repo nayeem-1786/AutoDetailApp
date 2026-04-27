@@ -10,6 +10,43 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## feat(sms): admin UI hardcoded messages section (part 2 of 3) — 2026-04-26 (Session 2E.1b)
+
+**Admin UI hardcoded messages section.** Read-only display of 7 hardcoded SMS slugs (`addon_authorization` variants, `quote_sms_*` variants, `receipt_sms`) with explanatory text setting expectations that they'll be editable after Sessions 3A-3D migrate them to chip-driven.
+
+**Architecture.** This session completes 2E.1's UI work. Operator-facing benefits of Path B Phase 2 architecture (Sessions 2A-2D) are now fully visible in the admin UI: 18 chip-driven slugs editable with universal-palette chip picker + warning gate, plus 7 hardcoded slugs surfaced as read-only entries. Session 2E.2 (drop legacy `sms_templates.variables` JSONB column + delete `src/lib/sms/sms-template-variables.ts`) remains as the final 2E series session; can ship anytime in the next few days, no dependency on this session's verification.
+
+### Implementation
+
+**`src/lib/sms/hardcoded-messages.ts`** (new) — exports `HardcodedMessageEntry` interface (`{ slug, name, description, sampleBody }`) and `HARDCODED_SMS_MESSAGES` array with 7 entries. Each entry's `sampleBody` mirrors the actual hardcoded body in the corresponding source file with placeholders rewritten in `{snake_case}` style for display consistency with the chip-driven slugs. File-level comment lists source-of-truth pointers for each slug so future drift is easy to catch. No `category` field — flat list of 7 entries doesn't need taxonomy bucketing.
+
+**`src/app/admin/settings/messaging/sms-templates/page.tsx`** — adds new `<Card>` section between the editable category groups and the slide-over editor. Heading "HARDCODED MESSAGES" matches the small-caps style used by editable category headers, with a count badge (`7`) and explanatory subtitle: "These messages are sent but not yet customizable. They'll be editable after the next platform update."
+
+Each entry renders in a row with:
+- Friendly name (`text-gray-900`) and description (`text-gray-500`)
+- Body preview as `<pre className="whitespace-pre-wrap rounded bg-gray-50 px-2 py-1.5 font-mono text-xs text-gray-700">` so multi-line structure is preserved (the addon authorization request has 5 lines; the POS receipt has 4 lines; single-line truncation would misrepresent the actual customer-facing content)
+- "Read-only" pill on the right (gray fill, matches the recipient-type pill shape)
+- Row uses `items-start` so the pill aligns to the top of taller rows rather than centering against the multi-line body
+- No `<Switch>`, no `cursor-pointer`, no chevron, no hover state — non-interactive by design
+
+Slug names mirror `INTENTIONALLY_HARDCODED_SMS` from `src/lib/sms/sms-template-variables.ts` exactly.
+
+### Verification
+
+- `npx tsc --noEmit` clean (exit 0)
+- `npm run lint` zero new issues (Session 2E.1a baseline preserved: 13 errors / 44 warnings, all pre-existing in unrelated files)
+- `npm run build` clean (after `rm -rf .next`)
+- `npx vitest run` 535/535 pass across 36 test files (no test changes; UI-only addition)
+- Manual UAT: page renders 18 editable templates above the new section, then "HARDCODED MESSAGES" heading + 7 entries with read-only treatment; multi-line bodies preserve line breaks; editable templates above the section still function (chip picker, save, warning flow).
+
+### Files
+
+- New: `src/lib/sms/hardcoded-messages.ts`
+- Modified: `src/app/admin/settings/messaging/sms-templates/page.tsx`
+- Docs: `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`
+
+---
+
 ## refactor(sms): admin UI universal palette cutover (part 1 of 3) — 2026-04-26 (Session 2E.1a)
 
 **Admin UI universal palette work (part 1 of 3).** Chip picker now reads from `required_variables` + `optional_variables` columns and joins against `SMS_PALETTE` for descriptions/samples; sectioned dropdown layout with Required/Optional headers and red asterisk markers; content-driven width sizing (280-360px); PUT validation rewritten to distinguish typos (hard reject) from in-palette-but-not-in-contract chips (warn + allow via 409 + `confirm_warnings` round-trip mirroring the existing `confirm_silence` pattern); test endpoint sample lookups migrated to `SMS_PALETTE`.

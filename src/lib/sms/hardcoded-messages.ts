@@ -1,0 +1,80 @@
+// Static display list for the admin SMS Templates page (Session 2E.1b).
+// Each entry corresponds to a hardcoded SMS body in the codebase that
+// hasn't yet migrated to the chip-driven contract model. Sessions 3A-3D
+// will eventually migrate these to sms_templates rows; until then the
+// admin UI surfaces them as read-only entries so operators see they exist
+// and understand they're not yet customizable.
+//
+// Source-of-truth pointers — keep in sync with the actual sendSms callsite
+// when the body changes. Cross-checked at Session 2E.1b Phase 0:
+//   addon_authorization          src/app/api/pos/jobs/[id]/addons/route.ts
+//   addon_authorization_resend   src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts
+//   addon_authorization_expired  src/app/api/webhooks/twilio/inbound/route.ts
+//   quote_sms_admin              src/lib/quotes/send-service.ts
+//   quote_sms_postcall           src/lib/services/voice-post-call.ts
+//   quote_sms_midcall            src/app/api/voice-agent/send-quote-sms/route.ts
+//   receipt_sms                  src/app/api/pos/receipts/sms/route.ts
+//
+// Slug names mirror src/lib/sms/sms-template-variables.ts INTENTIONALLY_HARDCODED_SMS.
+
+export interface HardcodedMessageEntry {
+  /** Slug identifier (parallels chip-driven slugs in sms_templates). */
+  slug: string;
+  /** Operator-friendly display name. */
+  name: string;
+  /** What this message does and when it fires. */
+  description: string;
+  /** Sample body in the form a customer would receive, with placeholders shown as {chip_name}. */
+  sampleBody: string;
+}
+
+export const HARDCODED_SMS_MESSAGES: HardcodedMessageEntry[] = [
+  {
+    slug: 'addon_authorization',
+    name: 'Add-on Authorization Request',
+    description: 'Sent to the customer when a detailer identifies additional work during a service and proposes an add-on with photos and pricing.',
+    sampleBody: [
+      'Hi {first_name}, while working on your {vehicle_description} we noticed {issue_text}.',
+      'We recommend {friendly_name} for an additional ${final_price} — shall we go ahead?',
+      'View pictures and approve or decline here: {authorize_url}',
+      '{detailer_name}',
+      '{business_name}',
+    ].join('\n'),
+  },
+  {
+    slug: 'addon_authorization_resend',
+    name: 'Add-on Authorization Resend',
+    description: 'Sent when staff resends an add-on authorization request, optionally with an updated photo and operator-typed message.',
+    sampleBody: '{message_to_customer}\n\nApprove or decline here: {authorize_url}\n\n— {business_name}',
+  },
+  {
+    slug: 'addon_authorization_expired',
+    name: 'Add-on Authorization Expired',
+    description: 'Auto-reply when a customer responds to an add-on request after the authorization link has expired.',
+    sampleBody: 'That authorization has expired. Would you like us to send a new one?',
+  },
+  {
+    slug: 'quote_sms_admin',
+    name: 'Quote — Sent from Admin',
+    description: 'Sent when a quote is delivered to the customer from the admin Quotes page; includes the quote PDF as an MMS attachment when possible.',
+    sampleBody: 'Estimate {quote_number} from {business_name}\nTotal: {total_amount}\n\nView Your Estimate: {short_url}',
+  },
+  {
+    slug: 'quote_sms_postcall',
+    name: 'Quote — Voice Agent Post-Call',
+    description: 'Sent to the customer right after a voice-agent call when the agent generated a quote during the call.',
+    sampleBody: "Thanks for calling {business_name}{name_greeting}! Here's a quote for what we discussed: {short_url}",
+  },
+  {
+    slug: 'quote_sms_midcall',
+    name: 'Quote — Voice Agent Mid-Call',
+    description: 'Sent to the customer mid-call when the voice agent delivers a quote during the conversation.',
+    sampleBody: "Here's your quote from {business_name} for {services}: {short_url}",
+  },
+  {
+    slug: 'receipt_sms',
+    name: 'POS Receipt',
+    description: 'Sent when the customer requests an SMS copy of their POS receipt; uses length-aware truncation to fit a 160-character SMS.',
+    sampleBody: '{business_name}\n{summary_line}\nThank you! View receipt:\n{short_url}',
+  },
+];
