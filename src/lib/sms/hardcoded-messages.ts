@@ -5,14 +5,12 @@
 // them as read-only entries so operators see they exist and understand
 // they're not yet customizable.
 //
-// Session 3A migrated `addon_authorization_expired` and `quote_sms_postcall`
-// to chip-driven slugs in sms_templates (entries removed from this list);
-// 5 hardcoded slugs remain.
+// Session 3A migrated `addon_authorization_expired` and `quote_sms_postcall`.
+// Session 3B migrated `addon_authorization` and `addon_authorization_resend`.
+// 3 hardcoded slugs remain.
 //
 // Source-of-truth pointers — keep in sync with the actual sendSms callsite
 // when the body changes. Cross-checked at Session 2E.1b Phase 0:
-//   addon_authorization          src/app/api/pos/jobs/[id]/addons/route.ts
-//   addon_authorization_resend   src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts
 //   quote_sms_admin              src/lib/quotes/send-service.ts
 //   quote_sms_midcall            src/app/api/voice-agent/send-quote-sms/route.ts
 //   receipt_sms                  src/app/api/pos/receipts/sms/route.ts
@@ -32,24 +30,6 @@ export interface HardcodedMessageEntry {
 }
 
 export const HARDCODED_SMS_MESSAGES: HardcodedMessageEntry[] = [
-  {
-    slug: 'addon_authorization',
-    name: 'Add-on Authorization Request',
-    description: 'Sent to the customer when a detailer identifies additional work during a service and proposes an add-on with photos and pricing.',
-    sampleBody: [
-      'Hi {first_name}, while working on your {vehicle_description} we noticed {issue_text}.',
-      'We recommend {friendly_name} for an additional ${final_price} — shall we go ahead?',
-      'View pictures and approve or decline here: {authorize_url}',
-      '{detailer_name}',
-      '{business_name}',
-    ].join('\n'),
-  },
-  {
-    slug: 'addon_authorization_resend',
-    name: 'Add-on Authorization Resend',
-    description: 'Sent when staff resends an add-on authorization request, optionally with an updated photo and operator-typed message.',
-    sampleBody: '{message_to_customer}\n\nApprove or decline here: {authorize_url}\n\n— {business_name}',
-  },
   {
     slug: 'quote_sms_admin',
     name: 'Quote — Sent from Admin',

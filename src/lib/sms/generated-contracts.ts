@@ -20,7 +20,9 @@
 
 export const SMS_SLUGS = [
   "addon_approved",
+  "addon_authorization",
   "addon_authorization_expired",
+  "addon_authorization_resend",
   "addon_declined",
   "appointment_cancelled",
   "appointment_confirmed",
@@ -54,7 +56,9 @@ export interface SmsContract {
 
 export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   addon_approved: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
+  addon_authorization: { required: ["vehicle_description", "issue_text", "friendly_name", "final_price", "authorize_url"], optional: ["first_name", "detailer_name"] },
   addon_authorization_expired: { required: [], optional: [] },
+  addon_authorization_resend: { required: ["authorize_url"], optional: ["message_to_customer"] },
   addon_declined: { required: ["service_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   appointment_cancelled: { required: [], optional: ["first_name", "services", "appointment_date", "appointment_time", "last_name", "vehicle_description", "business_name", "business_phone"] },
   appointment_confirmed: { required: ["service_name", "appointment_date", "appointment_time"], optional: ["first_name", "service_total", "last_name", "vehicle_description", "business_name", "business_phone"] },
@@ -89,7 +93,26 @@ export interface RenderVarsBySlug {
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };
+  addon_authorization: {
+    vehicle_description: string;
+    issue_text: string;
+    friendly_name: string;
+    final_price: string;
+    authorize_url: string;
+    first_name?: string | undefined;
+    detailer_name?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
   addon_authorization_expired: {
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  addon_authorization_resend: {
+    authorize_url: string;
+    message_to_customer?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;

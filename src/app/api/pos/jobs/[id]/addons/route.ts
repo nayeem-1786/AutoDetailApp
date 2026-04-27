@@ -9,6 +9,7 @@ import { getAnnotatedPhotoUrl } from '@/lib/utils/render-annotations';
 import { getIssueHumanReadable, friendlyServiceName } from '@/lib/utils/issue-types';
 import type { IssueType } from '@/lib/supabase/types';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 /**
  * GET /api/pos/jobs/[id]/addons — List addons for a job
@@ -224,8 +225,18 @@ export async function POST(
     }
 
     // Send SMS — conversational tone, NO mediaUrl
+    // Session 3B: migrated from hardcoded body to chip-driven slug
+    // `addon_authorization`. Random-UUID token (line ~117) and authorize URL
+    // composition (line ~179) stay caller-side; engine receives the URL as
+    // an opaque chip value. first_name OPTIONAL — rare empty-name case
+    // strips line 1 (loses vehicle_description + issue_text from rendered
+    // output) but lines 2-5 still render (offer + URL + signature
+    // actionable). Hard-skip alternative would mean "no SMS sent,"
+    // operationally worse. final_price chip value is numeric "XX.XX" without
+    // the dollar sign; the literal "$" in the template body provides the
+    // prefix.
     if (customer?.phone) {
-      const smsBody = [
+      const fallback = [
         `Hi ${customer.first_name}, while working on your ${vehicleDesc} we noticed ${issueText}.`,
         `We recommend ${friendlyName} for an additional $${finalPrice.toFixed(2)} — shall we go ahead?`,
         `View pictures and approve or decline here: ${authorizeUrl}`,
@@ -233,15 +244,27 @@ export async function POST(
         biz.name,
       ].join('\n');
 
-      const smsResult = await sendSms(customer.phone, smsBody, {
-        customerId: customer.id,
-        source: 'transactional',
-        logToConversation: true,
-        notificationType: 'addon_authorization_request',
-        contextId: addon.id,
-      });
-      if (smsResult.success) {
-        notifiedVia.push('sms');
+      const tpl = await renderSmsTemplate('addon_authorization', {
+        first_name: customer.first_name || undefined,
+        vehicle_description: vehicleDesc,
+        issue_text: issueText,
+        friendly_name: friendlyName,
+        final_price: finalPrice.toFixed(2),
+        authorize_url: authorizeUrl,
+        detailer_name: detailerName,
+      }, fallback);
+
+      if (tpl.isActive && tpl.body) {
+        const smsResult = await sendSms(customer.phone, tpl.body, {
+          customerId: customer.id,
+          source: 'transactional',
+          logToConversation: true,
+          notificationType: 'addon_authorization_request',
+          contextId: addon.id,
+        });
+        if (smsResult.success) {
+          notifiedVia.push('sms');
+        }
       }
     }
 

@@ -5,6 +5,7 @@ import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getAnnotatedPhotoUrl } from '@/lib/utils/render-annotations';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 /**
  * POST /api/pos/jobs/[id]/addons/[addonId]/resend
@@ -122,17 +123,34 @@ export async function POST(
       }
     }
 
+    // Session 3B: migrated from hardcoded body to chip-driven slug
+    // `addon_authorization_resend`. Composite chip {message_to_customer}
+    // carries operator-typed prose verbatim from the original addon record.
+    // Optional + REMOVE_LINE on missing fixes a small pre-existing UX bug:
+    // when operator left the original message blank, today's body literally
+    // said "null" at the top (JS template-literal coercion of NULL); the
+    // chip-driven REMOVE_LINE strips line 1 cleanly when null/empty. MMS
+    // attachment (mediaUrl) flow stays caller-side — no chip for the photo
+    // URL itself.
     if (customer?.phone) {
-      const smsBody = `${original.message_to_customer}\n\nApprove or decline here: ${authorizeUrl}\n\n— ${biz.name}`;
-      const smsResult = await sendSms(customer.phone, smsBody, {
-        customerId: customer.id,
-        source: 'transactional',
-        mediaUrl: photoUrl || undefined,
-        logToConversation: true,
-        notificationType: 'addon_authorization_resend',
-        contextId: addonId,
-      });
-      if (smsResult.success) notifiedVia.push('sms');
+      const fallback = `${original.message_to_customer ?? ''}\n\nApprove or decline here: ${authorizeUrl}\n\n— ${biz.name}`;
+
+      const tpl = await renderSmsTemplate('addon_authorization_resend', {
+        message_to_customer: original.message_to_customer || undefined,
+        authorize_url: authorizeUrl,
+      }, fallback);
+
+      if (tpl.isActive && tpl.body) {
+        const smsResult = await sendSms(customer.phone, tpl.body, {
+          customerId: customer.id,
+          source: 'transactional',
+          mediaUrl: photoUrl || undefined,
+          logToConversation: true,
+          notificationType: 'addon_authorization_resend',
+          contextId: addonId,
+        });
+        if (smsResult.success) notifiedVia.push('sms');
+      }
     }
 
     if (customer?.email) {

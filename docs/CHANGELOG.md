@@ -10,6 +10,28 @@ Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed 
 
 ---
 
+## refactor(sms): addon authorization slug migration — 2026-04-26 (Session 3B)
+
+**Session 3B — addon authorization slug migration.** Migrates `addon_authorization` and `addon_authorization_resend` from hardcoded `sendSms` calls to chip-driven `renderSmsTemplate`. Random-UUID token generation and URL composition preserved caller-side; chip-driven engine handles body rendering only. MMS attachment flow for resend preserved unchanged.
+
+**Architecture.** 24 chip-driven slugs total (was 22); 3 hardcoded slugs remaining (`quote_sms_admin`, `quote_sms_midcall`, `receipt_sms`). Sessions 3C–3D will close the remaining three.
+
+### Side-effect bug fix
+
+`addon_authorization_resend` body when `message_to_customer` was NULL produced literal "null" string at the top of the SMS due to JS template literal coercion. Migration to optional + REMOVE_LINE cleans this. Fallback path also corrected via `?? ''` to prevent reproduction in the template-not-found edge case. Bug existed since the resend feature shipped.
+
+### Deferred chip description correction
+
+`authorize_url` chip's palette description says "HMAC-token-bearing" but the actual implementation uses `crypto.randomUUID()` validated by DB lookup. Functionally equivalent (unguessable, unique-per-send, server-validated). Cosmetic palette description correction deferred to a future cleanup pass; not blocking 3B.
+
+### Files
+
+- New: `supabase/migrations/20260428000002_seed_3b_chip_driven_slugs.sql`
+- Modified: `src/app/api/pos/jobs/[id]/addons/route.ts` (caller migration), `src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts` (caller migration + null-string bug fix), `src/lib/sms/sms-contracts.source.ts` (+2 chip-driven slug entries), `src/lib/sms/generated-contracts.ts` (codegen output), `src/lib/sms/hardcoded-messages.ts` (entries removed for the 2 newly-migrated slugs; 3 entries remaining)
+- Docs: `docs/CHANGELOG.md`, `docs/dev/FILE_TREE.md`
+
+---
+
 ## refactor(sms): first hardcoded slug migration — addon_authorization_expired + quote_sms_postcall — 2026-04-26 (Session 3A)
 
 **First hardcoded slug migration.** Migrates `addon_authorization_expired` and `quote_sms_postcall` from hardcoded `sendSms` calls to chip-driven `renderSmsTemplate`. Establishes the migration pattern for Sessions 3B–3D.

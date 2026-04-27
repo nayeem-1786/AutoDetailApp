@@ -159,9 +159,17 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['service_name'],
       optional: ['first_name', 'last_name', 'vehicle_description'],
     },
+    addon_authorization: {
+      required: ['vehicle_description', 'issue_text', 'friendly_name', 'final_price', 'authorize_url'],
+      optional: ['first_name', 'detailer_name'],
+    },
     addon_authorization_expired: {
       required: [],
       optional: [],
+    },
+    addon_authorization_resend: {
+      required: ['authorize_url'],
+      optional: ['message_to_customer'],
     },
     addon_declined: {
       required: ['service_name'],
