@@ -4,6 +4,82 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(marketing): broken seeded review template — 2026-04-29 (Session RPB-1)
+
+**Session RPB-1 — Review Placeholder Bug.** The seeded review SMS template ("Google & Yelp Review Request — After Service" / "After Purchase", `lifecycle_rules.id 00b438f3-b7ca-4e67-beba-970f2a077eed`) uses `{detailer_first_name}` and `{vehicle_description}` tokens that were never wired into the legacy marketing renderer (`src/lib/utils/template.ts`). Customers received SMS with literal placeholder text in the body. Verified by inspecting tracked_links short_code 20ad0b which matched the URL in a real customer's broken message.
+
+**Fix.** Add both tokens to `VARIABLE_GROUPS` (chip picker auto-discovers them) and to `lifecycle-engine` `templateVars` (substitution at render time) with sensible fallbacks. `vehicle_description` is implemented as a strict alias of `vehicle_info` (same `cleanVehicleDescription` formatter, same fallback). The existing `vehicle_info` token's empty-string fallback is also unified to `"vehicle"` — its prior behavior produced equally-broken prose (`"...working on your . today"`) for vehicle-less customers; the unified fallback strictly improves the same shape of bug.
+
+### Fallbacks
+
+- `{detailer_first_name}` when no detailer is assigned (or no job_id on the execution): `"We"` — reads naturally in review prose (`"We had a great time working on your..."`).
+- `{vehicle_info}` and `{vehicle_description}` when no vehicle is on file: `"vehicle"` — reads naturally in the same slot (`"...working on your vehicle today"`).
+
+### Token resolution flow
+
+When `lifecycle_executions.job_id` is set (post-RFB-1, populated by `scheduleFromCompletedJobs` for service-completion executions), the engine performs one extra SELECT joining `jobs.assigned_staff_id` to `employees.first_name`. For product-only `after_transaction` executions (no job_id), the `"We"` fallback applies — no extra query. Vehicle resolution unchanged from prior code: appointment-driven branch loads `appointments.vehicle_id`; transaction-driven branch loads `transactions.vehicle_id`. Both feed into the new shared `vehicleDisplay` variable that gates the `"vehicle"` fallback for both `vehicle_info` and `vehicle_description`.
+
+### Behavior matrix (post-fix)
+
+| Scenario | `{detailer_first_name}` | `{vehicle_info}` / `{vehicle_description}` |
+|---|---|---|
+| Service customer, detailer assigned, vehicle present | Real first name | Real vehicle (e.g., "2024 Tesla Model 3") |
+| Service customer, no detailer assigned | `"We"` | Real vehicle |
+| Service customer, no vehicle on file | Real first name | `"vehicle"` |
+| Product-only POS purchase (after_transaction, no job) | `"We"` | `"vehicle"` |
+| Walk-in service (no appointment, has job + transaction) | Real first name (via job_id) | Real vehicle (via transaction.vehicle_id) |
+
+### Known limitation — drip-step-card chip leakage
+
+Both new tokens are placed in the `Event Context` group, which is included in `ALL_GROUPS`. The drip step card (`src/app/admin/marketing/campaigns/drip/_components/drip-step-card.tsx:314`) uses `ALL_GROUPS` for its chip picker, so `{detailer_first_name}` and `{vehicle_description}` will be visible to drip operators. The drip-engine send path (`src/lib/email/drip-engine.ts`) does NOT populate these tokens — so a drip operator who picks them would get literal `{detailer_first_name}` / `{vehicle_description}` in the dispatched drip. New failure mode for tokens that didn't exist before, not a regression of existing tokens.
+
+Mitigation accepted as documented limitation per Phase 0 decision (i):
+- Drip operators are technical staff; rare to pick service-context chips in a marketing drip
+- Adding the same fallback wiring into drip-engine is out of session scope (drip-engine.ts is not in the file allow-list and would require its own separate validation pass)
+- Consistent with the legacy marketing system's general loose-contract architecture
+
+Future RPB-2 could either (a) split `Event Context` → `Service Context` so only the Automations editor surfaces these chips, or (b) wire drip-engine to populate the same fallbacks. Both viable; defer until the footgun bites.
+
+The campaign wizard chip picker uses `CAMPAIGN_GROUPS` (excludes Event Context), so campaign operators cannot pick the new chips — no leakage on that surface.
+
+### Risk of regression on other `renderTemplate` callers
+
+| File | Risk |
+|---|---|
+| `src/app/api/marketing/campaigns/process-scheduled/route.ts` | None — campaign editor can't insert these chips; even if a body has them typed manually, they substituted as literal pre-fix and continue to do so. |
+| `src/app/api/marketing/campaigns/[id]/send/route.ts` | Same as above. |
+| `src/app/admin/marketing/campaigns/_components/campaign-wizard.tsx` | No chip leakage; preview behavior unchanged. |
+| `src/app/admin/settings/messaging/sms-templates/page.tsx` | Preview-only; actual sends go through Path B's `renderSmsTemplate`, separate palette. |
+| `src/app/admin/marketing/automations/[id]/page.tsx` + `new/page.tsx` | The point of the fix — chips become visible AND substitute correctly. ✅ |
+| `src/app/admin/marketing/campaigns/drip/_components/drip-step-card.tsx` | Footgun documented above. |
+
+### Files changed
+
+**Modified:**
+- `src/lib/utils/template.ts` — adds `vehicle_description` and `detailer_first_name` to `VARIABLE_GROUPS['Event Context']`. Updates `vehicle_info` description to document the unified `"vehicle"` fallback.
+- `src/app/api/cron/lifecycle-engine/route.ts` — type-strict `PendingExecution.job_id: string | null;`. Detailer resolution block (~30 lines): `exec.job_id ? SELECT employees.first_name : 'We'`. Unified `vehicleDisplay = vehicleDescription || 'vehicle'` shared by both `vehicle_info` (existing token, behavior change) and `vehicle_description` (new alias).
+
+**Files NOT touched** (per session constraints):
+- `src/lib/sms/*` (Path B — review SMS uses legacy renderer, untouched).
+- The seeded review SMS template body in `lifecycle_rules.sms_template` — stays as-is. The tokens it references become valid post-fix; no DB body edit needed.
+- The chip picker UI itself — reads `VARIABLE_GROUPS` dynamically, picks up the new chips automatically.
+
+### Verification gates (all passing)
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | Clean |
+| `npm run lint` | 57 problems (13 errors, 44 warnings) — baseline identical to Session 3D commit; none in RPB-1-touched files |
+| `npm run build` (after `rm -rf .next`) | Build succeeded |
+| `npx vitest run` | 535/535 tests passed (36 files, 2.55s) |
+| `supabase db push --linked --dry-run` | "Remote database is up to date" — no schema changes this session |
+
+### Production state at fix time
+
+No schema migration required. Until VPS deploy lands, the running production code still has the broken token-substitution behavior — customers triggering the affected review template continue to receive SMS with literal `{detailer_first_name}` and `{vehicle_description}` placeholder text. Post-deploy, the next service customer reaching the closed+picked review-eligibility gate will receive a correctly-rendered SMS.
+
+---
+
 ## refactor(sms): receipt_sms migration — 2026-04-29 (Session 3D)
 
 **Session 3D — receipt_sms migration to chip-driven. Closes Path B Phase 2.** All 27 SMS slugs in the system are now operator-editable via Admin > Settings > Messaging > SMS Templates. The Hardcoded Messages section becomes empty (renders as 0-count). The transformation that began with Sessions 2A through 3C completes here; ZERO hardcoded SMS slugs remain.

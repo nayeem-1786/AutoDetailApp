@@ -32,7 +32,9 @@ export const VARIABLE_GROUPS = {
   },
   'Event Context': {
     service_name: 'Service from the triggering event',
-    vehicle_info: 'Vehicle year/make/model',
+    vehicle_info: 'Vehicle year/make/model (falls back to "vehicle")',
+    vehicle_description: 'Alias of vehicle_info (year/make/model, same fallback)',
+    detailer_first_name: 'Assigned detailer\'s first name (falls back to "We")',
     appointment_date: 'Scheduled appointment date',
     appointment_time: 'Scheduled appointment time',
     amount_paid: 'Transaction total amount',

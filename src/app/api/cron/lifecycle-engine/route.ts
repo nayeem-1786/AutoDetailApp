@@ -461,6 +461,10 @@ interface PendingExecution {
   customer_id: string;
   appointment_id: string | null;
   transaction_id: string | null;
+  // Session RPB-1: type-strict job_id (column added in RFB-1; populated by
+  // scheduleFromCompletedJobs). executePending reads it to look up the
+  // assigned detailer's first name for the {detailer_first_name} token.
+  job_id: string | null;
   trigger_event: string;
   [key: string]: unknown;
 }
@@ -757,12 +761,39 @@ async function executePending(
         daysSinceLastVisit = String(diff);
       }
 
+      // Session RPB-1: resolve assigned detailer's first name for the
+      // {detailer_first_name} token (used by the seeded "Google & Yelp Review
+      // Request — After Service" template body). job_id is populated for
+      // service-completion executions by scheduleFromCompletedJobs (RFB-1).
+      // Product-only after_transaction executions have no job_id → fallback
+      // "We" reads naturally in review prose ("We had a great time...").
+      let detailerFirstName = 'We';
+      if (exec.job_id) {
+        const { data: jobRow } = await admin
+          .from('jobs')
+          .select('assigned_staff:employees!jobs_assigned_staff_id_fkey(first_name)')
+          .eq('id', exec.job_id)
+          .single();
+        // Supabase typed-select infers nested FK as array in some shapes;
+        // coerce through unknown matches the precedent at L633 for `services`.
+        const staff = jobRow?.assigned_staff as unknown as { first_name: string } | null;
+        if (staff?.first_name) detailerFirstName = staff.first_name;
+      }
+
+      // Session RPB-1: unified fallback for vehicle_info AND new alias
+      // vehicle_description. Prior empty-string behavior produced equally
+      // broken prose ("...working on your . today") for vehicle-less
+      // customers; "vehicle" reads naturally in the same slot.
+      const vehicleDisplay = vehicleDescription || 'vehicle';
+
       // Build template variables
       const templateVars: Record<string, string> = {
         first_name: customer.first_name || 'there',
         last_name: customer.last_name || '',
         service_name: serviceName || 'your service',
-        vehicle_info: vehicleDescription,
+        vehicle_info: vehicleDisplay,
+        vehicle_description: vehicleDisplay, // RPB-1: alias of vehicle_info
+        detailer_first_name: detailerFirstName, // RPB-1: 'We' fallback when no job/detailer
         business_name: businessName,
         business_phone: formatPhoneDisplay(businessInfo.phone),
         business_address: businessInfo.address,
