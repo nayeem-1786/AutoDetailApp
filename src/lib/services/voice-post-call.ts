@@ -80,16 +80,24 @@ export async function processVoiceCallEnd(
       .maybeSingle();
 
     if (existing) {
-      // Allow reprocessing of stale 'processing' entries (abandoned after 5 min)
-      const isStale = existing.status === 'processing' &&
+      // Reclaimable states (Session VPC-1):
+      //   - 'processing' older than 5 min (abandoned claim — recoverable)
+      //   - 'awaiting_data' (cron pre-tracked the conversation while ElevenLabs
+      //     finalized data; now phone is available via retry-tick or via
+      //     finalize_call/webhook arriving after the cron's first poll)
+      // Terminal states ('completed', 'failed_no_phone', legacy 'processed')
+      // always skip.
+      const isStaleProcessing = existing.status === 'processing' &&
         existing.processed_at &&
         Date.now() - new Date(existing.processed_at).getTime() > 5 * 60 * 1000;
+      const isReclaimable = isStaleProcessing || existing.status === 'awaiting_data';
 
-      if (!isStale) {
+      if (!isReclaimable) {
         console.log(`[VoicePostCall] Already processed: ${params.elevenlabsConversationId} (status: ${existing.status})`);
         return { success: true, skipped: true, reason: 'Already processed' };
       }
-      console.log(`[VoicePostCall] Stale 'processing' entry found (>5min) — reprocessing: ${params.elevenlabsConversationId}`);
+      const reclaimReason = isStaleProcessing ? "stale 'processing' (>5min)" : "'awaiting_data'";
+      console.log(`[VoicePostCall] Reclaiming ${reclaimReason} entry — reprocessing: ${params.elevenlabsConversationId}`);
     }
 
     // Immediately claim this conversation to close the race window.

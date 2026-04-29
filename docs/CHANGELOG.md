@@ -4,6 +4,174 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(marketing): premature review SMS firing — 2026-04-28 (Session RFB-1)
+
+**Customer impact.** A real customer reported receiving a "leave a review" SMS for a Friday 11:30 AM service that hadn't happened yet (booked, deposit paid earlier in the week). Trust-damaging — replays as "they're asking for a review before doing the work?". This fix prevents review SMS from firing on any service-related transaction until **work is done AND vehicle has been picked up AND full payment received**.
+
+**Root cause.** The lifecycle engine's `scheduleFromTransactions` path treated every `transactions.status='completed'` row as eligible for the seeded "Google Review Request — After Purchase" rule (`trigger_condition='after_transaction'`). When a customer paid a booking deposit via `api/book/route.ts:381-395`, that path inserts a transaction with `status='completed'` immediately — even though the appointment is still `'confirmed'` and no service work has happened. The cron then scheduled a review SMS for `transaction_date + 30 min` (rule's configured delay), and it fired before the appointment date.
+
+**Architectural fix — non-overlapping populations.** The two seeded review rules now serve disjoint customer populations:
+
+- **`service_completed` (After Service rule)** — fires when `jobs.status='closed' AND jobs.actual_pickup_at IS NOT NULL`. This is the operator-stated three-condition gate: work done (closed implies completed work), fully paid (closed requires a transaction link, set by POS at full-amount checkout), picked up (explicit POS operator action via `/api/pos/jobs/[id]/pickup`).
+- **`after_transaction` (After Purchase rule)** — restricted to product-only POS sales. Excludes any transaction with `appointment_id IS NOT NULL` AND any transaction referenced by `jobs.transaction_id`. Walk-in retail / supply purchases still trigger normally; service-tied transactions go through the job-driven path above.
+
+**Q2 — admin manual override stays strict.** When an operator uses the admin appointment edit UI to manually flip `appointments.status` to `'completed'` (without going through the POS cascade), no `jobs` row is touched and no review SMS fires. Rationale: manual overrides are rare edge cases for state cleanup, cancellation rescue, troubleshooting; the system has no reliable signal of pickup or payment when this path is used. If operators need to fire a review for an out-of-band appointment, that should be an explicit "Send Review Now" button in a future enhancement, not a side effect of status change.
+
+### Schema changes
+
+`supabase/migrations/20260428000005_lifecycle_executions_job_id_and_review_cleanup.sql`:
+
+- ADD `lifecycle_executions.job_id UUID REFERENCES jobs(id) ON DELETE SET NULL` — new dedup key for the job-driven schedule path. Walk-in service jobs (no `appointment_id`) get proper per-job dedup; previously they would have collided on the source-field index.
+- New partial index `idx_lifecycle_executions_job_id` on `(job_id) WHERE job_id IS NOT NULL`.
+- Replaces the unique-trigger index. Was: `(rule_id, COALESCE(appointment_id, sentinel), COALESCE(transaction_id, sentinel))`. Now: same plus `COALESCE(job_id, sentinel)`. Prevents collision between job-driven and transaction-driven rows that happen to share an `appointment_id`.
+- One-time cleanup `DELETE FROM lifecycle_executions` covering both (a) deposit/prepayment transactions tied to not-yet-closed-and-picked services, and (b) appointment-driven executions where the appointment lacks a closed+picked job. Production check at fix time reported 0 pending matches; cleanup is defense-in-depth for any rows enqueued between the diagnostic and the deploy.
+
+### Code changes
+
+`src/app/api/cron/lifecycle-engine/route.ts`:
+
+- **Renamed `scheduleFromAppointments` → `scheduleFromCompletedJobs`.** Query is now:
+  ```sql
+  FROM jobs WHERE status = 'closed'
+                AND actual_pickup_at IS NOT NULL
+                AND updated_at >= lookback
+                AND customer_id IS NOT NULL
+  ```
+  `updated_at` advances on every job mutation, so a job that was POS-closed days ago and only picked up today will surface in the recent window. `serviceIds` extraction now reads from `jobs.services` JSONB instead of `appointment_services`. The trigger event name is `'job_closed_picked_up'` (was `'appointment_completed'`).
+- **`scheduleFromTransactions` restricted to product-only.** Two-stage filter: SQL-level `appointment_id IS NULL` (excludes deposit and prepayment transactions tied to appointments), then in-memory exclusion of any tx referenced by `jobs.transaction_id` (walk-in service flow where the job has no appointment but is still a service ticket). Pure POS purchases pass through.
+- **`scheduleExecutions` shared helper extended.** `TriggerEvent.sourceField` widens to `'appointment_id' | 'transaction_id' | 'job_id'`. New optional `appointmentId`/`transactionId` cross-reference fields are propagated to the row for traceability without participating in dedup. Source dedup query now also reads `job_id`. Insert payload sets the source-field column AND any cross-references whose column is not the source field.
+
+### Trigger semantics matrix (post-fix)
+
+| Scenario | Job exists? | Appointment? | Transaction? | Triggers `service_completed`? | Triggers `after_transaction`? |
+|---|---|---|---|---|---|
+| Online booking + deposit, before service | No | confirmed | completed (deposit) | No (no closed+picked job) | No (`appointment_id` set) |
+| Online booking + full upfront, before service | No | confirmed | completed (full) | No (no closed+picked job) | No (`appointment_id` set) |
+| Service done, paid at POS, picked up | closed + actual_pickup_at | completed | completed | **Yes** | No (`appointment_id` set) |
+| Service done, paid at POS, NOT yet picked up | completed (or closed) without actual_pickup_at | completed | completed | No (pickup gate fails) | No (`appointment_id` set) |
+| Walk-in service (no appointment), paid + picked up | closed + actual_pickup_at, `appointment_id=NULL` | None | completed | **Yes** (job-driven, no appt needed) | No (jobs reference `transaction_id`) |
+| Pure POS product sale (walk-in retail) | None | None | completed | No (no job) | **Yes** |
+| Admin manual `appointment.status='completed'` override | No (path bypasses POS cascade) | completed (manual) | None | No (no closed+picked job) | No (no transaction created) |
+
+### Phase 1A audit — Marketing > Automations UI
+
+Verified `src/app/admin/marketing/automations/page.tsx` and `new/page.tsx`: operator can list / activate / deactivate any rule (including the two seeded review rules), edit body templates, change `trigger_condition`, `delay_days/minutes`, `trigger_service_id`, action channel, and chain order. Permission gate `marketing.lifecycle_rules`. So the seeded rules can stay active per Q3, and operators retain full control to disable or repurpose them.
+
+### Files changed
+
+**New:**
+- `supabase/migrations/20260428000005_lifecycle_executions_job_id_and_review_cleanup.sql`
+
+**Modified:**
+- `src/app/api/cron/lifecycle-engine/route.ts` — rewrite of both scheduling paths + shared helper.
+- `docs/dev/DB_SCHEMA.md` — regenerated.
+- `docs/dev/FILE_TREE.md` — new migration entry.
+
+**Files NOT touched** (per session constraints):
+- `renderSmsTemplate`, `palette.ts`, `generated-contracts.ts` — review SMS uses legacy `lifecycle_rules.sms_template` token-substitution, not the chip-driven engine. The body templates are unchanged; only the trigger gate moved.
+- POS pickup flow, POS checkout flow, booking flow — none modified. The fix is purely in how the cron interprets their state.
+
+---
+
+## fix(voice): voice-calls-poll retry state machine — 2026-04-28 (Session VPC-1)
+
+**Session VPC-1 — voice-calls-poll race condition fix.** Replaces the "insert null-phone tracking row that blocks retries" pattern with an explicit retry state machine. Conversations whose ElevenLabs data has not yet finalized at the time of the cron's first poll (typically the first 30-60 seconds after a call ends) are now tracked in `status='awaiting_data'` and retried on each subsequent poll until phone extraction succeeds (`status='completed'`) or a 5-minute hard timeout is reached (`status='failed_no_phone'`).
+
+**Production reliability impact.** Prior behavior: when ElevenLabs needed >2 minutes to populate `dynamic_variables.customer_phone`, the cron inserted a `phone:null` row that blocked all subsequent retries; the customer either waited up to 60 minutes for the post-call SMS (when the legacy 1-hour cleanup eventually let the row get re-processed) or got nothing if the row was manually deleted. Confirmed reproduction: voice_call_log row id `e0517f3d-9404-46d4-af80-4096c0ff6958` from 2026-04-28. New behavior: post-call SMS lands within ~3 minutes (cron runs every 2 min; 5-minute window admits 2-3 retry attempts) for the same calls that previously failed silently. Calls that exceed the 5-minute window are surfaced as `failed_no_phone` with `skip_reason='exceeded_5min_timeout'` for diagnostic visibility, instead of the previous silent loss.
+
+### Schema changes
+
+`voice_call_log` gains four columns (additive, no backfill):
+
+- `retry_count INTEGER NOT NULL DEFAULT 0`
+- `first_attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()`
+- `last_attempted_at TIMESTAMPTZ`
+- `skip_reason TEXT`
+
+New partial index for the retry scan:
+
+```sql
+CREATE INDEX idx_voice_call_log_awaiting_retry
+  ON voice_call_log (first_attempted_at)
+  WHERE status = 'awaiting_data';
+```
+
+`status` column is unconstrained TEXT (no CHECK constraint to update). Adds two new values to the in-use set: `'awaiting_data'` (retrying) and `'failed_no_phone'` (terminal). Existing values (`'processed'` legacy default, `'processing'`, `'completed'`) unchanged in semantics.
+
+### Migration also performs legacy cleanup
+
+```sql
+DELETE FROM voice_call_log
+ WHERE phone IS NULL
+   AND source = 'poll'
+   AND status NOT IN ('awaiting_data', 'failed_no_phone');
+```
+
+Removes any pre-existing null-phone rows from the old design. Status filter is defense-in-depth — protects rows already in the new state machine if migration ordering ever surprises us.
+
+### Cron flow (new)
+
+`src/app/api/cron/voice-calls-poll/route.ts` is restructured as a 5-step state machine:
+
+- **Step A — process pending retries.** `SELECT * FROM voice_call_log WHERE status='awaiting_data' AND first_attempted_at > now() - 5 min`. For each: refetch detail from ElevenLabs by `conversation_id`, retry phone extraction. On success, bump `retry_count`/`last_attempted_at` and dispatch `processVoiceCallEnd` (which re-claims the row to `'processing'` then `'completed'`). On still-no-phone, bump counters and log.
+- **Step B — sweep timeouts.** `UPDATE voice_call_log SET status='failed_no_phone', skip_reason='exceeded_5min_timeout' WHERE status='awaiting_data' AND first_attempted_at <= now() - 5 min`. Emits one log line per timed-out conversation including the final `retry_count`.
+- **Step C — process new conversations.** Cursor-driven listing from ElevenLabs `/v1/convai/conversations`, unchanged. When phone extraction fails on first attempt, the cron now INSERTs `{ status: 'awaiting_data', phone: NULL, source: 'poll', first_attempted_at: now(), retry_count: 0 }` instead of the legacy null-phone block row.
+- **Step D — advance cursor.** `last_voice_poll_at = now()`, unchanged.
+- **Step E — prune `failed_no_phone` retention** (new). `DELETE FROM voice_call_log WHERE status='failed_no_phone' AND first_attempted_at < now() - 30 days`. Strict status filter prevents touching active retries. Logged only when N > 0 to avoid noise.
+
+### Diagnostic logging additions
+
+| Trigger | Log line |
+|---|---|
+| Initial poll, phone missing | `[VoicePoll] No phone yet for ${id}, attempt 1 (will retry)` |
+| Retry tick, phone still missing | `[VoicePoll] No phone yet for ${id}, attempt ${n} (will retry)` |
+| Retry tick, phone resolved | `[VoicePoll] Phone available on retry for ${id} (attempt ${n}), processing now` |
+| 5-min timeout sweep | `[VoicePoll] ${id} exceeded 5min timeout, marking failed_no_phone (final retry_count: ${n})` |
+| Retention prune (only when N > 0) | `[VoicePoll] Pruned ${n} failed_no_phone rows older than 30 days` |
+| End-of-poll summary (expanded) | `[VoicePoll] Done — N processed (X new, Y via retry), Z pending, W timed out, K skipped, T listed` |
+
+### `processVoiceCallEnd` dedup update
+
+`src/lib/services/voice-post-call.ts` `isStale` check (lines 82-93 pre-fix) generalized to `isReclaimable`. Allow-list:
+
+- `'processing'` older than 5 min (existing behavior, unchanged)
+- `'awaiting_data'` (new — Step A's retry success or a late `finalize_call`/webhook arriving after Step C pre-tracked the conversation)
+
+Terminal states (`'completed'`, `'failed_no_phone'`, legacy `'processed'`) always skip. The subsequent claim UPDATE already overwrites `status`/`source`/`phone` correctly for the awaiting_data row; completion UPDATE at L452-454 still works (keys on `elevenlabs_conversation_id`).
+
+### Removed: legacy 1-hour cleanup
+
+Deleted L55-61 of pre-fix `voice-calls-poll/route.ts` (the `DELETE WHERE phone IS NULL AND source='poll' AND processed_at < now() - 1 hour`). New flow never creates null-phone-`'processed'` rows. Awaiting_data rows have their own state-driven lifecycle (succeed → `'completed'`, or timeout → `'failed_no_phone'`) and must NOT be touched by a generic cleanup. The legacy DELETE is also replicated once in the migration for any pre-existing rows.
+
+### Refactor side effect
+
+The per-conversation extraction logic (transcript summary, vehicle, customer name/type, interest, services, appointment-booked detection) was extracted from the inline loop into a `processConversation(admin, detail, phone)` helper so Step A retries and Step C new-conversations share a single code path. No semantic change to the extraction itself — only relocated. Phone extraction also factored into `extractPhone(detail)` for the same reason.
+
+### Operational notes
+
+- Cron cadence is `*/2 * * * *` (every 2 min) per `src/lib/cron/scheduler.ts:119`. CLAUDE.md previously stated 5 min — this is a doc-only mismatch (scheduler is the source of truth). At 2-min cadence, the 5-min retry window admits ~2-3 retry attempts before terminal timeout.
+- Customer-experience priority: voice agent tells callers "within a minute or two." 5-min window means anything that times out has already missed promise. After deploy, monitor `failed_no_phone` `retry_count` distribution — if average regularly hits the max, bump the window. If most failures occur with `retry_count=0` (extraction never succeeds), the issue is not finalization timing but data-shape; investigate ElevenLabs payload changes.
+- `failed_no_phone` rows are retained 30 days for diagnostics; pruned inline by Step E.
+
+### Files changed
+
+**New:**
+- `supabase/migrations/20260428000004_voice_call_log_retry_state.sql` — schema additions, partial index, legacy cleanup.
+
+**Modified:**
+- `src/app/api/cron/voice-calls-poll/route.ts` — full restructure to 5-step state machine; helpers extracted.
+- `src/lib/services/voice-post-call.ts` — `isStale` → `isReclaimable` dedup update.
+- `docs/dev/DB_SCHEMA.md` — regenerated.
+- `docs/dev/FILE_TREE.md` — new migration entry.
+
+**Files NOT touched** (per session constraints):
+- ElevenLabs agent configuration
+- `src/app/api/voice-agent/send-quote-sms/route.ts`
+- `src/app/api/voice-agent/finalize-call/route.ts`
+- The 26 existing chip-driven slugs and SMS template engine
+
+---
+
 ## Deployed to production 2026-04-26
 
 Sessions covered: 2A (architecture spine + 6 latent SMS bug fixes), 2A.5 (typed contract codegen), 2B (voice-agent caller refactors + voice-booked confirmation SMS now sends), 2C (non-voice caller refactors + specialty-callback email field), 2D (cheap-add wave + legacy variables clean rebuild).

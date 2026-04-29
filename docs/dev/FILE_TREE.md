@@ -1525,6 +1525,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260428000001_seed_3a_chip_driven_slugs.sql
 20260428000002_seed_3b_chip_driven_slugs.sql
 20260428000003_seed_3c_chip_driven_slugs.sql
+20260428000004_voice_call_log_retry_state.sql
+20260428000005_lifecycle_executions_job_id_and_review_cleanup.sql
 ```
 
 ## Scripts
