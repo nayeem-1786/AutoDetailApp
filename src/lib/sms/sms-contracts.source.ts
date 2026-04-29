@@ -251,6 +251,10 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['first_name', 'short_url'],
       optional: ['last_name', 'vehicle_description'],
     },
+    receipt_sms: {
+      required: ['summary_line', 'receipt_link'],
+      optional: ['first_name', 'last_name', 'vehicle_description'],
+    },
     staff_notification: {
       required: ['reason_label', 'customer_name', 'details', 'customer_phone'],
       optional: ['customer_email', 'last_name', 'vehicle_description'],

@@ -6,6 +6,8 @@ import { sendSms } from '@/lib/utils/sms';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { buildSummaryLine } from '@/lib/sms/composites';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,9 +34,6 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     // Fetch transaction with vehicle and access_token for the short SMS.
-    // Session 2C: added customer_id to support the conditional customer fetch
-    // below (loaded into scope for Session 3C's hardcoded → chip-driven
-    // migration of receipt_sms).
     const { data: transaction, error } = await supabase
       .from('transactions')
       .select(`
@@ -51,13 +50,10 @@ export async function POST(request: NextRequest) {
       throw new Error('Transaction not found');
     }
 
-    // Session 2C: conditional customer fetch (handles guest-checkout where
-    // transaction.customer_id is null). .maybeSingle() also tolerates the
-    // theoretical case where customer_id references a deleted record. Result
-    // (customer | null) is loaded into local scope at the SMS callsite below;
-    // chip-pass is unchanged in 2C — Session 3C's chip-wiring of receipt_sms
-    // will use this customer object and MUST handle the null case (receipts
-    // still send for guests, just without customer-personalized chips).
+    // Conditional customer fetch (handles guest-checkout where transaction.customer_id
+    // is null). .maybeSingle() also tolerates the theoretical case where customer_id
+    // references a deleted record. Receipts still send for guests, just without the
+    // optional customer-personalized chips (first_name / last_name) populated.
     let customer: { id: string; first_name: string | null; last_name: string | null; email: string | null; phone: string | null } | null = null;
     if (transaction.customer_id) {
       const { data: customerData } = await supabase
@@ -67,7 +63,6 @@ export async function POST(request: NextRequest) {
         .maybeSingle();
       customer = customerData;
     }
-    void customer; // Loaded for 3C; unused at this hardcoded callsite today.
 
     const businessInfo = await getBusinessInfo();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -78,7 +73,10 @@ export async function POST(request: NextRequest) {
     const grandTotal = Number(transaction.total_amount) + Number(transaction.tip_amount || 0);
     const total = `$${grandTotal.toFixed(2)}`;
 
-    // Build SMS body — vehicle line or "Your total" (length-aware)
+    // Build summary_line composite caller-side (length-aware: truncates the
+    // vehicle prefix when the assembled body would exceed 160 chars). The
+    // budget assumes the default body shape — operators editing the template
+    // to add prose may cause segmentation; vehicle prefix truncates first.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const vehicle = transaction.vehicle as any;
     const summaryLine = buildSummaryLine({
@@ -88,9 +86,25 @@ export async function POST(request: NextRequest) {
       shortUrl,
     });
 
-    const smsBody = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
+    // Session 3D: chip-driven render via receipt_sms slug. business_name
+    // auto-injected by the engine; summary_line + receipt_link required;
+    // first_name / last_name / vehicle_description optional cheap-adds for
+    // operators who want to introduce greeting prose via admin edit.
+    const fallback = `${businessInfo.name}\n${summaryLine}\nThank you! View receipt:\n${shortUrl}`;
+    const rendered = await renderSmsTemplate('receipt_sms', {
+      summary_line: summaryLine,
+      receipt_link: shortUrl,
+      first_name: customer?.first_name || undefined,
+      last_name: customer?.last_name || undefined,
+      vehicle_description: vehicle ? cleanVehicleDescription(vehicle) : undefined,
+    }, fallback);
 
-    const result = await sendSms(phone, smsBody, {
+    if (!rendered.isActive) {
+      console.log('[ReceiptSMS] Slug receipt_sms is silenced — skipping send');
+      return NextResponse.json({ success: true, skipped: 'template_disabled' });
+    }
+
+    const result = await sendSms(phone, rendered.body, {
       logToConversation: true,
       notificationType: 'receipt_sent',
       contextId: transaction_id,

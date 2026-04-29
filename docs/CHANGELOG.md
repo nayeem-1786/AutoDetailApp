@@ -4,6 +4,67 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(sms): receipt_sms migration — 2026-04-29 (Session 3D)
+
+**Session 3D — receipt_sms migration to chip-driven. Closes Path B Phase 2.** All 27 SMS slugs in the system are now operator-editable via Admin > Settings > Messaging > SMS Templates. The Hardcoded Messages section becomes empty (renders as 0-count). The transformation that began with Sessions 2A through 3C completes here; ZERO hardcoded SMS slugs remain.
+
+**Architecture.** Truncation logic preserved caller-side (Approach 1) so the chip-driven template body stays a fixed shape. `route.ts` computes a `summary_line` chip value via the existing 160-char-aware `buildSummaryLine` composite helper; the engine substitutes the value opaquely. The composite chip + helper were pre-staged in the palette during Session 2D's cheap-add wave (`sms-contracts.source.ts:121` with `composite: true`), so this session required no palette changes — only a slug entry, a seed migration, and the route-side `renderSmsTemplate` call.
+
+### Slug migrated
+
+**`receipt_sms`** — Sent when staff clicks "Send SMS receipt" from POS or admin receipt dialog. Source: `src/app/api/pos/receipts/sms/route.ts`. 4-line body, 4 chips referenced. Required: `summary_line`, `receipt_link`. Optional cheap-adds: `first_name`, `last_name`, `vehicle_description` (parity with sibling transactional slugs; not in default body, available for operator edit). `business_name` auto-injected. `category=transactional`, `recipient_type=customer`, `is_active=true`, `can_silence=true` (silencing returns `{ success: true, skipped: 'template_disabled' }` from the route — caller UI doesn't error).
+
+### Truncation contract — known operator-edit limitation
+
+The default body is sized at the 160-char SMS limit. The `summary_line` composite's truncation budget assumes the exact default surround prose (`"\nThank you! View receipt:\n"` + ` " — " ` separator inside summary_line, ~30 chars reserved). Operators editing the body to add prose (e.g., `"Hi {first_name}, here is your receipt for {service_name}: ..."`) may cause the rendered SMS to exceed 160 chars and split into 2 segments. Vehicle prefix in `summary_line` truncates first when the budget exhausts (10-char floor on the truncated vehicle prefix prevents pathological zeroing). Documented in the migration's leading SQL comment for future admin UI tooltip surfacing.
+
+### Receipt SMS dual-path preserved
+
+Two receipt-SMS paths coexist post-3D, each with its own slug:
+
+- **`receipt_sms` (Session 3D)** — manual operator action via `POST /api/pos/receipts/sms`. Triggered by POS receipt-options or admin receipt-dialog "Send SMS receipt" click.
+- **`payment_receipt` (already chip-driven, untouched this session)** — automatic 30-second post-transaction send from `pos/transactions/route.ts:547`. Uses `transaction_greeting` composite + loyalty-points line, NOT `summary_line`.
+
+Both share `notificationType: 'receipt_sent'` so the existing dedup at `pos/transactions/route.ts:456-466` continues to suppress the auto-send when manual happened first; dedup matches on `metadata.notificationType` + `contextId`, not slug. The migration is transparent to that interlock.
+
+### Files changed
+
+**New:**
+- `supabase/migrations/20260429000001_seed_3d_receipt_sms_chip_driven.sql` — slug INSERT (idempotent via `ON CONFLICT (slug) DO NOTHING`); leading SQL comment block documents the truncation contract and the dual-path coexistence with `payment_receipt`.
+
+**Source-of-truth:**
+- `src/lib/sms/sms-contracts.source.ts` — added `receipt_sms` entry under `slugs` map (alphabetical, between `quote_viewed_followup` and `staff_notification`).
+
+**Auto-generated (regenerated via `npx tsx scripts/regen-sms-contracts.ts`):**
+- `src/lib/sms/palette.ts` — no chip changes (no diff). Both `summary_line` and `receipt_link` were pre-staged in earlier sessions.
+- `src/lib/sms/generated-contracts.ts` — `SMS_SLUGS` widens 26 → 27; new `RenderVarsBySlug.receipt_sms` typed shape and `CONTRACTS_BY_SLUG.receipt_sms` entry. The 3 auto-injected business chips (`business_name`, `business_phone`, `business_address`) appear as optional in the generated render-vars type per palette convention.
+
+**Source:**
+- `src/app/api/pos/receipts/sms/route.ts` — replaces hardcoded `smsBody` template-literal construction with `renderSmsTemplate('receipt_sms', vars, fallback)`. Preserves `buildSummaryLine` import + caller-side truncation. Removes the prep-marker `void customer;` line from Session 2C — `customer` is now a real callsite consumer (provides `first_name`/`last_name` cheap-add chips). Adds `isActive: false` skip branch returning `{ success: true, skipped: 'template_disabled' }` so caller UIs don't error when an operator silences the slug. New imports: `renderSmsTemplate`, `cleanVehicleDescription`.
+
+**Hardcoded list:**
+- `src/lib/sms/hardcoded-messages.ts` — `HARDCODED_SMS_MESSAGES` set to `[]`. Comment block updated to reflect Path B Phase 2 closure. Interface and exports retained typed-empty so any future hardcoded SMS introduced in the codebase can be added back to this list with no infrastructure changes; the admin UI surfaces the entry the moment the array is non-empty.
+
+**Docs:**
+- `docs/dev/DB_SCHEMA.md` — regenerated; no structural change (only a new `sms_templates` row, no schema delta).
+- `docs/dev/FILE_TREE.md` — new migration entry.
+
+### Production state at fix time
+
+Migration applied via `supabase db push --linked` during implementation. Until the VPS deploy lands, the running production code still calls the pre-3D hardcoded path — so current sends continue to render correctly as the byte-identical default body. The new chip-driven code takes effect after the deploy.
+
+### Verification gates (all passing)
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | Clean |
+| `npm run lint` | 57 problems (13 errors, 44 warnings) — baseline identical to RFB-1 commit (none in 3D-touched files) |
+| `npm run build` (after `rm -rf .next`) | Build succeeded |
+| `npx vitest run` | 535/535 tests passed (36 files, 2.81s) |
+| `supabase db push --linked --dry-run` | "Remote database is up to date" — migration recorded; idempotent confirmed |
+
+---
+
 ## fix(marketing): premature review SMS firing — 2026-04-28 (Session RFB-1)
 
 **Customer impact.** A real customer reported receiving a "leave a review" SMS for a Friday 11:30 AM service that hadn't happened yet (booked, deposit paid earlier in the week). Trust-damaging — replays as "they're asking for a review before doing the work?". This fix prevents review SMS from firing on any service-related transaction until **work is done AND vehicle has been picked up AND full payment received**.
