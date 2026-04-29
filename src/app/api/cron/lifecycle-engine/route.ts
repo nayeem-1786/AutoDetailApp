@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     );
 
     if (serviceRules.length > 0) {
-      scheduled += await scheduleFromAppointments(admin, serviceRules, lookbackWindow, thirtyDaysAgo);
+      scheduled += await scheduleFromCompletedJobs(admin, serviceRules, lookbackWindow, thirtyDaysAgo);
     }
 
     if (transactionRules.length > 0) {
@@ -172,8 +172,19 @@ export async function GET(request: NextRequest) {
 }
 
 // ===========================================================================
-// Phase 1A — Schedule from completed appointments
+// Phase 1A — Schedule from completed jobs (work done + picked up + paid)
 // ===========================================================================
+//
+// Session RFB-1: prior implementation queried `appointments.status='completed'`,
+// which fires on the POS-checkout cascade (paid) but does NOT enforce vehicle
+// pickup. The current gate matches the operator-stated rule:
+//   work done       → jobs.status = 'closed' (set when POS links a transaction)
+//   fully paid      → jobs.status = 'closed' (same — closing requires a tx link)
+//   picked up       → jobs.actual_pickup_at IS NOT NULL (POS pickup action)
+//
+// Admin manual `appointment.status='completed'` overrides do NOT trigger a
+// review under this gate (no jobs row is touched by the manual edit path),
+// which matches Q2's "keep strict" decision — see Phase 0 report.
 
 interface Rule {
   id: string;
@@ -183,52 +194,77 @@ interface Rule {
   [key: string]: unknown;
 }
 
-async function scheduleFromAppointments(
+async function scheduleFromCompletedJobs(
   admin: ReturnType<typeof createAdminClient>,
   rules: Rule[],
   lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
-  // Find recently completed appointments with a customer
-  const { data: appointments, error } = await admin
-    .from('appointments')
+  // `updated_at` advances whenever the job changes; both link-transaction
+  // (closed) and pickup recording bump it. So a job that was closed days ago
+  // and only just picked up will surface in the recent window.
+  const { data: jobs, error } = await admin
+    .from('jobs')
     .select(`
       id,
+      appointment_id,
+      transaction_id,
       customer_id,
       updated_at,
-      customers!inner(id, phone, email, sms_consent, email_consent),
-      appointment_services(service_id)
+      services,
+      customers!inner(id, phone, email, sms_consent, email_consent)
     `)
-    .eq('status', 'completed')
+    .eq('status', 'closed')
+    .not('actual_pickup_at', 'is', null)
     .gte('updated_at', lookbackWindow)
     .not('customer_id', 'is', null);
 
-  if (error || !appointments?.length) {
-    if (error) console.error('Failed to query completed appointments:', error);
+  if (error || !jobs?.length) {
+    if (error) console.error('Failed to query closed+picked jobs:', error);
     return 0;
   }
 
   return scheduleExecutions(
     admin,
     rules,
-    appointments.map((apt) => ({
-      sourceId: apt.id,
-      sourceField: 'appointment_id' as const,
-      customerId: apt.customer_id!,
-      triggeredAt: apt.updated_at,
-      customer: apt.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
-      serviceIds: ((apt.appointment_services || []) as Array<{ service_id: string }>).map(
-        (s) => s.service_id
-      ),
-    })),
-    'appointment_completed',
+    jobs.map((j) => {
+      // jobs.services is JSONB array — best-effort extract service IDs to
+      // support trigger_service_id rule filters. Shape historically:
+      //   [{ service_id: '...', ... }, ...]
+      const serviceIds = Array.isArray(j.services)
+        ? (j.services as Array<{ service_id?: string | null }>)
+            .map((s) => s?.service_id)
+            .filter((sid): sid is string => typeof sid === 'string' && sid.length > 0)
+        : [];
+      return {
+        sourceId: j.id,
+        sourceField: 'job_id' as const,
+        // Propagate appointment_id and transaction_id to the lifecycle_executions
+        // row for traceability — they don't participate in dedup (job_id does)
+        // but are useful when operators audit why a review was scheduled.
+        appointmentId: j.appointment_id,
+        transactionId: j.transaction_id,
+        customerId: j.customer_id!,
+        triggeredAt: j.updated_at,
+        customer: j.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
+        serviceIds,
+      };
+    }),
+    'job_closed_picked_up',
     thirtyDaysAgo
   );
 }
 
 // ===========================================================================
-// Phase 1B — Schedule from completed transactions
+// Phase 1B — Schedule from completed transactions (product-only POS sales)
 // ===========================================================================
+//
+// Session RFB-1: this path is now restricted to non-service POS transactions.
+// Service-tied transactions (linked to an appointment, OR linked from any
+// jobs.transaction_id) are handled by scheduleFromCompletedJobs above; firing
+// `after_transaction` rules on them would cause dual-firing (Q3 — "non-
+// overlapping populations"). Pure product POS sales (walk-in supply purchase,
+// retail-only checkout) still trigger immediately on transaction completion.
 
 async function scheduleFromTransactions(
   admin: ReturnType<typeof createAdminClient>,
@@ -240,12 +276,14 @@ async function scheduleFromTransactions(
     .from('transactions')
     .select(`
       id,
+      appointment_id,
       customer_id,
       transaction_date,
       customers!inner(id, phone, email, sms_consent, email_consent),
       transaction_items(service_id)
     `)
     .eq('status', 'completed')
+    .is('appointment_id', null)
     .gte('transaction_date', lookbackWindow)
     .not('customer_id', 'is', null);
 
@@ -254,12 +292,32 @@ async function scheduleFromTransactions(
     return 0;
   }
 
+  // Second-level filter: also exclude transactions referenced by any job
+  // (jobs.transaction_id = tx.id). These are service-checkout transactions
+  // even when appointment_id is NULL (walk-in service flow, where the job
+  // has no appointment but is still a service ticket).
+  const txIds = transactions.map((t) => t.id);
+  const { data: jobsLinkingTxs } = await admin
+    .from('jobs')
+    .select('transaction_id')
+    .in('transaction_id', txIds)
+    .not('transaction_id', 'is', null);
+
+  const serviceTxIds = new Set(
+    (jobsLinkingTxs || []).map((j) => j.transaction_id as string)
+  );
+
+  const productOnly = transactions.filter((tx) => !serviceTxIds.has(tx.id));
+  if (productOnly.length === 0) return 0;
+
   return scheduleExecutions(
     admin,
     rules,
-    transactions.map((tx) => ({
+    productOnly.map((tx) => ({
       sourceId: tx.id,
       sourceField: 'transaction_id' as const,
+      appointmentId: null,
+      transactionId: tx.id,
       customerId: tx.customer_id!,
       triggeredAt: tx.transaction_date,
       customer: tx.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
@@ -278,7 +336,11 @@ async function scheduleFromTransactions(
 
 interface TriggerEvent {
   sourceId: string;
-  sourceField: 'appointment_id' | 'transaction_id';
+  sourceField: 'appointment_id' | 'transaction_id' | 'job_id';
+  // Cross-references propagated to lifecycle_executions for traceability,
+  // even when not part of the dedup key.
+  appointmentId?: string | null;
+  transactionId?: string | null;
   customerId: string;
   triggeredAt: string;
   customer: { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean };
@@ -300,13 +362,16 @@ async function scheduleExecutions(
   const sourceField = events[0]?.sourceField;
   const { data: existingBySource } = await admin
     .from('lifecycle_executions')
-    .select('lifecycle_rule_id, appointment_id, transaction_id')
+    .select('lifecycle_rule_id, appointment_id, transaction_id, job_id')
     .in('lifecycle_rule_id', ruleIds)
     .in(sourceField, sourceIds);
 
   const sourceDedupSet = new Set(
     (existingBySource || []).map((e) => {
-      const sid = sourceField === 'appointment_id' ? e.appointment_id : e.transaction_id;
+      const sid =
+        sourceField === 'appointment_id' ? e.appointment_id :
+        sourceField === 'transaction_id' ? e.transaction_id :
+        e.job_id;
       return `${e.lifecycle_rule_id}:${sid}`;
     })
   );
@@ -341,15 +406,26 @@ async function scheduleExecutions(
       const delayMs = (rule.delay_days * 1440 + (rule.delay_minutes || 0)) * 60 * 1000;
       const scheduledFor = new Date(new Date(event.triggeredAt).getTime() + delayMs).toISOString();
 
-      toInsert.push({
+      // Build the row — set the source-field column AND propagate any
+      // cross-references for traceability. The unique-trigger index now
+      // includes job_id so a job-driven row won't collide with a
+      // transaction-driven row that happens to share appointment_id.
+      const row: Record<string, unknown> = {
         lifecycle_rule_id: rule.id,
         customer_id: event.customerId,
-        [event.sourceField]: event.sourceId,
         trigger_event: triggerEvent,
         triggered_at: event.triggeredAt,
         scheduled_for: scheduledFor,
         status: 'pending',
-      });
+        [event.sourceField]: event.sourceId,
+      };
+      if (event.appointmentId !== undefined && event.sourceField !== 'appointment_id') {
+        row.appointment_id = event.appointmentId;
+      }
+      if (event.transactionId !== undefined && event.sourceField !== 'transaction_id') {
+        row.transaction_id = event.transactionId;
+      }
+      toInsert.push(row);
 
       // Mark in dedup sets to prevent dups within same batch
       sourceDedupSet.add(`${rule.id}:${event.sourceId}`);
