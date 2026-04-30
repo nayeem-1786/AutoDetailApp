@@ -151,7 +151,6 @@ export function CustomerStep({ state, onStateChange, onContinue }: CustomerStepP
             last_name: c.row['Last Name']?.trim() || '',
             phone: c.normalizedPhone,
             email: c.row['Email Address']?.trim() || null,
-            birthday: c.row['Birthday']?.trim() || null,
             address_line_1: c.row['Street Address 1']?.trim() || null,
             address_line_2: c.row['Street Address 2']?.trim() || null,
             city: c.row['City']?.trim() || null,

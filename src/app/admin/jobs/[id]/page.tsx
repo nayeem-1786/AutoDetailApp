@@ -90,8 +90,6 @@ interface JobDetail {
   intake_completed_at: string | null;
   intake_notes: string | null;
   estimated_pickup_at: string | null;
-  actual_pickup_at: string | null;
-  pickup_notes: string | null;
   appointment_id: string | null;
   transaction_id: string | null;
   gallery_token: string | null;
@@ -481,14 +479,6 @@ export default function AdminJobDetailPage({
                         color="green"
                       />
                     )}
-                    {job.actual_pickup_at && (
-                      <TimelineRow
-                        label="Customer Pickup"
-                        timestamp={job.actual_pickup_at}
-                        icon={<CheckCircle2 className="h-4 w-4" />}
-                        color="green"
-                      />
-                    )}
                     {job.cancelled_at && (
                       <TimelineRow
                         label="Cancelled"
@@ -590,21 +580,6 @@ export default function AdminJobDetailPage({
                           {formatCurrency(addonsTotal)}
                         </span>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Pickup Notes */}
-              {job.pickup_notes && (
-                <Card>
-                  <CardContent className="p-6">
-                    <h2 className="mb-2 text-lg font-semibold text-gray-900">Pickup Notes</h2>
-                    <p className="text-sm text-gray-600">{job.pickup_notes}</p>
-                    {job.actual_pickup_at && (
-                      <p className="mt-1 text-xs text-gray-400">
-                        Picked up {formatTimestamp(job.actual_pickup_at)}
-                      </p>
                     )}
                   </CardContent>
                 </Card>

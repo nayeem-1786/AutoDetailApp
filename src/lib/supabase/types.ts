@@ -68,7 +68,6 @@ export interface Customer {
   last_name: string;
   phone: string | null;
   email: string | null;
-  birthday: string | null;
   address_line_1: string | null;
   address_line_2: string | null;
   city: string | null;
@@ -996,8 +995,6 @@ export interface Job {
   intake_completed_at: string | null;
   intake_notes: string | null;
   estimated_pickup_at: string | null;
-  actual_pickup_at: string | null;
-  pickup_notes: string | null;
   gallery_token: string | null;
   cancellation_reason: string | null;
   cancelled_at: string | null;

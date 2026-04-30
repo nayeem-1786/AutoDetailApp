@@ -4,6 +4,82 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(marketing): lifecycle engine cleanup + trigger expansion — 2026-04-30 (Session RFB-2)
+
+**Session RFB-2 — Lifecycle engine cleanup.** Drops pickup-tracking dependency from the `service_completed` gate (was preventing review SMS for walk-in customers); adds 4 new event triggers (`after_work_completed`, `after_appointment_booked`, `after_appointment_cancelled`, `after_quote_accepted`); removes dead `no_visit_days` and `birthday` options from the dropdown; fully removes the pickup workflow (button + endpoint + UI code); drops the unused `customers.birthday` column. Net effect: lifecycle engine triggers reflect actual operator workflow, no more dead options, simpler gate semantics.
+
+### Trigger catalog (post-RFB-2)
+
+The Marketing → Automations dropdown now offers 6 operator-facing triggers, each routed through a dedicated scheduling function in `src/app/api/cron/lifecycle-engine/route.ts`:
+
+| Trigger value | Operator label | Source event | Scheduling fn |
+|---|---|---|---|
+| `after_work_completed` | After Work Completed (Detailer Marked Done) | `jobs.status='completed'` | `scheduleFromWorkCompleted` |
+| `service_completed` | After Service Closed (POS Rang Up) | `jobs.status='closed'` | `scheduleFromCompletedJobs` |
+| `after_transaction` | After Transaction (Product POS Sale) | `transactions.status='completed'` (non-service) | `scheduleFromTransactions` |
+| `after_appointment_booked` | After Appointment Booked | `appointments` insert (non-cancelled) | `scheduleFromAppointmentBooked` |
+| `after_appointment_cancelled` | After Appointment Cancelled | `appointments.status='cancelled'` | `scheduleFromAppointmentCancelled` |
+| `after_quote_accepted` | After Quote Accepted | `quotes.status='accepted'` | `scheduleFromQuoteAccepted` |
+
+The `service_completed` value is preserved (stable identifier across operator-saved rules); only the user-facing label changed. The internal `trigger_event` literal that lifecycle_executions records went from `'job_closed_picked_up'` to `'job_closed'`. Historical rows retain the old value; new rows get the new one.
+
+### Schema changes
+
+Migration: `supabase/migrations/20260430000001_rfb2_drop_birthday_and_expand_lifecycle.sql`. Single transaction:
+
+1. **Defensive guard** — `RAISE EXCEPTION` if `customers.birthday` has any non-NULL row. Phase 0 verified zero across 1349 customers; the guard is belt-and-suspenders for re-applies.
+2. **Recreate `merge_customers()`** — `CREATE OR REPLACE` without birthday column refs. Also dropped the now-broken `UPDATE photos SET customer_id ...` block that survived the `photos` table's deletion in `20260301000002_drop_orphaned_photos_table.sql`. Pre-existing breakage — the function would have raised at runtime on the next merge attempt; recreating it for birthday removal is the natural moment to fix.
+3. **Drop `customers.birthday` column.**
+4. **Add `lifecycle_executions.quote_id`** (FK → `quotes(id) ON DELETE SET NULL`) plus partial index `idx_lifecycle_executions_quote_id WHERE quote_id IS NOT NULL`.
+5. **Replace `idx_lifecycle_executions_unique_trigger`** to include `COALESCE(quote_id, ...)` in the composite — distinct sources (appointment / transaction / job / quote) cannot collide.
+6. **Delete the inactive lifecycle rule** with `trigger_condition='no_visit_days'` (the unreachable "Post-Service Thank You", inactive but still listed). The dropdown no longer offers `no_visit_days`/`birthday`, so leaving rows with those triggers in the table is dead state.
+
+### Pickup workflow removal
+
+The customer-pickup workflow (`actual_pickup_at`/`pickup_notes` writes) was unreachable for walk-ins: the button only rendered while `jobs.status='completed'` and was replaced by a "Paid" badge once `link-transaction` flipped status to `'closed'`. Same-day walk-in flows (pay at completion, drive away) had no time window in which the button was reachable. RFB-2 removes the workflow entirely.
+
+**Removed:**
+- `src/app/api/pos/jobs/[id]/pickup/route.ts` (endpoint + directory)
+- POS job-detail.tsx: pickup useState (`showPickupDialog`, `pickupNotes`, `pickingUp`), `handlePickup`, the pickup confirmation modal, the "Customer Pickup" button. The Checkout button on `completed` jobs remains.
+- `actual_pickup_at` / `pickup_notes` from `WORKFLOW_FIELDS` in `src/app/api/pos/jobs/[id]/route.ts` (defensive — no caller ever wrote them via PATCH, but the allowlist invited future re-introduction).
+- Admin job detail (`src/app/admin/jobs/[id]/page.tsx`): the "Customer Pickup" timestamp row in the timeline + the Pickup Notes card. Both rendered NULL for current jobs anyway.
+- `src/app/api/admin/jobs/route.ts`: `actual_pickup_at` from the SELECT.
+- `src/app/api/account/services/[jobId]/route.ts`: dropped `picked_up_at: job.actual_pickup_at` from response and removed `actual_pickup_at` from the SELECT.
+- `src/app/(account)/account/services/[jobId]/page.tsx`: removed `picked_up_at` from the response interface (the field was typed but never rendered).
+- `src/lib/supabase/types.ts`: removed `actual_pickup_at` and `pickup_notes` from the `Job` interface.
+
+**Kept (per Phase 0 decision):**
+- The `actual_pickup_at` and `pickup_notes` columns on `jobs` — nullable, harmless legacy data. Future flexibility if pickup tracking is reintroduced.
+- `estimated_pickup_at` (the walk-in scheduling proxy used by job-timeline, flag-issue-flow, addons ETA delays, and reschedule). Unrelated to the removed workflow.
+- Lifecycle engine gate's reference to the column has been removed (the `.not('actual_pickup_at', 'is', null)` filter is gone). New gate is `jobs.status='closed'` only.
+
+### Birthday removal
+
+Phase 0 verified zero non-NULL `customers.birthday` rows across 1349 customers. The field was collected by admin forms but never read by any cron, automation, or template. The `birthday` lifecycle trigger was a dead dropdown option (no handler, no cron). Removed across UI, API, types, validation, migration importer, and schema:
+
+- Admin customer forms (`new` + `[id]`): full Birthday section UI, `MONTHS`/`DAYS` constants, validation effect, `buildBirthdayDate` helper, state, payload field. Marketing Info grid rebalanced to give SMS/Email toggles 6 cols each (was 3 + 3 with Birthday at 4).
+- Admin customer API (`POST` + `PATCH`): destructure + insert/update.
+- Migration import (`/api/migration/customers` + `customer-step.tsx` + `lib/migration/types.ts`): payload field, CSV column mapping. Future Square CSV imports will skip the Birthday column.
+- Validation schema (`customerCreateSchema`).
+- Marketing → Automations dropdown options + `automation-table.tsx` badge/label entries.
+- `Customer` interface in `src/lib/supabase/types.ts`.
+
+### Risks accepted
+
+- **Misleading `service_completed` label.** Stable identifier preserved (rules saved before this session keep working). Operator-facing label is now "After Service Closed (POS Rang Up)".
+- **Dead state inside the column.** `actual_pickup_at` and `pickup_notes` remain on the schema as nullable columns. New jobs will never populate them. Display-time UI surfaces have been removed; only `lifecycle_executions` historical rows still reference them indirectly via the deprecated trigger_event literal.
+- **Backfill SMS-blast risk on first cron tick after deploy.** Phase 0 surfaced this. Mitigation: live state shows zero active `service_completed` rules (only `after_transaction` is active), so the simplified gate has no rule to fire against on first tick. UAT step in deploy checklist re-verifies this via SQL before allowing the cron to run.
+
+### Files touched
+
+**Modified** — `src/app/api/cron/lifecycle-engine/route.ts`, `src/app/admin/marketing/automations/new/page.tsx`, `src/app/admin/marketing/automations/[id]/page.tsx`, `src/app/admin/marketing/analytics/components/automation-table.tsx`, `src/app/pos/jobs/components/job-detail.tsx`, `src/app/api/pos/jobs/[id]/route.ts`, `src/app/admin/jobs/[id]/page.tsx`, `src/app/api/admin/jobs/route.ts`, `src/app/api/account/services/[jobId]/route.ts`, `src/app/(account)/account/services/[jobId]/page.tsx`, `src/app/admin/customers/new/page.tsx`, `src/app/admin/customers/[id]/page.tsx`, `src/app/api/admin/customers/route.ts`, `src/app/api/admin/customers/[id]/route.ts`, `src/app/api/migration/customers/route.ts`, `src/app/admin/migration/steps/customer-step.tsx`, `src/lib/utils/validation.ts`, `src/lib/supabase/types.ts`, `src/lib/migration/types.ts`, `docs/dev/DB_SCHEMA.md` (regen), `docs/dev/FILE_TREE.md`.
+
+**Deleted** — `src/app/api/pos/jobs/[id]/pickup/route.ts` + parent directory.
+
+**Created** — `supabase/migrations/20260430000001_rfb2_drop_birthday_and_expand_lifecycle.sql`.
+
+---
+
 ## fix(marketing): broken seeded review template — 2026-04-29 (Session RPB-1)
 
 **Session RPB-1 — Review Placeholder Bug.** The seeded review SMS template ("Google & Yelp Review Request — After Service" / "After Purchase", `lifecycle_rules.id 00b438f3-b7ca-4e67-beba-970f2a077eed`) uses `{detailer_first_name}` and `{vehicle_description}` tokens that were never wired into the legacy marketing renderer (`src/lib/utils/template.ts`). Customers received SMS with literal placeholder text in the body. Verified by inspecting tracked_links short_code 20ad0b which matched the URL in a real customer's broken message.

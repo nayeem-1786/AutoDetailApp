@@ -37,13 +37,6 @@ const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[
   { value: 'professional', label: 'Professional', activeClass: 'border-purple-400 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
 ];
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
-
 const US_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
   'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
@@ -61,12 +54,6 @@ export default function NewCustomerPage() {
   // Customer type
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
   const [typeError, setTypeError] = useState(false);
-
-  // Birthday fields
-  const [birthMonth, setBirthMonth] = useState('');
-  const [birthDay, setBirthDay] = useState('');
-  const [birthYear, setBirthYear] = useState('');
-  const [birthdayError, setBirthdayError] = useState('');
 
   // Duplicate check state
   const [phoneDup, setPhoneDup] = useState<{ name: string } | null>(null);
@@ -92,7 +79,6 @@ export default function NewCustomerPage() {
       last_name: '',
       phone: '',
       email: '',
-      birthday: '',
       address_line_1: '',
       address_line_2: '',
       city: '',
@@ -202,23 +188,6 @@ export default function NewCustomerPage() {
     };
   }, [watchEmail]);
 
-  // Birthday validation: if month or day is provided, both must be provided
-  useEffect(() => {
-    if ((birthMonth && !birthDay) || (!birthMonth && birthDay)) {
-      setBirthdayError('Both month and day are required');
-    } else if (birthYear) {
-      const yr = parseInt(birthYear);
-      const currentYear = new Date().getFullYear();
-      if (isNaN(yr) || yr < 1920 || yr > currentYear) {
-        setBirthdayError(`Year must be between 1920 and ${currentYear}`);
-      } else {
-        setBirthdayError('');
-      }
-    } else {
-      setBirthdayError('');
-    }
-  }, [birthMonth, birthDay, birthYear]);
-
   // Phone required validation
   const [phoneRequired, setPhoneRequired] = useState(false);
   const phoneDigits = (watchPhone || '').replace(/\D/g, '');
@@ -226,8 +195,7 @@ export default function NewCustomerPage() {
 
   const hasDuplicateError = !!phoneDup || !!emailDup;
   const hasEmailFormatError = !!emailFormatError;
-  const hasBirthdayError = !!birthdayError;
-  const hasAnyError = hasDuplicateError || hasEmailFormatError || hasBirthdayError || typeError;
+  const hasAnyError = hasDuplicateError || hasEmailFormatError || typeError;
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
@@ -236,18 +204,6 @@ export default function NewCustomerPage() {
     if (formatted.replace(/\D/g, '').length > 0) {
       setPhoneRequired(false);
     }
-  }
-
-  function buildBirthdayDate(): string | null {
-    if (!birthMonth && !birthDay) return null;
-    if (!birthMonth || !birthDay) return null; // validation catches this
-
-    const monthNum = String(MONTHS.indexOf(birthMonth) + 1).padStart(2, '0');
-    const dayNum = String(birthDay).padStart(2, '0');
-
-    // Birthday stored as DATE column. Year 1900 is sentinel when year is omitted.
-    const yr = birthYear ? String(parseInt(birthYear)) : '1900';
-    return `${yr}-${monthNum}-${dayNum}`;
   }
 
   async function onSubmit(data: CustomerCreateInput) {
@@ -270,14 +226,11 @@ export default function NewCustomerPage() {
 
     setSaving(true);
     try {
-      const birthday = buildBirthdayDate();
-
       const payload = {
         first_name: data.first_name,
         last_name: data.last_name,
         phone: data.phone || null,
         email: data.email || null,
-        birthday,
         address_line_1: data.address_line_1 || null,
         address_line_2: data.address_line_2 || null,
         city: data.city || null,
@@ -437,8 +390,8 @@ export default function NewCustomerPage() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
-              {/* Customer Type — cols 1-2 */}
-              <div className="min-w-0 space-y-1.5 lg:col-span-2">
+              {/* Customer Type — cols 1-4 */}
+              <div className="min-w-0 space-y-1.5 lg:col-span-4">
                 <label className="text-sm font-medium text-ui-text">
                   Customer Type <span className="text-red-500">*</span>
                 </label>
@@ -466,45 +419,8 @@ export default function NewCustomerPage() {
                 )}
               </div>
 
-              {/* Birthday — cols 3-6 */}
+              {/* SMS Marketing Toggle — cols 5-8 */}
               <div className="space-y-1.5 lg:col-span-4">
-                <label className="text-sm font-medium text-ui-text">Birthday</label>
-                <div className="grid grid-cols-[3fr_4.5rem_3fr] gap-1.5 max-w-[75%]">
-                  <Select
-                    value={birthMonth}
-                    onChange={(e) => setBirthMonth(e.target.value)}
-                    className={birthdayError ? 'border-red-500' : ''}
-                  >
-                    <option value="">Month</option>
-                    {MONTHS.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </Select>
-                  <Select
-                    value={birthDay}
-                    onChange={(e) => setBirthDay(e.target.value)}
-                    className={birthdayError ? 'border-red-500' : ''}
-                  >
-                    <option value="">Day</option>
-                    {DAYS.map((d) => (
-                      <option key={d} value={String(d)}>{d}</option>
-                    ))}
-                  </Select>
-                  <Input
-                    value={birthYear}
-                    onChange={(e) => setBirthYear(e.target.value)}
-                    placeholder="Year"
-                    maxLength={4}
-                    className={birthdayError && birthYear ? 'border-red-500' : ''}
-                  />
-                </div>
-                {birthdayError && (
-                  <p className="text-xs text-red-600">{birthdayError}</p>
-                )}
-              </div>
-
-              {/* SMS Marketing Toggle — cols 7-9 */}
-              <div className="space-y-1.5 lg:col-span-3">
                 <label className="text-sm font-medium text-ui-text">SMS Marketing</label>
                 <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
                   <p className="text-sm text-gray-700 dark:text-gray-300">Allow SMS</p>
@@ -515,8 +431,8 @@ export default function NewCustomerPage() {
                 </div>
               </div>
 
-              {/* Email Marketing Toggle — cols 10-12 */}
-              <div className="space-y-1.5 lg:col-span-3">
+              {/* Email Marketing Toggle — cols 9-12 */}
+              <div className="space-y-1.5 lg:col-span-4">
                 <label className="text-sm font-medium text-ui-text">Email Marketing</label>
                 <div className="flex items-center justify-between rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700">
                   <p className="text-sm text-gray-700 dark:text-gray-300">Allow Email</p>

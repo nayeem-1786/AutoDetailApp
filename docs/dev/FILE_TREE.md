@@ -393,7 +393,6 @@ src/app/api/pos/jobs/[id]/complete/route.ts
 src/app/api/pos/jobs/[id]/link-transaction/route.ts
 src/app/api/pos/jobs/[id]/photos/[photoId]/route.ts
 src/app/api/pos/jobs/[id]/photos/route.ts
-src/app/api/pos/jobs/[id]/pickup/route.ts
 src/app/api/pos/jobs/[id]/reschedule/route.ts
 src/app/api/pos/jobs/[id]/route.ts
 src/app/api/pos/jobs/[id]/start-work/route.ts
@@ -1528,6 +1527,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260428000004_voice_call_log_retry_state.sql
 20260428000005_lifecycle_executions_job_id_and_review_cleanup.sql
 20260429000001_seed_3d_receipt_sms_chip_driven.sql
+20260430000001_rfb2_drop_birthday_and_expand_lifecycle.sql
 ```
 
 ## Scripts

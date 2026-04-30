@@ -57,7 +57,6 @@ export async function GET(request: NextRequest) {
       work_completed_at,
       intake_started_at,
       intake_completed_at,
-      actual_pickup_at,
       estimated_pickup_at,
       appointment_id,
       transaction_id,

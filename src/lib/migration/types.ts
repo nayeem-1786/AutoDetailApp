@@ -79,7 +79,6 @@ export interface CustomerImportRow {
   'City': string;
   'State': string;
   'Postal Code': string;
-  'Birthday': string;
   'Memo': string;
   'Square Customer ID': string;
   'Creation Source': string;

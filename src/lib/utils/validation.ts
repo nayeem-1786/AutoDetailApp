@@ -47,7 +47,6 @@ export const customerCreateSchema = z.object({
   last_name: requiredString,
   phone: phoneSchema,
   email: emailSchema,
-  birthday: z.string().optional().nullable(),
   address_line_1: optionalString,
   address_line_2: optionalString,
   city: optionalString,

@@ -63,8 +63,6 @@ const WORKFLOW_FIELDS = [
   'timer_seconds',
   'timer_paused_at',
   'estimated_pickup_at',
-  'actual_pickup_at',
-  'pickup_notes',
   'transaction_id',
 ];
 

@@ -8,7 +8,6 @@ interface CustomerPayload {
   last_name: string;
   phone: string | null;
   email: string | null;
-  birthday: string | null;
   address_line_1: string | null;
   address_line_2: string | null;
   city: string | null;
@@ -53,7 +52,6 @@ export async function POST(request: NextRequest) {
         last_name: c.last_name || '',
         phone: c.phone || null,
         email: c.email || null,
-        birthday: c.birthday || null,
         address_line_1: c.address_line_1 || null,
         address_line_2: c.address_line_2 || null,
         city: c.city || null,

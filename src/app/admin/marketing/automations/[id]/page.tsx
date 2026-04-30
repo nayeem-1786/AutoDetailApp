@@ -244,10 +244,12 @@ export default function AutomationDetailPage() {
               </FormField>
               <FormField label="Trigger Condition" error={errors.trigger_condition?.message} required htmlFor="trigger_condition">
                 <Select id="trigger_condition" {...register('trigger_condition')}>
-                  <option value="service_completed">After Service (appointment completed)</option>
-                  <option value="after_transaction">After Transaction (POS checkout)</option>
-                  <option value="no_visit_days">No Visit (Days)</option>
-                  <option value="birthday">Birthday</option>
+                  <option value="after_work_completed">After Work Completed (Detailer Marked Done)</option>
+                  <option value="service_completed">After Service Closed (POS Rang Up)</option>
+                  <option value="after_transaction">After Transaction (Product POS Sale)</option>
+                  <option value="after_appointment_booked">After Appointment Booked</option>
+                  <option value="after_appointment_cancelled">After Appointment Cancelled</option>
+                  <option value="after_quote_accepted">After Quote Accepted</option>
                 </Select>
               </FormField>
               <FormField label="Trigger Service" error={errors.trigger_service_id?.message} htmlFor="trigger_service_id">

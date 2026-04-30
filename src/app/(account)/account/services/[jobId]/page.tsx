@@ -49,7 +49,6 @@ interface JobDetail {
     intake: PhotoItem[];
     completion: PhotoItem[];
   };
-  picked_up_at: string | null;
 }
 
 function formatDuration(seconds: number): string {

@@ -66,7 +66,6 @@ interface JobDetailData {
   appointment_id: string | null;
   services: { id: string; name: string; price: number }[];
   estimated_pickup_at: string | null;
-  actual_pickup_at: string | null;
   created_at: string;
   work_started_at: string | null;
   work_completed_at: string | null;
@@ -75,7 +74,6 @@ interface JobDetailData {
   intake_started_at: string | null;
   intake_completed_at: string | null;
   intake_notes: string | null;
-  pickup_notes: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -204,9 +202,6 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [startingWork, setStartingWork] = useState(false);
   const [zonePickerMode, setZonePickerMode] = useState<ZonePickerMode>(null);
   const [showFlagIssue, setShowFlagIssue] = useState(false);
-  const [showPickupDialog, setShowPickupDialog] = useState(false);
-  const [pickupNotes, setPickupNotes] = useState('');
-  const [pickingUp, setPickingUp] = useState(false);
   const [resendingAddon, setResendingAddon] = useState<string | null>(null);
   const [minExterior, setMinExterior] = useState(DEFAULT_MIN_EXTERIOR);
   const [minInterior, setMinInterior] = useState(DEFAULT_MIN_INTERIOR);
@@ -392,26 +387,6 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   function handleFlagIssueComplete() {
     setShowFlagIssue(false);
     fetchJob();
-  }
-
-  async function handlePickup() {
-    setPickingUp(true);
-    try {
-      const res = await posFetch(`/api/pos/jobs/${jobId}/pickup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: pickupNotes }),
-      });
-      if (res.ok) {
-        setShowPickupDialog(false);
-        setPickupNotes('');
-        fetchJob();
-      }
-    } catch (err) {
-      console.error('Failed to mark pickup:', err);
-    } finally {
-      setPickingUp(false);
-    }
   }
 
   // Reassignment handlers
@@ -1092,40 +1067,6 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         </div>
       </div>
 
-      {/* Pickup Dialog */}
-      {showPickupDialog && job && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white dark:bg-gray-900 p-5 shadow-xl dark:shadow-gray-950/50">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Customer Pickup</h3>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Mark {job.customer ? `${job.customer.first_name}'s` : 'this'} {formatVehicle(job.vehicle)} as picked up?
-            </p>
-            <textarea
-              value={pickupNotes}
-              onChange={(e) => setPickupNotes(e.target.value)}
-              placeholder="Optional notes (e.g., customer satisfied, noted concern about X)"
-              className="mt-3 w-full rounded-lg border border-gray-200 dark:border-gray-700 p-2.5 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-              rows={3}
-            />
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => { setShowPickupDialog(false); setPickupNotes(''); }}
-                className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePickup}
-                disabled={pickingUp}
-                className="flex-1 rounded-lg bg-green-600 dark:bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50"
-              >
-                {pickingUp ? 'Processing...' : 'Confirm Pickup'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Action buttons */}
       <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         {job.status === 'scheduled' && (
@@ -1200,23 +1141,14 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           </div>
         )}
         {job.status === 'completed' && (
-          <div className="space-y-2">
-            <button
-              onClick={handleCheckout}
-              disabled={checkingOut}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              {checkingOut ? 'Loading...' : 'Checkout'}
-            </button>
-            <button
-              onClick={() => setShowPickupDialog(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Customer Pickup
-            </button>
-          </div>
+          <button
+            onClick={handleCheckout}
+            disabled={checkingOut}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {checkingOut ? 'Loading...' : 'Checkout'}
+          </button>
         )}
         {job.status === 'closed' && (
           <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-2.5 text-sm font-medium text-green-700 dark:text-green-400">

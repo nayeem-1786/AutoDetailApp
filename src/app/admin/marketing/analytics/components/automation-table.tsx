@@ -74,21 +74,23 @@ function compareAutomations(a: Automation, b: Automation, key: SortKey, dir: Sor
 const TRIGGER_BADGE_CLASSES: Record<string, string> = {
   new_customer: 'bg-green-100 text-green-800',
   service_completed: 'bg-blue-100 text-blue-800',
+  after_work_completed: 'bg-cyan-100 text-cyan-800',
   after_transaction: 'bg-purple-100 text-purple-800',
-  appointment_booked: 'bg-indigo-100 text-indigo-800',
-  quote_accepted: 'bg-amber-100 text-amber-800',
+  after_appointment_booked: 'bg-indigo-100 text-indigo-800',
+  after_appointment_cancelled: 'bg-orange-100 text-orange-800',
+  after_quote_accepted: 'bg-amber-100 text-amber-800',
   inactive_customer: 'bg-red-100 text-red-800',
-  birthday: 'bg-pink-100 text-pink-800',
 };
 
 const TRIGGER_LABELS: Record<string, string> = {
   new_customer: 'New Customer',
-  service_completed: 'Service Completed',
-  after_transaction: 'After Transaction',
-  appointment_booked: 'Appointment Booked',
-  quote_accepted: 'Quote Accepted',
+  service_completed: 'Service Closed',
+  after_work_completed: 'Work Completed',
+  after_transaction: 'Product Sale',
+  after_appointment_booked: 'Appointment Booked',
+  after_appointment_cancelled: 'Appointment Cancelled',
+  after_quote_accepted: 'Quote Accepted',
   inactive_customer: 'Inactive Customer',
-  birthday: 'Birthday',
 };
 
 // ---------------------------------------------------------------------------

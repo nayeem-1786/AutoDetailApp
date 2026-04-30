@@ -103,12 +103,14 @@ export async function GET(request: NextRequest) {
   }
 
   if (rules && rules.length > 0) {
-    const serviceRules = rules.filter(
-      (r) => r.trigger_condition === 'service_completed'
-    );
-    const transactionRules = rules.filter(
-      (r) => r.trigger_condition === 'after_transaction'
-    );
+    const byTrigger = (cond: string) => rules.filter((r) => r.trigger_condition === cond);
+
+    const serviceRules = byTrigger('service_completed');
+    const transactionRules = byTrigger('after_transaction');
+    const workCompletedRules = byTrigger('after_work_completed');
+    const apptBookedRules = byTrigger('after_appointment_booked');
+    const apptCancelledRules = byTrigger('after_appointment_cancelled');
+    const quoteAcceptedRules = byTrigger('after_quote_accepted');
 
     if (serviceRules.length > 0) {
       scheduled += await scheduleFromCompletedJobs(admin, serviceRules, lookbackWindow, thirtyDaysAgo);
@@ -116,6 +118,22 @@ export async function GET(request: NextRequest) {
 
     if (transactionRules.length > 0) {
       scheduled += await scheduleFromTransactions(admin, transactionRules, lookbackWindow, thirtyDaysAgo);
+    }
+
+    if (workCompletedRules.length > 0) {
+      scheduled += await scheduleFromWorkCompleted(admin, workCompletedRules, lookbackWindow, thirtyDaysAgo);
+    }
+
+    if (apptBookedRules.length > 0) {
+      scheduled += await scheduleFromAppointmentBooked(admin, apptBookedRules, lookbackWindow, thirtyDaysAgo);
+    }
+
+    if (apptCancelledRules.length > 0) {
+      scheduled += await scheduleFromAppointmentCancelled(admin, apptCancelledRules, lookbackWindow, thirtyDaysAgo);
+    }
+
+    if (quoteAcceptedRules.length > 0) {
+      scheduled += await scheduleFromQuoteAccepted(admin, quoteAcceptedRules, lookbackWindow, thirtyDaysAgo);
     }
   }
 
@@ -172,19 +190,18 @@ export async function GET(request: NextRequest) {
 }
 
 // ===========================================================================
-// Phase 1A — Schedule from completed jobs (work done + picked up + paid)
+// Phase 1A — Schedule from closed jobs (work done + paid via POS)
 // ===========================================================================
 //
-// Session RFB-1: prior implementation queried `appointments.status='completed'`,
-// which fires on the POS-checkout cascade (paid) but does NOT enforce vehicle
-// pickup. The current gate matches the operator-stated rule:
-//   work done       → jobs.status = 'closed' (set when POS links a transaction)
-//   fully paid      → jobs.status = 'closed' (same — closing requires a tx link)
-//   picked up       → jobs.actual_pickup_at IS NOT NULL (POS pickup action)
+// Session RFB-2: dropped the `actual_pickup_at IS NOT NULL` requirement that
+// Session RFB-1 introduced. The pickup workflow turned out to be unreachable
+// for walk-ins (the button only renders for status='completed' and is replaced
+// by "Paid" once link-transaction flips status to 'closed'). RFB-2 also fully
+// removed the pickup endpoint + button. Gate now means simply:
+//   work done + paid → jobs.status = 'closed' (POS rang the job up)
 //
-// Admin manual `appointment.status='completed'` overrides do NOT trigger a
-// review under this gate (no jobs row is touched by the manual edit path),
-// which matches Q2's "keep strict" decision — see Phase 0 report.
+// Admin-manual `appointments.status='completed'` overrides still do NOT trigger
+// because no jobs row is touched by that path.
 
 interface Rule {
   id: string;
@@ -200,9 +217,6 @@ async function scheduleFromCompletedJobs(
   lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
-  // `updated_at` advances whenever the job changes; both link-transaction
-  // (closed) and pickup recording bump it. So a job that was closed days ago
-  // and only just picked up will surface in the recent window.
   const { data: jobs, error } = await admin
     .from('jobs')
     .select(`
@@ -215,12 +229,11 @@ async function scheduleFromCompletedJobs(
       customers!inner(id, phone, email, sms_consent, email_consent)
     `)
     .eq('status', 'closed')
-    .not('actual_pickup_at', 'is', null)
     .gte('updated_at', lookbackWindow)
     .not('customer_id', 'is', null);
 
   if (error || !jobs?.length) {
-    if (error) console.error('Failed to query closed+picked jobs:', error);
+    if (error) console.error('Failed to query closed jobs:', error);
     return 0;
   }
 
@@ -228,9 +241,6 @@ async function scheduleFromCompletedJobs(
     admin,
     rules,
     jobs.map((j) => {
-      // jobs.services is JSONB array — best-effort extract service IDs to
-      // support trigger_service_id rule filters. Shape historically:
-      //   [{ service_id: '...', ... }, ...]
       const serviceIds = Array.isArray(j.services)
         ? (j.services as Array<{ service_id?: string | null }>)
             .map((s) => s?.service_id)
@@ -239,9 +249,6 @@ async function scheduleFromCompletedJobs(
       return {
         sourceId: j.id,
         sourceField: 'job_id' as const,
-        // Propagate appointment_id and transaction_id to the lifecycle_executions
-        // row for traceability — they don't participate in dedup (job_id does)
-        // but are useful when operators audit why a review was scheduled.
         appointmentId: j.appointment_id,
         transactionId: j.transaction_id,
         customerId: j.customer_id!,
@@ -250,7 +257,7 @@ async function scheduleFromCompletedJobs(
         serviceIds,
       };
     }),
-    'job_closed_picked_up',
+    'job_closed',
     thirtyDaysAgo
   );
 }
@@ -331,16 +338,240 @@ async function scheduleFromTransactions(
 }
 
 // ===========================================================================
+// Phase 1C — Schedule from work-completed jobs (detailer marked done)
+// ===========================================================================
+//
+// Session RFB-2: fires when jobs.status='completed' (work physically done by
+// the detailer, before POS checkout). Independent from `service_completed`
+// (which gates on jobs.status='closed'). The same job can match both rules
+// at different lifecycle stages — dedup is per (rule_id, job_id), so two
+// different rules don't collide.
+
+async function scheduleFromWorkCompleted(
+  admin: ReturnType<typeof createAdminClient>,
+  rules: Rule[],
+  lookbackWindow: string,
+  thirtyDaysAgo: string
+): Promise<number> {
+  // work_completed_at is set exactly once when status flips to 'completed'
+  // (see /api/pos/jobs/[id]/complete). Use it directly so jobs that already
+  // closed and got their updated_at bumped by later edits don't backfire.
+  const { data: jobs, error } = await admin
+    .from('jobs')
+    .select(`
+      id,
+      appointment_id,
+      transaction_id,
+      customer_id,
+      work_completed_at,
+      services,
+      customers!inner(id, phone, email, sms_consent, email_consent)
+    `)
+    .eq('status', 'completed')
+    .gte('work_completed_at', lookbackWindow)
+    .not('customer_id', 'is', null);
+
+  if (error || !jobs?.length) {
+    if (error) console.error('Failed to query work-completed jobs:', error);
+    return 0;
+  }
+
+  return scheduleExecutions(
+    admin,
+    rules,
+    jobs.map((j) => {
+      const serviceIds = Array.isArray(j.services)
+        ? (j.services as Array<{ service_id?: string | null }>)
+            .map((s) => s?.service_id)
+            .filter((sid): sid is string => typeof sid === 'string' && sid.length > 0)
+        : [];
+      return {
+        sourceId: j.id,
+        sourceField: 'job_id' as const,
+        appointmentId: j.appointment_id,
+        transactionId: j.transaction_id,
+        customerId: j.customer_id!,
+        triggeredAt: j.work_completed_at!,
+        customer: j.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
+        serviceIds,
+      };
+    }),
+    'work_completed',
+    thirtyDaysAgo
+  );
+}
+
+// ===========================================================================
+// Phase 1D — Schedule from newly-booked appointments
+// ===========================================================================
+//
+// Session RFB-2. Excludes already-cancelled / no-show appointments at scheduling
+// time so a book-then-cancel within the cron tick doesn't queue an obsolete
+// "thanks for booking" send.
+
+async function scheduleFromAppointmentBooked(
+  admin: ReturnType<typeof createAdminClient>,
+  rules: Rule[],
+  lookbackWindow: string,
+  thirtyDaysAgo: string
+): Promise<number> {
+  const { data: appointments, error } = await admin
+    .from('appointments')
+    .select(`
+      id,
+      customer_id,
+      created_at,
+      status,
+      customers!inner(id, phone, email, sms_consent, email_consent),
+      appointment_services(service_id)
+    `)
+    .gte('created_at', lookbackWindow)
+    .not('customer_id', 'is', null)
+    .not('status', 'in', '(cancelled,no_show)');
+
+  if (error || !appointments?.length) {
+    if (error) console.error('Failed to query newly-booked appointments:', error);
+    return 0;
+  }
+
+  return scheduleExecutions(
+    admin,
+    rules,
+    appointments.map((a) => ({
+      sourceId: a.id,
+      sourceField: 'appointment_id' as const,
+      appointmentId: a.id,
+      transactionId: null,
+      customerId: a.customer_id!,
+      triggeredAt: a.created_at,
+      customer: a.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
+      serviceIds: ((a.appointment_services || []) as Array<{ service_id: string | null }>)
+        .map((s) => s.service_id)
+        .filter((sid): sid is string => typeof sid === 'string' && sid.length > 0),
+    })),
+    'appointment_booked',
+    thirtyDaysAgo
+  );
+}
+
+// ===========================================================================
+// Phase 1E — Schedule from cancelled appointments
+// ===========================================================================
+//
+// Session RFB-2. Per-appointment dedup means cascade-cancels (job cancel that
+// flips its linked appointment to cancelled) won't double-fire this rule —
+// the appointment_id is unique per execution.
+
+async function scheduleFromAppointmentCancelled(
+  admin: ReturnType<typeof createAdminClient>,
+  rules: Rule[],
+  lookbackWindow: string,
+  thirtyDaysAgo: string
+): Promise<number> {
+  const { data: appointments, error } = await admin
+    .from('appointments')
+    .select(`
+      id,
+      customer_id,
+      updated_at,
+      customers!inner(id, phone, email, sms_consent, email_consent),
+      appointment_services(service_id)
+    `)
+    .eq('status', 'cancelled')
+    .gte('updated_at', lookbackWindow)
+    .not('customer_id', 'is', null);
+
+  if (error || !appointments?.length) {
+    if (error) console.error('Failed to query cancelled appointments:', error);
+    return 0;
+  }
+
+  return scheduleExecutions(
+    admin,
+    rules,
+    appointments.map((a) => ({
+      sourceId: a.id,
+      sourceField: 'appointment_id' as const,
+      appointmentId: a.id,
+      transactionId: null,
+      customerId: a.customer_id!,
+      triggeredAt: a.updated_at,
+      customer: a.customers as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
+      serviceIds: ((a.appointment_services || []) as Array<{ service_id: string | null }>)
+        .map((s) => s.service_id)
+        .filter((sid): sid is string => typeof sid === 'string' && sid.length > 0),
+    })),
+    'appointment_cancelled',
+    thirtyDaysAgo
+  );
+}
+
+// ===========================================================================
+// Phase 1F — Schedule from accepted quotes
+// ===========================================================================
+//
+// Session RFB-2. Dedup on quote_id (new column added in this session). A
+// follow-on convert-to-appointment will independently fire after_appointment_booked
+// — that's the desired behavior; the two rules are operator-configurable.
+
+async function scheduleFromQuoteAccepted(
+  admin: ReturnType<typeof createAdminClient>,
+  rules: Rule[],
+  lookbackWindow: string,
+  thirtyDaysAgo: string
+): Promise<number> {
+  const { data: quotes, error } = await admin
+    .from('quotes')
+    .select(`
+      id,
+      customer_id,
+      accepted_at,
+      customer:customers!inner(id, phone, email, sms_consent, email_consent),
+      items:quote_items(service_id)
+    `)
+    .eq('status', 'accepted')
+    .gte('accepted_at', lookbackWindow)
+    .is('deleted_at', null)
+    .not('customer_id', 'is', null);
+
+  if (error || !quotes?.length) {
+    if (error) console.error('Failed to query accepted quotes:', error);
+    return 0;
+  }
+
+  return scheduleExecutions(
+    admin,
+    rules,
+    quotes.map((q) => ({
+      sourceId: q.id,
+      sourceField: 'quote_id' as const,
+      appointmentId: null,
+      transactionId: null,
+      quoteId: q.id,
+      customerId: q.customer_id!,
+      triggeredAt: q.accepted_at!,
+      customer: q.customer as unknown as { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean },
+      serviceIds: ((q.items || []) as Array<{ service_id: string | null }>)
+        .map((i) => i.service_id)
+        .filter((sid): sid is string => typeof sid === 'string' && sid.length > 0),
+    })),
+    'quote_accepted',
+    thirtyDaysAgo
+  );
+}
+
+// ===========================================================================
 // Shared scheduling logic (dedup + insert)
 // ===========================================================================
 
 interface TriggerEvent {
   sourceId: string;
-  sourceField: 'appointment_id' | 'transaction_id' | 'job_id';
+  sourceField: 'appointment_id' | 'transaction_id' | 'job_id' | 'quote_id';
   // Cross-references propagated to lifecycle_executions for traceability,
   // even when not part of the dedup key.
   appointmentId?: string | null;
   transactionId?: string | null;
+  quoteId?: string | null;
   customerId: string;
   triggeredAt: string;
   customer: { phone: string | null; email: string | null; sms_consent: boolean; email_consent: boolean };
@@ -362,7 +593,7 @@ async function scheduleExecutions(
   const sourceField = events[0]?.sourceField;
   const { data: existingBySource } = await admin
     .from('lifecycle_executions')
-    .select('lifecycle_rule_id, appointment_id, transaction_id, job_id')
+    .select('lifecycle_rule_id, appointment_id, transaction_id, job_id, quote_id')
     .in('lifecycle_rule_id', ruleIds)
     .in(sourceField, sourceIds);
 
@@ -371,6 +602,7 @@ async function scheduleExecutions(
       const sid =
         sourceField === 'appointment_id' ? e.appointment_id :
         sourceField === 'transaction_id' ? e.transaction_id :
+        sourceField === 'quote_id' ? e.quote_id :
         e.job_id;
       return `${e.lifecycle_rule_id}:${sid}`;
     })
@@ -407,9 +639,9 @@ async function scheduleExecutions(
       const scheduledFor = new Date(new Date(event.triggeredAt).getTime() + delayMs).toISOString();
 
       // Build the row — set the source-field column AND propagate any
-      // cross-references for traceability. The unique-trigger index now
-      // includes job_id so a job-driven row won't collide with a
-      // transaction-driven row that happens to share appointment_id.
+      // cross-references for traceability. The unique-trigger index includes
+      // appointment_id, transaction_id, job_id, AND quote_id (RFB-2) so
+      // distinct sources never collide.
       const row: Record<string, unknown> = {
         lifecycle_rule_id: rule.id,
         customer_id: event.customerId,
@@ -424,6 +656,9 @@ async function scheduleExecutions(
       }
       if (event.transactionId !== undefined && event.sourceField !== 'transaction_id') {
         row.transaction_id = event.transactionId;
+      }
+      if (event.quoteId !== undefined && event.sourceField !== 'quote_id') {
+        row.quote_id = event.quoteId;
       }
       toInsert.push(row);
 

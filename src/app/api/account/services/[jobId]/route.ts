@@ -34,7 +34,6 @@ export async function GET(
       .select(`
         id, status, services, created_at, gallery_token,
         timer_seconds, work_started_at, timer_paused_at,
-        actual_pickup_at,
         vehicle_id, assigned_staff_id, customer_id,
         vehicles(id, year, make, model, color),
         employees:assigned_staff_id(id, first_name)
@@ -130,7 +129,6 @@ export async function GET(
         gallery_token: job.gallery_token,
         photo_count: (photosResult.data || []).length,
         photos,
-        picked_up_at: job.actual_pickup_at,
       },
     });
   } catch (err) {
