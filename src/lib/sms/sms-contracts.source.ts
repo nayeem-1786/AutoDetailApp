@@ -66,6 +66,7 @@ export const SMS_CONTRACTS_SOURCE = {
     receipt_number: { description: 'Transaction receipt number', sample: 'R-001234', format: 'plain' },
     service_total: { description: 'Service / appointment total amount', sample: '$299.00', format: 'currency' },
     total_amount: { description: 'Total amount (raw, may include tip+tax)', sample: '$329.45', format: 'currency' },
+    amount_due: { description: 'Remaining balance to pay (total minus prior payments). Distinct from total_amount which is the full ticket figure.', sample: '$329.00', format: 'currency' },
     tax_total: { description: 'Tax portion of total', sample: '$26.91', format: 'currency' },
     subtotal: { description: 'Subtotal before tax/tip', sample: '$299.00', format: 'currency' },
     tip_amount: { description: 'Tip portion of total', sample: '$45.00', format: 'currency' },
@@ -110,6 +111,7 @@ export const SMS_CONTRACTS_SOURCE = {
     authorize_url: { description: 'Add-on authorization URL (HMAC-token-bearing)', sample: 'https://sdas.co/auth/abc', format: 'url' },
     admin_url: { description: 'Admin-side URL for staff', sample: 'https://admin.sdas/q/123', format: 'url' },
     portal_url: { description: 'Customer portal URL', sample: 'https://sdas.co/account', format: 'url' },
+    pay_url: { description: 'Customer-facing appointment payment URL', sample: 'https://sdas.co/pay/abc123', format: 'url' },
 
     // ────────── Caller-built composites (built in src/lib/sms/composites.ts) ──────────
     appointment_summary: { description: 'Composite: appointment scheduled block (greeting + service + date/time + total)', sample: 'Hi John, your appointment is scheduled:\nCeramic Coating\nMar 28 at 10:30 AM\nTotal: $299.00', format: 'plain', composite: true },
@@ -214,6 +216,10 @@ export const SMS_CONTRACTS_SOURCE = {
     loyalty_milestone: {
       required: ['loyalty_points_balance', 'loyalty_cash_value', 'booking_link'],
       optional: ['first_name', 'last_name', 'business_name'],
+    },
+    payment_link_sent: {
+      required: ['amount_due', 'pay_url'],
+      optional: ['first_name'],
     },
     payment_receipt: {
       required: ['transaction_greeting', 'receipt_link'],

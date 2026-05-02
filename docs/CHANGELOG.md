@@ -4,6 +4,67 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(payments): pay-link send route + SMS/email contracts — 2026-05-02 (Pay-Link Session 3)
+
+**Backend for the operator-initiated "Send Payment Link" action on appointments.** Builds on Sessions 1 (schema + webhook branch) and 2 (public `/pay/[token]` page). UI button + `SendMethodDialog` wiring is Session 3b. Quotes deferred entirely.
+
+### Migration `20260502203149_add_payment_link_sent_templates.sql`
+
+Two seed rows, no schema changes.
+
+- **`sms_templates`** row, slug `payment_link_sent`. Mirrors `receipt_sms` shape (`category='transactional'`, `recipient_type='customer'`, identical `body_template` and `default_body`, `can_silence=true`, `is_active=true`). Body is multi-line:
+  ```
+  Hi {first_name},
+  Your {business_name} payment link for ${amount_due}: {pay_url}
+  ```
+  Multi-line is intentional — the SMS engine's `REMOVE_LINE` sentinel cleanly drops the greeting line when `{first_name}` is missing/empty. A single-line body would trigger the engine's empty-render path at `render-sms-template.ts:364`, which falls back to the caller's hardcoded fallback string and silently bypasses any admin-UI edits for customers without a first name. Same pattern `receipt_sms` uses. Required: `amount_due`, `pay_url`. Optional: `first_name`. `business_name` is auto-injected by the engine.
+- **`email_templates`** row, template_key `payment_link_sent`. Block-based (heading → text → button → text), uses the `standard` layout. Subject: `"Payment link for your {business_name} appointment"`. Variables: `first_name`, `amount_due`, `pay_url`, `scheduled_date`, `scheduled_time`, `business_name`, `business_phone`. Seeded with `is_system=true` AND **`is_customized=true`** so `sendTemplatedEmail` consumes the seeded body directly (its short-circuit at `send-templated-email.ts:60` only fires on `is_system=true && !is_customized`, the "needs hardcoded fallback" state). The migration documents a pre-existing footgun: the `/admin/marketing/email-templates/[id]/reset` endpoint clears `body_blocks` to `[]` and flips `is_customized=false`, because the re-seed infrastructure noted in that route doesn't exist yet. The risk is identical for every seeded system template — not introduced here.
+
+### SMS contracts source-of-truth (`src/lib/sms/sms-contracts.source.ts`)
+
+Two new chips registered, then `npx tsx scripts/regen-sms-contracts.ts` was run to refresh `palette.ts` and `generated-contracts.ts`:
+
+- **`pay_url`** — `format: 'url'`, "Customer-facing appointment payment URL"
+- **`amount_due`** — `format: 'currency'`, "Remaining balance to pay (total minus prior payments). Distinct from total_amount which is the full ticket figure." Semantically distinct from existing `total_amount` (full ticket figure) and `service_total` (appointment total). Reusable for any future flow that needs to express "remaining balance."
+
+New slug entry registered: `payment_link_sent: { required: ['amount_due', 'pay_url'], optional: ['first_name'] }`. After regen the typed `RenderVarsBySlug['payment_link_sent']` shape is enforced at compile time on the send-route caller.
+
+### Send route `src/app/api/pos/appointments/[id]/send-payment-link/route.ts`
+
+- **Auth.** `authenticatePosRequest()` — same gate as `/api/pos/appointments/[id]/notify`. 401 on unauthenticated.
+- **Request body.** `{ method: 'email' | 'sms' | 'both' }`. 400 on anything else.
+- **Guards.** 404 if appointment not found; 409 on `cancelled` / `no_show` / `payment_status='paid'` / nothing-left-to-pay; **strict 422** when a requested channel has no destination on file (no email for `'email'`/`'both'`, no phone for `'sms'`/`'both'`). UI is expected to gate the button so 422 stays a defensive rail.
+- **Remaining balance** computed via `refund-math.ts` `toCents` → sum of payments rows joined through `transactions.appointment_id` → `Math.max(0, total - paid)`. Same math as the webhook branch (Session 1) and the public page (Session 2), so all three agree on what's owed.
+- **Token.** 16-char base62 from `crypto.getRandomValues(Uint8Array(16))`. Generated only when `appointments.payment_link_token IS NULL`. Concurrency-safe: the UPDATE includes `.is('payment_link_token', null)` so a parallel writer never gets overwritten; collision against the partial unique index retries up to 3× before 500. Existing tokens are reused on resend — same URL across multiple sends, idempotent.
+- **Pay URL.** `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/pay/${token}`. Same env-var pattern receipts/quotes/booking-deposit use across the codebase. No short-link wrap (per Session 3 decision — adds a redirect surface for no benefit).
+- **Send.** Email via `sendTemplatedEmail('payment_link_sent', vars)`. SMS via `renderSmsTemplate('payment_link_sent', vars, fallback)` → `sendSms(phone, body, { customerId, source: 'transactional', notificationType: 'payment_link_sent', contextId: appt.id })`. The fallback string passed to `renderSmsTemplate` is the no-first-name version of the message, used only if the engine ever returns an empty render (defensive — should never fire for this template now that the body is multi-line).
+- **Partial success.** Per-channel result tracked as `'sent' | 'skipped' | 'failed'` with collected `errors[]`. If at least one channel succeeded, returns `200 { success: true, channels, payment_link_token, pay_url, partial_errors? }` and stamps `appointments.payment_link_sent_at = now()`. If every requested channel failed, returns `500 { error, channels, errors }` without bumping `payment_link_sent_at`.
+- **No new audit-log rows.** `sendSms` already inserts into `sms_delivery_log` with `source: 'transactional'` (per CLAUDE.md rule 9). Mailgun handles email events.
+
+### Files touched
+
+- **NEW**: `supabase/migrations/20260502203149_add_payment_link_sent_templates.sql`
+- **NEW**: `src/app/api/pos/appointments/[id]/send-payment-link/route.ts`
+- `src/lib/sms/sms-contracts.source.ts` — added `pay_url` + `amount_due` chips and `payment_link_sent` slug
+- `src/lib/sms/palette.ts` and `src/lib/sms/generated-contracts.ts` — regenerated by `scripts/regen-sms-contracts.ts` (do not hand-edit)
+- `docs/dev/FILE_TREE.md` — added migration + send-route entries
+- `docs/CHANGELOG.md` (this entry)
+
+### Known limitations / what Session 3b inherits
+
+- No POS UI yet. Job-detail action bar is the planned location (gate on `job.appointment_id != null` and `appointment.payment_status != 'paid'`).
+- `SendMethodDialog` (`src/components/ui/send-method-dialog.tsx`) is the reusable email/SMS/both selector — wire its `onSend(method)` to a `POST` against this route.
+- The route returns the `pay_url` and `payment_link_token` so the UI can show a "Copy link" affordance alongside the send confirmation.
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` clean on the changed source files.
+- Existing webhook test (`payment-intent-succeeded.test.ts`, 6 tests) still passes.
+- Dev-server smoke: `POST` without auth returns `401 Unauthorized`. With invalid `method` payload, the auth gate fires first (also 401) — the method validator is unreachable until the request is POS-authed.
+
+---
+
 ## feat(payments): pay-link public page — 2026-05-02 (Pay-Link Session 2)
 
 **Public payment page for appointment payment links.** Builds on Session 1 (token columns + webhook branch). Customer clicks the link → branded `/pay/[token]` page → Stripe Elements form → webhook confirms → page re-renders with "Paid" state. The webhook from Session 1 stays the sole writer of payment state. Out of scope this session: POS button + send route, SMS/email templates, quotes (all Session 3 / deferred).

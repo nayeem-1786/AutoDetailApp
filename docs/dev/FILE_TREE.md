@@ -377,6 +377,7 @@ src/app/api/migration/vehicles/route.ts
 ### POS
 ```
 src/app/api/pos/appointments/[id]/notify/route.ts
+src/app/api/pos/appointments/[id]/send-payment-link/route.ts   — Send pay-link via SMS/email/both (Pay-Link Session 3)
 src/app/api/pos/auth/logout/route.ts
 src/app/api/pos/auth/pin-login/route.ts
 src/app/api/pos/auth/verify-override/route.ts
@@ -1537,6 +1538,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260429000001_seed_3d_receipt_sms_chip_driven.sql
 20260430000001_rfb2_drop_birthday_and_expand_lifecycle.sql
 20260502194628_add_appointment_payment_link.sql
+20260502203149_add_payment_link_sent_templates.sql
 ```
 
 ## Scripts
