@@ -290,6 +290,11 @@ src/app/api/checkout/shipping-rates/route.ts
 src/app/api/checkout/validate-address/route.ts
 ```
 
+### Pay Link (Appointment Payment Links)
+```
+src/app/api/pay/[token]/intent/route.ts   — POST: create PI for /pay/[token] (Pay-Link Session 2)
+```
+
 ### Cron (Internal Scheduler)
 ```
 src/app/api/cron/cleanup-audit-log/route.ts
@@ -796,6 +801,9 @@ src/app/(public)/quote/[token]/page.tsx         — Public quote view/accept
 src/app/(public)/quote/[token]/accept-button.tsx — Accept quote button component
 src/app/(public)/receipt/[token]/page.tsx        — Public receipt view (token-based, no login)
 src/app/(public)/receipt/[token]/print-button.tsx — Print/save-as-PDF button
+src/app/(public)/pay/[token]/page.tsx            — Public appointment pay page (Pay-Link Session 2)
+src/app/(public)/pay/[token]/pay-form.tsx        — Stripe Elements form for /pay/[token]
+src/app/(public)/pay/[token]/processing-refresh.tsx — Auto-refresh helper for post-redirect "confirming" state
 src/app/q/[token]/page.tsx               — Short quote URL redirect
 src/app/s/[code]/route.ts               — Short link redirect (route handler)
 src/app/authorize/[token]/page.tsx       — Job authorization (approve/decline)

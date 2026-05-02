@@ -4,6 +4,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(payments): pay-link public page — 2026-05-02 (Pay-Link Session 2)
+
+**Public payment page for appointment payment links.** Builds on Session 1 (token columns + webhook branch). Customer clicks the link → branded `/pay/[token]` page → Stripe Elements form → webhook confirms → page re-renders with "Paid" state. The webhook from Session 1 stays the sole writer of payment state. Out of scope this session: POS button + send route, SMS/email templates, quotes (all Session 3 / deferred).
+
+### New files
+
+- `src/app/api/pay/[token]/intent/route.ts` — POST handler that resolves the token, computes the remaining balance in cents (mirrors the webhook math via `refund-math.ts`), guards `cancelled`/`no_show` with 409, returns `{ alreadyPaid: true }` when nothing's owed, and otherwise creates a PaymentIntent with `metadata.type='appointment_payment_link'` + `metadata.appointment_id` + `metadata.payment_link_token`. Description uses `getBusinessInfo().name` (CLAUDE.md rule 8 — never hardcode the business name). PI id is **not** persisted on the appointment — multiple page loads creating multiple PIs is acceptable, Stripe abandons unconfirmed ones, and the webhook is the only authority on what got paid. Failures log with `{ token, error }` and return 500.
+- `src/app/(public)/pay/[token]/page.tsx` — Server component, mirrors the receipt-page pattern (`createAdminClient()`, token-as-auth, no RLS). Fetches appointment with joined customer, vehicle, and `appointment_services(service:services(name))` in one query. Computes `remainingCents` server-side so the page can render the correct due-amount before the API call. Renders four mutually exclusive views derived from `(status, payment_status, redirect_status, pl_retry)`:
+  - `cancelled` — when `status` is `cancelled` or `no_show`. Form is suppressed; renders an explanatory card with the business phone (wrapped in `<a href="tel:">` per CLAUDE.md rule 15).
+  - `paid` — when `payment_status === 'paid'` or `remainingCents <= 0`. Renders a "Payment received" card with `payment_link_paid_at` formatted PST.
+  - `processing` — only when not paid, not cancelled, `redirect_status === 'succeeded'`, and `pl_retry < 3`. The webhook normally lands before the Stripe redirect, but it's not guaranteed; this state covers the race.
+  - `pay` — default. Renders the pay form.
+- `src/app/(public)/pay/[token]/pay-form.tsx` — Client component. Mirrors `step-payment.tsx` structure: posts to `/api/pay/[token]/intent` on mount, on `alreadyPaid` calls `router.refresh()` so the server re-renders with the paid state, otherwise wraps `<PaymentElement>` in `<Elements>` with the same dark-theme appearance the booking flow uses. `confirmPayment` uses the default `redirect: 'always'` mode and a `return_url` that points back to `/pay/[token]?redirect_status=succeeded` — the server component is the single source of truth for the post-payment view.
+- `src/app/(public)/pay/[token]/processing-refresh.tsx` — Tiny client helper (`useEffect` + `setTimeout` + `router.replace` / `router.refresh`) that drives the 3-second auto-advance for the `processing` view. Used instead of an inline `<meta http-equiv="refresh">` to avoid the React Server Component head-element rule (`<head>` doesn't render correctly when emitted from a server component body in App Router). Functionally identical to meta-refresh.
+
+### Race handling — webhook vs. redirect
+
+Stripe normally fires `payment_intent.succeeded` and the customer redirect within hundreds of milliseconds of each other, with the webhook usually first. When the webhook is slower than the redirect, the customer would briefly see the pay form again, which would be confusing. The `processing` view bridges that window:
+
+- First arrival with `?redirect_status=succeeded&pl_retry=0` → renders the spinner card; `ProcessingRefresh` schedules a navigation to `?redirect_status=succeeded&pl_retry=1` after 3 seconds.
+- Up to `pl_retry=3` (~9 seconds total). Each retry re-fetches the appointment server-side, so as soon as the webhook lands the page flips to `paid`.
+- After 3 retries the page falls through to whatever the DB says. If the webhook never landed at all, the customer sees the pay form again — the same outcome as a hard refresh, and the safest fallback (it does NOT pretend the payment succeeded; it shows the truth from the DB).
+
+### Stripe + middleware notes
+
+- No new Stripe SDK surface — uses `stripe.paymentIntents.create()` exactly as `api/checkout/create-payment-intent` and `api/book/payment-intent` do. `automatic_payment_methods.enabled = true`. No saved cards in v1, no tipping.
+- The PI route enforces Stripe's $0.50 minimum with a 400 + descriptive error.
+- Existing middleware allows `/pay/[token]`. PUBLIC_ROUTES at `src/middleware.ts:7` doesn't list `/pay`, but the receipt page (also not listed) works the same way: anonymous requests fall through to `updateSession` (cheap, no redirect) and the only auth-gated routes are `/admin` and `/account`. No middleware change needed.
+- The `(public)` layout wraps the page with the storefront chrome (header, footer, themes) — same treatment the receipt page gets. No new abstractions or layout overrides.
+
+### Files touched
+
+- **NEW**: `src/app/api/pay/[token]/intent/route.ts`
+- **NEW**: `src/app/(public)/pay/[token]/page.tsx`
+- **NEW**: `src/app/(public)/pay/[token]/pay-form.tsx`
+- **NEW**: `src/app/(public)/pay/[token]/processing-refresh.tsx`
+- `docs/dev/FILE_TREE.md` — registered the four new files under "Pay Link" + "Standalone Public Pages"
+- `docs/CHANGELOG.md` (this entry)
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` on the new files clean.
+- Existing webhook test (`payment-intent-succeeded.test.ts`, 6 tests) still passes.
+- Dev server boots cleanly; `GET /pay/<bogus-token>` returns Next's `not-found` (proves the route compiles, the layout renders, the middleware lets it through, and the server component reaches the `notFound()` branch). Manual end-to-end (real Stripe test card → webhook → paid state) is in the session prompt for local-deploy testing.
+
+---
+
 ## feat(payments): pay-link foundation — 2026-05-02 (Pay-Link Session 1)
 
 **Foundation for the "Send Payment Link" feature on appointments.** Schema + Stripe webhook only — no public pay page, no send route, no POS UI, no SMS/email templates this session (those are Sessions 2 and 3). Quotes are out of scope for this feature entirely. Layered cleanly on top of the existing PaymentIntent + Elements infrastructure that already powers booking deposits and online-store checkout, so no third-party integrations or env vars added.
