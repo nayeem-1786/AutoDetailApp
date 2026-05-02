@@ -506,6 +506,13 @@ export const paymentSchema = z.object({
   stripe_payment_intent_id: optionalString,
   card_brand: optionalString,
   card_last_four: optionalString,
+  // Cash-only: what the customer handed over (>= amount) and the change they
+  // got back (>= 0). Server recomputes change_given from cash_tendered + amount
+  // and ignores the client value if they disagree (see transactions/route.ts).
+  // Method-vs-field consistency is enforced in the route handler so the
+  // failure mode is a 422 with a useful message instead of a Zod 400.
+  cash_tendered: positiveNumber.optional().nullable(),
+  change_given: positiveNumber.optional().nullable(),
 });
 
 export const transactionCreateSchema = z.object({

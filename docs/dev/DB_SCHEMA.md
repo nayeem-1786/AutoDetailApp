@@ -1681,6 +1681,8 @@ CREATE UNIQUE INDEX page_seo_pkey ON public.page_seo USING btree (id)
 | card_last_four | TEXT | — |  |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |  |
 | card_fingerprint | TEXT | — |  |
+| cash_tendered | NUMERIC(10,2) | — |  |
+| change_given | NUMERIC(10,2) | — |  |
 
 **Indexes:**
 ```

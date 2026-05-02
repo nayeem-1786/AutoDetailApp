@@ -152,6 +152,20 @@ export async function POST(request: NextRequest) {
 
     // 3. Insert payment(s)
     if (data.payments && data.payments.length > 0) {
+      // Method-vs-field validation: cash_tendered / change_given are cash-only.
+      // A non-cash payment with either value populated returns 422 — the column
+      // semantics don't apply to card/check/split rows.
+      for (const p of data.payments) {
+        if (p.method !== 'cash' && (p.cash_tendered != null || p.change_given != null)) {
+          return NextResponse.json(
+            {
+              error: `cash_tendered and change_given are only valid for method='cash' (got method='${p.method}')`,
+            },
+            { status: 422 }
+          );
+        }
+      }
+
       const paymentRows = data.payments.map((p: {
         method: string;
         amount: number;
@@ -159,18 +173,44 @@ export async function POST(request: NextRequest) {
         stripe_payment_intent_id?: string | null;
         card_brand?: string | null;
         card_last_four?: string | null;
-      }) => ({
-        transaction_id: transaction.id,
-        method: p.method,
-        amount: p.amount,
-        tip_amount: p.tip_amount,
-        tip_net: p.method === 'card'
-          ? Math.round(p.tip_amount * (1 - CC_FEE_RATE) * 100) / 100
-          : p.tip_amount,
-        stripe_payment_intent_id: p.stripe_payment_intent_id || null,
-        card_brand: p.card_brand || null,
-        card_last_four: p.card_last_four || null,
-      }));
+        cash_tendered?: number | null;
+        change_given?: number | null;
+      }) => {
+        // Server is the source of truth for change_given. If the client sent
+        // a value that disagrees with max(0, cash_tendered - amount), normalize
+        // and warn — don't reject. Historical clients and offline-sync replays
+        // may not send change_given at all; that's fine.
+        let cashTendered: number | null = null;
+        let changeGiven: number | null = null;
+        if (p.method === 'cash' && p.cash_tendered != null) {
+          cashTendered = Math.round(p.cash_tendered * 100) / 100;
+          const expectedChange = Math.max(0, Math.round((cashTendered - p.amount) * 100) / 100);
+          if (
+            p.change_given != null &&
+            Math.round(p.change_given * 100) / 100 !== expectedChange
+          ) {
+            console.warn(
+              `[transactions] cash payment change_given (${p.change_given}) disagrees with computed (${expectedChange}); using server value`
+            );
+          }
+          changeGiven = expectedChange;
+        }
+
+        return {
+          transaction_id: transaction.id,
+          method: p.method,
+          amount: p.amount,
+          tip_amount: p.tip_amount,
+          tip_net: p.method === 'card'
+            ? Math.round(p.tip_amount * (1 - CC_FEE_RATE) * 100) / 100
+            : p.tip_amount,
+          stripe_payment_intent_id: p.stripe_payment_intent_id || null,
+          card_brand: p.card_brand || null,
+          card_last_four: p.card_last_four || null,
+          cash_tendered: cashTendered,
+          change_given: changeGiven,
+        };
+      });
 
       const { error: payError } = await supabase
         .from('payments')

@@ -83,6 +83,8 @@ export function CashPayment() {
                 method: 'cash',
                 amount: amountDue,
                 tip_amount: 0,
+                cash_tendered: tenderedNum,
+                change_given: change,
               },
             ],
           }),

@@ -42,6 +42,10 @@ interface ReceiptPayment {
   tip_amount: number;
   card_brand?: string | null;
   card_last_four?: string | null;
+  /** Cash-only: what the customer handed over. NULL on historical rows + non-cash. */
+  cash_tendered?: number | null;
+  /** Cash-only: change handed back. NULL on historical rows + non-cash. */
+  change_given?: number | null;
 }
 
 export interface ReceiptTransaction {
@@ -928,7 +932,17 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         p.method === 'card' && p.card_brand
           ? `${esc(p.card_brand)} ****${esc(p.card_last_four || '')}`
           : p.method.toUpperCase();
-      return row(label, `$${p.amount.toFixed(2)}`);
+      let html = row(label, `$${p.amount.toFixed(2)}`);
+      // Cash-only: render Tendered + Change as indented sub-rows below the
+      // payment line. Historical cash rows have cash_tendered NULL → no extra
+      // rows. Non-cash methods can never have these populated (server
+      // validates), so we don't need a method guard here.
+      if (p.method === 'cash' && p.cash_tendered != null) {
+        html += row('&nbsp;&nbsp;Tendered', `$${p.cash_tendered.toFixed(2)}`, '#666666');
+        const change = p.change_given != null ? p.change_given : Math.max(0, p.cash_tendered - p.amount);
+        html += row('&nbsp;&nbsp;Change', `$${change.toFixed(2)}`, '#666666');
+      }
+      return html;
     })
     .join('');
 

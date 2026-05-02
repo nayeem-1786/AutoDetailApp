@@ -58,6 +58,8 @@ interface TransactionWithRelations {
     tip_amount: number;
     card_brand: string | null;
     card_last_four: string | null;
+    cash_tendered: number | null;
+    change_given: number | null;
   }[];
   refunds: {
     id: string;
@@ -499,10 +501,36 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 p.method === 'card' && p.card_brand
                   ? `${p.card_brand} ending in ${p.card_last_four || '****'}`
                   : p.method.charAt(0).toUpperCase() + p.method.slice(1);
+              // Cash-only Tendered/Change sub-rows. Historical cash rows have
+              // cash_tendered NULL → no extra rows render. Non-cash rows can
+              // never have these populated (server validates), so no method
+              // guard needed beyond the != null check.
+              const showTender = p.method === 'cash' && p.cash_tendered != null;
+              const change = showTender
+                ? p.change_given ?? Math.max(0, (p.cash_tendered as number) - p.amount)
+                : 0;
               return (
-                <div key={p.id} className="flex justify-between text-sm">
-                  <span className="text-site-text-muted">{label}</span>
-                  <span className="font-medium text-site-text">{formatCurrency(p.amount)}</span>
+                <div key={p.id} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-site-text-muted">{label}</span>
+                    <span className="font-medium text-site-text">{formatCurrency(p.amount)}</span>
+                  </div>
+                  {showTender && (
+                    <>
+                      <div className="flex justify-between text-xs pl-4">
+                        <span className="text-site-text-muted">Tendered</span>
+                        <span className="text-site-text-muted tabular-nums">
+                          {formatCurrency(p.cash_tendered as number)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs pl-4">
+                        <span className="text-site-text-muted">Change</span>
+                        <span className="text-site-text-muted tabular-nums">
+                          {formatCurrency(change)}
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}

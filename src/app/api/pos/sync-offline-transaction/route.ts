@@ -127,13 +127,34 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Insert cash payment
+    // 3. Insert cash payment.
+    // The offline-queue payload (src/lib/pos/offline-queue.ts) uses
+    // cash_tendered + cash_change. Reconcile to the DB column names
+    // (cash_tendered + change_given) and recompute change_given server-side
+    // from cash_tendered and amount, mirroring transactions/route.ts so the
+    // server stays the source of truth even for replayed offline records.
+    let cashTendered: number | null = null;
+    let changeGiven: number | null = null;
+    if (typeof body.cash_tendered === 'number') {
+      cashTendered = Math.round(body.cash_tendered * 100) / 100;
+      const expectedChange = Math.max(0, Math.round((cashTendered - body.total_amount) * 100) / 100);
+      const clientChange = typeof body.cash_change === 'number' ? Math.round(body.cash_change * 100) / 100 : null;
+      if (clientChange != null && clientChange !== expectedChange) {
+        console.warn(
+          `[offline-sync] cash_change (${body.cash_change}) disagrees with computed (${expectedChange}) for offline tx ${offlineId}; using server value`
+        );
+      }
+      changeGiven = expectedChange;
+    }
+
     const { error: payError } = await supabase.from('payments').insert({
       transaction_id: transaction.id,
       method: 'cash',
       amount: body.total_amount,
       tip_amount: 0,
       tip_net: 0,
+      cash_tendered: cashTendered,
+      change_given: changeGiven,
     });
 
     if (payError) {

@@ -4,6 +4,87 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(payments): persist cash tendered + change given on payments rows
+
+**Cash tendered + change given now persist with each cash payment and render on every receipt format that shows payment details.** Solves the long-standing gap where the cash drawer captured both for UX (change display, cash drawer kick) but discarded them on submit — meaning a reloaded receipt couldn't reconstruct what the customer handed over. Backward-compatible: every historical cash row has these columns NULL and renders exactly as it did before.
+
+### Migration `20260502224451_add_cash_tendered_to_payments.sql`
+
+```sql
+ALTER TABLE payments
+  ADD COLUMN cash_tendered NUMERIC(10,2),
+  ADD COLUMN change_given NUMERIC(10,2);
+```
+
+Both NULLABLE, no defaults, no CHECK, no triggers. Validation lives at the app layer so the failure mode is a useful 422 instead of a cryptic constraint violation. `amount` stays the source of truth for what the customer was charged; `cash_tendered` is what they handed over (>= amount); `change_given` is the difference (>= 0).
+
+### Client capture — `src/app/pos/components/checkout/cash-payment.tsx`
+
+The online POST path already had `tenderedNum` and `change` in component state for the change-display UI. Now they ride along in the `payments[0]` row sent to `/api/pos/transactions` (only for `method='cash'`; non-cash callers don't send these fields). `amount: amountDue` is unchanged.
+
+### Schema — `src/lib/utils/validation.ts`
+
+`paymentSchema` extended with `cash_tendered` and `change_given` as `positiveNumber.optional().nullable()`. Method-vs-field consistency intentionally NOT enforced at the Zod layer (would surface as a 400) — it's enforced in the route handler so the message can be specific and the status can be 422.
+
+### Server persistence + validation — `src/app/api/pos/transactions/route.ts`
+
+Three rules applied to each payment row in the request:
+
+1. **Method gate (422).** `method !== 'cash'` AND either field is non-NULL → `422 { error: "cash_tendered and change_given are only valid for method='cash' (got method='card')" }`. The column semantics don't apply to card / check / split rows; we reject rather than silently dropping.
+2. **Server is the truth source for `change_given`.** When `method='cash'` and `cash_tendered` is provided, the route recomputes `change_given = max(0, cash_tendered - amount)` and uses that. If the client-sent `change_given` disagrees, it logs a warning and uses the server value — does NOT reject. Mirrors the prevailing "client is informational, server is authoritative" pattern across the codebase.
+3. **Backward compat.** Cash rows where the client omits `cash_tendered` (older PWA caches, automation paths) get NULL — receipts render exactly as before, no error.
+
+### Offline sync — `src/app/api/pos/sync-offline-transaction/route.ts`
+
+The IndexedDB queue payload uses field names `cash_tendered` / `cash_change` (per `src/lib/pos/offline-queue.ts:43-44`), which DON'T match the DB columns (`cash_tendered` / `change_given`). The sync route now reconciles: reads `body.cash_tendered` and `body.cash_change`, recomputes `change_given` server-side from `cash_tendered + amount` (same logic as the online path), and writes both to the payments row. Pre-existing offline records that were queued before this session and haven't synced yet will still sync cleanly — `cash_tendered` was already in the queue payload, so historical offline records get the columns populated retroactively on first sync.
+
+### Receipt rendering
+
+Single edit in `src/app/pos/lib/receipt-template.ts` — `generateReceiptHtml`'s `paymentRows` block now appends two indented sub-rows ("Tendered" + "Change") below the cash payment line when `cash_tendered != null`. Color is muted gray (`#666666`) so the primary amount stays visually dominant. Method guard (`method === 'cash'`) plus the NULL check makes this safe for non-cash rows and historical cash rows.
+
+`generateReceiptHtml` is called by:
+- `/api/pos/receipts/email/route.ts` (HTML email receipt)
+- `/api/pos/receipts/print-copier/route.ts` (office copier full-sheet print)
+- `/api/pos/receipts/html/route.ts` (POS in-browser preview)
+- `/api/customer/receipts/html/route.ts` (customer-portal receipt)
+- `/admin/settings/receipt-printer/page.tsx` (admin preview)
+
+So all five share the new render automatically.
+
+The public receipt page (`src/app/(public)/receipt/[token]/page.tsx`) has its own JSX renderer (does NOT call `generateReceiptHtml`). Its `Payment Methods` block at line 493 was edited to mirror the same Tendered/Change sub-rows in the page's dark theme. Its TypeScript interface for `payments[]` was extended with the two new nullable fields. The Supabase select uses `payments(*)` so the new columns flow into the query response automatically.
+
+### Surface coverage
+
+- ✅ HTML email template — Tendered/Change added (via `generateReceiptHtml`)
+- ✅ Copier print template — Tendered/Change added (same `generateReceiptHtml` path; copier route is `/api/pos/receipts/print-copier/route.ts`)
+- ✅ Public receipt page (`/receipt/[token]`) — Tendered/Change added (separate JSX renderer, edited directly)
+- ✅ SMS — not modified (link-only; the SMS body sends a short URL to the public receipt page above)
+
+ESC/POS thermal printer (`generateReceiptLines` → `receiptToEscPos` via `/api/pos/receipts/print-server/route.ts`) was NOT modified this session — explicitly out of scope. Same for the in-page checkout-completion `payment-complete.tsx` view, which still pulls `tenderedNum` / `change` from transient checkout context.
+
+### Files touched
+
+- **NEW**: `supabase/migrations/20260502224451_add_cash_tendered_to_payments.sql`
+- `src/app/pos/components/checkout/cash-payment.tsx` — sends `cash_tendered` + `change_given` in the cash payment row
+- `src/lib/utils/validation.ts` — `paymentSchema` accepts the new optional fields
+- `src/app/api/pos/transactions/route.ts` — 422 on method mismatch, recomputes `change_given` server-side
+- `src/app/api/pos/sync-offline-transaction/route.ts` — reconciles offline-queue field names + persists both columns
+- `src/app/pos/lib/receipt-template.ts` — `ReceiptPayment` interface gains the fields; `generateReceiptHtml` renders sub-rows
+- `src/app/(public)/receipt/[token]/page.tsx` — type extended + Tendered/Change sub-rows in JSX
+- `docs/dev/DB_SCHEMA.md` — regenerated (two new payments columns)
+- `docs/dev/FILE_TREE.md` — added migration filename
+- `docs/CHANGELOG.md` (this entry)
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` clean on all 6 source files.
+- Existing webhook test (6 tests) still passes.
+- Dev server smoke: `/api/pos/transactions` POST and `/receipt/[token]` GET both compile (523 + 1281 modules) and respond as expected (401 / 200).
+- Manual end-to-end (run a $14.50 ticket with $20 cash → confirm DB row + receipt rendering across all formats) is in the session prompt.
+
+---
+
 ## feat(payments): pay-link POS button + dialog — 2026-05-02 (Pay-Link Session 3b)
 
 **UI for the operator-initiated "Send Payment Link" action.** Wires a button + modal in POS > Jobs > Job Detail to the Session 3a backend. No backend changes beyond extending the job-detail GET/PATCH response so the button has the data it needs to gate visibility and display the right dollar amount. Quotes deferred entirely; appointments only.
