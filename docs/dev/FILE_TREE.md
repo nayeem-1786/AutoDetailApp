@@ -1233,6 +1233,11 @@ src/components/quotes/notify-customer-dialog.tsx
 src/components/quotes/quote-book-dialog.tsx
 ```
 
+### Job Components
+```
+src/components/jobs/send-payment-link-dialog.tsx   — POS Send Payment Link modal (Pay-Link Session 3b)
+```
+
 ### Other
 ```
 src/components/before-after-slider.tsx

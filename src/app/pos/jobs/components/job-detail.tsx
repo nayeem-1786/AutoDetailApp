@@ -36,6 +36,8 @@ import { usePosPermission } from '../../context/pos-permission-context';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
+import { SendPaymentLinkDialog } from '@/components/jobs/send-payment-link-dialog';
+import { fromCents } from '@/lib/utils/refund-math';
 import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
@@ -93,6 +95,14 @@ interface JobDetailData {
     id: string;
     first_name: string;
     last_name: string;
+  } | null;
+  appointment: {
+    id: string;
+    status: string;
+    payment_status: string;
+    total_amount: number;
+    /** Server-computed remaining balance in integer cents. */
+    amount_due_cents?: number;
   } | null;
   addons: AddonData[] | null;
 }
@@ -216,6 +226,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [showNotifyDialog, setShowNotifyDialog] = useState(false);
   const [notifySending, setNotifySending] = useState(false);
   const [notifySuccess, setNotifySuccess] = useState(false);
+
+  // Payment link dialog state (Pay-Link Session 3b)
+  const [paymentLinkDialogOpen, setPaymentLinkDialogOpen] = useState(false);
 
   // Reassignment state
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -675,6 +688,26 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const _expiredAddons = allAddons.filter((a) => a.status === 'expired');
 
   const showTimer = job.status === 'in_progress' && (job.work_started_at || job.timer_paused_at);
+
+  // Send Payment Link visibility — appointment-linked, unpaid, not cancelled,
+  // and the customer has at least one contact channel. amount_due_cents is
+  // server-computed to match the webhook + send-route + public-page math;
+  // total_amount is the safe fallback if the field hasn't propagated yet
+  // (e.g., older client cache during a deploy).
+  const appt = job.appointment;
+  const showPaymentLinkButton = !!(
+    job.appointment_id &&
+    appt &&
+    appt.payment_status !== 'paid' &&
+    appt.status !== 'cancelled' &&
+    appt.status !== 'no_show' &&
+    (job.customer?.email || job.customer?.phone)
+  );
+  const amountDueDollars = appt
+    ? typeof appt.amount_due_cents === 'number'
+      ? fromCents(appt.amount_due_cents)
+      : Number(appt.total_amount)
+    : 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -1161,6 +1194,17 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             This job is cancelled
           </p>
         )}
+        {/* Send Payment Link — appointment-linked, unpaid, has contact */}
+        {showPaymentLinkButton && (
+          <button
+            onClick={() => setPaymentLinkDialogOpen(true)}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-blue-300 dark:border-blue-700 px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+          >
+            <Send className="h-4 w-4" />
+            Send Payment Link
+          </button>
+        )}
+
         {/* Cancel Job button */}
         {canCancel && (
           <button
@@ -1345,6 +1389,19 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         sendLabel="Cancel & Notify"
         cancelLabel="Back"
       />
+
+      {/* Send Payment Link Dialog (appointment-linked, unpaid jobs) */}
+      {job.appointment_id && (
+        <SendPaymentLinkDialog
+          open={paymentLinkDialogOpen}
+          onOpenChange={setPaymentLinkDialogOpen}
+          appointmentId={job.appointment_id}
+          customerEmail={job.customer?.email ?? null}
+          customerPhone={job.customer?.phone ?? null}
+          amountDue={amountDueDollars}
+          onSent={() => fetchJob()}
+        />
+      )}
 
       {/* Edit Customer Modal */}
       {showEditCustomer && (

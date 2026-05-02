@@ -3,14 +3,67 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { toCents } from '@/lib/utils/refund-math';
 
 const JOB_SELECT = `
   *,
   customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email),
   vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
   assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
+  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount),
   addons:job_addons(*)
 `;
+
+type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
+
+interface JobWithAppointment {
+  appointment_id: string | null;
+  appointment?: {
+    id: string;
+    status: string;
+    payment_status: string;
+    total_amount: number;
+    amount_due_cents?: number;
+  } | null;
+  [key: string]: unknown;
+}
+
+/**
+ * Compute and attach `appointment.amount_due_cents` to a job row that already
+ * has the joined appointment data from JOB_SELECT. Mirrors the refund-math
+ * approach used by /api/pos/appointments/[id]/send-payment-link and the
+ * /pay/[token] page so all three surfaces agree on what's owed. No-op when
+ * the job has no linked appointment.
+ */
+async function attachAmountDueCents(
+  supabase: SupabaseAdminClient,
+  job: JobWithAppointment
+): Promise<void> {
+  const appt = job.appointment;
+  if (!appt) return;
+
+  const totalCents = toCents(Number(appt.total_amount));
+
+  const { data: txs } = await supabase
+    .from('transactions')
+    .select('id')
+    .eq('appointment_id', appt.id);
+
+  const txIds = (txs ?? []).map((t) => t.id);
+  let paidCents = 0;
+  if (txIds.length > 0) {
+    const { data: pays } = await supabase
+      .from('payments')
+      .select('amount')
+      .in('transaction_id', txIds);
+    paidCents = (pays ?? []).reduce(
+      (sum, p) => sum + toCents(Number(p.amount)),
+      0
+    );
+  }
+
+  appt.amount_due_cents = Math.max(0, totalCents - paidCents);
+}
 
 /**
  * GET /api/pos/jobs/[id] — Get job detail with relations
@@ -41,6 +94,8 @@ export async function GET(
       }
       return NextResponse.json({ error: 'Failed to fetch job' }, { status: 500 });
     }
+
+    await attachAmountDueCents(supabase, job as unknown as JobWithAppointment);
 
     return NextResponse.json({ data: job });
   } catch (err) {
@@ -142,6 +197,8 @@ export async function PATCH(
       }
       return NextResponse.json({ error: 'Failed to update job' }, { status: 500 });
     }
+
+    await attachAmountDueCents(supabase, job as unknown as JobWithAppointment);
 
     logAudit({
       userId: posEmployee.auth_user_id,

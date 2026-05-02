@@ -4,6 +4,56 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(payments): pay-link POS button + dialog — 2026-05-02 (Pay-Link Session 3b)
+
+**UI for the operator-initiated "Send Payment Link" action.** Wires a button + modal in POS > Jobs > Job Detail to the Session 3a backend. No backend changes beyond extending the job-detail GET/PATCH response so the button has the data it needs to gate visibility and display the right dollar amount. Quotes deferred entirely; appointments only.
+
+### New file: `src/components/jobs/send-payment-link-dialog.tsx`
+
+Sibling to `src/components/quotes/notify-customer-dialog.tsx` — same shape, same auto-close-on-success pattern, same error-via-toast (NOT inline) treatment. Uses `posFetch` directly because this is a POS-only surface, so there's no `fetchFn` prop indirection like NotifyCustomerDialog has. Props: `open`, `onOpenChange`, `appointmentId`, `customerEmail`, `customerPhone`, `amountDue` (dollars, for the description string), and an optional `onSent` callback that hands the parent `{ paymentLinkToken, payUrl }` so it can refetch / toast / etc. The send POSTs `{ method }` to the Session 3a route, surfaces `partial_errors` as warning toasts, and calls `onSent` only on a successful 2xx (not on 422/409/404/500/network — those become a single error toast).
+
+### Modified: `src/app/api/pos/jobs/[id]/route.ts`
+
+Two changes, applied to both the GET and PATCH response paths so the client never sees a stale appointment shape after a workflow update:
+
+- **JOB_SELECT extended** with `appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount)`. The existing customer fields (`email`, `phone`) were already on the select, so no change there.
+- **`amount_due_cents` computed server-side** by a new local helper `attachAmountDueCents()` that mirrors the refund-math pattern used by `/api/pos/appointments/[id]/send-payment-link` and the public `/pay/[token]` page (toCents on `total_amount` minus the cent-sum of `payments` rows joined through `transactions.appointment_id`). The helper is a no-op for walk-in jobs (no `appointment_id`).
+
+This keeps the three pay-link surfaces (POS button display, send route, public pay page) in agreement on what's owed, even when a deposit has been applied. Older client caches that don't see `amount_due_cents` fall back to `total_amount` in the job-detail render — so a stale tab won't crash, just show a slightly off display amount until the next fetch.
+
+### Modified: `src/app/pos/jobs/components/job-detail.tsx`
+
+- `JobDetailData` interface gains `appointment: { id, status, payment_status, total_amount, amount_due_cents? } | null` to match the extended GET response.
+- New `paymentLinkDialogOpen` state.
+- `showPaymentLinkButton` predicate (computed inline below the existing render-guard `if (!job)`): requires `appointment_id`, joined `appointment.payment_status !== 'paid'`, `appointment.status !== 'cancelled' && !== 'no_show'`, and at least one of `customer.email | customer.phone`. Walk-in jobs and paid/cancelled appointments hide the button entirely.
+- `amountDueDollars` = `fromCents(appointment.amount_due_cents)` when present, falling back to `Number(appointment.total_amount)` (covers the post-deploy stale-client window).
+- The button itself slots into the existing action-buttons block at the bottom, just above "Cancel Job" — same width and corner-radius treatment as the surrounding action buttons but with a blue outline (matches the "payment-related" visual cue the Checkout button already uses, while staying distinct as a secondary action). Button is status-agnostic — visible across all non-terminal job statuses, mirroring how Cancel Job is also placed outside any status-conditional branch.
+- On `onSent`, calls `fetchJob()` to refresh the job — this re-pulls `appointment.payment_status` and the recomputed `amount_due_cents`, so a successful send + immediate webhook write would flip the button to hidden on the next render. The `SendPaymentLinkDialog` itself shows the success toast.
+
+### Files touched
+
+- **NEW**: `src/components/jobs/send-payment-link-dialog.tsx`
+- `src/app/api/pos/jobs/[id]/route.ts` — appointment join + `amount_due_cents` helper applied to both GET and PATCH return paths
+- `src/app/pos/jobs/components/job-detail.tsx` — interface, state, predicate, button, dialog mount
+- `docs/dev/FILE_TREE.md` — added the new component under a new "Job Components" section
+- `docs/CHANGELOG.md` (this entry)
+
+### Out of scope (deliberately)
+
+- No "Copy link" affordance — future work.
+- No surfacing on `src/app/admin/appointments/page.tsx` or any quote surface — out of scope per the session prompt.
+- No backend route or template changes — the entire backend was Session 3a.
+- The appointment-list view in admin (`/admin/appointments`) remains the alternate location for staff who want to send a link before a job exists; not wired this session.
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` clean on the three changed source files.
+- Dev server compiles `/api/pos/jobs/[id]` (412 modules) and `/api/pos/appointments/[id]/send-payment-link` (521 modules) without errors. Both 401 correctly without auth — the route changes don't break the existing auth gate.
+- Manual end-to-end (test card → public pay page → webhook → button hides) is in the session prompt for local-deploy testing.
+
+---
+
 ## feat(payments): pay-link send route + SMS/email contracts — 2026-05-02 (Pay-Link Session 3)
 
 **Backend for the operator-initiated "Send Payment Link" action on appointments.** Builds on Sessions 1 (schema + webhook branch) and 2 (public `/pay/[token]` page). UI button + `SendMethodDialog` wiring is Session 3b. Quotes deferred entirely.
