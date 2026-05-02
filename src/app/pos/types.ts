@@ -55,6 +55,22 @@ export interface TicketItem {
   prerequisiteForServiceId: string | null;  // When added as a prereq, the dependent service's ID
 }
 
+// ─── Prior Payments ───────────────────────────────────────────
+// Surfaces every payments row that hit the linked appointment, regardless
+// of source (pay-link webhook, booking deposit, prior in-store POS). Lets
+// the ticket panel itemize a "Payments Received" block and the totals
+// computation deduct the correct remaining balance — closes the pay-link
+// double-charge gap that existed when only deposit_amount was surfaced.
+// Populated server-side in /api/pos/jobs/[id]/checkout-items.
+
+export interface PriorPayment {
+  amount_cents: number;
+  method: 'cash' | 'card' | 'check' | 'split';
+  paid_at: string; // ISO timestamp
+  source_label: string; // e.g. "Online (pay link)", "Booking deposit", "Cash"
+  stripe_payment_intent_id: string | null;
+}
+
 // ─── Ticket State ──────────────────────────────────────────────
 
 export interface TicketState {
@@ -67,6 +83,8 @@ export interface TicketState {
   manualDiscount: { type: 'dollar' | 'percent'; value: number; label: string } | null;
   depositCredit: number; // Pre-paid deposit from online booking (separate from discounts)
   depositDate: string | null; // ISO date when the deposit was collected online
+  priorPayments: PriorPayment[]; // Itemized prior payments for the linked appointment
+  priorPaymentsTotal: number; // Sum in dollars (server-computed cents → fromCents)
   notes: string | null;
   // Computed totals
   subtotal: number;

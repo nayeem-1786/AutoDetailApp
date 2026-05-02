@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { transactionCreateSchema } from '@/lib/utils/validation';
+import { toCents } from '@/lib/utils/refund-math';
 import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
@@ -34,23 +35,103 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+    const isCloseOut = data.close_out === true;
 
-    // Permission checks based on payment method
+    // Permission checks based on payment method.
+    // Close-out (payment_method=null + close_out=true) bypasses these — no
+    // money is moving, so cash/card/split tender permissions don't apply.
+    // Any POS-authenticated user can close out a fully pre-paid appointment.
     const paymentMethod = data.payment_method;
-    if (paymentMethod === 'card') {
-      const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_card');
-      if (!granted) {
-        return NextResponse.json({ error: 'Forbidden: cannot process card payments' }, { status: 403 });
+    if (!isCloseOut) {
+      if (paymentMethod === 'card') {
+        const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_card');
+        if (!granted) {
+          return NextResponse.json({ error: 'Forbidden: cannot process card payments' }, { status: 403 });
+        }
+      } else if (paymentMethod === 'cash' || paymentMethod === 'check') {
+        const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_cash');
+        if (!granted) {
+          return NextResponse.json({ error: 'Forbidden: cannot process cash/check payments' }, { status: 403 });
+        }
+      } else if (paymentMethod === 'split') {
+        const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_split');
+        if (!granted) {
+          return NextResponse.json({ error: 'Forbidden: cannot process split payments' }, { status: 403 });
+        }
       }
-    } else if (paymentMethod === 'cash' || paymentMethod === 'check') {
-      const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_cash');
-      if (!granted) {
-        return NextResponse.json({ error: 'Forbidden: cannot process cash/check payments' }, { status: 403 });
-      }
-    } else if (paymentMethod === 'split') {
-      const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_split');
-      if (!granted) {
-        return NextResponse.json({ error: 'Forbidden: cannot process split payments' }, { status: 403 });
+    }
+
+    // Overpay guard — pre-insert. Find the most recent completed-but-unlinked
+    // job for this customer (same lookup as the fire-and-forget job-linking
+    // block at the bottom of this route, hoisted up so we can read the
+    // appointment_id and reject double-charge attempts).
+    //
+    // Race scenario: customer paid the pay link mid-checkout. The Session 1
+    // webhook lands while staff is in the POS screen with a stale ticket. The
+    // request hits this route with the original full-balance payment. We sum
+    // existing payments for the appointment vs the appointment total. If the
+    // request would push the appointment past total_amount, return 409 with
+    // a code the UI can recognize. Tolerance is zero cents — refund-math
+    // convention says the request and DB must match exactly.
+    if (data.customer_id) {
+      const { data: linkedJob } = await supabase
+        .from('jobs')
+        .select('appointment_id')
+        .eq('customer_id', data.customer_id)
+        .eq('status', 'completed')
+        .is('transaction_id', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const apptId = linkedJob?.appointment_id ?? null;
+      if (apptId) {
+        const { data: appt } = await supabase
+          .from('appointments')
+          .select('total_amount, payment_status')
+          .eq('id', apptId)
+          .maybeSingle();
+
+        if (appt) {
+          const apptTotalCents = toCents(Number(appt.total_amount));
+
+          const { data: existingTxs } = await supabase
+            .from('transactions')
+            .select('id')
+            .eq('appointment_id', apptId)
+            .eq('status', 'completed');
+
+          const txIds = (existingTxs ?? []).map((t) => t.id);
+          let existingPaidCents = 0;
+          if (txIds.length > 0) {
+            const { data: existingPays } = await supabase
+              .from('payments')
+              .select('amount')
+              .in('transaction_id', txIds);
+            existingPaidCents = (existingPays ?? []).reduce(
+              (sum, p) => sum + toCents(Number(p.amount)),
+              0
+            );
+          }
+
+          const incomingPaidCents = (data.payments ?? []).reduce(
+            (sum, p) => sum + toCents(Number(p.amount)),
+            0
+          );
+
+          if (
+            appt.payment_status === 'paid' &&
+            existingPaidCents + incomingPaidCents > apptTotalCents
+          ) {
+            return NextResponse.json(
+              {
+                error: 'Payment already received — refresh to see updated balance.',
+                code: 'appointment_overpay_guard',
+              },
+              { status: 409 }
+            );
+          }
+        }
       }
     }
 
@@ -68,7 +149,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 1. Insert transaction
+    // 1. Insert transaction.
+    // Close-out: stamp a recognizable notes marker so the audit trail shows
+    // this was a fully pre-paid appointment closure (no money collected this
+    // visit). payment_method=null is intentional — receipts will skip the
+    // payment-method line and the empty payments[] array means the public
+    // receipt page hides the payment block entirely.
+    const closeOutNotes = 'Closed out — fully pre-paid';
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .insert({
@@ -88,7 +175,7 @@ export async function POST(request: NextRequest) {
         loyalty_points_earned: 0,
         loyalty_points_redeemed: data.loyalty_points_redeemed || 0,
         loyalty_discount: data.loyalty_discount || 0,
-        notes: data.notes || null,
+        notes: isCloseOut ? closeOutNotes : (data.notes || null),
         transaction_date: new Date().toISOString(),
       })
       .select('*')

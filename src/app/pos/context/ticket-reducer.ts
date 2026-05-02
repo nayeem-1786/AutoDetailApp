@@ -12,6 +12,8 @@ export const initialTicketState: TicketState = {
   manualDiscount: null,
   depositCredit: 0,
   depositDate: null,
+  priorPayments: [],
+  priorPaymentsTotal: 0,
   notes: null,
   subtotal: 0,
   taxAmount: 0,
@@ -46,7 +48,12 @@ function recalculateTotals(state: TicketState): TicketState {
 
   const discountAmount =
     (state.coupon?.discount ?? 0) + state.loyaltyDiscount + manualDiscountAmount;
-  const totals = calculateTicketTotals(state.items, discountAmount, state.depositCredit);
+  const totals = calculateTicketTotals(
+    state.items,
+    discountAmount,
+    state.depositCredit,
+    state.priorPaymentsTotal
+  );
   return { ...state, ...totals };
 }
 
@@ -586,7 +593,14 @@ export function ticketReducer(
     }
 
     case 'RESTORE_TICKET': {
-      return recalculateTotals({ ...action.state });
+      // Defensive normalization for sessionStorage payloads predating the
+      // priorPayments fields — older tickets in the held-tickets queue or
+      // an open browser tab on deploy would otherwise have these as undefined.
+      return recalculateTotals({
+        ...action.state,
+        priorPayments: action.state.priorPayments ?? [],
+        priorPaymentsTotal: action.state.priorPaymentsTotal ?? 0,
+      });
     }
 
     case 'CLEAR_TICKET': {

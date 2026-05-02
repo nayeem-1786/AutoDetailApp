@@ -1,6 +1,132 @@
+
+
 # Changelog — Auto Detail App
 
 Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff context lean.
+
+---
+
+## feat(pos): pre-payment-aware Checkout + Close Out (Session 4b)
+
+**Eliminates the pay-link double-charge bug.** Before this session, POS Checkout only surfaced `appointment.deposit_amount` (the booking-flow concept). Pay-link payments — written to the `payments` table by the Session 1 webhook with no `deposit_amount` set — were invisible to Checkout. Staff opening a pay-link-paid job saw the full balance due and would double-charge if they proceeded. Same gap applied silently to "paid in full at booking" appointments.
+
+The fix unifies all prior-payment scenarios through one path: **read `payments` rows joined through `transactions.appointment_id`**. Sum, render itemized in the ticket, deduct from balance. When balance lands at $0, the action becomes "Close Out" — single-button, skips the tender numpad, writes a $0 transaction.
+
+No migration. No DB change. Six file edits + one schema tweak.
+
+### Discriminator strategy (no new column)
+
+Both non-POS transaction creators write distinct, durable `notes` prefixes already in production:
+- Pay-link webhook (`src/app/api/webhooks/stripe/route.ts:144`): `'Online payment link. PI: <pi_id>.'`
+- Booking deposit (`src/app/api/book/route.ts:393`): `'Online booking deposit. Service total: $X. Balance due at service: $Y.'`
+
+The new `deriveSourceLabel()` helper in `checkout-items/route.ts` matches on these prefixes for source labeling (`"Online (pay link)"`, `"Booking deposit"`), falling back to `payments.method` for in-store POS transactions. Reusing existing data avoids a `transactions.source` column. Risk: someone could in theory rename either prefix without realizing it's a discriminator — both source files now have the helper as a downstream consumer, but no automated guard. Worth a comment if either source changes.
+
+### Files modified
+
+**1. `src/app/api/pos/jobs/[id]/checkout-items/route.ts`**
+
+Adds two new fields to the response, additive to existing `deposit_amount` / `deposit_date` (untouched):
+
+```ts
+prior_payments: PriorPayment[]
+prior_payments_total_cents: number
+```
+
+`PriorPayment = { amount_cents, method, paid_at, source_label, stripe_payment_intent_id }`. Cents math goes through `refund-math.ts` `toCents` per the codebase invariant. Query joins `payments → transactions ON appointment_id` filtered to `transactions.status = 'completed'`. Non-fatal failure path: empty array, no crash, no double-charge protection on that load.
+
+**2. `src/app/pos/types.ts`**
+
+Adds `PriorPayment` interface (exported so other files import from one place per the spec) and adds `priorPayments: PriorPayment[]` + `priorPaymentsTotal: number` to `TicketState`.
+
+**3. `src/app/pos/context/ticket-reducer.ts`**
+
+`initialTicketState` defaults the new fields to `[]` and `0`. `recalculateTotals()` passes `state.priorPaymentsTotal` to `calculateTicketTotals`. `RESTORE_TICKET` defensively normalizes the new fields with `?? []` / `?? 0` so sessionStorage payloads that predate this session don't crash on first load after deploy.
+
+**4. `src/app/pos/utils/tax.ts`**
+
+`calculateTicketTotals` signature gains a fourth optional param `priorPaymentsTotal: number` (default `0`). The total formula becomes:
+
+```
+total = max(0, subtotal + taxAmount - discountAmount - depositCredit - priorPaymentsTotal)
+```
+
+`depositCredit` and `priorPaymentsTotal` are kept as separate explicit subtractions, NOT collapsed — they mean different things in the data model and need to remain debuggable. The `quote-reducer.ts` caller passes 3 args and gets the default-zero new param, no change needed.
+
+Math convention stays as the existing `Math.round(x * 100) / 100`. The spec was explicit: do NOT refactor to `refund-math.ts` in this session — separate concern, can be its own session if penny mismatches surface.
+
+**5. `src/app/pos/jobs/page.tsx`**
+
+`handleCheckout` reads the new `prior_payments` + `prior_payments_total_cents` from the response, plumbs them into the `TicketState` passed to `RESTORE_TICKET`. Recomputes initial `total` to deduct both `depositCredit` and `priorPaymentsTotal` so the totals flash-correctly before the reducer's `recalculateTotals` runs.
+
+**6. `src/app/pos/components/ticket-totals.tsx`**
+
+Renders a new "Payments Received" block at the TOP of the totals area (above Subtotal, below items per the spec — narrative is "what's already been paid → bill builds → balance"):
+
+```
+PAYMENTS RECEIVED
+  Online (pay link) · Apr 30, 2026, 2:38 PM    -$1.00
+  Booking deposit  · Apr 15, 2026, 9:00 AM     -$50.00
+SUBTOTAL                                        $61.00
+TAX                                             $0.00
+…
+BALANCE DUE                                     $10.00
+```
+
+Block hidden entirely when `priorPayments.length === 0` (walk-in tickets stay clean). Date format reuses `formatReceiptDateTime` from `src/lib/utils/format.ts` — PST, no new formatter introduced. The Balance Due row now renders ALWAYS (the conditional only flips the LABEL between "Balance Due" and "Total" based on whether any pre-payment is present); `$0.00` is shown explicitly so staff see "nothing owed" rather than a missing line.
+
+**7. `src/app/pos/components/checkout/payment-method-screen.tsx`**
+
+When `ticket.total === 0 && priorPayments.length > 0` (close-out), the screen renders a single green "Close Out" button instead of the four Cash/Card/Check/Split tile buttons. Clicking it POSTs to `/api/pos/transactions` with `payments: [], close_out: true, total_amount: 0, payment_method: null`, then advances to the existing PaymentComplete screen via `checkout.setComplete`. Existing tender flows (cash/card/split) are unchanged — they still see the four-tile grid when the balance is positive.
+
+**8. `src/lib/utils/validation.ts`**
+
+`transactionCreateSchema` two changes: `payment_method` becomes `.nullable()` (close-out passes `null`), and a new `close_out: z.boolean().optional().default(false)` flag.
+
+**9. `src/app/api/pos/transactions/route.ts`**
+
+Two server changes:
+
+- **Overpay guard (always-on, all paths).** Pre-insert: looks up the linked appointment via the same job-lookup query the existing fire-and-forget block uses (hoisted to run blocking). Sums existing payments for that appointment in cents. Sums incoming `data.payments` in cents. If `appt.payment_status === 'paid'` AND `existing + incoming > apptTotalCents` (zero tolerance per refund-math convention), returns `409 { error, code: 'appointment_overpay_guard' }`. The UI can recognize the code and tell staff to refresh.
+- **Close-out branch.** When `close_out=true`: skips the cash/card/split permission gate (any POS user can close out a fully pre-paid appointment — no money moves), writes `notes='Closed out — fully pre-paid'` (audit trail), accepts `payment_method=null`, and naturally writes no payments rows (the existing `if (data.payments.length > 0)` guard already handles the empty array). Items, job-linking, QBO sync, auto-receipt SMS all proceed normally.
+
+**10. `src/app/pos/jobs/components/job-detail.tsx`**
+
+The "Checkout" button on a `completed` job now flips its label and color when `job.appointment_id != null && job.appointment.amount_due_cents === 0` (data already on the response from Session 3b, no new fetch). Label becomes "Close Out", icon swaps from `ShoppingCart` to `CheckCircle2`, color switches from blue to green. Walk-in jobs and jobs with positive balance keep the "Checkout" label. Per the spec, tapping it still navigates into POS — the close-out submission happens from the PaymentMethodScreen above. Staff sees the ticket panel with the Payments Received block first, then confirms with the green Close Out button.
+
+### Tests
+
+Updated `src/app/pos/components/__tests__/ticket-actions.test.tsx` fixtures to include the new `priorPayments` + `priorPaymentsTotal` fields (else the typed `TicketState` rejected the literals at compile time). Existing 4 tests still pass; webhook test (6 tests) also still passes.
+
+### Files touched (10)
+
+- `src/app/api/pos/jobs/[id]/checkout-items/route.ts` — prior_payments + helper
+- `src/app/pos/types.ts` — `PriorPayment` + state extension
+- `src/app/pos/context/ticket-reducer.ts` — defaults + RESTORE normalize
+- `src/app/pos/utils/tax.ts` — totals signature + formula
+- `src/app/pos/jobs/page.tsx` — RESTORE plumbing + response type
+- `src/app/pos/components/ticket-totals.tsx` — Payments Received block + Balance Due always-on
+- `src/app/pos/components/checkout/payment-method-screen.tsx` — Close Out path
+- `src/lib/utils/validation.ts` — `payment_method.nullable()` + `close_out`
+- `src/app/api/pos/transactions/route.ts` — overpay guard + close-out branch
+- `src/app/pos/jobs/components/job-detail.tsx` — Checkout/Close Out label switch
+- `src/app/pos/components/__tests__/ticket-actions.test.tsx` — fixture update
+- `docs/CHANGELOG.md` (this entry)
+
+### Known follow-ups (deliberately out of scope)
+
+- **`linked_receipt` column does not exist** on `transactions`. The user's spec referenced setting `transactions.linked_receipt` to the prior receipt's access token; per `docs/dev/DB_SCHEMA.md:2879-2913` no such column exists. The receipt template's `linked_receipt` field is a CLIENT-SIDE derived cross-reference (assembled in the public receipt page from booking-deposit joins, not stored). I dropped the linked_receipt write from the close-out path entirely. **Downstream effect:** the close-out receipt at `/receipt/[token]` for the new $0 transaction renders line items + $0 total + no payment section (existing code at `(public)/receipt/[token]/page.tsx:493` gates on `payments.length > 0`). It will NOT show a "see also: receipt #SD-XXXXX" pointer to the original pay-link receipt. That cross-reference logic exists today only for booking deposits (gated on `appt.payment_type === 'deposit'`), not for pay-link payments. The customer can find the original pay-link receipt via the email or SMS they were sent at pay time. If we want a unified pointer, that's a separate session: extend the public receipt page's deposit-cross-ref logic to also handle pay-link, or add a real `transactions.linked_receipt_id` column.
+- **Race between webhook and POS submit** — the overpay guard rejects the second submission with `409`, but the UI treatment is just a toast. A nicer UX would auto-refresh the ticket on 409. Out of scope.
+- **`payment_method` in admin transaction listings** — close-out transactions have `payment_method=null`. Admin filters on this field may need a "Close-out" virtual label. Not modified this session.
+- **`tax.ts` math convention** — explicitly left alone per spec. Could be unified with `refund-math.ts` in a future session if penny mismatches ever surface in practice.
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` clean on all 11 changed source files.
+- Existing tests pass: 6 webhook tests + 4 ticket-actions tests = 10 total.
+- Dev server: `/api/pos/jobs/[id]/checkout-items` (411 modules) + `/api/pos/transactions` (526 modules) compile clean and 401 correctly without auth.
+- Manual end-to-end (close-out flow + partial pre-payment + race guard + walk-in regression) is in the session prompt.
 
 ---
 

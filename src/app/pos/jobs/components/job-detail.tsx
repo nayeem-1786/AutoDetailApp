@@ -1173,16 +1173,31 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             </button>
           </div>
         )}
-        {job.status === 'completed' && (
-          <button
-            onClick={handleCheckout}
-            disabled={checkingOut}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {checkingOut ? 'Loading...' : 'Checkout'}
-          </button>
-        )}
+        {job.status === 'completed' && (() => {
+          // Close-out vs Checkout: when the linked appointment is fully covered
+          // by prior payments (pay-link, deposit, or paid-in-full at booking),
+          // the action is "Close Out" — staff still enters POS to confirm, but
+          // there's nothing to tender. amount_due_cents is server-computed in
+          // /api/pos/jobs/[id] (Session 3b) so the gate is reliable.
+          const isCloseOut =
+            job.appointment_id !== null &&
+            job.appointment?.amount_due_cents === 0;
+          return (
+            <button
+              onClick={handleCheckout}
+              disabled={checkingOut}
+              className={cn(
+                'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50',
+                isCloseOut
+                  ? 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
+                  : 'bg-blue-600 dark:bg-blue-500 hover:bg-blue-700 dark:hover:bg-blue-600'
+              )}
+            >
+              {isCloseOut ? <CheckCircle2 className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+              {checkingOut ? 'Loading...' : isCloseOut ? 'Close Out' : 'Checkout'}
+            </button>
+          );
+        })()}
         {job.status === 'closed' && (
           <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-2.5 text-sm font-medium text-green-700 dark:text-green-400">
             <Check className="h-4 w-4" />

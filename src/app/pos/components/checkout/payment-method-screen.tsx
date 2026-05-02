@@ -1,24 +1,141 @@
 'use client';
 
-import { Banknote, CreditCard, FileText, Split, WifiOff } from 'lucide-react';
+import { useState } from 'react';
+import { Banknote, CreditCard, FileText, Split, WifiOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
+import { posFetch } from '../../lib/pos-fetch';
 
 export function PaymentMethodScreen() {
-  const { ticket } = useTicket();
-  const { setPaymentMethod, setStep, closeCheckout } = useCheckout();
+  const { ticket, dispatch } = useTicket();
+  const checkout = useCheckout();
+  const { setPaymentMethod, setStep, closeCheckout } = checkout;
   const { granted: canProcessCard } = usePosPermission('pos.process_card');
   const { granted: canProcessCash } = usePosPermission('pos.process_cash');
   const { granted: canProcessSplit } = usePosPermission('pos.process_split');
   const isOnline = useOnlineStatus();
+  const [closingOut, setClosingOut] = useState(false);
+
+  // Close-out path: appointment is fully covered by prior payments, so there's
+  // nothing left to tender. Submit a $0 transaction (no payments rows) and
+  // jump to the Payment Complete screen, bypassing the tender selector.
+  const isCloseOut = ticket.total === 0 && ticket.priorPayments.length > 0;
 
   function handleSelect(method: 'cash' | 'card' | 'check' | 'split') {
     setPaymentMethod(method);
     setStep(method);
+  }
+
+  async function handleCloseOut() {
+    if (closingOut) return;
+    setClosingOut(true);
+    checkout.setProcessing(true);
+    try {
+      const res = await posFetch('/api/pos/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: ticket.customer?.id || null,
+          vehicle_id: ticket.vehicle?.id || null,
+          subtotal: ticket.subtotal,
+          tax_amount: ticket.taxAmount,
+          tip_amount: 0,
+          discount_amount: ticket.discountAmount,
+          deposit_credit: ticket.depositCredit,
+          total_amount: 0,
+          payment_method: null,
+          coupon_id: ticket.coupon?.id || null,
+          coupon_code: ticket.coupon?.code || null,
+          loyalty_points_redeemed: ticket.loyaltyPointsToRedeem,
+          loyalty_discount: ticket.loyaltyDiscount,
+          notes: ticket.notes,
+          items: ticket.items.map((i) => {
+            const hasPerUnitQty = i.perUnitQty != null && i.perUnitQty > 1;
+            return {
+              item_type: i.itemType,
+              product_id: i.productId,
+              service_id: i.serviceId,
+              item_name: i.itemName,
+              quantity: hasPerUnitQty ? i.perUnitQty! : i.quantity,
+              unit_price: hasPerUnitQty ? i.unitPrice / i.perUnitQty! : i.unitPrice,
+              total_price: i.totalPrice,
+              tax_amount: i.taxAmount,
+              is_taxable: i.isTaxable,
+              tier_name: i.tierName,
+              vehicle_size_class: i.vehicleSizeClass,
+              notes: i.notes,
+              standard_price: hasPerUnitQty ? i.standardPrice / i.perUnitQty! : i.standardPrice,
+              pricing_type: i.pricingType,
+              is_addon: !!i.parentItemId,
+              prerequisite_note: i.prerequisiteNote || null,
+            };
+          }),
+          payments: [],
+          close_out: true,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to close out');
+      }
+      checkout.setComplete(
+        json.data.id,
+        json.data.receipt_number,
+        ticket.customer?.email,
+        ticket.customer?.phone,
+        ticket.customer?.id,
+        ticket.customer?.tags
+      );
+      dispatch({ type: 'CLEAR_TICKET' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Close out failed';
+      toast.error(msg);
+      checkout.setError(msg);
+    } finally {
+      setClosingOut(false);
+      checkout.setProcessing(false);
+    }
+  }
+
+  if (isCloseOut) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+        <div className="text-center">
+          <p className="text-lg text-gray-500 dark:text-gray-400">Balance Due</p>
+          <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">$0.00</p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Fully covered by prior payments — nothing to tender.
+          </p>
+        </div>
+
+        {checkout.error && (
+          <p className="text-sm text-red-600 dark:text-red-400">{checkout.error}</p>
+        )}
+
+        <Button
+          size="lg"
+          onClick={handleCloseOut}
+          disabled={closingOut}
+          className="min-w-[200px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600 gap-2"
+        >
+          {closingOut ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5" />
+          )}
+          {closingOut ? 'Closing Out…' : 'Close Out'}
+        </Button>
+
+        <Button variant="outline" onClick={closeCheckout} disabled={closingOut}>
+          Back
+        </Button>
+      </div>
+    );
   }
 
   return (

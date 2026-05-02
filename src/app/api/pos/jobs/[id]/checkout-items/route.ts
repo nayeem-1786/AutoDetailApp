@@ -2,6 +2,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
+import { toCents } from '@/lib/utils/refund-math';
+
+interface PriorPayment {
+  amount_cents: number;
+  method: 'cash' | 'card' | 'check' | 'split';
+  paid_at: string;
+  source_label: string;
+  stripe_payment_intent_id: string | null;
+}
+
+/**
+ * Derive a human-readable source for a prior payment row using the durable
+ * notes-prefix discriminators set by the two non-POS transaction creators:
+ *   - Pay-link webhook (src/app/api/webhooks/stripe/route.ts:144)
+ *   - Booking deposit  (src/app/api/book/route.ts:393)
+ * Any other source falls through to a method-based label (in-store POS).
+ */
+function deriveSourceLabel(
+  notes: string | null,
+  method: PriorPayment['method']
+): string {
+  if (notes && notes.startsWith('Online payment link.')) return 'Online (pay link)';
+  if (notes && notes.startsWith('Online booking deposit.')) return 'Booking deposit';
+  switch (method) {
+    case 'cash':
+      return 'Cash';
+    case 'card':
+      return 'Card';
+    case 'check':
+      return 'Check';
+    case 'split':
+      return 'Split';
+  }
+}
 
 /**
  * GET /api/pos/jobs/[id]/checkout-items
@@ -245,6 +279,46 @@ export async function GET(
       }
     }
 
+    // Prior payments — additive to deposit_amount above. Surfaces every
+    // payment that hit this appointment via the payments table, regardless
+    // of source (pay-link webhook, booking deposit, prior in-store POS).
+    // Lets the ticket panel show an itemized "Payments Received" block and
+    // lets the totals computation deduct the correct remaining balance,
+    // which closes the pay-link double-charge gap (was: only deposit_amount
+    // surfaced, so pay-link payments invisible to checkout).
+    const prior_payments: PriorPayment[] = [];
+    let prior_payments_total_cents = 0;
+    if (job.appointment_id) {
+      const { data: appPayments, error: payErr } = await supabase
+        .from('payments')
+        .select(
+          'amount, method, created_at, stripe_payment_intent_id, transaction:transactions!inner(id, appointment_id, status, notes)'
+        )
+        .eq('transaction.appointment_id', job.appointment_id)
+        .eq('transaction.status', 'completed')
+        .order('created_at', { ascending: true });
+
+      if (payErr) {
+        console.error('Checkout items - prior payments fetch error:', payErr);
+        // Non-fatal: empty prior_payments is the safe fallback (no double-charge
+        // protection on this load, but no crash either).
+      } else if (appPayments) {
+        for (const row of appPayments) {
+          const tx = row.transaction as unknown as { notes: string | null } | null;
+          const method = row.method as PriorPayment['method'];
+          const amountCents = toCents(Number(row.amount));
+          prior_payments.push({
+            amount_cents: amountCents,
+            method,
+            paid_at: row.created_at,
+            source_label: deriveSourceLabel(tx?.notes ?? null, method),
+            stripe_payment_intent_id: row.stripe_payment_intent_id ?? null,
+          });
+          prior_payments_total_cents += amountCents;
+        }
+      }
+    }
+
     return NextResponse.json({
       data: {
         job_id: job.id,
@@ -256,6 +330,8 @@ export async function GET(
         coupon_code,
         deposit_amount,
         deposit_date,
+        prior_payments,
+        prior_payments_total_cents,
         status: job.status,
       },
     });

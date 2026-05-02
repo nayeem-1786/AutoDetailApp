@@ -524,7 +524,10 @@ export const transactionCreateSchema = z.object({
   discount_amount: positiveNumber.default(0),
   deposit_credit: positiveNumber.default(0),
   total_amount: positiveNumber,
-  payment_method: z.enum(['cash', 'card', 'check', 'split']),
+  // Nullable to support close-out transactions (fully pre-paid appointments
+  // that need a $0 transaction row without a tender). Existing cash/card/
+  // check/split paths always pass a non-null method.
+  payment_method: z.enum(['cash', 'card', 'check', 'split']).nullable(),
   coupon_id: z.string().uuid().optional().nullable(),
   coupon_code: z.string().optional().nullable(),
   loyalty_points_redeemed: positiveInt.default(0),
@@ -532,6 +535,11 @@ export const transactionCreateSchema = z.object({
   notes: optionalString,
   items: z.array(transactionItemSchema),
   payments: z.array(paymentSchema),
+  // Close-out flag: when true, skips method-permission checks, sets a marker
+  // notes value, and (since payments[] is empty) writes only the transaction
+  // row + transaction_items + closes the job. See route handler for the full
+  // overpay-guard flow.
+  close_out: z.boolean().optional().default(false),
 });
 
 // ---------------------------------------------------------------------------

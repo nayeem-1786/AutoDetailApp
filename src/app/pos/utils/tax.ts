@@ -11,16 +11,26 @@ export function calculateItemTax(price: number, isTaxable: boolean): number {
 }
 
 /**
- * Calculate all ticket totals from items, discounts, and deposit credit.
+ * Calculate all ticket totals from items, discounts, deposit credit, and
+ * any prior payments already received against the linked appointment.
+ *
+ * `depositCredit` and `priorPaymentsTotal` are kept as separate explicit
+ * subtractions on purpose — they mean different things in the data model
+ * (deposit_amount column on appointments vs. payments rows on the
+ * appointment) and need to remain debuggable.
  */
 export function calculateTicketTotals(
   items: TicketItem[],
   discountAmount: number = 0,
-  depositCredit: number = 0
+  depositCredit: number = 0,
+  priorPaymentsTotal: number = 0
 ) {
   const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const taxAmount = items.reduce((sum, item) => sum + item.taxAmount, 0);
-  const total = Math.max(0, subtotal + taxAmount - discountAmount - depositCredit);
+  const total = Math.max(
+    0,
+    subtotal + taxAmount - discountAmount - depositCredit - priorPaymentsTotal
+  );
 
   return {
     subtotal: Math.round(subtotal * 100) / 100,

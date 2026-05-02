@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useTicket } from '../context/ticket-context';
+import { formatReceiptDateTime } from '@/lib/utils/format';
 
 function formatDepositLabel(depositDate: string | null): string {
   if (!depositDate) return 'Deposit Paid - Online';
@@ -14,9 +15,34 @@ function formatDepositLabel(depositDate: string | null): string {
 
 export function TicketTotals() {
   const { ticket, dispatch } = useTicket();
+  const hasPriorPayments = ticket.priorPayments.length > 0;
 
   return (
     <div className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-3">
+      {/* Payments Received — itemized prior payments hitting this appointment.
+          Rendered ABOVE Subtotal so the customer/staff first see "what's
+          already been paid", then the bill builds up to the Balance Due. */}
+      {hasPriorPayments && (
+        <div className="space-y-1 pb-2 mb-1 border-b border-gray-200 dark:border-gray-700">
+          <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Payments Received
+          </div>
+          {ticket.priorPayments.map((p, i) => (
+            <div
+              key={`${p.paid_at}-${i}`}
+              className="flex justify-between text-sm text-blue-600 dark:text-blue-400"
+            >
+              <span className="truncate pr-2">
+                {p.source_label} · {formatReceiptDateTime(p.paid_at)}
+              </span>
+              <span className="tabular-nums shrink-0">
+                -${(p.amount_cents / 100).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
         <span>Subtotal</span>
         <span className="tabular-nums">${ticket.subtotal.toFixed(2)}</span>
@@ -89,8 +115,14 @@ export function TicketTotals() {
         </div>
       )}
 
+      {/* Balance Due — always rendered, even at $0.00. Staff need to see the
+          explicit "Balance Due: $0.00" so they know nothing is owed. The label
+          flips to "Balance Due" whenever any pre-payment (deposit OR pay-link
+          OR booking-paid-in-full) has been applied; otherwise it's "Total". */}
       <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 text-base font-semibold text-gray-900 dark:text-gray-100">
-        <span>{ticket.depositCredit > 0 ? 'Balance Due' : 'Total'}</span>
+        <span>
+          {ticket.depositCredit > 0 || hasPriorPayments ? 'Balance Due' : 'Total'}
+        </span>
         <span className="tabular-nums">${ticket.total.toFixed(2)}</span>
       </div>
     </div>

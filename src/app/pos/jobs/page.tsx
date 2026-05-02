@@ -8,7 +8,7 @@ import { JobDetail } from './components/job-detail';
 import { useTicket } from '../context/ticket-context';
 import { calculateItemTax } from '../utils/tax';
 import { posFetch } from '../lib/pos-fetch';
-import type { TicketItem, TicketState } from '../types';
+import type { TicketItem, TicketState, PriorPayment } from '../types';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
 
 type View =
@@ -79,6 +79,8 @@ function JobsPageInner() {
       coupon_code: string | null;
       deposit_amount: number;
       deposit_date: string | null;
+      prior_payments?: PriorPayment[];
+      prior_payments_total_cents?: number;
       status: string;
     } | undefined;
 
@@ -134,9 +136,21 @@ function JobsPageInner() {
 
       const subtotal = ticketItems.reduce((sum, i) => sum + i.totalPrice, 0);
       const taxAmount = ticketItems.reduce((sum, i) => sum + i.taxAmount, 0);
-      const total = Math.max(0, subtotal + taxAmount);
 
       const depositCredit = data.deposit_amount || 0;
+
+      // Prior payments — itemized payments hitting the linked appointment.
+      // Server returns amount_cents; we keep cents for the array (UI reads
+      // amount_cents directly) but maintain priorPaymentsTotal in dollars to
+      // match the depositCredit / total convention used by tax.ts.
+      const priorPayments = (data.prior_payments ?? []) as PriorPayment[];
+      const priorPaymentsTotalCents = (data.prior_payments_total_cents ?? 0) as number;
+      const priorPaymentsTotal = priorPaymentsTotalCents / 100;
+
+      const total = Math.max(
+        0,
+        subtotal + taxAmount - depositCredit - priorPaymentsTotal
+      );
 
       const newTicket: TicketState = {
         items: ticketItems,
@@ -148,6 +162,8 @@ function JobsPageInner() {
         manualDiscount: null,
         depositCredit,
         depositDate: data.deposit_date || null,
+        priorPayments,
+        priorPaymentsTotal: Math.round(priorPaymentsTotal * 100) / 100,
         notes: null,
         subtotal: Math.round(subtotal * 100) / 100,
         taxAmount: Math.round(taxAmount * 100) / 100,
