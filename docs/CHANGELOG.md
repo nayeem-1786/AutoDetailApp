@@ -4,6 +4,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(payments): pay-link foundation — 2026-05-02 (Pay-Link Session 1)
+
+**Foundation for the "Send Payment Link" feature on appointments.** Schema + Stripe webhook only — no public pay page, no send route, no POS UI, no SMS/email templates this session (those are Sessions 2 and 3). Quotes are out of scope for this feature entirely. Layered cleanly on top of the existing PaymentIntent + Elements infrastructure that already powers booking deposits and online-store checkout, so no third-party integrations or env vars added.
+
+### Schema (`20260502194628_add_appointment_payment_link.sql`)
+
+Three new columns on `appointments` plus a partial unique index:
+
+- `payment_link_token TEXT` — opaque token for the public `/pay/[token]` URL (Session 2 generates these)
+- `payment_link_sent_at TIMESTAMPTZ` — set when an operator sends the link via SMS/email/both (Session 3)
+- `payment_link_paid_at TIMESTAMPTZ` — set by the webhook when Stripe confirms payment; doubles as an idempotency sentinel
+- `appointments_payment_link_token_unique` — unique partial index, only enforced when `payment_link_token IS NOT NULL` (so unset rows don't collide on `NULL`)
+
+`appointments.payment_status` (existing enum: `pending`, `partial`, `paid`, `refunded`, `partial_refund`) and `appointments.stripe_payment_intent_id` are both reused — no duplicate columns added.
+
+### Webhook extension (`src/app/api/webhooks/stripe/route.ts`)
+
+New branch on `payment_intent.succeeded` that fires when `pi.metadata.type === 'appointment_payment_link'` and `pi.metadata.appointment_id` is a valid UUID. The webhook is the **sole writer** for this flow (the public pay page in Session 2 will create the PI but won't write payment state — Stripe is the source of truth, and retries are handled here). Behavior:
+
+1. **Idempotency.** Loads the appointment; if `payment_status === 'paid'` OR `payment_link_paid_at IS NOT NULL`, logs `pay_link_already_processed` and returns 200. Stripe retries `succeeded` events on transient client failures, so this guard is required.
+2. **Amount math via `refund-math.ts` (`toCents` / `fromCents`).** `pi.amount_received` is already integer cents and stays in cents through the comparison. Remaining balance = `toCents(appointment.total_amount) − Σ toCents(existing payments.amount)` (joined via `transactions.appointment_id`). New `payment_status` is `'paid'` when `amount_received >= remaining`, else `'partial'`.
+3. **Transaction row created** mirroring the booking-deposit shape from `src/app/api/book/route.ts:381` (status `completed`, `payment_method='card'`, `subtotal = appointment.total_amount`, `total_amount = paid amount`, `employee_id = null`). This satisfies `payments.transaction_id NOT NULL` and keeps pay-link payments visible in Admin > Transactions alongside POS and deposit transactions.
+4. **Payments row inserted** mirroring the booking-deposit shape from `src/app/api/book/route.ts:459` (`method='card'`, `tip_amount=0`, `tip_net=0`, `stripe_payment_intent_id=pi.id`). The `payments` table has no `created_by_staff_id` column, so the system-actor question is moot — webhook context simply omits employee linkage.
+5. **Appointment update**: `payment_link_paid_at = now()`, `payment_status = 'paid' | 'partial'`. `stripe_payment_intent_id` is written **only if currently NULL** so a deposit PI from the booking flow is never overwritten.
+6. **Notification deferred.** A `// TODO(payment-link-session-3)` comment marks the spot; SMS/email confirmation lands with the templates in Session 3.
+7. **Errors rethrow.** Any failure inside the branch is logged with `{ payment_intent_id, appointment_id, error }` and rethrown so the webhook returns 500 → Stripe retries. Order/online-store and booking-deposit branches are untouched.
+
+### Discovered gap (booking-deposit webhook) — DEFERRED
+
+While auditing the existing `is_deposit === 'true'` branch in `src/app/api/webhooks/stripe/route.ts:39-52` for the pay-link work, found that this branch only **logs**. It does not:
+
+- update `appointments.payment_status`
+- write `appointments.stripe_payment_intent_id`
+- insert any `payments` or `transactions` row
+
+All of those writes happen synchronously in the booking route itself — `src/app/api/book/route.ts:362-471` — after Stripe confirms the deposit client-side. So the webhook is redundant on the happy path, but **if the booking route fails after Stripe takes payment** (network drop, DB error mid-write, unexpected exception between the PI confirmation and the appointment insert), the webhook is the only safety net, and it currently writes nothing. The customer is charged with no DB record. Secondary observation: `src/app/api/book/route.ts:373` sets `payment_status = 'pending'` for partial deposits rather than `'partial'` — the enum has a `partial` value that more accurately describes the state.
+
+**Not fixing in this session** per the prompt — the fix touches deposit accounting beyond pay-link's scope and warrants its own session (decisions to make: idempotency between booking-route synchronous writes and webhook fallback writes; whether to switch partial deposits to `'partial'`; whether the webhook should reconcile a missing `transactions` row). Documented here so the gap is captured.
+
+### Files touched
+
+- **NEW**: `supabase/migrations/20260502194628_add_appointment_payment_link.sql`
+- `src/app/api/webhooks/stripe/route.ts` — added pay-link branch + `toCents`/`fromCents` import + UUID regex helper
+- `docs/dev/DB_SCHEMA.md` — regenerated (3 new columns + 1 unique partial index on `appointments`)
+- `docs/dev/FILE_TREE.md` — added migration filename
+- `docs/CHANGELOG.md` (this entry)
+
+### Verification
+
+Existing webhook test (`src/app/api/webhooks/stripe/__tests__/payment-intent-succeeded.test.ts`, 6 tests) still passes — order branch is untouched. Manual verification SQL + Stripe CLI fire-twice idempotency check provided in the session prompt for local-deploy testing before VPS push. Unit test for the new branch is deferred to keep this session minimal; the public pay page in Session 2 will need a happy-path integration test that effectively covers it end-to-end.
+
+---
+
 ## docs(marketing): marketing decision guide — 2026-05-02 (Session 6c)
 
 **Session 6c — Marketing decision guide documentation.** Operator-facing reference document at `docs/manual/MARKETING_DECISION_GUIDE.md` covering all 4 messaging systems (SMS Templates, Marketing Automations, Campaigns, Drip) with decision tree, common scenarios, and capability gaps. Pure documentation — no code or schema changes. Closes the long-standing operator gap surfaced by the messaging-architecture audit (April 2026): until now, operators had no canonical reference for "when do I use System X vs Y?"

@@ -7,6 +7,10 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
+import { toCents, fromCents } from '@/lib/utils/refund-math';
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
@@ -50,6 +54,153 @@ export async function POST(request: NextRequest) {
             console.log(`[Stripe Webhook] Booking deposit received but no appointment found yet (PI: ${pi.id}). Transaction created by booking route.`);
           }
         }
+
+        // Appointment payment-link branch.
+        // Triggered when a customer pays the public /pay/[token] page (Session 2).
+        // Webhook is the SOLE writer of payment + transaction state for this flow,
+        // so idempotency under Stripe retries is required.
+        if (pi.metadata.type === 'appointment_payment_link') {
+          const apptIdFromMeta = pi.metadata.appointment_id;
+
+          if (!apptIdFromMeta || !UUID_REGEX.test(apptIdFromMeta)) {
+            console.error(
+              `[Stripe Webhook] pay_link missing/invalid appointment_id in metadata (PI: ${pi.id}, value: ${apptIdFromMeta ?? 'null'})`
+            );
+            break;
+          }
+
+          try {
+            const { data: appt, error: apptErr } = await admin
+              .from('appointments')
+              .select('id, customer_id, vehicle_id, total_amount, payment_status, payment_link_paid_at, stripe_payment_intent_id')
+              .eq('id', apptIdFromMeta)
+              .maybeSingle();
+
+            if (apptErr) {
+              throw new Error(`appointment lookup failed: ${apptErr.message}`);
+            }
+            if (!appt) {
+              throw new Error(`appointment ${apptIdFromMeta} not found`);
+            }
+
+            // Idempotency: Stripe retries succeeded events. Bail if already processed.
+            if (appt.payment_status === 'paid' || appt.payment_link_paid_at !== null) {
+              console.log(
+                `[Stripe Webhook] pay_link_already_processed (appointment: ${appt.id}, PI: ${pi.id}, status: ${appt.payment_status}, paid_at: ${appt.payment_link_paid_at})`
+              );
+              break;
+            }
+
+            // Amount math: integer cents end-to-end via refund-math helpers.
+            // pi.amount_received is already integer cents.
+            const totalCents = toCents(Number(appt.total_amount));
+
+            // Sum existing payments rows for this appointment to compute remaining balance.
+            const { data: existingTxs, error: txsErr } = await admin
+              .from('transactions')
+              .select('id')
+              .eq('appointment_id', appt.id);
+            if (txsErr) {
+              throw new Error(`existing-transactions lookup failed: ${txsErr.message}`);
+            }
+
+            const txIds = (existingTxs ?? []).map((t) => t.id);
+            let paidSoFarCents = 0;
+            if (txIds.length > 0) {
+              const { data: existingPays, error: paysErr } = await admin
+                .from('payments')
+                .select('amount')
+                .in('transaction_id', txIds);
+              if (paysErr) {
+                throw new Error(`existing-payments lookup failed: ${paysErr.message}`);
+              }
+              paidSoFarCents = (existingPays ?? []).reduce(
+                (sum, p) => sum + toCents(Number(p.amount)),
+                0
+              );
+            }
+
+            const remainingCents = Math.max(0, totalCents - paidSoFarCents);
+            const amountReceivedCents = pi.amount_received ?? pi.amount;
+            const newPaymentStatus = amountReceivedCents >= remainingCents ? 'paid' : 'partial';
+            const amountReceivedDollars = fromCents(amountReceivedCents);
+
+            // Mirror booking-deposit transaction shape (book/route.ts:381).
+            // Webhook context has no employee actor → employee_id null.
+            const { data: tx, error: txErr } = await admin
+              .from('transactions')
+              .insert({
+                appointment_id: appt.id,
+                customer_id: appt.customer_id,
+                vehicle_id: appt.vehicle_id,
+                employee_id: null,
+                status: 'completed',
+                subtotal: Number(appt.total_amount),
+                tax_amount: 0,
+                tip_amount: 0,
+                discount_amount: 0,
+                total_amount: amountReceivedDollars,
+                payment_method: 'card',
+                notes: `Online payment link. PI: ${pi.id}.`,
+                transaction_date: new Date().toISOString(),
+              })
+              .select('id')
+              .single();
+
+            if (txErr || !tx) {
+              throw new Error(`transaction insert failed: ${txErr?.message ?? 'no row'}`);
+            }
+
+            // Mirror booking-deposit payments shape (book/route.ts:459).
+            const { error: payErr } = await admin
+              .from('payments')
+              .insert({
+                transaction_id: tx.id,
+                method: 'card',
+                amount: amountReceivedDollars,
+                tip_amount: 0,
+                tip_net: 0,
+                stripe_payment_intent_id: pi.id,
+              });
+
+            if (payErr) {
+              throw new Error(`payment insert failed: ${payErr.message}`);
+            }
+
+            // Update appointment. Only write stripe_payment_intent_id if currently NULL
+            // so we don't overwrite a deposit PI from the booking flow.
+            const apptUpdate: Record<string, unknown> = {
+              payment_link_paid_at: new Date().toISOString(),
+              payment_status: newPaymentStatus,
+            };
+            if (appt.stripe_payment_intent_id === null) {
+              apptUpdate.stripe_payment_intent_id = pi.id;
+            }
+
+            const { error: apptUpdErr } = await admin
+              .from('appointments')
+              .update(apptUpdate)
+              .eq('id', appt.id);
+
+            if (apptUpdErr) {
+              throw new Error(`appointment update failed: ${apptUpdErr.message}`);
+            }
+
+            // TODO(payment-link-session-3): send payment_link_paid notification
+
+            console.log(
+              `[Stripe Webhook] pay_link_processed (appointment: ${appt.id}, PI: ${pi.id}, amount: $${amountReceivedDollars.toFixed(2)}, status: ${newPaymentStatus})`
+            );
+          } catch (err) {
+            console.error('[Stripe Webhook] pay_link processing failed', {
+              payment_intent_id: pi.id,
+              appointment_id: apptIdFromMeta,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            throw err; // rethrow → 500 → Stripe retries the webhook
+          }
+        }
+
         break;
       }
 

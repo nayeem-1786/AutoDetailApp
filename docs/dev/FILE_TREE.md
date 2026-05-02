@@ -1528,6 +1528,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260428000005_lifecycle_executions_job_id_and_review_cleanup.sql
 20260429000001_seed_3d_receipt_sms_chip_driven.sql
 20260430000001_rfb2_drop_birthday_and_expand_lifecycle.sql
+20260502194628_add_appointment_payment_link.sql
 ```
 
 ## Scripts
