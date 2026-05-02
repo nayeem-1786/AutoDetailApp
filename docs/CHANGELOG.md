@@ -4,6 +4,57 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## chore(marketing): wire up scheduled campaigns + housekeeping — 2026-05-01 (Session 6a)
+
+**Session 6a — Wire up scheduled campaigns + housekeeping.** Registers the orphan `process-scheduled` endpoint with `scheduler.ts` at 5-min interval (fixes the broken "schedule a campaign for later" feature, unifies auth on `CRON_API_KEY`). Collapses `sms/hardcoded-messages.ts` to minimal stub (Path B Phase 2 dead code). Refreshes `database.types.ts` to remove stale `customers.birthday` reference. Renames `chain_order` admin form label from "Chain Order" / "Order in multi-step sequences" to "Display Order" with consistent description across new and edit forms. `tag_added` trigger cleanup deferred to Session 6d.
+
+### Fix A — process-scheduled wire-up
+
+Before: `src/app/api/marketing/campaigns/process-scheduled/route.ts` was a `POST`-only endpoint authed via `Authorization: Bearer <CRON_SECRET>` (a custom env var used nowhere else in the app), and was **not registered** in `src/lib/cron/scheduler.ts`. Scheduled campaigns silently never auto-fired — a campaign created with `scheduled_at` in the future sat in `status='scheduled'` indefinitely.
+
+After:
+- Extracted shared `runProcessScheduled()` helper (file-private — Next.js routes only permit HTTP-method exports). Both handlers call it.
+- New `GET` handler with `x-api-key: CRON_API_KEY` validation (mirrors `lifecycle-engine` pattern). Cron entry point.
+- `POST` handler refactored to admin-session-only (super_admin / admin role). Reserved for a future "Process now" admin button. Dropped the dead `CRON_SECRET` branch.
+- Registered in `scheduler.ts` at `*/5 * * * *` (every 5 min). Cadence chosen to match operator-acceptable jitter for marketing dispatch.
+
+Pre-deploy SQL check confirmed clean: zero rows in `campaigns` with `status='scheduled'`. Safe to register without retroactive ghost dispatch.
+
+### Fix C — sms/hardcoded-messages.ts collapse
+
+The file was already structurally empty (`HARDCODED_SMS_MESSAGES = []`) since Session 3D closed Path B Phase 2. Stripped 47 lines of historical comments and the `.map()`-derivation indirection for `INTENTIONALLY_HARDCODED_SMS`. Net: 50 LOC → 3 LOC. Exports identical, so the sole caller (`src/app/admin/settings/messaging/sms-templates/page.tsx`) needs no change.
+
+### Fix D — database.types.ts regen
+
+Ran `npx supabase gen types typescript --linked > src/lib/supabase/database.types.ts`. Removed stale `customers.birthday` column references (3 locations: Row, Insert, Update). The newer Supabase CLI emits more comprehensive type metadata (Views, Enums, Functions for all schemas) → file size grew from 2540 to 6917 lines. `tsc --noEmit` clean post-regen.
+
+### Fix E — chain_order admin label rename
+
+`src/app/admin/marketing/automations/new/page.tsx` and `[id]/page.tsx`: `<FormField label="Chain Order" ... description="Order in multi-step sequences">` (description present only on `new/`) → `<FormField label="Display Order" ... description="Controls display order in the admin rules list">` (consistent across both pages). Multi-step orchestration is Drip's job; `chain_order` on automations is purely a sort key for the admin rules list.
+
+### Deferred from this session
+
+- **`tag_added` drip trigger removal** — initially scoped here as a one-line drip-engine change, but Phase 0 surfaced 8 source-file references plus a `drip_sequences_trigger_condition_check` CHECK constraint. Full cleanup deferred to Session 6d (8 files + migration + DB_SCHEMA regen).
+
+### Verification
+
+- `npx tsc --noEmit`: clean
+- `npm run lint`: 114 problems (26 errors, 88 warnings) — unchanged from pre-Session-6a baseline (verified via `git stash` + re-lint). Net contribution: 0.
+- `npx vitest run`: 535 / 535 passed
+- `npm run build` (after `rm -rf .next`): ✓ Compiled successfully
+- `npx supabase db push --linked --dry-run`: "Remote database is up to date" (no schema changes — expected)
+
+### Files touched
+
+- `src/app/api/marketing/campaigns/process-scheduled/route.ts` (refactored, ~370 LOC reorganized; added GET handler, dropped CRON_SECRET branch)
+- `src/lib/cron/scheduler.ts` (+2 lines: task entry + console.log)
+- `src/lib/sms/hardcoded-messages.ts` (50 LOC → 3 LOC)
+- `src/lib/supabase/database.types.ts` (regenerated, 2540 → 6917 lines)
+- `src/app/admin/marketing/automations/new/page.tsx` (1-line label/description swap)
+- `src/app/admin/marketing/automations/[id]/page.tsx` (1-line label rename + new description prop)
+
+---
+
 ## refactor(marketing): lifecycle engine cleanup + trigger expansion — 2026-04-30 (Session RFB-2)
 
 **Session RFB-2 — Lifecycle engine cleanup.** Drops pickup-tracking dependency from the `service_completed` gate (was preventing review SMS for walk-in customers); adds 4 new event triggers (`after_work_completed`, `after_appointment_booked`, `after_appointment_cancelled`, `after_quote_accepted`); removes dead `no_visit_days` and `birthday` options from the dropdown; fully removes the pickup workflow (button + endpoint + UI code); drops the unused `customers.birthday` column. Net effect: lifecycle engine triggers reflect actual operator workflow, no more dead options, simpler gate semantics.

@@ -276,7 +276,7 @@ export default function AutomationDetailPage() {
                   <p className="mt-1 text-sm text-red-600">{errors.delay_days?.message || errors.delay_minutes?.message}</p>
                 )}
               </div>
-              <FormField label="Chain Order" error={errors.chain_order?.message} htmlFor="chain_order">
+              <FormField label="Display Order" error={errors.chain_order?.message} htmlFor="chain_order" description="Controls display order in the admin rules list">
                 <Input id="chain_order" type="number" min="0" {...register('chain_order')} />
               </FormField>
             </div>

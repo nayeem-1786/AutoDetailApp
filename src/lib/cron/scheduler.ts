@@ -118,6 +118,7 @@ export function setupCronJobs() {
     { name: 'conversation-summaries', expr: '0 */6 * * *', fn: () => runJob('conversation-summaries', '/api/cron/conversation-summaries') },
     { name: 'voice-calls-poll', expr: '*/2 * * * *', fn: () => runJob('voice-calls-poll', '/api/cron/voice-calls-poll') },
     { name: 'cleanup-verification-codes', expr: '0 12 * * *', fn: () => runJob('cleanup-verification-codes', '/api/cron/cleanup-verification-codes') },
+    { name: 'process-scheduled', expr: '*/5 * * * *', fn: () => runJob('process-scheduled', '/api/marketing/campaigns/process-scheduled') },
   ];
 
   // Stagger task starts 2s apart to avoid aligned schedule bursts
@@ -142,4 +143,5 @@ export function setupCronJobs() {
   console.log('  - conversation-summaries: every 6 hours');
   console.log('  - voice-calls-poll: every 2 minutes');
   console.log('  - cleanup-verification-codes: daily at 4:00 AM PST');
+  console.log('  - process-scheduled: every 5 minutes');
 }
