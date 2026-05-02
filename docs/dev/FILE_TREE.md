@@ -1568,6 +1568,7 @@ docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md
 docs/manual/03-job-management.md
 docs/manual/05-customers.md
+docs/manual/MARKETING_DECISION_GUIDE.md   # Operator decision tree for the 4 messaging systems (Session 6c)
 docs/manual/website/README.md
 docs/hardware/print-server/package.json
 docs/hardware/print-server/README.md

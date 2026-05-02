@@ -4,6 +4,29 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs(marketing): marketing decision guide — 2026-05-02 (Session 6c)
+
+**Session 6c — Marketing decision guide documentation.** Operator-facing reference document at `docs/manual/MARKETING_DECISION_GUIDE.md` covering all 4 messaging systems (SMS Templates, Marketing Automations, Campaigns, Drip) with decision tree, common scenarios, and capability gaps. Pure documentation — no code or schema changes. Closes the long-standing operator gap surfaced by the messaging-architecture audit (April 2026): until now, operators had no canonical reference for "when do I use System X vs Y?"
+
+### Document structure (8 sections, ~2,900 words)
+
+1. **Quick Decision Tree** — flowchart-style routing rule for the four systems
+2. **SMS Templates** — transactional contract layer (27 chip-driven slugs)
+3. **Marketing Automations** — single-shot event-triggered sends, with all 6 post-Session 5 triggers documented and behavioral gotchas (30-day dedup, 24h cron lookback, marketing consent gating)
+4. **Campaigns** — operator-initiated segment blasts, both immediate and scheduled modes (notes Session 6a wired up the dispatch cron at 5-min cadence)
+5. **Drip** — multi-step nurture sequences (canonical home for chained messaging — clarifies that `chain_order` on Automations is just a sort key, not orchestration)
+6. **Common Operator Scenarios** — 12 scenarios mapped to the right system with caveats
+7. **Important Behaviors and Gotchas** — non-obvious behaviors operators must know (consent gating, dedup, audience materialization timing)
+8. **Future Capability Gaps** — what's NOT supported today (zip filter, birthday triggers, Automation segment overlay, stop conditions, Drip↔Automation integration, etc.)
+
+### Files touched
+
+- **NEW**: `docs/manual/MARKETING_DECISION_GUIDE.md`
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/FILE_TREE.md` (added new doc to manual section)
+
+---
+
 ## chore(marketing): wire up scheduled campaigns + housekeeping — 2026-05-01 (Session 6a)
 
 **Session 6a — Wire up scheduled campaigns + housekeeping.** Registers the orphan `process-scheduled` endpoint with `scheduler.ts` at 5-min interval (fixes the broken "schedule a campaign for later" feature, unifies auth on `CRON_API_KEY`). Collapses `sms/hardcoded-messages.ts` to minimal stub (Path B Phase 2 dead code). Refreshes `database.types.ts` to remove stale `customers.birthday` reference. Renames `chain_order` admin form label from "Chain Order" / "Order in multi-step sequences" to "Display Order" with consistent description across new and edit forms. `tag_added` trigger cleanup deferred to Session 6d.
