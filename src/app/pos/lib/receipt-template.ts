@@ -646,6 +646,28 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       left: label,
       right: `$${p.amount.toFixed(2)}`,
     });
+    // Cash-only Tendered + Change sub-rows. Two-space indent matches the
+    // muted treatment used in generateReceiptHtml + the public receipt page
+    // (commit 4129e784). The 'columns' renderer preserves leading whitespace
+    // in `left`. Historical cash rows have cash_tendered NULL → no sub-rows.
+    // Non-cash methods can never have these populated (server validates), so
+    // the method check is defensive only.
+    if (p.method === 'cash' && p.cash_tendered != null) {
+      lines.push({
+        type: 'columns',
+        left: '  Tendered',
+        right: `$${p.cash_tendered.toFixed(2)}`,
+      });
+      const change =
+        p.change_given != null
+          ? p.change_given
+          : Math.max(0, p.cash_tendered - p.amount);
+      lines.push({
+        type: 'columns',
+        left: '  Change',
+        right: `$${change.toFixed(2)}`,
+      });
+    }
   }
 
   // Refund summary sections
@@ -700,7 +722,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       lines.push({ type: 'divider' });
       lines.push({
         type: 'text',
-        text: `Join our rewards program — this visit would've earned you $${dollarValue} off!`,
+        text: `Join our rewards program - this visit would've earned you $${dollarValue} off!`,
         alignment: 'center',
       });
     }
@@ -1276,6 +1298,49 @@ function textToBytes(text: string): number[] {
 }
 
 /**
+ * Word-wrap a string to a fixed column width, breaking at whitespace.
+ * If a single word is wider than `width`, hard-break it across lines so the
+ * printer never sees an over-length line (the Star TSP100III auto-wraps
+ * mid-character at the column boundary, which produces ugly mid-word breaks).
+ *
+ * Returns the wrapped lines as strings, no trailing whitespace.
+ */
+function wrapTextToWidth(text: string, width: number): string[] {
+  if (text.length <= width) return [text];
+  const out: string[] = [];
+  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  let current = '';
+  for (const word of words) {
+    if (word.length > width) {
+      // Word longer than the line — flush current, then hard-break the word.
+      if (current.length > 0) {
+        out.push(current);
+        current = '';
+      }
+      for (let i = 0; i < word.length; i += width) {
+        const chunk = word.slice(i, i + width);
+        if (chunk.length === width) {
+          out.push(chunk);
+        } else {
+          current = chunk;
+        }
+      }
+      continue;
+    }
+    if (current.length === 0) {
+      current = word;
+    } else if (current.length + 1 + word.length <= width) {
+      current += ' ' + word;
+    } else {
+      out.push(current);
+      current = word;
+    }
+  }
+  if (current.length > 0) out.push(current);
+  return out;
+}
+
+/**
  * Convert receipt lines to Star TSP100 ESC/POS binary commands.
  * Matches the visual layout of generateReceiptHtml() as closely
  * as a 48-column thermal printer allows:
@@ -1315,11 +1380,19 @@ export function receiptToEscPos(
         parts.push(LF); // Space after business name
         break;
 
-      case 'text':
+      case 'text': {
+        // Server-side word-wrap so long centered lines (e.g. "Join our rewards
+        // program – this visit would've earned you $X.XX off!") break at
+        // whitespace. Without this, the printer's character-level auto-wrap
+        // produces mid-word breaks like "...would've e\narned you...".
         parts.push(...CMD_ALIGN_CENTER);
-        parts.push(...textToBytes(line.text ?? ''));
-        parts.push(LF);
+        const wrapped = wrapTextToWidth(line.text ?? '', width);
+        for (const sub of wrapped) {
+          parts.push(...textToBytes(sub));
+          parts.push(LF);
+        }
         break;
+      }
 
       case 'bold':
         if (!(line.text ?? '').trim()) {

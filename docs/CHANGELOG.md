@@ -4,6 +4,63 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(receipts): thermal Tendered/Change + rewards-line wrap (4r-followup)
+
+**Closes the missed fourth receipt surface from commit 4129e784.** Session 4r added Tendered/Change rendering to HTML email, copier print, and the public `/receipt/[token]` page, but missed the Star TSP100III thermal printer at the register (the "Print" button on the POS Payment Complete screen). Same architecture, same single file (`src/app/pos/lib/receipt-template.ts`), three small additions.
+
+### Thermal Tendered/Change
+
+The thermal renderer is `generateReceiptLines(tx, config, context)` → `receiptToEscPos(lines, 48)`, both in `src/app/pos/lib/receipt-template.ts`. The print-server route at `src/app/api/pos/receipts/print-server/route.ts` calls them and base64-queues the bytes into `print_jobs` for the OptiPlex polling agent.
+
+Inside the payments loop in `generateReceiptLines`, after the existing `'columns'` line for each payment, two indented `'columns'` sub-rows now render when `method === 'cash' && cash_tendered != null`:
+
+```
+CASH                                       $14.50
+  Tendered                                 $20.00
+  Change                                    $5.50
+```
+
+Two-space indent on the labels mirrors the indentation convention used in the HTML and public-page renderers. The `'columns'` renderer preserves leading whitespace on `left`. Backward compat: historical cash rows have `cash_tendered` NULL → no sub-rows render. Non-cash methods can never have these populated (server validates in `transactions/route.ts`), so the method check is defensive only. `change_given` falls back to `max(0, cash_tendered - amount)` if NULL, matching the public-page render.
+
+### Rewards-line wrap fix
+
+Production thermal print showed `"...would've e\narned you $0.05 off!"` with an orphan `?` where the source string had `—` (em-dash). Two compounding bugs:
+
+1. **`textToBytes` substitutes non-ASCII chars with `?` (0x3F)** at line 1273. The em-dash `—` (U+2014) is non-ASCII → printed as `?`. Fixed in the source string at line 703 by replacing `—` with `-` (ASCII hyphen). One-character source change. Doesn't introduce a regression elsewhere — em-dash was the only non-ASCII char in that string.
+2. **The Star TSP100III auto-wraps long lines at column 48 by character, not by word.** The `'text'` case in `receiptToEscPos` was sending raw bytes with no server-side wrap. With the em-dash → `?` substitution making the line exactly 68 chars, column 48 lands mid-word in "earned" → `"e\narned"`.
+
+Added `wrapTextToWidth(text, width)` helper next to `textToBytes` that splits on whitespace, falling back to a hard break only for words longer than the column width. The `'text'` case in `receiptToEscPos` now wraps via this helper before pushing bytes. Other line types (`'columns'`, `'header'`, `'bold'`, etc.) already had their own width handling and are untouched.
+
+Verified: with the rewards-line input (66 chars), the helper produces:
+- Line 1: `"Join our rewards program - this visit would've"` (46 chars)
+- Line 2: `"earned you $0.05 off!"` (21 chars)
+
+Both within 48-column budget, centered, no mid-word break, no orphan punctuation.
+
+### Surface coverage (now complete)
+
+- ✅ HTML email — covered in 4129e784
+- ✅ Copier print — covered in 4129e784
+- ✅ Public receipt page (`/receipt/[token]`) — covered in 4129e784
+- ✅ **Star TSP100III thermal receipt — covered in this session**
+- ✅ SMS — not modified (link-only; opens public page above)
+
+### Files touched
+
+- `src/app/pos/lib/receipt-template.ts` — payments loop in `generateReceiptLines`, em-dash fix in rewards source string, new `wrapTextToWidth` helper, word-wrapped `'text'` case in `receiptToEscPos`
+- `docs/CHANGELOG.md` (this entry)
+
+No new files. No migrations. No FILE_TREE.md change.
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` clean on the changed file.
+- Dev server compiles `/api/pos/receipts/print-server` (504 modules) and 401s without auth.
+- Manual end-to-end (run a $14.50 ticket with $20 cash, tap Print, confirm thermal printout shows the new sub-rows + the rewards line wraps cleanly) is in the session prompt.
+
+---
+
 ## feat(payments): persist cash tendered + change given on payments rows
 
 **Cash tendered + change given now persist with each cash payment and render on every receipt format that shows payment details.** Solves the long-standing gap where the cash drawer captured both for UX (change display, cash drawer kick) but discarded them on submit — meaning a reloaded receipt couldn't reconstruct what the customer handed over. Backward-compatible: every historical cash row has these columns NULL and renders exactly as it did before.
