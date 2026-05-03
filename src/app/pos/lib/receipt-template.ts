@@ -46,6 +46,14 @@ interface ReceiptPayment {
   cash_tendered?: number | null;
   /** Cash-only: change handed back. NULL on historical rows + non-cash. */
   change_given?: number | null;
+  /** When this payment row was created. Required for online-source date stamps
+   * (e.g. "Online (pay link) · May 2, 2026, 5:43 PM"). Optional for back-compat. */
+  created_at?: string | null;
+  /** Human-readable source label assembled in receipt-data.ts via
+   * derivePaymentSourceLabel. Defined for appointment-linked transactions
+   * where the renderer iterates the FULL appointment payment history;
+   * absent on walk-in transactions where local payments[] is the source. */
+  source_label?: string | null;
 }
 
 export interface ReceiptTransaction {
@@ -85,6 +93,13 @@ export interface ReceiptTransaction {
   deposit_date?: string;
   /** Cross-reference to the linked deposit or balance receipt */
   linked_receipt?: { receipt_number: string; label: string } | null;
+  /** Balance due on the linked appointment (cents). Defined only for
+   * appointment-linked transactions — sum of all completed-transaction
+   * payments on the appointment vs appointment.total_amount, never negative.
+   * Renderers display this as a "Balance Due" row at the end of the Payment
+   * section, even at $0.00. Walk-in transactions leave this undefined and
+   * the row is skipped. */
+  appointment_balance_due?: number;
 }
 
 export interface ReceiptLine {
@@ -637,10 +652,21 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
 
   // Payments
   for (const p of tx.payments) {
-    const label =
-      p.method === 'card' && p.card_brand
-        ? `${p.card_brand} ****${p.card_last_four}`
-        : p.method.toUpperCase();
+    // Online sources get a "Source · date" label; in-store card keeps
+    // brand+last-four; cash/check fall through to method.toUpperCase().
+    // Same logic as generateReceiptHtml above.
+    const isOnlineSource =
+      p.source_label === 'Online (pay link)' ||
+      p.source_label === 'Booking deposit';
+    let label: string;
+    if (isOnlineSource) {
+      const dateStr = p.created_at ? ` · ${formatReceiptDateTime(p.created_at)}` : '';
+      label = `${p.source_label}${dateStr}`;
+    } else if (p.method === 'card' && p.card_brand) {
+      label = `${p.card_brand} ****${p.card_last_four}`;
+    } else {
+      label = p.method.toUpperCase();
+    }
     lines.push({
       type: 'columns',
       left: label,
@@ -668,6 +694,16 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         right: `$${change.toFixed(2)}`,
       });
     }
+  }
+  // Balance Due — always render for appointment-linked transactions, even at
+  // $0.00 (mirrors POS ticket-totals invariant). Walk-in receipts have
+  // appointment_balance_due undefined so the row is skipped.
+  if (tx.appointment_balance_due !== undefined) {
+    lines.push({
+      type: 'columns',
+      left: 'Balance Due',
+      right: `$${(tx.appointment_balance_due / 100).toFixed(2)}`,
+    });
   }
 
   // Refund summary sections
@@ -948,25 +984,48 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     totals.push(row(esc(formatDepositLabel(tx.deposit_date)), `-$${tx.deposit_credit.toFixed(2)}`, '#2563eb'));
   }
 
-  const paymentRows = tx.payments
-    .map((p) => {
-      const label =
-        p.method === 'card' && p.card_brand
-          ? `${esc(p.card_brand)} ****${esc(p.card_last_four || '')}`
-          : p.method.toUpperCase();
-      let html = row(label, `$${p.amount.toFixed(2)}`);
-      // Cash-only: render Tendered + Change as indented sub-rows below the
-      // payment line. Historical cash rows have cash_tendered NULL → no extra
-      // rows. Non-cash methods can never have these populated (server
-      // validates), so we don't need a method guard here.
-      if (p.method === 'cash' && p.cash_tendered != null) {
-        html += row('&nbsp;&nbsp;Tendered', `$${p.cash_tendered.toFixed(2)}`, '#666666');
-        const change = p.change_given != null ? p.change_given : Math.max(0, p.cash_tendered - p.amount);
-        html += row('&nbsp;&nbsp;Change', `$${change.toFixed(2)}`, '#666666');
-      }
-      return html;
-    })
-    .join('');
+  const paymentRows = (() => {
+    let html = tx.payments
+      .map((p) => {
+        // Online sources (pay link, booking deposit) get a "Source · date" label.
+        // In-store card retains the existing "VISA ****1234" affordance because
+        // brand+last-four is more useful to staff than a generic "Card" label.
+        // Cash/check fall through to method.toUpperCase() (today's behavior),
+        // OR source_label when present (which renders the same casing as the
+        // POS Payments Received block).
+        const isOnlineSource =
+          p.source_label === 'Online (pay link)' ||
+          p.source_label === 'Booking deposit';
+        let label: string;
+        if (isOnlineSource) {
+          const dateStr = p.created_at ? ` · ${esc(formatReceiptDateTime(p.created_at))}` : '';
+          label = `${esc(p.source_label!)}${dateStr}`;
+        } else if (p.method === 'card' && p.card_brand) {
+          label = `${esc(p.card_brand)} ****${esc(p.card_last_four || '')}`;
+        } else {
+          label = p.method.toUpperCase();
+        }
+        let row_html = row(label, `$${p.amount.toFixed(2)}`);
+        // Cash-only: render Tendered + Change as indented sub-rows below the
+        // payment line. Historical cash rows have cash_tendered NULL → no extra
+        // rows. Non-cash methods can never have these populated (server
+        // validates), so we don't need a method guard here.
+        if (p.method === 'cash' && p.cash_tendered != null) {
+          row_html += row('&nbsp;&nbsp;Tendered', `$${p.cash_tendered.toFixed(2)}`, '#666666');
+          const change = p.change_given != null ? p.change_given : Math.max(0, p.cash_tendered - p.amount);
+          row_html += row('&nbsp;&nbsp;Change', `$${change.toFixed(2)}`, '#666666');
+        }
+        return row_html;
+      })
+      .join('');
+    // Balance Due — appointment-linked transactions only. Always render, even
+    // at $0.00, mirroring the POS ticket-totals invariant. Walk-in transactions
+    // leave appointment_balance_due undefined and the row is skipped.
+    if (tx.appointment_balance_due !== undefined) {
+      html += row('Balance Due', `$${(tx.appointment_balance_due / 100).toFixed(2)}`);
+    }
+    return html;
+  })();
 
   const logoAlign = c.logo_alignment || 'center';
   const logoSrc = images?.logoBase64 || c.logo_url;

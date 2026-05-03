@@ -6,6 +6,154 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): appointment_id orphan + unified receipt history + pay-page wording (Session 5b)
+
+Three connected fixes to the Pay-Link feature.
+
+### Fix 1: appointment_id orphan on POS-created transactions (BIGGER THAN REPORTED)
+
+**Production diagnostic was right but understated the scope.** It surfaced as "close-out transactions have appointment_id=NULL", but the actual cause is that **every POS-created transaction since the route was written** orphans appointment_id — cash, card, split, AND close-out. Only booking-deposit (`book/route.ts`) and pay-link webhook writes carried it.
+
+Root cause: no client path (`cash-payment.tsx`, `card-payment.tsx`, `split-payment.tsx`, `payment-method-screen.tsx`) sends `appointment_id` in the request body, and `transactions/route.ts`'s insert mapping never included it. Session 4b added a `linkedApptId` lookup for the overpay guard but threw it away after.
+
+Fix: hoist the existing `linkedApptId` lookup so it's resolved once at the top of the route and used by BOTH the overpay guard AND the transaction insert. Same fix applied to `sync-offline-transaction/route.ts` (offline path had the identical orphan). Files:
+- `src/app/api/pos/transactions/route.ts` — hoists lookup, adds `appointment_id: linkedApptId` to insert
+- `src/app/api/pos/sync-offline-transaction/route.ts` — same lookup + insert pattern
+
+#### Backfill SQL (run manually after reviewing — NOT a migration)
+
+Backfills `transactions.appointment_id` for every historical POS-created transaction by walking `transactions ← jobs.transaction_id → jobs.appointment_id`. Cleaner and more reliable than the spec's customer_id+amount heuristic — uses the actual job-linkage that already exists. Run as one transaction so a partial failure doesn't leave the DB in an inconsistent state:
+
+```sql
+BEGIN;
+
+-- Preview the count first:
+SELECT COUNT(*) AS would_backfill
+FROM transactions t
+JOIN jobs j ON j.transaction_id = t.id
+WHERE t.appointment_id IS NULL
+  AND j.appointment_id IS NOT NULL;
+
+-- Apply:
+UPDATE transactions t
+SET appointment_id = j.appointment_id
+FROM jobs j
+WHERE j.transaction_id = t.id
+  AND t.appointment_id IS NULL
+  AND j.appointment_id IS NOT NULL;
+
+-- Verify after:
+SELECT COUNT(*) AS still_orphaned_with_a_linked_job
+FROM transactions t
+JOIN jobs j ON j.transaction_id = t.id
+WHERE t.appointment_id IS NULL
+  AND j.appointment_id IS NOT NULL;
+-- Should be 0.
+
+-- Show remaining orphans (will be the close-outs that don't have linked
+-- jobs.transaction_id set yet — those need a separate pass via the
+-- close-out's notes='Closed out — fully pre-paid' marker):
+SELECT COUNT(*) AS close_outs_orphaned
+FROM transactions
+WHERE notes = 'Closed out — fully pre-paid'
+  AND appointment_id IS NULL;
+
+COMMIT;
+```
+
+If close-outs are still orphaned after the JOIN backfill (the close-out path's job-linking fire-and-forget may have raced or failed for some rows), pair them by customer_id + close-out timestamp:
+
+```sql
+-- ONLY run if the previous query showed close_outs_orphaned > 0.
+-- Best-effort: link a close-out to a sibling completed pay-link transaction
+-- on the same customer that has an appointment_id and where total matches
+-- a single payments row.
+UPDATE transactions tx
+SET appointment_id = sibling.appointment_id
+FROM transactions sibling
+WHERE tx.notes = 'Closed out — fully pre-paid'
+  AND tx.appointment_id IS NULL
+  AND tx.customer_id = sibling.customer_id
+  AND sibling.id != tx.id
+  AND sibling.appointment_id IS NOT NULL
+  AND sibling.transaction_date < tx.transaction_date
+  AND sibling.notes LIKE 'Online payment link.%';
+```
+
+Don't run that second block blindly — it can mis-link if a customer has multiple pay-link appointments. Inspect output before commit.
+
+### Fix 2: receipts render full appointment payment history
+
+**Problem:** The receipt template iterates `tx.payments[]` from the rendered transaction. Close-out transactions have an empty `payments[]` (no money tendered), so the receipt rendered with an empty Payment section. Same gap for any future scenario where the rendered transaction's payments don't cover the full appointment story (partial pre-pay, split between online + in-store, etc).
+
+**Fix:** When `transaction.appointment_id IS NOT NULL`, the data fetcher now replaces the local `payments[]` with the FULL chronologically-ordered payment history for that appointment, joined through `transactions.appointment_id`. Each payment carries a `source_label` derived from the joined transaction's notes prefix via the new shared `derivePaymentSourceLabel()` helper. Receipts also gain a "Balance Due" row at the end of the Payment section, always rendered (even at $0.00) — mirrors POS Payments Received.
+
+Walk-in transactions (appointment_id IS NULL) keep the existing `payments(*)` join — no behavior change.
+
+#### Three render scenarios after this fix
+- **Walk-in cash $14.50 ($20 tendered)** — exactly today's behavior. `CASH $14.50` + `Tendered $20.00` + `Change $5.50`. No Balance Due row.
+- **Close-out $0 with $1 pay-link prior** — `Online (pay link) · May 2, 2026, 5:43 PM    $1.00` + `Balance Due    $0.00`.
+- **Partial-pay: $7 cash with $3 pay-link prior** — `Online (pay link) · …    $3.00` + `CASH    $7.00` + `Tendered $7.00` (no change) + `Balance Due    $0.00`.
+
+#### Source label rules (single source of truth)
+`src/lib/utils/payment-source-label.ts` (new):
+- `notes LIKE 'Online payment link.%'` → `"Online (pay link)"`
+- `notes LIKE 'Online booking deposit.%'` → `"Booking deposit"`
+- else → `"Cash"` / `"Card"` / `"Check"` / `"Split"` based on `payments.method`
+
+Replaces the duplicated local helper in `checkout-items/route.ts` (Session 4b). Three call sites now share this single function — POS Payments Received, receipt-data fetcher, and (transitively, via receipt-data) all four receipt formats.
+
+#### Files touched
+
+- **NEW**: `src/lib/utils/payment-source-label.ts` — shared helper
+- `src/app/api/pos/jobs/[id]/checkout-items/route.ts` — switches local `deriveSourceLabel` for the shared helper
+- `src/lib/data/receipt-data.ts` — appointment-history fetch + `appointment_balance_due` computation when `transaction.appointment_id` is set
+- `src/app/pos/lib/receipt-template.ts` — `ReceiptPayment` interface gains `created_at` + `source_label`; `ReceiptTransaction` gains `appointment_balance_due`; `generateReceiptHtml` and `generateReceiptLines` payment loops render `"Source · date"` for online sources, retain `"VISA ****1234"` for in-store card, fall through to method label, and append a Balance Due row when `appointment_balance_due` is defined
+- `src/app/(public)/receipt/[token]/page.tsx` — local `payments[]` type extended; `getTransaction()` mirrors the receipt-data appointment-history logic; JSX renders `Source · date` labels and a Balance Due row at the end of the Payment section; the Payment section is now also kept open at $0 payments when `appointment_balance_due` is defined (so close-out receipts always show the Payment block with the prior history + Balance Due $0.00 instead of hiding it entirely)
+
+#### Backward compat
+- Pre-existing receipts with `transaction.appointment_id IS NULL` (walk-ins) render exactly as today.
+- Card payments from in-store retain the `"VISA ****1234"` affordance — staff need brand+last-four more than a generic "Card" label.
+- Cash sub-rows (Tendered/Change) from Session 4r still render per-payment.
+- Booking-deposit receipts: unchanged — they were already correctly identified as `is_deposit=true` and rendered through the existing deposit-specific path. The new appointment-history logic ALSO populates their `payments[]` from the appointment, but for a deposit-only appointment that's just the same one row.
+
+### Fix 3: public pay page wording
+
+**Problem:** When a customer pays via pay-link, the post-payment page rendered "Already paid" in the totals row. Confusing wording (sounds like a prior unrelated payment, especially right after the customer just paid).
+
+**Fix:** When `appointment.payment_link_paid_at` is set, the row renders `"Paid (pay link) · May 2, 2026, 5:43 PM PST"` (using the same `formatReceiptDateTime` PST formatter the receipt template + POS Payments Received block use). When it's null (pre-pay-link historical state, partial booking deposit, etc.), the wording stays "Already paid" — no regression. The existing PAID green pill at the top of the page is unchanged (it was a state banner, not the confusing element).
+
+File: `src/app/(public)/pay/[token]/page.tsx` — single line replacement in the totals block. Format matches POS Payments Received exactly.
+
+### Files touched (8)
+
+- **NEW**: `src/lib/utils/payment-source-label.ts`
+- `src/app/api/pos/transactions/route.ts` — hoist linkedApptId; insert appointment_id
+- `src/app/api/pos/sync-offline-transaction/route.ts` — same hoist + insert
+- `src/app/api/pos/jobs/[id]/checkout-items/route.ts` — use shared label helper
+- `src/lib/data/receipt-data.ts` — appointment-history fetch + balance-due
+- `src/app/pos/lib/receipt-template.ts` — interface + render extensions
+- `src/app/(public)/receipt/[token]/page.tsx` — type + getTransaction + JSX
+- `src/app/(public)/pay/[token]/page.tsx` — wording fix
+- `docs/CHANGELOG.md` (this entry)
+
+### Verification
+
+- `npx tsc --noEmit` clean.
+- `npx eslint` clean on all 8 changed source files.
+- **All 535 tests pass** (`npx vitest run`, 36 test files) — webhook + ticket-actions + every other suite.
+- Dev server compiles `/api/pos/transactions`, `/receipt/[token]`, `/pay/[token]` (1266 / 1311 modules) and responds correctly without auth.
+- Manual end-to-end (close-out + walk-in regression + pay-page wording + backfill SQL) is in the session prompt.
+
+### Known follow-ups (deliberately out of scope)
+
+- Custom payment-link amount (Session 5).
+- Backfill SQL is provided for manual run (not a migration). Re-running is idempotent (the WHERE `appointment_id IS NULL` clause guards).
+- The PAID green pill at the top of the pay page is unchanged. If we want it to also stamp the date, that's a 2-line change — flag for a future session.
+- Booking-deposit receipts now ALSO go through the appointment-history path (their `appointment_id` was always set). Behavior should be unchanged in practice (deposit appointments typically have one payment), but worth a sanity check on the next deposit-paid receipt.
+
+---
+
 ## feat(pos): pre-payment-aware Checkout + Close Out (Session 4b)
 
 **Eliminates the pay-link double-charge bug.** Before this session, POS Checkout only surfaced `appointment.deposit_amount` (the booking-flow concept). Pay-link payments — written to the `payments` table by the Session 1 webhook with no `deposit_amount` set — were invisible to Checkout. Staff opening a pay-link-paid job saw the full balance due and would double-charge if they proceeded. Same gap applied silently to "paid in full at booking" appointments.

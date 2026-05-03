@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { toCents } from '@/lib/utils/refund-math';
+import { derivePaymentSourceLabel } from '@/lib/utils/payment-source-label';
 
 interface PriorPayment {
   amount_cents: number;
@@ -10,31 +11,6 @@ interface PriorPayment {
   paid_at: string;
   source_label: string;
   stripe_payment_intent_id: string | null;
-}
-
-/**
- * Derive a human-readable source for a prior payment row using the durable
- * notes-prefix discriminators set by the two non-POS transaction creators:
- *   - Pay-link webhook (src/app/api/webhooks/stripe/route.ts:144)
- *   - Booking deposit  (src/app/api/book/route.ts:393)
- * Any other source falls through to a method-based label (in-store POS).
- */
-function deriveSourceLabel(
-  notes: string | null,
-  method: PriorPayment['method']
-): string {
-  if (notes && notes.startsWith('Online payment link.')) return 'Online (pay link)';
-  if (notes && notes.startsWith('Online booking deposit.')) return 'Booking deposit';
-  switch (method) {
-    case 'cash':
-      return 'Cash';
-    case 'card':
-      return 'Card';
-    case 'check':
-      return 'Check';
-    case 'split':
-      return 'Split';
-  }
 }
 
 /**
@@ -311,7 +287,7 @@ export async function GET(
             amount_cents: amountCents,
             method,
             paid_at: row.created_at,
-            source_label: deriveSourceLabel(tx?.notes ?? null, method),
+            source_label: derivePaymentSourceLabel(tx?.notes ?? null, method),
             stripe_payment_intent_id: row.stripe_payment_intent_id ?? null,
           });
           prior_payments_total_cents += amountCents;

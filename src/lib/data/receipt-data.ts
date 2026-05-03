@@ -2,6 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ReceiptTransaction, ReceiptContext, ReceiptImages } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
+import { derivePaymentSourceLabel, type PaymentMethodLike } from '@/lib/utils/payment-source-label';
+import { toCents } from '@/lib/utils/refund-math';
 import QRCode from 'qrcode';
 import bwipjs from 'bwip-js';
 
@@ -165,9 +167,68 @@ export async function fetchReceiptData(
     }
   }
 
-  // 9. Map database transaction to ReceiptTransaction interface
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = transaction as any;
+
+  // 8c. When the transaction is appointment-linked, replace the locally
+  // joined payments[] with the FULL payment history for that appointment,
+  // chronologically ordered. Closes the gap where a close-out (or any
+  // appointment-linked sale) would render an empty Payment section because
+  // its own payments[] was empty (close-out) or didn't include prior
+  // pay-link / booking-deposit / partial pre-payment rows.
+  //
+  // Each row carries source_label (derived from the joined transaction's
+  // notes prefix; same logic as POS Payments Received) so the renderer can
+  // print "Online (pay link)" / "Booking deposit" / method name with date.
+  // Walk-in transactions (appointment_id IS NULL) keep raw.payments — no
+  // change to current behavior.
+  let renderedPayments = raw.payments ?? [];
+  let appointmentBalanceDue: number | undefined = undefined;
+
+  if (raw.appointment_id) {
+    const { data: appPayments } = await supabase
+      .from('payments')
+      .select(
+        '*, transaction:transactions!inner(id, appointment_id, status, notes)'
+      )
+      .eq('transaction.appointment_id', raw.appointment_id)
+      .eq('transaction.status', 'completed')
+      .order('created_at', { ascending: true });
+
+    if (appPayments) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      renderedPayments = appPayments.map((p: any) => ({
+        ...p,
+        source_label: derivePaymentSourceLabel(
+          p.transaction?.notes ?? null,
+          p.method as PaymentMethodLike
+        ),
+      }));
+
+      // Pull the appointment total to compute Balance Due on the receipt.
+      // Reuses the appt fetch above when isDeposit; re-fetches otherwise so
+      // we always have the correct total for non-deposit appointment-linked
+      // transactions (close-out, partial pre-pay, in-store sale on a
+      // pay-link-paid appointment, etc).
+      const { data: apptForBalance } = await supabase
+        .from('appointments')
+        .select('total_amount')
+        .eq('id', raw.appointment_id)
+        .maybeSingle();
+
+      if (apptForBalance) {
+        const totalCents = toCents(Number(apptForBalance.total_amount));
+        const paidCents = renderedPayments.reduce(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (sum: number, p: any) => sum + toCents(Number(p.amount)),
+          0
+        );
+        appointmentBalanceDue = Math.max(0, totalCents - paidCents);
+      }
+    }
+  }
+
+  // 9. Map database transaction to ReceiptTransaction interface
   const tx: ReceiptTransaction = {
     status: raw.status,
     receipt_number: raw.receipt_number,
@@ -185,7 +246,7 @@ export async function fetchReceiptData(
     employee: raw.employee ?? (isDeposit ? { first_name: 'Online', last_name: 'Booking' } : null),
     vehicle: raw.vehicle,
     items: raw.items ?? [],
-    payments: raw.payments ?? [],
+    payments: renderedPayments,
     refunds: raw.refunds ?? [],
     is_deposit: isDeposit,
     deposit_amount: isDeposit ? depositAmount : undefined,
@@ -193,6 +254,7 @@ export async function fetchReceiptData(
     deposit_credit: raw.deposit_credit > 0 ? raw.deposit_credit : undefined,
     deposit_date: depositDate,
     linked_receipt: linkedReceipt,
+    appointment_balance_due: appointmentBalanceDue,
   };
 
   return { tx, config: merged, context, images, print_server_url };

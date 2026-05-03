@@ -5,6 +5,8 @@ import { LOYALTY } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { PrintButton } from './print-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { derivePaymentSourceLabel, type PaymentMethodLike } from '@/lib/utils/payment-source-label';
+import { toCents } from '@/lib/utils/refund-math';
 
 function formatDepositLabel(depositDate: string | null): string {
   if (!depositDate) return 'Deposit Paid - Online';
@@ -60,7 +62,17 @@ interface TransactionWithRelations {
     card_last_four: string | null;
     cash_tendered: number | null;
     change_given: number | null;
+    /** When this payment row was created — for online-source date stamps. */
+    created_at: string;
+    /** Derived in getTransaction() from the joined transaction's notes prefix
+     * when the receipt is appointment-linked. Absent for walk-in receipts. */
+    source_label?: string | null;
   }[];
+  /** Balance due on the linked appointment (cents). Defined only when
+   * the receipt is appointment-linked (Fix 1 ensures all POS transactions
+   * carry appointment_id when there is one). Renders as a "Balance Due"
+   * row at the end of the Payment section, even at $0.00. */
+  appointment_balance_due?: number;
   refunds: {
     id: string;
     amount: number;
@@ -178,6 +190,51 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
   const employee = (raw.employee as TransactionWithRelations['employee'])
     ?? (isDeposit ? { first_name: 'Online', last_name: 'Booking' } : null);
 
+  // Appointment-linked: replace local payments[] with the FULL payment history
+  // for that appointment (chronological), and compute Balance Due. Mirrors the
+  // logic in src/lib/data/receipt-data.ts so the public page and the
+  // template-rendered surfaces (HTML email, copier, thermal) stay in sync.
+  // Walk-in receipts (appointment_id IS NULL) keep the locally joined
+  // payments[] — no behavior change for those.
+  let renderedPayments = (data as unknown as TransactionWithRelations).payments;
+  let appointmentBalanceDue: number | undefined;
+
+  if (raw.appointment_id) {
+    const { data: appPayments } = await supabase
+      .from('payments')
+      .select(
+        '*, transaction:transactions!inner(id, appointment_id, status, notes)'
+      )
+      .eq('transaction.appointment_id', raw.appointment_id as string)
+      .eq('transaction.status', 'completed')
+      .order('created_at', { ascending: true });
+
+    if (appPayments) {
+      renderedPayments = (appPayments as Array<Record<string, unknown>>).map((p) => {
+        const txNotes = (p.transaction as { notes?: string | null } | null)?.notes ?? null;
+        return {
+          ...p,
+          source_label: derivePaymentSourceLabel(txNotes, p.method as PaymentMethodLike),
+        };
+      }) as unknown as TransactionWithRelations['payments'];
+    }
+
+    const { data: apptForBalance } = await supabase
+      .from('appointments')
+      .select('total_amount')
+      .eq('id', raw.appointment_id as string)
+      .maybeSingle();
+
+    if (apptForBalance) {
+      const totalCents = toCents(Number(apptForBalance.total_amount));
+      const paidCents = (renderedPayments ?? []).reduce(
+        (sum, p) => sum + toCents(Number(p.amount)),
+        0
+      );
+      appointmentBalanceDue = Math.max(0, totalCents - paidCents);
+    }
+  }
+
   return {
     ...(data as unknown as TransactionWithRelations),
     employee,
@@ -186,6 +243,8 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     balance_due: balanceDue,
     deposit_date: depositDate,
     linked_receipt: linkedReceipt,
+    payments: renderedPayments,
+    appointment_balance_due: appointmentBalanceDue,
   };
 }
 
@@ -491,16 +550,34 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Payment Methods */}
-      {tx.payments.length > 0 && (
+      {/* Payment Methods.
+          For appointment-linked receipts, payments[] is the FULL appointment
+          payment history (Fix 2). For walk-in receipts it's just this
+          transaction's payments (no behavior change). Render condition is
+          intentionally NOT `payments.length > 0` for appointment-linked rows
+          because we still want a Balance Due line at $0.00 to appear; the
+          appointment_balance_due flag opens the section even when payments
+          is empty (which won't happen in practice — close-out always has
+          at least one prior payment that triggered the close-out path). */}
+      {(tx.payments.length > 0 || tx.appointment_balance_due !== undefined) && (
         <div className="mb-8 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
           <h3 className="text-sm font-medium text-site-text-secondary">Payment</h3>
           <div className="mt-2 space-y-1">
             {tx.payments.map((p) => {
-              const label =
-                p.method === 'card' && p.card_brand
-                  ? `${p.card_brand} ending in ${p.card_last_four || '****'}`
-                  : p.method.charAt(0).toUpperCase() + p.method.slice(1);
+              // Online sources (pay link, booking deposit) → "Source · date".
+              // In-store card → "VISA ending in 1234" (existing behavior).
+              // Cash/check → method.toUpperCase() OR source_label.
+              const isOnlineSource =
+                p.source_label === 'Online (pay link)' ||
+                p.source_label === 'Booking deposit';
+              let label: string;
+              if (isOnlineSource) {
+                label = `${p.source_label} · ${formatReceiptDateTime(p.created_at)}`;
+              } else if (p.method === 'card' && p.card_brand) {
+                label = `${p.card_brand} ending in ${p.card_last_four || '****'}`;
+              } else {
+                label = p.method.charAt(0).toUpperCase() + p.method.slice(1);
+              }
               // Cash-only Tendered/Change sub-rows. Historical cash rows have
               // cash_tendered NULL → no extra rows render. Non-cash rows can
               // never have these populated (server validates), so no method
@@ -534,6 +611,15 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </div>
               );
             })}
+            {/* Balance Due — appointment-linked only, always render. */}
+            {tx.appointment_balance_due !== undefined && (
+              <div className="flex justify-between text-sm pt-2 border-t border-site-border mt-2">
+                <span className="font-medium text-site-text">Balance Due</span>
+                <span className="font-medium text-site-text tabular-nums">
+                  {formatCurrency(tx.appointment_balance_due / 100)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

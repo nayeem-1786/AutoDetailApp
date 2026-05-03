@@ -266,7 +266,11 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
           </div>
           {paidCents > 0 && (
             <div className="flex justify-between">
-              <span className="text-site-text-muted">Already paid</span>
+              <span className="text-site-text-muted">
+                {appointment.payment_link_paid_at
+                  ? `Paid (pay link) · ${formatReceiptDateTime(appointment.payment_link_paid_at)}`
+                  : 'Already paid'}
+              </span>
               <span className="text-blue-500 font-medium tabular-nums">
                 -{formatCurrency(paidDollars)}
               </span>

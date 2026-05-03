@@ -61,18 +61,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Overpay guard — pre-insert. Find the most recent completed-but-unlinked
-    // job for this customer (same lookup as the fire-and-forget job-linking
-    // block at the bottom of this route, hoisted up so we can read the
-    // appointment_id and reject double-charge attempts).
-    //
-    // Race scenario: customer paid the pay link mid-checkout. The Session 1
-    // webhook lands while staff is in the POS screen with a stale ticket. The
-    // request hits this route with the original full-balance payment. We sum
-    // existing payments for the appointment vs the appointment total. If the
-    // request would push the appointment past total_amount, return 409 with
-    // a code the UI can recognize. Tolerance is zero cents — refund-math
-    // convention says the request and DB must match exactly.
+    // Resolve the linked appointment_id ONCE up-front. Used twice:
+    //   1. Overpay guard (below) — needs appointment.total_amount
+    //   2. Transaction insert (later) — appointment_id was historically NULL
+    //      on every POS-created transaction (cash/card/split/close-out)
+    //      because no client path passed it. The route used to compute it
+    //      only inside the overpay guard and discard it afterwards. As a
+    //      result every appointment-linked POS sale was orphaned in the DB
+    //      and receipts couldn't reach back to pay-link / booking-deposit
+    //      history. Hoisting it here fixes both gaps with one lookup.
+    //      Backfill SQL for historical rows is in CHANGELOG.
+    let linkedApptId: string | null = null;
     if (data.customer_id) {
       const { data: linkedJob } = await supabase
         .from('jobs')
@@ -83,54 +82,62 @@ export async function POST(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
+      linkedApptId = linkedJob?.appointment_id ?? null;
+    }
 
-      const apptId = linkedJob?.appointment_id ?? null;
-      if (apptId) {
-        const { data: appt } = await supabase
-          .from('appointments')
-          .select('total_amount, payment_status')
-          .eq('id', apptId)
-          .maybeSingle();
+    // Overpay guard — pre-insert.
+    // Race scenario: customer paid the pay link mid-checkout. The Session 1
+    // webhook lands while staff is in the POS screen with a stale ticket. The
+    // request hits this route with the original full-balance payment. We sum
+    // existing payments for the appointment vs the appointment total. If the
+    // request would push the appointment past total_amount, return 409 with
+    // a code the UI can recognize. Tolerance is zero cents — refund-math
+    // convention says the request and DB must match exactly.
+    if (linkedApptId) {
+      const { data: appt } = await supabase
+        .from('appointments')
+        .select('total_amount, payment_status')
+        .eq('id', linkedApptId)
+        .maybeSingle();
 
-        if (appt) {
-          const apptTotalCents = toCents(Number(appt.total_amount));
+      if (appt) {
+        const apptTotalCents = toCents(Number(appt.total_amount));
 
-          const { data: existingTxs } = await supabase
-            .from('transactions')
-            .select('id')
-            .eq('appointment_id', apptId)
-            .eq('status', 'completed');
+        const { data: existingTxs } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('appointment_id', linkedApptId)
+          .eq('status', 'completed');
 
-          const txIds = (existingTxs ?? []).map((t) => t.id);
-          let existingPaidCents = 0;
-          if (txIds.length > 0) {
-            const { data: existingPays } = await supabase
-              .from('payments')
-              .select('amount')
-              .in('transaction_id', txIds);
-            existingPaidCents = (existingPays ?? []).reduce(
-              (sum, p) => sum + toCents(Number(p.amount)),
-              0
-            );
-          }
-
-          const incomingPaidCents = (data.payments ?? []).reduce(
+        const txIds = (existingTxs ?? []).map((t) => t.id);
+        let existingPaidCents = 0;
+        if (txIds.length > 0) {
+          const { data: existingPays } = await supabase
+            .from('payments')
+            .select('amount')
+            .in('transaction_id', txIds);
+          existingPaidCents = (existingPays ?? []).reduce(
             (sum, p) => sum + toCents(Number(p.amount)),
             0
           );
+        }
 
-          if (
-            appt.payment_status === 'paid' &&
-            existingPaidCents + incomingPaidCents > apptTotalCents
-          ) {
-            return NextResponse.json(
-              {
-                error: 'Payment already received — refresh to see updated balance.',
-                code: 'appointment_overpay_guard',
-              },
-              { status: 409 }
-            );
-          }
+        const incomingPaidCents = (data.payments ?? []).reduce(
+          (sum, p) => sum + toCents(Number(p.amount)),
+          0
+        );
+
+        if (
+          appt.payment_status === 'paid' &&
+          existingPaidCents + incomingPaidCents > apptTotalCents
+        ) {
+          return NextResponse.json(
+            {
+              error: 'Payment already received — refresh to see updated balance.',
+              code: 'appointment_overpay_guard',
+            },
+            { status: 409 }
+          );
         }
       }
     }
@@ -161,6 +168,7 @@ export async function POST(request: NextRequest) {
       .insert({
         customer_id: data.customer_id || null,
         vehicle_id: data.vehicle_id || null,
+        appointment_id: linkedApptId,
         employee_id: posEmployee.employee_id,
         status: 'completed',
         subtotal: data.subtotal,

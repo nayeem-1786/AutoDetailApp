@@ -49,12 +49,30 @@ export async function POST(request: NextRequest) {
       ? new Date(body.timestamp).toISOString()
       : new Date().toISOString();
 
+    // Resolve linked appointment_id from the most recent completed-but-unlinked
+    // job for this customer. Mirrors the live POS path in transactions/route.ts.
+    // Pre-Session 5b bug: offline-synced transactions also orphaned appointment_id.
+    let linkedApptId: string | null = null;
+    if (body.customer_id) {
+      const { data: linkedJob } = await supabase
+        .from('jobs')
+        .select('appointment_id')
+        .eq('customer_id', body.customer_id)
+        .eq('status', 'completed')
+        .is('transaction_id', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      linkedApptId = linkedJob?.appointment_id ?? null;
+    }
+
     // 1. Insert transaction
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .insert({
         customer_id: body.customer_id || null,
         vehicle_id: body.vehicle_id || null,
+        appointment_id: linkedApptId,
         employee_id: posEmployee.employee_id,
         status: 'completed',
         subtotal: body.subtotal,
