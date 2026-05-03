@@ -10,14 +10,29 @@ interface PinPadProps {
   onAction?: () => void;
   actionLabel?: string;
   size?: 'sm' | 'default' | 'lg';
-  variant?: 'light' | 'dark';
+  /** Color theme. Was previously named `variant`; renamed to make room for
+   * the layout-variant prop without overloading semantics. */
+  colorVariant?: 'light' | 'dark';
+  /** Layout variant — `'pin'` (default) renders the classic 10-key with `.`
+   * de-emphasized in the bottom-left for PIN entry surfaces. `'amount'`
+   * renders [00, 0, backspace] in the bottom row for cents-from-the-right
+   * money entry, matching Square / Toast / Clover / Lightspeed convention
+   * (00 placed left of 0). */
+  layoutVariant?: 'pin' | 'amount';
 }
 
-const KEYS = [
+const KEYS_PIN = [
   ['1', '2', '3'],
   ['4', '5', '6'],
   ['7', '8', '9'],
   ['.', '0', 'backspace'],
+];
+
+const KEYS_AMOUNT = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['00', '0', 'backspace'],
 ];
 
 export const PinPad = memo(function PinPad({
@@ -26,11 +41,13 @@ export const PinPad = memo(function PinPad({
   onAction,
   actionLabel,
   size = 'default',
-  variant = 'light',
+  colorVariant = 'light',
+  layoutVariant = 'pin',
 }: PinPadProps) {
   const isLg = size === 'lg';
   const isSm = size === 'sm';
-  const isDark = variant === 'dark';
+  const isDark = colorVariant === 'dark';
+  const KEYS = layoutVariant === 'amount' ? KEYS_AMOUNT : KEYS_PIN;
 
   function handleKey(key: string) {
     if (key === 'backspace') {
@@ -59,7 +76,9 @@ export const PinPad = memo(function PinPad({
                 : isLg
                   ? 'min-h-[72px] rounded-xl text-2xl'
                   : 'min-h-[60px] rounded-xl text-xl',
-              key === '.' && (isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500')
+              // De-emphasize the inert `.` key in PIN layout. Amount layout
+              // doesn't render `.` at all, so this branch never fires there.
+              layoutVariant === 'pin' && key === '.' && (isDark ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500')
             )}
           >
             {key === 'backspace' ? (

@@ -205,8 +205,8 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   // ─── Keypad handlers ────────────────────────────────────────
 
   function handleDigit(d: string) {
-    if (d === '.') return; // Ignore decimal — cents-based input
-    const next = cents * 10 + parseInt(d, 10);
+    if (d === '.') return; // Defensive — `.` is no longer rendered in amount layout, kept as a guard.
+    const next = d === '00' ? cents * 100 : cents * 10 + parseInt(d, 10);
     if (next > 9999999) return; // Cap at $99,999.99
     setCents(next);
   }
@@ -323,6 +323,7 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
               onAction={handleAddToTicket}
               actionLabel="Add to Ticket"
               size="default"
+              layoutVariant="amount"
             />
           </div>
         </div>

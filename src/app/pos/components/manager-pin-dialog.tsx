@@ -27,6 +27,7 @@ export function ManagerPinDialog({ permissionKey, onSuccess, onCancel }: Manager
   const [loading, setLoading] = useState(false);
 
   function handleDigit(digit: string) {
+    if (digit === '.') return; // Defensive — `.` is rendered (PIN layout) but inert for PIN entry, mirrors pin-screen.tsx.
     if (pin.length < 4) {
       setPin((prev) => prev + digit);
       setError(null);

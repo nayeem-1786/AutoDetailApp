@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(keypad): Session A — `layoutVariant` prop on `PinPad` (amount layout adds `00`, drops `.`)
+
+First half of a two-session split (Session A: keypad refactor; Session B, deferred: cash-payment redesign). Audit showed five `<PinPad>` consumers — two PIN-entry (`pin-screen`, `manager-pin-dialog`), three amount-entry (`keypad-tab`, `register-tab`, `payment-link-amount-modal`). Amount consumers all defensively filter `'.'` because the inert decimal key on the shared keypad invites misclicks; the PIN-entry surfaces leave it visible but de-emphasized. Goal: drop `.` from amount-entry surfaces entirely and surface a `00` shortcut in its place, matching Square / Toast / Clover / Lightspeed convention (`00` placed left of `0`).
+
+Approach is Option A from the audit: add a layout prop to the existing `PinPad`, no new component, no headless hook. The existing `variant` prop (color theme: `'light' | 'dark'`) was renamed to `colorVariant` to make room for `layoutVariant` without overloading semantics. `pin-screen.tsx` was the only caller using the old prop and is updated. The new `layoutVariant?: 'pin' | 'amount'` defaults to `'pin'`; PIN-entry surfaces inherit the default and render verbatim today's layout. `'amount'` swaps the bottom row to `[00, 0, backspace]` and removes the `.` styling branch. Internally the component picks one of two `KEYS_PIN` / `KEYS_AMOUNT` arrays at the top of the function body — branchy in one place, no behavior change for PIN consumers.
+
+The three amount consumers each gain `layoutVariant="amount"` on the `<PinPad>` JSX and a one-line `handleDigit` change to handle the new `'00'` digit string: `const next = d === '00' ? cents * 100 : cents * 10 + parseInt(d, 10);`. The cap check `if (next > 9999999) return;` runs once on the unified `next` and gates both branches identically. The defensive `if (d === '.') return;` is retained as a guard against future regressions (it's a no-op in `'amount'` layout since `.` no longer renders).
+
+Bundled latent-bug fix in `manager-pin-dialog.tsx`: the audit flagged that its `handleDigit` blindly appended any keypress to the PIN string, so a misclick on the (still-rendered) inert `.` could produce an invalid PIN like `12.3`. Added `if (digit === '.') return;` at the top of the handler, mirroring the guard `pin-screen.tsx` has had since it was written.
+
+### Files touched
+- `src/app/pos/components/pin-pad.tsx` — `variant` → `colorVariant`; new `layoutVariant?: 'pin' | 'amount'`; `KEYS_PIN` / `KEYS_AMOUNT` split; `'.'` styling gated on PIN layout
+- `src/app/pos/components/pin-screen.tsx` — `variant="dark"` → `colorVariant="dark"` (color theme rename, no behavior change)
+- `src/app/pos/components/manager-pin-dialog.tsx` — `'.'` filter added to `handleDigit` (latent-bug fix)
+- `src/app/pos/components/keypad-tab.tsx` — `layoutVariant="amount"` + `'00'` branch in `handleDigit`
+- `src/app/pos/components/register-tab.tsx` — `layoutVariant="amount"` + `'00'` branch in `handleDigit`
+- `src/components/jobs/payment-link-amount-modal.tsx` — `layoutVariant="amount"` + `'00'` branch in `handleDigit`
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (touched files) → 0/0. `npx vitest run` → 557/557.
+
+Mental cap walkthrough (any amount consumer): cents=99,999 ($999.99), tap `00` → 9,999,900 ($99,999.00), passes cap. Tap `00` again → 999,990,000 > 9,999,999, rejected (state unchanged). Backspace → floor(9,999,900 / 10) = 999,990 ($9,999.90). cents=50 ($0.50), tap `00` → 5,000 ($50.00).
+
+Session B (cash-payment redesign with embedded amount keypad, denomination increment, OS-keyboard suppression) is deferred until Session A dogfoods cleanly.
+
+---
+
 ## fix(pay-link): Session 5-followup-3 — unified validation/preview slot
 
 Continuation of the followup-2 layout-stability work. The amount modal still shifted Cancel/Continue (and the keypad) every time the user crossed the validation boundary mid-entry, because the validation error and the "Send link for $X.XX" preview lived in two separate, mutually-exclusive slots — one inside the custom block (right under the keypad), one outside as a boxed summary below it. As the user typed `4 → 0 → 0` the error vacated its slot at `$4.00` and the preview's slot mounted below, pushing the buttons down by one row. Reverse direction on backspace.

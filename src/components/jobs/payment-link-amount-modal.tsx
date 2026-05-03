@@ -74,8 +74,8 @@ export function PaymentLinkAmountModal({
   }
 
   function handleDigit(d: string) {
-    if (d === '.') return; // Ignored — fixed-decimal entry has no decimal key.
-    const next = customCents * 10 + parseInt(d, 10);
+    if (d === '.') return; // Defensive — `.` is no longer rendered in amount layout, kept as a guard.
+    const next = d === '00' ? customCents * 100 : customCents * 10 + parseInt(d, 10);
     if (next > 9999999) return; // $99,999.99 hard cap matches keypad-tab.
     setCustomCents(next);
   }
@@ -186,6 +186,7 @@ export function PaymentLinkAmountModal({
               onDigit={handleDigit}
               onBackspace={handleBackspace}
               size="sm"
+              layoutVariant="amount"
             />
           </div>
         )}

@@ -19,8 +19,8 @@ export function KeypadTab() {
   const enterSubmitNote = useEnterSubmit(handleAddToTicket, cents > 0);
 
   function handleDigit(d: string) {
-    if (d === '.') return; // Ignore decimal — cents-based input
-    const next = cents * 10 + parseInt(d, 10);
+    if (d === '.') return; // Defensive — `.` is no longer rendered in amount layout, kept as a guard.
+    const next = d === '00' ? cents * 100 : cents * 10 + parseInt(d, 10);
     if (next > 9999999) return; // Cap at $99,999.99
     setCents(next);
   }
@@ -100,6 +100,7 @@ export function KeypadTab() {
           onBackspace={handleBackspace}
           onAction={handleAddToTicket}
           actionLabel="Add to Ticket"
+          layoutVariant="amount"
         />
       </div>
     </div>

@@ -138,7 +138,7 @@ export function PinScreen({ lastSessionName, onSuccess, overlay }: PinScreenProp
         onDigit={handleDigit}
         onBackspace={handleBackspace}
         size="lg"
-        variant="dark"
+        colorVariant="dark"
       />
 
       <style jsx>{`
