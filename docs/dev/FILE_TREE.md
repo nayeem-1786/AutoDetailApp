@@ -1235,7 +1235,8 @@ src/components/quotes/quote-book-dialog.tsx
 
 ### Job Components
 ```
-src/components/jobs/send-payment-link-dialog.tsx   — POS Send Payment Link modal (Pay-Link Session 3b)
+src/components/jobs/send-payment-link-dialog.tsx   — POS Send Payment Link channel-pick modal (Pay-Link Session 3b)
+src/components/jobs/payment-link-amount-modal.tsx  — POS Pre-send amount selector (25/50/75/Full + Custom) (Pay-Link Session 5)
 ```
 
 ### Other
@@ -1546,6 +1547,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260502203149_add_payment_link_sent_templates.sql
 20260502224451_add_cash_tendered_to_payments.sql
 20260503024921_add_refunds_notes.sql
+20260503160000_add_payment_link_amount_cents.sql
 ```
 
 ## Scripts

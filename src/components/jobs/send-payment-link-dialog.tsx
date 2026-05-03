@@ -11,8 +11,15 @@ interface SendPaymentLinkDialogProps {
   appointmentId: string;
   customerEmail: string | null;
   customerPhone: string | null;
-  /** Remaining balance in dollars, displayed in the dialog description. */
+  /** Remaining balance in dollars — used as the *display* fallback when no
+   * custom amount has been chosen yet (legacy callers). When `amountCents` is
+   * provided, the description renders that instead. */
   amountDue: number;
+  /** Custom-amount selection from PaymentLinkAmountModal (Pay-Link Session 5).
+   * When non-null, this is the amount the link will charge for and the value
+   * forwarded to the server. NULL means "let the server pick remaining"
+   * (legacy/full-balance behavior). */
+  amountCents?: number | null;
   /** Fired after a successful send so the parent can refresh / toast. */
   onSent?: (result: { paymentLinkToken: string; payUrl: string }) => void;
 }
@@ -30,6 +37,7 @@ export function SendPaymentLinkDialog({
   customerEmail,
   customerPhone,
   amountDue,
+  amountCents,
   onSent,
 }: SendPaymentLinkDialogProps) {
   const [sending, setSending] = useState(false);
@@ -38,12 +46,15 @@ export function SendPaymentLinkDialog({
   async function handleSend(method: SendMethod) {
     setSending(true);
     try {
+      const body: { method: SendMethod; amount_cents?: number } = { method };
+      if (typeof amountCents === 'number') body.amount_cents = amountCents;
+
       const res = await posFetch(
         `/api/pos/appointments/${appointmentId}/send-payment-link`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ method }),
+          body: JSON.stringify(body),
         }
       );
 
@@ -89,7 +100,7 @@ export function SendPaymentLinkDialog({
         if (!isOpen && !success) onOpenChange(false);
       }}
       title="Send Payment Link"
-      description={`Send a secure payment link for $${amountDue.toFixed(2)} to the customer.`}
+      description={`Send a secure payment link for $${(typeof amountCents === 'number' ? amountCents / 100 : amountDue).toFixed(2)} to the customer.`}
       customerEmail={customerEmail}
       customerPhone={customerPhone}
       onSend={handleSend}

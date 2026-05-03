@@ -23,7 +23,7 @@ export async function POST(
 
     const { data: appt, error: apptErr } = await admin
       .from('appointments')
-      .select('id, status, total_amount, payment_status')
+      .select('id, status, total_amount, payment_status, payment_link_amount_cents')
       .eq('payment_link_token', token)
       .maybeSingle();
 
@@ -81,9 +81,19 @@ export async function POST(
       return NextResponse.json({ alreadyPaid: true });
     }
 
-    if (remainingCents < STRIPE_MIN_AMOUNT_CENTS) {
+    // Custom-amount link (Pay-Link Session 5): if the appointment row has a
+    // chosen amount, charge that. Clamp to remaining defensively in case the
+    // remaining shrunk between send and pay (extra in-store payment after
+    // link was issued). NULL = legacy "full remaining" behavior.
+    const customAmountCents = appt.payment_link_amount_cents;
+    const chargeCents =
+      typeof customAmountCents === 'number'
+        ? Math.min(customAmountCents, remainingCents)
+        : remainingCents;
+
+    if (chargeCents < STRIPE_MIN_AMOUNT_CENTS) {
       return NextResponse.json(
-        { error: `Amount due ($${(remainingCents / 100).toFixed(2)}) is below the online payment minimum.` },
+        { error: `Amount due ($${(chargeCents / 100).toFixed(2)}) is below the online payment minimum.` },
         { status: 400 }
       );
     }
@@ -91,7 +101,7 @@ export async function POST(
     const businessInfo = await getBusinessInfo();
 
     const pi = await stripe.paymentIntents.create({
-      amount: remainingCents,
+      amount: chargeCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
       metadata: {
@@ -104,7 +114,7 @@ export async function POST(
 
     return NextResponse.json({
       clientSecret: pi.client_secret,
-      amountCents: remainingCents,
+      amountCents: chargeCents,
       alreadyPaid: false,
     });
   } catch (err) {

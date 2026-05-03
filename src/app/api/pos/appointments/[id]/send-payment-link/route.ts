@@ -12,6 +12,10 @@ const TOKEN_ALPHABET =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const TOKEN_RETRIES = 3;
 
+// Mirrors STRIPE_MIN_AMOUNT_CENTS in /api/pay/[token]/intent/route.ts. Reject
+// at send time so staff don't end up with a Stripe-rejected pay page later.
+const STRIPE_MIN_AMOUNT_CENTS = 50;
+
 type Method = 'email' | 'sms' | 'both';
 type ChannelStatus = 'sent' | 'skipped' | 'failed';
 interface ChannelsResult {
@@ -59,6 +63,28 @@ export async function POST(
         { error: "method must be 'email', 'sms', or 'both'" },
         { status: 400 }
       );
+    }
+
+    // amount_cents is optional. Omitted = legacy/full-balance behavior, the
+    // column stays NULL on the row. Provided = custom-amount link, validated
+    // below against the recomputed remaining (we never trust the client's
+    // remaining — staff could be looking at stale UI).
+    const rawAmountCents: unknown = body?.amount_cents;
+    let chosenAmountCents: number | null = null;
+    if (rawAmountCents !== undefined && rawAmountCents !== null) {
+      if (
+        typeof rawAmountCents !== 'number' ||
+        !Number.isInteger(rawAmountCents) ||
+        rawAmountCents < STRIPE_MIN_AMOUNT_CENTS
+      ) {
+        return NextResponse.json(
+          {
+            error: `amount_cents must be an integer >= ${STRIPE_MIN_AMOUNT_CENTS}`,
+          },
+          { status: 422 }
+        );
+      }
+      chosenAmountCents = rawAmountCents;
     }
 
     const admin = createAdminClient();
@@ -158,6 +184,21 @@ export async function POST(
       );
     }
 
+    // Server-side overpayment guard. Client clamps too, but staff could send
+    // a stale UI request; reject anything > recomputed remaining.
+    if (chosenAmountCents !== null && chosenAmountCents > remainingCents) {
+      return NextResponse.json(
+        {
+          error: `amount_cents (${chosenAmountCents}) exceeds remaining balance (${remainingCents})`,
+        },
+        { status: 422 }
+      );
+    }
+
+    // Effective link amount: explicit choice, or fall back to full remaining
+    // (legacy callers who don't send amount_cents).
+    const linkAmountCents = chosenAmountCents ?? remainingCents;
+
     // Token: reuse existing or mint new with retry on unique-violation.
     let token: string | null = appt.payment_link_token ?? null;
     if (!token) {
@@ -203,11 +244,12 @@ export async function POST(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const payUrl = `${appUrl}/pay/${token}`;
 
-    const remainingDollars = fromCents(remainingCents);
+    const linkAmountDollars = fromCents(linkAmountCents);
     // amount_due chip is the bare formatted dollar figure (e.g. "1.00"). The
     // SMS template body has the literal "$" before {amount_due}; the email
-    // button text "Pay ${amount_due}" composes the same way.
-    const amountDueChip = remainingDollars.toFixed(2);
+    // button text "Pay ${amount_due}" composes the same way. Chip carries the
+    // chosen link amount (may be < remaining for partial-deposit flows).
+    const amountDueChip = linkAmountDollars.toFixed(2);
 
     const dateStr = new Date(
       `${appt.scheduled_date}T${appt.scheduled_start_time}`
@@ -309,10 +351,20 @@ export async function POST(
       );
     }
 
-    // At least one channel succeeded — bump the sent_at marker.
+    // At least one channel succeeded. Persist the link amount and reset
+    // payment_link_paid_at so a subsequent webhook event for THIS link isn't
+    // short-circuited by the (legacy) paid_at guard. The webhook now uses
+    // per-PI idempotency, but the reset keeps the column meaning consistent:
+    // payment_link_paid_at = "is the *current* outstanding link paid?".
+    // payment_link_amount_cents stores the chosen amount (NULL when caller
+    // omitted amount_cents → "use full remaining at pay time").
     const { error: stampErr } = await admin
       .from('appointments')
-      .update({ payment_link_sent_at: new Date().toISOString() })
+      .update({
+        payment_link_sent_at: new Date().toISOString(),
+        payment_link_paid_at: null,
+        payment_link_amount_cents: chosenAmountCents,
+      })
       .eq('id', appt.id);
     if (stampErr) {
       console.error('[send-payment-link] failed to stamp payment_link_sent_at', {

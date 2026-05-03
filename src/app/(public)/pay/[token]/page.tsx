@@ -21,6 +21,7 @@ interface AppointmentRecord {
   scheduled_start_time: string;
   scheduled_end_time: string;
   payment_link_paid_at: string | null;
+  payment_link_amount_cents: number | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -43,7 +44,7 @@ interface AppointmentRecord {
 
 async function getAppointmentByToken(
   token: string
-): Promise<{ appointment: AppointmentRecord; remainingCents: number; paidCents: number } | null> {
+): Promise<{ appointment: AppointmentRecord; remainingCents: number; paidCents: number; chargeCents: number } | null> {
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -52,7 +53,7 @@ async function getAppointmentByToken(
       `
       id, status, payment_status, total_amount,
       scheduled_date, scheduled_start_time, scheduled_end_time,
-      payment_link_paid_at,
+      payment_link_paid_at, payment_link_amount_cents,
       customer:customers(first_name, last_name, email, phone),
       vehicle:vehicles(year, make, model, color),
       appointment_services(
@@ -88,10 +89,20 @@ async function getAppointmentByToken(
     );
   }
 
+  const remainingCents = Math.max(0, totalCents - paidCents);
+  // Charge amount: custom-amount link (Pay-Link Session 5) honored when set,
+  // else full remaining. Clamped so the page never displays/charges more than
+  // what's actually owed if remaining shrunk after link was issued.
+  const chargeCents =
+    typeof appointment.payment_link_amount_cents === 'number'
+      ? Math.min(appointment.payment_link_amount_cents, remainingCents)
+      : remainingCents;
+
   return {
     appointment,
-    remainingCents: Math.max(0, totalCents - paidCents),
+    remainingCents,
     paidCents,
+    chargeCents,
   };
 }
 
@@ -134,7 +145,7 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
     notFound();
   }
 
-  const { appointment, remainingCents, paidCents } = result;
+  const { appointment, remainingCents, paidCents, chargeCents } = result;
 
   const redirectStatus = typeof sp.redirect_status === 'string' ? sp.redirect_status : null;
   const retryCountRaw = typeof sp.pl_retry === 'string' ? sp.pl_retry : '0';
@@ -147,6 +158,10 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
     !isCancelled &&
     redirectStatus === 'succeeded' &&
     retryCount < PROCESSING_RETRY_LIMIT;
+
+  // Custom-amount link active when this link's charge is < remaining.
+  // Drives the "Total appointment: $X.XX" subtitle in the totals block.
+  const isPartialLink = !isPaid && chargeCents < remainingCents;
 
   // ---------- Branded shell helpers ----------
   const customerName = appointment.customer
@@ -161,7 +176,7 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
     : null;
 
   const totalAmountDollars = Number(appointment.total_amount);
-  const remainingDollars = fromCents(remainingCents);
+  const chargeDollars = fromCents(chargeCents);
   const paidDollars = fromCents(paidCents);
 
   const scheduledDateStr = new Date(
@@ -281,9 +296,15 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
               {isPaid ? 'Total Paid' : 'Amount Due Now'}
             </span>
             <span className="text-lg font-bold text-site-text tabular-nums">
-              {formatCurrency(isPaid ? totalAmountDollars : remainingDollars)}
+              {formatCurrency(isPaid ? totalAmountDollars : chargeDollars)}
             </span>
           </div>
+          {isPartialLink && (
+            <div className="flex justify-between text-xs text-site-text-muted">
+              <span>Total appointment</span>
+              <span className="tabular-nums">{formatCurrency(totalAmountDollars)}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -310,7 +331,7 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
       ) : isProcessing ? (
         <ProcessingCard token={token} retryCount={retryCount} />
       ) : (
-        <PayForm token={token} amountDueCents={remainingCents} />
+        <PayForm token={token} amountDueCents={chargeCents} />
       )}
     </div>
   );

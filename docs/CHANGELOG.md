@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pay-link): custom amount selector + per-PI webhook idempotency (Pay-Link Session 5)
+
+Pay-Link feature gains custom-amount support for B2B/fleet partial-deposit workflows ("$100 deposit now, $300 on completion" against a $400 ticket). Staff can now pick 25% / 50% / 75% / Full balance, or enter a Custom dollar amount, before the SMS/email is sent.
+
+**New surfaces**:
+- `supabase/migrations/20260503160000_add_payment_link_amount_cents.sql` — `appointments.payment_link_amount_cents INTEGER NULL` with `CHECK (NULL OR >= 50)`. NULL = "use full remaining at pay time" (legacy + post-paid resting state). 50¢ floor matches `STRIPE_MIN_AMOUNT_CENTS`.
+- `src/components/jobs/payment-link-amount-modal.tsx` (new ~210 LOC) — preset row + Custom input with inline validation (≥$0.50, ≤remaining). Uses `toCents`/`fromCents` exclusively per `refund-math.ts` invariants.
+
+**Two-step flow** (`src/app/pos/jobs/components/job-detail.tsx`): tap "Send Payment Link" → amount modal → Continue → `SendPaymentLinkDialog` (channel pick, existing flow) with the chosen amount as a prop. Back from the channel dialog without sending returns to the amount modal preserving the prior selection. After successful send: state cleared, job refetched.
+
+**Webhook idempotency change (CRITICAL)**: `src/app/api/webhooks/stripe/route.ts` — replaced the `payment_link_paid_at IS NOT NULL` short-circuit with per-PI uniqueness (`SELECT id FROM payments WHERE stripe_payment_intent_id = pi.id`). The old guard silently dropped the *second* webhook event when staff sent a follow-up link after a deposit was paid; the new guard correctly handles multi-link flows while still protecting against Stripe retries of the same event. The appointment update on success now also clears `payment_link_amount_cents` so the column means "current outstanding link amount, NULL when no link is active." `payment_link_paid_at` is similarly reset on a new send (in `send-payment-link/route.ts`) so it tracks the *current* link's paid status, not historical.
+
+**Server-side validation** (`src/app/api/pos/appointments/[id]/send-payment-link/route.ts`): accepts optional `amount_cents` integer in the request body. Validates `>=50` (Stripe min) and `<=remainingCents` (recomputed server-side, never trusting client). Persists to `payment_link_amount_cents` on send. Omitted = NULL = legacy/full-balance behavior preserved. SMS/email `amount_due` chip now carries the chosen link amount.
+
+**Public pay page** (`src/app/(public)/pay/[token]/page.tsx`, `src/app/api/pay/[token]/intent/route.ts`): both read `payment_link_amount_cents` and compute `chargeCents = min(customAmountCents, remainingCents)` (defensive clamp for the case where in-store payments shrunk remaining after link issuance). PI is created with `chargeCents`. The page renders a "Total appointment: $X.XX" subtitle in the totals block when the link is for less than full remaining.
+
+**Architectural decisions (locked)**:
+1. Same token, latest amount wins. No `appointment_payment_links` child table.
+2. Webhook idempotency: per-PI lookup (not per-appointment paid_at).
+3. `payment_link_amount_cents` = NULL after webhook success ("no link active").
+4. Hard reject overpayment: client clamps to remaining, server validates ≤remaining.
+5. SMS/email chip plumbing unchanged — receives chosen amount as a string.
+6. Job-detail "link sent unpaid" indicator deferred — button stays "Send Payment Link".
+
+**Backward compatibility**: any pay-link sent before this deploy has `payment_link_amount_cents = NULL`. The intent route, public page, and webhook all preserve the legacy "use full remaining" semantics in that case.
+
+### Files touched
+- **NEW**: `supabase/migrations/20260503160000_add_payment_link_amount_cents.sql`
+- **NEW**: `src/components/jobs/payment-link-amount-modal.tsx`
+- `src/app/pos/jobs/components/job-detail.tsx` — two-step state + amount-modal mount
+- `src/components/jobs/send-payment-link-dialog.tsx` — accept `amountCents` prop, forward in body, render in description
+- `src/app/api/pos/appointments/[id]/send-payment-link/route.ts` — body validation, persist, reset `payment_link_paid_at`, SMS/email chip drives off chosen amount
+- `src/app/api/pay/[token]/intent/route.ts` — read column, clamp, charge `chargeCents`
+- `src/app/(public)/pay/[token]/page.tsx` — read column, clamp, partial-link subtitle
+- `src/app/api/webhooks/stripe/route.ts` — per-PI idempotency, clear `payment_link_amount_cents` on success
+- `docs/dev/DB_SCHEMA.md` (regenerated)
+- `docs/dev/FILE_TREE.md` (new component + new migration)
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (changed files) → 0/0. `npx vitest run` → 535/535. Migration applied via `supabase db push`. Schema doc regenerated and verified to show new column + check constraint. Post-deploy UAT (25%/Custom/overpayment/legacy/per-PI replay) handled separately on the VPS.
+
+---
+
 ## perf: enable multi-core webpack build (single-threaded → 12 cores)
 
 Production VPS build was at 11.5min and growing — single-threaded webpack with serial server/edge compilation and serial standalone trace generation, on a 16-core / 62GB-RAM VPS sitting idle during build. Added `experimental.webpackBuildWorker: true`, `parallelServerCompiles: true`, `parallelServerBuildTraces: true`, and `cpus: 12` (4-core headroom for OS + concurrent processes) to `next.config.ts`. All four flags verified against `node_modules/next@15.3.3/dist/server/config-shared.d.ts`; per the JSDoc, `parallelServerCompiles`/`parallelServerBuildTraces` require `webpackBuildWorker` to be active. `NextConfig` accepts `experimental` natively — no type assertion needed.

@@ -83,10 +83,28 @@ export async function POST(request: NextRequest) {
               throw new Error(`appointment ${apptIdFromMeta} not found`);
             }
 
-            // Idempotency: Stripe retries succeeded events. Bail if already processed.
-            if (appt.payment_status === 'paid' || appt.payment_link_paid_at !== null) {
+            // Idempotency: per-PI uniqueness, not per-appointment. Each Stripe
+            // PaymentIntent ID is unique, and the pay-link branch is the sole
+            // writer of the payments row carrying it. Multi-link flows
+            // (Pay-Link Session 5: $X deposit now, $Y on completion) issue
+            // distinct PIs against the same appointment — the old guard
+            // (`payment_link_paid_at IS NOT NULL`) silently dropped the second
+            // and later events. Lookup by PI sidesteps that and still protects
+            // against Stripe retries of the same event.
+            const { data: existingPaymentForPi, error: existingPayErr } =
+              await admin
+                .from('payments')
+                .select('id')
+                .eq('stripe_payment_intent_id', pi.id)
+                .maybeSingle();
+            if (existingPayErr) {
+              throw new Error(
+                `existing-payment lookup failed: ${existingPayErr.message}`
+              );
+            }
+            if (existingPaymentForPi) {
               console.log(
-                `[Stripe Webhook] pay_link_already_processed (appointment: ${appt.id}, PI: ${pi.id}, status: ${appt.payment_status}, paid_at: ${appt.payment_link_paid_at})`
+                `[Stripe Webhook] pi_already_processed (appointment: ${appt.id}, PI: ${pi.id}, payment_id: ${existingPaymentForPi.id})`
               );
               break;
             }
@@ -169,8 +187,16 @@ export async function POST(request: NextRequest) {
 
             // Update appointment. Only write stripe_payment_intent_id if currently NULL
             // so we don't overwrite a deposit PI from the booking flow.
+            //
+            // Clear payment_link_amount_cents — the link this PI was for is
+            // now consumed. NULL signals "no link is currently active." A
+            // follow-up send (e.g. final-balance link after a deposit link)
+            // sets the column again on send. The send route also clears
+            // payment_link_paid_at so that field is "is the *current* link
+            // paid", not historical.
             const apptUpdate: Record<string, unknown> = {
               payment_link_paid_at: new Date().toISOString(),
+              payment_link_amount_cents: null,
               payment_status: newPaymentStatus,
             };
             if (appt.stripe_payment_intent_id === null) {

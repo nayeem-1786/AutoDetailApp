@@ -37,6 +37,7 @@ import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 import { SendPaymentLinkDialog } from '@/components/jobs/send-payment-link-dialog';
+import { PaymentLinkAmountModal } from '@/components/jobs/payment-link-amount-modal';
 import { fromCents } from '@/lib/utils/refund-math';
 import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
@@ -227,8 +228,13 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [notifySending, setNotifySending] = useState(false);
   const [notifySuccess, setNotifySuccess] = useState(false);
 
-  // Payment link dialog state (Pay-Link Session 3b)
+  // Payment link dialog state — two-step flow (Pay-Link Session 5):
+  // (1) amount modal → (2) channel-pick dialog. selectedAmountCents persists
+  // across the transition so Back from the channel dialog returns to the
+  // amount modal with the prior choice intact.
+  const [paymentAmountModalOpen, setPaymentAmountModalOpen] = useState(false);
   const [paymentLinkDialogOpen, setPaymentLinkDialogOpen] = useState(false);
+  const [selectedAmountCents, setSelectedAmountCents] = useState<number | null>(null);
 
   // Reassignment state
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -1212,7 +1218,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         {/* Send Payment Link — appointment-linked, unpaid, has contact */}
         {showPaymentLinkButton && (
           <button
-            onClick={() => setPaymentLinkDialogOpen(true)}
+            onClick={() => setPaymentAmountModalOpen(true)}
             className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-blue-300 dark:border-blue-700 px-4 py-2 text-sm font-medium text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30"
           >
             <Send className="h-4 w-4" />
@@ -1405,17 +1411,52 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         cancelLabel="Back"
       />
 
-      {/* Send Payment Link Dialog (appointment-linked, unpaid jobs) */}
+      {/* Send Payment Link — two-step flow (amount → channel) */}
       {job.appointment_id && (
-        <SendPaymentLinkDialog
-          open={paymentLinkDialogOpen}
-          onOpenChange={setPaymentLinkDialogOpen}
-          appointmentId={job.appointment_id}
-          customerEmail={job.customer?.email ?? null}
-          customerPhone={job.customer?.phone ?? null}
-          amountDue={amountDueDollars}
-          onSent={() => fetchJob()}
-        />
+        <>
+          <PaymentLinkAmountModal
+            open={paymentAmountModalOpen}
+            onOpenChange={(open) => {
+              setPaymentAmountModalOpen(open);
+              if (!open) setSelectedAmountCents(null);
+            }}
+            remainingCents={
+              typeof appt?.amount_due_cents === 'number'
+                ? appt.amount_due_cents
+                : Math.round(amountDueDollars * 100)
+            }
+            customerName={
+              job.customer
+                ? `${job.customer.first_name} ${job.customer.last_name}`.trim()
+                : undefined
+            }
+            onContinue={(amountCents) => {
+              setSelectedAmountCents(amountCents);
+              setPaymentAmountModalOpen(false);
+              setPaymentLinkDialogOpen(true);
+            }}
+          />
+          <SendPaymentLinkDialog
+            open={paymentLinkDialogOpen}
+            onOpenChange={(open) => {
+              setPaymentLinkDialogOpen(open);
+              // Closing the channel dialog without sending → return to amount
+              // modal so staff can adjust selection rather than starting over.
+              if (!open && selectedAmountCents !== null) {
+                setPaymentAmountModalOpen(true);
+              }
+            }}
+            appointmentId={job.appointment_id}
+            customerEmail={job.customer?.email ?? null}
+            customerPhone={job.customer?.phone ?? null}
+            amountDue={amountDueDollars}
+            amountCents={selectedAmountCents}
+            onSent={() => {
+              setSelectedAmountCents(null);
+              fetchJob();
+            }}
+          />
+        </>
       )}
 
       {/* Edit Customer Modal */}
