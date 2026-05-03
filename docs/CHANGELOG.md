@@ -6,6 +6,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pay-link): Session 5-followup-3 — unified validation/preview slot
+
+Continuation of the followup-2 layout-stability work. The amount modal still shifted Cancel/Continue (and the keypad) every time the user crossed the validation boundary mid-entry, because the validation error and the "Send link for $X.XX" preview lived in two separate, mutually-exclusive slots — one inside the custom block (right under the keypad), one outside as a boxed summary below it. As the user typed `4 → 0 → 0` the error vacated its slot at `$4.00` and the preview's slot mounted below, pushing the buttons down by one row. Reverse direction on backspace.
+
+Fix: one always-mounted `<p>` at the bottom of `DialogContent`, replacing both. `min-h-[1.25rem]` reserves space whether populated or empty. Content priority is `validationError` (red) → preview (default text) → empty. The boxed-callout styling on the old summary is gone — it's plain inline text now, single-line, matching the spec ("error in red, preview in default text color, both single-line"). Preview keeps its conditional percentage tail (`(Y% of $Z.ZZ remaining)`) for partial amounts and drops it for full-balance/`'full'` selections, exactly as before. `role="status"` + `aria-live="polite"` so screen readers announce both error and preview transitions.
+
+The known constraint from followup-2 still applies and is now noted in a comment on the unified slot: `min-h` is sized for a single line. A multi-line wrap (very large amounts, future longer error strings) reintroduces shift and the `min-h` would need to expand.
+
+### Files touched
+- `src/components/jobs/payment-link-amount-modal.tsx` — removed inline error `<p>` and boxed summary `<div>`; added unified always-mounted `<p>` slot
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (changed file) → 0/0. `npx vitest run` → 557/557. Repro: typing `4 → 0 → 0` ($0.04 → $0.40 → $4.00 → preview swap) leaves Cancel/Continue and the keypad anchored across the validation boundary.
+
+---
+
 ## fix(pay-link): Session 5-followup-2 — dismiss after send + stable validation layout
 
 Two small UX fixes from real-world testing of Session 5-followup. Independent of any other open work.

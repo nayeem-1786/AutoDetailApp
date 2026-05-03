@@ -187,46 +187,39 @@ export function PaymentLinkAmountModal({
               onBackspace={handleBackspace}
               size="sm"
             />
-            {/* Reserve space so error appearing/disappearing across digits
-                ($0.04 → $0.40 → $4.00) doesn't shift Cancel/Continue and the
-                keypad. min-h matches the rendered <p>'s line-height at
-                text-sm (Session 5-followup-2 Bug 2). */}
-            {/* min-h sized for single-line errors. If a future error string
-                wraps to 2 lines, this needs to expand or layout shift returns. */}
-            <p
-              className="min-h-[1.25rem] text-sm text-red-500 dark:text-red-400"
-              role="alert"
-              aria-live="polite"
-            >
-              {validationError ?? ' '}
-            </p>
           </div>
         )}
 
-        {/* Summary line */}
-        {chosen !== null && (
-          <div className="rounded-md border border-ui-border bg-ui-bg-soft px-3 py-2 text-sm">
-            {selected === 'full' || chosen === remainingCents ? (
-              <span className="text-ui-text">
-                Send link for{' '}
-                <span className="font-semibold tabular-nums">
-                  ${fromCents(chosen).toFixed(2)}
-                </span>
+        {/* Unified status slot — error (custom flow, invalid amount) OR
+            preview (any selection with a valid amount) OR empty. Mutually
+            exclusive content sharing one min-h-reserved row keeps Cancel/
+            Continue and the keypad anchored as the user types digits across
+            the validation boundary ($0.04 → $0.40 → $4.00).
+            min-h sized for single-line content. If a future error or preview
+            string wraps to 2 lines, this needs to expand or layout shift
+            returns. (Session 5-followup-3.) */}
+        <p
+          className="min-h-[1.25rem] text-sm"
+          role="status"
+          aria-live="polite"
+        >
+          {validationError ? (
+            <span className="text-red-500 dark:text-red-400">{validationError}</span>
+          ) : chosen !== null ? (
+            <>
+              <span className="text-ui-text">Send link for </span>
+              <span className="font-semibold tabular-nums text-ui-text">
+                ${fromCents(chosen).toFixed(2)}
               </span>
-            ) : (
-              <span className="text-ui-text">
-                Send link for{' '}
-                <span className="font-semibold tabular-nums">
-                  ${fromCents(chosen).toFixed(2)}
-                </span>{' '}
+              {selected !== 'full' && chosen !== remainingCents && (
                 <span className="text-ui-text-muted">
-                  ({Math.round((chosen / remainingCents) * 100)}% of $
+                  {' '}({Math.round((chosen / remainingCents) * 100)}% of $
                   {remainingDollars.toFixed(2)} remaining)
                 </span>
-              </span>
-            )}
-          </div>
-        )}
+              )}
+            </>
+          ) : null}
+        </p>
       </DialogContent>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>
