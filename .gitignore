@@ -42,3 +42,6 @@ next-env.d.ts
 
 # session-local repair artifacts (Session 1B schema_migrations snapshot)
 supabase/.repair-backup-*.txt
+
+# Claude Code agent worktrees and config — never commit
+.claude/
