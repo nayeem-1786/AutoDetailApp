@@ -144,6 +144,12 @@ export default function AdminTransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
+  // Close-out rows show $0.00 — without this map, staff can't tell from a
+  // list scan whether a row is real revenue or junk. Single batched query
+  // by appointment_id keyed off rows whose notes match the close-out marker.
+  const [appointmentTotalsByApptId, setAppointmentTotalsByApptId] = useState<
+    Map<string, number>
+  >(new Map());
 
   // Convenience filter accessors
   const statusFilter = (table.filters.status as string) || 'all';
@@ -282,7 +288,34 @@ export default function AdminTransactionsPage() {
           setTransactions([]);
           setTotalCount(0);
         } else {
-          setTransactions((data as unknown as TransactionRow[]) ?? []);
+          const rows = (data as unknown as TransactionRow[]) ?? [];
+          setTransactions(rows);
+          // Batched lookup of appointment.total_amount for close-out rows so
+          // the list can show "$0.00 / ($X.XX paid to appt)" without an
+          // N+1 fetch per row. Walk-in / non-close-out rows are skipped.
+          const closeOutApptIds = Array.from(
+            new Set(
+              rows
+                .filter(
+                  (r) =>
+                    r.notes === 'Closed out — fully pre-paid' && r.appointment_id
+                )
+                .map((r) => r.appointment_id as string)
+            )
+          );
+          if (closeOutApptIds.length > 0) {
+            const { data: appts } = await supabase
+              .from('appointments')
+              .select('id, total_amount')
+              .in('id', closeOutApptIds);
+            const map = new Map<string, number>();
+            for (const a of appts ?? []) {
+              map.set(a.id as string, Number(a.total_amount));
+            }
+            setAppointmentTotalsByApptId(map);
+          } else {
+            setAppointmentTotalsByApptId(new Map());
+          }
           setTotalCount(count ?? 0);
         }
       } catch (err) {
@@ -495,6 +528,11 @@ export default function AdminTransactionsPage() {
                         key={tx.id}
                         tx={tx}
                         onReceiptClick={() => setReceiptTransactionId(tx.id)}
+                        appointmentGross={
+                          tx.notes === 'Closed out — fully pre-paid' && tx.appointment_id
+                            ? appointmentTotalsByApptId.get(tx.appointment_id) ?? null
+                            : null
+                        }
                       />
                     ))}
                   </tbody>
@@ -549,9 +587,14 @@ export default function AdminTransactionsPage() {
 function TransactionTableRow({
   tx,
   onReceiptClick,
+  appointmentGross,
 }: {
   tx: TransactionRow;
   onReceiptClick: () => void;
+  /** Set only when this row is a close-out and the parent loaded the
+   * appointment.total_amount. Renders the "($X.XX paid to appt)" subtitle
+   * under the $0.00 total so list scans show real revenue, not zeros. */
+  appointmentGross: number | null;
 }) {
   return (
     <tr className="transition-colors hover:bg-gray-50">
@@ -620,6 +663,11 @@ function TransactionTableRow({
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-right font-medium tabular-nums text-gray-900">
         {formatCurrency(tx.total_amount)}
+        {appointmentGross !== null && (
+          <div className="text-xs font-normal text-gray-500">
+            ({formatCurrency(appointmentGross)} paid to appt)
+          </div>
+        )}
       </td>
     </tr>
   );

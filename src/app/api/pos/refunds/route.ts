@@ -13,6 +13,10 @@ import {
 } from '@/lib/utils/refund-math';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import type { AdjustmentType } from '@/lib/utils/stock-adjustments';
+import {
+  isCloseOutTransaction,
+  resolveRefundSourcePlan,
+} from '@/lib/refunds/source-plan';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -165,18 +169,16 @@ export async function POST(request: NextRequest) {
     // each touched source's status independently. Mid-flight failure persists
     // the partial-success state honestly — Stripe doesn't allow rollback.
     // ─────────────────────────────────────────────────────────────────────
-    const isCloseOut =
-      transaction.notes === 'Closed out — fully pre-paid' ||
-      (transaction.appointment_id != null &&
-        (transaction.payments ?? []).reduce(
-          (s: number, p: { amount: number }) => s + toCents(p.amount),
-          0
-        ) < recomputed.totalCents);
+    const isCloseOut = isCloseOutTransaction({
+      notes: transaction.notes,
+      appointment_id: transaction.appointment_id,
+      payments: transaction.payments,
+    });
 
-    // Source-of-money refund plan. For non-close-out: a single entry pointing
-    // at this transaction (preserves the existing single-source flow). For
-    // close-out: LIFO list of sibling completed transactions on the same
-    // appointment, each annotated with its remaining refundable cents.
+    // Source-of-money refund plan. For close-out: LIFO sibling sources via
+    // the shared helper. For non-close-out: a single entry pointing at this
+    // transaction (preserves the existing flow). The local SourcePlan shape
+    // matches the shared SourceEntry minus the modal-only fields.
     interface SourcePlan {
       transaction_id: string;
       payments: Array<{ method: string; amount: number; stripe_payment_intent_id: string | null }>;
@@ -187,47 +189,17 @@ export async function POST(request: NextRequest) {
     const sourcePlan: SourcePlan[] = [];
 
     if (isCloseOut && transaction.appointment_id) {
-      // Gather sibling completed transactions on the same appointment, newest
-      // first. Exclude already-fully-refunded sources.
-      const { data: siblings } = await supabase
-        .from('transactions')
-        .select('id, total_amount, tip_amount, status, payments(*)')
-        .eq('appointment_id', transaction.appointment_id)
-        .eq('status', 'completed')
-        .neq('id', transaction.id)
-        .order('transaction_date', { ascending: false });
-
-      for (const sib of (siblings ?? []) as Array<{
-        id: string;
-        total_amount: number;
-        tip_amount: number;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        payments?: any[];
-      }>) {
-        const sibPaidCents = (sib.payments ?? []).reduce(
-          (s: number, p: { amount: number }) => s + toCents(p.amount),
-          0
-        );
-        if (sibPaidCents <= 0) continue;
-        // Subtract any prior refunds against this source.
-        const { data: priorRefunds } = await supabase
-          .from('refunds')
-          .select('amount')
-          .eq('transaction_id', sib.id)
-          .eq('status', 'processed');
-        const priorRefundedCents = (priorRefunds ?? []).reduce(
-          (s: number, r: { amount: number }) => s + toCents(r.amount),
-          0
-        );
-        const remaining = Math.max(0, sibPaidCents - priorRefundedCents);
-        if (remaining <= 0) continue;
+      const sources = await resolveRefundSourcePlan(supabase, {
+        id: transaction.id,
+        appointment_id: transaction.appointment_id,
+      });
+      for (const sp of sources) {
         sourcePlan.push({
-          transaction_id: sib.id,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          payments: (sib.payments ?? []) as any[],
-          remaining_refundable_cents: remaining,
-          total_amount: sib.total_amount,
-          tip_amount: sib.tip_amount || 0,
+          transaction_id: sp.transaction_id,
+          payments: sp.payments,
+          remaining_refundable_cents: sp.remaining_refundable_cents,
+          total_amount: sp.total_amount,
+          tip_amount: sp.tip_amount,
         });
       }
 

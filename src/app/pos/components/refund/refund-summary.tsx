@@ -6,6 +6,8 @@ import type { TransactionItem } from '@/lib/supabase/types';
 import { fromCents, toCents } from '@/lib/utils/refund-math';
 import type { RefundDisposition } from '@/lib/utils/validation';
 import type { AllItemsDisposition } from './refund-dialog';
+import { walkLifoAllocation, type SourceEntry } from '@/lib/refunds/source-plan';
+import { formatReceiptDateTime } from '@/lib/utils/format';
 
 interface RefundSummaryProps {
   items: Array<{
@@ -25,6 +27,10 @@ interface RefundSummaryProps {
   onAllDispositionChange: (d: AllItemsDisposition) => void;
   hasProductItems: boolean;
   onDispositionChange: (itemId: string, disposition: RefundDisposition) => void;
+  /** LIFO source plan from /api/pos/refunds/source-plan/[id]. Empty for
+   * walk-in transactions and appointment-linked rows with no siblings —
+   * the "Refund will be issued from:" section is hidden in those cases. */
+  sourcePlan?: SourceEntry[];
 }
 
 const DISPOSITION_OPTIONS: {
@@ -84,6 +90,7 @@ export function RefundSummary({
   onAllDispositionChange,
   hasProductItems,
   onDispositionChange,
+  sourcePlan,
 }: RefundSummaryProps) {
   const itemsTotalCents = items.reduce(
     (sum, entry) => sum + entry.amountCents,
@@ -91,6 +98,14 @@ export function RefundSummary({
   );
   const totalCents = itemsTotalCents + toCents(tipRefund);
   const totalAmount = fromCents(totalCents);
+
+  // LIFO allocation across sibling sources. Recomputes on every selection
+  // change so the displayed rows match what the server will actually do.
+  // Empty allocation when no source plan (walk-in / no siblings) — section
+  // hidden below.
+  const allocation = (sourcePlan && sourcePlan.length > 0)
+    ? walkLifoAllocation(sourcePlan, totalCents)
+    : [];
 
   // Disposition readiness check
   const dispositionReady = !hasProductItems || (
@@ -179,6 +194,30 @@ export function RefundSummary({
           ${totalAmount.toFixed(2)}
         </span>
       </div>
+
+      {/* "Refund will be issued from:" — appointment-linked sources only.
+          LIFO order (most recent payment first), recomputed on every
+          selection change via walkLifoAllocation in shared source-plan. */}
+      {allocation.length > 0 && (
+        <div className="space-y-1.5 rounded-md bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5">
+          <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
+            Refund will be issued from:
+          </p>
+          {allocation.map((row) => (
+            <div
+              key={row.transaction_id}
+              className="flex items-center justify-between text-sm"
+            >
+              <span className="text-blue-600 dark:text-blue-400 truncate pr-2">
+                {row.source_label} - {formatReceiptDateTime(row.newest_paid_at)}
+              </span>
+              <span className="shrink-0 font-medium tabular-nums text-blue-700 dark:text-blue-300">
+                -${(row.amount_cents / 100).toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Disposition picker — only when there are product items */}
       {hasProductItems && (

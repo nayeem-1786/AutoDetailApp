@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogHeader,
@@ -24,6 +24,11 @@ import {
   fromCents,
 } from '@/lib/utils/refund-math';
 import type { RefundDisposition } from '@/lib/utils/validation';
+import {
+  walkLifoAllocation,
+  type SourceEntry,
+  type SourceAllocation,
+} from '@/lib/refunds/source-plan';
 
 interface RefundDialogProps {
   open: boolean;
@@ -60,6 +65,30 @@ export function RefundDialog({
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'select' | 'confirm'>('select');
   const [allDisposition, setAllDisposition] = useState<AllItemsDisposition>(null);
+
+  // Close-out / appointment-linked: fetch the LIFO source plan once when the
+  // dialog opens. Walk-in transactions get an empty plan and the
+  // "Refund will be issued from:" section never renders. The walk
+  // (walkLifoAllocation) runs in the summary on every selection change so
+  // the display tracks the staff's chosen subset.
+  const [sourcePlan, setSourcePlan] = useState<SourceEntry[]>([]);
+  useEffect(() => {
+    if (!open || !transaction.appointment_id) {
+      setSourcePlan([]);
+      return;
+    }
+    let cancelled = false;
+    posFetch(`/api/pos/refunds/source-plan/${transaction.id}`)
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = await res.json().catch(() => null);
+        if (!cancelled && json?.data?.sources) {
+          setSourcePlan(json.data.sources as SourceEntry[]);
+        }
+      })
+      .catch(() => { /* network error — modal still works, just no source list */ });
+    return () => { cancelled = true; };
+  }, [open, transaction.id, transaction.appointment_id]);
 
   // Calculate max refundable quantity for each transaction item
   const maxRefundableQtyMap = useMemo(() => {
@@ -365,6 +394,7 @@ export function RefundDialog({
               onAllDispositionChange={setAllDisposition}
               hasProductItems={hasProductItems}
               onDispositionChange={updateDisposition}
+              sourcePlan={sourcePlan}
             />
           </div>
         )}

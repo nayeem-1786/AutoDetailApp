@@ -6,9 +6,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## fix(pos): close-out refunds + receipt Total + thermal em-dash (Session 5c)
+## feat(pos): refund source-plan display + admin list close-out indicator (Session 4d-followup)
 
-End-to-end testing of Session 5b found four connected bugs on close-out transactions. All four share one root cause: appointment-linked transactions display `transaction.total_amount` instead of the appointment's gross.
+Two deferrals from Session 4d landed. Plus session-naming corrections in this file.
+
+**Task 1 — Refund modal "Refund will be issued from:" display.** Extracted the LIFO source-plan resolver from `src/app/api/pos/refunds/route.ts` into a shared helper at `src/lib/refunds/source-plan.ts` (`isCloseOutTransaction`, `resolveRefundSourcePlan`, `walkLifoAllocation`). Server route now imports from there. New read-only GET endpoint at `src/app/api/pos/refunds/source-plan/[id]/route.ts` returns the same plan to the modal so client and server agree by construction. `refund-dialog.tsx` fetches the plan when it opens for an appointment-linked transaction; `refund-summary.tsx` renders a "Refund will be issued from:" block under Total Refund using `walkLifoAllocation(plan, totalCents)` so the displayed sources track the staff member's selected line items dynamically. Walk-in transactions and appointment-linked rows with no siblings render exactly as before — no behavior change.
+
+**Task 2 — Admin transactions list close-out indicator.** Option A from the prompt: close-out rows now show `$0.00` with a `($X.XX paid to appt)` sub-line under it, so list scans surface real revenue instead of zeros. Single batched `appointments.select('id, total_amount').in('id', closeOutApptIds)` query keyed off rows whose `notes='Closed out — fully pre-paid'` — no N+1. Walk-in and non-close-out rows unchanged.
+
+**Task 3 — CHANGELOG naming corrections.** Two prior entries were mislabeled — the appointment_id orphan + receipt history + pay-page wording entry (commit `1c819f77`) is now correctly labeled "Session 4c"; the close-out refunds + receipt Total + thermal em-dash entry (commit `428b805d`) is now "Session 4d". Both entries' bodies also updated where they referenced the wrong predecessor session.
+
+### Files touched
+- **NEW**: `src/lib/refunds/source-plan.ts`
+- **NEW**: `src/app/api/pos/refunds/source-plan/[id]/route.ts`
+- `src/app/api/pos/refunds/route.ts` — refactored to import shared helper
+- `src/app/pos/components/refund/refund-dialog.tsx` — fetches plan, passes to summary
+- `src/app/pos/components/refund/refund-summary.tsx` — renders source block + LIFO walk
+- `src/app/admin/transactions/page.tsx` — close-out indicator + batched lookup
+- `docs/CHANGELOG.md` (this entry + two label corrections)
+
+### Verification
+
+`tsc --noEmit` clean. Manual verification per the session prompt's flows (refund modal opens with source list; partial-refund updates dynamically; admin list shows close-out indicator; walk-in regression).
+
+---
+
+## fix(pos): close-out refunds + receipt Total + thermal em-dash (Session 4d)
+
+End-to-end testing of Session 4c found four connected bugs on close-out transactions. All four share one root cause: appointment-linked transactions display `transaction.total_amount` instead of the appointment's gross.
 
 ### Migration `20260503024921_add_refunds_notes.sql`
 
@@ -38,7 +63,7 @@ Existing single-source path is preserved exactly: when `isCloseOut === false`, t
 
 ### Fix 4 — Thermal em-dash recurrence
 
-`textToBytes` in `src/app/pos/lib/receipt-template.ts` was substituting all non-ASCII chars with `0x3F` (`?`). Session 5b's payment label introduced a U+00B7 middle dot (`·`) as separator between source label and date, which printed as `?` on the Star TSP100III.
+`textToBytes` in `src/app/pos/lib/receipt-template.ts` was substituting all non-ASCII chars with `0x3F` (`?`). Session 4c's payment label introduced a U+00B7 middle dot (`·`) as separator between source label and date, which printed as `?` on the Star TSP100III.
 
 Fix: added a `THERMAL_ASCII_SUBSTITUTIONS` map applied before the byte emit. Maps the common typography offenders to ASCII equivalents:
 - `·` → `-` (the immediate bug)
@@ -104,7 +129,7 @@ Walk-in regression: ring up walk-in cash → receipt unchanged, refund flow unch
 
 ---
 
-## fix(pos): appointment_id orphan + unified receipt history + pay-page wording (Session 5b)
+## fix(pos): appointment_id orphan + unified receipt history + pay-page wording (Session 4c)
 
 Three connected fixes to the Pay-Link feature.
 
