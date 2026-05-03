@@ -6,6 +6,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pay-link): Session 5-followup-2 — dismiss after send + stable validation layout
+
+Two small UX fixes from real-world testing of Session 5-followup. Independent of any other open work.
+
+**Bug 1 — Amount modal re-opened after a successful "both" send.** Flow: Send Payment Link → Custom → enter amount → Continue → SendMethodDialog → pick "both" → Send. SendMethodDialog auto-closes 3s after a successful send via a `setTimeout` inside `SendPaymentLinkDialog.handleSend`. That timeout captures the parent's `onOpenChange` prop in a closure at the moment the user tapped Send — when `selectedAmountCents` was still non-null. Even though the parent's `onSent` clears `selectedAmountCents` synchronously, the stale closure later runs the "if `!open && selectedAmountCents !== null` → reopen amount modal" branch and re-surfaces the amount modal. Fix: a stable `paymentLinkSentRef` in `job-detail.tsx`. `onSent` flips the ref to `true`; the close handler consumes the flag and short-circuits the reopen branch. Refs survive across renders, so the stale closure reads the latest `.current` at call time. Verified across all three channels (sms / email / both).
+
+**Bug 2 — Validation error message caused layout shift in amount modal.** Typing "4" → "$0.04" surfaced "Minimum $0.50" and pushed Cancel/Continue and the keypad down. Typing "0" → "$0.40" kept the error showing. Typing "0" again → "$4.00" cleared the error and the layout snapped back up. Fix: replaced the conditional `{validationError && <p>…</p>}` with an always-mounted `<p>` carrying `min-h-[1.25rem]` (matches Tailwind `text-sm`'s line-height). Empty when no error, same height when populated — no shift. Bonus: `role="alert"` + `aria-live="polite"` so screen readers announce validation feedback. Inline comments flag two latent constraints: (a) the min-h is sized for single-line errors only — multi-line wraps will reintroduce shift; (b) the 3s `setTimeout` in `send-payment-link-dialog.tsx` captures parent state at send-time and depends on the parent's `paymentLinkSentRef` to stay correct, so future parent refactors should revisit the closure.
+
+### Files touched
+- `src/app/pos/jobs/components/job-detail.tsx` — Bug 1 (`paymentLinkSentRef` + close-handler short-circuit)
+- `src/components/jobs/payment-link-amount-modal.tsx` — Bug 2 (always-mounted error `<p>` with min-h reservation)
+- `src/components/jobs/send-payment-link-dialog.tsx` — comment-only (latent-constraint pointer back to the parent ref)
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (changed files) → 0/0. `npx vitest run` → 557/557.
+
+---
+
 ## fix(pay-link): Session 5-followup — modal close + paid-state UX + fixed-decimal Custom input
 
 Three bugs surfaced in real-world testing of Pay-Link Session 5. All three fixed in one pass.

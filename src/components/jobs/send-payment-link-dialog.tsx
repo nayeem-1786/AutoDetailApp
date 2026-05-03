@@ -82,6 +82,10 @@ export function SendPaymentLinkDialog({
       });
 
       setSuccess(true);
+      // 3s setTimeout captures dialog state at send-time. Parent (job-detail.tsx)
+      // uses a paymentLinkSentRef to short-circuit the reopen branch when this
+      // closure fires with stale state. If parent logic is refactored, revisit
+      // this internal closure.
       setTimeout(() => {
         setSuccess(false);
         onOpenChange(false);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatPhone } from '@/lib/utils/format';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import {
@@ -235,6 +235,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [paymentAmountModalOpen, setPaymentAmountModalOpen] = useState(false);
   const [paymentLinkDialogOpen, setPaymentLinkDialogOpen] = useState(false);
   const [selectedAmountCents, setSelectedAmountCents] = useState<number | null>(null);
+  // SendPaymentLinkDialog auto-closes 3s after a successful send via a
+  // setTimeout inside its own handleSend. That timeout captures the parent's
+  // onOpenChange prop in a closure at the moment the user tapped Send — when
+  // selectedAmountCents was still non-null. Even though onSent clears the
+  // amount synchronously, the stale closure later runs the "if !open &&
+  // selectedAmountCents !== null → reopen amount modal" branch, which
+  // re-surfaces the amount modal (Session 5-followup-2 Bug 1). A ref is
+  // stable across renders, so the stale closure reads the latest value.
+  const paymentLinkSentRef = useRef(false);
 
   // Reassignment state
   const [showReassignModal, setShowReassignModal] = useState(false);
@@ -1442,10 +1451,22 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             open={paymentLinkDialogOpen}
             onOpenChange={(open) => {
               setPaymentLinkDialogOpen(open);
-              // Closing the channel dialog without sending → return to amount
-              // modal so staff can adjust selection rather than starting over.
-              if (!open && selectedAmountCents !== null) {
-                setPaymentAmountModalOpen(true);
+              if (!open) {
+                // After a successful send the dialog auto-closes; in that
+                // case we must NOT reopen the amount modal. The ref is set
+                // by onSent and consumed here so the stale-closure path
+                // (3s setTimeout inside SendPaymentLinkDialog) sees current
+                // state instead of the captured non-null amount.
+                if (paymentLinkSentRef.current) {
+                  paymentLinkSentRef.current = false;
+                  setSelectedAmountCents(null);
+                  return;
+                }
+                // Closing without sending → return to amount modal so staff
+                // can adjust their selection rather than starting over.
+                if (selectedAmountCents !== null) {
+                  setPaymentAmountModalOpen(true);
+                }
               }
             }}
             appointmentId={job.appointment_id}
@@ -1454,6 +1475,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             amountDue={amountDueDollars}
             amountCents={selectedAmountCents}
             onSent={() => {
+              paymentLinkSentRef.current = true;
               setSelectedAmountCents(null);
               fetchJob();
             }}

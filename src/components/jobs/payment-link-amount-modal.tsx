@@ -187,9 +187,19 @@ export function PaymentLinkAmountModal({
               onBackspace={handleBackspace}
               size="sm"
             />
-            {validationError && (
-              <p className="text-sm text-red-500 dark:text-red-400">{validationError}</p>
-            )}
+            {/* Reserve space so error appearing/disappearing across digits
+                ($0.04 → $0.40 → $4.00) doesn't shift Cancel/Continue and the
+                keypad. min-h matches the rendered <p>'s line-height at
+                text-sm (Session 5-followup-2 Bug 2). */}
+            {/* min-h sized for single-line errors. If a future error string
+                wraps to 2 lines, this needs to expand or layout shift returns. */}
+            <p
+              className="min-h-[1.25rem] text-sm text-red-500 dark:text-red-400"
+              role="alert"
+              aria-live="polite"
+            >
+              {validationError ?? ' '}
+            </p>
           </div>
         )}
 
