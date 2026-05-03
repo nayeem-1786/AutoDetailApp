@@ -1,8 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Standalone output for self-hosted deployment (PM2 on Hostinger VPS)
-  output: 'standalone',
+  // output: 'standalone', // Disabled — Hostinger PM2 setup uses `next start`, not standalone. Re-enable only if migrating to Docker/serverless.
 
   // Multi-core build parallelism. VPS has 16 cores idle during build; default
   // is single-threaded webpack + serial server/edge compiles + serial standalone
