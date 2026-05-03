@@ -6,6 +6,75 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pos): walk-in TCPA consent capture at New Customer intake — 2026-05-03 (Session 6b)
+
+POS "New Customer" form now captures TCPA-compliant SMS and Email consent at the counter, closing the gap left by yesterday's one-off production backfill (1,328 customers retroactively opted in via verbal consent during owner phone outreach — applied as ad-hoc SQL against the production DB, not committed; this session is the going-forward replacement so future walk-ins are captured at the moment of intake instead of via retroactive sweeps).
+
+Online booking already captured consent through `/api/book/route.ts`. Admin customer creation already captured it. The POS walk-in path was the last creation surface without consent capture; mid-transaction "add a customer to the ticket" goes through the same `CustomerCreateDialog` (verified in Phase 0 — `ticket-panel.tsx:664` and `quotes/quote-ticket-panel.tsx:752` both mount the identical dialog), so a single change covers both Q1 case A (counter intake) and case B (mid-transaction add).
+
+### UI changes — `src/app/pos/components/customer-create-dialog.tsx`
+
+Two new segmented controls in a stable two-column grid placed between Email and Customer Type:
+- **SMS Consent** (left, 50% width): always visible; always required. Phone is mandatory at customer creation in both the form and the API, so the SMS consent question always applies.
+- **Email Consent** (right, 50% width): renders only when the email field has a non-empty value. Required when visible. The right grid column is always present (even if empty) so the row never jitters as the email field is filled or cleared.
+
+Buttons match the existing `TYPE_OPTIONS` styling (Yes = green, No = neutral gray; `aria-pressed` + `role="group"` for screen readers). State is reset on close/back. When email is cleared after being filled, the email-consent state resets so re-typing an email starts fresh.
+
+Submit gating mirrors the existing Customer Type pattern: button stays clickable, click handler shows a "Please answer the SMS and Email consent questions" toast and applies a red border + "Required" text to any unselected control.
+
+### API changes — `src/app/api/pos/customers/route.ts`
+
+POST now accepts `sms_consent: boolean` (required, must be a real boolean — `null`/`undefined`/strings rejected with 400) and `email_consent: boolean` (required when `email` is provided in the payload; ignored otherwise). The customer row persists both flags; absent `email_consent` fields are omitted from the insert (DB default applies) when no email is captured.
+
+After a successful customer INSERT, three audit-log writes fire (all best-effort — failures are logged but never roll back the customer create, since the customers row is the source of truth and matches the existing booking-form/admin pattern):
+
+1. **`sms_consent_log` row** (always written — phone is always present): `action: opt_in|opt_out` per the captured value, `keyword: 'VERBAL'` (matching yesterday's backfill), `source: 'pos_walkin'` (new value, see migration below), `previous_value: null` (new customer = no prior state), `new_value: <captured>`, `notes: 'Captured at POS during walk-in intake by staff_id=<employee_id>, customer_id=<id>'`.
+2. **`marketing_consent_log` row, channel='sms'** (always written): `action: opt_in|opt_out`, `source: 'pos'` (existing enum value), `recorded_by: <employee_id>`. Mirrors the dual-write pattern in `src/app/api/admin/customers/route.ts:152–169`.
+3. **`marketing_consent_log` row, channel='email'** (only when email was provided): same shape, `channel: 'email'`. Matches the admin pattern at `src/app/api/admin/customers/route.ts:170–177`.
+
+### Divergence from existing pattern — log opt-outs too
+
+The existing booking-form and admin-customer flows only write a consent-log row on opt-in (e.g., `if (sms_consent) { ... }` at `admin/customers/route.ts:153`). This session intentionally diverges and writes a row for **both opt-in (Yes) and opt-out (No)**. Reason: stronger TCPA defensibility for at-the-counter capture — proof of "asked and declined" is just as important as proof of "asked and accepted" when the only record of the conversation is the audit trail itself.
+
+Harmonizing this convention across booking + admin (so they also log opt-outs) is **out of scope for this session and flagged for a future audit pass**. Until then, opt-out audit coverage is asymmetric: present in POS walk-in, absent in booking form and admin customer creation.
+
+### Schema change — `supabase/migrations/20260503181924_add_pos_walkin_consent_source.sql`
+
+Adds `'pos_walkin'` to the `sms_consent_log_source_check` CHECK constraint. Pattern mirrors `20260210000004_add_customer_portal_consent_source.sql` exactly: `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT` with the expanded value list. Applied via `npx supabase db push --linked`. Post-apply dry-run reports "Remote database is up to date." Schema doc regenerated.
+
+`marketing_consent_log` did **not** require a migration — its `consent_source` ENUM already includes `'pos'`. Granularity (POS walk-in specifically vs other future POS-driven sources) is preserved by joining the `sms_consent_log` row (`source='pos_walkin'`) and the `marketing_consent_log` row (`source='pos'`) on `customer_id` plus near-equal `created_at`.
+
+### Latent bug surfaced (deferred)
+
+Phase 0 found that `src/lib/utils/sms-consent.ts:8` declares `'inbound_call'` in its TS source union, but the `sms_consent_log_source_check` DB constraint does NOT include `'inbound_call'` — any inbound-call-driven INSERT would fail at the DB layer. Not fixed in this session (out of scope; would need either a migration to add the value or removal of the TS literal). Added an inline `// NOTE` comment in `sms-consent.ts` pointing to this Phase 0 finding so the audit session has a paper trail.
+
+### Files touched
+
+**Created:**
+- `supabase/migrations/20260503181924_add_pos_walkin_consent_source.sql`
+- `src/app/api/pos/customers/__tests__/route.test.ts` (12 tests covering 401 / 400 / 201 / opt-in / opt-out / log shapes / log-failure non-blocking / archived-skip)
+- `src/app/pos/components/__tests__/customer-create-dialog.test.tsx` (10 tests covering SMS-always-visible, email-conditional, layout-stability, submit-gating, payload shapes, email-clear-resets-consent)
+
+**Modified:**
+- `src/app/pos/components/customer-create-dialog.tsx` — `CONSENT_OPTIONS` constant, two consent state slots, conditional render with `data-testid="consent-row"`, validation in `handleSubmit`, state reset in `handleClose`/`handleBack`, payload extension
+- `src/app/api/pos/customers/route.ts` — payload destructure + boolean validation, customer-row persistence, three audit-log inserts post-INSERT
+- `src/lib/utils/sms-consent.ts` — added `'pos_walkin'` to source TS union; `// NOTE` comment about the latent `inbound_call` mismatch
+- `docs/dev/DB_SCHEMA.md` (regenerated — only the `sms_consent_log_source_check` line changed)
+
+### Verification
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | Clean |
+| `npm run lint` | 0 errors / 44 warnings — baseline unchanged from Session 4d-followup |
+| `npm run build` (after `rm -rf .next`) | Compiled successfully in 12.0s |
+| `npx vitest run` | 557 / 557 (was 535; +22 new) |
+| `supabase db push --linked --dry-run` | "Remote database is up to date" (post-apply) |
+
+Manual UAT against local dev pending operator handoff (see deploy step below).
+
+---
+
 ## feat(pay-link): custom amount selector + per-PI webhook idempotency (Pay-Link Session 5)
 
 Pay-Link feature gains custom-amount support for B2B/fleet partial-deposit workflows ("$100 deposit now, $300 on completion" against a $400 ticket). Staff can now pick 25% / 50% / 75% / Full balance, or enter a Custom dollar amount, before the SMS/email is sent.

@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
 
     const body = await request.json();
-    const { first_name, last_name, phone, email, customer_type } = body;
+    const { first_name, last_name, phone, email, customer_type, sms_consent, email_consent } = body;
 
     if (!first_name || !last_name || !phone) {
       return NextResponse.json(
@@ -28,6 +28,23 @@ export async function POST(request: NextRequest) {
     if (!normalizedPhone) {
       return NextResponse.json(
         { error: 'Invalid phone number' },
+        { status: 400 }
+      );
+    }
+
+    // Session 6b: TCPA consent capture is mandatory at POS walk-in intake. Phone is
+    // required, so SMS consent is always required. Email consent is required only when
+    // an email is provided. Both must be explicit booleans (Yes or No) — null is rejected.
+    if (typeof sms_consent !== 'boolean') {
+      return NextResponse.json(
+        { error: 'sms_consent is required and must be a boolean (true or false)' },
+        { status: 400 }
+      );
+    }
+    const emailProvided = !!(email && String(email).trim());
+    if (emailProvided && typeof email_consent !== 'boolean') {
+      return NextResponse.json(
+        { error: 'email_consent is required when email is provided and must be a boolean (true or false)' },
         { status: 400 }
       );
     }
@@ -84,6 +101,8 @@ export async function POST(request: NextRequest) {
         phone: normalizedPhone,
         ...(normalizedEmail ? { email: normalizedEmail } : {}),
         ...(resolvedType ? { customer_type: resolvedType } : {}),
+        sms_consent,
+        ...(emailProvided ? { email_consent } : {}),
       })
       .select('*')
       .single();
@@ -94,6 +113,59 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create customer' },
         { status: 500 }
       );
+    }
+
+    // Session 6b: TCPA audit logs. Captured verbally by staff at the POS counter.
+    // Divergent from the admin/booking pattern: we log BOTH opt-in and opt-out here
+    // for stronger TCPA defensibility (proof of "asked and declined" alongside opt-ins).
+    // The admin route only logs opt-ins — harmonization deferred to a future audit session.
+    // Failures are logged but never roll back the customer create (audit trail is
+    // best-effort; the customers row is the source of truth).
+    const consentNotes = `Captured at POS during walk-in intake by staff_id=${posEmployee.employee_id}, customer_id=${customer.id}`;
+
+    {
+      const { error: smsLogErr } = await supabase
+        .from('sms_consent_log')
+        .insert({
+          customer_id: customer.id,
+          phone: normalizedPhone,
+          action: sms_consent ? 'opt_in' : 'opt_out',
+          keyword: 'VERBAL',
+          source: 'pos_walkin',
+          previous_value: null,
+          new_value: sms_consent,
+          notes: consentNotes,
+        });
+      if (smsLogErr) {
+        console.error('[SMS_CONSENT] sms_consent_log insert failed (non-blocking):', smsLogErr);
+      }
+      const { error: smsMarketingLogErr } = await supabase
+        .from('marketing_consent_log')
+        .insert({
+          customer_id: customer.id,
+          channel: 'sms',
+          action: sms_consent ? 'opt_in' : 'opt_out',
+          source: 'pos',
+          recorded_by: posEmployee.employee_id,
+        });
+      if (smsMarketingLogErr) {
+        console.error('[SMS_CONSENT] marketing_consent_log (sms) insert failed (non-blocking):', smsMarketingLogErr);
+      }
+    }
+
+    if (emailProvided) {
+      const { error: emailMarketingLogErr } = await supabase
+        .from('marketing_consent_log')
+        .insert({
+          customer_id: customer.id,
+          channel: 'email',
+          action: email_consent ? 'opt_in' : 'opt_out',
+          source: 'pos',
+          recorded_by: posEmployee.employee_id,
+        });
+      if (emailMarketingLogErr) {
+        console.error('[EMAIL_CONSENT] marketing_consent_log (email) insert failed (non-blocking):', emailMarketingLogErr);
+      }
     }
 
     // QBO Customer Sync — fire and forget

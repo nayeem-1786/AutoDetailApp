@@ -2568,7 +2568,7 @@ CREATE UNIQUE INDEX site_theme_settings_pkey ON public.site_theme_settings USING
 
 **CHECK constraints:**
 - `sms_consent_log_action_check`: `CHECK ((action = ANY (ARRAY['opt_out'::text, 'opt_in'::text])))`
-- `sms_consent_log_source_check`: `CHECK ((source = ANY (ARRAY['inbound_sms'::text, 'admin_manual'::text, 'unsubscribe_page'::text, 'booking_form'::text, 'customer_portal'::text, 'system'::text])))`
+- `sms_consent_log_source_check`: `CHECK ((source = ANY (ARRAY['inbound_sms'::text, 'admin_manual'::text, 'unsubscribe_page'::text, 'booking_form'::text, 'customer_portal'::text, 'system'::text, 'pos_walkin'::text])))`
 
 **Indexes:**
 ```

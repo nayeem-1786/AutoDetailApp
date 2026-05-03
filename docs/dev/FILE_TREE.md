@@ -386,6 +386,7 @@ src/app/api/pos/coupons/validate/route.ts
 src/app/api/pos/customers/[id]/route.ts
 src/app/api/pos/customers/[id]/type/route.ts
 src/app/api/pos/customers/[id]/vehicles/route.ts
+src/app/api/pos/customers/__tests__/route.test.ts
 src/app/api/pos/customers/check-duplicate/route.ts
 src/app/api/pos/customers/route.ts
 src/app/api/pos/customers/search/route.ts
@@ -1292,6 +1293,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         transactions/
                                                         vehicle-create-dialog.tsx
                                                         vehicle-selector.tsx
+                                                        __tests__/customer-create-dialog.test.tsx
                                                         __tests__/customer-lookup.test.tsx
                                                         __tests__/service-detail-dialog.test.tsx
                                                         __tests__/service-pricing-picker.test.tsx
@@ -1548,6 +1550,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260502224451_add_cash_tendered_to_payments.sql
 20260503024921_add_refunds_notes.sql
 20260503160000_add_payment_link_amount_cents.sql
+20260503181924_add_pos_walkin_consent_source.sql
 ```
 
 ## Scripts

@@ -38,6 +38,11 @@ const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[
   { value: 'professional', label: 'Professional', activeClass: 'bg-purple-600 text-white border-purple-600' },
 ];
 
+const CONSENT_OPTIONS: { value: boolean; label: string; activeClass: string }[] = [
+  { value: true, label: 'Yes', activeClass: 'bg-green-600 dark:bg-green-500 text-white border-green-600 dark:border-green-500' },
+  { value: false, label: 'No', activeClass: 'bg-gray-600 dark:bg-gray-500 text-white border-gray-600 dark:border-gray-500' },
+];
+
 interface DuplicateError {
   name: string;
 }
@@ -54,6 +59,10 @@ export function CustomerCreateDialog({
   const [email, setEmail] = useState('');
   const [customerType, setCustomerType] = useState<CustomerType | null>(null);
   const [typeError, setTypeError] = useState(false);
+  const [smsConsent, setSmsConsent] = useState<boolean | null>(null);
+  const [smsConsentError, setSmsConsentError] = useState(false);
+  const [emailConsent, setEmailConsent] = useState<boolean | null>(null);
+  const [emailConsentError, setEmailConsentError] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Duplicate check state
@@ -125,6 +134,17 @@ export function CustomerCreateDialog({
   }, [email]);
 
   const hasDuplicateError = !!phoneDup || !!emailDup;
+  const hasEmail = email.trim().length > 0;
+
+  // Email consent only applies when email is provided. Clearing the email field
+  // resets the email-consent state so the next entry starts fresh and the
+  // validation error doesn't linger after the slot becomes irrelevant.
+  useEffect(() => {
+    if (!hasEmail) {
+      setEmailConsent(null);
+      setEmailConsentError(false);
+    }
+  }, [hasEmail]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -137,6 +157,20 @@ export function CustomerCreateDialog({
     if (!customerType) {
       setTypeError(true);
       toast.error('Please select a customer type');
+      return;
+    }
+
+    let consentBlocked = false;
+    if (smsConsent === null) {
+      setSmsConsentError(true);
+      consentBlocked = true;
+    }
+    if (hasEmail && emailConsent === null) {
+      setEmailConsentError(true);
+      consentBlocked = true;
+    }
+    if (consentBlocked) {
+      toast.error('Please answer the SMS and Email consent questions');
       return;
     }
 
@@ -153,6 +187,8 @@ export function CustomerCreateDialog({
           phone,
           email: email.trim() || undefined,
           customer_type: customerType,
+          sms_consent: smsConsent,
+          ...(hasEmail ? { email_consent: emailConsent } : {}),
         }),
       });
 
@@ -184,6 +220,10 @@ export function CustomerCreateDialog({
     setEmail('');
     setCustomerType(null);
     setTypeError(false);
+    setSmsConsent(null);
+    setSmsConsentError(false);
+    setEmailConsent(null);
+    setEmailConsentError(false);
     setPhoneDup(null);
     setEmailDup(null);
     onClose();
@@ -196,6 +236,10 @@ export function CustomerCreateDialog({
     setEmail('');
     setCustomerType(null);
     setTypeError(false);
+    setSmsConsent(null);
+    setSmsConsentError(false);
+    setEmailConsent(null);
+    setEmailConsentError(false);
     setPhoneDup(null);
     setEmailDup(null);
     onBack?.();
@@ -274,6 +318,79 @@ export function CustomerCreateDialog({
                 Email already belongs to {emailDup.name}
               </p>
             )}
+          </div>
+          {/* TCPA consent capture (Session 6b). SMS slot always rendered + required;
+              email slot reserves 50% width even when no email is entered, so the
+              row layout never jitters as the email field is filled or cleared. */}
+          <div className="grid grid-cols-2 gap-3" data-testid="consent-row">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                SMS Consent
+              </label>
+              <div className="flex gap-2" role="group" aria-label="SMS Consent">
+                {CONSENT_OPTIONS.map((opt) => (
+                  <button
+                    key={`sms-${opt.label}`}
+                    type="button"
+                    aria-pressed={smsConsent === opt.value}
+                    onClick={() => {
+                      setSmsConsent(opt.value);
+                      setSmsConsentError(false);
+                    }}
+                    className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      smsConsent === opt.value
+                        ? opt.activeClass
+                        : smsConsentError
+                          ? 'border-red-400 dark:border-red-500 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {smsConsentError && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  Required
+                </p>
+              )}
+            </div>
+            <div>
+              {hasEmail ? (
+                <>
+                  <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
+                    Email Consent
+                  </label>
+                  <div className="flex gap-2" role="group" aria-label="Email Consent">
+                    {CONSENT_OPTIONS.map((opt) => (
+                      <button
+                        key={`email-${opt.label}`}
+                        type="button"
+                        aria-pressed={emailConsent === opt.value}
+                        onClick={() => {
+                          setEmailConsent(opt.value);
+                          setEmailConsentError(false);
+                        }}
+                        className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          emailConsent === opt.value
+                            ? opt.activeClass
+                            : emailConsentError
+                              ? 'border-red-400 dark:border-red-500 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                              : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {emailConsentError && (
+                    <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                      Required
+                    </p>
+                  )}
+                </>
+              ) : null}
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">

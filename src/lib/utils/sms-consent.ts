@@ -5,7 +5,10 @@ interface ConsentChangeParams {
   phone: string;
   action: 'opt_out' | 'opt_in';
   keyword: string;
-  source: 'inbound_sms' | 'inbound_call' | 'admin_manual' | 'unsubscribe_page' | 'booking_form' | 'customer_portal' | 'system';
+  // NOTE (Session 6b Phase 0 finding, deferred to audit session): 'inbound_call' is in this TS union
+  // but NOT in the sms_consent_log_source_check DB constraint. Any inbound-call-driven INSERT
+  // currently fails with a CHECK violation. Fix scoped out of Session 6b.
+  source: 'inbound_sms' | 'inbound_call' | 'admin_manual' | 'unsubscribe_page' | 'booking_form' | 'customer_portal' | 'system' | 'pos_walkin';
   notes?: string;
 }
 
