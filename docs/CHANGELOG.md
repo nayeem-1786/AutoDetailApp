@@ -6,6 +6,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pay-link): Session 5-followup — modal close + paid-state UX + fixed-decimal Custom input
+
+Three bugs surfaced in real-world testing of Pay-Link Session 5. All three fixed in one pass.
+
+**Bug 1 — Amount modal stayed open behind SendPaymentLinkDialog.** The two-step flow (amount → channel) was relying on the parent's `onContinue` handler to flip both modal flags in a single render — `setPaymentAmountModalOpen(false); setPaymentLinkDialogOpen(true)`. In practice both modals rendered visible simultaneously. Fix: `payment-link-amount-modal.tsx` `handleContinue` now calls `onOpenChange(false)` *before* `onContinue(chosen)`, so the amount modal closes itself explicitly. Parent's `onContinue` simplified to just record the choice and open the channel dialog.
+
+**Bug 2 — Public pay page showed "pay remaining" form after partial payment.** A $1 deposit on a $400 appointment left the customer staring at a "$399.00 due / Pay $399.00" form below the "Paid (pay link)" line. Architectural rule: a pay link is for *one* specific amount; once paid, the customer's contract with that link is done. The page now branches on `appointment.payment_link_paid_at` and renders a confirmation-only `<LinkPaidCard>` (headline + "$X.XX paid" + thanks + business contact). No form, no Pay button, no outstanding-balance prompt. The render priority is `isCancelled → isPaid → isLinkConsumed → isProcessing → PayForm`. `isLinkConsumed = !isPaid && payment_link_paid_at !== null` distinguishes "this link is done" from "appointment is fully paid." A *new* link sent on the same appointment clears `payment_link_paid_at` (handled by the send route) and the page returns to State A. The displayed paid-amount comes from a server-side query for the most-recent payment row on the appointment — best-effort match (window between webhook stamp and next send is short and bounded by the send route's reset).
+
+**Bug 3 — Custom amount input flaky on iPad keypad.** Replaced the native `<input type="text">` with the same fixed-decimal pattern used by `keypad-tab.tsx`: integer-cents state + reused `<PinPad>` component. Every digit shifts the value left by one place (`cents * 10 + digit`); backspace is `Math.floor(cents / 10)`. PinPad's `.` key is rendered but inert (matching keypad-tab convention). Whole-dollar entry costs more keystrokes — the 25/50/75/Full presets cover the common cases. `$99,999.99` cap matches keypad-tab. Hard-cap on STRIPE_MIN_AMOUNT_CENTS (≥$0.50) and remaining (≤$X.XX) unchanged. No changes to `pin-pad.tsx` (reused as-is) or `cash-payment.tsx` (out of scope; queued for a future session).
+
+### Files touched
+- `src/components/jobs/payment-link-amount-modal.tsx` — Bug 1 (explicit close in handleContinue), Bug 3 (cents state + PinPad)
+- `src/app/pos/jobs/components/job-detail.tsx` — Bug 1 (parent onContinue simplified)
+- `src/app/(public)/pay/[token]/page.tsx` — Bug 2 (`isLinkConsumed` branch + `<LinkPaidCard>` + most-recent-payment query)
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (changed files) → 0/0. `npx vitest run` → 557/557. Post-deploy UAT covers V1 (modal close timing), V2 (cents-shift entry + min/max validation), V3 (link-paid confirmation card), V4 (token reuse for second link returns to State A).
+
+---
+
 ## feat(pos): walk-in TCPA consent capture at New Customer intake — 2026-05-03 (Session 6b)
 
 POS "New Customer" form now captures TCPA-compliant SMS and Email consent at the counter, closing the gap left by yesterday's one-off production backfill (1,328 customers retroactively opted in via verbal consent during owner phone outreach — applied as ad-hoc SQL against the production DB, not committed; this session is the going-forward replacement so future walk-ins are captured at the moment of intake instead of via retroactive sweeps).

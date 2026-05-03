@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { fromCents, toCents } from '@/lib/utils/refund-math';
+import { PinPad } from '@/app/pos/components/pin-pad';
 
 // Mirrors STRIPE_MIN_AMOUNT_CENTS in src/app/api/pay/[token]/intent/route.ts.
 // Inlined to avoid coupling client bundles to a server-only file.
@@ -41,12 +42,16 @@ export function PaymentLinkAmountModal({
   customerName,
 }: PaymentLinkAmountModalProps) {
   const [selected, setSelected] = useState<Preset | null>(null);
-  const [customAmount, setCustomAmount] = useState('');
+  // Custom amount lives as integer cents and entry is "fixed-decimal" (Square /
+  // Clover / Toast pattern): every digit shifts the existing value left by one
+  // place. No decimal key, no way to skip the cents column. See keypad-tab.tsx
+  // for the same pattern in the POS register flow.
+  const [customCents, setCustomCents] = useState(0);
 
   useEffect(() => {
     if (!open) {
       setSelected(null);
-      setCustomAmount('');
+      setCustomCents(0);
     }
   }, [open]);
 
@@ -59,21 +64,24 @@ export function PaymentLinkAmountModal({
     full: remainingCents,
   };
 
-  const customCents = (() => {
-    const parsed = parseFloat(customAmount);
-    if (!Number.isFinite(parsed) || parsed <= 0) return 0;
-    return toCents(parsed);
-  })();
-
   let validationError: string | null = null;
-  if (selected === 'custom') {
-    if (customAmount.trim() === '') {
-      validationError = null;
-    } else if (customCents < STRIPE_MIN_AMOUNT_CENTS) {
+  if (selected === 'custom' && customCents > 0) {
+    if (customCents < STRIPE_MIN_AMOUNT_CENTS) {
       validationError = `Minimum $${(STRIPE_MIN_AMOUNT_CENTS / 100).toFixed(2)}`;
     } else if (customCents > remainingCents) {
       validationError = `Cannot exceed $${remainingDollars.toFixed(2)} remaining`;
     }
+  }
+
+  function handleDigit(d: string) {
+    if (d === '.') return; // Ignored — fixed-decimal entry has no decimal key.
+    const next = customCents * 10 + parseInt(d, 10);
+    if (next > 9999999) return; // $99,999.99 hard cap matches keypad-tab.
+    setCustomCents(next);
+  }
+
+  function handleBackspace() {
+    setCustomCents(Math.floor(customCents / 10));
   }
 
   function chosenCents(): number | null {
@@ -90,6 +98,10 @@ export function PaymentLinkAmountModal({
 
   function handleContinue() {
     if (!canContinue || chosen === null) return;
+    // Close *this* modal explicitly before opening the next step. Relying on
+    // the parent's onContinue handler to flip both flags in one render led to
+    // both modals being visible simultaneously (Bug 1, Session 5-followup).
+    onOpenChange(false);
     onContinue(chosen);
   }
 
@@ -121,7 +133,7 @@ export function PaymentLinkAmountModal({
                 type="button"
                 onClick={() => {
                   setSelected(key);
-                  setCustomAmount('');
+                  setCustomCents(0);
                 }}
                 className={cn(
                   'flex flex-col items-center justify-center rounded-lg border-2 px-3 py-3 transition-all',
@@ -153,25 +165,28 @@ export function PaymentLinkAmountModal({
           <span className="text-base font-semibold">Custom</span>
         </button>
 
-        {/* Custom input */}
+        {/* Custom amount: fixed-decimal entry via on-screen keypad. The native
+            iPad keyboard's decimal handling is unreliable; this pattern (used
+            by Square/Clover/Toast and by keypad-tab.tsx) treats every digit
+            as a cents-column shift-left. */}
         {selected === 'custom' && (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-lg text-gray-500 dark:text-gray-400">$</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]*\.?[0-9]*"
-                autoFocus
-                value={customAmount}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9.]/g, '');
-                  setCustomAmount(v);
-                }}
-                className="h-12 flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-transparent px-3 text-center text-xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
-                placeholder="0.00"
-              />
+          <div className="space-y-3">
+            <div
+              className={cn(
+                'flex items-center justify-center rounded-lg border-2 px-4 py-3 text-3xl font-bold tabular-nums',
+                customCents === 0
+                  ? 'border-gray-200 dark:border-gray-700 text-gray-300 dark:text-gray-600'
+                  : 'border-blue-200 dark:border-blue-800 text-gray-900 dark:text-gray-100'
+              )}
+              aria-live="polite"
+            >
+              ${(customCents / 100).toFixed(2)}
             </div>
+            <PinPad
+              onDigit={handleDigit}
+              onBackspace={handleBackspace}
+              size="sm"
+            />
             {validationError && (
               <p className="text-sm text-red-500 dark:text-red-400">{validationError}</p>
             )}

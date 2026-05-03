@@ -44,7 +44,16 @@ interface AppointmentRecord {
 
 async function getAppointmentByToken(
   token: string
-): Promise<{ appointment: AppointmentRecord; remainingCents: number; paidCents: number; chargeCents: number } | null> {
+): Promise<{
+  appointment: AppointmentRecord;
+  remainingCents: number;
+  paidCents: number;
+  chargeCents: number;
+  /** When payment_link_paid_at is set, the cents amount of the most recent
+   * payment on this appointment — i.e., what was charged via this consumed
+   * link. Used by the link-paid confirmation panel. */
+  linkPaidAmountCents: number | null;
+} | null> {
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -78,15 +87,25 @@ async function getAppointmentByToken(
 
   const txIds = (txs ?? []).map((t) => t.id);
   let paidCents = 0;
+  let linkPaidAmountCents: number | null = null;
   if (txIds.length > 0) {
     const { data: pays } = await supabase
       .from('payments')
-      .select('amount')
-      .in('transaction_id', txIds);
+      .select('amount, created_at')
+      .in('transaction_id', txIds)
+      .order('created_at', { ascending: false });
     paidCents = (pays ?? []).reduce(
       (sum, p) => sum + toCents(Number(p.amount)),
       0
     );
+    // Most-recent payment row drives the "link paid" confirmation amount when
+    // payment_link_paid_at is set. The send route clears payment_link_paid_at
+    // on each new send, so this window is bounded to "between webhook success
+    // and next send" — the most recent payment is the link's payment by
+    // construction in normal flows.
+    if (appointment.payment_link_paid_at && pays && pays.length > 0) {
+      linkPaidAmountCents = toCents(Number(pays[0].amount));
+    }
   }
 
   const remainingCents = Math.max(0, totalCents - paidCents);
@@ -103,6 +122,7 @@ async function getAppointmentByToken(
     remainingCents,
     paidCents,
     chargeCents,
+    linkPaidAmountCents,
   };
 }
 
@@ -145,7 +165,7 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
     notFound();
   }
 
-  const { appointment, remainingCents, paidCents, chargeCents } = result;
+  const { appointment, remainingCents, paidCents, chargeCents, linkPaidAmountCents } = result;
 
   const redirectStatus = typeof sp.redirect_status === 'string' ? sp.redirect_status : null;
   const retryCountRaw = typeof sp.pl_retry === 'string' ? sp.pl_retry : '0';
@@ -153,15 +173,24 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
 
   const isCancelled = appointment.status === 'cancelled' || appointment.status === 'no_show';
   const isPaid = appointment.payment_status === 'paid' || remainingCents <= 0;
+  // "This link has been consumed" state. Distinct from isPaid because the
+  // appointment may still have outstanding balance (e.g., $1 deposit link on a
+  // $400 ticket) — but THIS link's contract with the customer was fulfilled
+  // when the webhook stamped payment_link_paid_at. The page must NOT prompt
+  // for the remaining balance; staff send a fresh link if more is owed
+  // (Session 5-followup Bug 2).
+  const isLinkConsumed = !isPaid && appointment.payment_link_paid_at !== null;
   const isProcessing =
     !isPaid &&
+    !isLinkConsumed &&
     !isCancelled &&
     redirectStatus === 'succeeded' &&
     retryCount < PROCESSING_RETRY_LIMIT;
 
-  // Custom-amount link active when this link's charge is < remaining.
-  // Drives the "Total appointment: $X.XX" subtitle in the totals block.
-  const isPartialLink = !isPaid && chargeCents < remainingCents;
+  // Custom-amount link active when this link's charge is < remaining AND the
+  // link is unpaid (drives the "Total appointment: $X.XX" subtitle in the
+  // totals block — only relevant before payment).
+  const isPartialLink = !isPaid && !isLinkConsumed && chargeCents < remainingCents;
 
   // ---------- Branded shell helpers ----------
   const customerName = appointment.customer
@@ -293,10 +322,16 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
           )}
           <div className="flex justify-between border-t border-site-border pt-2">
             <span className="text-base font-semibold text-site-text">
-              {isPaid ? 'Total Paid' : 'Amount Due Now'}
+              {isPaid ? 'Total Paid' : isLinkConsumed ? 'Link Paid' : 'Amount Due Now'}
             </span>
             <span className="text-lg font-bold text-site-text tabular-nums">
-              {formatCurrency(isPaid ? totalAmountDollars : chargeDollars)}
+              {formatCurrency(
+                isPaid
+                  ? totalAmountDollars
+                  : isLinkConsumed
+                    ? fromCents(linkPaidAmountCents ?? 0)
+                    : chargeDollars
+              )}
             </span>
           </div>
           {isPartialLink && (
@@ -328,6 +363,13 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
           paidAtIso={appointment.payment_link_paid_at}
           phone={businessInfo.phone}
         />
+      ) : isLinkConsumed ? (
+        <LinkPaidCard
+          businessName={businessInfo.name}
+          paidAtIso={appointment.payment_link_paid_at}
+          paidAmountCents={linkPaidAmountCents}
+          phone={businessInfo.phone}
+        />
       ) : isProcessing ? (
         <ProcessingCard token={token} retryCount={retryCount} />
       ) : (
@@ -355,6 +397,54 @@ function PaidCard({
       <h3 className="text-lg font-semibold text-green-500">Payment received</h3>
       <p className="mt-2 text-sm text-site-text-muted">
         Thanks — your appointment has been paid in full.
+      </p>
+      {paidAtIso && (
+        <p className="mt-1 text-xs text-site-text-muted">
+          Paid on {formatReceiptDateTime(paidAtIso)} PST
+        </p>
+      )}
+      <p className="mt-4 text-xs text-site-text-muted">
+        Questions? Call {businessName} at{' '}
+        <a href={`tel:${phone}`} className="text-accent-brand">
+          {phone}
+        </a>
+        .
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Link-paid card — appointment still has outstanding balance, but THIS link
+// was paid. The customer's contract with this URL was for a specific amount
+// and that amount has been received. No outstanding-balance prompt; staff
+// send a fresh link if more is owed (Session 5-followup Bug 2).
+// ---------------------------------------------------------------------------
+
+function LinkPaidCard({
+  businessName,
+  paidAtIso,
+  paidAmountCents,
+  phone,
+}: {
+  businessName: string;
+  paidAtIso: string | null;
+  paidAmountCents: number | null;
+  phone: string;
+}) {
+  return (
+    <div className="rounded-lg border border-site-border bg-brand-dark p-6 text-center">
+      <h3 className="text-lg font-semibold text-green-500">Payment received</h3>
+      {paidAmountCents !== null && (
+        <p className="mt-2 text-base text-site-text">
+          <span className="font-semibold tabular-nums">
+            {formatCurrency(fromCents(paidAmountCents))}
+          </span>{' '}
+          paid
+        </p>
+      )}
+      <p className="mt-2 text-sm text-site-text-muted">
+        Thanks — we&apos;ve received your payment for this link.
       </p>
       {paidAtIso && (
         <p className="mt-1 text-xs text-site-text-muted">

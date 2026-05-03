@@ -1431,8 +1431,10 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 : undefined
             }
             onContinue={(amountCents) => {
+              // Modal closes itself via onOpenChange(false) inside handleContinue
+              // (Session 5-followup Bug 1 fix). We just record the choice and
+              // open the next dialog.
               setSelectedAmountCents(amountCents);
-              setPaymentAmountModalOpen(false);
               setPaymentLinkDialogOpen(true);
             }}
           />
