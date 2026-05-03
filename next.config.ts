@@ -4,6 +4,17 @@ const nextConfig: NextConfig = {
   // Standalone output for self-hosted deployment (PM2 on Hostinger VPS)
   output: 'standalone',
 
+  // Multi-core build parallelism. VPS has 16 cores idle during build; default
+  // is single-threaded webpack + serial server/edge compiles + serial standalone
+  // trace gen. cpus:12 leaves 4 cores headroom for OS + concurrent processes.
+  // parallelServerCompiles and parallelServerBuildTraces require webpackBuildWorker.
+  experimental: {
+    webpackBuildWorker: true,
+    parallelServerCompiles: true,
+    parallelServerBuildTraces: true,
+    cpus: 12,
+  },
+
   // Prevent Turbopack from bundling heavy server-only packages
   serverExternalPackages: ['pdfkit', 'sharp'],
 
