@@ -100,6 +100,10 @@ export interface ReceiptTransaction {
    * section, even at $0.00. Walk-in transactions leave this undefined and
    * the row is skipped. */
   appointment_balance_due?: number;
+  /** Appointment gross (dollars). Defined for appointment-linked
+   * transactions. Renderers use this as the Total line so close-out
+   * receipts (total_amount=0) display the meaningful gross instead of $0. */
+  appointment_total?: number;
 }
 
 export interface ReceiptLine {
@@ -615,7 +619,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       type: 'bold',
       text: '',
     });
-    const balanceGrandTotal = tx.total_amount + tx.tip_amount;
+    const balanceGrandTotal = (tx.appointment_total ?? tx.total_amount) + tx.tip_amount;
     lines.push({
       type: 'columns',
       left: 'TOTAL',
@@ -626,7 +630,10 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       type: 'bold',
       text: '',
     });
-    const grandTotal = tx.total_amount + tx.tip_amount;
+    // Appointment-linked transactions display the appointment gross as Total
+    // (close-out has total_amount=0 — without this fallback, receipts show
+    // "$0.00" as the Total which is misleading). Walk-in keeps tx.total_amount.
+    const grandTotal = (tx.appointment_total ?? tx.total_amount) + tx.tip_amount;
     lines.push({
       type: 'columns',
       left: 'TOTAL',
@@ -1252,7 +1259,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>
     <tr>
       <td style="padding:6px 0;font-size:15px;font-weight:bold;">${tx.is_deposit ? 'TOTAL CHARGED' : 'TOTAL'}</td>
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(tx.is_deposit ? tx.total_amount : tx.total_amount + tx.tip_amount).toFixed(2)}</td>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(tx.is_deposit ? tx.total_amount : ((tx.appointment_total ?? tx.total_amount) + tx.tip_amount)).toFixed(2)}</td>
     </tr>
     ${tx.is_deposit && tx.balance_due != null ? `<tr>
       <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">EST. BALANCE DUE AT SERVICE</td>
@@ -1346,12 +1353,45 @@ const CMD_DOUBLE_SIZE = [ESC, 0x21, 0x30];     // ESC ! 0x30 — double width + 
 const CMD_NORMAL_SIZE = [ESC, 0x21, 0x00];     // ESC ! 0x00 — normal size
 const CMD_CUT = [0x1D, 0x56, 0x01];            // GS V partial cut (at end only)
 
+// Common non-ASCII typography characters that the Star TSP100III code page
+// can't render — substitute with ASCII-safe equivalents BEFORE the byte
+// emit so we don't end up with "?" placeholders on the thermal print.
+// Add to this map when you discover a new offender (logs will surface it
+// via the console.warn below).
+const THERMAL_ASCII_SUBSTITUTIONS: Record<string, string> = {
+  '·': '-', // · (middle dot — used as separator in receipt source labels)
+  '—': '-', // — (em dash)
+  '–': '-', // – (en dash)
+  '‘': "'", // left single quote
+  '’': "'", // right single quote / apostrophe
+  '“': '"', // left double quote
+  '”': '"', // right double quote
+  '…': '...', // ellipsis
+  ' ': ' ', // non-breaking space
+};
+
 function textToBytes(text: string): number[] {
   const bytes: number[] = [];
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    // ASCII-safe: replace non-ASCII with '?'
-    bytes.push(code < 128 ? code : 0x3F);
+  // Apply known ASCII substitutions in one pass before the byte emit.
+  let normalized = text;
+  for (const [from, to] of Object.entries(THERMAL_ASCII_SUBSTITUTIONS)) {
+    if (normalized.includes(from)) {
+      normalized = normalized.split(from).join(to);
+    }
+  }
+  for (let i = 0; i < normalized.length; i++) {
+    const code = normalized.charCodeAt(i);
+    if (code < 128) {
+      bytes.push(code);
+    } else {
+      // Unmapped non-ASCII — surface in dev logs so future regressions
+      // (e.g. someone adding a new emoji or accent to a template) are
+      // immediately visible. Then substitute '?' as today.
+      console.warn(
+        `[ESC/POS] Non-ASCII char U+${code.toString(16).padStart(4, '0').toUpperCase()} in receipt text — substituting '?'. Add to THERMAL_ASCII_SUBSTITUTIONS if recurring.`
+      );
+      bytes.push(0x3F);
+    }
   }
   return bytes;
 }

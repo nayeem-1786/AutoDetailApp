@@ -6,6 +6,104 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): close-out refunds + receipt Total + thermal em-dash (Session 5c)
+
+End-to-end testing of Session 5b found four connected bugs on close-out transactions. All four share one root cause: appointment-linked transactions display `transaction.total_amount` instead of the appointment's gross.
+
+### Migration `20260503024921_add_refunds_notes.sql`
+
+Adds `refunds.notes TEXT` (nullable). Stores a JSON breakdown of source transactions touched on multi-source refunds. Single-source refunds (today's flow) leave it NULL.
+
+### Fix 1 — Receipt Total now shows appointment gross
+
+`src/lib/data/receipt-data.ts` computes a new `appointment_total` field when the receipt's transaction is appointment-linked. `ReceiptTransaction` interface gains the field. All three template surfaces (HTML email, copier print, thermal print) now render `tx.appointment_total ?? tx.total_amount` for the Total line. Public `/receipt/[token]` page mirrors the same logic in its own renderer + type. Walk-in receipts keep `tx.total_amount` — no change.
+
+Files: `src/lib/data/receipt-data.ts`, `src/app/pos/lib/receipt-template.ts` (3 Total render sites), `src/app/(public)/receipt/[token]/page.tsx` (type + render).
+
+### Fix 2 — Refund flow now works on close-out transactions
+
+`src/app/api/pos/refunds/route.ts` gains a close-out branch detected via `transaction.notes === 'Closed out — fully pre-paid'` (primary signal — Session 4b writes it explicitly) AND/OR insufficient local payments (defensive secondary).
+
+When triggered:
+1. **Source plan**: gather sibling completed transactions on the same appointment, sort LIFO (most recent first), exclude already-fully-refunded sources. Each source carries its remaining-refundable cents and its payments.
+2. **Pre-flight validation**: walk LIFO until requested cents covered. If any source we'd touch is a card payment with no Stripe PI, return `400 { code: 'refund_source_missing_pi' }` BEFORE any Stripe call.
+3. **LIFO Stripe execution**: one `stripe.refunds.create()` call per source, capped at that source's card payment amount. Cash portions on a source are recorded only (no Stripe call). Walk through sources until requested amount satisfied.
+4. **Mid-flight Stripe failure (honest reporting)**: if Stripe call N+1 fails AFTER call N succeeded, persist what moved to `refunds` + `refund_items`, return `207 { partialSuccess: true, refundedAmount, failedAt, error }`. Stripe doesn't allow rollback, so the audit trail stays truthful. If Stripe fails on the FIRST call (nothing committed), return `500 { error }` as before.
+5. **Source JSON in `refunds.notes`**: serialized list of `{transaction_id, stripe_pi, stripe_refund_id, amount, method}` per source touched. Single-source refunds (legacy flow) leave NULL.
+6. **Per-source status updates**: each source we drew from flips to `'refunded'` if its remaining-refundable hit 0, else `'partial_refund'`. Untouched siblings unchanged. Close-out target flips based on whether the requested refund total was fully met.
+
+Loyalty clawback continues to fire once on the close-out target's totals (per user spec — unchanged).
+
+Existing single-source path is preserved exactly: when `isCloseOut === false`, the route uses the same source-plan structure with one entry pointing at the target transaction and follows the same Stripe call shape that was there before.
+
+### Fix 4 — Thermal em-dash recurrence
+
+`textToBytes` in `src/app/pos/lib/receipt-template.ts` was substituting all non-ASCII chars with `0x3F` (`?`). Session 5b's payment label introduced a U+00B7 middle dot (`·`) as separator between source label and date, which printed as `?` on the Star TSP100III.
+
+Fix: added a `THERMAL_ASCII_SUBSTITUTIONS` map applied before the byte emit. Maps the common typography offenders to ASCII equivalents:
+- `·` → `-` (the immediate bug)
+- `—` (em dash) → `-` (recurrence-prone — was the Session 4r-followup bug)
+- `–` (en dash) → `-`
+- `‘` `’` → `'`
+- `“` `”` → `"`
+- `…` → `...`
+- non-breaking space → space
+
+Plus a `console.warn` for any unmapped non-ASCII char that hits the `?` fallback — future regressions surface in dev logs immediately. Defensive non-ASCII audit deferred per session prompt; the warn-on-substitute self-monitoring covers ongoing surveillance.
+
+### Deferred (not blockers; functional refund works)
+
+Two visual-only items deferred to a follow-up:
+
+- **"Refund will be issued from:" client display in the refund modal.** The server now correctly resolves and refunds across multiple sources, and the success toast surfaces the refunded amount. The breakdown LIST in the modal (informational only) requires either a new GET endpoint or a sibling-fetch from `transaction-detail.tsx` — both small but adds files. Punted.
+- **Admin Transactions list close-out indicator** (`src/app/admin/transactions/page.tsx`). The list still shows `$0.00` for close-out rows. The receipts and the detail-view payments block now show appointment gross correctly, but the list-view scan-readability fix is deferred. Same scope estimate as above (~30 LOC).
+
+Both deferrals have no impact on the refund flow itself — staff can refund close-out transactions correctly today; they just don't see the source breakdown in advance and won't see appointment gross when scanning the list.
+
+### Files touched
+
+- **NEW**: `supabase/migrations/20260503024921_add_refunds_notes.sql`
+- `src/app/api/pos/refunds/route.ts` — close-out branch (LIFO, partial-success, source JSON, per-source status)
+- `src/lib/data/receipt-data.ts` — `appointment_total` computation
+- `src/app/pos/lib/receipt-template.ts` — `appointment_total` Total render (HTML + 2 thermal sites); `THERMAL_ASCII_SUBSTITUTIONS` map + warn
+- `src/app/(public)/receipt/[token]/page.tsx` — type + Total render
+
+### Verification
+
+- `npx tsc --noEmit` clean
+- `npx eslint` clean on changed files
+- All 535 tests pass
+
+### Manual verification (test appointment id `beefe5ad-9246-4984-acb1-abbd4b8ba937`)
+
+Close-out flow: open the close-out tx in POS Transactions → Issue Refund → confirm modal max refundable shows $1.00 (computed from line items, not transaction.total_amount). Submit → expect `201` response and Stripe Dashboard shows the refund against the original pay-link PI.
+
+```sql
+-- After refund:
+SELECT id, status, notes
+FROM transactions
+WHERE appointment_id = 'beefe5ad-9246-4984-acb1-abbd4b8ba937'
+ORDER BY transaction_date;
+-- Both rows status='refunded'.
+
+SELECT id, transaction_id, amount, status, notes
+FROM refunds
+WHERE transaction_id IN (
+  SELECT id FROM transactions
+  WHERE appointment_id = 'beefe5ad-9246-4984-acb1-abbd4b8ba937'
+);
+-- One row, transaction_id = close-out's id, amount=1.00, notes is JSON
+-- {"sources":[{"transaction_id":"<pay-link-tx>","stripe_pi":"pi_...","stripe_refund_id":"re_...","amount":1.00,"method":"card"}]}
+```
+
+Receipt Total: open `/receipt/<close_out_token>` — expect `Total $1.00`, not `$0.00`. Same on print/email/thermal.
+
+Thermal em-dash: print thermal receipt — payment row reads `Online (pay link) - May 2, 2026, ... $1.00` (ASCII hyphen separator, not `?`). Watch the dev console for `[ESC/POS] Non-ASCII char U+...` warnings on any future regression.
+
+Walk-in regression: ring up walk-in cash → receipt unchanged, refund flow unchanged.
+
+---
+
 ## fix(pos): appointment_id orphan + unified receipt history + pay-page wording (Session 5b)
 
 Three connected fixes to the Pay-Link feature.

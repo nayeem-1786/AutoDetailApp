@@ -1545,6 +1545,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260502194628_add_appointment_payment_link.sql
 20260502203149_add_payment_link_sent_templates.sql
 20260502224451_add_cash_tendered_to_payments.sql
+20260503024921_add_refunds_notes.sql
 ```
 
 ## Scripts

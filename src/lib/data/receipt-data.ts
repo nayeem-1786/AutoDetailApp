@@ -184,6 +184,7 @@ export async function fetchReceiptData(
   // change to current behavior.
   let renderedPayments = raw.payments ?? [];
   let appointmentBalanceDue: number | undefined = undefined;
+  let appointmentTotal: number | undefined = undefined;
 
   if (raw.appointment_id) {
     const { data: appPayments } = await supabase
@@ -224,6 +225,10 @@ export async function fetchReceiptData(
           0
         );
         appointmentBalanceDue = Math.max(0, totalCents - paidCents);
+        // Receipt Total displays the appointment gross when this transaction
+        // is appointment-linked. Close-out has total_amount=0 — without this,
+        // the receipt shows "$0.00" as the Total which is misleading.
+        appointmentTotal = Number(apptForBalance.total_amount);
       }
     }
   }
@@ -255,6 +260,7 @@ export async function fetchReceiptData(
     deposit_date: depositDate,
     linked_receipt: linkedReceipt,
     appointment_balance_due: appointmentBalanceDue,
+    appointment_total: appointmentTotal,
   };
 
   return { tx, config: merged, context, images, print_server_url };

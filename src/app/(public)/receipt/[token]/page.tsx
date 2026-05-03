@@ -73,6 +73,9 @@ interface TransactionWithRelations {
    * carry appointment_id when there is one). Renders as a "Balance Due"
    * row at the end of the Payment section, even at $0.00. */
   appointment_balance_due?: number;
+  /** Appointment gross (dollars). Defined for appointment-linked receipts
+   * so the Total line shows the gross instead of $0 on close-outs. */
+  appointment_total?: number;
   refunds: {
     id: string;
     amount: number;
@@ -198,6 +201,7 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
   // payments[] — no behavior change for those.
   let renderedPayments = (data as unknown as TransactionWithRelations).payments;
   let appointmentBalanceDue: number | undefined;
+  let appointmentTotal: number | undefined;
 
   if (raw.appointment_id) {
     const { data: appPayments } = await supabase
@@ -232,6 +236,7 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
         0
       );
       appointmentBalanceDue = Math.max(0, totalCents - paidCents);
+      appointmentTotal = Number(apptForBalance.total_amount);
     }
   }
 
@@ -245,6 +250,7 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     linked_receipt: linkedReceipt,
     payments: renderedPayments,
     appointment_balance_due: appointmentBalanceDue,
+    appointment_total: appointmentTotal,
   };
 }
 
@@ -497,7 +503,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 {tx.is_deposit ? 'Total Charged' : 'Total'}
               </span>
               <span className="text-lg font-bold text-site-text">
-                {formatCurrency(tx.is_deposit ? tx.total_amount : tx.total_amount + tx.tip_amount)}
+                {formatCurrency(tx.is_deposit ? tx.total_amount : ((tx.appointment_total ?? tx.total_amount) + tx.tip_amount))}
               </span>
             </div>
             {tx.is_deposit && tx.balance_due > 0 && (

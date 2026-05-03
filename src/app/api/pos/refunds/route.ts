@@ -152,73 +152,266 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Aggregate cap: refund total must not exceed amount paid minus already
-    // refunded. Keeps a +1¢ tolerance for legacy DB rows whose rounded amounts
-    // may drift; new-path recompute is exact.
-    if (recomputed.totalCents > 0) {
-      const { data: existingRefunds } = await supabase
-        .from('refunds')
-        .select('amount')
-        .eq('transaction_id', data.transaction_id)
-        .eq('status', 'processed');
-      const alreadyRefundedCents = (existingRefunds || []).reduce(
-        (sum: number, r: { amount: number }) => sum + toCents(r.amount),
+    // ─────────────────────────────────────────────────────────────────────
+    // Close-out detection (Pay-Link Session 5c).
+    // The notes prefix is the primary signal — Session 4b writes it
+    // explicitly. The empty/insufficient-payments branch is a defensive
+    // secondary, in case someone routes a non-close-out tx through this path
+    // with no payments (shouldn't happen, but cheaper to guard than to debug).
+    //
+    // For close-outs, the money lives across sibling completed transactions
+    // on the same appointment. We refund LIFO (most recent first), one Stripe
+    // call per source, persist a JSON breakdown in refunds.notes, and update
+    // each touched source's status independently. Mid-flight failure persists
+    // the partial-success state honestly — Stripe doesn't allow rollback.
+    // ─────────────────────────────────────────────────────────────────────
+    const isCloseOut =
+      transaction.notes === 'Closed out — fully pre-paid' ||
+      (transaction.appointment_id != null &&
+        (transaction.payments ?? []).reduce(
+          (s: number, p: { amount: number }) => s + toCents(p.amount),
+          0
+        ) < recomputed.totalCents);
+
+    // Source-of-money refund plan. For non-close-out: a single entry pointing
+    // at this transaction (preserves the existing single-source flow). For
+    // close-out: LIFO list of sibling completed transactions on the same
+    // appointment, each annotated with its remaining refundable cents.
+    interface SourcePlan {
+      transaction_id: string;
+      payments: Array<{ method: string; amount: number; stripe_payment_intent_id: string | null }>;
+      remaining_refundable_cents: number;
+      total_amount: number;
+      tip_amount: number;
+    }
+    const sourcePlan: SourcePlan[] = [];
+
+    if (isCloseOut && transaction.appointment_id) {
+      // Gather sibling completed transactions on the same appointment, newest
+      // first. Exclude already-fully-refunded sources.
+      const { data: siblings } = await supabase
+        .from('transactions')
+        .select('id, total_amount, tip_amount, status, payments(*)')
+        .eq('appointment_id', transaction.appointment_id)
+        .eq('status', 'completed')
+        .neq('id', transaction.id)
+        .order('transaction_date', { ascending: false });
+
+      for (const sib of (siblings ?? []) as Array<{
+        id: string;
+        total_amount: number;
+        tip_amount: number;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        payments?: any[];
+      }>) {
+        const sibPaidCents = (sib.payments ?? []).reduce(
+          (s: number, p: { amount: number }) => s + toCents(p.amount),
+          0
+        );
+        if (sibPaidCents <= 0) continue;
+        // Subtract any prior refunds against this source.
+        const { data: priorRefunds } = await supabase
+          .from('refunds')
+          .select('amount')
+          .eq('transaction_id', sib.id)
+          .eq('status', 'processed');
+        const priorRefundedCents = (priorRefunds ?? []).reduce(
+          (s: number, r: { amount: number }) => s + toCents(r.amount),
+          0
+        );
+        const remaining = Math.max(0, sibPaidCents - priorRefundedCents);
+        if (remaining <= 0) continue;
+        sourcePlan.push({
+          transaction_id: sib.id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          payments: (sib.payments ?? []) as any[],
+          remaining_refundable_cents: remaining,
+          total_amount: sib.total_amount,
+          tip_amount: sib.tip_amount || 0,
+        });
+      }
+
+      const totalAvailableCents = sourcePlan.reduce(
+        (s, sp) => s + sp.remaining_refundable_cents,
         0
       );
-      const maxRefundableCents =
-        toCents(transaction.total_amount) +
-        toCents(transaction.tip_amount || 0) -
-        alreadyRefundedCents;
-      if (recomputed.totalCents > maxRefundableCents + 1) {
+
+      if (recomputed.totalCents > totalAvailableCents + 1) {
         return NextResponse.json(
           {
-            error: `Refund amount ($${fromCents(
-              recomputed.totalCents
-            ).toFixed(2)}) exceeds maximum refundable ($${fromCents(
-              maxRefundableCents
+            error: `Refund amount ($${fromCents(recomputed.totalCents).toFixed(
+              2
+            )}) exceeds available refundable across appointment sources ($${fromCents(
+              totalAvailableCents
             ).toFixed(2)})`,
           },
           { status: 400 }
         );
       }
-    }
 
-    // 1. If payment was card, issue Stripe refund FIRST (before inserting records)
-    const cardPayment = transaction.payments?.find(
-      (p: { method: string }) => p.method === 'card'
-    );
-    let stripeRefundId: string | null = null;
-
-    if (cardPayment?.stripe_payment_intent_id) {
-      // Cap Stripe refund at card payment amount (rest was cash/check)
-      const stripeRefundAmount = Math.min(totalRefundAmount, cardPayment.amount || 0);
-      if (stripeRefundAmount > 0) {
-        try {
-          const stripeRefund = await stripe.refunds.create({
-            payment_intent: cardPayment.stripe_payment_intent_id,
-            amount: Math.round(stripeRefundAmount * 100),
-          });
-          stripeRefundId = stripeRefund.id;
-        } catch (stripeErr) {
-          console.error('Stripe refund error:', stripeErr);
+      // Pre-flight: each source we'll touch must be refundable. For card
+      // payments, that means a non-null stripe_payment_intent_id. For cash,
+      // we just record it. Walk LIFO until requested cents are covered, and
+      // bail loudly if we hit a card source without a PI.
+      let need = recomputed.totalCents;
+      for (const sp of sourcePlan) {
+        if (need <= 0) break;
+        const portion = Math.min(need, sp.remaining_refundable_cents);
+        const cardPmt = sp.payments.find((p) => p.method === 'card');
+        if (cardPmt && !cardPmt.stripe_payment_intent_id) {
           return NextResponse.json(
-            { error: 'Stripe refund failed. No records created.' },
-            { status: 500 }
+            {
+              error: `Source transaction ${sp.transaction_id} is missing Stripe PaymentIntent — cannot refund. Contact support.`,
+              code: 'refund_source_missing_pi',
+            },
+            { status: 400 }
+          );
+        }
+        need -= portion;
+      }
+    } else {
+      // Single-source path: aggregate cap vs THIS transaction.
+      if (recomputed.totalCents > 0) {
+        const { data: existingRefunds } = await supabase
+          .from('refunds')
+          .select('amount')
+          .eq('transaction_id', data.transaction_id)
+          .eq('status', 'processed');
+        const alreadyRefundedCents = (existingRefunds || []).reduce(
+          (sum: number, r: { amount: number }) => sum + toCents(r.amount),
+          0
+        );
+        const maxRefundableCents =
+          toCents(transaction.total_amount) +
+          toCents(transaction.tip_amount || 0) -
+          alreadyRefundedCents;
+        if (recomputed.totalCents > maxRefundableCents + 1) {
+          return NextResponse.json(
+            {
+              error: `Refund amount ($${fromCents(
+                recomputed.totalCents
+              ).toFixed(2)}) exceeds maximum refundable ($${fromCents(
+                maxRefundableCents
+              ).toFixed(2)})`,
+            },
+            { status: 400 }
           );
         }
       }
+      // Single-source plan: this transaction.
+      sourcePlan.push({
+        transaction_id: transaction.id,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        payments: (transaction.payments ?? []) as any[],
+        remaining_refundable_cents:
+          toCents(transaction.total_amount) + toCents(transaction.tip_amount || 0),
+        total_amount: transaction.total_amount,
+        tip_amount: transaction.tip_amount || 0,
+      });
     }
 
-    // 2. Insert refund record (only after Stripe succeeds or payment is cash/check)
+    // 1. Walk the source plan LIFO, issuing Stripe refunds for card sources.
+    // For close-out: multiple sources; for single-source: at most one card
+    // payment (existing behavior preserved).
+    interface RefundedSource {
+      transaction_id: string;
+      stripe_pi: string | null;
+      stripe_refund_id: string | null;
+      amount: number;
+      method: string;
+    }
+    const refundedSources: RefundedSource[] = [];
+    let stripeRefundId: string | null = null; // primary id for the refunds row
+    let remainingNeedCents = recomputed.totalCents;
+    let stripeFailure: { transaction_id: string; error: string } | null = null;
+
+    for (const sp of sourcePlan) {
+      if (remainingNeedCents <= 0) break;
+      const portionCents = Math.min(remainingNeedCents, sp.remaining_refundable_cents);
+      const portionDollars = fromCents(portionCents);
+      const cardPmt = sp.payments.find((p) => p.method === 'card');
+
+      if (cardPmt && cardPmt.stripe_payment_intent_id && portionCents > 0) {
+        // Cap at the card payment amount (rest was cash/check on this source)
+        const stripeAmountCents = Math.min(portionCents, toCents(cardPmt.amount || 0));
+        if (stripeAmountCents > 0) {
+          try {
+            const stripeRefund = await stripe.refunds.create({
+              payment_intent: cardPmt.stripe_payment_intent_id,
+              amount: stripeAmountCents,
+            });
+            if (!stripeRefundId) stripeRefundId = stripeRefund.id;
+            refundedSources.push({
+              transaction_id: sp.transaction_id,
+              stripe_pi: cardPmt.stripe_payment_intent_id,
+              stripe_refund_id: stripeRefund.id,
+              amount: fromCents(stripeAmountCents),
+              method: 'card',
+            });
+            remainingNeedCents -= stripeAmountCents;
+          } catch (stripeErr) {
+            console.error('Stripe refund error (close-out source):', stripeErr);
+            stripeFailure = {
+              transaction_id: sp.transaction_id,
+              error: stripeErr instanceof Error ? stripeErr.message : 'Stripe error',
+            };
+            break;
+          }
+        }
+        // Cash portion (if any) on this source after the card cap is covered
+        const cashPortion = portionCents - stripeAmountCents;
+        if (cashPortion > 0 && remainingNeedCents > 0) {
+          refundedSources.push({
+            transaction_id: sp.transaction_id,
+            stripe_pi: null,
+            stripe_refund_id: null,
+            amount: fromCents(cashPortion),
+            method: 'cash',
+          });
+          remainingNeedCents -= cashPortion;
+        }
+      } else if (portionCents > 0) {
+        // Cash/check source — no Stripe call, just record the portion
+        refundedSources.push({
+          transaction_id: sp.transaction_id,
+          stripe_pi: null,
+          stripe_refund_id: null,
+          amount: portionDollars,
+          method: cardPmt ? 'card' : (sp.payments[0]?.method ?? 'cash'),
+        });
+        remainingNeedCents -= portionCents;
+      }
+    }
+
+    // If Stripe failed mid-flight AND nothing succeeded yet, abort hard (no
+    // partial state to commit). Otherwise persist what moved + return a
+    // partial-success payload so staff knows manual recovery is needed.
+    if (stripeFailure && refundedSources.length === 0) {
+      return NextResponse.json(
+        { error: 'Stripe refund failed. No records created.' },
+        { status: 500 }
+      );
+    }
+    const committedRefundCents = recomputed.totalCents - remainingNeedCents;
+    const committedRefundAmount = fromCents(committedRefundCents);
+
+    // 2. Insert refund record. amount = what actually moved (partial-success
+    // case persists committed cents only). notes = JSON breakdown of source
+    // transactions touched (NULL for traditional single-source flow).
+    const refundNotes =
+      isCloseOut || refundedSources.length > 1
+        ? JSON.stringify({ sources: refundedSources })
+        : null;
     const { data: refund, error: refundError } = await supabase
       .from('refunds')
       .insert({
         transaction_id: data.transaction_id,
         status: 'processed',
-        amount: totalRefundAmount,
+        amount: committedRefundAmount,
         reason: data.reason,
         processed_by: posEmployee.employee_id,
         stripe_refund_id: stripeRefundId,
+        notes: refundNotes,
       })
       .select('*')
       .single();
@@ -385,12 +578,28 @@ export async function POST(request: NextRequest) {
         .eq('id', refund.id);
     }
 
-    // 6. Update transaction status
-    const txFullAmount = transaction.total_amount + (transaction.tip_amount || 0);
-    const newStatus = totalRefundAmount >= txFullAmount
-      ? 'refunded'
-      : 'partial_refund';
+    // 6. Update transaction status.
+    // Per-source: each source we drew from gets 'refunded' if its remaining
+    // refundable hit 0, else 'partial_refund'. Sources we never touched stay
+    // unchanged. Close-out target itself flips based on whether the requested
+    // refund total was fully met.
+    for (const sp of sourcePlan) {
+      const sourceCents = refundedSources
+        .filter((r) => r.transaction_id === sp.transaction_id)
+        .reduce((s, r) => s + toCents(r.amount), 0);
+      if (sourceCents <= 0) continue;
+      const sourceFullyRefunded = sourceCents >= sp.remaining_refundable_cents;
+      // Skip self (close-out target) here — we update it below to reflect the
+      // overall refund status, not a per-source check.
+      if (sp.transaction_id === transaction.id) continue;
+      await supabase
+        .from('transactions')
+        .update({ status: sourceFullyRefunded ? 'refunded' : 'partial_refund' })
+        .eq('id', sp.transaction_id);
+    }
 
+    const targetFullyRefunded = remainingNeedCents <= 0;
+    const newStatus = targetFullyRefunded ? 'refunded' : 'partial_refund';
     await supabase
       .from('transactions')
       .update({ status: newStatus })
@@ -448,6 +657,21 @@ export async function POST(request: NextRequest) {
       ipAddress: getRequestIp(request),
       source: 'pos',
     });
+
+    // Partial-success path: Stripe failed mid-flight AFTER at least one
+    // source committed. Honest reporting — modal toasts the partial state.
+    if (stripeFailure) {
+      return NextResponse.json(
+        {
+          partialSuccess: true,
+          refundedAmount: committedRefundAmount,
+          failedAt: stripeFailure.transaction_id,
+          error: `Partial refund: $${committedRefundAmount.toFixed(2)} committed; remaining $${fromCents(remainingNeedCents).toFixed(2)} failed at source ${stripeFailure.transaction_id}: ${stripeFailure.error}. Contact support for manual recovery.`,
+          data: refund,
+        },
+        { status: 207 }
+      );
+    }
 
     return NextResponse.json({ data: refund }, { status: 201 });
   } catch (err) {
