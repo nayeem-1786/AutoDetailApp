@@ -6,6 +6,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## perf: enable multi-core webpack build (single-threaded → 12 cores)
+
+Production VPS build was at 11.5min and growing — single-threaded webpack with serial server/edge compilation and serial standalone trace generation, on a 16-core / 62GB-RAM VPS sitting idle during build. Added `experimental.webpackBuildWorker: true`, `parallelServerCompiles: true`, `parallelServerBuildTraces: true`, and `cpus: 12` (4-core headroom for OS + concurrent processes) to `next.config.ts`. All four flags verified against `node_modules/next@15.3.3/dist/server/config-shared.d.ts`; per the JSDoc, `parallelServerCompiles`/`parallelServerBuildTraces` require `webpackBuildWorker` to be active. `NextConfig` accepts `experimental` natively — no type assertion needed.
+
+Local benchmark on the MBP intentionally skipped: different core count + warm `.next/cache` make local timings non-predictive of VPS gains. Real measurement is the next VPS build.
+
+`tsconfig.json` was already on `incremental: true` (`.tsbuildinfo` cache active), so no TypeScript-side change was needed for this pass.
+
+**Audit-only finding (no code change):** `next.config.ts` line 5 has `output: 'standalone'` ENABLED. A prior memory note had this commented out; the memory was stale and was corrected this session.
+
+### Files touched
+- `next.config.ts` — new `experimental` block (4 flags)
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint next.config.ts` clean. `npx vitest run` → 535/535. Build-time impact: pending VPS measurement.
+
+---
+
 ## chore: lint cleanup — 0 errors, hook violation fixed (Session 4d-followup tail)
 
 Followed up on the lint debt deferred at the end of Session 4d-followup. Started at 26 errors / 90 warnings; ended at 0 errors / 44 warnings. `tsc --noEmit` clean, vitest 535/535.
