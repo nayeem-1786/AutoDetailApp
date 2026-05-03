@@ -6,6 +6,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## chore: lint cleanup — 0 errors, hook violation fixed (Session 4d-followup tail)
+
+Followed up on the lint debt deferred at the end of Session 4d-followup. Started at 26 errors / 90 warnings; ended at 0 errors / 44 warnings. `tsc --noEmit` clean, vitest 535/535.
+
+**Hook violation (the important one)**: `src/components/booking/booking-wizard.tsx` had `useState(false)` for `showSpecialtyBlock` declared at line 601, *after* the early-return `if (confirmation) return <BookingConfirmation .../>` at line 554. When a booking confirmed, the component returned early and the hook was never called — violating React's stable-hook-order rule and risking state corruption on the render that flips `confirmation` back to null. Hoisted the declaration to line 464 alongside the other `useState` calls. The conditional logic that *uses* the state (set in `handleVehicleSelect`, conditional JSX at step 1) is unchanged.
+
+**ESLint config**: nested `eslint.config.mjs` files inside `.claude/worktrees/` (created by Claude agents in worktree-isolation mode) were being auto-loaded by ESLint's flat-config discovery, overriding parent ignores. Added `--no-config-lookup --config ./eslint.config.mjs` to the `lint` npm script so only the project-root config is used. Added `**/worktrees/**/*` and `**/docs/hardware/**/*` to the parent config's `ignores` (`docs/hardware/` holds standalone CommonJS Node scripts deployed separately to a Windows OptiPlex via PM2 — not part of the Next.js bundle).
+
+**Other manual fix**: `src/app/admin/inventory/counts/page.tsx:297` — escaped `"` → `&quot;` in JSX text.
+
+**Auto-fixed (`eslint --fix`)**: 4 `prefer-const` (`let result`/`projectedNegative`/`variantMap`/`t` → `const`) across `customers/page.tsx`, `inventory/counts/[id]/revert-preview/route.ts`, `voice-agent/products/details/route.ts`, `voice-agent/vehicle-classify/route.ts`. 2 unused `eslint-disable-next-line react-hooks/exhaustive-deps` directives removed in `customer-auth-provider.tsx` and `useTableState.ts`.
+
+### Files touched
+- `src/components/booking/booking-wizard.tsx` — hook hoist
+- `src/app/admin/inventory/counts/page.tsx` — JSX entity escape
+- `eslint.config.mjs` — global ignores for worktrees + hardware scripts
+- `package.json` — `lint` script forces explicit parent config
+- `src/app/admin/customers/page.tsx`, `src/app/api/admin/inventory/counts/[id]/revert-preview/route.ts`, `src/app/api/voice-agent/products/details/route.ts`, `src/app/api/voice-agent/vehicle-classify/route.ts` — `let` → `const`
+- `src/lib/auth/customer-auth-provider.tsx`, `src/lib/hooks/useTableState.ts` — dead disable directives removed
+
+### Verification
+`npm run lint` → 0 errors / 44 warnings. `npx tsc --noEmit` clean. `npx vitest run` → 535/535. Booking-wizard hoist verified by `grep` — declaration at line 464 (with sibling useStates), all 5 usage sites unchanged.
+
+---
+
 ## feat(pos): refund source-plan display + admin list close-out indicator (Session 4d-followup)
 
 Two deferrals from Session 4d landed. Plus session-naming corrections in this file.

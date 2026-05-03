@@ -88,7 +88,7 @@ export async function GET(
     // after reversal? Same math the RPC's first pass uses; surfaced in the
     // preview so the UI can render an actionable error banner without
     // waiting for a 409 from the revert call.
-    let projectedNegative: ProjectedNegativeProduct[] = [];
+    const projectedNegative: ProjectedNegativeProduct[] = [];
     if (affectedProductIds.length > 0) {
       const { data: liveProducts, error: prodErr } = await admin
         .from('products')

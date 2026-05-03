@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --no-config-lookup --config ./eslint.config.mjs",
     "typecheck": "tsc --noEmit",
     "regen:sms-contracts": "tsx scripts/regen-sms-contracts.ts"
   },

@@ -43,7 +43,7 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   const loadingResolvedRef = useRef(false);
 
   // Stable supabase reference — prevents useEffect re-subscriptions
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   const supabase = useMemo(() => createClient(), []);
 
   const loadCustomerData = useCallback(

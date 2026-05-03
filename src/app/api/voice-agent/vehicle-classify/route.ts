@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = createAdminClient();
 
-  let t = perf.now();
+  const t = perf.now();
   const classification = await resolveVehicleClassification(
     supabase,
     make,

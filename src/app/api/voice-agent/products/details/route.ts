@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         .filter((gid): gid is string => !!gid)
     )];
 
-    let variantMap = new Map<string, Array<{ name: string; variant_label: string | null; retail_price: number; sale_price: number | null; sale_starts_at: string | null; sale_ends_at: string | null; quantity_on_hand: number }>>();
+    const variantMap = new Map<string, Array<{ name: string; variant_label: string | null; retail_price: number; sale_price: number | null; sale_starts_at: string | null; sale_ends_at: string | null; quantity_on_hand: number }>>();
 
     if (groupIds.length > 0) {
       const t2 = perf.now();

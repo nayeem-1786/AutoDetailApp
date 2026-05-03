@@ -3,6 +3,13 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
 const eslintConfig = defineConfig([
+  // Ignore-only config (must be first; flat config respects ignores additively).
+  // .claude/worktrees/** are temporary git worktrees from Claude agents — not application code.
+  // docs/hardware/** are standalone CommonJS Node scripts deployed separately to a Windows
+  // OptiPlex via PM2 (own package.json + runtime, not part of the Next.js bundle).
+  {
+    ignores: ["**/worktrees/**/*", "**/docs/hardware/**/*"],
+  },
   ...nextVitals,
   ...nextTs,
   {

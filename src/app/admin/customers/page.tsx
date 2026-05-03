@@ -371,7 +371,7 @@ export default function CustomersPage() {
     const now = new Date();
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
-    let result = customers.filter((c) => {
+    const result = customers.filter((c) => {
       // Text search (debounced)
       if (table.debouncedSearch) {
         const q = table.debouncedSearch.toLowerCase();

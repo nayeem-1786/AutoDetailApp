@@ -459,6 +459,9 @@ export function BookingWizard({
   const [confirmation, setConfirmation] = useState<ConfirmationData | null>(null);
   const [editEntryStep, setEditEntryStep] = useState<number | null>(null);
   const [urlCouponAttempted, setUrlCouponAttempted] = useState(false);
+  // Specialty vehicle block state (Phase 4 — exotic/classic booking gate).
+  // Declared here (not below the confirmation early-return) so hook order is stable.
+  const [showSpecialtyBlock, setShowSpecialtyBlock] = useState(false);
 
   // --- URL state sync ---
   const updateUrl = useCallback((newStep: number, newState: BookingState) => {
@@ -596,9 +599,6 @@ export function BookingWizard({
       }),
     }))
     .filter((cat) => cat.services.length > 0);
-
-  // Specialty vehicle block state (Phase 4 — exotic/classic booking gate)
-  const [showSpecialtyBlock, setShowSpecialtyBlock] = useState(false);
 
   // Step 1: Vehicle → advance to Step 2 (or block if specialty)
   function handleVehicleSelect(vehicle: VehicleSelection) {

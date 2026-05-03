@@ -294,7 +294,7 @@ export default function InventoryCountsPage() {
 
             <div>
               <label className="mb-2 block text-sm font-medium text-ui-text">
-                Section Label {newType === 'sectional' && <span className="text-ui-text-muted">(e.g., "Shelf A1-A5")</span>}
+                Section Label {newType === 'sectional' && <span className="text-ui-text-muted">(e.g., &quot;Shelf A1-A5&quot;)</span>}
               </label>
               <Input
                 value={newLabel}

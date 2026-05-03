@@ -185,7 +185,7 @@ export function useTableState(options: UseTableStateOptions = {}): UseTableState
       setPageState(1);
     }
     resetPageOnChange.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [debouncedSearch, filters, sort]);
 
   const setSearch = useCallback((value: string) => {
