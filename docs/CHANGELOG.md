@@ -6,6 +6,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(split-payment): 3-column grid layout — center keypad with full-width displays, presets float left
+
+Visual review of `01f4519b` (sync-to-cash-payment two-column rhythm) on iPad PWA showed that matching cash-payment's symmetric two-column layout exactly didn't read well for split-payment. Cash-payment has one display + one keypad; split-payment has TWO displays + one keypad, and the symmetric two-column treatment made the surface feel narrow and the keypad off-center inside the 850px modal. User directive on review: keep the keypad as the visually-centered focal element while letting the preset chips float at the modal's left edge.
+
+This session intentionally walks back the "match cash exactly" constraint from `01f4519b` for split-payment specifically. Cash-payment is unchanged.
+
+**Two coupled changes:**
+
+1. **Modal body: 2-column flex → 3-column grid** (`grid grid-cols-[1fr_auto_1fr] items-start gap-4`)
+   - Cell 1 (`1fr`): preset chips, no `justify-self` set → grid items default left-aligned, 60px chip column sits flush at the modal's left edge.
+   - Cell 2 (`auto`, locked to 320px via inner wrapper `w-[320px]`): Cash + Card displays + embedded keypad — the focal element.
+   - Cell 3 (`1fr`): empty `aria-hidden` phantom that mirrors cell 1's width so the center cell renders at the TRUE horizontal center of the 850px modal (presets push the layout left from cell 1; phantom pads from cell 3).
+   - The `w-[320px]` is intentional and explicit — `w-full max-w-xs` percentage widths inside grid auto tracks resolve circularly and collapse the right column to PinPad's min-content (~106px). The pre-fix two-column layout worked because the 320px wrapper was sized against the parent flex container, not a grid auto track.
+
+2. **Cash/Card display fields: `w-44 mx-auto justify-center` → `w-full justify-between px-4`**
+   - `fieldClass` updated: `w-44` → `w-full`, `justify-center` → `justify-between`, added `px-4`.
+   - Displays widen from a 176px centered pill to a full 320px column-spanning block.
+   - Label flush left, `$amount` flush right with `px-4` breathing room (was inline `Cash $0.00` with `mr-2`).
+   - Caller-side `<span className="mr-2">` removed; the dollar amount wrapped in its own `<span>` so flex `justify-between` can split label and value.
+   - `mx-auto` dropped from button className — full-width fields no longer need outer centering.
+   - POS convention rationale: tall block-style fields read as primary input slots (mirrors POS register/calculator UX); the eye scans label → amount left-to-right.
+
+**Spacer math (unchanged from `01f4519b`):**
+- LEFT cell first preset top: spacer1 (60) + gap-3 (12) + spacer2 (60) + gap-3 (12) = **144px**
+- CENTER cell PinPad row 1 top: Cash display (60) + gap-3 (12) + Card display (60) + gap-3 (12) = **144px** ✓ row-aligned
+
+**Visual outcome:** Keypad sits at true horizontal center of modal. Cash + Card displays read as tall block-style input slots labeled left, amount right. Preset chips hug the modal's left edge as a vertical column. The surface no longer matches cash-payment's exact rhythm — the asymmetry is documented inline as deliberate, with rationale ("two displays + one keypad ≠ one display + one keypad") captured in the comment block.
+
+**Verification:** `tsc --noEmit` clean · `eslint` clean. Layout change is visual-only — no engine, no API, no test impact.
+
+---
+
 ## feat(refund): render per-method breakdown across all 4 receipt surfaces + POS transaction detail
 
 Session 4d's refund engine writes a JSON `{sources:[...]}` breakdown to `refunds.notes` for split-tender and close-out refunds (per-leg method, amount, stripe_pi, stripe_refund_id). Production transaction SD-006261 ($75 split — $74 cash + $1 card) refunded successfully and the engine recorded the per-method breakdown correctly, but no UI surface read it back. The transaction-detail page, all three receipt renderers, and the admin transactions list rendered only the aggregate refund total, leaving operators blind to which method actually moved.

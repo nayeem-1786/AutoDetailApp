@@ -432,8 +432,11 @@ export function SplitPayment() {
   // white background. transition-colors smooths the swap.
   function fieldClass(field: ActiveField): string {
     const isActive = activeField === field;
+    // w-full + px-4 + justify-between: field stretches to fill the right
+    // column (320px), label sits flush left, $-amount flush right with px-4
+    // breathing room. POS convention — eye scans label → amount left-to-right.
     return cn(
-      'flex h-[60px] w-44 items-center justify-center rounded-lg text-2xl tabular-nums text-gray-900 dark:text-gray-100 transition-colors touch-manipulation cursor-pointer',
+      'flex h-[60px] w-full items-center justify-between rounded-lg px-4 text-2xl tabular-nums text-gray-900 dark:text-gray-100 transition-colors touch-manipulation cursor-pointer',
       isActive
         ? 'border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30'
         : 'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500',
@@ -451,22 +454,24 @@ export function SplitPayment() {
 
       {splitStep === 'enter-amounts' && (
         <>
-          {/* Two-column body — layout sync to cash-payment.tsx (a8f87c98).
-              LEFT column: NO explicit width (shrinks to 60px button content)
-              + outer gap-3 + inner button-group wrapper (gap-2 between
-              chips). RIGHT column: w-full max-w-xs (320px max) + gap-3.
-              Total horizontal: 60 + 16 (gap-4) + 320 = ~396px = matches
-              cash-payment exactly. Pre-sync this surface used 300px columns
-              + gap-4 column gap = 616px total, ~220px wider than cash and
-              breaking the visual sibling rhythm. */}
-          <div className="flex flex-row items-start gap-4">
-            {/* LEFT column — vertical preset stack, mirrors cash-payment's
-                left-column structure exactly. Two h-[60px] spacers stand in
-                for the right column's Cash display + Card display heights,
-                separated by gap-3 (12px). Inner button-group wrapper has
-                gap-2 (8px) between chips. First preset (50/50) top at
-                60+12+60+12 = 144px = matches RIGHT column's PinPad row 1
-                top (also 144px). */}
+          {/* 3-column grid layout — asymmetric by design, intentionally
+              diverges from cash-payment.tsx's symmetric two-column rhythm.
+              Cell 1 (1fr): preset chips, left-aligned at modal edge.
+              Cell 2 (auto, locked to 320px via inner wrapper): Cash + Card
+              displays + keypad — the visually-centered focal element.
+              Cell 3 (1fr): empty phantom that mirrors cell 1's width so the
+              center cell sits at true horizontal center of the modal.
+              gap-4 between cells (16px). Auto-track sizes to max-content of
+              its content; explicit w-[320px] on the inner right-column
+              wrapper (NOT w-full max-w-xs) because percentage widths inside
+              grid auto tracks resolve circularly. */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-4">
+            {/* LEFT cell (column 1) — preset chips. Grid items default to
+                left-aligned within their cell (no justify-self set), so the
+                60px chip column sits flush against the modal's left edge.
+                Two h-[60px] spacers stand in for the right column's Cash +
+                Card display heights (60+12+60+12 = 144px); first preset top
+                aligns with PinPad row 1 top. */}
             <div className="flex flex-col gap-3">
               <div className="h-[60px]" aria-hidden="true" />
               <div className="h-[60px]" aria-hidden="true" />
@@ -495,26 +500,28 @@ export function SplitPayment() {
               </div>
             </div>
 
-            {/* RIGHT column — two display fields + keypad. Mirrors cash-payment's
-                right-column wrapper exactly: w-full max-w-xs (320px) + gap-3.
-                PinPad fills the column → cells ~101px (B-followup-3 lesson).
-                Display fields (w-44 = 176px) centered with mx-auto. */}
-            <div className="flex w-full max-w-xs flex-col gap-3">
+            {/* CENTER cell (column 2, auto width = 320px from inner wrapper)
+                — two full-width display fields + keypad. Display fields
+                widen to fill the 320px column (vs prior w-44/176px), giving
+                the surface a tall block-style layout. Right column wrapper
+                uses explicit w-[320px] (NOT w-full max-w-xs) — percentage
+                widths inside grid auto tracks have circular resolution and
+                collapse to PinPad's min-content (~106px). */}
+            <div className="flex w-[320px] flex-col gap-3">
               {/* Cash display field — tap to activate. Active treatment:
                   thicker blue border + light blue tint. Inactive: standard
-                  gray border. Both fields render via fromCents() and stay
-                  fixed-width (w-44) regardless of value. Label rendered
-                  inside the field via `Cash $X.XX` for compactness. */}
+                  gray border. fieldClass renders w-full justify-between
+                  px-4 — label flush left, $-amount flush right. */}
               <button
                 type="button"
                 role="button"
                 onClick={() => handleFieldTap('cash')}
                 aria-pressed={activeField === 'cash'}
                 aria-label={`Cash amount ${cashDisplay}, ${activeField === 'cash' ? 'active' : 'inactive'}`}
-                className={cn('mx-auto', fieldClass('cash'))}
+                className={fieldClass('cash')}
               >
-                <span className="mr-2 text-base font-medium text-gray-500 dark:text-gray-400">Cash</span>
-                ${cashDisplay}
+                <span className="text-base font-medium text-gray-500 dark:text-gray-400">Cash</span>
+                <span>${cashDisplay}</span>
               </button>
 
               {/* Card display field — same pattern. */}
@@ -524,10 +531,10 @@ export function SplitPayment() {
                 onClick={() => handleFieldTap('card')}
                 aria-pressed={activeField === 'card'}
                 aria-label={`Card amount ${cardDisplay}, ${activeField === 'card' ? 'active' : 'inactive'}`}
-                className={cn('mx-auto', fieldClass('card'))}
+                className={fieldClass('card')}
               >
-                <span className="mr-2 text-base font-medium text-gray-500 dark:text-gray-400">Card</span>
-                ${cardDisplay}
+                <span className="text-base font-medium text-gray-500 dark:text-gray-400">Card</span>
+                <span>${cardDisplay}</span>
               </button>
 
               {/* Embedded keypad — sends digits to whichever field is
@@ -539,6 +546,11 @@ export function SplitPayment() {
                 size="default"
               />
             </div>
+
+            {/* RIGHT cell (column 3) — empty phantom. Mirrors cell 1's 1fr
+                width so the center cell renders at true horizontal center
+                of the modal. aria-hidden so screen readers skip it. */}
+            <div aria-hidden="true" />
           </div>
 
           <div className="flex gap-4">
