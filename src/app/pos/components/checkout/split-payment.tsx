@@ -12,8 +12,9 @@ import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 import { PinPad } from '../pin-pad';
 
-type SplitStep = 'enter-amounts' | 'processing-card' | 'complete' | 'error';
-type SplitMode = 'cash-first' | 'card-first';
+type SplitStep = 'enter-amounts' | 'processing' | 'complete' | 'error';
+type ActiveField = 'cash' | 'card';
+type ProcessingBranch = 'cash-only' | 'card-only' | 'mixed';
 
 // $99,999.99 hard cap — same value as cash-payment.tsx / keypad-tab.tsx /
 // register-tab.tsx / payment-link-amount-modal.tsx. Inlined for self-contained
@@ -25,82 +26,230 @@ export function SplitPayment() {
   const checkout = useCheckout();
 
   const grandTotal = ticket.total;
-  const [splitMode, setSplitMode] = useState<SplitMode>('cash-first');
-  // Tendered primary amount lives as integer cents and entry is "fixed-decimal"
-  // — every keypad digit shifts the value left by one column. Mirrors the
-  // pattern in cash-payment.tsx / keypad-tab.tsx / payment-link-amount-modal.tsx.
-  const [primaryCents, setPrimaryCents] = useState(0);
+  const grandTotalCents = toCents(grandTotal);
+
+  // Two-field architecture (post-mode-toggle removal): Cash and Card amounts
+  // are simultaneously editable. activeField controls which one the keypad +
+  // presets target; the OTHER field auto-derives as grandTotalCents - active.
+  // Initial state: Cash active at $0, Card auto-derived at the full grandTotal.
+  // Allows endpoint splits ($75 cash + $0 card OR $0 cash + $75 card) without
+  // mode-toggle UX gymnastics. Pre-refactor: splitMode + primaryCents forced
+  // both halves > 0, blocking endpoints and creating a "stuck at primary = 0"
+  // dead state when user backspaced the primary to nothing.
+  const [activeField, setActiveField] = useState<ActiveField>('cash');
+  const [cashCents, setCashCents] = useState(0);
+  const [cardCents, setCardCents] = useState(grandTotalCents);
   const [splitStep, setSplitStep] = useState<SplitStep>('enter-amounts');
+  // Captures which branch handleProcessSplit is running so the 'processing'
+  // UI can fork (cash-only shows brief "Collecting cash...", card-only and
+  // mixed show terminal prompt). Set at the start of handleProcessSplit;
+  // cleared on cancel / next mount.
+  const [processingBranch, setProcessingBranch] = useState<ProcessingBranch | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const grandTotalCents = toCents(grandTotal);
-  const primaryNum = fromCents(primaryCents);
-  const displayValue = primaryNum.toFixed(2);
+  const cashAmount = fromCents(cashCents);
+  const cardAmount = fromCents(cardCents);
+  const cashDisplay = cashAmount.toFixed(2);
+  const cardDisplay = cardAmount.toFixed(2);
 
-  // Based on mode, calculate the portions. Formulas byte-identical to the
-  // pre-rebuild string-state version — only the `primaryNum` source changed
-  // from `parseFloat(primaryAmount) || 0` to `fromCents(primaryCents)`.
-  const cashAmount = splitMode === 'cash-first' ? primaryNum : Math.max(0, Math.round((grandTotal - primaryNum) * 100) / 100);
-  const cardAmount = splitMode === 'card-first' ? primaryNum : Math.max(0, Math.round((grandTotal - primaryNum) * 100) / 100);
-  const remaining = Math.max(0, Math.round((grandTotal - cashAmount - cardAmount) * 100) / 100);
+  // Auto-derive enforces sum = grandTotalCents whenever either field changes
+  // through setActiveCents. isValidSplit confirms the invariant — defensive
+  // guard against rounding drift or edge cases.
+  const isValidSplit = (cashCents + cardCents) === grandTotalCents;
 
-  const isValidSplit =
-    primaryNum > 0 &&
-    primaryNum < grandTotal &&
-    cashAmount >= 0 &&
-    cardAmount > 0;
+  // ----- Field-update helpers (preserve auto-derive invariant) -----
+
+  // Update the active field to `cents` and auto-derive the other so the two
+  // always sum to grandTotalCents.
+  function setActiveCents(cents: number) {
+    if (activeField === 'cash') {
+      setCashCents(cents);
+      setCardCents(Math.max(0, grandTotalCents - cents));
+    } else {
+      setCardCents(cents);
+      setCashCents(Math.max(0, grandTotalCents - cents));
+    }
+  }
+
+  // ----- Keypad handlers -----
 
   function handleDigit(d: string) {
     if (d === '.') return; // Defensive — `.` is not rendered in amount layout.
-    const next = d === '00' ? primaryCents * 100 : primaryCents * 10 + parseInt(d, 10);
-    // Cap one cent below grand total — split MUST leave at least $0.01 for the
-    // OTHER half, otherwise it isn't a split. Also cap at $99,999.99 hard limit.
-    const cap = Math.min(CENTS_CAP, grandTotalCents - 1);
+    const current = activeField === 'cash' ? cashCents : cardCents;
+    const next = d === '00' ? current * 100 : current * 10 + parseInt(d, 10);
+    // Cap at grandTotalCents (endpoint splits are valid — full total in one
+    // field). Pre-refactor used grandTotalCents - 1 to force both halves > 0.
+    const cap = Math.min(CENTS_CAP, grandTotalCents);
     if (next > cap) return;
-    setPrimaryCents(next);
+    setActiveCents(next);
   }
 
   function handleBackspace() {
-    setPrimaryCents(Math.floor(primaryCents / 10));
+    const current = activeField === 'cash' ? cashCents : cardCents;
+    setActiveCents(Math.floor(current / 10));
   }
 
-  // Quick-split presets — OVERWRITE primaryCents (different from cash-payment's
-  // increment denomination chips). Reasoning: "split is exactly $20 cash" is
-  // the operation, not "received $20 then $20 more".
-  function handleSplitHalf() {
-    // Floor at integer cents so odd totals (e.g., $5.55 → $2.77 + $2.78)
-    // split cleanly with the larger cent landing on the OTHER half. Matches
-    // the prior float-based behavior `Math.floor((grandTotal / 2) * 100) / 100`.
-    setPrimaryCents(Math.floor(grandTotalCents / 2));
+  // ----- Field tap (clear-on-tap semantic) -----
+
+  // Tap-to-activate. If tapping the inactive field: switch active, clear that
+  // field to 0, set the OTHER (now-inactive) field to grandTotalCents so the
+  // sum invariant holds. The user's next keypad digit accumulates on the new
+  // active field from 0. Matches existing keypad-surface behavior (entering a
+  // new amount overwrites whatever was there).
+  function handleFieldTap(field: ActiveField) {
+    if (field === activeField) return;
+    setActiveField(field);
+    if (field === 'cash') {
+      setCashCents(0);
+      setCardCents(grandTotalCents);
+    } else {
+      setCardCents(0);
+      setCashCents(grandTotalCents);
+    }
   }
+
+  // ----- Quick presets -----
+
+  // 50/50 — sets BOTH fields. Floor at integer cents so odd totals
+  // (e.g., $5.55 → $2.77 + $2.78) split cleanly. The LARGER half goes to
+  // the currently-active field (intentional — feels deliberate rather than
+  // arbitrary). Active field stays active after preset.
+  function handleSplitHalf() {
+    // Active field gets the larger half on odd totals — feels intentional rather than arbitrary.
+    const smaller = Math.floor(grandTotalCents / 2);
+    const larger = grandTotalCents - smaller; // == ceil(grandTotalCents / 2)
+    if (activeField === 'cash') {
+      setCashCents(larger);
+      setCardCents(smaller);
+    } else {
+      setCardCents(larger);
+      setCashCents(smaller);
+    }
+  }
+
+  // $X chip — overwrite the active field with this dollar amount. The
+  // OTHER field auto-derives via setActiveCents.
+  function handlePresetAmount(amt: number) {
+    setActiveCents(toCents(amt));
+  }
+
+  // ----- Confirm + branch routing -----
 
   async function handleProcessSplit() {
     if (!isValidSplit) return;
 
-    setSplitStep('processing-card');
+    // Determine branch up-front so the processing UI can fork and we don't
+    // re-derive at each conditional below.
+    const branch: ProcessingBranch =
+      cashCents === grandTotalCents ? 'cash-only' :
+      cardCents === grandTotalCents ? 'card-only' :
+      'mixed';
+
+    setProcessingBranch(branch);
+    setSplitStep('processing');
     checkout.setProcessing(true);
 
+    // Items payload built once — shared across all branches.
+    const itemsPayload = ticket.items.map((i) => {
+      const hasPerUnitQty = i.perUnitQty != null && i.perUnitQty > 1;
+      return {
+        item_type: i.itemType,
+        product_id: i.productId,
+        service_id: i.serviceId,
+        item_name: i.itemName,
+        quantity: hasPerUnitQty ? i.perUnitQty! : i.quantity,
+        unit_price: hasPerUnitQty ? i.unitPrice / i.perUnitQty! : i.unitPrice,
+        total_price: i.totalPrice,
+        tax_amount: i.taxAmount,
+        is_taxable: i.isTaxable,
+        tier_name: i.tierName,
+        vehicle_size_class: i.vehicleSizeClass,
+        notes: i.notes,
+        standard_price: hasPerUnitQty ? i.standardPrice / i.perUnitQty! : i.standardPrice,
+        pricing_type: i.pricingType,
+        is_addon: !!i.parentItemId,
+        prerequisite_note: i.prerequisiteNote || null,
+      };
+    });
+
     try {
-      // Create PaymentIntent for card portion (no tip baked in)
-      const cardCents = Math.round(cardAmount * 100);
+      // ===== CASH-ONLY branch =====
+      // Skip Stripe Terminal entirely — no PI, no terminal, no capture, no
+      // tip (on-reader tip mechanism is the only tip path here; cash-only
+      // means no tip prompt). Single-method 'cash' transaction with one
+      // payment row. Drawer kicks (cash > 0).
+      if (branch === 'cash-only') {
+        const txRes = await posFetch('/api/pos/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: ticket.customer?.id || null,
+            vehicle_id: ticket.vehicle?.id || null,
+            subtotal: ticket.subtotal,
+            tax_amount: ticket.taxAmount,
+            tip_amount: 0,
+            discount_amount: ticket.discountAmount,
+            deposit_credit: ticket.depositCredit,
+            total_amount: ticket.total,
+            payment_method: 'cash',
+            coupon_id: ticket.coupon?.id || null,
+            coupon_code: ticket.coupon?.code || null,
+            loyalty_points_redeemed: ticket.loyaltyPointsToRedeem,
+            loyalty_discount: ticket.loyaltyDiscount,
+            notes: ticket.notes,
+            items: itemsPayload,
+            payments: [
+              { method: 'cash', amount: cashAmount, tip_amount: 0 },
+            ],
+          }),
+        });
+
+        const txJson = await txRes.json();
+        if (!txRes.ok) throw new Error(txJson.error || 'Failed to save transaction');
+
+        // Drawer kick — fire-and-forget.
+        posFetch('/api/pos/receipts/cash-drawer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch(() => { /* drawer kick is best-effort */ });
+
+        const txId = txJson.data.id;
+        setSplitStep('complete');
+        checkout.setSplitPayment(cashAmount, 0);
+        checkout.setCashPayment(cashAmount, 0);
+        checkout.setComplete(
+          txId,
+          txJson.data.receipt_number,
+          ticket.customer?.email,
+          ticket.customer?.phone,
+          ticket.customer?.id,
+          ticket.customer?.tags || null
+        );
+        dispatch({ type: 'CLEAR_TICKET' });
+        return;
+      }
+
+      // ===== CARD-ONLY and MIXED branches share the Stripe Terminal flow =====
+      // The only differences are (1) payment_method on the transaction
+      // ('card' for card-only, 'split' for mixed), (2) payments array shape
+      // (one row vs two), (3) drawer kick (skipped for card-only — no cash
+      // to put away), (4) context setters (cash=0 for card-only).
+      const cardCentsForStripe = Math.round(cardAmount * 100);
       const piRes = await posFetch('/api/pos/stripe/payment-intent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: cardCents,
-          description: `POS Split Sale (card portion)`,
+          amount: cardCentsForStripe,
+          description: branch === 'card-only'
+            ? 'POS Card Sale (via split surface)'
+            : 'POS Split Sale (card portion)',
         }),
       });
 
       const piJson = await piRes.json();
-      if (!piRes.ok) {
-        throw new Error(piJson.error || 'Failed to create payment intent');
-      }
+      if (!piRes.ok) throw new Error(piJson.error || 'Failed to create payment intent');
 
-      // Collect + process card via terminal with on-reader tipping
-      const { collectPaymentMethod, processPayment } = await import(
-        '../../lib/stripe-terminal'
-      );
+      const { collectPaymentMethod, processPayment } = await import('../../lib/stripe-terminal');
 
       const subtotalCents = Math.round(ticket.subtotal * 100);
       const tipOptions = TIP_PRESETS.map((pct) => ({
@@ -115,7 +264,6 @@ export function SplitPayment() {
 
       const processed = await processPayment(paymentIntent);
 
-      // Capture the authorized payment (finalizes charge including tip)
       const captureRes = await posFetch('/api/pos/stripe/capture-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -129,14 +277,28 @@ export function SplitPayment() {
         throw new Error(captureErr.error || 'Failed to capture payment');
       }
 
-      // Calculate tip from amount difference
-      const tipCents = Math.max(0, processed.amount - cardCents);
+      const tipCents = Math.max(0, processed.amount - cardCentsForStripe);
       const tipAmount = tipCents / 100;
-
-      // Set tip in checkout context for display
       checkout.setTip(tipAmount, null);
 
-      // Create transaction with both payments
+      // Branch-specific payments array.
+      const payments = branch === 'card-only' ? [
+        {
+          method: 'card',
+          amount: cardAmount + tipAmount,
+          tip_amount: tipAmount,
+          stripe_payment_intent_id: piJson.id,
+        },
+      ] : [
+        { method: 'cash', amount: cashAmount, tip_amount: 0 },
+        {
+          method: 'card',
+          amount: cardAmount + tipAmount,
+          tip_amount: tipAmount,
+          stripe_payment_intent_id: piJson.id,
+        },
+      ];
+
       const txRes = await posFetch('/api/pos/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -149,61 +311,32 @@ export function SplitPayment() {
           discount_amount: ticket.discountAmount,
           deposit_credit: ticket.depositCredit,
           total_amount: ticket.total,
-          payment_method: 'split',
+          // card-only is a single-method 'card' transaction (matches what
+          // card-payment.tsx produces); mixed is 'split'. Cash-only branch
+          // already returned above.
+          payment_method: branch === 'card-only' ? 'card' : 'split',
           coupon_id: ticket.coupon?.id || null,
           coupon_code: ticket.coupon?.code || null,
           loyalty_points_redeemed: ticket.loyaltyPointsToRedeem,
           loyalty_discount: ticket.loyaltyDiscount,
           notes: ticket.notes,
-          items: ticket.items.map((i) => {
-            const hasPerUnitQty = i.perUnitQty != null && i.perUnitQty > 1;
-            return {
-              item_type: i.itemType,
-              product_id: i.productId,
-              service_id: i.serviceId,
-              item_name: i.itemName,
-              quantity: hasPerUnitQty ? i.perUnitQty! : i.quantity,
-              unit_price: hasPerUnitQty ? i.unitPrice / i.perUnitQty! : i.unitPrice,
-              total_price: i.totalPrice,
-              tax_amount: i.taxAmount,
-              is_taxable: i.isTaxable,
-              tier_name: i.tierName,
-              vehicle_size_class: i.vehicleSizeClass,
-              notes: i.notes,
-              standard_price: hasPerUnitQty ? i.standardPrice / i.perUnitQty! : i.standardPrice,
-              pricing_type: i.pricingType,
-              is_addon: !!i.parentItemId,
-              prerequisite_note: i.prerequisiteNote || null,
-            };
-          }),
-          payments: [
-            {
-              method: 'cash',
-              amount: cashAmount,
-              tip_amount: 0,
-            },
-            {
-              method: 'card',
-              amount: cardAmount + tipAmount,
-              tip_amount: tipAmount,
-              stripe_payment_intent_id: piJson.id,
-            },
-          ],
+          items: itemsPayload,
+          payments,
         }),
       });
 
       const txJson = await txRes.json();
-      if (!txRes.ok) {
-        throw new Error(txJson.error || 'Failed to save transaction');
+      if (!txRes.ok) throw new Error(txJson.error || 'Failed to save transaction');
+
+      // Drawer kick only when cash > 0 (mixed branch only). Card-only has
+      // no cash to put away.
+      if (branch === 'mixed') {
+        posFetch('/api/pos/receipts/cash-drawer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }).catch(() => { /* drawer kick is best-effort */ });
       }
 
-      // Fire-and-forget: kick cash drawer open via print server
-      posFetch('/api/pos/receipts/cash-drawer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      }).catch(() => { /* drawer kick is best-effort */ });
-
-      // Card-to-customer matching for the card portion (fire-and-forget)
       const piId = piJson.id;
       const txId = txJson.data.id;
       const custId = ticket.customer?.id || null;
@@ -211,6 +344,10 @@ export function SplitPayment() {
       const custPhone = ticket.customer?.phone;
       const custTags = ticket.customer?.tags || null;
 
+      // Card-to-customer matching for the card portion (fire-and-forget).
+      // Server-side endpoint also populates payments.card_brand /
+      // payments.card_last_four from the Stripe charge object — see prior
+      // session 5154c731 for the full reasoning chain.
       posFetch('/api/pos/card-customer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -235,26 +372,21 @@ export function SplitPayment() {
             );
           }
         })
-        .catch(() => {
-          // Silent fail — card matching is non-critical
-        });
+        .catch(() => { /* Silent fail — card matching is non-critical */ });
 
       setSplitStep('complete');
-      // Record BOTH cash and card portions so PaymentComplete renders the
-      // correct split summary. Pre-fix: setSplitCash(cash) only — cardPortion
-      // stayed at its initial 0 → split receipts always read "Card $0.00".
-      checkout.setSplitPayment(cashAmount, cardAmount);
-      // brand/lastFour intentionally null here — the Stripe Terminal SDK's
-      // PaymentIntent does not reliably expose these client-side; the values
-      // ARE persisted to payments.card_brand / payments.card_last_four by the
-      // /api/pos/card-customer server endpoint (fired async above) which
-      // queries the Stripe charge object server-side. Receipts read from the
-      // payments table, so the printed receipt has the brand. PaymentComplete
-      // doesn't currently render brand/lastFour inline; if extended to do so,
-      // it would need to await the card-customer response or call a separate
-      // endpoint to fetch the persisted brand. Out of scope here.
+      // Branch-specific context: card-only sets cash=0; mixed sets both.
+      // tipAmount lives separately via setTip; not added to either portion
+      // here (the receipt template renders Tip as its own line).
+      checkout.setSplitPayment(
+        branch === 'card-only' ? 0 : cashAmount,
+        cardAmount,
+      );
+      // brand/lastFour intentionally null — see prior session 5154c731 for
+      // why the Stripe Terminal SDK doesn't reliably expose these
+      // client-side. Server-side card-customer endpoint populates them.
       checkout.setCardResult(piId, null, null);
-      checkout.setCashPayment(cashAmount, 0);
+      checkout.setCashPayment(branch === 'card-only' ? 0 : cashAmount, 0);
       checkout.setComplete(
         txId,
         txJson.data.receipt_number,
@@ -281,7 +413,31 @@ export function SplitPayment() {
       // ignore
     }
     setSplitStep('enter-amounts');
+    setProcessingBranch(null);
     checkout.setProcessing(false);
+  }
+
+  // Context-aware confirm button label. Three variants:
+  //   cash-only:  "Collect Cash $X.XX"
+  //   card-only:  "Process Card $X.XX"
+  //   mixed:      "Collect $X.XX + Process $Y.YY"
+  // Button stays green for all three — successful payment commitment.
+  const buttonLabel =
+    cashCents === grandTotalCents ? `Collect Cash $${cashAmount.toFixed(2)}` :
+    cardCents === grandTotalCents ? `Process Card $${cardAmount.toFixed(2)}` :
+    `Collect $${cashAmount.toFixed(2)} + Process $${cardAmount.toFixed(2)}`;
+
+  // Field-display className builder. Active field gets a thicker blue border
+  // + light blue tint background; inactive uses the standard gray border +
+  // white background. transition-colors smooths the swap.
+  function fieldClass(field: ActiveField): string {
+    const isActive = activeField === field;
+    return cn(
+      'flex h-[60px] w-44 items-center justify-center rounded-lg text-2xl tabular-nums text-gray-900 dark:text-gray-100 transition-colors touch-manipulation cursor-pointer',
+      isActive
+        ? 'border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30'
+        : 'border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500',
+    );
   }
 
   return (
@@ -295,156 +451,80 @@ export function SplitPayment() {
 
       {splitStep === 'enter-amounts' && (
         <>
-          {/* Mode toggle: cash-first vs card-first. Labels shortened from
-              "Enter Cash Amount" / "Enter Card Amount" to "Cash" / "Card"
-              now that the prompt text in the right column explains the
-              meaning. min-w-[100px] keeps the buttons visually balanced
-              despite the short labels. */}
-          <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
-            <button
-              onClick={() => { setSplitMode('cash-first'); setPrimaryCents(0); }}
-              className={cn(
-                'min-w-[100px] rounded-md px-4 py-2 text-sm font-medium transition-all',
-                splitMode === 'cash-first'
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              )}
-            >
-              Cash
-            </button>
-            <button
-              onClick={() => { setSplitMode('card-first'); setPrimaryCents(0); }}
-              className={cn(
-                'min-w-[100px] rounded-md px-4 py-2 text-sm font-medium transition-all',
-                splitMode === 'card-first'
-                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-              )}
-            >
-              Card
-            </button>
-          </div>
-
-          {/* Two-column body \u2014 LEFT: quick presets (top) + running totals
-              (below, conditional). RIGHT: prompt text (top) + display + PinPad.
-              Both columns fixed at w-[300px] so PinPad's grid-cols-3 fills
-              the right column and cells render at ~94px (B-followup-3 lesson).
-              Total row width 300+16+300 = 616px, fits 768px-viewport iPads'
-              inner area (627px after px-8 64px padding) with 11px breathing,
-              and fits all larger iPads with proportionally more breathing.
-              items-start aligns columns at top \u2014 left column is shorter than
-              right (especially when running totals hide), empty space below
-              the left column is acceptable. NO items-center on either column;
-              presets row uses justify-center, display + running totals use
-              mx-auto / w-full to position within the 300px column. */}
+          {/* Two-column body — LEFT: vertical preset stack. RIGHT: two
+              display fields stacked + PinPad. Mode toggle removed (was
+              redundant with always-visible two-field architecture). Running
+              totals box removed (the two display fields ARE the running
+              totals). 300px columns + gap-4 = 616px content row, fits
+              768px-viewport iPads' inner area (627px after px-8 padding)
+              with 11px breathing. */}
           <div className="flex flex-row items-start gap-4">
-            {/* LEFT column \u2014 quick presets + running totals */}
-            <div className="flex w-[300px] flex-col gap-4">
-              {/* Top spacer \u2014 row-aligns the presets row with the keypad's
-                  first row (1, 2, 3) in the right column. Right column above
-                  PinPad: prompt text (text-sm ~20px) + gap-4 (16px) + display
-                  (h-[60px]) + gap-4 (16px) = 112px \u2192 keypad row 1 top sits
-                  at 112px from column start. Left column has its own gap-4
-                  between this spacer and the presets row, so the spacer
-                  itself is 112 \u2212 16 (one gap-4) = 96px. Top of presets =
-                  spacer (96) + gap-4 (16) = 112px. \u2713 Mirrors cash-payment.tsx's
-                  left-column spacer pattern (denom chips row-aligned with
-                  keypad rows). h-[96px] (not min-h) for exact match \u2014 right
-                  column above keypad is constant height. */}
-              <div className="h-[96px]" aria-hidden="true" />
-              {/* Quick preset chips \u2014 OVERWRITE primaryCents (different from
-                  cash-payment's increment denoms). justify-center within the
-                  300px column (chip row is 264px wide, leaves 18px breathing
-                  on each side). */}
-              <div className="flex flex-row justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSplitHalf}
-                  className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
-                >
-                  50/50
-                </button>
-                {[20, 50, 100].map((amt) => (
-                  <button
-                    key={amt}
-                    type="button"
-                    onClick={() => setPrimaryCents(toCents(amt))}
-                    disabled={amt >= grandTotal}
-                    className={cn(
-                      'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
-                      amt >= grandTotal && 'opacity-40 cursor-not-allowed'
-                    )}
-                  >
-                    ${amt}
-                  </button>
-                ))}
-              </div>
+            {/* LEFT column — vertical preset stack. Spacer above row-aligns
+                first preset (50/50) with PinPad row 1 (1, 2, 3) in the
+                right column. Right column above PinPad: Cash display 60 +
+                gap-4 16 + Card display 60 + gap-4 16 = 152 px. Left column
+                wrapper has gap-2 (8px) between spacer and first preset, so
+                spacer height = 152 - 8 = 144 px. Verified math. */}
+            <div className="flex w-[300px] flex-col gap-2 items-center">
+              <div className="h-[144px]" aria-hidden="true" />
 
-              {/* Running totals \u2014 JSX byte-identical to single-column
-                  version; condition unchanged (primaryNum > 0 \u27fa primaryCents > 0).
-                  w-full fills the 300px left column; max-w-xs (320px) is
-                  redundant since the column is narrower, but kept verbatim
-                  from prior version to minimize diff. */}
-              {primaryNum > 0 && (
-                <div className="w-full max-w-xs rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Cash</span>
-                      <span className="text-lg font-semibold tabular-nums text-green-700 dark:text-green-400">
-                        ${cashAmount.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Card</span>
-                      <span className="text-lg font-semibold tabular-nums text-blue-700 dark:text-blue-400">
-                        ${cardAmount.toFixed(2)}
-                      </span>
-                    </div>
-                    {remaining > 0.01 && (
-                      <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
-                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Remaining</span>
-                        <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
-                          ${remaining.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    {remaining <= 0.01 && (
-                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
-                        Fully allocated
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={handleSplitHalf}
+                className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
+              >
+                50/50
+              </button>
+              {[20, 50, 100].map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => handlePresetAmount(amt)}
+                  disabled={amt * 100 > grandTotalCents}
+                  className={cn(
+                    'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
+                    amt * 100 > grandTotalCents && 'opacity-40 cursor-not-allowed'
+                  )}
+                >
+                  ${amt}
+                </button>
+              ))}
             </div>
 
-            {/* RIGHT column \u2014 prompt + display + keypad */}
+            {/* RIGHT column — two display fields + keypad */}
             <div className="flex w-[300px] flex-col gap-4">
-              {/* Prompt text \u2014 single-line guidance restating the toggle's
-                  meaning. Original phrasing kept (fits on one line at
-                  text-sm in 300px column \u2014 ~287px of text). text-center
-                  positions the line within the column. */}
-              <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-                {splitMode === 'cash-first'
-                  ? 'Enter cash amount \u2014 remainder goes to card'
-                  : 'Enter card amount \u2014 remainder is cash'}
-              </p>
-
-              {/* Tendered display \u2014 non-focusable div, no OS keyboard pop
-                  on iPad. Fixed width w-44 (176px); $ inside the box;
-                  mx-auto centered within the 300px right column. */}
-              <div
-                role="status"
-                aria-live="polite"
-                aria-label="Primary amount"
-                className="mx-auto flex h-[60px] w-44 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
+              {/* Cash display field — tap to activate. Active treatment:
+                  thicker blue border + light blue tint. Inactive: standard
+                  gray border. Both fields render via fromCents() and stay
+                  fixed-width (w-44) regardless of value. Label rendered
+                  inside the field via `Cash $X.XX` for compactness. */}
+              <button
+                type="button"
+                role="button"
+                onClick={() => handleFieldTap('cash')}
+                aria-pressed={activeField === 'cash'}
+                aria-label={`Cash amount ${cashDisplay}, ${activeField === 'cash' ? 'active' : 'inactive'}`}
+                className={cn('mx-auto', fieldClass('cash'))}
               >
-                ${displayValue}
-              </div>
+                <span className="mr-2 text-base font-medium text-gray-500 dark:text-gray-400">Cash</span>
+                ${cashDisplay}
+              </button>
 
-              {/* Embedded keypad \u2014 fills the 300px right column. Cells
-                  ~94px each from grid-cols-3 + gap-2 ((300\u221216)/3 = 94.67).
-                  Well above the 44px Apple HIG tap-target minimum. */}
+              {/* Card display field — same pattern. */}
+              <button
+                type="button"
+                role="button"
+                onClick={() => handleFieldTap('card')}
+                aria-pressed={activeField === 'card'}
+                aria-label={`Card amount ${cardDisplay}, ${activeField === 'card' ? 'active' : 'inactive'}`}
+                className={cn('mx-auto', fieldClass('card'))}
+              >
+                <span className="mr-2 text-base font-medium text-gray-500 dark:text-gray-400">Card</span>
+                ${cardDisplay}
+              </button>
+
+              {/* Embedded keypad — sends digits to whichever field is
+                  active. Cap = grandTotalCents (endpoint splits valid). */}
               <PinPad
                 onDigit={handleDigit}
                 onBackspace={handleBackspace}
@@ -465,30 +545,62 @@ export function SplitPayment() {
             <Button
               size="lg"
               onClick={handleProcessSplit}
-              disabled={!isValidSplit}
+              disabled={!isValidSplit || checkout.processing}
               className="min-w-[160px] bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600"
             >
-              Process Card ${cardAmount.toFixed(2)}
+              {buttonLabel}
             </Button>
           </div>
         </>
       )}
 
-      {splitStep === 'processing-card' && (
+      {splitStep === 'processing' && (
         <>
           <div className="flex flex-col items-center gap-4">
-            <p className="rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-2 text-sm text-green-700 dark:text-green-400">
-              Cash: ${cashAmount.toFixed(2)} collected
-            </p>
-            <CreditCard className="h-16 w-16 text-blue-500 dark:text-blue-400" />
-            <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
-              Present card for ${cardAmount.toFixed(2)}
-            </p>
-            <Loader2 className="h-6 w-6 animate-spin text-blue-400 dark:text-blue-300" />
+            {/* CASH-ONLY: no terminal, brief flash of "Collecting cash..."
+                while the transaction insert + drawer kick complete. */}
+            {processingBranch === 'cash-only' && (
+              <>
+                <Loader2 className="h-12 w-12 animate-spin text-green-500 dark:text-green-400" />
+                <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
+                  Collecting cash ${cashAmount.toFixed(2)}…
+                </p>
+              </>
+            )}
+
+            {/* CARD-ONLY: terminal prompt, no "cash collected" banner. */}
+            {processingBranch === 'card-only' && (
+              <>
+                <CreditCard className="h-16 w-16 text-blue-500 dark:text-blue-400" />
+                <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
+                  Present card for ${cardAmount.toFixed(2)}
+                </p>
+                <Loader2 className="h-6 w-6 animate-spin text-blue-400 dark:text-blue-300" />
+              </>
+            )}
+
+            {/* MIXED: cash banner + terminal prompt (existing behavior). */}
+            {processingBranch === 'mixed' && (
+              <>
+                <p className="rounded-lg bg-green-50 dark:bg-green-900/30 px-4 py-2 text-sm text-green-700 dark:text-green-400">
+                  Cash: ${cashAmount.toFixed(2)} collected
+                </p>
+                <CreditCard className="h-16 w-16 text-blue-500 dark:text-blue-400" />
+                <p className="text-xl font-medium text-gray-900 dark:text-gray-100">
+                  Present card for ${cardAmount.toFixed(2)}
+                </p>
+                <Loader2 className="h-6 w-6 animate-spin text-blue-400 dark:text-blue-300" />
+              </>
+            )}
           </div>
-          <Button variant="outline" size="lg" onClick={handleCancel}>
-            Cancel
-          </Button>
+          {/* Cancel button — only meaningful when terminal is active. For
+              cash-only, the operation is local + fast; cancel mid-flight
+              would orphan a half-written transaction. Hide for cash-only. */}
+          {processingBranch !== 'cash-only' && (
+            <Button variant="outline" size="lg" onClick={handleCancel}>
+              Cancel
+            </Button>
+          )}
         </>
       )}
 
@@ -514,6 +626,7 @@ export function SplitPayment() {
               size="lg"
               onClick={() => {
                 setSplitStep('enter-amounts');
+                setProcessingBranch(null);
                 setErrorMsg(null);
               }}
             >

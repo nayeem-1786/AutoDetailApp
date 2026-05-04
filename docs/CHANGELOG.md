@@ -6,6 +6,132 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(split-payment): two-field architecture — removes mode toggle, supports endpoint splits
+
+iPad PWA test of `8c9cee06` (split-payment row-alignment fix) flagged that the mode-toggle architecture, while functional, had four interacting issues: (1) Process Card button stuck disabled when primary = 0, blocking the "I changed my mind, charge it all to card" path; (2) presets rendered horizontally when the user wanted vertical for visual parity with cash-payment's denomination column; (3) Process Card label misleading on Cash mode (always said "Process Card $X" even for $0 card portions); (4) auto-calc was already happening but mode toggle made the user manually pick which side they were editing instead of just tapping the field. Audit confirmed mode toggle was the underlying friction; recommended Option B (two-field architecture, no mode toggle, last-focused = active) matching Square/Toast/Clover convention.
+
+This refactor implements Option B: two simultaneously editable Cash and Card display fields with auto-derive between them, vertical preset stack, three-branch `handleProcessSplit` (cash-only / card-only / mixed), context-aware confirm button label, removed mode toggle, removed running totals box (the two display fields ARE the running totals). Single-session refactor — user authorized override of the >300 LOC rule (final delta: +381 / −269 = ~350 LOC). PinPad, checkout-context, transactions API contract all unchanged.
+
+### State refactor
+
+| Old | New |
+|---|---|
+| `splitMode: 'cash-first' \| 'card-first'` | `activeField: 'cash' \| 'card'` |
+| `primaryCents: number` (one field, mode determines what it means) | `cashCents: number` + `cardCents: number` (both fields explicit) |
+| Auto-derived `cashAmount` and `cardAmount` from primary + mode | Auto-derived via `setActiveCents(cents)` helper that updates active + sets the OTHER to `grandTotalCents − active` |
+| `splitStep: 'enter-amounts' \| 'processing-card' \| 'complete' \| 'error'` | `splitStep: 'enter-amounts' \| 'processing' \| 'complete' \| 'error'` (renamed `'processing-card'` → `'processing'`; verified zero external consumers via `grep -rn "processing-card" src/`) |
+| (none) | `processingBranch: 'cash-only' \| 'card-only' \| 'mixed' \| null` (captures branch at `handleProcessSplit` start so the processing UI can fork) |
+| `errorMsg` | unchanged |
+
+`primaryCents`, `splitMode`, and the `'processing-card'` string are removed entirely. Initial state: Cash active at $0, Card auto-derived at the full grandTotal — sum invariant `cashCents + cardCents === grandTotalCents` holds from mount.
+
+### Validation
+
+```ts
+const isValidSplit = (cashCents + cardCents) === grandTotalCents;
+```
+
+`isValidSplit` always true once auto-derive has fired (which is on every state-mutating handler). Defensive guard against rounding drift. Pre-refactor required both halves > 0 (`primaryNum > 0 && primaryNum < grandTotal && cardAmount > 0`), which blocked endpoint splits and created the "stuck at primary = 0" dead state — gone now.
+
+### Handlers
+
+- **`setActiveCents(cents)`** (NEW helper, lines 67-74): sets active field's cents, derives the OTHER as `Math.max(0, grandTotalCents - cents)`. Single source of truth for the auto-derive invariant.
+- **`handleDigit(d)`**: routes digit to whichever field is active. Cap = `Math.min(CENTS_CAP, grandTotalCents)` (endpoint splits valid — pre-refactor cap was `grandTotalCents - 1` which forced both halves > 0).
+- **`handleBackspace()`**: routes to active field via `setActiveCents(Math.floor(current / 10))`.
+- **`handleFieldTap(field)`** (NEW, lines 95-110): tap-to-activate with clear-on-tap semantic. Tapping inactive field: `setActiveField(field)`, clear that field to 0, set the OTHER to `grandTotalCents` (preserves sum invariant). Next keypad digit accumulates from 0 on the new active field. Matches existing keypad-surface "new entry overwrites" behavior. Edit-in-place on the inactive field is deferred (out of scope; clear-on-tap for first iteration).
+- **`handleSplitHalf()`**: 50/50 preset. `Math.floor(grandTotalCents / 2)` and `grandTotalCents - smaller` give two halves; the LARGER half goes to the currently-active field on odd totals (intentional — feels deliberate rather than arbitrary). For even totals (most common), both halves are equal.
+- **`handlePresetAmount(amt)`** (NEW, lines 131-133): $20 / $50 / $100 chips. Overwrites active field with `toCents(amt)`; the OTHER field auto-derives. `$X` chips disabled when `amt * 100 > grandTotalCents` (cannot exceed total).
+- **`handleProcessSplit()`** — three branches per below.
+- **`handleCancel()`**: unchanged from pre-refactor (cancels Stripe collect, resets `splitStep` to `enter-amounts`); also clears `processingBranch`.
+
+### `handleProcessSplit` three-branch routing
+
+Branch determined up-front from cents state:
+
+```ts
+const branch: ProcessingBranch =
+  cashCents === grandTotalCents ? 'cash-only' :
+  cardCents === grandTotalCents ? 'card-only' :
+  'mixed';
+```
+
+| Branch | `payment_method` | `payments` array | Stripe? | Drawer kick? | tip path |
+|---|---|---|---|---|---|
+| `cash-only` (cash = total, card = 0) | `'cash'` | `[{ method: 'cash', amount: cashAmount, tip_amount: 0 }]` | NO | YES | none (no tip mechanism without terminal) |
+| `card-only` (cash = 0, card = total) | `'card'` (single-method, matches `card-payment.tsx` output) | `[{ method: 'card', amount: cardAmount + tipAmount, ..., stripe_payment_intent_id }]` | YES | NO (no cash to put away) | on-reader tip → card row |
+| `mixed` (both > 0) | `'split'` | `[{ method: 'cash', ... }, { method: 'card', ... }]` | YES | YES | on-reader tip → card row |
+
+`itemsPayload` built once before the branch fork — shared across all three branches. CASH-ONLY branch returns early (no Stripe code path); CARD-ONLY and MIXED share the Stripe flow with branch-specific differences in `payments` array shape, `payment_method`, drawer-kick gating, and context setters at completion (`setSplitPayment(branch === 'card-only' ? 0 : cashAmount, cardAmount)`, etc.).
+
+### Context-aware confirm button label
+
+```ts
+const buttonLabel =
+  cashCents === grandTotalCents ? `Collect Cash $${cashAmount.toFixed(2)}` :
+  cardCents === grandTotalCents ? `Process Card $${cardAmount.toFixed(2)}` :
+  `Collect $${cashAmount.toFixed(2)} + Process $${cardAmount.toFixed(2)}`;
+```
+
+Three variants: cash-only, card-only, mixed. Button stays green (`bg-green-600`) for all three — successful payment commitment. Disabled when `!isValidSplit || checkout.processing`.
+
+### Layout
+
+**Right column (`w-[300px] flex flex-col gap-4`)**:
+- Cash display field (`h-[60px] w-44 mx-auto`, tap-to-activate, active treatment via `fieldClass('cash')`)
+- Card display field (same pattern)
+- PinPad (fills column → cells ~94 px, B-followup-3 lesson)
+
+**Active/inactive field treatment** (`fieldClass(field)` helper):
+- Active: `border-2 border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30`
+- Inactive: `border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:border-gray-400 dark:hover:border-gray-500`
+- `transition-colors` smooths the swap. Each field labeled inline (`<span>Cash</span> $X.XX`) so the user sees the field identity even when both values are visible.
+
+**Left column (`w-[300px] flex flex-col gap-2 items-center`)**:
+- Top spacer (`h-[144px]`) — row-aligns first preset (50/50) with PinPad row 1 (1, 2, 3). Math: right column above PinPad = Cash 60 + gap-4 16 + Card 60 + gap-4 16 = **152 px**; left column gap-2 (8 px) between spacer and first preset → spacer = 152 − 8 = **144 px**. Verified inline in code comment.
+- 4 vertical preset chips: 50/50, $20, $50, $100. Each 60×60 px, `bg-gray-200 ... text-base font-semibold` (mirrors cash-payment denomination chip styling). `$X` chips disable when `amt * 100 > grandTotalCents`.
+
+**Removed from JSX**:
+- Mode toggle pill switcher (40+ px row above the two-column body) — gone entirely.
+- Running totals box (~120 px conditional render below presets) — gone entirely. The two display fields ARE the running totals; both always visible, both always reflect current state, no separate Cash/Card/Remaining/Fully allocated table needed.
+
+### Processing UI fork (`splitStep === 'processing'`)
+
+Forks on `processingBranch`:
+- `cash-only`: `<Loader2>` + "Collecting cash $X.XX…". Cancel button HIDDEN — operation is local + fast; cancel mid-flight would orphan a half-written transaction.
+- `card-only`: `<CreditCard>` + "Present card for $X.XX" + spinner. Cancel button visible (Stripe terminal session is cancellable via `cancelCollect()`).
+- `mixed`: existing flow — green "Cash $X.XX collected" banner + `<CreditCard>` + "Present card for $X.XX" + spinner. Cancel button visible.
+
+### What is NOT changed (regression surface)
+
+- **PinPad** untouched (shared component — changes there ripple to PIN login, manager dialog, register, cash-payment, pay-link Custom modal).
+- **`checkout-context.tsx`** untouched. `setSplitPayment(cash, card)` signature reused as-is from prior session 5154c731. Same setters called: `setSplitPayment`, `setCardResult`, `setCashPayment`, `setComplete`, `setProcessing`, `setStep`, `setTip`. Just with branch-conditional values (e.g., `card-only` calls `setCashPayment(0, 0)`).
+- **API/payload contracts** unchanged. `/api/pos/transactions` already accepts `payment_method: 'cash' | 'card' | 'split'` and any-length `payments` array (cash-payment.tsx and card-payment.tsx already produce single-method versions; split-payment now produces all three depending on branch).
+- **Stripe Terminal flow** for card-portion processing byte-identical to pre-refactor (PI creation, collect, process, capture, tip math, card-customer matching) — only the `description` string differs slightly between card-only and mixed for clarity.
+- **`'enter-amounts'`, `'complete'`, `'error'`** state UIs largely unchanged. Error state's Back button additionally clears `processingBranch` (was already clearing splitStep + errorMsg).
+
+### Files touched
+- `src/app/pos/components/checkout/split-payment.tsx` — full refactor of `enter-amounts` step (state, handlers, JSX) + processing UI fork. +381 / −269 lines.
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/app/pos/components/checkout/split-payment.tsx` → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT (iPad PWA portrait + Mac browser):
+- **All Cash $75 of $75**: open split — Cash field active at $0.00, Card auto-derived at $75.00. Type 7→5→0→0 on keypad → Cash $75.00 (active), Card $0.00 (inactive). Button reads "Collect Cash $75.00". Tap → CASH-ONLY branch: skip Stripe, POST `payment_method: 'cash'` with single payment row, drawer kick, complete. Brief "Collecting cash $75.00…" UI between confirm and complete.
+- **Split $35 cash + $40 card on $75**: Cash active at $0, Card $75. Type 3→5→0→0 → Cash $35, Card $40 (auto-derived). Tap Card field → Card cleared to $0, Cash auto-fills $75. Re-type 4→0→0→0 → Card $40, Cash $35. Button "Collect $35.00 + Process $40.00". Tap → MIXED branch: existing flow, green cash banner + terminal prompt.
+- **50:50 on $75**: tap 50/50 preset → Cash (active) gets $37.50, Card $37.50. Even total: both halves equal. Button "Collect $37.50 + Process $37.50".
+- **50:50 on $5.55** (odd total edge): with Cash active, tap 50/50 → Cash $2.78 (larger half), Card $2.77 (smaller half). The active-field-gets-larger rule has a clarifying inline comment for future readers.
+- **All Card $75**: tap Card field → Card cleared to $0, Cash auto $75. Type 7→5→0→0 → Card $75, Cash $0. Button "Process Card $75.00". Tap → CARD-ONLY branch: Stripe processes, no drawer kick, single-method `payment_method: 'card'` transaction. Cancel button visible during terminal collect.
+- **Endpoint cap**: type to $75 in either field → keypad cap reached (`min(CENTS_CAP, grandTotalCents)`). Backspace works. Tap any 50/50 / $X preset to overwrite.
+- **Receipt** (post-process, all branches): the prior session 5154c731 fix already handles `setSplitPayment(cash, card)` recording both halves correctly, so PaymentComplete renders the actual amounts (not "Card $0.00" pre-fix-1). Receipt template uses `Math.max(appointment_total, transaction.total_amount)` (prior session 5154c731 fix) so TOTAL line shows correct gross. Card brand renders title-case (prior session 5154c731 — `formatCardBrand`).
+
+### Deferred (NOT in this session, flagged for future)
+
+- **Edit-in-place on inactive field**: current behavior is "tap inactive → clear + activate". User who wants to bump card from $40 to $45 must currently tap Card → re-type 4→5. Edit-in-place (preserve value, allow backspace + retype to mutate) is more surgical for review-and-modify flows but adds state-machine complexity. Defer to real-world iPad UAT before committing to either pattern.
+- **Active-field affordance verification**: the 2 px blue border + light blue tint should be visually obvious at iPad portrait. If real-world test shows staff missing the active state, escalate to Option C (explicit indicator: pill switcher or radio on each field's header). Lean: ship Option B as-is, observe.
+- **Tip routing for cash-only**: cash-only has no tip mechanism (on-reader is the only path). If staff need to record a cash tip, they'd have to add it as a separate line item or upstream tip-screen — neither currently flows into this surface. Acceptable trade-off for first iteration.
+
+---
+
 ## fix(split-payment): left-column top spacer to row-align presets with keypad first row
 
 iPad test of `5154c731` (3-bug fix session) confirmed the receipt + PaymentComplete fixes shipped correctly. Real-world observation flagged a residual layout issue from the prior `03a92bf5` two-column commit: the left-column presets row sits at the top of the two-column row, beside the right column's prompt text + display field, instead of beside the keypad. Visual rhythm is off — presets read as paired with the prompt rather than as auxiliary action chips beside the digit entry. Cash-payment achieves correct rhythm via spacer divs in its left column equal to its right column's pre-keypad height; replicate that pattern here.
