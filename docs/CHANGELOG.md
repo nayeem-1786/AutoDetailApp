@@ -6,6 +6,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(cash-payment): Session B — embedded keypad + denomination increment + non-focusable display
+
+Second half of the keypad-refactor split (Session A: `PinPad layoutVariant`; this session: cash-payment surface adoption). The POS Cash Payment screen previously relied on a native `<input inputMode="decimal">` that popped the iPad OS keyboard, with three "snap-to" QUICK_TENDERS (`$20 / $50 / $100`) plus an `Exact` button — fine for desktop, awkward for an iPad-first cash workflow. This session redesigns the surface around an embedded keypad and bill-denomination buttons, eliminating OS keyboard reliance entirely.
+
+**Layout** (Layout 2 from the audit, top-down): header (Cash Payment + amount due) → tendered display + change/short box → 3×2 denomination grid + full-width Clear button → `<PinPad layoutVariant="amount" size="default">` keypad → footer (Back + Complete). Container compressed from `gap-8 px-8 py-12` to `gap-4 px-6 py-6` to fit within the 700px modal cap on iPad portrait. Mental fit estimate: ~716px empty state, ~766px with change box visible — relies on the overlay's existing `overflow-y-auto` for the small overflow at the moment the user is finalizing the tender (Complete is the next tap, so scroll is benign).
+
+**Tendered state** moved from `string` (parseFloat-parsed) to integer **cents** (`useState(0)`). Derivations go through `fromCents` / `toCents` from `refund-math.ts` (single-rounding-site invariant). The native `<input>` is replaced with a non-focusable `<div role="status" aria-live="polite">` of identical visual footprint (`h-14 w-40 rounded-lg border text-2xl tabular-nums`) — there is no `<input>` element in this surface anymore, so iPad has no focus target to pop a keyboard for. `useEnterSubmit` is dropped; touch-only Complete is the sole submit affordance.
+
+**Denominations** are `[1, 5, 10, 20, 50, 100]` as a 3×2 grid. Tapping increments `cents` by the dollar amount × 100 (Square / Toast / Clover / Lightspeed convention) — `$20` × 3 → `$60`. Overflow past the `9,999,999` cents cap (`$99,999.99`, mirroring `keypad-tab` / `register-tab` / `payment-link-amount-modal`) is **rejected**, not clamped: `if (next > CENTS_CAP) return;` keeps `cents` at its prior value and the tap is a no-op. A full-width Clear button below the grid resets cents to 0; it's disabled when already at 0 (defensive visual cue).
+
+**Keypad handlers** mirror `keypad-tab.tsx:21-26` verbatim: `handleDigit` does `cents * 100` for `'00'` and `cents * 10 + parseInt(d, 10)` for single digits, gated by the same cap check. The defensive `if (d === '.') return;` is retained even though `layoutVariant="amount"` no longer renders `.` — cheap insurance. **There is no "how was cents last set" branching** in `handleDigit`: a denomination tap followed by a keypad digit produces the standard cents-shift-left behavior (cents=2000 + tap `5` → 20005 = $200.05), exactly like all other amount-entry surfaces.
+
+**Preserved verbatim** (regression-critical, easy to lose in a layout rewrite):
+- `handleProcessCash` body — online `posFetch /api/pos/transactions`, fire-and-forget `/api/pos/receipts/cash-drawer` gated by `canOpenDrawer`, offline `queueTransaction` to IndexedDB with the offline-ID toast
+- The `setCashPayment(tendered: number, change: number)` context contract — both args in dollars, fed via `fromCents(cents)` / `fromCents(changeCents)`. Unchanged signature → `split-payment.tsx:215` continues to work without touching it
+- API payload shape (`cash_tendered` and `change_given` in dollars; `amount` = `ticket.total`)
+- Offline queue payload (`cash_tendered`, `cash_change` in dollars)
+- `dispatch({ type: 'CLEAR_TICKET' })` on success, `toast.error` + `checkout.setError` on failure
+- `Back` button → `checkout.setStep('payment-method')`; `Complete` styling / `disabled={!isValid || processing}` / spinner-during-processing
+
+### Files touched
+- `src/app/pos/components/checkout/cash-payment.tsx` — full surface redesign
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (changed file) → 0/0. `npx vitest run` → 557/557. No component-level tests exist for `cash-payment.tsx`; manual UAT covers the regression surface (online cash → drawer kick → ticket clear; offline cash → IndexedDB queue + toast; denomination increment + keypad mix; cap rejects at $99,999.99; Clear; Back).
+
+Mental cap walkthrough: cents=9,999,800, tap `$100` → 10,009,800 > 9,999,999 → rejected, cents stays at 9,999,800 (no-op). cents=99,999, tap `00` via keypad → 9,999,900 ($99,999.00), accepted. Backspace from 4500 → 450 → 45 → 4 → 0.
+
+Out of scope: `split-payment.tsx` retains its old cash-amount derivation; if it ever gets a typed cash input (it doesn't today — `cashAmount` is computed from `primaryNum`), the same Layout-2 treatment would apply.
+
+---
+
 ## feat(keypad): Session A — `layoutVariant` prop on `PinPad` (amount layout adds `00`, drops `.`)
 
 First half of a two-session split (Session A: keypad refactor; Session B, deferred: cash-payment redesign). Audit showed five `<PinPad>` consumers — two PIN-entry (`pin-screen`, `manager-pin-dialog`), three amount-entry (`keypad-tab`, `register-tab`, `payment-link-amount-modal`). Amount consumers all defensively filter `'.'` because the inert decimal key on the shared keypad invites misclicks; the PIN-entry surfaces leave it visible but de-emphasized. Goal: drop `.` from amount-entry surfaces entirely and surface a `00` shortcut in its place, matching Square / Toast / Clover / Lightspeed convention (`00` placed left of `0`).

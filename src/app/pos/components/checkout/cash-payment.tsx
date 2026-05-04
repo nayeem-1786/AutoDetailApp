@@ -6,14 +6,22 @@ import { Loader2, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
-import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { useOnlineStatus } from '@/lib/hooks/use-online-status';
 import { queueTransaction } from '@/lib/pos/offline-queue';
+import { fromCents, toCents } from '@/lib/utils/refund-math';
+import { PinPad } from '../pin-pad';
 
-const QUICK_TENDERS = [20, 50, 100];
+// Bill denominations rendered as 3×2 grid above the keypad. Tapping a
+// denomination *increments* the tendered cents (Square / Toast / Clover
+// convention), so $20 × 3 → $60. Matches the build prompt's Layout 2.
+const DENOMINATIONS = [1, 5, 10, 20, 50, 100] as const;
+
+// $99,999.99 hard cap — same value as keypad-tab.tsx / register-tab.tsx /
+// payment-link-amount-modal.tsx. Inlined to avoid coupling to those files.
+const CENTS_CAP = 9999999;
 
 export function CashPayment() {
   const { ticket, dispatch } = useTicket();
@@ -22,16 +30,45 @@ export function CashPayment() {
   const isOnline = useOnlineStatus();
 
   const amountDue = ticket.total;
-  const [tendered, setTendered] = useState('');
+  const amountDueCents = toCents(amountDue);
+  // Tendered amount lives as integer cents and entry is "fixed-decimal" —
+  // every keypad digit shifts the value left by one column. Mirrors the
+  // pattern in keypad-tab.tsx and payment-link-amount-modal.tsx.
+  const [cents, setCents] = useState(0);
   const [processing, setProcessing] = useState(false);
 
-  const tenderedNum = parseFloat(tendered) || 0;
-  const change = Math.max(0, tenderedNum - amountDue);
-  const isValid = tenderedNum >= amountDue;
-  const enterSubmit = useEnterSubmit(handleProcessCash, isValid && !processing);
+  const tenderedDollars = fromCents(cents);
+  const displayValue = tenderedDollars.toFixed(2);
+  const changeCents = Math.max(0, cents - amountDueCents);
+  const changeDollars = fromCents(changeCents);
+  const shortDollars = fromCents(Math.max(0, amountDueCents - cents));
+  const isValid = cents >= amountDueCents;
+
+  function handleDigit(d: string) {
+    if (d === '.') return; // Defensive — `.` is not rendered in amount layout.
+    const next = d === '00' ? cents * 100 : cents * 10 + parseInt(d, 10);
+    if (next > CENTS_CAP) return;
+    setCents(next);
+  }
+
+  function handleBackspace() {
+    setCents(Math.floor(cents / 10));
+  }
+
+  function handleDenomination(denom: number) {
+    const next = cents + denom * 100;
+    if (next > CENTS_CAP) return; // Reject denominations that would exceed the cap.
+    setCents(next);
+  }
 
   async function handleProcessCash() {
     if (!isValid) return;
+
+    // tenderedNum and change are dollars, matching the existing API payload
+    // shape and the setCashPayment(tendered, change) context contract used
+    // by split-payment.tsx. Local state is cents; conversion happens here.
+    const tenderedNum = tenderedDollars;
+    const change = changeDollars;
 
     setProcessing(true);
     checkout.setProcessing(true);
@@ -180,7 +217,8 @@ export function CashPayment() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+    <div className="flex flex-col items-center gap-4 px-6 py-6">
+      {/* Header */}
       <div className="text-center">
         <p className="text-lg text-gray-500 dark:text-gray-400">Cash Payment</p>
         <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">
@@ -195,83 +233,85 @@ export function CashPayment() {
         </div>
       )}
 
-      {/* Quick tender buttons */}
-      <div className="flex gap-3">
-        {QUICK_TENDERS.map((amt) => (
-          <button
-            key={amt}
-            onClick={() => setTendered(amt.toString())}
-            disabled={amt < amountDue}
+      {/* Tendered display + change/short box */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl text-gray-500 dark:text-gray-400">$</span>
+          {/* Non-focusable display div — replaces native <input> so iPad
+              won't pop the OS keyboard. Identical visual footprint to the
+              former input (h-14 w-40, rounded-lg, text-2xl, tabular-nums). */}
+          <div
+            role="status"
+            aria-live="polite"
+            aria-label="Tendered amount"
+            className="flex h-14 w-40 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
+          >
+            {displayValue}
+          </div>
+        </div>
+
+        {cents > 0 && (
+          <div
             className={cn(
-              'h-14 w-20 rounded-lg border-2 text-lg font-semibold transition-all',
-              tendered === amt.toString()
-                ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600',
-              amt < amountDue && 'opacity-40'
+              'rounded-lg px-6 py-2 text-center',
+              isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
             )}
           >
-            ${amt}
-          </button>
-        ))}
+            {isValid ? (
+              <p className="text-base">
+                Change:{' '}
+                <span className="text-xl font-bold text-green-700 dark:text-green-400 tabular-nums">
+                  ${changeDollars.toFixed(2)}
+                </span>
+              </p>
+            ) : (
+              <p className="text-base text-red-600 dark:text-red-400 tabular-nums">
+                Short ${shortDollars.toFixed(2)}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Denomination grid + Clear */}
+      <div className="flex w-full max-w-xs flex-col gap-2">
+        <div className="grid grid-cols-3 gap-2">
+          {DENOMINATIONS.map((denom) => (
+            <button
+              key={denom}
+              type="button"
+              onClick={() => handleDenomination(denom)}
+              className="flex h-14 items-center justify-center rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-lg font-semibold text-gray-700 dark:text-gray-300 transition-all hover:border-gray-300 dark:hover:border-gray-600 active:scale-[0.97] touch-manipulation"
+            >
+              ${denom}
+            </button>
+          ))}
+        </div>
         <button
-          onClick={() => setTendered(amountDue.toFixed(2))}
-          className={cn(
-            'h-14 rounded-lg border-2 px-4 text-lg font-semibold transition-all',
-            tendered === amountDue.toFixed(2)
-              ? 'border-green-500 dark:border-green-600 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-              : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-          )}
+          type="button"
+          onClick={() => setCents(0)}
+          disabled={cents === 0}
+          className="flex h-12 items-center justify-center rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-red-600 dark:text-red-400 transition-all hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-[0.99] touch-manipulation disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-gray-900"
         >
-          Exact
+          Clear
         </button>
       </div>
 
-      {/* Custom amount input */}
-      <div className="flex items-center gap-2">
-        <span className="text-xl text-gray-500 dark:text-gray-400">$</span>
-        <input
-          type="text"
-          inputMode="decimal"
-          pattern="[0-9]*\.?[0-9]*"
-          value={tendered}
-          onChange={(e) => {
-            const v = e.target.value.replace(/[^0-9.]/g, '');
-            setTendered(v);
-          }}
-          {...enterSubmit}
-          className="h-14 w-40 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-green-400 dark:focus:border-green-600 focus:outline-none focus:ring-2 focus:ring-green-200 dark:focus:ring-green-800"
-          placeholder="0.00"
+      {/* Keypad */}
+      <div className="w-full max-w-xs">
+        <PinPad
+          onDigit={handleDigit}
+          onBackspace={handleBackspace}
+          layoutVariant="amount"
+          size="default"
         />
       </div>
-
-      {/* Change display */}
-      {tenderedNum > 0 && (
-        <div
-          className={cn(
-            'rounded-lg px-6 py-3 text-center',
-            isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
-          )}
-        >
-          {isValid ? (
-            <p className="text-lg">
-              Change:{' '}
-              <span className="text-2xl font-bold text-green-700 dark:text-green-400">
-                ${change.toFixed(2)}
-              </span>
-            </p>
-          ) : (
-            <p className="text-lg text-red-600 dark:text-red-400">
-              Short ${(amountDue - tenderedNum).toFixed(2)}
-            </p>
-          )}
-        </div>
-      )}
 
       {checkout.error && (
         <p className="text-sm text-red-600 dark:text-red-400">{checkout.error}</p>
       )}
 
-      {/* Actions */}
+      {/* Footer — Back + Complete */}
       <div className="flex gap-4">
         <Button
           variant="outline"
