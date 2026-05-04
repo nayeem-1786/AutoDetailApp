@@ -6,6 +6,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(split-payment): sync horizontal layout exactly to cash-payment two-column rhythm
+
+iPad PWA test of `a8f87c98` (split-payment two-field architecture) flagged that the horizontal rhythm between the left preset column and the right keypad column was visibly wider than cash-payment's equivalent rhythm. The two surfaces — designed as siblings of the same payment-surface family — read as strangers. User directive: "Follow the cash payment EXACTLY to determine the space between the cash buttons and the keypad. This is NOT unification!!!!!"
+
+Audit confirmed three structural divergences against `cash-payment.tsx` (HEAD, the source of truth):
+
+| Element | cash-payment | split-payment (pre-fix) | gap |
+|---|---|---|---|
+| LEFT column wrapper | `flex flex-col gap-3` (no width — shrinks to 60 px button content) | `flex w-[300px] flex-col gap-2 items-center` (fixed 300 px + items-center centering 60 px chips) | +240 px wider, plus ~120 px wasted whitespace each side of chips |
+| LEFT outer gap | `gap-3` (12 px) between spacers + button group | `gap-2` (8 px) between flat children | gap-3 vs gap-2 |
+| LEFT inner structure | spacer1 + spacer2 + `<group flex flex-col gap-2>{4 buttons}</group>` | single spacer + 4 flat buttons (no group wrapper) | structural |
+| RIGHT column wrapper | `flex w-full max-w-xs flex-col gap-3` (320 px max) | `flex w-[300px] flex-col gap-4` (fixed 300 px) | 20 px narrower, gap-3 vs gap-4 |
+| **Effective horizontal** | **~396 px** (60 + 16 + 320) | **616 px** (300 + 16 + 300) | **+220 px** |
+
+Two-column row container (`flex flex-row items-start gap-4`) and button styling (`h-[60px] w-[60px]` plus the rest of the chip class) were already identical — only the column wrappers and inner structure diverged.
+
+**Fix — byte-level layout match against cash-payment:**
+
+1. **LEFT column wrapper**: dropped `w-[300px]` and `items-center`; changed `gap-2` → `gap-3`. Result: `flex flex-col gap-3` — column shrinks to 60 px button content, exactly matching cash.
+2. **LEFT inner structure**: split the single `h-[144px]` spacer into TWO `h-[60px]` spacers (one per Cash display, one per Card display in right column); wrapped the 4 preset buttons in an inner `flex flex-col gap-2` group. Mirrors cash's `<spacer h-[60px]>` + `<spacer h-[48px]>` + `<group>{buttons}</group>` pattern exactly. Spacer heights diverge from cash (60+60 vs cash's 60+48) — necessary because the right column's pre-keypad content differs (split has two display fields of equal h-[60px], cash has display + change/short slot of h-[60px] + h-[48px]). Documented inline.
+3. **RIGHT column wrapper**: changed `w-[300px]` → `w-full max-w-xs` (320 px max); changed `gap-4` → `gap-3`. Now byte-identical to cash's right column wrapper.
+
+Both inner mounting patterns (display fields with `mx-auto`, PinPad as direct child) were already correct — preserved.
+
+**Spacer math (recomputed under new gap-3):**
+- RIGHT col PinPad row 1 top: Cash display 60 + gap-3 (12) + Card display 60 + gap-3 (12) = **144 px**
+- LEFT col first preset top: spacer1 60 + gap-3 (12) + spacer2 60 + gap-3 (12) = **144 px** ✓ row-aligned
+
+Pre-fix the equivalent math used gap-4 (16 px) and a single 144 px spacer; new structure uses gap-3 (12 px) and two 60 px spacers, arriving at the same 144 px alignment but mirroring cash's structural pattern. The arithmetic happens to work out cleanly — spacer1 (60) + spacer2 (60) + 2 × gap-3 (24) = 144 px exactly.
+
+**Visual outcome:** Total horizontal layout shrinks from 616 px to ~396 px — same as cash. The gap between left chips and the right keypad now reads as the same 16 px gap-4 the user sees on cash-payment. The two surfaces look like siblings.
+
+**No behavioral changes** — handlers (`handleDigit`, `handleBackspace`, `handleFieldTap`, `handleSplitHalf`, `handlePresetAmount`, `handleProcessSplit` 3-branch routing, `handleCancel`), state shape (`activeField`, `cashCents`, `cardCents`, `splitStep`, `processingBranch`, `errorMsg`), derived values (`grandTotalCents`, `cashAmount`, `cardAmount`, `cashDisplay`, `cardDisplay`, `isValidSplit`), `setActiveCents` helper, context-aware button label, processing UI fork — all byte-identical to a8f87c98. PinPad untouched. checkout-context untouched. API/payload contracts untouched.
+
+### Files touched
+- `src/app/pos/components/checkout/split-payment.tsx` — only the two-column body's wrapper classNames and inner structural shape (spacer count + button group wrapper). +20 / −15 line delta within the JSX block.
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/app/pos/components/checkout/split-payment.tsx` → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT (iPad PWA portrait):
+- Open cash-payment surface. Note left-to-right rhythm: 60 px denomination chip column → 16 px gap → 320 px display+keypad column. Total ~396 px.
+- Open split-payment surface. Same rhythm: 60 px preset chip column → 16 px gap → 320 px two-display+keypad column. Total ~396 px. **Visually identical horizontal proportions** to cash. Two surfaces read as siblings.
+- LEFT column: 50/50 chip top-aligns with PinPad row 1 (1, 2, 3) top via 60+12+60+12 = 144 px offset. $20 chip aligns with row 2 (4, 5, 6). $50 with row 3 (7, 8, 9). $100 with row 4 (00, 0, ⌫). All four row-aligned via the matched gap-2 (8 px) between chips and gap-2 between keypad rows.
+- RIGHT column: PinPad cells render at ~101 px wide (320 px column / grid-cols-3 minus gap-2) — same as cash-payment. Display fields at w-44 (176 px) `mx-auto` centered.
+- All other behaviors unchanged: tap-to-activate, auto-derive, three-branch handleProcessSplit, context-aware button label, processing UI fork.
+
+---
+
 ## feat(split-payment): two-field architecture — removes mode toggle, supports endpoint splits
 
 iPad PWA test of `8c9cee06` (split-payment row-alignment fix) flagged that the mode-toggle architecture, while functional, had four interacting issues: (1) Process Card button stuck disabled when primary = 0, blocking the "I changed my mind, charge it all to card" path; (2) presets rendered horizontally when the user wanted vertical for visual parity with cash-payment's denomination column; (3) Process Card label misleading on Cash mode (always said "Process Card $X" even for $0 card portions); (4) auto-calc was already happening but mode toggle made the user manually pick which side they were editing instead of just tapping the field. Audit confirmed mode toggle was the underlying friction; recommended Option B (two-field architecture, no mode toggle, last-focused = active) matching Square/Toast/Clover convention.

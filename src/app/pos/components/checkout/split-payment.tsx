@@ -451,48 +451,55 @@ export function SplitPayment() {
 
       {splitStep === 'enter-amounts' && (
         <>
-          {/* Two-column body — LEFT: vertical preset stack. RIGHT: two
-              display fields stacked + PinPad. Mode toggle removed (was
-              redundant with always-visible two-field architecture). Running
-              totals box removed (the two display fields ARE the running
-              totals). 300px columns + gap-4 = 616px content row, fits
-              768px-viewport iPads' inner area (627px after px-8 padding)
-              with 11px breathing. */}
+          {/* Two-column body — layout sync to cash-payment.tsx (a8f87c98).
+              LEFT column: NO explicit width (shrinks to 60px button content)
+              + outer gap-3 + inner button-group wrapper (gap-2 between
+              chips). RIGHT column: w-full max-w-xs (320px max) + gap-3.
+              Total horizontal: 60 + 16 (gap-4) + 320 = ~396px = matches
+              cash-payment exactly. Pre-sync this surface used 300px columns
+              + gap-4 column gap = 616px total, ~220px wider than cash and
+              breaking the visual sibling rhythm. */}
           <div className="flex flex-row items-start gap-4">
-            {/* LEFT column — vertical preset stack. Spacer above row-aligns
-                first preset (50/50) with PinPad row 1 (1, 2, 3) in the
-                right column. Right column above PinPad: Cash display 60 +
-                gap-4 16 + Card display 60 + gap-4 16 = 152 px. Left column
-                wrapper has gap-2 (8px) between spacer and first preset, so
-                spacer height = 152 - 8 = 144 px. Verified math. */}
-            <div className="flex w-[300px] flex-col gap-2 items-center">
-              <div className="h-[144px]" aria-hidden="true" />
-
-              <button
-                type="button"
-                onClick={handleSplitHalf}
-                className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
-              >
-                50/50
-              </button>
-              {[20, 50, 100].map((amt) => (
+            {/* LEFT column — vertical preset stack, mirrors cash-payment's
+                left-column structure exactly. Two h-[60px] spacers stand in
+                for the right column's Cash display + Card display heights,
+                separated by gap-3 (12px). Inner button-group wrapper has
+                gap-2 (8px) between chips. First preset (50/50) top at
+                60+12+60+12 = 144px = matches RIGHT column's PinPad row 1
+                top (also 144px). */}
+            <div className="flex flex-col gap-3">
+              <div className="h-[60px]" aria-hidden="true" />
+              <div className="h-[60px]" aria-hidden="true" />
+              <div className="flex flex-col gap-2">
                 <button
-                  key={amt}
                   type="button"
-                  onClick={() => handlePresetAmount(amt)}
-                  disabled={amt * 100 > grandTotalCents}
-                  className={cn(
-                    'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
-                    amt * 100 > grandTotalCents && 'opacity-40 cursor-not-allowed'
-                  )}
+                  onClick={handleSplitHalf}
+                  className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
                 >
-                  ${amt}
+                  50/50
                 </button>
-              ))}
+                {[20, 50, 100].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => handlePresetAmount(amt)}
+                    disabled={amt * 100 > grandTotalCents}
+                    className={cn(
+                      'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
+                      amt * 100 > grandTotalCents && 'opacity-40 cursor-not-allowed'
+                    )}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* RIGHT column — two display fields + keypad */}
-            <div className="flex w-[300px] flex-col gap-4">
+            {/* RIGHT column — two display fields + keypad. Mirrors cash-payment's
+                right-column wrapper exactly: w-full max-w-xs (320px) + gap-3.
+                PinPad fills the column → cells ~101px (B-followup-3 lesson).
+                Display fields (w-44 = 176px) centered with mx-auto. */}
+            <div className="flex w-full max-w-xs flex-col gap-3">
               {/* Cash display field — tap to activate. Active treatment:
                   thicker blue border + light blue tint. Inactive: standard
                   gray border. Both fields render via fromCents() and stay
