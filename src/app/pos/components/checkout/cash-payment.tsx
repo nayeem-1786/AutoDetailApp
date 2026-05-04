@@ -243,14 +243,18 @@ export function CashPayment() {
         <div className="flex flex-row items-start gap-4">
           {/* Left column — denomination chips, row-aligned with keypad rows.
               Spacers above the button group offset for the right column's
-              display+X row (60px) and change/short row (40px), separated by
-              gap-3 (12px). Total offset 60+12+40+12 = 124px puts $10 top
+              display+X row (60px) and change/short slot (48px), separated by
+              gap-3 (12px). Total offset 60+12+48+12 = 132px puts $10 top
               aligned with keypad row 1 top. Buttons are gap-2 (8px) apart to
               match the keypad's vertical row gap, so $10/$20/$50/$100 row-
-              align with keypad rows 1/2/3/4 respectively. */}
+              align with keypad rows 1/2/3/4 respectively. The 48px slot
+              height comes from the Change variant's natural height: text-xl
+              line-height (28px) + py-2 (16px) = 44px, rounded up to 48px to
+              absorb small style variance and prevent keypad shift between
+              the cents===0 and cents>0 states (Session B-followup-4 fix). */}
           <div className="flex flex-col gap-3">
             <div className="h-[60px]" aria-hidden="true" />
-            <div className="h-[40px]" aria-hidden="true" />
+            <div className="h-[48px]" aria-hidden="true" />
             <div className="flex flex-col gap-2">
               {DENOMINATIONS.map((denom) => (
                 <button
@@ -300,32 +304,38 @@ export function CashPayment() {
               </button>
             </div>
 
-            {/* Row 2: change / short box. Always renders (placeholder when
-                cents===0) so the keypad position stays stable and the left
-                column's spacer offset stays valid regardless of state. */}
-            {cents > 0 ? (
-              <div
-                className={cn(
-                  'mx-auto flex min-h-[40px] w-[244px] items-center justify-center rounded-lg px-6 py-2 text-center',
-                  isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
-                )}
-              >
-                {isValid ? (
-                  <p className="text-base">
-                    Change:{' '}
-                    <span className="text-xl font-bold text-green-700 dark:text-green-400 tabular-nums">
-                      ${changeDollars.toFixed(2)}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="text-base text-red-600 dark:text-red-400 tabular-nums">
-                    Short ${shortDollars.toFixed(2)}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="mx-auto h-[40px] w-[244px]" aria-hidden="true" />
-            )}
+            {/* Row 2: change / short slot. Fixed-size 244×48 wrapper that
+                ALWAYS occupies the same vertical space, so the keypad never
+                shifts between cents===0 and cents>0. Inner box (when cents>0)
+                fills the wrapper via h-full / w-full. 48px chosen to fully
+                contain the Change variant's natural height (text-xl line
+                28px + py-2 16px = 44px) with 4px headroom — Session
+                B-followup-2 used min-h-[40px] which the Change variant
+                overflowed by 4px, causing the keypad to drop on every
+                transition into a fully-tendered state. */}
+            <div className="mx-auto h-[48px] w-[244px]">
+              {cents > 0 && (
+                <div
+                  className={cn(
+                    'flex h-full w-full items-center justify-center rounded-lg px-6 text-center',
+                    isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
+                  )}
+                >
+                  {isValid ? (
+                    <p className="text-base">
+                      Change:{' '}
+                      <span className="text-xl font-bold text-green-700 dark:text-green-400 tabular-nums">
+                        ${changeDollars.toFixed(2)}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-base text-red-600 dark:text-red-400 tabular-nums">
+                      Short ${shortDollars.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Row 3: keypad — unchanged from PinPad shared component. */}
             <PinPad

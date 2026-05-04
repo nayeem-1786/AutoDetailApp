@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(cash-payment): Session B-followup-4 — equalize change/short slot height to prevent keypad shift
+
+iPad PWA test of `35eef596` (Session B-followup-3) revealed a residual layout shift: tapping a denomination (or any digit) that pushed `cents > 0` AND `cents >= amountDue` (Change variant) caused the keypad to drop by 4 px, breaking the row-alignment between left-column denomination chips ($10/$20/$50/$100) and keypad rows (1/4/7/00). Tapping a denomination that under-paid (Short variant) did NOT cause the shift. The asymmetry is the diagnostic signature of a single overflowing variant.
+
+**Root cause** — The B-followup-2 slot used `min-h-[40px]` on the Change/Short box and a sibling `h-[40px]` placeholder for the `cents === 0` state. Heights:
+- Placeholder (`cents === 0`): exactly 40 px.
+- Short variant box: `<p class="text-base">` line-height 24 px + `py-2` 16 px = 40 px (matches `min-h-[40px]` exactly, no overflow).
+- Change variant box: `<p class="text-base">Change: <span class="text-xl">$X.XX</span></p>` — line-height of the `<p>` is dictated by its dominant inline child, which is the `text-xl` span at 28 px line-height. Plus `py-2` 16 px = **44 px**. The `min-h-[40px]` is a floor, not a ceiling — content overflowed the floor by 4 px → the slot grew → the keypad below shifted down by 4 px.
+
+The left column's spacer offset (60 + 12 + 40 + 12 = 124 px) was fixed at 124 px regardless of the right column's actual height. So when the right column grew to 128 px above the keypad in Change mode, the keypad slid 4 px down while denominations stayed put → row alignment broke.
+
+**Fix** — Replace the ternary `{cents > 0 ? <box> : <placeholder>}` with a fixed-size wrapper that ALWAYS occupies 244 × 48 px, and conditionally render the inner box at `h-full w-full` only when `cents > 0`:
+
+```jsx
+<div className="mx-auto h-[48px] w-[244px]">
+  {cents > 0 && (
+    <div className={cn('flex h-full w-full items-center justify-center rounded-lg px-6 text-center', isValid ? 'bg-green-50 ...' : 'bg-red-50 ...')}>
+      {isValid ? <p>Change: <span class="text-xl">$X.XX</span></p> : <p>Short $X.XX</p>}
+    </div>
+  )}
+</div>
+```
+
+48 px chosen to fully contain the Change variant's natural 44 px (28 + 16) with 4 px headroom — absorbs small style variance and prevents future regression if a Tailwind preset bumps line-heights. Inner box's `min-h-[40px]`, `py-2`, `mx-auto`, and `w-[244px]` removed (sizing now lives on the wrapper); inner box gets `h-full w-full` to fill. With slot at 48 px and `text-xl` line at 28 px, the Change content centers with 10 px breathing room top and bottom — visually equivalent to the prior `py-2`-based padding.
+
+**Left column spacer bumped** — old offset 60 + 12 + 40 + 12 = 124 px (matched B-followup-2's 40 px slot). New: 60 + 12 + **48** + 12 = **132 px**. The left column's second spacer changed from `h-[40px]` to `h-[48px]`. Math documented inline. $10/$20/$50/$100 row-alignment with keypad rows 1/2/3/4 preserved across both `cents === 0` and `cents > 0` states.
+
+**Why this is more robust than B-followup-2's approach** — the B-followup-2 design used the inner box's `min-h-[40px]` as the height contract, which made the slot's actual height a function of the inner content (and silently broke when content exceeded the floor). The B-followup-4 design moves the height contract to the OUTER wrapper as a fixed `h-[48px]`, which the inner box cannot exceed regardless of content. The slot is now a true fixed-dimension reservation, not a floor-with-grow-to-fit.
+
+**No structural changes elsewhere** — handlers, state, denomination data, color/styling, footer, header, offline banner, PinPad, display field, X icon button — all untouched. Only the slot wrapper structure and one spacer height changed.
+
+### Files touched
+- `src/app/pos/components/checkout/cash-payment.tsx` — slot wrapper restructure (ternary → fixed wrapper + conditional inner) + left column spacer height bump (40 → 48 px) + comment updates with new math
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/app/pos/components/checkout/cash-payment.tsx` → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT:
+- `cents === 0`: slot wrapper 48 px tall, no inner box. Keypad starts at 132 px from right column top. $10 top at 132 px (left column offset 60+12+48+12 = 132 px). ✓
+- `cents = 2000` (under-pay $20 of $428, Short variant): slot wrapper still 48 px, inner box (red, "Short $408.00") fills it. Keypad still at 132 px. ✓
+- `cents = 50000` (over-pay $500 of $428, Change variant): slot wrapper still 48 px, inner box (green, "Change: $72.00" with `text-xl` span) fills it — content (28 px line) centers in 48 px wrapper (10 px breathing top/bottom), no overflow. Keypad still at 132 px. ✓ (regression resolved)
+- Backspace cents to 0: inner box unmounts, wrapper stays at 48 px. Keypad still at 132 px. ✓
+- Row alignment in all four states: $10 ↔ keypad row (1, 2, 3) top, $20 ↔ row (4, 5, 6) top, $50 ↔ row (7, 8, 9) top, $100 ↔ row (00, 0, ⌫) top. Verified via offset math (132 px both columns) and button-group geometry (4 × 60 + 3 × 8 = 264 px = keypad height).
+
+---
+
 ## fix(cash-payment): Session B-followup-3 — restore keypad cell width (items-center alignment regression from B-followup-2)
 
 iPad PWA test of `2411cd18` (Session B-followup-2) revealed a visual regression: PinPad cells (1-9, 00, 0, ⌫) rendered as narrow tall pills (~40-50 px wide × 60 px tall, fully rounded by `rounded-xl` at that aspect ratio) instead of the intended ~101 px × 60 px squares. Denomination chips, display, and X icon button rendered correctly — only the keypad cells inside the shared `<PinPad>` component were squished. PinPad's source was confirmed byte-identical (`git diff ef8aed5c..HEAD -- pin-pad.tsx` empty), so the cause had to be in `cash-payment.tsx`'s wrapper structure.
