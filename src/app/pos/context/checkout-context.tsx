@@ -47,7 +47,7 @@ interface CheckoutContextType extends CheckoutState {
   setTip: (amount: number, percent: number | null) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
   setCashPayment: (tendered: number, change: number) => void;
-  setSplitCash: (cashPortion: number) => void;
+  setSplitPayment: (cashPortion: number, cardPortion: number) => void;
   setCardResult: (intentId: string, brand: string | null, lastFour: string | null) => void;
   setComplete: (transactionId: string, receiptNumber: string | null, customerEmail?: string | null, customerPhone?: string | null, customerId?: string | null, customerTags?: string[] | null) => void;
   setProcessing: (processing: boolean) => void;
@@ -107,8 +107,13 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, cashTendered: tendered, cashChange: change }));
   }, []);
 
-  const setSplitCash = useCallback((cashPortion: number) => {
-    setState((s) => ({ ...s, cashPortion }));
+  // Sets BOTH cashPortion AND cardPortion in one call. Replaces the old
+  // setSplitCash which only set cash — cardPortion was dead state, read by
+  // PaymentComplete but never written, so split receipts always rendered
+  // "Card $0.00" regardless of actual card amount charged. Single setter
+  // means callers can't forget the card half.
+  const setSplitPayment = useCallback((cashPortion: number, cardPortion: number) => {
+    setState((s) => ({ ...s, cashPortion, cardPortion }));
   }, []);
 
   const setCardResult = useCallback(
@@ -162,7 +167,7 @@ export function CheckoutProvider({ children }: { children: ReactNode }) {
         setTip,
         setPaymentMethod,
         setCashPayment,
-        setSplitCash,
+        setSplitPayment,
         setCardResult,
         setComplete,
         setProcessing,

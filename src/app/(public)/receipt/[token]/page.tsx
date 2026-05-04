@@ -7,6 +7,7 @@ import { PrintButton } from './print-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { derivePaymentSourceLabel, type PaymentMethodLike } from '@/lib/utils/payment-source-label';
 import { toCents } from '@/lib/utils/refund-math';
+import { formatCardBrand } from '@/lib/utils/card-brand';
 
 function formatDepositLabel(depositDate: string | null): string {
   if (!depositDate) return 'Deposit Paid - Online';
@@ -503,7 +504,12 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 {tx.is_deposit ? 'Total Charged' : 'Total'}
               </span>
               <span className="text-lg font-bold text-site-text">
-                {formatCurrency(tx.is_deposit ? tx.total_amount : ((tx.appointment_total ?? tx.total_amount) + tx.tip_amount))}
+                {/* Use the larger of appointment_total and transaction.total_amount.
+                    Handles both close-out shells (transaction is $0, appointment carries
+                    gross) AND in-store sales that exceed appointment value (transaction
+                    carries gross, appointment is stale). Mirrors the receipt-template.ts
+                    policy. */}
+                {formatCurrency(tx.is_deposit ? tx.total_amount : (Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount))}
               </span>
             </div>
             {tx.is_deposit && tx.balance_due > 0 && (
@@ -580,7 +586,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               if (isOnlineSource) {
                 label = `${p.source_label} · ${formatReceiptDateTime(p.created_at)}`;
               } else if (p.method === 'card' && p.card_brand) {
-                label = `${p.card_brand} ending in ${p.card_last_four || '****'}`;
+                label = `${formatCardBrand(p.card_brand)} ending in ${p.card_last_four || '****'}`;
               } else {
                 label = p.method.charAt(0).toUpperCase() + p.method.slice(1);
               }

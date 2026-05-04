@@ -224,10 +224,20 @@ export async function fetchReceiptData(
           (sum: number, p: any) => sum + toCents(Number(p.amount)),
           0
         );
+        // appointmentBalanceDue uses Math.max(0, totalCents - paidCents) to
+        // CLAMP NEGATIVE values to zero — semantically distinct from the
+        // receipt-template.ts Math.max(appointment_total, transaction.total_amount)
+        // which selects the LARGER GROSS. Both are intentional. If an
+        // in-store sale ($78) exceeds a stale appointment.total_amount ($1),
+        // paidCents > totalCents → balance = max(0, -77) = 0 → "fully paid"
+        // semantic, which is correct UX (staff don't need a "you owe -$77"
+        // alert). The actual Total displayed on the receipt is fixed by the
+        // template-side Math.max policy; this clamp here only protects the
+        // separate "balance due" display.
         appointmentBalanceDue = Math.max(0, totalCents - paidCents);
-        // Receipt Total displays the appointment gross when this transaction
-        // is appointment-linked. Close-out has total_amount=0 — without this,
-        // the receipt shows "$0.00" as the Total which is misleading.
+        // Raw appointment.total_amount — the renderer applies a
+        // Math.max(appointment_total, transaction.total_amount) policy to
+        // pick the larger gross for the TOTAL line. See receipt-template.ts.
         appointmentTotal = Number(apptForBalance.total_amount);
       }
     }

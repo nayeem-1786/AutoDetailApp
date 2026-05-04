@@ -6,6 +6,71 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(checkout/receipt): split-payment cardPortion in PaymentComplete + receipt TOTAL uses larger of appointment/transaction + card brand title-case
+
+Live production split-payment transaction on `2026-05-04` (Receipt SD-006260: $78.00 ticket, Cash $77 + Card $1, customer Nayeem Khan) surfaced three independent bugs along the same flow: (1) PaymentComplete rendered "Card $0.00" instead of "$1.00", (2) printed receipt TOTAL line read $1.00 instead of $78.00, (3) printed receipt card line read "visa ****8085" instead of "Visa ****8085". Stripe charge succeeded correctly ($1.00 captured, drawer kicked, $77 cash collected) — DB ground truth was correct (`transactions.total_amount = 78`, two `payments` rows of $77 cash + $1 card with `card_brand="visa"`, `card_last_four="8085"`). All three bugs were rendering / state-propagation issues, not data-integrity issues.
+
+Three independent root causes, three surgical fixes, bundled because (a) all three are user-visible from the same recently-shipped split-payment flow; shipping a partial fix means another iPad test cycle, (b) Bugs 2 and 3 share `receipt-template.ts` so touching it once is more efficient.
+
+### Bug 1 — PaymentComplete "Card $0.00" on every split
+
+**Root cause** — `checkout.cardPortion` declared in `CheckoutState` (line 29 of `checkout-context.tsx`), initialized to `0` (line 67), READ by `payment-complete.tsx:80` for the split-payment branch — but **never written by any setter**. `setSplitCash(cashPortion)` at line 110 only set the cash half; no `setCardPortion` / `setSplitCard` setter existed. `setCardResult(piId, brand, lastFour)` set only PI id / brand / lastFour, not amount. Result: `cardPortion` was dead state. PaymentComplete always rendered `Card $0.00` regardless of actual card amount charged.
+
+**Fix** — Replace `setSplitCash(cashPortion)` with `setSplitPayment(cashPortion, cardPortion)` that sets BOTH portions atomically. Single setter means callers can't forget the card half. Grep confirmed `setSplitCash` had only one callsite (`split-payment.tsx:243`); removed without backwards-compat shim. `split-payment.tsx` `handleProcessSplit` success path now calls `checkout.setSplitPayment(cashAmount, cardAmount)`.
+
+**Secondary finding within Bug 1** — `setCardResult(piId, null, null)` at the same callsite passes `card_brand=null` and `card_last_four=null` even though the Stripe charge has both. Reason: brand/lastFour are NOT readily available from the Stripe Terminal SDK's `processPayment` result client-side; they're populated server-side in `payments.card_brand` / `payments.card_last_four` by the `/api/pos/card-customer` endpoint (fired async after transaction insert) which queries the Stripe charge object server-side. Receipts read from the `payments` table directly, so the printed receipt has the brand/lastFour correctly. PaymentComplete doesn't currently render brand/lastFour inline. Documented inline in `split-payment.tsx` why null/null stays — if PaymentComplete is ever extended to display brand inline, the fix would be to await the card-customer response or add a separate fetch endpoint.
+
+### Bug 2 — Receipt TOTAL $1.00 instead of $78.00
+
+**Root cause** — `receipt-template.ts:622, 636, 1262` and `(public)/receipt/[token]/page.tsx:506` all used `tx.appointment_total ?? tx.total_amount` to derive the receipt's TOTAL line. `??` (null-coalescing) only falls through on `null`/`undefined`, so a non-null `appointment_total` ALWAYS wins. For SD-006260: `appointments.total_amount = 1` (the value persisted when the appointment was originally created — likely from a $1 pay-link or booking deposit), `transactions.total_amount = 78` (the correct in-store ticket gross including 3× WATER + Express Wash). The `??` fallback picked the stale appointment value. Pre-fix intent (per inline comments) was to handle close-out scenarios where `transaction.total_amount = 0` and the appointment carries the meaningful gross; the inverse case (in-store sale exceeds original appointment value) was unanticipated.
+
+**Fix (Option A from diagnostic)** — Change the fallback to `Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0)` at all 4 sites. Picks the LARGER of the two grosses, handling both directions:
+- Close-out shells: `transaction.total_amount = 0`, `appointment_total = $X` → max = $X (preserves existing close-out UX).
+- In-store sales beyond appointment value: `transaction.total_amount = $78`, `appointment_total = $1` → max = $78 (fixes this bug).
+- Walk-in (no appointment): `appointment_total = null`, `transaction.total_amount = $X` → max = $X (unchanged).
+
+Each Math.max site has an 8-line code comment documenting the policy and the pre-fix bug context so the rationale survives future refactors.
+
+**`receipt-data.ts` verified — no Math.max change needed.** The `appointmentBalanceDue = Math.max(0, totalCents - paidCents)` math at line ~227 uses Math.max with semantically DIFFERENT intent (clamps negative balances to zero, not "pick the larger gross"). For the bug scenario: paidCents ($78) > totalCents ($1) → balance = max(0, -77) = 0 → "fully paid" semantic, which is correct UX (staff don't need a "you owe -$77" alert). Added an 8-line code comment documenting the distinction between this Math.max and receipt-template.ts's Math.max, plus a separate comment noting that `appointmentTotal = Number(apptForBalance.total_amount)` is intentionally raw (the policy lives at the renderer end).
+
+### Bug 3 — Card brand "visa" lowercase on receipts
+
+**Root cause** — Stripe's API returns card brands as lowercase identifiers (`'visa' | 'mastercard' | 'amex' | 'discover' | 'diners' | 'jcb' | 'unionpay' | 'unknown'`). The brand string is stored lowercase in `payments.card_brand` (DB confirmed: `"visa"`). Three rendering sites interpolate it raw without case transformation: `receipt-template.ts:673` (thermal), `:1011` (HTML), `(public)/receipt/[token]/page.tsx:589`.
+
+**Fix** — New `src/lib/utils/card-brand.ts` exports `formatCardBrand(brand)` with a Stripe-aware lookup map: `visa → Visa`, `mastercard → Mastercard`, `amex → Amex`, `discover → Discover`, `diners → Diners`, `jcb → JCB`, `unionpay → UnionPay`, `unknown → Card`. Falls back to naive title-case for unrecognized brands so the receipt never prints a literal lowercase brand name. `null`/`undefined` returns "Card". Single source of truth — adding a new Stripe-supported brand only requires updating the map. Applied at all 3 rendering sites: thermal template, HTML template, public receipt page.
+
+PaymentComplete checked separately — does not currently render `card_brand` inline, so no `formatCardBrand` application there. Bug 1's `setCardResult` documentation notes that if PaymentComplete is ever extended to display brand inline, `formatCardBrand` should be applied at that callsite too.
+
+### Files touched
+- `src/lib/utils/card-brand.ts` — NEW utility (Stripe brand → display name lookup)
+- `src/app/pos/context/checkout-context.tsx` — `setSplitCash` removed, `setSplitPayment(cash, card)` added
+- `src/app/pos/components/checkout/split-payment.tsx` — call new setter; document why setCardResult brand/lastFour stays null/null
+- `src/app/pos/lib/receipt-template.ts` — Math.max at 3 TOTAL sites (thermal deposit, thermal normal, HTML); formatCardBrand at 2 card-label sites (thermal, HTML); import added
+- `src/lib/data/receipt-data.ts` — no behavior change; documentation comments distinguish the existing `Math.max(0, …)` balance-due clamp from the new template-side Math.max(appointment, transaction) gross-selection policy
+- `src/app/(public)/receipt/[token]/page.tsx` — Math.max at TOTAL site; formatCardBrand at card-label site; import added
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (6 changed files) → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT (live production-like flow):
+- Process split: Cash $77 + Card $1 on $78 ticket, customer charged correctly via Stripe Terminal.
+- **Bug 1 fix**: PaymentComplete renders "Cash $77.00 / Card $1.00". (Pre-fix: "Cash $77.00 / Card $0.00".)
+- **Bug 2 fix**: Print receipt → TOTAL line shows "$78.00" (Math.max of stale $1 appointment and correct $78 transaction). (Pre-fix: "$1.00".)
+- **Bug 3 fix**: Print receipt → card line shows "Visa ****8085". (Pre-fix: "visa ****8085".) Same on HTML email receipt and public receipt page. Mental test with other brands: mastercard → "Mastercard", amex → "Amex", jcb → "JCB", unknown → "Card", null → "Card".
+- All other receipt fields unchanged (Cash $77 line, items, subtotal, tax, customer block, etc.).
+- All other checkout flows (full cash, full card, full check, walk-in no appointment, deposit, close-out) unchanged.
+
+### Known issue — deferred to separate audit (Option B from diagnostic)
+
+`appointments.total_amount` goes stale when an in-store sale adds items that bring the ticket gross above the appointment's recorded total. SD-006260's underlying appointment row still has `total_amount = 1` even though the actual transaction was $78 — the in-store-sale flow (`POST /api/pos/transactions` with `appointment_id`) does NOT update the appointment row's `total_amount` to reflect added items. The Math.max workaround in this commit makes receipts render correctly, but the appointment row is still wrong, which can affect:
+- Reports / analytics that aggregate `appointments.total_amount` (they undercount actual revenue captured against the appointment)
+- Future code that uses `appointments.total_amount` as the source of truth for "what was promised vs delivered" comparisons
+- Customer-facing displays that show the appointment value (if any)
+
+The structural fix (Option B) is to update `appointments.total_amount` on transaction insert when the new transaction's total exceeds the appointment's recorded total. That requires audit of all consumers of `appointments.total_amount` to ensure the update doesn't break any flow that depends on the appointment's ORIGINAL value (e.g., booking deposit math, no-show fee calculations). Out of scope for this session — flagged for a future maintenance audit. Reference this commit when planning Option B.
+
+---
+
 ## feat(checkout): split-payment two-column layout + raise modal cap to 850px
 
 iPad PWA test of `5e6e84e6` (split-payment input rebuild) confirmed the surface overflows the 700px modal cap by 112-248px depending on running-totals visibility — `min-h-full + justify-center` from Stage 1 distributes the overflow above and below the visible area, clipping the header at top and the footer at bottom. Two related changes resolve the fit problem: (1) raise the modal cap to give every surface breathing room, (2) restructure split-payment into a two-column layout that distributes content horizontally and matches cash-payment's visual rhythm.

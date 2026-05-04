@@ -240,7 +240,19 @@ export function SplitPayment() {
         });
 
       setSplitStep('complete');
-      checkout.setSplitCash(cashAmount);
+      // Record BOTH cash and card portions so PaymentComplete renders the
+      // correct split summary. Pre-fix: setSplitCash(cash) only — cardPortion
+      // stayed at its initial 0 → split receipts always read "Card $0.00".
+      checkout.setSplitPayment(cashAmount, cardAmount);
+      // brand/lastFour intentionally null here — the Stripe Terminal SDK's
+      // PaymentIntent does not reliably expose these client-side; the values
+      // ARE persisted to payments.card_brand / payments.card_last_four by the
+      // /api/pos/card-customer server endpoint (fired async above) which
+      // queries the Stripe charge object server-side. Receipts read from the
+      // payments table, so the printed receipt has the brand. PaymentComplete
+      // doesn't currently render brand/lastFour inline; if extended to do so,
+      // it would need to await the card-customer response or call a separate
+      // endpoint to fetch the persisted brand. Out of scope here.
       checkout.setCardResult(piId, null, null);
       checkout.setCashPayment(cashAmount, 0);
       checkout.setComplete(

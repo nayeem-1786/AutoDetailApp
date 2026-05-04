@@ -3,6 +3,7 @@ import { formatPhone, formatReceiptDateTime } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
 import QRCode from 'qrcode';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { formatCardBrand } from '@/lib/utils/card-brand';
 
 interface ReceiptItem {
   id: string;
@@ -619,7 +620,15 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       type: 'bold',
       text: '',
     });
-    const balanceGrandTotal = (tx.appointment_total ?? tx.total_amount) + tx.tip_amount;
+    // Use the larger of appointment_total and transaction.total_amount.
+    // Handles both close-out shells (transaction is $0, appointment carries
+    // gross) AND in-store sales that exceed appointment value (transaction
+    // carries gross, appointment is stale — e.g., a $1 pay-link booking that
+    // had $77 of in-store items added). Pre-fix used `?? null-coalescing`
+    // which only fell through on null/undefined, so a stale $1 appointment
+    // beat the correct $78 transaction. Math.max(0, ...) on each operand
+    // protects against negative values from corrupt data.
+    const balanceGrandTotal = Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount;
     lines.push({
       type: 'columns',
       left: 'TOTAL',
@@ -630,10 +639,12 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       type: 'bold',
       text: '',
     });
-    // Appointment-linked transactions display the appointment gross as Total
-    // (close-out has total_amount=0 — without this fallback, receipts show
-    // "$0.00" as the Total which is misleading). Walk-in keeps tx.total_amount.
-    const grandTotal = (tx.appointment_total ?? tx.total_amount) + tx.tip_amount;
+    // Use the larger of appointment_total and transaction.total_amount.
+    // Handles both close-out shells (transaction is $0, appointment carries
+    // gross) AND in-store sales that exceed appointment value (transaction
+    // carries gross, appointment is stale). See balanceGrandTotal above for
+    // the full rationale and pre-fix-bug context.
+    const grandTotal = Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount;
     lines.push({
       type: 'columns',
       left: 'TOTAL',
@@ -670,7 +681,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       const dateStr = p.created_at ? ` · ${formatReceiptDateTime(p.created_at)}` : '';
       label = `${p.source_label}${dateStr}`;
     } else if (p.method === 'card' && p.card_brand) {
-      label = `${p.card_brand} ****${p.card_last_four}`;
+      label = `${formatCardBrand(p.card_brand)} ****${p.card_last_four}`;
     } else {
       label = p.method.toUpperCase();
     }
@@ -1008,7 +1019,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
           const dateStr = p.created_at ? ` · ${esc(formatReceiptDateTime(p.created_at))}` : '';
           label = `${esc(p.source_label!)}${dateStr}`;
         } else if (p.method === 'card' && p.card_brand) {
-          label = `${esc(p.card_brand)} ****${esc(p.card_last_four || '')}`;
+          label = `${esc(formatCardBrand(p.card_brand))} ****${esc(p.card_last_four || '')}`;
         } else {
           label = p.method.toUpperCase();
         }
@@ -1259,7 +1270,12 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>
     <tr>
       <td style="padding:6px 0;font-size:15px;font-weight:bold;">${tx.is_deposit ? 'TOTAL CHARGED' : 'TOTAL'}</td>
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(tx.is_deposit ? tx.total_amount : ((tx.appointment_total ?? tx.total_amount) + tx.tip_amount)).toFixed(2)}</td>
+      <!-- Use the larger of appointment_total and transaction.total_amount.
+           Handles both close-out shells (transaction is $0, appointment carries
+           gross) AND in-store sales that exceed appointment value (transaction
+           carries gross, appointment is stale). Mirrors the thermal renderer's
+           policy in this same file (see balanceGrandTotal / grandTotal above). -->
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(tx.is_deposit ? tx.total_amount : (Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount)).toFixed(2)}</td>
     </tr>
     ${tx.is_deposit && tx.balance_due != null ? `<tr>
       <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">EST. BALANCE DUE AT SERVICE</td>
