@@ -30,7 +30,7 @@ export function CheckoutOverlay() {
       onTouchEnd={handleBackdropTouchEnd}
     >
       <div
-        className="relative h-full w-full bg-white dark:bg-gray-900 md:h-[90vh] md:max-h-[700px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl"
+        className="relative h-full w-full bg-white dark:bg-gray-900 md:h-[90vh] md:max-h-[850px] md:w-[90vw] md:max-w-[800px] md:rounded-2xl md:shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onTouchEnd={(e) => e.stopPropagation()}
       >

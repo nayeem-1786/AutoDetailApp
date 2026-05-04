@@ -283,130 +283,151 @@ export function SplitPayment() {
 
       {splitStep === 'enter-amounts' && (
         <>
-          {/* Mode toggle: cash-first vs card-first */}
+          {/* Mode toggle: cash-first vs card-first. Labels shortened from
+              "Enter Cash Amount" / "Enter Card Amount" to "Cash" / "Card"
+              now that the prompt text in the right column explains the
+              meaning. min-w-[100px] keeps the buttons visually balanced
+              despite the short labels. */}
           <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
             <button
               onClick={() => { setSplitMode('cash-first'); setPrimaryCents(0); }}
               className={cn(
-                'rounded-md px-4 py-2 text-sm font-medium transition-all',
+                'min-w-[100px] rounded-md px-4 py-2 text-sm font-medium transition-all',
                 splitMode === 'cash-first'
                   ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               )}
             >
-              Enter Cash Amount
+              Cash
             </button>
             <button
               onClick={() => { setSplitMode('card-first'); setPrimaryCents(0); }}
               className={cn(
-                'rounded-md px-4 py-2 text-sm font-medium transition-all',
+                'min-w-[100px] rounded-md px-4 py-2 text-sm font-medium transition-all',
                 splitMode === 'card-first'
                   ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               )}
             >
-              Enter Card Amount
+              Card
             </button>
           </div>
 
-          {/* Amount input \u2014 wrapper is w-full max-w-xs (320px) so PinPad's
-              grid-cols-3 stretches to the column width (cells ~101px each).
-              No items-center on the column \u2014 that would collapse PinPad to
-              min-content (B-followup-3 lesson). Display, preset row, and
-              prompt text use mx-auto / text-center to center within. */}
-          <div className="flex w-full max-w-xs flex-col gap-4">
-            <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-              {splitMode === 'cash-first'
-                ? 'Enter cash amount \u2014 remainder goes to card'
-                : 'Enter card amount \u2014 remainder is cash'}
-            </p>
-
-            {/* Tendered display \u2014 non-focusable div, no OS keyboard pop on
-                iPad. Fixed width w-44 (176px) \u2014 sufficient for $99,999.99
-                at text-2xl tabular-nums plus padding \u2014 so the field NEVER
-                widens with content. $ moved inside the box so display reads
-                as one locked unit. Mirrors cash-payment.tsx pattern. */}
-            <div
-              role="status"
-              aria-live="polite"
-              aria-label="Primary amount"
-              className="mx-auto flex h-[60px] w-44 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
-            >
-              ${displayValue}
-            </div>
-
-            {/* Quick preset chips \u2014 OVERWRITE primaryCents (different from
-                cash-payment's increment denoms). Filled gray styling at
-                60\u00d760 to mirror cash-payment's denom chip geometry; text-base
-                (vs cash-payment's text-xl) accommodates "50/50"'s 5-char
-                length and signals the "shortcut" semantic vs cash-payment's
-                "received bill" semantic. $X chips disable when amt >= total. */}
-            <div className="mx-auto flex flex-row gap-2">
-              <button
-                type="button"
-                onClick={handleSplitHalf}
-                className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
-              >
-                50/50
-              </button>
-              {[20, 50, 100].map((amt) => (
+          {/* Two-column body \u2014 LEFT: quick presets (top) + running totals
+              (below, conditional). RIGHT: prompt text (top) + display + PinPad.
+              Both columns fixed at w-[300px] so PinPad's grid-cols-3 fills
+              the right column and cells render at ~94px (B-followup-3 lesson).
+              Total row width 300+16+300 = 616px, fits 768px-viewport iPads'
+              inner area (627px after px-8 64px padding) with 11px breathing,
+              and fits all larger iPads with proportionally more breathing.
+              items-start aligns columns at top \u2014 left column is shorter than
+              right (especially when running totals hide), empty space below
+              the left column is acceptable. NO items-center on either column;
+              presets row uses justify-center, display + running totals use
+              mx-auto / w-full to position within the 300px column. */}
+          <div className="flex flex-row items-start gap-4">
+            {/* LEFT column \u2014 quick presets + running totals */}
+            <div className="flex w-[300px] flex-col gap-4">
+              {/* Quick preset chips \u2014 OVERWRITE primaryCents (different from
+                  cash-payment's increment denoms). justify-center within the
+                  300px column (chip row is 264px wide, leaves 18px breathing
+                  on each side). */}
+              <div className="flex flex-row justify-center gap-2">
                 <button
-                  key={amt}
                   type="button"
-                  onClick={() => setPrimaryCents(toCents(amt))}
-                  disabled={amt >= grandTotal}
-                  className={cn(
-                    'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
-                    amt >= grandTotal && 'opacity-40 cursor-not-allowed'
-                  )}
+                  onClick={handleSplitHalf}
+                  className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
                 >
-                  ${amt}
+                  50/50
                 </button>
-              ))}
-            </div>
+                {[20, 50, 100].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setPrimaryCents(toCents(amt))}
+                    disabled={amt >= grandTotal}
+                    className={cn(
+                      'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
+                      amt >= grandTotal && 'opacity-40 cursor-not-allowed'
+                    )}
+                  >
+                    ${amt}
+                  </button>
+                ))}
+              </div>
 
-            {/* Embedded keypad \u2014 shared PinPad in amount layout (00 / 0 / \u232b
-                bottom row). Stretches to the 320px column \u2192 cells ~101px. */}
-            <PinPad
-              onDigit={handleDigit}
-              onBackspace={handleBackspace}
-              layoutVariant="amount"
-              size="default"
-            />
-
-            {/* Running totals \u2014 JSX byte-identical to pre-rebuild; condition
-                still works because primaryNum > 0 \u27fa primaryCents > 0. */}
-            {primaryNum > 0 && (
-              <div className="w-full max-w-xs rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Cash</span>
-                    <span className="text-lg font-semibold tabular-nums text-green-700 dark:text-green-400">
-                      ${cashAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Card</span>
-                    <span className="text-lg font-semibold tabular-nums text-blue-700 dark:text-blue-400">
-                      ${cardAmount.toFixed(2)}
-                    </span>
-                  </div>
-                  {remaining > 0.01 && (
-                    <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
-                      <span className="text-sm font-medium text-red-600 dark:text-red-400">Remaining</span>
-                      <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
-                        ${remaining.toFixed(2)}
+              {/* Running totals \u2014 JSX byte-identical to single-column
+                  version; condition unchanged (primaryNum > 0 \u27fa primaryCents > 0).
+                  w-full fills the 300px left column; max-w-xs (320px) is
+                  redundant since the column is narrower, but kept verbatim
+                  from prior version to minimize diff. */}
+              {primaryNum > 0 && (
+                <div className="w-full max-w-xs rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Cash</span>
+                      <span className="text-lg font-semibold tabular-nums text-green-700 dark:text-green-400">
+                        ${cashAmount.toFixed(2)}
                       </span>
                     </div>
-                  )}
-                  {remaining <= 0.01 && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
-                      Fully allocated
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Card</span>
+                      <span className="text-lg font-semibold tabular-nums text-blue-700 dark:text-blue-400">
+                        ${cardAmount.toFixed(2)}
+                      </span>
                     </div>
-                  )}
+                    {remaining > 0.01 && (
+                      <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-2">
+                        <span className="text-sm font-medium text-red-600 dark:text-red-400">Remaining</span>
+                        <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
+                          ${remaining.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {remaining <= 0.01 && (
+                      <div className="border-t border-gray-200 dark:border-gray-700 pt-2 text-center text-sm font-medium text-green-600 dark:text-green-400">
+                        Fully allocated
+                      </div>
+                    )}
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* RIGHT column \u2014 prompt + display + keypad */}
+            <div className="flex w-[300px] flex-col gap-4">
+              {/* Prompt text \u2014 single-line guidance restating the toggle's
+                  meaning. Original phrasing kept (fits on one line at
+                  text-sm in 300px column \u2014 ~287px of text). text-center
+                  positions the line within the column. */}
+              <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+                {splitMode === 'cash-first'
+                  ? 'Enter cash amount \u2014 remainder goes to card'
+                  : 'Enter card amount \u2014 remainder is cash'}
+              </p>
+
+              {/* Tendered display \u2014 non-focusable div, no OS keyboard pop
+                  on iPad. Fixed width w-44 (176px); $ inside the box;
+                  mx-auto centered within the 300px right column. */}
+              <div
+                role="status"
+                aria-live="polite"
+                aria-label="Primary amount"
+                className="mx-auto flex h-[60px] w-44 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
+              >
+                ${displayValue}
               </div>
-            )}
+
+              {/* Embedded keypad \u2014 fills the 300px right column. Cells
+                  ~94px each from grid-cols-3 + gap-2 ((300\u221216)/3 = 94.67).
+                  Well above the 44px Apple HIG tap-target minimum. */}
+              <PinPad
+                onDigit={handleDigit}
+                onBackspace={handleBackspace}
+                layoutVariant="amount"
+                size="default"
+              />
+            </div>
           </div>
 
           <div className="flex gap-4">

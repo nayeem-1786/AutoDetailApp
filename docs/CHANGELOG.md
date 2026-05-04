@@ -6,6 +6,84 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(checkout): split-payment two-column layout + raise modal cap to 850px
+
+iPad PWA test of `5e6e84e6` (split-payment input rebuild) confirmed the surface overflows the 700px modal cap by 112-248px depending on running-totals visibility — `min-h-full + justify-center` from Stage 1 distributes the overflow above and below the visible area, clipping the header at top and the footer at bottom. Two related changes resolve the fit problem: (1) raise the modal cap to give every surface breathing room, (2) restructure split-payment into a two-column layout that distributes content horizontally and matches cash-payment's visual rhythm.
+
+**Two surgical changes, no behavioral edits:**
+
+### 1. Modal cap raised 700 → 850 px
+
+`checkout-overlay.tsx:33` — `md:max-h-[700px]` → `md:max-h-[850px]`. Single value change in the modal container className. No other height-related classes touched. Audit of the overlay confirmed no fixed `h-[700px]` anywhere, no aggressive `max-h` on parent ancestors (backdrop is `fixed inset-0` = full viewport, no constraint).
+
+Viewport-by-viewport behavior (modal width is `min(90vw, 800px)`, height is `min(90vh, max-h)`):
+
+| iPad model | Viewport | New cap behavior |
+|---|---|---|
+| iPad 9.7"/10.2" portrait | 768 × 1024 | 90vh = 921 → cap 850 → modal 850px (was 700) |
+| iPad Air 10.9" portrait | 820 × 1180 | 90vh = 1062 → cap 850 → modal 850px |
+| iPad 11" Pro portrait | 834 × 1194 | 90vh = 1074 → cap 850 → modal 850px |
+| iPad 12.9" Pro portrait | 1024 × 1366 | 90vh = 1229 → cap 850 → modal 850px |
+| iPad landscape (any) | viewport ≤ 1024 tall | 90vh = ≤922 → cap doesn't bind on smaller landscape; modal stays at 90vh |
+
+All 6 checkout surfaces (Method, Cash, Card, Check, Split, Complete) gain breathing room. Stage 1's `min-h-full + justify-center` still center-anchors content; the larger cap simply means content has more room before overflow scroll kicks in. Surfaces that previously fit in 700px still center identically (vertical centering math depends on cap, but with `justify-center` the surface always spans the full cap height — content centers within that span).
+
+### 2. Split-payment two-column layout
+
+`split-payment.tsx` — `enter-amounts` step body restructured from single-column vertical stack to two-column row. Header + mode toggle stay full-width above the columns. Footer stays full-width below.
+
+**LEFT column (`w-[300px] flex flex-col gap-4`):**
+- Quick presets row (4 chips at 60×60, `justify-center` within 300px column — 264px chip row leaves 18px breathing each side)
+- Running totals box (conditional on `primaryNum > 0`, `w-full` fills 300px column)
+
+**RIGHT column (`w-[300px] flex flex-col gap-4`):**
+- Prompt text (`text-center text-sm`, single line)
+- Display field (`mx-auto h-[60px] w-44`, `$` inside box, non-focusable)
+- Embedded PinPad (`layoutVariant="amount" size="default"`, fills 300px column → cells ~94px each via `(300−16)/3 = 94.67`)
+
+**Two-column row wrapper:** `flex flex-row items-start gap-4`. `items-start` aligns columns at top — left is shorter than right (especially when running totals hidden), empty space below the left column is acceptable. **No `items-center` on either column wrapper** (B-followup-3 lesson: `items-center` collapses children to min-content, breaking PinPad). Inner elements use `mx-auto` (display) / `justify-center` (presets row) / `w-full` (running totals) for positioning within the 300px column.
+
+**Column width 300 (not 320) for hardware compatibility:** Total content row 300+16+300 = 616px. Inner content area on smallest iPad portrait (768px viewport, 691px modal, `px-8` 64px outer padding) = 627px → fits with **11px breathing**. Larger iPads have proportionally more breathing room (iPad Air 820: 58px; iPad Pro 11" 834: 70px; iPad Pro 12.9": 120px). PinPad cells at 94px square are well above the 44px Apple HIG tap-target minimum and visually similar to cash-payment's 101px cells (cash-payment uses 320px right column because it has only ONE keypad-bearing column; split has two equal-width columns and the math forces narrower).
+
+**Vertical fit math (with running totals visible, the larger state):** header 68 + gap-8 32 + mode toggle 40 + gap-8 32 + two-col row max(196, 376) = 376 + gap-8 32 + footer 44 = 624px content + py-12 96px padding = **720px** ≤ 850px cap → **130px breathing**. Without running totals, two-col row drops to max(60, 376) = 376 (right dominates regardless of left-column state) → total 720 - delta ≈ 588px content + 96 padding = 684px. Both states fit comfortably.
+
+**Mode toggle labels shortened:** "Enter Cash Amount" / "Enter Card Amount" → **"Cash" / "Card"**. The prompt text in the right column (`'Enter cash amount — remainder goes to card'` / `'Enter card amount — remainder is cash'`) now carries the explanatory weight; toggle labels become the compact selection control they were always meant to be. Each button gains `min-w-[100px]` for visual balance after shortening.
+
+**Prompt text phrasing kept verbatim** — at `text-sm` (14px font, sans-serif average ~7px/char), the longer phrase ("Enter cash amount — remainder goes to card", 41 chars) is ~287px wide and fits cleanly on one line in the 300px column. No further compacting needed; documented inline in code.
+
+### What is NOT changed (regression-critical)
+
+- **All handler bodies byte-identical**: `handleProcessSplit` (Stripe PI / terminal collect / capture / transaction insert / drawer kick / card-customer match), `handleSplitHalf`, `handleDigit` (cap `min(CENTS_CAP, grandTotalCents - 1)`), `handleBackspace`, `handleCancel`. Confirmed via git diff — the diff hunks skip entirely past these function bodies.
+- **State shape unchanged**: `primaryCents: number`, `splitMode`, `splitStep`, `errorMsg`. Same hooks, same setters.
+- **Mode toggle clear-on-switch behavior preserved**: still calls `setSplitMode + setPrimaryCents(0)`. Only the button labels and `min-w-[100px]` changed.
+- **Quick presets remain overwrite-style** (`setPrimaryCents(toCents(amt))`, not increment). Cap on `$X` chips (`disabled={amt >= grandTotal}`) preserved.
+- **Running totals derivation logic unchanged** (`cashAmount`, `cardAmount`, `remaining`, `Fully allocated` vs `Remaining $X` branches). JSX inside the running totals box byte-identical to single-column version; only the parent container changed.
+- **`isValidSplit` formula unchanged.**
+- **`splitStep` state machine unchanged** — `processing-card` / `complete` / `error` step UIs not touched.
+- **API/context contracts unchanged** — `/api/pos/stripe/payment-intent`, `/api/pos/stripe/capture-payment`, `/api/pos/transactions`, `/api/pos/receipts/cash-drawer`, `/api/pos/card-customer` payloads identical. `setSplitCash` / `setCardResult` / `setCashPayment` / `setComplete` / `setProcessing` / `setStep` / `setTip` calls identical.
+- **PinPad untouched** (shared component — changes there would ripple to PIN login, manager dialog, register tab, cash-payment, pay-link Custom modal).
+- **Stage 1's unified outer spacing preserved across all 6 surfaces** — `flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12`. No per-surface override; the modal cap raise solves the fit problem at the right layer.
+
+### Files touched
+- `src/app/pos/components/checkout/checkout-overlay.tsx` — modal cap 700 → 850 px (single value change)
+- `src/app/pos/components/checkout/split-payment.tsx` — `enter-amounts` body restructured to two-column (mode toggle full-width above; left column 300px with presets + running totals; right column 300px with prompt + display + PinPad; footer full-width below). Mode toggle labels shortened ("Cash" / "Card") with `min-w-[100px]` for visual balance.
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (both files) → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT (iPad PWA + Mac browser):
+- Modal opens at 850px cap on iPad portrait. All 6 checkout surfaces render with breathing room; no clipping.
+- Split-payment surface: header + mode toggle ("Cash" active) centered above; two-column body (presets row left, prompt + display + keypad right); footer (Back | Process Card $428.00) below. All vertically centered in 850px modal via Stage 1's `min-h-full + justify-center`.
+- Tap $20 preset on $428 total: primaryCents = 2000, display $20.00, running totals appear in left column showing Cash $20 / Card $408 / Remaining $0.00 (or "Fully allocated"). Right column unchanged.
+- Tap 50/50 on $428: primaryCents = Math.floor(42800/2) = 21400 = $214.00. Running totals: Cash $214 / Card $214 / Fully allocated.
+- Mode toggle "Cash" → "Card": clears primaryCents to 0, prompt text changes to "Enter card amount — remainder is cash", running totals hide.
+- Tap keypad 5: display $0.05. Tap 0: $0.50. Tap 0: $5.00. No horizontal column shift. No OS keyboard popup.
+- Cap edge: $428 grandTotal, type to $427.99 (cap = grandTotalCents − 1 = 42799), one more digit rejected. Display stays $427.99.
+- Process Card button enables when isValidSplit true; fires handleProcessSplit unchanged → Stripe terminal flow.
+- Horizontal fit: 616px content row in 627px inner area (768px-viewport iPads) = 11px breathing, no horizontal scroll on any iPad. Larger iPads have more breathing.
+
+---
+
 ## feat(split-payment): non-focusable display + embedded PinPad + cents state
 
 iPad PWA test of `7a0cd042` (Stage-1 vertical-centering session) confirmed split-payment had the SAME OS-keyboard-popup UX problem cash-payment had pre-Session-B — and worse: `autoFocus` on the native input made the OS keyboard pop up the moment the user tapped the Split tile, consuming ~40-50% of vertical screen real estate before the user could orient. Audit at `5452dc55` documented the exact divergence from the post-Session-B cash-payment paradigm: native `<input type="text" inputMode="decimal" autoFocus>`, `$` sign as separate sibling element outside the input box, `h-14 w-40` display dimensions identical to pre-rebuild cash-payment, no embedded keypad, only OS keyboard or four overwrite-style presets ($20 / $50 / $100 / 50/50). Rebuild brings split-payment to feature parity with cash-payment's input mechanism while preserving split's unique semantics (mode toggle, derived running totals, splitStep state machine, overwrite-style presets).
