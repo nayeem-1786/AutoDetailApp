@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## debug(sms): log Twilio POST body for 30034 diagnosis
+
+**TEMPORARY — to be reverted in a follow-up session.**
+
+`a2368442` (fix(sms) → MessagingServiceSid routing) was deployed but Twilio is still surfacing 30034 errors on outbound transactional sends. Need to confirm whether `MessagingServiceSid` actually appears in the literal HTTP POST body — the early `if (!twilioMessagingServiceSid) return ...` guard at `sms.ts:57` should short-circuit a missing env var, but the only ground truth is the bytes Twilio receives.
+
+Added one diagnostic line in `sendSms()` immediately after the `StatusCallback` append block, before the `fetch()` call:
+
+```ts
+console.log('[SMS DEBUG] Twilio POST body:', formData.toString());
+```
+
+After deploy + a single test SMS, the server log will print the URL-encoded body verbatim:
+
+- Body contains `MessagingServiceSid=MG86eb8e41…` → parameter is sent correctly. 30034 is a Twilio-side issue (messaging service / A2P registration / TCR campaign linkage), not an app bug.
+- Body shows `MessagingServiceSid=undefined` or omits the parameter → runtime bug in env-var resolution or formData construction.
+
+**Privacy note:** the logged body includes the recipient phone number and full SMS text. Logs are server-side only (Hostinger PM2), but the line MUST be reverted before production message volume accumulates.
+
+`sendMarketingSms()` is intentionally NOT instrumented — 30034 errors are coming from the transactional path. Add to the marketing path in a follow-up only if the diagnosis points there.
+
+**Revert plan:** follow-up session removes the `console.log` line and the inline `TEMP DEBUG` comment block. The revert commit's body will close the diagnosis loop (what the log showed and what was concluded).
+
+**Verification:** `tsc --noEmit` clean · `eslint` clean.
+
+---
+
 ## fix(sms): route via messagingServiceSid for A2P 10DLC compliance
 
 US SMS sends were failing with carrier error `30034 - Unregistered Number`. Cause: the implicit phone-number ↔ A2P Campaign association on the Twilio account was reset during account recovery and is no longer restored automatically — the phone number now requires routing through a Messaging Service to inherit the approved Brand/Campaign registration. Twilio support confirmed the account state: phone +14244010094 attached to Messaging Service `MG86eb8e41c73485dcde3a2a98ecb37555`, linked to approved Brand `BNd6e181c2ba80f656d4390080eb5b4123`, with Campaign `CM31c5fe2f8528484f453be7cfe460a0df` in TCR review.

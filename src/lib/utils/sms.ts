@@ -80,6 +80,10 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
       formData.append('StatusCallback', `${appUrl}/api/webhooks/twilio/status`);
     }
 
+    // TEMP DEBUG (Twilio 30034 diagnosis) — verify MessagingServiceSid is in
+    // the actual outbound POST body. Revert in follow-up session.
+    console.log('[SMS DEBUG] Twilio POST body:', formData.toString());
+
     const res = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
       {
