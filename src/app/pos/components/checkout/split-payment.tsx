@@ -340,6 +340,18 @@ export function SplitPayment() {
           <div className="flex flex-row items-start gap-4">
             {/* LEFT column \u2014 quick presets + running totals */}
             <div className="flex w-[300px] flex-col gap-4">
+              {/* Top spacer \u2014 row-aligns the presets row with the keypad's
+                  first row (1, 2, 3) in the right column. Right column above
+                  PinPad: prompt text (text-sm ~20px) + gap-4 (16px) + display
+                  (h-[60px]) + gap-4 (16px) = 112px \u2192 keypad row 1 top sits
+                  at 112px from column start. Left column has its own gap-4
+                  between this spacer and the presets row, so the spacer
+                  itself is 112 \u2212 16 (one gap-4) = 96px. Top of presets =
+                  spacer (96) + gap-4 (16) = 112px. \u2713 Mirrors cash-payment.tsx's
+                  left-column spacer pattern (denom chips row-aligned with
+                  keypad rows). h-[96px] (not min-h) for exact match \u2014 right
+                  column above keypad is constant height. */}
+              <div className="h-[96px]" aria-hidden="true" />
               {/* Quick preset chips \u2014 OVERWRITE primaryCents (different from
                   cash-payment's increment denoms). justify-center within the
                   300px column (chip row is 264px wide, leaves 18px breathing

@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(split-payment): left-column top spacer to row-align presets with keypad first row
+
+iPad test of `5154c731` (3-bug fix session) confirmed the receipt + PaymentComplete fixes shipped correctly. Real-world observation flagged a residual layout issue from the prior `03a92bf5` two-column commit: the left-column presets row sits at the top of the two-column row, beside the right column's prompt text + display field, instead of beside the keypad. Visual rhythm is off — presets read as paired with the prompt rather than as auxiliary action chips beside the digit entry. Cash-payment achieves correct rhythm via spacer divs in its left column equal to its right column's pre-keypad height; replicate that pattern here.
+
+**Pure JSX fix — single 8-line spacer added at the top of the LEFT column wrapper.** No state, handler, data, derivation, modal, or any other change. Diff: +12 / −0 lines (8-line code-comment math walkthrough + spacer div + import-context blank line).
+
+**Math (verified cell-by-cell):** Right column above PinPad: prompt text (text-sm, 20px line) + gap-4 (16px) + display (h-[60px]) + gap-4 (16px) = 112px → keypad row 1 top sits at 112px from column start. Left column has its own `gap-4` between the new spacer and the presets row, so the spacer height is 112 − 16 (one gap-4) = **96px**, NOT 112px. Initial spec said 112px but that double-counts the inter-child gap. Corrected during diff review before commit. Presets-top in left column now = spacer (96px) + gap-4 (16px) = 112px = PinPad-row-1-top in right column. Eye-aligned.
+
+**Why h-[96px], not min-h-[96px]** — the right column's pre-keypad height is constant (prompt is always one line, display is fixed `h-[60px]`, gaps are fixed `gap-4`). No state changes the right column's vertical structure. `h-[96px]` exact match is more reliable than `min-h-[96px]` which could theoretically grow if a future style tweak added padding above the spacer. Mirrors cash-payment.tsx's spacer pattern (`h-[60px]` + `h-[48px]` for B-followup-4's slot height, both fixed).
+
+**Alignment table (LEFT vs RIGHT, top-down from column start):**
+
+| Position | LEFT (new) | RIGHT (unchanged) |
+|---:|---|---|
+| 0 | spacer top | prompt text top |
+| 20 | (in spacer) | prompt text bottom |
+| 36 | (in spacer) | display top (after gap-4) |
+| 96 | spacer bottom | display bottom |
+| 112 | **presets row top** (after gap-4) | display bottom + gap-4 → **PinPad row 1 top** ✓ |
+| 172 | presets row bottom | (within PinPad row 1, 60px tall) |
+
+Presets row top = PinPad row 1 top = 112px. Visual alignment achieved.
+
+**Running totals position** — running totals stay attached BELOW presets (gap-4 → ~120px box when visible), so they appear roughly aligned with PinPad rows 3-4 area when present. Acceptable side-effect of the spacer shift; running totals were never strictly aligned to a specific keypad row, just stacked below presets.
+
+**Modal cap fit (verified)** — Spacer adds 96px to LEFT column height (60px presets → 60+16+96 = 172px without running totals; +120 = 292px with running totals). RIGHT column unchanged (376px). Two-column row height = max(LEFT, RIGHT) = 376px (right still dominates). Total surface height: header 68 + gap-8 32 + mode toggle 40 + gap-8 32 + two-col 376 + gap-8 32 + footer 44 = 624px content + py-12 96px padding = **720px** (unchanged from prior). Still fits 850px modal cap with 130px breathing room. No clipping risk.
+
+**No behavioral changes** — `handleProcessSplit`, `handleSplitHalf`, `handleDigit`, `handleBackspace`, `handleCancel` byte-identical. State hooks (`primaryCents`, `splitMode`, `splitStep`, `errorMsg`) byte-identical. `setSplitPayment(cashAmount, cardAmount)`, `setCashPayment`, `setCardResult`, `setComplete` calls byte-identical (from prior 5154c731 fix). Mode toggle clear-on-switch byte-identical. Running totals derivation (`cashAmount`, `cardAmount`, `remaining`, `Fully allocated` vs `Remaining $X` branches) byte-identical. PinPad untouched. Modal cap (850px) untouched. Column widths (300px each) untouched. Right column structure byte-identical.
+
+### Files touched
+- `src/app/pos/components/checkout/split-payment.tsx` — single 8-line spacer div added at the top of the LEFT column wrapper
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/app/pos/components/checkout/split-payment.tsx` → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT (iPad PWA portrait):
+- Open split-payment surface from $78 ticket. Two-column body visible.
+- LEFT column: empty 96px space at top, then presets row (50/50 / $20 / $50 / $100), then no running totals (cents = 0).
+- RIGHT column: prompt text "Enter cash amount — remainder goes to card", then display $0.00, then PinPad row 1 (1, 2, 3) at the same vertical position as the presets row.
+- Tap $20 preset: display jumps to $20.00; running totals appear below presets in LEFT column (Cash $20 / Card $58 / Fully allocated). Right column unchanged. Presets row STILL aligned with PinPad row 1 (running totals appearing below doesn't shift presets up).
+- Tap keypad 5: display $0.05 (overwrites preset). Running totals update live. Presets-row alignment with PinPad row 1 unchanged.
+- Mode toggle Cash → Card: clears primaryCents, running totals hide, prompt text changes. Presets-row alignment unchanged.
+- Process Card button → handleProcessSplit fires unchanged → Stripe terminal flow → PaymentComplete shows correct Cash/Card portions (5154c731 fix verified in prior session).
+
+---
+
 ## fix(checkout/receipt): split-payment cardPortion in PaymentComplete + receipt TOTAL uses larger of appointment/transaction + card brand title-case
 
 Live production split-payment transaction on `2026-05-04` (Receipt SD-006260: $78.00 ticket, Cash $77 + Card $1, customer Nayeem Khan) surfaced three independent bugs along the same flow: (1) PaymentComplete rendered "Card $0.00" instead of "$1.00", (2) printed receipt TOTAL line read $1.00 instead of $78.00, (3) printed receipt card line read "visa ****8085" instead of "Visa ****8085". Stripe charge succeeded correctly ($1.00 captured, drawer kicked, $77 cash collected) — DB ground truth was correct (`transactions.total_amount = 78`, two `payments` rows of $77 cash + $1 card with `card_brand="visa"`, `card_last_four="8085"`). All three bugs were rendering / state-propagation issues, not data-integrity issues.
