@@ -8,6 +8,12 @@ import { toast } from 'sonner';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
+import { formatCardBrand } from '@/lib/utils/card-brand';
+import {
+  parseRefundSources,
+  enrichRefundSources,
+  shortStripeRefundId,
+} from '@/lib/data/refund-sources';
 import { posFetch } from '../../lib/pos-fetch';
 import { RefundDialog } from '../refund/refund-dialog';
 import { ReceiptOptions } from '../receipt-options';
@@ -444,6 +450,62 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
                       {refund.status.charAt(0).toUpperCase() + refund.status.slice(1)}
                     </span>
                   </div>
+
+                  {/* Per-method "Refunded to:" block.
+                      Parsed from refund.notes (JSON {sources:[...]}) which
+                      Session 4d's engine writes for split-tender and close-out
+                      refunds. card_brand + last_four are joined against the
+                      transaction's payments[] when the source's stripe_pi
+                      matches locally; close-out sources whose pi lives on a
+                      sibling tx fall through with brand/last_four undefined
+                      (renderer handles via formatCardBrand fallback). */}
+                  {(() => {
+                    const rawSources = parseRefundSources(refund.notes ?? null);
+                    if (!rawSources) return null;
+                    const sources = enrichRefundSources(rawSources, transaction.payments);
+                    return (
+                      <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2">
+                        <p className="mb-1 text-xs font-medium text-gray-400 dark:text-gray-500">Refunded to</p>
+                        <div className="flex flex-col gap-0.5">
+                          {sources.map((source, i) => {
+                            let label: string;
+                            if (source.method === 'cash') {
+                              label = 'Cash';
+                            } else if (source.method === 'card') {
+                              const brand = formatCardBrand(source.card_brand);
+                              label = source.card_last_four
+                                ? `Card (${brand} ****${source.card_last_four})`
+                                : brand === 'Card' ? 'Card' : `Card (${brand})`;
+                            } else {
+                              label = source.method.charAt(0).toUpperCase() + source.method.slice(1);
+                            }
+                            const stripeTag = source.method === 'card'
+                              ? shortStripeRefundId(source.stripe_refund_id)
+                              : null;
+                            return (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400"
+                              >
+                                <span className="flex items-center gap-1.5">
+                                  {label}
+                                  {stripeTag && (
+                                    <span
+                                      className="rounded bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 font-mono text-[10px] text-gray-500 dark:text-gray-400"
+                                      title={source.stripe_refund_id ?? undefined}
+                                    >
+                                      {stripeTag}
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="tabular-nums">-{formatCurrency(Number(source.amount))}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Refund items */}
                   {refund.refund_items && refund.refund_items.length > 0 && (

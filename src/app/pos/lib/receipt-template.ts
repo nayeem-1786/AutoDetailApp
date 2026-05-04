@@ -4,6 +4,7 @@ import { LOYALTY } from '@/lib/utils/constants';
 import QRCode from 'qrcode';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { formatCardBrand } from '@/lib/utils/card-brand';
+import type { RefundSource } from '@/lib/data/refund-sources';
 
 interface ReceiptItem {
   id: string;
@@ -35,6 +36,11 @@ interface ReceiptRefund {
   points_restored: number;
   created_at: string;
   refund_items: ReceiptRefundItem[];
+  /** Per-method source-plan breakdown — populated by receipt-data.ts when
+   * refunds.notes is a JSON {sources:[...]} payload (Session 4d). Undefined
+   * for single-source / pre-Session-4d refunds; renderer skips the
+   * "Refunded to:" block when absent. */
+  sources?: RefundSource[];
 }
 
 interface ReceiptPayment {
@@ -344,6 +350,28 @@ function pushZoneLines(
  * This can be used by Star WebPRNT or formatted as plain text.
  */
 // ─── Refund Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Format a refund source's method-side label.
+ * - Cash:           "Cash"
+ * - Card w/ brand:  "Card (Visa ****8085)"
+ * - Card no brand:  "Card"   (close-out source where local payments lookup missed)
+ * Used by both thermal and HTML refund renderers.
+ */
+function formatRefundSourceLabel(source: RefundSource): string {
+  if (source.method === 'cash') return 'Cash';
+  if (source.method === 'card') {
+    const brand = formatCardBrand(source.card_brand);
+    if (source.card_last_four) {
+      return `Card (${brand} ****${source.card_last_four})`;
+    }
+    return brand === 'Card' ? 'Card' : `Card (${brand})`;
+  }
+  // Defensive — non-cash, non-card method label falls back to the raw value
+  // title-cased. Engine only writes 'cash' / 'card' today; this branch keeps
+  // future tender additions from rendering blank.
+  return source.method.charAt(0).toUpperCase() + source.method.slice(1);
+}
 
 function buildRefundedMap(refunds: ReceiptRefund[] | undefined): Map<string, { qty: number; amount: number }> {
   const map = new Map<string, { qty: number; amount: number }>();
@@ -743,6 +771,21 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         left: 'Refund Amount',
         right: `-$${refund.amount.toFixed(2)}`,
       });
+      // Per-method breakdown ("Refunded to:") — printed only when the engine
+      // wrote a multi-source breakdown into refunds.notes (split tender or
+      // close-out). Stripe refund id is intentionally omitted on thermal —
+      // monospace surface, paper-saving; staff use POS transaction-detail
+      // for reconciliation.
+      if (refund.sources && refund.sources.length > 0) {
+        lines.push({ type: 'text', text: 'Refunded to:' });
+        for (const source of refund.sources) {
+          lines.push({
+            type: 'columns',
+            left: `  ${formatRefundSourceLabel(source)}`,
+            right: `-$${Number(source.amount).toFixed(2)}`,
+          });
+        }
+      }
       if (refund.points_clawed_back > 0) {
         lines.push({
           type: 'columns',
@@ -1300,7 +1343,25 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   ${(() => {
     const htmlProcessedRefunds = (tx.refunds ?? []).filter((r) => r.status === 'processed');
     if (htmlProcessedRefunds.length === 0) return '';
-    return htmlProcessedRefunds.map((refund) => `
+    return htmlProcessedRefunds.map((refund) => {
+      // Per-method "Refunded to:" — rendered when refunds.notes carried a
+      // JSON {sources:[...]} breakdown (split tender or close-out). Stripe
+      // refund id appears as a small monospace tag at the end of card lines
+      // for operator reconciliation.
+      const sourcesBlock = refund.sources && refund.sources.length > 0 ? `
+    <div style="margin-top:8px;padding-top:6px;border-top:1px dashed #f3c2c2;">
+      <div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Refunded to</div>
+      ${refund.sources.map((source) => {
+        const stripeTag = source.method === 'card' && source.stripe_refund_id
+          ? ` <span style="display:inline-block;margin-left:6px;padding:1px 5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10px;color:#666;background:#f5f5f5;border-radius:3px;">${esc(source.stripe_refund_id)}</span>`
+          : '';
+        return `<div style="display:flex;justify-content:space-between;font-size:12px;color:#444;padding:1px 0;">
+          <span>${esc(formatRefundSourceLabel(source))}${stripeTag}</span>
+          <span style="font-variant-numeric:tabular-nums;">-$${Number(source.amount).toFixed(2)}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+      return `
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
   <div style="border-left:3px solid #dc2626;padding-left:10px;margin:8px 0;">
     <div style="font-size:13px;font-weight:bold;color:#dc2626;">Refund</div>
@@ -1308,8 +1369,9 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     ${refund.reason ? `<div style="font-size:12px;color:#666;">Reason: ${esc(refund.reason)}</div>` : ''}
     <div style="font-size:14px;font-weight:bold;color:#dc2626;margin-top:4px;">-$${refund.amount.toFixed(2)}</div>
     ${refund.points_clawed_back > 0 ? `<div style="font-size:12px;color:#dc2626;margin-top:2px;">Points Reversed: -${refund.points_clawed_back}</div>` : ''}
-    ${refund.points_restored > 0 ? `<div style="font-size:12px;color:#16a34a;margin-top:2px;">Points Restored: +${refund.points_restored}</div>` : ''}
-  </div>`).join('');
+    ${refund.points_restored > 0 ? `<div style="font-size:12px;color:#16a34a;margin-top:2px;">Points Restored: +${refund.points_restored}</div>` : ''}${sourcesBlock}
+  </div>`;
+    }).join('');
   })()}
 
   ${(() => {

@@ -4,6 +4,11 @@ import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 import { derivePaymentSourceLabel, type PaymentMethodLike } from '@/lib/utils/payment-source-label';
 import { toCents } from '@/lib/utils/refund-math';
+import {
+  parseRefundSources,
+  enrichRefundSources,
+  type RefundSource,
+} from '@/lib/data/refund-sources';
 import QRCode from 'qrcode';
 import bwipjs from 'bwip-js';
 
@@ -243,6 +248,55 @@ export async function fetchReceiptData(
     }
   }
 
+  // 8d. Per-refund source-plan enrichment.
+  // refunds.notes carries a JSON {sources:[...]} breakdown (Session 4d). The
+  // stripe_pi on each card source lets us look up card_brand + last_four from
+  // payments. For split tender on this transaction, the local payments[] is
+  // sufficient. For close-outs, sources point at SIBLING transactions whose
+  // payments aren't in raw.payments — fall back to a single batched
+  // payments-by-stripe-pi query when any pi isn't covered locally.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawRefunds = (raw.refunds ?? []) as any[];
+  const refundsWithSources: Array<Record<string, unknown> & { sources?: RefundSource[] }> = [];
+  // Pre-parse sources once so we can collect any stripe_pis missing from local payments.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parsedPerRefund: Array<{ refund: any; raw: ReturnType<typeof parseRefundSources> }> = rawRefunds.map((r) => ({
+    refund: r,
+    raw: parseRefundSources(r?.notes ?? null),
+  }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const localPayments = (raw.payments ?? []) as any[];
+  const localPiSet = new Set<string>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    localPayments.map((p: any) => p?.stripe_payment_intent_id).filter(Boolean)
+  );
+  const missingPis = new Set<string>();
+  for (const { raw: sources } of parsedPerRefund) {
+    if (!sources) continue;
+    for (const s of sources) {
+      if (s.method === 'card' && s.stripe_pi && !localPiSet.has(s.stripe_pi)) {
+        missingPis.add(s.stripe_pi);
+      }
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let extendedPayments: any[] = localPayments;
+  if (missingPis.size > 0) {
+    const { data: extra } = await supabase
+      .from('payments')
+      .select('stripe_payment_intent_id, card_brand, card_last_four')
+      .in('stripe_payment_intent_id', Array.from(missingPis));
+    if (extra) extendedPayments = [...localPayments, ...extra];
+  }
+  for (const { refund, raw: sources } of parsedPerRefund) {
+    if (!sources) {
+      refundsWithSources.push(refund);
+      continue;
+    }
+    const enriched = enrichRefundSources(sources, extendedPayments);
+    refundsWithSources.push({ ...refund, sources: enriched });
+  }
+
   // 9. Map database transaction to ReceiptTransaction interface
   const tx: ReceiptTransaction = {
     status: raw.status,
@@ -262,7 +316,8 @@ export async function fetchReceiptData(
     vehicle: raw.vehicle,
     items: raw.items ?? [],
     payments: renderedPayments,
-    refunds: raw.refunds ?? [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    refunds: refundsWithSources as any,
     is_deposit: isDeposit,
     deposit_amount: isDeposit ? depositAmount : undefined,
     balance_due: isDeposit ? balanceDue : undefined,

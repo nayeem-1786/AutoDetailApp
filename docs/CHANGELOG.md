@@ -6,6 +6,71 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(refund): render per-method breakdown across all 4 receipt surfaces + POS transaction detail
+
+Session 4d's refund engine writes a JSON `{sources:[...]}` breakdown to `refunds.notes` for split-tender and close-out refunds (per-leg method, amount, stripe_pi, stripe_refund_id). Production transaction SD-006261 ($75 split — $74 cash + $1 card) refunded successfully and the engine recorded the per-method breakdown correctly, but no UI surface read it back. The transaction-detail page, all three receipt renderers, and the admin transactions list rendered only the aggregate refund total, leaving operators blind to which method actually moved.
+
+Diagnostic confirmed this was UI-only — engine output, schema, and Stripe call were all correct. This session wires the existing JSON through to all customer- and operator-facing rendering paths.
+
+**New shared helper — `src/lib/data/refund-sources.ts`:**
+
+- `RawRefundSource` / `RefundSource` types — sources plus optional enriched `card_brand` + `card_last_four`.
+- `parseRefundSources(notes)` — JSON.parse with shape validation; returns `null` for null / empty / non-JSON / legacy free-text values so renderers can hide the block without try/catch noise. Backwards-compatible with the entire pre-Session-4d refund history.
+- `enrichRefundSources(raw, payments)` — joins each card source against a payments[] lookup by `stripe_payment_intent_id` to attach `card_brand` and `card_last_four`. Cash sources and unjoined cards pass through untouched (renderer falls back to plain "Card").
+- `buildRefundSources(notes, payments)` — convenience parse + enrich.
+- `shortStripeRefundId(id)` — truncates `re_3TTFysENbnZeOoWd0BalweTQ` → `re_3TTFysE…` for compact pill display on operator surfaces; `title` attribute carries the full id.
+
+**Type extension — `Refund` (src/lib/supabase/types.ts):**
+
+`notes: string | null` added. The DB column has existed since `20260503024921_add_refunds_notes.sql`, but the TS interface omitted it — calling code had to cast `unknown` to read it. The new field is documented inline as the JSON breakdown carrier.
+
+**Data layer — `src/lib/data/receipt-data.ts`:**
+
+After the existing appointment-payments enrichment block, a new step pre-parses every refund's `notes` once, collects any `stripe_pi` values not already covered by the locally joined `payments[]`, and (only if any are missing) issues ONE batched `payments.in('stripe_payment_intent_id', […])` query to enrich close-out sources whose pi rows live on sibling transactions. For the common single-transaction split-tender case (which covers SD-006261 and every walk-in split), no extra DB hop is made — the local `payments[]` is sufficient. Each refund row gets a `sources?: RefundSource[]` field attached for the renderers to consume.
+
+**Renderer extension — `src/app/pos/lib/receipt-template.ts`:**
+
+- `ReceiptRefund.sources?: RefundSource[]` added.
+- `formatRefundSourceLabel(source)` shared helper produces `"Cash"` | `"Card (Visa ****8085)"` | `"Card (Visa)"` | `"Card"` depending on enrichment availability. `formatCardBrand` from `src/lib/utils/card-brand.ts` is the single source of truth for brand title-casing.
+- **Thermal renderer** (lines 728-790 area): below each refund's amount line, when `sources` is present and non-empty, emits a `Refunded to:` text line followed by one `columns` line per source. Stripe refund id is intentionally omitted on thermal — paper-saving on a monospace surface; staff use POS detail for reconciliation.
+- **HTML renderer** (lines 1300-1340 area): inside the existing red-bordered refund card, appends a dashed-top sub-block with an uppercase `REFUNDED TO` header and one row per source. Card sources include a small monospace gray pill carrying the full Stripe refund id (HTML email is operator-readable; the full id supports Stripe Dashboard lookup).
+
+**Public receipt page — `src/app/(public)/receipt/[token]/page.tsx`:**
+
+`getTransaction()` mirrors the parse + missing-pi fallback fetch from `receipt-data.ts`. `TransactionWithRelations.refunds[].sources?: RefundSource[]` added to the local type. Render block lives below `points_restored` inside the existing red-bordered refund card: dashed top border, uppercase `REFUNDED TO` label, per-method rows. **Stripe refund id is hidden** on this surface — the public link is customer-facing, and the Stripe id provides no customer value while inviting confusion. Staff who need it use the POS transaction detail.
+
+**POS transaction detail — `src/app/pos/components/transactions/transaction-detail.tsx`:**
+
+Inline IIFE inside each Refund History row, above the existing "Items Refunded" block. Calls `parseRefundSources(refund.notes)` (returns `null` → block is omitted entirely with no empty container) then `enrichRefundSources(rawSources, transaction.payments)` against the locally fetched `payments[]` (which the existing `/api/pos/transactions/[id]` GET already includes complete with `stripe_payment_intent_id`, `card_brand`, `card_last_four`). Each card source displays a compact mono pill with `shortStripeRefundId(...)`; the pill's `title` attribute exposes the full id on hover for copy-paste reconciliation.
+
+**Coverage matrix — verified against the four product-level send-receipt actions:**
+
+| Button | Route | Renderer | Status |
+|---|---|---|---|
+| Print (copier) | `/api/pos/receipts/print-copier` | `generateReceiptHtml` | ✓ |
+| Email | `/api/pos/receipts/email` | `generateReceiptHtml` | ✓ |
+| SMS | `/api/pos/receipts/sms` | (link to public receipt) | ✓ via public page |
+| Receipt (thermal) | `/api/pos/receipts/print-server` | `generateReceiptLines` + `receiptToEscPos` | ✓ |
+| (bonus) Customer portal | `/api/customer/receipts/html` | `generateReceiptHtml` | ✓ inherited |
+
+SMS does not embed inline receipt content — the body is the `receipt_sms` slug-rendered template carrying a short link to `${appUrl}/receipt/${access_token}`, so the public-receipt page update covers it transitively.
+
+**Out-of-scope (explicit):**
+
+- Refund engine (`route.ts`) untouched — no changes to source-plan logic, Stripe calls, or refund record persistence.
+- No cash-drawer kick on cash-portion refunds (engine never enqueues one — separate session).
+- `payments.refunded_amount` column still unwritten by the engine — separate session.
+- Admin transactions list still shows only status badges — deferred (small scope).
+- No new SQL writes, no schema changes.
+
+**Backwards compatibility:**
+
+Every refund where `notes` is null, free-text, malformed JSON, or valid JSON without a `sources` array hits the parser's null-return path. All four renderers and the transaction-detail block hide their per-method section entirely — no empty containers, no errors, no broken layout. The existing pre-Session-4d refund history renders exactly as before.
+
+**Verification:** `tsc --noEmit` clean · `eslint` clean on six touched files · `vitest` 561/561 passing.
+
+---
+
 ## fix(split-payment): sync horizontal layout exactly to cash-payment two-column rhythm
 
 iPad PWA test of `a8f87c98` (split-payment two-field architecture) flagged that the horizontal rhythm between the left preset column and the right keypad column was visibly wider than cash-payment's equivalent rhythm. The two surfaces — designed as siblings of the same payment-surface family — read as strangers. User directive: "Follow the cash payment EXACTLY to determine the space between the cash buttons and the keypad. This is NOT unification!!!!!"

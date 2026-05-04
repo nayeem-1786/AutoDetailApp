@@ -442,6 +442,11 @@ export interface Refund {
   processed_by: string | null;
   points_clawed_back: number;
   points_restored: number;
+  /** JSON-stringified {sources:[...]} breakdown when a refund spans multiple
+   * sources (split tender on a single transaction OR close-out walking
+   * sibling transactions). NULL for traditional single-source refunds. See
+   * src/lib/data/refund-sources.ts and Session 4d notes. */
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }

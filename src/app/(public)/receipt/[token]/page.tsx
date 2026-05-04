@@ -8,6 +8,11 @@ import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { derivePaymentSourceLabel, type PaymentMethodLike } from '@/lib/utils/payment-source-label';
 import { toCents } from '@/lib/utils/refund-math';
 import { formatCardBrand } from '@/lib/utils/card-brand';
+import {
+  parseRefundSources,
+  enrichRefundSources,
+  type RefundSource,
+} from '@/lib/data/refund-sources';
 
 function formatDepositLabel(depositDate: string | null): string {
   if (!depositDate) return 'Deposit Paid - Online';
@@ -91,6 +96,10 @@ interface TransactionWithRelations {
       quantity: number;
       amount: number;
     }[];
+    /** Per-method source-plan breakdown — populated below via
+     * parseRefundSources(refund.notes) when the engine wrote a JSON
+     * {sources:[...]} payload. Undefined for older / single-source refunds. */
+    sources?: RefundSource[];
   }[];
 }
 
@@ -241,6 +250,47 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     }
   }
 
+  // Per-refund source-plan enrichment. refunds.notes carries a JSON
+  // {sources:[...]} breakdown for split-tender / close-out refunds. Pull
+  // card_brand + last_four from local payments when stripe_pi matches; for
+  // close-out sources whose pi lives on a sibling tx, do one batched lookup.
+  const baseRefunds = (data as unknown as TransactionWithRelations).refunds ?? [];
+  const parsedRefundEntries = baseRefunds.map((r) => ({
+    refund: r,
+    raw: parseRefundSources(
+      ((r as unknown) as { notes?: string | null }).notes ?? null
+    ),
+  }));
+  const localPiSet = new Set<string>(
+    ((data as unknown as { payments?: Array<{ stripe_payment_intent_id?: string | null }> }).payments ?? [])
+      .map((p) => p?.stripe_payment_intent_id)
+      .filter((v): v is string => !!v)
+  );
+  const missingPis = new Set<string>();
+  for (const { raw } of parsedRefundEntries) {
+    if (!raw) continue;
+    for (const s of raw) {
+      if (s.method === 'card' && s.stripe_pi && !localPiSet.has(s.stripe_pi)) {
+        missingPis.add(s.stripe_pi);
+      }
+    }
+  }
+  let extendedPayments: Array<{ stripe_payment_intent_id?: string | null; card_brand?: string | null; card_last_four?: string | null }> =
+    ((data as unknown as { payments?: Array<{ stripe_payment_intent_id?: string | null; card_brand?: string | null; card_last_four?: string | null }> }).payments ?? []);
+  if (missingPis.size > 0) {
+    const { data: extra } = await supabase
+      .from('payments')
+      .select('stripe_payment_intent_id, card_brand, card_last_four')
+      .in('stripe_payment_intent_id', Array.from(missingPis));
+    if (extra) extendedPayments = [...extendedPayments, ...extra];
+  }
+  const refundsWithSources: TransactionWithRelations['refunds'] = parsedRefundEntries.map(
+    ({ refund, raw }) => {
+      if (!raw) return refund;
+      return { ...refund, sources: enrichRefundSources(raw, extendedPayments) };
+    }
+  );
+
   return {
     ...(data as unknown as TransactionWithRelations),
     employee,
@@ -252,6 +302,7 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
     payments: renderedPayments,
     appointment_balance_due: appointmentBalanceDue,
     appointment_total: appointmentTotal,
+    refunds: refundsWithSources,
   };
 }
 
@@ -556,6 +607,34 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               )}
               {refund.points_restored > 0 && (
                 <p className="text-xs text-green-500 mt-1">Points Restored: +{refund.points_restored}</p>
+              )}
+              {/* Per-method "Refunded to:" — only when the engine wrote a
+                  JSON {sources:[...]} breakdown into refunds.notes. Stripe
+                  refund id is intentionally hidden on the public/customer
+                  receipt — staff use the POS detail view for reconciliation. */}
+              {refund.sources && refund.sources.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-red-200">
+                  <p className="text-[10px] uppercase tracking-wide text-site-text-muted mb-1">Refunded to</p>
+                  <div className="space-y-0.5">
+                    {refund.sources.map((source, i) => {
+                      const label = source.method === 'cash'
+                        ? 'Cash'
+                        : source.method === 'card'
+                          ? source.card_last_four
+                            ? `Card (${formatCardBrand(source.card_brand)} ****${source.card_last_four})`
+                            : (formatCardBrand(source.card_brand) === 'Card'
+                                ? 'Card'
+                                : `Card (${formatCardBrand(source.card_brand)})`)
+                          : source.method.charAt(0).toUpperCase() + source.method.slice(1);
+                      return (
+                        <div key={i} className="flex justify-between text-xs text-site-text">
+                          <span>{label}</span>
+                          <span className="tabular-nums">-{formatCurrency(Number(source.amount))}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
           ))}
