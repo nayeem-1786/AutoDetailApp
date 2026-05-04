@@ -6,6 +6,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(cash-payment): Session B-followup-3 — restore keypad cell width (items-center alignment regression from B-followup-2)
+
+iPad PWA test of `2411cd18` (Session B-followup-2) revealed a visual regression: PinPad cells (1-9, 00, 0, ⌫) rendered as narrow tall pills (~40-50 px wide × 60 px tall, fully rounded by `rounded-xl` at that aspect ratio) instead of the intended ~101 px × 60 px squares. Denomination chips, display, and X icon button rendered correctly — only the keypad cells inside the shared `<PinPad>` component were squished. PinPad's source was confirmed byte-identical (`git diff ef8aed5c..HEAD -- pin-pad.tsx` empty), so the cause had to be in `cash-payment.tsx`'s wrapper structure.
+
+**Root cause** — Session B-followup-2 added `items-center` to the right column wrapper (`<div className="flex w-full max-w-xs flex-col items-center gap-3">`) to center the 244 px display+X row and 244 px change/short box over the 320 px keypad. In a `flex flex-col`, `items-center` sets `align-items: center` (cross-axis = horizontal), which changes children's `align-self` from default `stretch` to `center`. PinPad — a direct flex child with no explicit width — stopped stretching to fill the 320 px column and instead collapsed to its grid's min-content width. PinPad's grid is `grid grid-cols-3` which is `grid-template-columns: repeat(3, minmax(0, 1fr))`; with no parent forcing a width, columns shrank to per-cell text-content width (~30-50 px). Cells retained their `min-h-[60px]` from `pin-pad.tsx:78` → narrow tall stadium-pill rendering with `rounded-xl` (12 px) corners visually fully rounding at that aspect ratio.
+
+**Fix** — Remove `items-center` from the column (restoring `align-items: stretch` so PinPad fills 320 px), then per-row `mx-auto` on the display+X row, the change/short box (`cents > 0` branch), AND the placeholder div (`cents === 0` branch — must match its sibling's centering rule for parity at the slot). Four class-name changes total, no DOM-tree restructure. PinPad's grid now stretches to the full 320 px column → cells return to ~101 px × 60 px squares as intended.
+
+**Why the placeholder needed `mx-auto` too** — the right column toggles between `<div w-[244px] change-or-short>` and `<div w-[244px] placeholder>` at the same DOM slot. Both are 244 px in a 320 px column. With column reverted to default `stretch`, children that don't declare a horizontal alignment would left-align (block element flow); explicit `mx-auto` on both branches ensures the slot is centered consistently regardless of `cents` state.
+
+**No structural changes** — left column unchanged, denomination chips unchanged, display field unchanged, X button unchanged, footer unchanged, change/short box internals unchanged (only the wrapper className gained `mx-auto`). Spacer math (60 + 12 + 40 + 12 = 124 px offset) unchanged → row-alignment of $10/$20/$50/$100 with keypad rows 1/2/3/4 preserved. PinPad untouched.
+
+### Files touched
+- `src/app/pos/components/checkout/cash-payment.tsx` — 4 class-name changes (1 removal + 3 additions of `mx-auto`)
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/app/pos/components/checkout/cash-payment.tsx` → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT:
+- Cash payment opens with `amountDue $428.00`. Keypad cells render as ~101 px × 60 px squares (1, 2, 3 in row 1; 4, 5, 6 in row 2; etc.) — NOT narrow pills. Display+X row centered horizontally over the keypad. Change/Short box (when present) also centered.
+- Toggle `cents > 0` ↔ `cents === 0` (tap any digit then X icon) — placeholder ↔ change/short box swap stays centered, no horizontal shift.
+- Row alignment unchanged: $10/$20/$50/$100 still row-align with keypad rows 1/2/3/4 (spacer offset math identical).
+- Footer Back/Complete spread unchanged.
+
+---
+
 ## polish(cash-payment): Session B-followup-2 — fixed-width display, X icon Clear, $10–100 only, filled denomination chips, row-aligned columns
 
 Mac-browser test of Session B-followup's two-column layout surfaced four UX problems: (1) display field appeared to widen as digits accumulated (`$` lived outside a `w-40` box, so the visual unit didn't read as locked), (2) full-width text "Clear" button looked too prominent for an auxiliary action, (3) `$1` and `$5` denominations are rarely used in real cash transactions (most cash payments are `$10`+), (4) denomination column and keypad column were both white outlined cells — the eye couldn't quickly distinguish the two functional zones.

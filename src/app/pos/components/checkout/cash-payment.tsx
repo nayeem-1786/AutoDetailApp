@@ -266,16 +266,21 @@ export function CashPayment() {
           </div>
 
           {/* Right column — display+X row, change/short row, keypad.
-              items-center centers the 244px display+X row and 244px change/
-              short row over the 320px keypad. */}
-          <div className="flex w-full max-w-xs flex-col items-center gap-3">
+              Default align-items: stretch is required so PinPad fills the
+              320px column width (its grid auto-sizes to parent). Centering
+              of the 244px display+X and change/short rows is done per-row
+              via mx-auto, NOT via items-center on the column — items-center
+              would set align-self:center on every child, collapsing PinPad
+              to min-content width and rendering keypad cells as narrow pills
+              (Session B-followup-2 regression, fixed in B-followup-3). */}
+          <div className="flex w-full max-w-xs flex-col gap-3">
             {/* Row 1: tendered display + X clear button.
                 Display width is fixed at w-44 (176px) — sufficient for
                 $99,999.99 at text-2xl tabular-nums plus padding — so the
                 field NEVER widens with content. $ moved inside the box so
                 display + X reads as one locked unit. Combined row width:
                 176 + 8 (gap) + 60 (X) = 244px. */}
-            <div className="flex flex-row items-center gap-2">
+            <div className="mx-auto flex flex-row items-center gap-2">
               <div
                 role="status"
                 aria-live="polite"
@@ -301,7 +306,7 @@ export function CashPayment() {
             {cents > 0 ? (
               <div
                 className={cn(
-                  'flex min-h-[40px] w-[244px] items-center justify-center rounded-lg px-6 py-2 text-center',
+                  'mx-auto flex min-h-[40px] w-[244px] items-center justify-center rounded-lg px-6 py-2 text-center',
                   isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
                 )}
               >
@@ -319,7 +324,7 @@ export function CashPayment() {
                 )}
               </div>
             ) : (
-              <div className="h-[40px] w-[244px]" aria-hidden="true" />
+              <div className="mx-auto h-[40px] w-[244px]" aria-hidden="true" />
             )}
 
             {/* Row 3: keypad — unchanged from PinPad shared component. */}
