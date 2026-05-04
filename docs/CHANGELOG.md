@@ -6,6 +6,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(cash-payment): Session B-followup — two-column layout (left denominations, right entry + keypad)
+
+Real-world Mac-browser test of Session B's single-column stack revealed the layout was too tall and underutilized horizontal space — denominations sat above the keypad in a 3×2 grid, with the entry display floating between header and denominations. Iterating to a two-column layout puts the 6 denominations as a vertical stack on the left (matching keypad button dimensions exactly), and the entry display + Clear + keypad + change-box stack on the right. The footer now uses `justify-between` to spread Back/Complete to the left/right edges of the body block, instead of grouping them as a centered pair.
+
+**Pure JSX refactor.** No data, state, handler, or effect changes. `handleDigit` / `handleBackspace` / `handleDenomination` / `handleProcessCash` / `setCashPayment` / `canOpenDrawer` / drawer-kick / online-offline branches / API payload shapes all untouched at the byte level (lines 1-218 of `cash-payment.tsx` are byte-for-byte identical to Session B's `c78abb3b`). Only the `return ( … )` JSX changed.
+
+**Layout specifics** — denomination buttons match keypad button dimensions: `min-h-[60px] rounded-xl text-xl` inside `w-[101px] flex flex-col gap-2`. Width is one keypad cell wide (~101.33px from `grid-cols-3 gap-2` within `max-w-xs`/320px), height matches `min-h-[60px]` from PinPad `size="default"`, and `gap-2` mirrors the keypad's inter-row gap so the visual rhythm aligns across the two columns. Right column is `w-full max-w-xs` (320px) with `gap-3` between display, Clear, keypad, and change-box.
+
+**Body block sizing trick** — the two-column row + error + footer live inside an inner `flex flex-col gap-4` block with no explicit width, so the block naturally sizes to the two-column width (~437px). Footer `flex w-full justify-between` then spreads Back to the column's left edge and Complete to the right edge in one row, instead of the prior centered pair. The error display gets `w-full` so it spans the same column-aligned width when it fires.
+
+**Vertical fit improved** — right column (the taller one) is ~416px empty / ~466px with change box, vs Session B's single-column ~572px stack. Total page now fits ~612px empty / ~662px with change box, comfortably under the modal's 700px cap with no scroll required (Session B's layout overflowed by 16–66px).
+
+### Files touched
+- `src/app/pos/components/checkout/cash-payment.tsx` — JSX-only restructure
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (changed file) → 0/0. `npx vitest run` → 561/561. No handler diff (line-1-to-218 byte-identical to Session B). Manual UAT covers the same regression surface as Session B (online + offline + drawer kick + denomination increment + cap reject + Clear + Back); only the visual arrangement changed.
+
+---
+
 ## feat(refund): shell mode for items-less transactions (pay-link, deposits)
 
 POS refund modal couldn't refund pay-link transactions. Reproduced on prod with the $1.00 close-out shell on appointment `418730b0…`: user opens "Issue Refund", sees an empty item list (the Stripe pay-link webhook creates a `transactions` row + a `payments` row but no `transaction_items`), and the "Review Refund" button stays disabled because `canProceed = selectedItems.size > 0 && reason.trim().length > 0` and `selectedItems.size` is permanently `0` with nothing to check. Architectural mismatch: the refund modal was built around items, but pay-link/booking-deposit/appointment-payment transactions are payment shells with a single $ value and a Stripe PI — the same shape Stripe itself refunds against.
