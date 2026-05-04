@@ -6,6 +6,28 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(sms): route via messagingServiceSid for A2P 10DLC compliance
+
+US SMS sends were failing with carrier error `30034 - Unregistered Number`. Cause: the implicit phone-number ↔ A2P Campaign association on the Twilio account was reset during account recovery and is no longer restored automatically — the phone number now requires routing through a Messaging Service to inherit the approved Brand/Campaign registration. Twilio support confirmed the account state: phone +14244010094 attached to Messaging Service `MG86eb8e41c73485dcde3a2a98ecb37555`, linked to approved Brand `BNd6e181c2ba80f656d4390080eb5b4123`, with Campaign `CM31c5fe2f8528484f453be7cfe460a0df` in TCR review.
+
+Replaced the `From` parameter with `MessagingServiceSid` at the single send site (`src/lib/utils/sms.ts`). The two are mutually exclusive at the Twilio API level. Per CLAUDE.md rule 9, every SMS in the codebase routes through `sendSms()` / `sendMarketingSms()` — patching this one file covers all transactional, lifecycle, campaign, and marketing sends. New env var `TWILIO_MESSAGING_SERVICE_SID` (already on production VPS and local MBP `.env.local`).
+
+`TWILIO_PHONE_NUMBER` env var is preserved for display-only use in the `sms_delivery_log.from_phone` column (now null-safe with `?? null` so a missing value doesn't fail logging). The send no longer requires it.
+
+Defensive guard added: `sendSms()` returns `{success: false, error: 'TWILIO_MESSAGING_SERVICE_SID is not configured'}` when the env var is unset, mirroring the existing `'SMS service not configured'` shape (no throw — caller pattern is to check `result.success` and log). Failure mode trades opaque `30034` for an explicit config error.
+
+**Untouched (intentionally):**
+- `src/lib/utils/phone-validation.ts` — uses `lookups.twilio.com/v2/PhoneNumbers/...` (different endpoint, no Messaging Services)
+- `src/app/api/webhooks/twilio/inbound/route.ts` and `status/route.ts` — receive Twilio HTTP requests, don't send
+
+### Files touched
+- `src/lib/utils/sms.ts` — `From` → `MessagingServiceSid` swap, defensive guard, null-safe `from_phone` log
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/lib/utils/sms.ts` → 0/0. `npx vitest run` → 561/561 (`sendSms` is mocked in tests; no real-send dependency). End-to-end SMS verification deferred until A2P Campaign clears TCR review on the Twilio side.
+
+---
+
 ## feat(split-payment): 3-column grid layout — center keypad with full-width displays, presets float left
 
 Visual review of `01f4519b` (sync-to-cash-payment two-column rhythm) on iPad PWA showed that matching cash-payment's symmetric two-column layout exactly didn't read well for split-payment. Cash-payment has one display + one keypad; split-payment has TWO displays + one keypad, and the symmetric two-column treatment made the surface feel narrow and the keypad off-center inside the 850px modal. User directive on review: keep the keypad as the visually-centered focal element while letting the preset chips float at the modal's left edge.

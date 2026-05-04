@@ -44,15 +44,29 @@ export interface SendSmsOptions {
 export async function sendSms(to: string, body: string, options?: SendSmsOptions): Promise<SendSmsResult> {
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
+  const twilioMessagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  // TWILIO_PHONE_NUMBER kept for display/logging only (sms_delivery_log.from_phone).
+  // Sends route via Messaging Service for A2P 10DLC compliance — the Service is
+  // attached to the phone number + approved Brand/Campaign at the Twilio account
+  // level. From: parameter would bypass that and trigger 30034 - Unregistered Number.
   const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
 
-  if (!twilioSid || !twilioAuth || !twilioFrom) {
+  if (!twilioSid || !twilioAuth) {
     return { success: false, error: 'SMS service not configured' };
+  }
+  if (!twilioMessagingServiceSid) {
+    return {
+      success: false,
+      error: 'TWILIO_MESSAGING_SERVICE_SID is not configured',
+    };
   }
 
   try {
     const formData = new URLSearchParams();
-    formData.append('From', twilioFrom);
+    // MessagingServiceSid and From are mutually exclusive — the Twilio API
+    // rejects requests that include both. Sticking with the Service for A2P
+    // 10DLC routing.
+    formData.append('MessagingServiceSid', twilioMessagingServiceSid);
     formData.append('To', to);
     formData.append('Body', body);
 
@@ -95,7 +109,7 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
       await adminClient.from('sms_delivery_log').insert({
         message_sid: data.sid,
         to_phone: to,
-        from_phone: twilioFrom,
+        from_phone: twilioFrom ?? null,
         status: 'queued',
         customer_id: options?.customerId || null,
         campaign_id: options?.campaignId || null,
