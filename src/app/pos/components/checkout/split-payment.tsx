@@ -7,12 +7,18 @@ import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
 import { cn } from '@/lib/utils/cn';
 import { TIP_PRESETS } from '@/lib/utils/constants';
-import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
+import { fromCents, toCents } from '@/lib/utils/refund-math';
 import { useTicket } from '../../context/ticket-context';
 import { useCheckout } from '../../context/checkout-context';
+import { PinPad } from '../pin-pad';
 
 type SplitStep = 'enter-amounts' | 'processing-card' | 'complete' | 'error';
 type SplitMode = 'cash-first' | 'card-first';
+
+// $99,999.99 hard cap — same value as cash-payment.tsx / keypad-tab.tsx /
+// register-tab.tsx / payment-link-amount-modal.tsx. Inlined for self-contained
+// reading; intentional duplication, not coupling.
+const CENTS_CAP = 9999999;
 
 export function SplitPayment() {
   const { ticket, dispatch } = useTicket();
@@ -20,13 +26,20 @@ export function SplitPayment() {
 
   const grandTotal = ticket.total;
   const [splitMode, setSplitMode] = useState<SplitMode>('cash-first');
-  const [primaryAmount, setPrimaryAmount] = useState('');
+  // Tendered primary amount lives as integer cents and entry is "fixed-decimal"
+  // — every keypad digit shifts the value left by one column. Mirrors the
+  // pattern in cash-payment.tsx / keypad-tab.tsx / payment-link-amount-modal.tsx.
+  const [primaryCents, setPrimaryCents] = useState(0);
   const [splitStep, setSplitStep] = useState<SplitStep>('enter-amounts');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const primaryNum = parseFloat(primaryAmount) || 0;
+  const grandTotalCents = toCents(grandTotal);
+  const primaryNum = fromCents(primaryCents);
+  const displayValue = primaryNum.toFixed(2);
 
-  // Based on mode, calculate the portions
+  // Based on mode, calculate the portions. Formulas byte-identical to the
+  // pre-rebuild string-state version — only the `primaryNum` source changed
+  // from `parseFloat(primaryAmount) || 0` to `fromCents(primaryCents)`.
   const cashAmount = splitMode === 'cash-first' ? primaryNum : Math.max(0, Math.round((grandTotal - primaryNum) * 100) / 100);
   const cardAmount = splitMode === 'card-first' ? primaryNum : Math.max(0, Math.round((grandTotal - primaryNum) * 100) / 100);
   const remaining = Math.max(0, Math.round((grandTotal - cashAmount - cardAmount) * 100) / 100);
@@ -36,12 +49,29 @@ export function SplitPayment() {
     primaryNum < grandTotal &&
     cashAmount >= 0 &&
     cardAmount > 0;
-  const enterSubmit = useEnterSubmit(handleProcessSplit, isValidSplit && splitStep === 'enter-amounts');
 
-  // Quick-split presets
+  function handleDigit(d: string) {
+    if (d === '.') return; // Defensive — `.` is not rendered in amount layout.
+    const next = d === '00' ? primaryCents * 100 : primaryCents * 10 + parseInt(d, 10);
+    // Cap one cent below grand total — split MUST leave at least $0.01 for the
+    // OTHER half, otherwise it isn't a split. Also cap at $99,999.99 hard limit.
+    const cap = Math.min(CENTS_CAP, grandTotalCents - 1);
+    if (next > cap) return;
+    setPrimaryCents(next);
+  }
+
+  function handleBackspace() {
+    setPrimaryCents(Math.floor(primaryCents / 10));
+  }
+
+  // Quick-split presets — OVERWRITE primaryCents (different from cash-payment's
+  // increment denomination chips). Reasoning: "split is exactly $20 cash" is
+  // the operation, not "received $20 then $20 more".
   function handleSplitHalf() {
-    const half = Math.floor((grandTotal / 2) * 100) / 100;
-    setPrimaryAmount(half.toFixed(2));
+    // Floor at integer cents so odd totals (e.g., $5.55 → $2.77 + $2.78)
+    // split cleanly with the larger cent landing on the OTHER half. Matches
+    // the prior float-based behavior `Math.floor((grandTotal / 2) * 100) / 100`.
+    setPrimaryCents(Math.floor(grandTotalCents / 2));
   }
 
   async function handleProcessSplit() {
@@ -256,7 +286,7 @@ export function SplitPayment() {
           {/* Mode toggle: cash-first vs card-first */}
           <div className="flex gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
             <button
-              onClick={() => { setSplitMode('cash-first'); setPrimaryAmount(''); }}
+              onClick={() => { setSplitMode('cash-first'); setPrimaryCents(0); }}
               className={cn(
                 'rounded-md px-4 py-2 text-sm font-medium transition-all',
                 splitMode === 'cash-first'
@@ -267,7 +297,7 @@ export function SplitPayment() {
               Enter Cash Amount
             </button>
             <button
-              onClick={() => { setSplitMode('card-first'); setPrimaryAmount(''); }}
+              onClick={() => { setSplitMode('card-first'); setPrimaryCents(0); }}
               className={cn(
                 'rounded-md px-4 py-2 text-sm font-medium transition-all',
                 splitMode === 'card-first'
@@ -279,46 +309,54 @@ export function SplitPayment() {
             </button>
           </div>
 
-          {/* Amount input */}
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+          {/* Amount input \u2014 wrapper is w-full max-w-xs (320px) so PinPad's
+              grid-cols-3 stretches to the column width (cells ~101px each).
+              No items-center on the column \u2014 that would collapse PinPad to
+              min-content (B-followup-3 lesson). Display, preset row, and
+              prompt text use mx-auto / text-center to center within. */}
+          <div className="flex w-full max-w-xs flex-col gap-4">
+            <p className="text-center text-sm text-gray-600 dark:text-gray-400">
               {splitMode === 'cash-first'
                 ? 'Enter cash amount \u2014 remainder goes to card'
                 : 'Enter card amount \u2014 remainder is cash'}
             </p>
-            <div className="flex items-center gap-2">
-              <span className="text-xl text-gray-500 dark:text-gray-400">$</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9]*\.?[0-9]*"
-                value={primaryAmount}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^0-9.]/g, '');
-                  setPrimaryAmount(v);
-                }}
-                autoFocus
-                {...enterSubmit}
-                className="h-14 w-40 rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
-                placeholder="0.00"
-              />
+
+            {/* Tendered display \u2014 non-focusable div, no OS keyboard pop on
+                iPad. Fixed width w-44 (176px) \u2014 sufficient for $99,999.99
+                at text-2xl tabular-nums plus padding \u2014 so the field NEVER
+                widens with content. $ moved inside the box so display reads
+                as one locked unit. Mirrors cash-payment.tsx pattern. */}
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label="Primary amount"
+              className="mx-auto flex h-[60px] w-44 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
+            >
+              ${displayValue}
             </div>
 
-            {/* Quick split buttons */}
-            <div className="flex gap-2">
+            {/* Quick preset chips \u2014 OVERWRITE primaryCents (different from
+                cash-payment's increment denoms). Filled gray styling at
+                60\u00d760 to mirror cash-payment's denom chip geometry; text-base
+                (vs cash-payment's text-xl) accommodates "50/50"'s 5-char
+                length and signals the "shortcut" semantic vs cash-payment's
+                "received bill" semantic. $X chips disable when amt >= total. */}
+            <div className="mx-auto flex flex-row gap-2">
               <button
+                type="button"
                 onClick={handleSplitHalf}
-                className="min-h-[44px] rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
               >
                 50/50
               </button>
               {[20, 50, 100].map((amt) => (
                 <button
                   key={amt}
-                  onClick={() => setPrimaryAmount(amt.toFixed(2))}
+                  type="button"
+                  onClick={() => setPrimaryCents(toCents(amt))}
                   disabled={amt >= grandTotal}
                   className={cn(
-                    'min-h-[44px] rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800',
+                    'flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-base font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation',
                     amt >= grandTotal && 'opacity-40 cursor-not-allowed'
                   )}
                 >
@@ -327,7 +365,17 @@ export function SplitPayment() {
               ))}
             </div>
 
-            {/* Running totals */}
+            {/* Embedded keypad \u2014 shared PinPad in amount layout (00 / 0 / \u232b
+                bottom row). Stretches to the 320px column \u2192 cells ~101px. */}
+            <PinPad
+              onDigit={handleDigit}
+              onBackspace={handleBackspace}
+              layoutVariant="amount"
+              size="default"
+            />
+
+            {/* Running totals \u2014 JSX byte-identical to pre-rebuild; condition
+                still works because primaryNum > 0 \u27fa primaryCents > 0. */}
             {primaryNum > 0 && (
               <div className="w-full max-w-xs rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <div className="space-y-2">
