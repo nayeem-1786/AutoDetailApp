@@ -6,6 +6,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## polish(checkout): vertical-center all checkout surfaces — min-h-full + justify-center
+
+iPad PWA test of `5452dc55` (Session B-followup-4) revealed cash-payment was top-aligned in the 700 px modal slot, leaving ~100 px empty space below the Complete button. Audit found 5 of 6 checkout surfaces had `justify-center` on their outer flex-col wrapper but lacked `min-h-full`, making `justify-center` a silent no-op. Only `check-payment.tsx` used the correct pattern (`min-h-full` + `justify-center`). The other 5 had been silently top-aligned since Session 12 — no one noticed because their content density made the empty trailing space less obvious; cash-payment's compact two-column body made it conspicuous.
+
+**Root cause** — The slot in `checkout-overlay.tsx:48` is `<div className="flex h-full flex-col overflow-y-auto overscroll-contain">` (full modal height, vertical stacking, no `justify-content`). Default `align-items: stretch` (cross-axis = horizontal) and no main-axis distribution. Each surface child mounts as the only child rendered. With `flex flex-col`, the surface child takes its own content height vertically (no `flex-grow`); horizontally it stretches to fill. For `justify-center` ON the surface to take effect vertically, the surface itself must have a defined height ≥ the modal slot. Surfaces without `min-h-full` collapse to content height, making their `justify-center` a no-op (centers content within its own collapsed-to-content height = no visible centering).
+
+`check-payment.tsx:112` got it right with `flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12`. The other 5 surfaces (and cash-payment, which lacked even `justify-center`) needed unification to that pattern.
+
+**Fix** — Single-className update per file; pure CSS unification, zero content or behavior changes:
+
+| File | Outer wrapper change |
+|---|---|
+| `cash-payment.tsx:221` | added `min-h-full` AND `justify-center` (had neither) |
+| `payment-method-screen.tsx:107, 142` | added `min-h-full` to BOTH branches (close-out + main return) |
+| `card-payment.tsx:255` | added `min-h-full` |
+| `split-payment.tsx:246` | added `min-h-full` |
+| `payment-complete.tsx:16` | added `min-h-full` |
+| `tip-screen.tsx:43` | added `min-h-full` |
+
+Six files, 7 className updates (payment-method-screen has two outer divs for its two render branches, both updated for parity). `check-payment.tsx` not touched — already correct. `checkout-overlay.tsx` not touched — slot-level fix would have rippled to all surfaces with risk of breaking any future surface that intentionally relies on top-alignment; per-surface fix is surgical and self-documenting.
+
+**Why `min-h-full` (not `h-full`)** — `min-h-full` lets the surface grow taller than the slot if content ever exceeds (e.g., a long error state or expanded form), preserving the slot's `overflow-y-auto` scroll behavior. `h-full` would clamp height and force inner scrolling within a fixed-size box. `min-h-full` is the more robust pattern (which check-payment already uses).
+
+**No structural changes** — surface content (header, body, footer), inner gap/padding (`gap-8 px-8 py-12` for 5 surfaces; `gap-4 px-6 py-6` for cash-payment, intentionally tighter for its denser two-column layout), color, sizing, all handlers, all state, all context contracts, all API payloads — untouched. Diff is +7 / -7 lines across 6 files.
+
+### Files touched
+- `src/app/pos/components/checkout/cash-payment.tsx` — wrapper className gained `min-h-full` + `justify-center`
+- `src/app/pos/components/checkout/payment-method-screen.tsx` — both return branches' wrapper className gained `min-h-full`
+- `src/app/pos/components/checkout/card-payment.tsx` — wrapper className gained `min-h-full`
+- `src/app/pos/components/checkout/split-payment.tsx` — wrapper className gained `min-h-full`
+- `src/app/pos/components/checkout/payment-complete.tsx` — wrapper className gained `min-h-full`
+- `src/app/pos/components/checkout/tip-screen.tsx` — wrapper className gained `min-h-full`
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint` (6 changed files) → 0/0. `npx vitest run` → 561/561.
+
+Mental UAT (per surface, iPad PWA portrait + Mac browser):
+- Cash payment: opens with two-column body + footer (~600 px) centered in 700 px modal — ~50 px breathing space above header, ~50 px below Complete. Was top-aligned with ~100 px below Complete; no longer.
+- Payment method: 4-method grid centers in modal. Close-out branch ($0 balance) also centers (both render branches updated).
+- Card payment: "Insert/swipe/tap" prompt + reader status icon centers in modal.
+- Split payment: mode toggle + amount input + presets + running totals + footer centers in modal. (Surface's input UX issues are out of scope; covered separately if a future Session B-style rebuild is approved.)
+- Payment complete: large CheckCircle2 + receipt block centers in modal.
+- Tip screen: tip preset buttons + custom-tip input centers in modal.
+- Mobile (no `md:` breakpoint): modal is full-viewport; `min-h-full` applies to full viewport; surfaces still center within full screen. No regression.
+- Surfaces with content taller than 700 px (rare — would only happen with a long error message): `min-h-full` doesn't clamp height; slot's `overflow-y-auto` handles scrolling. Same robust behavior as check-payment.
+
+---
+
 ## fix(cash-payment): Session B-followup-4 — equalize change/short slot height to prevent keypad shift
 
 iPad PWA test of `35eef596` (Session B-followup-3) revealed a residual layout shift: tapping a denomination (or any digit) that pushed `cents > 0` AND `cents >= amountDue` (Change variant) caused the keypad to drop by 4 px, breaking the row-alignment between left-column denomination chips ($10/$20/$50/$100) and keypad rows (1/4/7/00). Tapping a denomination that under-paid (Short variant) did NOT cause the shift. The asymmetry is the diagnostic signature of a single overflowing variant.

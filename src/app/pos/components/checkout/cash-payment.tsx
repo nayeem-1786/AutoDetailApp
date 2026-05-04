@@ -218,7 +218,7 @@ export function CashPayment() {
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 px-6 py-6">
+    <div className="flex min-h-full flex-col items-center justify-center gap-4 px-6 py-6">
       {/* Header */}
       <div className="text-center">
         <p className="text-lg text-gray-500 dark:text-gray-400">Cash Payment</p>

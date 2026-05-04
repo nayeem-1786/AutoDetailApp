@@ -252,7 +252,7 @@ export function CardPayment() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+    <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
         <p className="text-lg text-gray-500 dark:text-gray-400">Card Payment</p>
         <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">

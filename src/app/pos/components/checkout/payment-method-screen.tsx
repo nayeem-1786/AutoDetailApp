@@ -104,7 +104,7 @@ export function PaymentMethodScreen() {
 
   if (isCloseOut) {
     return (
-      <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+      <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
         <div className="text-center">
           <p className="text-lg text-gray-500 dark:text-gray-400">Balance Due</p>
           <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">$0.00</p>
@@ -139,7 +139,7 @@ export function PaymentMethodScreen() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+    <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
       <div className="text-center">
         <p className="text-lg text-gray-500 dark:text-gray-400">Payment method</p>
         <p className="mt-1 text-3xl font-bold text-gray-900 dark:text-gray-100">

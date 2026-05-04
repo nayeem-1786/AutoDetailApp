@@ -13,7 +13,7 @@ export function PaymentComplete() {
   const isOfflineTx = checkout.transactionId?.startsWith('offline-');
 
   return (
-    <div className="flex flex-col items-center justify-center gap-8 px-8 py-12">
+    <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
       <CheckCircle2 className="h-20 w-20 text-green-500 dark:text-green-400" />
 
       <div className="text-center">
