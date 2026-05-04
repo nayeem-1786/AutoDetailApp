@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, WifiOff } from 'lucide-react';
+import { Loader2, WifiOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
 import { posFetch } from '../../lib/pos-fetch';
@@ -14,10 +14,11 @@ import { queueTransaction } from '@/lib/pos/offline-queue';
 import { fromCents, toCents } from '@/lib/utils/refund-math';
 import { PinPad } from '../pin-pad';
 
-// Bill denominations rendered as 3×2 grid above the keypad. Tapping a
-// denomination *increments* the tendered cents (Square / Toast / Clover
-// convention), so $20 × 3 → $60. Matches the build prompt's Layout 2.
-const DENOMINATIONS = [1, 5, 10, 20, 50, 100] as const;
+// Bill denominations stacked vertically in the left column, row-aligned with
+// keypad rows. Tapping a denomination *increments* the tendered cents (Square
+// / Toast / Clover convention), so $20 × 3 → $60. $1 and $5 dropped — real
+// cash payments are dominantly $10+.
+const DENOMINATIONS = [10, 20, 50, 100] as const;
 
 // $99,999.99 hard cap — same value as keypad-tab.tsx / register-tab.tsx /
 // payment-link-amount-modal.tsx. Inlined to avoid coupling to those files.
@@ -240,62 +241,67 @@ export function CashPayment() {
       <div className="flex flex-col gap-4">
         {/* Two-column row */}
         <div className="flex flex-row items-start gap-4">
-          {/* Left column — denomination buttons stacked vertically.
-              Width matches one keypad cell (~101px from grid-cols-3 inside
-              max-w-xs / 320px with gap-2), height matches keypad button
-              min-h-[60px] from PinPad size="default". gap-2 mirrors the
-              keypad's inter-row gap so the visual rhythm aligns. */}
-          <div className="flex w-[101px] flex-col gap-2">
-            {DENOMINATIONS.map((denom) => (
-              <button
-                key={denom}
-                type="button"
-                onClick={() => handleDenomination(denom)}
-                className="flex min-h-[60px] items-center justify-center rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-xl font-semibold text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-600 active:scale-[0.97] touch-manipulation"
-              >
-                ${denom}
-              </button>
-            ))}
+          {/* Left column — denomination chips, row-aligned with keypad rows.
+              Spacers above the button group offset for the right column's
+              display+X row (60px) and change/short row (40px), separated by
+              gap-3 (12px). Total offset 60+12+40+12 = 124px puts $10 top
+              aligned with keypad row 1 top. Buttons are gap-2 (8px) apart to
+              match the keypad's vertical row gap, so $10/$20/$50/$100 row-
+              align with keypad rows 1/2/3/4 respectively. */}
+          <div className="flex flex-col gap-3">
+            <div className="h-[60px]" aria-hidden="true" />
+            <div className="h-[40px]" aria-hidden="true" />
+            <div className="flex flex-col gap-2">
+              {DENOMINATIONS.map((denom) => (
+                <button
+                  key={denom}
+                  type="button"
+                  onClick={() => handleDenomination(denom)}
+                  className="flex h-[60px] w-[60px] items-center justify-center rounded-xl bg-gray-200 dark:bg-gray-700 text-xl font-semibold text-gray-700 dark:text-gray-200 transition-colors hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
+                >
+                  ${denom}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Right column — display, Clear, keypad, change/short box */}
-          <div className="flex w-full max-w-xs flex-col gap-3">
-            {/* Tendered display — non-focusable div, no OS keyboard pop on iPad */}
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-xl text-gray-500 dark:text-gray-400">$</span>
+          {/* Right column — display+X row, change/short row, keypad.
+              items-center centers the 244px display+X row and 244px change/
+              short row over the 320px keypad. */}
+          <div className="flex w-full max-w-xs flex-col items-center gap-3">
+            {/* Row 1: tendered display + X clear button.
+                Display width is fixed at w-44 (176px) — sufficient for
+                $99,999.99 at text-2xl tabular-nums plus padding — so the
+                field NEVER widens with content. $ moved inside the box so
+                display + X reads as one locked unit. Combined row width:
+                176 + 8 (gap) + 60 (X) = 244px. */}
+            <div className="flex flex-row items-center gap-2">
               <div
                 role="status"
                 aria-live="polite"
                 aria-label="Tendered amount"
-                className="flex h-14 w-40 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
+                className="flex h-[60px] w-44 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-center text-2xl tabular-nums text-gray-900 dark:text-gray-100"
               >
-                {displayValue}
+                ${displayValue}
               </div>
+              <button
+                type="button"
+                onClick={() => setCents(0)}
+                disabled={cents === 0}
+                aria-label="Clear amount"
+                className="flex h-[60px] w-[60px] items-center justify-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-red-500 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800 active:scale-[0.97] touch-manipulation disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-900"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
 
-            {/* Clear — full-width within right column, sits directly above keypad */}
-            <button
-              type="button"
-              onClick={() => setCents(0)}
-              disabled={cents === 0}
-              className="flex h-12 items-center justify-center rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-medium text-red-600 dark:text-red-400 transition-all hover:bg-red-50 dark:hover:bg-red-900/20 active:scale-[0.99] touch-manipulation disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-gray-900"
-            >
-              Clear
-            </button>
-
-            {/* Keypad */}
-            <PinPad
-              onDigit={handleDigit}
-              onBackspace={handleBackspace}
-              layoutVariant="amount"
-              size="default"
-            />
-
-            {/* Change / short box — only when cents > 0 */}
-            {cents > 0 && (
+            {/* Row 2: change / short box. Always renders (placeholder when
+                cents===0) so the keypad position stays stable and the left
+                column's spacer offset stays valid regardless of state. */}
+            {cents > 0 ? (
               <div
                 className={cn(
-                  'self-center rounded-lg px-6 py-2 text-center',
+                  'flex min-h-[40px] w-[244px] items-center justify-center rounded-lg px-6 py-2 text-center',
                   isValid ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
                 )}
               >
@@ -312,7 +318,17 @@ export function CashPayment() {
                   </p>
                 )}
               </div>
+            ) : (
+              <div className="h-[40px] w-[244px]" aria-hidden="true" />
             )}
+
+            {/* Row 3: keypad — unchanged from PinPad shared component. */}
+            <PinPad
+              onDigit={handleDigit}
+              onBackspace={handleBackspace}
+              layoutVariant="amount"
+              size="default"
+            />
           </div>
         </div>
 

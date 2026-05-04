@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## polish(cash-payment): Session B-followup-2 — fixed-width display, X icon Clear, $10–100 only, filled denomination chips, row-aligned columns
+
+Mac-browser test of Session B-followup's two-column layout surfaced four UX problems: (1) display field appeared to widen as digits accumulated (`$` lived outside a `w-40` box, so the visual unit didn't read as locked), (2) full-width text "Clear" button looked too prominent for an auxiliary action, (3) `$1` and `$5` denominations are rarely used in real cash transactions (most cash payments are `$10`+), (4) denomination column and keypad column were both white outlined cells — the eye couldn't quickly distinguish the two functional zones.
+
+**Pure JSX + data refactor.** No state, handler, effect, API payload, offline queue payload, or context contract changes. `handleDigit` / `handleBackspace` / `handleDenomination` / `handleProcessCash` / `setCashPayment` / `canOpenDrawer` / drawer-kick / online-offline branches all byte-identical to Session B-followup's `ef8aed5c` (lines 1-218 unchanged at the byte level). Only the `DENOMINATIONS` array (data) and the `return ( … )` JSX changed.
+
+**Five JSX-locked changes:**
+
+1. **Display fixed at `w-44` (176px) with `$` moved INSIDE the box** — sufficient for the `$99,999.99` cap at `text-2xl tabular-nums` plus padding. `$` and digits now read as one locked unit, never widens with content. Height bumped to `h-[60px]` to vertically match the X button beside it.
+
+2. **Clear text button → `<X>` icon button** — `lucide-react` `X` icon (`h-5 w-5`) inside a 60×60 px outlined cell that byte-matches the keypad cell styling (`border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl`, same hover/active backgrounds as `pin-pad.tsx:73`). Icon color is `text-red-500`. Disabled state preserved (`cents === 0` → `opacity-40 cursor-not-allowed`, `setCents(0)` is a no-op via existing handler). The X button sits directly to the right of the display in a `flex flex-row gap-2` row at the top of the right column.
+
+3. **`DENOMINATIONS = [10, 20, 50, 100]`** — dropped `$1` and `$5`. Four chips remain. `handleDenomination` body untouched — only the iterated array changed.
+
+4. **Denomination chips filled (Square POS convention)** — `bg-gray-200 hover:bg-gray-300 active:bg-gray-400 text-gray-700` in light mode, `dark:bg-gray-700 dark:hover:bg-gray-600 dark:active:bg-gray-500 dark:text-gray-200` in dark mode, no border. Geometry matches keypad cells (`h-[60px] w-[60px] rounded-xl text-xl font-semibold`) but visually distinct via solid gray fill vs keypad's white outlined. Eye now groups them as separate functional zones at a glance.
+
+5. **Change/Short box repositioned + width-locked + always-rendered** — moved from below the keypad to between the display+X row and the keypad. Width fixed at `w-[244px]` (matches the display+X+gap row width). Always renders (placeholder `h-[40px] w-[244px]` div when `cents === 0`) so the keypad position stays stable across the `cents > 0` boundary and the left column's spacer offset stays valid regardless of state.
+
+**Row-alignment math** — left column uses two leading spacer divs (`h-[60px]` for the display+X row, `h-[40px]` for the change/short row) inside a `flex flex-col gap-3` container, then a `flex flex-col gap-2` button group. Total offset: 60 + 12 (gap-3) + 40 + 12 (gap-3) = 124px before the first denomination. Right column reaches the keypad at the same 124px (60 display+X + 12 gap-3 + 40 change/short + 12 gap-3 = 124px). Within the button group, gap-2 (8px) matches the keypad's inter-row gap (8px), so `$10` / `$20` / `$50` / `$100` row-align with keypad rows 1 / 2 / 3 / 4. Total denomination column height 4×60 + 3×8 = 264px = total keypad height 4×60 + 3×8 = 264px. Verified mentally cell-by-cell.
+
+**Right column `items-center` decision** — kept the right column at `max-w-xs` (320px) so the keypad's `grid grid-cols-3` cells stay at ~101 px wide (preserves tap-target size, matches Session B-followup). The narrower 244px display+X row and 244px change/short row are centered above the wider 320px keypad via `items-center` on the column flex. Visual hierarchy: input zone (244 px) anchored over keypad zone (320 px), denomination chips row-aligned to the keypad's left.
+
+**PinPad untouched** — `src/app/pos/components/pin-pad.tsx` is shared with PIN login, manager dialog, register tab, and pay-link Custom modal. Per session scope, the keypad keeps its current outlined white-cell appearance; only denomination chips were restyled to the filled variant for visual contrast.
+
+### Files touched
+- `src/app/pos/components/checkout/cash-payment.tsx` — JSX refactor + 4-element `DENOMINATIONS` data change
+
+### Verification
+`npx tsc --noEmit` clean. `npx eslint src/app/pos/components/checkout/cash-payment.tsx` → 0/0. `npx vitest run` → 561/561. Handler diff byte-identical (lines 1-218 unchanged from `ef8aed5c`).
+
+Mental UAT:
+- Cash payment with `amountDue $428.00` opens. Display shows `$0.00` at fixed width. X icon disabled (40% opacity), no Change/Short box (placeholder div maintains layout).
+- Tap `$100` four times → display shows `$400.00`, NO horizontal expansion. Short `$28.00` box appears in the relocated position (244 px wide, between display and keypad).
+- Tap `$100` once more → display shows `$500.00`, Short box becomes Change `$72.00` box (green). X icon now active (red).
+- Tap X icon → display resets to `$0.00`, Change box hides (replaced by invisible 40 px placeholder so keypad doesn't jump up).
+- Tap keypad `5` → `$0.05`. Tap `0` → `$0.50`. Tap `00` → `$50.00`. Tap `00` → `$5,000.00`. Display still fixed width.
+- Worst-case fill: tap digits to reach `$99,999.99` (the cap) — display still fixed width, no other column moves.
+- Visual zone test: gray-filled denomination chips (left, bg-gray-200) clearly distinct from white outlined keypad cells (right). Eye groups them as separate functional regions.
+- Row alignment: `$10` top edge aligns with `1` top edge, `$20` with `4` top, `$50` with `7` top, `$100` with `00` top. Confirmed via spacer math (124 px offset both sides) and button group geometry (4×60 + 3×8 = 264 px = keypad height).
+- Footer Back/Complete spread untouched. Header untouched. Offline banner untouched.
+
+---
+
 ## fix(cash-payment): Session B-followup — two-column layout (left denominations, right entry + keypad)
 
 Real-world Mac-browser test of Session B's single-column stack revealed the layout was too tall and underutilized horizontal space — denominations sat above the keypad in a 3×2 grid, with the entry display floating between header and denominations. Iterating to a two-column layout puts the 6 denominations as a vertical stack on the left (matching keypad button dimensions exactly), and the entry display + Clear + keypad + change-box stack on the right. The footer now uses `justify-between` to spread Back/Complete to the left/right edges of the body block, instead of grouping them as a centered pair.
