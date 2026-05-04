@@ -558,12 +558,31 @@ const refundItemSchema = z.object({
   restock: z.boolean().optional(),
 });
 
-export const refundCreateSchema = z.object({
-  transaction_id: z.string().uuid(),
-  items: z.array(refundItemSchema).min(1, 'Select at least one item to refund'),
-  tip_refund: z.coerce.number().min(0).default(0),
-  reason: requiredString,
-});
+// Two refund payload shapes share this schema:
+//   1. Items mode (POS sales): items[] populated, server recomputes per-line
+//      amounts from stored transaction_items + tax/discount math.
+//   2. Shell mode (pay-link / booking deposit / appointment-payment shells with
+//      no transaction_items rows): items=[], bulk_amount carries the total $
+//      to refund against the transaction. Server skips per-item recompute and
+//      refunds the bulk amount via the shared LIFO source plan.
+// The refine() guard requires exactly one of the two to be populated.
+export const refundCreateSchema = z
+  .object({
+    transaction_id: z.string().uuid(),
+    items: z.array(refundItemSchema),
+    bulk_amount: positiveNumber.optional(),
+    tip_refund: z.coerce.number().min(0).default(0),
+    reason: requiredString,
+  })
+  .refine(
+    (data) =>
+      data.items.length > 0 ||
+      (data.bulk_amount !== undefined && data.bulk_amount > 0),
+    {
+      message:
+        'Provide either items[] (items mode) or bulk_amount > 0 (shell mode)',
+    }
+  );
 
 // ---------------------------------------------------------------------------
 // POS Shop Use schema

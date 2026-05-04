@@ -43,6 +43,19 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
 
+    // Shell-mode: empty items[] + bulk_amount. The dialog enters this branch
+    // for transactions with no transaction_items rows (pay-link, booking
+    // deposit, appointment-payment shells) — Stripe-style "refund $X against
+    // a PI", no line-item granularity. The schema's refine() already enforces
+    // either items.length > 0 OR bulk_amount > 0, so the dual check below is
+    // belt-and-suspenders for the runtime side.
+    //
+    // Mode precedence (contract): items[] takes priority. When items.length > 0,
+    // items mode runs and any bulk_amount in the payload is ignored. When
+    // items.length === 0, shell mode runs and bulk_amount is required. Clients
+    // should send exactly one shape, not both.
+    const isShellMode = data.items.length === 0;
+
     // Normalize disposition: new clients send disposition directly;
     // cached PWA clients may send legacy restock boolean instead.
     const normalizedItems = data.items.map((item) => {
@@ -74,87 +87,158 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Bulk fetch transaction_items — needed for server-side refund math
-    // recompute. See src/lib/utils/refund-math.ts invariants.
-    const { data: txItems, error: txItemsError } = await supabase
-      .from('transaction_items')
-      .select('id, unit_price, quantity, tax_amount')
-      .eq('transaction_id', data.transaction_id);
+    // Items-mode preamble: bulk fetch transaction_items, validate payload
+    // ids, recompute per-line amounts, exact-match against client values.
+    // Shell mode skips this whole block — there are no items to recompute.
+    let recomputedTotalCents = 0;
+    let lineAmountsCents: number[] = [];
+    // Shell-mode-only: pre-existing refunds total + max refundable total,
+    // captured during the shell branch and reused below for the correct
+    // post-refund status calculation. Items-mode keeps its existing status
+    // decision (`remainingNeedCents <= 0`) untouched.
+    let shellAlreadyRefundedCents = 0;
+    let shellTotalRefundableCents = 0;
 
-    if (txItemsError || !txItems) {
-      console.error('Transaction items fetch error:', txItemsError);
-      return NextResponse.json(
-        { error: 'Failed to load transaction items' },
-        { status: 500 }
-      );
-    }
+    if (!isShellMode) {
+      // Bulk fetch transaction_items — needed for server-side refund math
+      // recompute. See src/lib/utils/refund-math.ts invariants.
+      const { data: txItems, error: txItemsError } = await supabase
+        .from('transaction_items')
+        .select('id, unit_price, quantity, tax_amount')
+        .eq('transaction_id', data.transaction_id);
 
-    const itemsById = new Map(
-      txItems.map((row) => [row.id as string, row])
-    );
-
-    // Validate every payload item resolves to a real transaction_item row
-    for (const payloadItem of data.items) {
-      if (!itemsById.has(payloadItem.transaction_item_id)) {
+      if (txItemsError || !txItems) {
+        console.error('Transaction items fetch error:', txItemsError);
         return NextResponse.json(
-          { error: `Unknown transaction_item_id: ${payloadItem.transaction_item_id}` },
+          { error: 'Failed to load transaction items' },
+          { status: 500 }
+        );
+      }
+
+      const itemsById = new Map(
+        txItems.map((row) => [row.id as string, row])
+      );
+
+      // Validate every payload item resolves to a real transaction_item row
+      for (const payloadItem of data.items) {
+        if (!itemsById.has(payloadItem.transaction_item_id)) {
+          return NextResponse.json(
+            { error: `Unknown transaction_item_id: ${payloadItem.transaction_item_id}` },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Recompute refund amounts server-side from stored transaction_items.
+      // Client-sent amounts are validated input; server values are
+      // authoritative on write.
+      const tipRefund = data.tip_refund ?? 0;
+      const recomputed = computeTotalRefundCents({
+        transaction: {
+          subtotal: transaction.subtotal,
+          discount_amount: transaction.discount_amount || 0,
+          tip_amount: transaction.tip_amount || 0,
+        },
+        items: data.items.map((payloadItem) => {
+          const row = itemsById.get(payloadItem.transaction_item_id)!;
+          return {
+            unit_price: row.unit_price,
+            quantity: row.quantity,
+            tax_amount: row.tax_amount || 0,
+            refund_quantity: payloadItem.quantity,
+          };
+        }),
+        tip_refund: tipRefund,
+      });
+
+      // Per-line exact-match check (tolerance 0). Both client and server use
+      // the shared helper — any disagreement indicates a bug, not rounding
+      // drift.
+      for (let i = 0; i < data.items.length; i++) {
+        const clientCents = toCents(data.items[i].amount);
+        const serverCents = recomputed.lineAmountsCents[i];
+        if (clientCents !== serverCents) {
+          return NextResponse.json(
+            {
+              error: `Refund line ${i + 1} amount mismatch: expected $${fromCents(
+                serverCents
+              ).toFixed(2)}, got $${fromCents(clientCents).toFixed(2)}`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+
+      recomputedTotalCents = recomputed.totalCents;
+      lineAmountsCents = recomputed.lineAmountsCents;
+
+      // Allow $0 refunds when there's loyalty, coupon, or restock to reverse
+      const hasLoyaltyToReverse = (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0);
+      const hasCouponToReverse = !!transaction.coupon_id;
+      const hasItemsToRestock = data.items.some((item) => item.restock);
+
+      if (recomputedTotalCents <= 0 && !hasLoyaltyToReverse && !hasCouponToReverse && !hasItemsToRestock) {
+        return NextResponse.json(
+          { error: 'Nothing to refund — no payment, loyalty points, or items to restock' },
           { status: 400 }
         );
       }
-    }
+    } else {
+      // Shell mode: bulk_amount is the full requested refund (no tip
+      // separation — the bulk is the total). Cap against
+      // (total_amount + tip_amount) − sum of prior processed refunds.
+      if (!data.bulk_amount || data.bulk_amount <= 0) {
+        return NextResponse.json(
+          { error: 'bulk_amount is required when items[] is empty' },
+          { status: 400 }
+        );
+      }
 
-    // Recompute refund amounts server-side from stored transaction_items.
-    // Client-sent amounts are validated input; server values are authoritative
-    // on write.
-    const tipRefund = data.tip_refund ?? 0;
-    const recomputed = computeTotalRefundCents({
-      transaction: {
-        subtotal: transaction.subtotal,
-        discount_amount: transaction.discount_amount || 0,
-        tip_amount: transaction.tip_amount || 0,
-      },
-      items: data.items.map((payloadItem) => {
-        const row = itemsById.get(payloadItem.transaction_item_id)!;
-        return {
-          unit_price: row.unit_price,
-          quantity: row.quantity,
-          tax_amount: row.tax_amount || 0,
-          refund_quantity: payloadItem.quantity,
-        };
-      }),
-      tip_refund: tipRefund,
-    });
+      const { data: existingRefunds } = await supabase
+        .from('refunds')
+        .select('amount')
+        .eq('transaction_id', data.transaction_id)
+        .eq('status', 'processed');
+      shellAlreadyRefundedCents = (existingRefunds ?? []).reduce(
+        (sum: number, r: { amount: number }) => sum + toCents(Number(r.amount)),
+        0
+      );
+      shellTotalRefundableCents =
+        toCents(transaction.total_amount) +
+        toCents(transaction.tip_amount || 0);
+      const maxRefundableCents = Math.max(
+        0,
+        shellTotalRefundableCents - shellAlreadyRefundedCents
+      );
 
-    // Per-line exact-match check (tolerance 0). Both client and server use the
-    // shared helper — any disagreement indicates a bug, not rounding drift.
-    for (let i = 0; i < data.items.length; i++) {
-      const clientCents = toCents(data.items[i].amount);
-      const serverCents = recomputed.lineAmountsCents[i];
-      if (clientCents !== serverCents) {
+      if (maxRefundableCents <= 0) {
         return NextResponse.json(
           {
-            error: `Refund line ${i + 1} amount mismatch: expected $${fromCents(
-              serverCents
-            ).toFixed(2)}, got $${fromCents(clientCents).toFixed(2)}`,
+            error:
+              'Transaction has no refundable amount remaining (already fully refunded or close-out shell with $0 own payment — refund the source transaction instead).',
           },
           { status: 400 }
         );
       }
+
+      const requestedCents = toCents(data.bulk_amount);
+      if (requestedCents > maxRefundableCents + 1) {
+        return NextResponse.json(
+          {
+            error: `Refund amount ($${data.bulk_amount.toFixed(
+              2
+            )}) exceeds maximum refundable ($${fromCents(
+              maxRefundableCents
+            ).toFixed(2)})`,
+          },
+          { status: 400 }
+        );
+      }
+
+      recomputedTotalCents = requestedCents;
     }
 
-    const totalRefundAmount = fromCents(recomputed.totalCents);
-
-    // Allow $0 refunds when there's loyalty, coupon, or restock to reverse
-    const hasLoyaltyToReverse = (transaction.loyalty_points_redeemed > 0 || transaction.loyalty_points_earned > 0);
-    const hasCouponToReverse = !!transaction.coupon_id;
-    const hasItemsToRestock = data.items.some((item) => item.restock);
-
-    if (recomputed.totalCents <= 0 && !hasLoyaltyToReverse && !hasCouponToReverse && !hasItemsToRestock) {
-      return NextResponse.json(
-        { error: 'Nothing to refund — no payment, loyalty points, or items to restock' },
-        { status: 400 }
-      );
-    }
+    const totalRefundAmount = fromCents(recomputedTotalCents);
 
     // ─────────────────────────────────────────────────────────────────────
     // Close-out detection (Pay-Link Session 5c).
@@ -208,10 +292,10 @@ export async function POST(request: NextRequest) {
         0
       );
 
-      if (recomputed.totalCents > totalAvailableCents + 1) {
+      if (recomputedTotalCents > totalAvailableCents + 1) {
         return NextResponse.json(
           {
-            error: `Refund amount ($${fromCents(recomputed.totalCents).toFixed(
+            error: `Refund amount ($${fromCents(recomputedTotalCents).toFixed(
               2
             )}) exceeds available refundable across appointment sources ($${fromCents(
               totalAvailableCents
@@ -225,7 +309,7 @@ export async function POST(request: NextRequest) {
       // payments, that means a non-null stripe_payment_intent_id. For cash,
       // we just record it. Walk LIFO until requested cents are covered, and
       // bail loudly if we hit a card source without a PI.
-      let need = recomputed.totalCents;
+      let need = recomputedTotalCents;
       for (const sp of sourcePlan) {
         if (need <= 0) break;
         const portion = Math.min(need, sp.remaining_refundable_cents);
@@ -243,7 +327,7 @@ export async function POST(request: NextRequest) {
       }
     } else {
       // Single-source path: aggregate cap vs THIS transaction.
-      if (recomputed.totalCents > 0) {
+      if (recomputedTotalCents > 0) {
         const { data: existingRefunds } = await supabase
           .from('refunds')
           .select('amount')
@@ -257,11 +341,11 @@ export async function POST(request: NextRequest) {
           toCents(transaction.total_amount) +
           toCents(transaction.tip_amount || 0) -
           alreadyRefundedCents;
-        if (recomputed.totalCents > maxRefundableCents + 1) {
+        if (recomputedTotalCents > maxRefundableCents + 1) {
           return NextResponse.json(
             {
               error: `Refund amount ($${fromCents(
-                recomputed.totalCents
+                recomputedTotalCents
               ).toFixed(2)}) exceeds maximum refundable ($${fromCents(
                 maxRefundableCents
               ).toFixed(2)})`,
@@ -294,7 +378,7 @@ export async function POST(request: NextRequest) {
     }
     const refundedSources: RefundedSource[] = [];
     let stripeRefundId: string | null = null; // primary id for the refunds row
-    let remainingNeedCents = recomputed.totalCents;
+    let remainingNeedCents = recomputedTotalCents;
     let stripeFailure: { transaction_id: string; error: string } | null = null;
 
     for (const sp of sourcePlan) {
@@ -364,7 +448,7 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-    const committedRefundCents = recomputed.totalCents - remainingNeedCents;
+    const committedRefundCents = recomputedTotalCents - remainingNeedCents;
     const committedRefundAmount = fromCents(committedRefundCents);
 
     // 2. Insert refund record. amount = what actually moved (partial-success
@@ -397,22 +481,25 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Insert refund items (server-computed amounts; client values were
-    //    validated input only)
-    const refundItemRows = normalizedItems.map((item, i) => ({
-      refund_id: refund.id,
-      transaction_item_id: item.transaction_item_id,
-      quantity: item.quantity,
-      amount: fromCents(recomputed.lineAmountsCents[i]),
-      restock: item.disposition === 'restock',
-      disposition: item.disposition,
-    }));
+    //    validated input only). Shell mode has no items — skip the insert
+    //    entirely rather than calling .insert([]) which Supabase rejects.
+    if (!isShellMode) {
+      const refundItemRows = normalizedItems.map((item, i) => ({
+        refund_id: refund.id,
+        transaction_item_id: item.transaction_item_id,
+        quantity: item.quantity,
+        amount: fromCents(lineAmountsCents[i]),
+        restock: item.disposition === 'restock',
+        disposition: item.disposition,
+      }));
 
-    const { error: refundItemsError } = await supabase
-      .from('refund_items')
-      .insert(refundItemRows);
+      const { error: refundItemsError } = await supabase
+        .from('refund_items')
+        .insert(refundItemRows);
 
-    if (refundItemsError) {
-      console.error('Refund items insert error:', refundItemsError);
+      if (refundItemsError) {
+        console.error('Refund items insert error:', refundItemsError);
+      }
     }
 
     // 4. Inventory handling per disposition.
@@ -570,7 +657,16 @@ export async function POST(request: NextRequest) {
         .eq('id', sp.transaction_id);
     }
 
-    const targetFullyRefunded = remainingNeedCents <= 0;
+    // Shell mode: the transaction is fully refunded only when the cumulative
+    // committed refunds reach the original (total + tip). A shell-mode partial
+    // that fully meets the request still leaves headroom on the transaction,
+    // so it must land on 'partial_refund'.
+    // Items mode: preserved unchanged — `remainingNeedCents <= 0` reflects
+    // request satisfaction, which is the historical status meaning.
+    const targetFullyRefunded = isShellMode
+      ? shellAlreadyRefundedCents + committedRefundCents >=
+        shellTotalRefundableCents
+      : remainingNeedCents <= 0;
     const newStatus = targetFullyRefunded ? 'refunded' : 'partial_refund';
     await supabase
       .from('transactions')

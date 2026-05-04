@@ -93,6 +93,57 @@ describe('refundCreateSchema — disposition field', () => {
   });
 });
 
+describe('refundCreateSchema — shell mode (items-less)', () => {
+  it('accepts items=[] + bulk_amount > 0 (shell-mode payload)', () => {
+    const result = refundCreateSchema.safeParse({
+      transaction_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+      items: [],
+      bulk_amount: 1.0,
+      reason: 'Pay-link refund',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.items).toEqual([]);
+      expect(result.data.bulk_amount).toBe(1.0);
+    }
+  });
+
+  it('rejects items=[] without bulk_amount', () => {
+    const result = refundCreateSchema.safeParse({
+      transaction_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+      items: [],
+      reason: 'Pay-link refund',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects items=[] with bulk_amount=0', () => {
+    const result = refundCreateSchema.safeParse({
+      transaction_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+      items: [],
+      bulk_amount: 0,
+      reason: 'Pay-link refund',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('items-mode payload still works without bulk_amount', () => {
+    const result = refundCreateSchema.safeParse({
+      transaction_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+      items: [
+        {
+          transaction_item_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+          quantity: 1,
+          amount: 10.0,
+          disposition: 'restock',
+        },
+      ],
+      reason: 'Customer requested',
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
 describe('shopUseSchema', () => {
   it('validates a valid shop use payload', () => {
     const result = shopUseSchema.safeParse({
