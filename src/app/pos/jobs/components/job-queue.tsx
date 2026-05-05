@@ -456,14 +456,6 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           </label>
         </div>
 
-        <button
-          onClick={() => setDate(addDays(selectedDate, 1))}
-          className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700"
-          aria-label="Next day"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-
         {!isToday && (
           <button
             onClick={() => setDate(today)}
@@ -472,6 +464,14 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
             Today
           </button>
         )}
+
+        <button
+          onClick={() => setDate(addDays(selectedDate, 1))}
+          className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700"
+          aria-label="Next day"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Past/Future date indicator */}

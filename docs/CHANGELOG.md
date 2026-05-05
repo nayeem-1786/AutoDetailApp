@@ -6,6 +6,21 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): reorder date-nav buttons — Today sits left of next-day to prevent button jump
+
+POS jobs header date navigation: previously when the user navigated away from today's date, the `Today` shortcut button rendered to the *right* of the next-day `>` arrow. Tapping `>` repeatedly to advance days caused the `>` button to shift horizontally as `Today` appeared/disappeared on the next render — a UX trap where users miss the target on the second tap.
+
+Reordered the JSX in the date-nav row at `src/app/pos/jobs/components/job-queue.tsx` so the conditional `{!isToday && <Today>}` block sits *before* the `>` button instead of after. The flex container's existing `gap-2` + `flex-1` spacer on the centered date label naturally keeps `>` flush right whether `Today` is present or not — no `justify-between` rewrite, no absolute positioning, no reserved-space hack. Conditional rendering (not `visibility:hidden`) means there's no awkward gap when on today's date.
+
+**UX guarantee:** `[<]` stays flush left and `[>]` stays flush right at all times. The `[Today]` button, when visible, appears immediately to the left of `[>]` with `gap-2` spacing between them. Tapping `[>]` repeatedly never causes the button to shift.
+
+**Verification:** `tsc --noEmit` clean · `eslint` clean (one pre-existing unrelated warning on `lastPollAt`).
+
+### Files touched
+- `src/app/pos/jobs/components/job-queue.tsx` — JSX reorder only, no logic or styling changes.
+
+---
+
 ## debug(sms): log Twilio POST body for 30034 diagnosis
 
 **TEMPORARY — to be reverted in a follow-up session.**
