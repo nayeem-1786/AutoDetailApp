@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -30,10 +30,50 @@ import { ManagerPinDialog } from '../manager-pin-dialog';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
+import type { TicketItem, QuoteState } from '../../types';
 
 interface QuoteTicketPanelProps {
   onSaved: (quoteId: string) => void;
   walkInMode?: boolean;
+}
+
+const AUTO_SAVE_DEBOUNCE_MS = 800;
+
+function buildItemsPayload(items: TicketItem[]) {
+  return items.map((item) => ({
+    service_id: item.serviceId || null,
+    product_id: item.productId || null,
+    item_name: item.itemName,
+    quantity: item.quantity,
+    unit_price: item.unitPrice,
+    tier_name: item.tierName || null,
+    notes: item.notes || null,
+  }));
+}
+
+// Stable hash of the persistable slice of quote state. Used to skip auto-save
+// when current state matches the last successful save (or the load-snapshot
+// captured on resume), so resuming a draft does not trigger a redundant PATCH.
+// Excludes manualDiscount and loyalty fields — they are NOT persisted on the
+// quotes table today, so changes to them never need to round-trip to the server.
+function computeQuoteHash(q: QuoteState): string {
+  return JSON.stringify({
+    items: q.items.map((i) => ({
+      itemType: i.itemType,
+      productId: i.productId,
+      serviceId: i.serviceId,
+      itemName: i.itemName,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      tierName: i.tierName,
+      notes: i.notes,
+    })),
+    customerId: q.customer?.id ?? null,
+    vehicleId: q.vehicle?.id ?? null,
+    notes: q.notes,
+    validUntil: q.validUntil,
+    couponCode: q.coupon?.code ?? null,
+  });
 }
 
 export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps) {
@@ -65,6 +105,223 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     dependentItemId: string;
     dependentName: string;
   } | null>(null);
+
+  // Auto-save plumbing. The debounced effect persists drafts as the user edits;
+  // savingRef + dirtyRef coalesce concurrent change bursts; lastSavedHashRef
+  // doubles as the load-snapshot on resume so the first render of an existing
+  // draft does not fire a redundant PATCH.
+  const savingRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlightPromiseRef = useRef<Promise<void> | null>(null);
+  const lastSavedHashRef = useRef<string | null>(null);
+  const quoteRef = useRef(quote);
+  useEffect(() => {
+    quoteRef.current = quote;
+  }, [quote]);
+
+  const persistDraft = useCallback(
+    async ({ silent }: { silent: boolean }): Promise<boolean> => {
+      const q = quoteRef.current;
+      if (q.items.length === 0) {
+        if (!silent) toast.error('Add at least one item to the quote');
+        return false;
+      }
+      // Status guard: never auto-save a quote that is no longer a draft.
+      if (silent && q.status && q.status !== 'draft') {
+        console.log(`[QUOTE_AUTO_SAVE] skip — status=${q.status}`);
+        return false;
+      }
+
+      const items = buildItemsPayload(q.items);
+      const isUpdate = !!q.quoteId;
+
+      if (silent) {
+        console.log(
+          `[QUOTE_AUTO_SAVE] save start (quoteId=${q.quoteId ?? 'null'}, items=${items.length})`
+        );
+      }
+
+      savingRef.current = true;
+      if (!silent) setSaving(true);
+      try {
+        if (isUpdate) {
+          const res = await posFetch(`/api/pos/quotes/${q.quoteId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customer_id: q.customer?.id || null,
+              vehicle_id: q.vehicle?.id || null,
+              notes: q.notes,
+              valid_until: q.validUntil,
+              coupon_code: q.coupon?.code || null,
+              items,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const msg = data.error || `Failed to update quote (status=${res.status})`;
+            if (silent) {
+              console.log(
+                `[QUOTE_AUTO_SAVE] save failed (status=${res.status}, message=${JSON.stringify(msg)}) — swallowed`
+              );
+              return false;
+            }
+            throw new Error(msg);
+          }
+          lastSavedHashRef.current = computeQuoteHash(q);
+          if (silent) {
+            console.log(
+              `[QUOTE_AUTO_SAVE] save success (quoteId=${q.quoteId}, quote_number=${q.quoteNumber ?? 'unchanged'})`
+            );
+          } else {
+            toast.success('Quote updated');
+            onSaved(q.quoteId!);
+          }
+          return true;
+        } else {
+          const res = await posFetch('/api/pos/quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customer_id: q.customer?.id || null,
+              vehicle_id: q.vehicle?.id || null,
+              notes: q.notes,
+              valid_until: q.validUntil,
+              coupon_code: q.coupon?.code || null,
+              items,
+            }),
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const msg = data.error || `Failed to create quote (status=${res.status})`;
+            if (silent) {
+              console.log(
+                `[QUOTE_AUTO_SAVE] save failed (status=${res.status}, message=${JSON.stringify(msg)}) — swallowed`
+              );
+              return false;
+            }
+            throw new Error(msg);
+          }
+          const data = await res.json();
+          lastSavedHashRef.current = computeQuoteHash(q);
+          if (silent) {
+            // Capture id+number so subsequent saves PATCH instead of POST.
+            // Metadata-only dispatch — never clobbers in-flight item/customer edits.
+            dispatch({
+              type: 'SET_QUOTE_META',
+              quoteId: data.quote.id,
+              quoteNumber: data.quote.quote_number,
+              status: 'draft',
+            });
+            console.log(
+              `[QUOTE_AUTO_SAVE] save success (quoteId=${data.quote.id}, quote_number=${data.quote.quote_number})`
+            );
+          } else {
+            toast.success(`Quote ${data.quote.quote_number} created`);
+            dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
+            onSaved(data.quote.id);
+          }
+          return true;
+        }
+      } catch (err) {
+        if (silent) {
+          console.log(
+            `[QUOTE_AUTO_SAVE] save failed (${err instanceof Error ? err.message : 'unknown'}) — swallowed`
+          );
+          return false;
+        }
+        toast.error(err instanceof Error ? err.message : 'Failed to save quote');
+        return false;
+      } finally {
+        savingRef.current = false;
+        if (!silent) setSaving(false);
+      }
+    },
+    [dispatch, onSaved, quoteValidityDays]
+  );
+
+  // Always-fresh ref so the unmount cleanup can call the latest persistDraft.
+  const persistDraftRef = useRef(persistDraft);
+  useEffect(() => {
+    persistDraftRef.current = persistDraft;
+  }, [persistDraft]);
+
+  // Debounced auto-save. Trailing edge only — fires AUTO_SAVE_DEBOUNCE_MS
+  // after the last user change. Skipped when: walk-in mode, no items, status
+  // beyond draft, or current state matches the last save / load-snapshot.
+  useEffect(() => {
+    if (walkInMode) {
+      // Only log the gate once per panel mount to avoid spam — gate-on-walk-in
+      // is a static decision tied to the prop, not a per-keystroke skip.
+      return;
+    }
+    if (quote.items.length === 0) return;
+    if (quote.status && quote.status !== 'draft') return;
+
+    const currentHash = computeQuoteHash(quote);
+
+    // Resume-init: capture the load-snapshot once for an existing draft so the
+    // initial render of LOAD_QUOTE'd state does not trigger a redundant PATCH.
+    if (quote.quoteId && lastSavedHashRef.current === null) {
+      lastSavedHashRef.current = currentHash;
+      return;
+    }
+    if (lastSavedHashRef.current === currentHash) return;
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      if (savingRef.current) {
+        // A save is mid-flight; coalesce by marking dirty. The completion path
+        // below re-fires once when the in-flight save resolves.
+        dirtyRef.current = true;
+        return;
+      }
+      const promise = (async () => {
+        await persistDraftRef.current({ silent: true });
+        if (dirtyRef.current) {
+          dirtyRef.current = false;
+          await persistDraftRef.current({ silent: true });
+        }
+      })();
+      inFlightPromiseRef.current = promise;
+      promise.finally(() => {
+        if (inFlightPromiseRef.current === promise) {
+          inFlightPromiseRef.current = null;
+        }
+      });
+    }, AUTO_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [quote, walkInMode]);
+
+  // Final flush on unmount — covers footer-tab navigation and the Back link.
+  // Hard tab-close is acceptably out of scope (no beforeunload by design).
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      const q = quoteRef.current;
+      if (walkInMode) return;
+      if (q.items.length === 0) return;
+      if (q.status && q.status !== 'draft') return;
+      const currentHash = computeQuoteHash(q);
+      if (lastSavedHashRef.current === currentHash) return;
+      console.log('[QUOTE_AUTO_SAVE] cleanup flush');
+      // Fire-and-forget: the fetch outlives the unmount; we don't await.
+      persistDraftRef.current({ silent: true }).catch(() => {});
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRemoveItem = useCallback((itemId: string) => {
     const item = quote.items.find((i) => i.id === itemId);
@@ -184,75 +441,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   }
 
   async function handleSaveDraft() {
-    if (quote.items.length === 0) {
-      toast.error('Add at least one item to the quote');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const items = quote.items.map((item) => ({
-        service_id: item.serviceId || null,
-        product_id: item.productId || null,
-        item_name: item.itemName,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        tier_name: item.tierName || null,
-        notes: item.notes || null,
-      }));
-
-      if (quote.quoteId) {
-        // Update existing quote
-        const res = await posFetch(`/api/pos/quotes/${quote.quoteId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: quote.customer?.id || null,
-            vehicle_id: quote.vehicle?.id || null,
-            notes: quote.notes,
-            valid_until: quote.validUntil,
-            coupon_code: quote.coupon?.code || null,
-            items,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to update quote');
-        }
-
-        toast.success('Quote updated');
-        onSaved(quote.quoteId);
-      } else {
-        // Create new quote
-        const res = await posFetch('/api/pos/quotes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: quote.customer?.id || null,
-            vehicle_id: quote.vehicle?.id || null,
-            notes: quote.notes,
-            valid_until: quote.validUntil,
-            coupon_code: quote.coupon?.code || null,
-            items,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to create quote');
-        }
-
-        const data = await res.json();
-        toast.success(`Quote ${data.quote.quote_number} created`);
-        dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
-        onSaved(data.quote.id);
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save quote');
-    } finally {
-      setSaving(false);
-    }
+    await persistDraft({ silent: false });
   }
 
   async function handleSendQuote() {
@@ -265,95 +454,31 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       return;
     }
 
-    // Save first if not yet saved
-    if (!quote.quoteId) {
-      setSaving(true);
-      try {
-        const items = quote.items.map((item) => ({
-          service_id: item.serviceId || null,
-          product_id: item.productId || null,
-          item_name: item.itemName,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          tier_name: item.tierName || null,
-          notes: item.notes || null,
-        }));
-
-        const res = await posFetch('/api/pos/quotes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: quote.customer.id,
-            vehicle_id: quote.vehicle?.id || null,
-            notes: quote.notes,
-            valid_until: quote.validUntil,
-            coupon_code: quote.coupon?.code || null,
-            items,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to create quote');
-        }
-
-        const data = await res.json();
-        // Update state with the new quote ID
-        dispatch({
-          type: 'LOAD_QUOTE',
-          state: {
-            ...quote,
-            quoteId: data.quote.id,
-            quoteNumber: data.quote.quote_number,
-            status: 'draft',
-          },
-        });
-
-        // Now open the send dialog
-        setSendDialogOpen(true);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to save quote');
-      } finally {
-        setSaving(false);
+    setSaving(true);
+    try {
+      // Wait for any in-flight auto-save so we don't double-create or race the
+      // POST→PATCH transition.
+      if (inFlightPromiseRef.current) {
+        await inFlightPromiseRef.current;
       }
-    } else {
-      // Already saved — also save any pending changes before sending
-      setSaving(true);
-      try {
-        const items = quote.items.map((item) => ({
-          service_id: item.serviceId || null,
-          product_id: item.productId || null,
-          item_name: item.itemName,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          tier_name: item.tierName || null,
-          notes: item.notes || null,
-        }));
-
-        const res = await posFetch(`/api/pos/quotes/${quote.quoteId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: quote.customer.id,
-            vehicle_id: quote.vehicle?.id || null,
-            notes: quote.notes,
-            valid_until: quote.validUntil,
-            coupon_code: quote.coupon?.code || null,
-            items,
-          }),
-        });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || 'Failed to update quote');
-        }
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to save quote');
-        setSaving(false);
-        return;
+      // Cancel any pending debounce — we'll save synchronously below.
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
       }
-      setSaving(false);
+      // Persist current state silently. Handles POST-on-first-save (which
+      // dispatches SET_QUOTE_META) or PATCH on subsequent saves. Returns false
+      // on swallowed silent failure — we treat that as a hard send-blocker so
+      // the dialog never opens with stale-on-server data.
+      const ok = await persistDraft({ silent: true });
+      if (!ok || !quoteRef.current.quoteId) {
+        throw new Error('Failed to save quote before sending');
+      }
       setSendDialogOpen(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save quote');
+    } finally {
+      setSaving(false);
     }
   }
 

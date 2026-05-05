@@ -513,6 +513,19 @@ export function quoteReducer(
       return { ...state, validUntil: action.date };
     }
 
+    case 'SET_QUOTE_META': {
+      // Metadata-only update — used after silent auto-save POST to capture the
+      // server-assigned id/number so subsequent saves PATCH instead of POST.
+      // Must NOT touch items, customer, vehicle, notes, totals, coupon, or
+      // manualDiscount, which may have been edited during the in-flight save.
+      return {
+        ...state,
+        quoteId: action.quoteId,
+        quoteNumber: action.quoteNumber,
+        status: action.status,
+      };
+    }
+
     case 'CLEAR_QUOTE': {
       const days = action.validityDays ?? 10;
       const defaultValidUntil = new Date();

@@ -95,11 +95,69 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           prerequisiteForServiceId: null,
         }));
 
+        // Re-hydrate coupon by re-validating the persisted code against the
+        // loaded cart. Coupon discount is dynamic (depends on cart contents),
+        // so we cannot just store the precomputed amount — we must recompute
+        // it via the same endpoint the manual coupon-input uses. If the coupon
+        // is no longer valid (expired, deactivated, items shifted out of its
+        // eligible set), we silently drop it and log; user sees no coupon and
+        // can re-apply manually if intended.
+        let coupon: QuoteState['coupon'] = null;
+        if (q.coupon_code) {
+          try {
+            const cartItems = items.map((i) => ({
+              item_type: i.itemType,
+              product_id: i.productId || undefined,
+              service_id: i.serviceId || undefined,
+              category_id: i.categoryId || undefined,
+              unit_price: i.unitPrice,
+              quantity: i.quantity,
+              item_name: i.itemName,
+              standard_price: i.standardPrice,
+              pricing_type: i.pricingType,
+            }));
+            const validateRes = await posFetch('/api/pos/coupons/validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: q.coupon_code,
+                subtotal: q.subtotal,
+                customer_id: q.customer?.id || null,
+                items: cartItems,
+              }),
+            });
+            const validateJson = await validateRes.json();
+            if (validateRes.ok) {
+              coupon = {
+                id: validateJson.data.id,
+                code: validateJson.data.code,
+                discount: validateJson.data.total_discount,
+                isAutoApplied: false,
+              };
+            } else {
+              console.warn(
+                `[QUOTE_RESUME] coupon ${q.coupon_code} no longer valid: ${validateJson.error ?? 'unknown'}`
+              );
+              toast.warning(
+                `Coupon ${q.coupon_code} is no longer valid and was removed from this quote.`
+              );
+            }
+          } catch (err) {
+            console.warn('[QUOTE_RESUME] coupon revalidate failed', err);
+            toast.warning(
+              `Coupon ${q.coupon_code} could not be re-validated and was removed from this quote.`
+            );
+          }
+        }
+
         const loadState: QuoteState = {
           items,
           customer: q.customer || null,
           vehicle: q.vehicle || null,
-          coupon: null,
+          coupon,
+          // manualDiscount and loyalty redemption are NOT persisted on the
+          // quotes table today (no DB columns), so they cannot round-trip
+          // without a migration. Tracked as a follow-up.
           loyaltyPointsToRedeem: 0,
           loyaltyDiscount: 0,
           manualDiscount: null,

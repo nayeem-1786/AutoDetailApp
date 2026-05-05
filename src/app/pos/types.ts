@@ -189,4 +189,5 @@ export type QuoteAction =
   | { type: 'REMOVE_MANUAL_DISCOUNT' }
   | { type: 'LOAD_QUOTE'; state: QuoteState }
   | { type: 'SET_VALID_UNTIL'; date: string | null }
+  | { type: 'SET_QUOTE_META'; quoteId: string; quoteNumber: string; status: QuoteStatus }
   | { type: 'CLEAR_QUOTE'; validityDays?: number };

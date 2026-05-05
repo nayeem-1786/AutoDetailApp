@@ -6,6 +6,53 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pos): quote auto-save to draft + coupon round-trip on resume
+
+Staff routinely lost in-progress quotes when navigating away mid-edit (footer tab switch, Back link, browser back). The "Save Draft" button existed but staff forgot to press it. Fix: auto-persist every change to a `status='draft'` row using the same code path the manual button uses, so navigating away silently preserves the work and the user resumes via the Drafts filter on the Quotes list.
+
+### Auto-save mechanics (`src/app/pos/components/quotes/quote-ticket-panel.tsx`)
+
+Extracted a single `persistDraft({ silent }): Promise<boolean>` helper from the previous duplicated POST/PATCH inside `handleSaveDraft` and `handleSendQuote`. Both code paths now share the same items-mapping, request shape, and error handling — only the side-effects differ. Silent mode skips the toast, the `CLEAR_QUOTE` dispatch, and the `onSaved()` navigation. Non-silent mode (the manual button) keeps its prior behavior bit-for-bit.
+
+A debounced `useEffect` keyed on the persistable slice of quote state fires `persistDraft({ silent: true })` 800 ms after the last user change. Trailing edge only — the first item add does not fire instantly. Concurrency is handled by `savingRef` + `dirtyRef`: if a change lands during an in-flight save, the next save is queued and fired exactly once when the in-flight one resolves. A `lastSavedHashRef` doubles as the load-snapshot on resume so re-rendering a freshly-LOAD_QUOTE'd state doesn't trigger a redundant PATCH; subsequent edits diverge from the snapshot and trigger save normally. The unmount cleanup fires one final fire-and-forget save when there are pending changes — covers footer-tab navigation and the in-builder Back link. No `beforeunload` / `sendBeacon` / `keepalive` (per session decision); hard tab close losing 800 ms of edits is acceptable.
+
+### Skip gates (in order)
+
+`walkInMode` skips entirely (walk-in goes directly to `converted` via `handleCreateJob`, never `draft`). Empty cart skips (matches server `items.min(1)` validation; matches the manual button's existing gate). Status `!== 'draft'` skips (status guard — never overwrite a sent/viewed/accepted/converted quote). Snapshot match skips (no-op pass). All gates are inert: silent failures swallow + log with the `[QUOTE_AUTO_SAVE]` prefix, no toast spam, no UI state change.
+
+### POST → PATCH transition (`src/app/pos/context/quote-reducer.ts` + `src/app/pos/types.ts`)
+
+The first auto-save on a brand-new quote POSTs and the server assigns a `quote_number` and `id`. We need that id captured into the reducer so subsequent saves PATCH instead of POST (otherwise every keystroke would mint a new `Q-XXXX`). Added `SET_QUOTE_META` action — metadata-only; updates `quoteId`, `quoteNumber`, `status` and leaves items/customer/vehicle/notes/totals/coupon/manualDiscount untouched. This guarantees that an in-flight save which finishes after the user has made further edits cannot clobber those edits when it dispatches its id-write-back.
+
+### Send-Quote race fix
+
+`handleSendQuote` previously had its own duplicated POST/PATCH that could race the auto-save's POST. It now awaits any in-flight auto-save promise, cancels any pending debounce, runs `persistDraft({ silent: true })` once, and only opens the send dialog if that returns `true`. Failed silent save → throw → toast → dialog stays closed, server state stays consistent.
+
+### Coupon round-trip on resume (`src/app/pos/components/quotes/quote-builder.tsx`)
+
+The `LOAD_QUOTE` mapping previously hardcoded `coupon: null` even though `quotes.coupon_code` is persisted. With auto-save, resume frequency is much higher, so this gap was bundled in. On load, if `q.coupon_code` is non-null, we re-call `/api/pos/coupons/validate` with the loaded cart to reconstruct the full `{ id, code, discount }` shape (coupon discount is dynamic — it depends on cart contents, so storing the precomputed amount is wrong; the validate endpoint is the source of truth). Hydration happens **before** dispatching `LOAD_QUOTE` so the snapshot init in `quote-ticket-panel` captures the coupon-included hash, avoiding a redundant PATCH on the very first render. If the coupon is no longer valid (expired, deactivated, items shifted out of its eligible set), we drop the coupon, log to console, and surface a toast: `"Coupon CODE is no longer valid and was removed from this quote."` — staff can re-apply manually if intended. No toast when the loaded quote had no coupon to begin with.
+
+### Known limitation: manual_discount + loyalty_redemption deferred
+
+`manualDiscount` and the loyalty-redemption fields (`loyaltyPointsToRedeem`, `loyaltyDiscount`) are NOT persisted on the `quotes` table — there are no DB columns for them today, and `createQuoteSchema` / `updateQuoteSchema` don't accept them. They have always been client-only state; the previous "drop on resume" was a data-model gap, not a mapping bug. Auto-saved drafts will lose these fields on resume until a follow-up migration session adds the columns, extends the validation schemas, and updates `createQuote` / `updateQuote` to read & write them. Coupon round-trip works correctly. Inline note left at `quote-builder.tsx` next to the LOAD_QUOTE mapping.
+
+### Observability
+
+All silent-save events log to console with `[QUOTE_AUTO_SAVE]` prefix: `save start`, `save success` (with quoteId + quote_number), `save failed (status=…, message=…) — swallowed`, `skip — status=…`, `cleanup flush`. Coupon resume failures log under `[QUOTE_RESUME]`. No visual save indicator in the UI by design — staff should never have to think about whether a save happened. 403 permission failures swallow + log only; no toast spam, no retry.
+
+### Files touched
+
+- `src/app/pos/types.ts` — `SET_QUOTE_META` variant added to `QuoteAction`.
+- `src/app/pos/context/quote-reducer.ts` — `SET_QUOTE_META` handler (metadata-only).
+- `src/app/pos/components/quotes/quote-ticket-panel.tsx` — extracted `persistDraft`, added auto-save effect + cleanup flush + send-race fix; `handleSaveDraft` collapsed to a one-line wrapper.
+- `src/app/pos/components/quotes/quote-builder.tsx` — coupon re-validation on `LOAD_QUOTE`, with user-facing toast on revalidation failure.
+
+### Verification
+
+`tsc --noEmit` clean · `eslint` clean on changed files · `vitest run quote-reducer-vehicle-change.test.ts` 18/18 pass.
+
+---
+
 ## fix(pos): reorder date-nav buttons — Today sits left of next-day to prevent button jump
 
 POS jobs header date navigation: previously when the user navigated away from today's date, the `Today` shortcut button rendered to the *right* of the next-day `>` arrow. Tapping `>` repeatedly to advance days caused the `>` button to shift horizontally as `Today` appeared/disappeared on the next render — a UX trap where users miss the target on the second tap.
