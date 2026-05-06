@@ -6,6 +6,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(quotes): default Convert-to-Appointment date+time to now, fix input widths
+
+Three issues in the Convert-to-Appointment dialog (`src/components/quotes/quote-book-dialog.tsx`) — reached from a quote's "Convert to Appointment" button on Quote Detail. Originally surfaced as suspected bug "+ New Walk-In dates for tomorrow" (BUG #3A); audit showed the Walk-In flow does not actually create an appointment record at all (it goes through POST /api/pos/jobs with `appointment_id: null`), and the only place in the codebase that explicitly defaults an appointment date to `today + 1` is this dialog. Fix scoped to defaults + width parity; no changes to submission logic, API payload, or the Walk-In flow.
+
+### Issue A — Date defaulted to TOMORROW
+
+The dialog opened with `tomorrow.setDate(tomorrow.getDate() + 1)` and `tomorrow.toISOString().split('T')[0]`. The `+1` was the proximate bug; `toISOString()` is also the canonical UTC-extraction footgun called out in `pst-date.ts` (`new Date(value).toISOString().split('T')[0]` is off by 1 day for late-night PST timestamps). Replaced with the new `getNowPstRoundedTo15()` helper, which returns today's PST date.
+
+### Issue B — Start Time defaulted to hardcoded "09:00"
+
+Replaced with `getNowPstRoundedTo15()` — current PST time rounded UP to the next 15-minute slot, with exact boundaries (`:00`, `:15`, `:30`, `:45`) advancing rather than staying. Hour and midnight wrap correctly: 13:47 → 14:00, 13:00 → 13:15, 23:53 → 00:00. After midnight or after business close, the helper still returns the next 15-min slot from now — staff adjusts manually if a future date is intended. Defaults refresh on every dialog reopen so "now" reflects the moment it appears, not the moment the component mounted.
+
+### Issue C — Date and Start Time inputs overflowed the modal
+
+All four inputs (Date, Start Time, Duration, Detailer) use `w-full` but native `<input type="date">` and `<input type="time">` controls render OS-supplied calendar/clock widgets that claim intrinsic min-width and override `w-full` at the flex/grid level. Added `min-w-0` to both, which lets `w-full` actually take effect and matches the visible width of Duration (`type="number"`) and Detailer (`<select>`).
+
+### Helpers added to `src/lib/utils/pst-date.ts`
+
+- `getTodayPst(): string` — returns YYYY-MM-DD in `America/Los_Angeles` via `Intl.DateTimeFormat('en-CA', { timeZone: LA_TZ })`. The canonical inline pattern is repeated 5+ times across the codebase (POS jobs route, voice agent, QBO sync, etc.) — those duplicates are intentionally NOT touched in this session and are deferred to the unification work in `docs/planning/job-creation-unification.md`. The helper exists now so new callers (this dialog) consume it from day one.
+- `getNowPstRoundedTo15(): { date: string; time: string }` — returns today's PST date plus current PST time rounded UP to the next 15-minute slot. Uses `Intl.DateTimeFormat('en-GB', { timeZone: LA_TZ, hour12: false })` `formatToParts` to read the current PST hour/minute, computes total minutes, advances by `(floor(t/15) + 1) * 15`, wraps modulo 1440. The wrapped time crossing midnight does NOT roll the date forward — caller adjusts.
+
+Folded the dialog's `min={todayStr}` constraint (line 147) into `getTodayPst()` at the same time so all PST-date reads in the file go through the helper.
+
+### Files touched
+
+- `src/lib/utils/pst-date.ts` (added 2 exported helpers; existing helpers untouched)
+- `src/components/quotes/quote-book-dialog.tsx` (1 import, 2 useEffect-default lines, 1 todayStr line, `min-w-0` on Date and Start Time inputs)
+
+### Out of scope (deferred)
+
+- Refactor of the 5+ inline `Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' })` duplicates → unification work
+- Validating selected date is a business day → existing booking validation
+- Validating selected time is within business hours → existing booking validation
+- Walk-In flow date defaults → audit showed Walk-In does not create an appointment record, so no fix needed there
+
+---
+
 ## docs: capture job/appointment creation unification planning doc
 
 Documentation-only session. New file at `docs/planning/job-creation-unification.md` captures Nayeem's vision for unifying the six paths that currently create jobs and/or appointments (Online Booking, Voice AI, Quote → Convert to Appointment, Quote → Create Job, POS + New Walk-In, future Voice AI + Payment Link). Each path evolved organically; downstream Job Detail / Appointment Detail / Walk-In Detail / Convert-to-Job result views diverged in fields, cards, ordering, and edit affordances. The doc lays out the symptoms (most prominently: `created_at` doing double-duty as appointment time, no in-place date edit on Job Detail, missing Payment Link button on Job Detail), the long-term goal of a single shared Detail component driven by status + role + settings rather than creation path, the open design questions that block implementation, and a proposed 8–10 session implementation sequence. Includes a verbatim "Original User Notes" section at the bottom preserving Nayeem's raw wording so structured sections can be reconciled against original intent if they drift later.

@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getTodayPst, getNowPstRoundedTo15 } from '@/lib/utils/pst-date';
 interface QuoteBookDialogProps {
   open: boolean;
   onClose: () => void;
@@ -47,13 +48,13 @@ export function QuoteBookDialog({
   const [booking, setBooking] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
 
-  // Set default date to tomorrow on open
+  // Default date to today PST and time to now rounded up to next 15-min slot.
+  // Refreshes on every reopen so "now" reflects the moment the dialog appears.
   useEffect(() => {
     if (open) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setDate(tomorrow.toISOString().split('T')[0]);
-      setTime('09:00');
+      const { date: todayPst, time: roundedTime } = getNowPstRoundedTo15();
+      setDate(todayPst);
+      setTime(roundedTime);
       setDuration(defaultDuration || 60);
       setEmployeeId('');
     }
@@ -144,7 +145,7 @@ export function QuoteBookDialog({
     }
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getTodayPst();
 
   // Derive the notification API base path from the quotes API path
   const notifyApiBasePath = apiBasePath.includes('/pos/')
@@ -171,7 +172,7 @@ export function QuoteBookDialog({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 min={todayStr}
-                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                className="h-9 w-full min-w-0 rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
               />
             </div>
 
@@ -182,7 +183,7 @@ export function QuoteBookDialog({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                className="h-9 w-full min-w-0 rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
               />
             </div>
 

@@ -92,3 +92,48 @@ export function formatPstShortDate(isoString: string): string {
     timeZone: LA_TZ,
   }).format(new Date(isoString));
 }
+
+/**
+ * Get today's date in PST/PDT as YYYY-MM-DD.
+ * Example: "2026-05-05"
+ */
+export function getTodayPst(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: LA_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+/**
+ * Get the current PST/PDT date + time, with time rounded UP to the next 15-minute slot.
+ * Always rounds up — :00, :15, :30, :45 advance to the next slot.
+ * The returned `date` is today's PST date AT THE MOMENT OF CALL — it does not roll
+ * forward when the rounded time crosses midnight (caller may adjust if needed).
+ *
+ * Example:
+ *   13:47 PST → { date: "2026-05-05", time: "14:00" }
+ *   13:01 PST → { date: "2026-05-05", time: "13:15" }
+ *   13:00 PST → { date: "2026-05-05", time: "13:15" }  // exact boundary rounds up
+ *   23:53 PST → { date: "2026-05-05", time: "00:00" }  // wraps time, date stays today
+ */
+export function getNowPstRoundedTo15(): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: LA_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date());
+  const hour = parseInt(parts.find((p) => p.type === 'hour')!.value, 10);
+  const minute = parseInt(parts.find((p) => p.type === 'minute')!.value, 10);
+
+  const totalMinutes = hour * 60 + minute;
+  const nextSlotMinutes = (Math.floor(totalMinutes / 15) + 1) * 15;
+  const wrappedMinutes = nextSlotMinutes % (24 * 60);
+  const newHour = Math.floor(wrappedMinutes / 60);
+  const newMinute = wrappedMinutes % 60;
+  const time = `${String(newHour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`;
+
+  return { date: getTodayPst(), time };
+}
