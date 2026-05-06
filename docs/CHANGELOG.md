@@ -6,6 +6,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(quotes): remove min-w-0 from Date/Time inputs to match Duration/Detailer widths
+
+Follow-up to the previous Convert-to-Appointment dialog fix. The `min-w-0` class added to the Date and Start Time inputs in the prior commit did not resolve the iPad Safari overflow — Date and Start Time still rendered visibly wider than Duration and Assign Detailer in both portrait and landscape orientations. Diff of the four field classNames showed `min-w-0` was the ONLY token that differed between the two pairs; Duration (`<input type="number">`) and Detailer (`<select>`) had `h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200` and rendered correctly. Removed `min-w-0` from Date and Start Time so all four fields use byte-identical width classes.
+
+Wrapper `<div>`s (lines 168, 180, 191, 207) and the outer `<div className="space-y-4">` container were already identical across all four fields — no parent normalization needed. The native `<input type="date">` / `<input type="time">` widgets evidently respect `w-full` on iPad Safari without the `min-w-0` escape-hatch; adding it forced a different layout pass that produced the wider render.
+
+### Files touched
+
+- `src/components/quotes/quote-book-dialog.tsx` (removed `min-w-0` from two input classNames)
+
+---
+
 ## fix(quotes): default Convert-to-Appointment date+time to now, fix input widths
 
 Three issues in the Convert-to-Appointment dialog (`src/components/quotes/quote-book-dialog.tsx`) — reached from a quote's "Convert to Appointment" button on Quote Detail. Originally surfaced as suspected bug "+ New Walk-In dates for tomorrow" (BUG #3A); audit showed the Walk-In flow does not actually create an appointment record at all (it goes through POST /api/pos/jobs with `appointment_id: null`), and the only place in the codebase that explicitly defaults an appointment date to `today + 1` is this dialog. Fix scoped to defaults + width parity; no changes to submission logic, API payload, or the Walk-In flow.

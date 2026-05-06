@@ -172,7 +172,7 @@ export function QuoteBookDialog({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 min={todayStr}
-                className="h-9 w-full min-w-0 rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
               />
             </div>
 
@@ -183,7 +183,7 @@ export function QuoteBookDialog({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="h-9 w-full min-w-0 rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                className="h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
               />
             </div>
 
