@@ -6,6 +6,18 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## docs: capture job/appointment creation unification planning doc
+
+Documentation-only session. New file at `docs/planning/job-creation-unification.md` captures Nayeem's vision for unifying the six paths that currently create jobs and/or appointments (Online Booking, Voice AI, Quote → Convert to Appointment, Quote → Create Job, POS + New Walk-In, future Voice AI + Payment Link). Each path evolved organically; downstream Job Detail / Appointment Detail / Walk-In Detail / Convert-to-Job result views diverged in fields, cards, ordering, and edit affordances. The doc lays out the symptoms (most prominently: `created_at` doing double-duty as appointment time, no in-place date edit on Job Detail, missing Payment Link button on Job Detail), the long-term goal of a single shared Detail component driven by status + role + settings rather than creation path, the open design questions that block implementation, and a proposed 8–10 session implementation sequence. Includes a verbatim "Original User Notes" section at the bottom preserving Nayeem's raw wording so structured sections can be reconciled against original intent if they drift later.
+
+Status: planning only — NOT started. Bug #3A (walk-in date) ships as a NARROW fix separately from this initiative. No implementation work begins until a follow-up audit + design-spec session resolves the open questions.
+
+### Files touched
+
+- `docs/planning/job-creation-unification.md` (new)
+
+---
+
 ## feat(pos): quote auto-save to draft + coupon round-trip on resume
 
 Staff routinely lost in-progress quotes when navigating away mid-edit (footer tab switch, Back link, browser back). The "Save Draft" button existed but staff forgot to press it. Fix: auto-persist every change to a `status='draft'` row using the same code path the manual button uses, so navigating away silently preserves the work and the user resumes via the Drafts filter on the Quotes list.
