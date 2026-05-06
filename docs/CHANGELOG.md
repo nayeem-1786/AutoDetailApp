@@ -6,6 +6,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): Timeline auto-scroll-to-9-AM resets on filter and view changes too
+
+Follow-up to the business-day-start scroll default. The auto-scroll effect previously only re-fired on date change. Two user-controllable state changes were missed:
+
+- **Filter change** (My Jobs / All Jobs / Unassigned): JobTimeline stays mounted, `filter` was not passed as a prop, and the effect's deps didn't include any signal that filter had changed. Result: scroll position carried over from the previous filter.
+- **View toggle** (List ↔ Timeline): JobTimeline unmounts/remounts (conditional render at `job-queue.tsx:562-574`), so on remount the effect fires once. But if the user toggled during a poll cycle or right after a date change where `loading=true` at the mount instant, the loading-spinner JSX renders without `ref={scrollRef}` — React nulls the ref → effect early-exits → never fires again because none of the deps changed when loading later flipped false. Race-conditional, hence the user's intermittent observation.
+
+### Fix
+
+Added `filter` as a prop to `JobTimeline` and included **both `filter` and `loading`** in the auto-scroll effect's dep array.
+
+- `filter` covers filter changes directly — semantic correctness.
+- `loading` is the actual cause-and-effect link for both bugs: the parent's `loading` flag transitions true→false during every refetch (filter change, date change, view-toggle-during-loading). When loading flips false, the real scroll container remounts with `ref={scrollRef}` set; the effect fires post-paint with the ref now defined, and scroll lands correctly. Without `loading` in deps, the effect's only chance to fire is at mount-time, which races against the spinner's null-ref window.
+
+Final deps: `[isToday, selectedDate, staff.length, filter, loading]`. `nowMinutes` remains intentionally excluded — the now-line ticks every minute and must NOT re-scroll on each tick.
+
+### Trace
+
+- Filter change My → All: `filter` dep flips, `loading` flips true→false. Effect fires twice (early-exits while ref is null during spinner, scrolls when scroll container remounts). ✓
+- View toggle List → Timeline during data fetch: Timeline mounts with `loading=true` → spinner JSX → ref null → effect early-exits. Loading flips false → real container mounts → effect fires (`loading` dep changed) → scrolls. ✓
+- View toggle List → Timeline with cached data: Timeline mounts with `loading=false` → real container renders → effect fires post-paint with ref set → scrolls. Then staff fetch resolves → `staff.length` flips 0→N → effect fires again → idempotent scroll. ✓
+- Date navigation (already worked): still works via `selectedDate` dep. ✓
+
+### Files touched
+
+- `src/app/pos/jobs/components/job-timeline.tsx` (1 prop added to interface, 1 prop destructured, 5-line comment + 2 dep additions)
+- `src/app/pos/jobs/components/job-queue.tsx` (1 line: `filter={filter}` passed to JobTimeline)
+
+### Out of scope (deferred)
+
+- Persisting the user's manual scroll position across filter / view changes — intentionally NOT preserved per user requirement; mental model is "Timeline always shows the work day as the default starting point"
+- `business_settings`-driven `BUSINESS_DAY_START_HOUR` → unification roadmap
+- Pre-existing `lastPollAt` unused-var warning in `job-queue.tsx:221` — not introduced by this change, left as-is
+
+---
+
 ## fix(pos): default Timeline scroll to business day start
 
 Follow-up to the 24-hour Timeline expansion. With the prior change, the auto-scroll behavior had two awkward edges: (1) past/future dates skipped auto-scroll entirely and landed at scrollLeft=0, dropping the user into 12 AM with the entire day's worth of empty pre-business-hour columns to scroll through; (2) today before business hours (e.g., a 6 AM open) followed "now" all the way to 5 AM, hiding the upcoming business day to the right.

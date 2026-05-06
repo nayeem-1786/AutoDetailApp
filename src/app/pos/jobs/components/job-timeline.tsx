@@ -349,6 +349,7 @@ interface JobTimelineProps {
   loading: boolean;
   selectedDate: string;
   isToday: boolean;
+  filter: 'mine' | 'all' | 'unassigned';
   onSelectJob: (jobId: string) => void;
   onCheckout?: (jobId: string) => void;
   onRefresh?: () => void;
@@ -357,7 +358,7 @@ interface JobTimelineProps {
   onLocalUpdate?: (jobId: string) => void;
 }
 
-export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob, onCheckout, onRefresh, onInteractionChange, highlightedJobs, onLocalUpdate }: JobTimelineProps) {
+export function JobTimeline({ jobs, loading, selectedDate, isToday, filter, onSelectJob, onCheckout, onRefresh, onInteractionChange, highlightedJobs, onLocalUpdate }: JobTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [nowMinutes, setNowMinutes] = useState(getNowMinutes);
@@ -405,8 +406,13 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
       : businessDayStartLeft - HOUR_WIDTH;
     scrollRef.current.scrollLeft = Math.max(0, target);
   // nowMinutes intentionally excluded — we don't re-scroll every minute.
+  // `loading` is included so the effect re-fires once the scroll container
+  // remounts after a refetch (filter change refetches data, which transitions
+  // loading false→true→false and unmounts/remounts the scroll ref).
+  // `filter` is included for semantic correctness — filter changes should
+  // reset the default scroll position.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isToday, selectedDate, staff.length]);
+  }, [isToday, selectedDate, staff.length, filter, loading]);
 
   const { scheduledJobs, unscheduledJobs } = useMemo(() => {
     const scheduled: JobListItem[] = [];

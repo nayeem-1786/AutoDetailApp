@@ -565,6 +565,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           loading={loading}
           selectedDate={selectedDate}
           isToday={isToday}
+          filter={filter}
           onSelectJob={onSelectJob}
           onCheckout={onCheckout}
           onRefresh={() => { markLocalUpdate('__refresh__'); fetchJobs(selectedDate); }}
