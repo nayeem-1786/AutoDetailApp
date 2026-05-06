@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): Timeline auto-scroll always to 9 AM, never follow now-time
+
+Spec reversal of commit `a19aebd6`. The previous spec was `target = isToday ? Math.max(businessDayStartLeft, nowLeft) - HOUR_WIDTH : businessDayStartLeft - HOUR_WIDTH`. Once the clock passed ~10 AM, `nowLeft` exceeded `businessDayStartLeft`, MAX selected `nowLeft`, and the scroll target became "now − 1 hour" rather than the business day start. Approved at the time on the assumption that following "now" during business hours was helpful. Production observation reversed that assumption: at 3:29 PM PST on iPad Pro 11", the timeline landed with ~2:30 PM as the leftmost visible hour, putting the user in the middle of the workday with the morning's completed work hidden to the left and no immediate "what does today look like overall" glance. The mental model the user actually wants is "Timeline always shows the work day starting at 9 AM."
+
+### New logic
+
+```ts
+const target = BUSINESS_DAY_START_HOUR * HOUR_WIDTH - HOUR_WIDTH; // 688 px
+scrollRef.current.scrollLeft = Math.max(0, target);
+```
+
+No `isToday` branching, no `Math.max(businessDayStartLeft, nowLeft)`, no `nowMinutes` reference in the scroll path. Same target for today, yesterday, tomorrow, and any other date.
+
+### Trade-off (accepted)
+
+After ~5:30 PM PST the now-line is off-screen-right on iPad portrait (viewport 688..1378 covers ~8 AM through ~4 PM). Staff scroll right manually to see late-day work or to put the now-line back in view. The user explicitly rejected the alternatives — adding a "Jump to now" button, or extending the scroll target to keep the now-line on screen — in favor of the simpler "always 9 AM" rule. The accepted reasoning: the late-shift use case is rare, the morning-glance use case is constant, and a fixed default is more predictable than one that depends on clock time.
+
+### Other cleanup
+
+- Removed `isToday` from the auto-scroll effect's dep array; no longer referenced in the body.
+- Removed the `// eslint-disable-next-line react-hooks/exhaustive-deps` directive that excluded `nowMinutes` — the new effect doesn't read `nowMinutes`, so the deps are naturally exhaustive and the eslint suppression is no longer needed.
+- The red now-line itself is unchanged: still ticks every 60 s via the existing `nowMinutes` interval at `:389-393`, still renders at the correct `nowLeft` x-coordinate in each lane. The line moves; the viewport just no longer chases it.
+
+### Files touched
+
+- `src/app/pos/jobs/components/job-timeline.tsx` (auto-scroll useEffect simplified — 9-line body shrunk to 3 lines, deps array trimmed by 1, comment block rewritten, eslint-disable removed)
+
+### Out of scope (deferred, explicitly rejected, or queued for separate sessions)
+
+- "Jump to now" button when now-line is off-screen → rejected
+- Auto-extending scroll to keep now-line in viewport → rejected
+- Smooth scroll animation → not requested, current instant scroll preserved
+- iPad Pro 11" Convert-to-Appointment dialog width → separate session
+- Trailing 12 PM hour label visual → separate session
+- Filter ordering and role-based default filter → separate session
+
+---
+
 ## fix(pos): Timeline auto-scroll-to-9-AM resets on filter and view changes too
 
 Follow-up to the business-day-start scroll default. The auto-scroll effect previously only re-fired on date change. Two user-controllable state changes were missed:
