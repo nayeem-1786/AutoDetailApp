@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): expand Timeline to 24h with 86px/hour for full business day on iPad
+
+POS Jobs Timeline view (`src/app/pos/jobs/components/job-timeline.tsx`) was hardcoded to display only 8 AM–6 PM. Jobs scheduled outside that window — manual admin entries, special-case appointments, edge cases — were invisible (clamped to `left=0` for pre-8 AM, off-screen for post-6 PM) even though the underlying data was present in the API response. Audit confirmed the display window was a pure render-time restriction (two module constants `START_HOUR=8` / `END_HOUR=18`) with no coupling to `business_settings`, no time-range filter at the data layer, and no shared dependency from any other view.
+
+Display window expanded to full 24 hours (`START_HOUR=0`, `END_HOUR=24`). Booking validation is unchanged — staff are still constrained by business hours when scheduling, but the Timeline now renders any appointment that exists in the data regardless of clock time.
+
+### Per-hour width reduced to 86 px
+
+At the original 120 px/hour, expanding to 24 hours would have produced a 2880-px-wide timeline that requires excessive horizontal scrolling on iPad portrait (~690 px content viewport, ~5.75 hours visible at a glance). Reduced to 86 px/hour: `690 / 86 ≈ 8.02 hours visible` — the full 9 AM–5 PM business day fits in one glance on iPad portrait. iPad landscape (~1180 px) shows ~13.7 hours, so most of the working day plus prep/cleanup hours are visible without scrolling. Total timeline width: 24 × 86 = 2064 px (modest increase from old 10 × 120 = 1200 px). Off-business-hour appointments remain reachable via horizontal scroll.
+
+Hour label format (`formatHourLabel`) already returned short strings like `"12 AM"` / `"1 PM"` / `"12 PM"` — max 5 characters — so the narrower column fits the existing labels without truncation. No format change needed.
+
+### Clamp boundary fix in `minutesToTimeStr`
+
+At `END_HOUR=24`, the prior upper-bound clamp `END_HOUR * 60 = 1440` produced the invalid TIME literal `"24:00"` for a drag-drop landing at the right edge of the timeline. The reschedule API would have rejected this. Tightened the clamp to `END_HOUR * 60 - 1 = 1439` so the maximum string is `"23:59"` — last valid wall-clock time of the day. Inline comment captures the rationale.
+
+### Auto-scroll-to-now lead-in adjusted
+
+The first paint when `isToday` auto-scrolls to land "now" at the user's left. Old behavior subtracted a hardcoded 100 px lead-in — at the new 86 px/hour, that places "now" slightly past one hour from the left edge, with off-by-pixels arithmetic that depends on a magic number. Replaced with `HOUR_WIDTH` so the lead-in is exactly one hour of context before "now". At 10 AM today this scrolls to `(10 × 86) - 86 = 774 px`; the iPad portrait viewport then covers approximately 9 AM through 5 PM — the full business day immediately on open. Past dates (`isToday=false`) skip auto-scroll and start at scrollLeft=0, preserving prior behavior.
+
+### Naturally fixed by the constants change (no extra work)
+
+- **Now-line visibility gate** (`nowMinutes >= START_HOUR*60 && nowMinutes <= END_HOUR*60`): with `START_HOUR=0` / `END_HOUR=24`, the gate is permissive across the full day; the red "now" line shows at 7 AM and 9 PM equally.
+- **Drag-drop snap range:** `minutesToTimeStr` produces valid `"00:00"` through `"23:59"` for any in-bounds drop. The 15-min snap (`SNAP_MINUTES`) is unchanged.
+- **Data fetch:** `/api/pos/jobs` already returned all jobs for the date with no clock-time filter — no API change needed.
+
+### Files touched
+
+- `src/app/pos/jobs/components/job-timeline.tsx` (3 constants, 1 clamp boundary, 1 auto-scroll constant; 11 lines changed including 2 new comment blocks)
+
+### Out of scope (deferred / rejected)
+
+- Variable hour widths or business-hours compression — rejected; would break the equal-width gridline math throughout the file
+- Coupling the display window to `business_settings.operating_hours` — rejected; off-hour appointments must remain visible regardless of policy
+- Configurable HOUR_WIDTH via settings — over-engineered for current need
+- Pre-existing eslint warning on `selectedDate` unused arg (line 356) — not introduced by this change, left as-is
+
+---
+
 ## fix(quotes): remove min-w-0 from Date/Time inputs to match Duration/Detailer widths
 
 Follow-up to the previous Convert-to-Appointment dialog fix. The `min-w-0` class added to the Date and Start Time inputs in the prior commit did not resolve the iPad Safari overflow — Date and Start Time still rendered visibly wider than Duration and Assign Detailer in both portrait and landscape orientations. Diff of the four field classNames showed `min-w-0` was the ONLY token that differed between the two pairs; Duration (`<input type="number">`) and Detailer (`<select>`) had `h-9 w-full rounded-lg border border-gray-200 px-3 text-sm text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200` and rendered correctly. Removed `min-w-0` from Date and Start Time so all four fields use byte-identical width classes.

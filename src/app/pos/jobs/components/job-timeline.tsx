@@ -37,13 +37,13 @@ import type { JobListItem } from './job-queue';
 
 // ─── Constants ──────────────────────────────────────────────────
 
-const START_HOUR = 8;
-const END_HOUR = 18;
+const START_HOUR = 0;
+const END_HOUR = 24;
 const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
 const MIN_BLOCK_MINUTES = 30;
 const LANE_HEIGHT = 72;
 const LABEL_WIDTH = 120;
-const HOUR_WIDTH = 120;
+const HOUR_WIDTH = 86;
 const TIMELINE_WIDTH = (END_HOUR - START_HOUR) * HOUR_WIDTH;
 const SNAP_MINUTES = 15;
 
@@ -103,7 +103,10 @@ function snapToGrid(minutes: number): number {
 }
 
 function minutesToTimeStr(minutes: number): string {
-  const clamped = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60, minutes));
+  // Upper bound is END_HOUR * 60 - 1 so a drop at the right edge yields "23:59"
+  // rather than "24:00" — the latter is an invalid TIME literal that the
+  // reschedule API would reject.
+  const clamped = Math.max(START_HOUR * 60, Math.min(END_HOUR * 60 - 1, minutes));
   const h = Math.floor(clamped / 60);
   const m = clamped % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -387,7 +390,9 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
   // Auto-scroll
   useEffect(() => {
     if (!isToday || !scrollRef.current) return;
-    const nowOffset = minutesToLeft(nowMinutes) - 100;
+    // One hour of context before "now" — at 86px/hour this lands "now" 86px
+    // from the left edge, leaving the upcoming day visible to the right.
+    const nowOffset = minutesToLeft(nowMinutes) - HOUR_WIDTH;
     scrollRef.current.scrollLeft = Math.max(0, nowOffset);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isToday, staff.length]);
