@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): default Timeline scroll to business day start
+
+Follow-up to the 24-hour Timeline expansion. With the prior change, the auto-scroll behavior had two awkward edges: (1) past/future dates skipped auto-scroll entirely and landed at scrollLeft=0, dropping the user into 12 AM with the entire day's worth of empty pre-business-hour columns to scroll through; (2) today before business hours (e.g., a 6 AM open) followed "now" all the way to 5 AM, hiding the upcoming business day to the right.
+
+Both fixed by introducing a hardcoded `BUSINESS_DAY_START_HOUR = 9` and a unified scroll-target formula that runs on every date change.
+
+### Logic
+
+- **Past/future dates (`isToday=false`):** `target = (BUSINESS_DAY_START_HOUR × HOUR_WIDTH) - HOUR_WIDTH = 774 - 86 = 688 px`. Lands the 9 AM column 86 px from the left edge with one hour of context (8 AM) showing on its left. iPad portrait viewport then covers ~8 AM–4 PM at a glance.
+- **Today during/after business hours:** `target = MAX(businessDayStartLeft, nowLeft) - HOUR_WIDTH`. The MAX keeps "now" in the picture once the day is underway. At 10 AM today this yields `MAX(774, 860) - 86 = 774` — viewport covers ~9 AM–5 PM, exactly the full business day.
+- **Today before business hours:** the MAX clamp prevents scrolling earlier than the business day start. At 6 AM today: `MAX(774, 516) - 86 = 688` — same default as past/future dates, business day visible immediately, no empty pre-dawn view.
+- **Today late evening:** at 11 PM today: `MAX(774, 1978) - 86 = 1892`; the browser naturally clamps this to the maximum scrollable position so the right edge of the timeline is visible.
+
+The one-hour lead-in (`- HOUR_WIDTH`) applies in all cases for consistency.
+
+### `BUSINESS_DAY_START_HOUR` is hardcoded — coupling to `business_settings` is deferred
+
+The proper implementation reads `business_settings.business_hours` per-day-of-week and accounts for closed days, varying open/close times, and operator-defined exceptions. That work belongs in the larger job/appointment unification effort captured in `docs/planning/job-creation-unification.md`, where the Timeline view will eventually share business-hour logic with booking validation, voice agent routing, and the Convert-to-Appointment dialog. Hardcoding `9` for now matches Smart Details' typical Mon–Sat 9 AM open and avoids a one-off `business_settings` query that would diverge from the unified design.
+
+### Effect re-runs on date navigation
+
+Added `selectedDate` to the auto-scroll effect's dependency array so navigating between dates (Today → Yesterday → Tomorrow) re-applies the default position. Without this, scroll position would carry over between dates, producing inconsistent landing points. `nowMinutes` is still intentionally excluded from deps — the now-line ticks every 60 seconds, but the timeline must NOT re-scroll on each tick.
+
+### Side-benefit: stale eslint warning resolved
+
+The pre-existing `selectedDate is defined but never used` warning on the `JobTimeline` props destructure is now naturally resolved — `selectedDate` is used in the effect's dependency array, which counts as a use for `@typescript-eslint/no-unused-vars`.
+
+### Files touched
+
+- `src/app/pos/jobs/components/job-timeline.tsx` (1 new constant with comment, auto-scroll useEffect rewritten — 11 lines diff including comments)
+
+### Out of scope (deferred)
+
+- Reading `business_settings.business_hours` for the start hour → unification roadmap
+- Per-day-of-week scroll target (different open time on Saturday vs Monday) → unification roadmap
+- Closed-day handling (default to a sensible viewport when business is closed) → unification roadmap
+- Manual scroll persistence across date changes — intentionally re-scroll on every date change for predictable landing position
+
+---
+
 ## fix(pos): expand Timeline to 24h with 86px/hour for full business day on iPad
 
 POS Jobs Timeline view (`src/app/pos/jobs/components/job-timeline.tsx`) was hardcoded to display only 8 AM–6 PM. Jobs scheduled outside that window — manual admin entries, special-case appointments, edge cases — were invisible (clamped to `left=0` for pre-8 AM, off-screen for post-6 PM) even though the underlying data was present in the API response. Audit confirmed the display window was a pure render-time restriction (two module constants `START_HOUR=8` / `END_HOUR=18`) with no coupling to `business_settings`, no time-range filter at the data layer, and no shared dependency from any other view.

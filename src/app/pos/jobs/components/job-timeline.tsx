@@ -46,6 +46,10 @@ const LABEL_WIDTH = 120;
 const HOUR_WIDTH = 86;
 const TIMELINE_WIDTH = (END_HOUR - START_HOUR) * HOUR_WIDTH;
 const SNAP_MINUTES = 15;
+// Hardcoded for now — proper business_settings.business_hours coupling is
+// deferred to the job/appointment unification work in
+// docs/planning/job-creation-unification.md.
+const BUSINESS_DAY_START_HOUR = 9;
 
 const DRAGGABLE_STATUSES: JobStatus[] = ['scheduled', 'intake', 'in_progress'];
 
@@ -387,15 +391,22 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, onSelectJob,
     return () => clearInterval(id);
   }, [isToday]);
 
-  // Auto-scroll
+  // Auto-scroll: land on the business day start by default, with a one-hour
+  // lead-in so the business day start sits 86px from the left edge. On today
+  // during/after business hours, follow "now" instead — but never scroll
+  // earlier than the business day start (no empty pre-dawn morning view).
+  // Re-runs on date change so navigating between days resets the position.
   useEffect(() => {
-    if (!isToday || !scrollRef.current) return;
-    // One hour of context before "now" — at 86px/hour this lands "now" 86px
-    // from the left edge, leaving the upcoming day visible to the right.
-    const nowOffset = minutesToLeft(nowMinutes) - HOUR_WIDTH;
-    scrollRef.current.scrollLeft = Math.max(0, nowOffset);
+    if (!scrollRef.current) return;
+    const businessDayStartLeft = BUSINESS_DAY_START_HOUR * HOUR_WIDTH;
+    const nowLeft = minutesToLeft(nowMinutes);
+    const target = isToday
+      ? Math.max(businessDayStartLeft, nowLeft) - HOUR_WIDTH
+      : businessDayStartLeft - HOUR_WIDTH;
+    scrollRef.current.scrollLeft = Math.max(0, target);
+  // nowMinutes intentionally excluded — we don't re-scroll every minute.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isToday, staff.length]);
+  }, [isToday, selectedDate, staff.length]);
 
   const { scheduledJobs, unscheduledJobs } = useMemo(() => {
     const scheduled: JobListItem[] = [];
