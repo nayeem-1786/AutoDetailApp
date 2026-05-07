@@ -156,3 +156,67 @@ These notes are preserved verbatim from the user's original observations. They d
 > Another thing that is important to notate is that the Job Detail does not allow you to edit the Date. In fact it doesn't record either path as the appointment time (we need to use the shared appointment modal to select current date and time, then store this data as appointment time as that is separate field than Created, which I believe is currently being uses as the appointment time. But this distinction should be clear as both times can be different).
 
 > Let's audit what info is present, discuss what should be editable, and button for Payment Link / Deposit button. Like it functions in the appointments page. Question why are the data sets, order, cards, and items different between, Walk-Ins, Quotes, Converted to Appointment, Create Job, Booked online, or by phone AI agent. Let's figure out what each of these paths looks like in the POS, then figure out how to unify them, and build ONE share component (if possible).
+
+## Day-Boundary Semantics (Open Question)
+
+When a single service appointment crosses midnight, where does it "belong" operationally?
+
+USER DECISION (5/6/26): Use BUSINESS DAY model. Any job/appointment STARTED before midnight (during business hours or after-close work) belongs to the start day for all operational, scheduling, and accounting purposes. Detailer hours, intake records, and the Timeline view all anchor to the start day. Records DO NOT split or duplicate across days.
+
+REVENUE RECOGNITION: Revenue is recognized on the date it was COLLECTED, not the date the work was performed. A walk-in started 11:50 PM Monday, paid 12:30 AM Tuesday → revenue counts on Tuesday. (This is independent of the business-day operational anchor.)
+
+Decisions needed during unification design phase:
+- Audit how scheduled_date, appointment_date, and estimated_pickup_at interact for spanning records
+- Confirm the Timeline view renders the start-day correctly without duplicating on the end-day
+- Audit dashboard, reports, and detailer-hours-worked queries to ensure business-day model is honored
+- Migration: any existing records that violate this model
+
+Bug #9 (Walk-In/Convert-to-Job 15-min rounding) addresses the rounding edge case where estimated_pickup_at wraps past midnight. It does not change the business-day anchoring policy.
+
+## Multi-Day Services (Open Question)
+
+Some Smart Details services take longer than a single business day:
+- RV details: 8-12 hours
+- Full ceramic coatings: 8-12 hours, sometimes more
+- Other multi-stage premium services
+
+Constraints:
+- A detailer realistically works no more than 8 hours per day
+- Service may legitimately need to span 1-3 days
+- Customer drops off vehicle once, picks up once at end
+- Daily cap is operational, not necessarily contractual
+
+Possible data models (decision deferred to design phase):
+
+Option A: Single appointment with multiple "work session" records
+- One appointments row, multiple job_sessions rows
+- Each session = one calendar day's work
+- Pros: single appointment for customer-facing display, payment, loyalty
+- Cons: new table, new query patterns
+
+Option B: Single appointment spanning multiple calendar days
+- One appointments row with start_date and end_date
+- No splitting of database records
+- Daily Timeline rendering computes which portion of work happens each day
+- Pros: simpler data model
+- Cons: harder to track "what work happened Day 1 vs Day 2", no per-day detailer assignment if different detailers work different days
+
+Option C: Multiple linked appointments (one per day)
+- Each calendar day has its own appointments row
+- Linked via parent_appointment_id or similar
+- Daily detailer assignment, daily intake/completion possible
+- Pros: clean per-day operational model
+- Cons: customer-facing has to aggregate across rows, payment / loyalty / coupon need to know about the link
+
+Open questions for design phase:
+- Which option? Or hybrid?
+- Customer drop-off and pick-up flow: still single intake (Day 1) and single completion (Day N)?
+- Photos: one set at intake (Day 1), one set at completion (Day N), OR per-day photo sets?
+- Detailer assignment: same detailer all days, or can it vary?
+- What happens if Day 2 needs to be rescheduled (sickness, equipment failure)?
+- Payment timing: deposit at start, balance at completion?
+- Loyalty/coupons: applied once at start, once at end, or per session?
+- Booking impact: does a multi-day service block a specific bay/spot for those days, or just a detailer's time?
+- How does this interact with the Timeline view — does Day 2 start at 9 AM (or wherever continuation makes sense)?
+
+USER PREFERENCE (5/6/26): Lean toward splitting visible work across multiple business days for accurate detailer scheduling and Timeline visibility. Don't show 12 hours of work as a single block on one day.
