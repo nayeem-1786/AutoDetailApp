@@ -439,7 +439,7 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, filter, onSe
 
   const hours = useMemo(() => {
     const h: number[] = [];
-    for (let i = START_HOUR; i <= END_HOUR; i++) h.push(i);
+    for (let i = START_HOUR; i < END_HOUR; i++) h.push(i);
     return h;
   }, []);
 

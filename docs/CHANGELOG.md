@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): drop trailing 12 PM Timeline label; round Walk-In/Create-Job time to 15-min
+
+Two POS fixes plus a small helper extension.
+
+### Fix A — Timeline trailing "12 PM" hour-marker
+
+`job-timeline.tsx:442` rendered hour markers with `for (let i = START_HOUR; i <= END_HOUR; i++)`. With `START_HOUR=0` and `END_HOUR=24`, the inclusive upper bound produced 25 markers (hours 0..24). `formatHourLabel(24)` returns `"12 PM"` (24 > 12 → `${24-12} PM`), so a stray `"12 PM"` rendered at the right edge of the timeline alongside the legitimate `"12 PM"` at hour 12. Changed to `i < END_HOUR` — 24 markers (hours 0..23), last label is `"11 PM"`. The container's right edge serves as the visual boundary; no closing gridline is missed.
+
+### Fix B — Walk-In / Convert-to-Job time rounded to next 15-min slot
+
+Walk-In (`+ New Walk-In` → quote builder → "Create Job") and Convert-to-Job (Quote Detail → "Create Job") both POST to `/api/pos/jobs` without a time field. The route at `:233` was setting `estimated_pickup_at = now.toISOString()` — the exact instant the request arrived. For a job created at 11:07 PM PST, the timeline rendered the job at 11:07 (since `getJobStartTime` falls back to `estimated_pickup_at`'s PST time portion when there's no appointment row). The user wanted clean 15-min slots like the booking dialog produces.
+
+No appointments row is created for walk-in jobs (`appointment_id: null` per CLAUDE.md walk-in rule), so this is purely about `jobs.estimated_pickup_at`'s ISO timestamp. Replaced the default branch with `getNowPstRoundedTo15().iso`. The caller-provided-`estimated_pickup_at` branch is untouched.
+
+`pstDate` / `pstTime` (`:211-222`) used for `findAvailableDetailer` were intentionally **not** rounded — they need to reflect the actual current moment so detailer availability is checked against now, not a future slot. This produces a small, accepted inconsistency (detailer availability checked at 23:07, job timeline placement at 23:15), but the alternative would degrade detailer-assignment correctness.
+
+### Helper extension — `getNowPstRoundedTo15` gains `iso` and date-wrap
+
+`src/lib/utils/pst-date.ts` — extended the helper added in commit `2cf62a16` for Bug #7 with two improvements that the new caller needed:
+
+- **`iso` field added** to the return value (`{ date, time, iso }`). The ISO is composed by reusing the offset from `pstStartOfDayLiteral(date).slice(-6)` and building `new Date(\`${date}T${time}:00${offset}\`).toISOString()` — same pattern already in use at `src/app/api/pos/jobs/populate/route.ts:113-122`. Non-breaking: existing destructure-`{ date, time }` callers ignore the extra field.
+- **Midnight-wrap fix**: when the rounded time crosses midnight (e.g., 23:53 PST → "00:00"), the returned `date` now advances to tomorrow PST instead of staying today. Previously documented as "caller may adjust" — the new behavior eliminates the foot-gun. DST is safe at the wrap moment because US DST transitions occur at 2 AM PST, not at the wrap-past-midnight boundary.
+
+This silently improves the QuoteBookDialog (Convert-to-Appointment) defaults near midnight: at 23:53 PST it previously defaulted to today + 00:00 (24 hours in the past — a bug); now it defaults to tomorrow + 00:00 (7 minutes in the future, correct). No dialog code changes needed.
+
+### Files touched
+
+- `src/app/pos/jobs/components/job-timeline.tsx` (Fix A: 1-char loop bound)
+- `src/lib/utils/pst-date.ts` (helper return type + body extended; existing rounding logic unchanged)
+- `src/app/api/pos/jobs/route.ts` (Fix B: 1 import + 1 line replacement)
+
+### Out of scope (deferred / intentionally not changed)
+
+- Refactoring Walk-In and Convert-to-Job into a unified handler → unification roadmap in `docs/planning/job-creation-unification.md`
+- Rounding `pstDate` / `pstTime` for detailer assignment → intentionally not rounded; preserves now-correctness for availability check
+- Changing the timeline render loop's `END_HOUR` constant → stays at 24
+- Pre-existing `lastPollAt` unused-var warning at `job-queue.tsx:221` → not introduced by this change
+
+---
+
 ## fix(pos): Timeline scroll lands 9 AM leftmost; reorder filters with All Jobs default
 
 Two small POS Jobs adjustments observed on iPad after the prior auto-scroll spec landed.

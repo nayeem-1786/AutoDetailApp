@@ -109,16 +109,17 @@ export function getTodayPst(): string {
 /**
  * Get the current PST/PDT date + time, with time rounded UP to the next 15-minute slot.
  * Always rounds up — :00, :15, :30, :45 advance to the next slot.
- * The returned `date` is today's PST date AT THE MOMENT OF CALL — it does not roll
- * forward when the rounded time crosses midnight (caller may adjust if needed).
+ * When the rounded time crosses midnight, the returned `date` advances to tomorrow PST
+ * so callers don't have to handle the wrap themselves. `iso` is the same instant as
+ * `date` + `time` rendered as a UTC ISO timestamp (TIMESTAMPTZ-compatible).
  *
  * Example:
- *   13:47 PST → { date: "2026-05-05", time: "14:00" }
- *   13:01 PST → { date: "2026-05-05", time: "13:15" }
- *   13:00 PST → { date: "2026-05-05", time: "13:15" }  // exact boundary rounds up
- *   23:53 PST → { date: "2026-05-05", time: "00:00" }  // wraps time, date stays today
+ *   13:47 PST → { date: "2026-05-05", time: "14:00", iso: "2026-05-05T21:00:00.000Z" }
+ *   13:00 PST → { date: "2026-05-05", time: "13:15", iso: "..." }  // exact boundary rounds up
+ *   23:45 PST → { date: "2026-05-06", time: "00:00", iso: "2026-05-06T07:00:00.000Z" }  // wraps to tomorrow
+ *   23:53 PST → { date: "2026-05-06", time: "00:00", iso: "..." }
  */
-export function getNowPstRoundedTo15(): { date: string; time: string } {
+export function getNowPstRoundedTo15(): { date: string; time: string; iso: string } {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: LA_TZ,
     hour: '2-digit',
@@ -130,10 +131,30 @@ export function getNowPstRoundedTo15(): { date: string; time: string } {
 
   const totalMinutes = hour * 60 + minute;
   const nextSlotMinutes = (Math.floor(totalMinutes / 15) + 1) * 15;
+  const wrapped = nextSlotMinutes >= 24 * 60;
   const wrappedMinutes = nextSlotMinutes % (24 * 60);
   const newHour = Math.floor(wrappedMinutes / 60);
   const newMinute = wrappedMinutes % 60;
   const time = `${String(newHour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`;
 
-  return { date: getTodayPst(), time };
+  // Advance the date by one PST day when the rounded time wrapped past midnight.
+  // Compute by building tomorrow's PST date via the offset attached to today
+  // (DST transitions are vanishingly rare at this exact wrap moment).
+  let date = getTodayPst();
+  if (wrapped) {
+    const tomorrowUtcMidnight = new Date(date + 'T00:00:00Z').getTime() + 24 * 60 * 60 * 1000;
+    date = new Intl.DateTimeFormat('en-CA', {
+      timeZone: LA_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(tomorrowUtcMidnight));
+  }
+
+  // Compose an ISO TIMESTAMPTZ representing the rounded PST instant.
+  // Reuse the offset from pstStartOfDayLiteral to handle PST/PDT correctly.
+  const offsetStr = pstStartOfDayLiteral(date).slice(-6);
+  const iso = new Date(`${date}T${time}:00${offsetStr}`).toISOString();
+
+  return { date, time, iso };
 }

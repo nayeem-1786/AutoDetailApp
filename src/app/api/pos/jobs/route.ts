@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
-import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
+import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15 } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
@@ -226,11 +226,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Compute estimated_pickup_at for timeline placement (walk-ins have no appointment)
-    // Use caller-provided value, or default to now (so the job appears at current time on timeline)
+    // Use caller-provided value, or default to now rounded UP to the next 15-min slot
+    // so the timeline displays a clean slot (e.g., 23:07 → 23:15) rather than an
+    // arbitrary minute. The helper handles the midnight wrap by advancing the date.
     let pickupAt = estimated_pickup_at || null;
     if (!pickupAt) {
-      // Set to current PST time as ISO timestamp — the timeline extracts the time portion
-      pickupAt = now.toISOString();
+      pickupAt = getNowPstRoundedTo15().iso;
     }
 
     const { data: job, error } = await supabase
