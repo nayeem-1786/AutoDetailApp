@@ -193,7 +193,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const isToday = selectedDate === today;
   const diff = daysDiff(selectedDate);
 
-  const [filter, setFilter] = useState<FilterType>(isBookable ? 'mine' : 'all');
+  const [filter, setFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('pos-jobs-view') as ViewMode) || 'timeline';
@@ -512,7 +512,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
       {/* Filter pills */}
       <div className="flex gap-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-2">
-        {(['mine', 'all', 'unassigned'] as const)
+        {(['all', 'mine', 'unassigned'] as const)
           .filter((f) => f !== 'mine' || isBookable)
           .map((f) => (
             <button

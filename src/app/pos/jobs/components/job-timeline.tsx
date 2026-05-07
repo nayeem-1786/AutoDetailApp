@@ -392,18 +392,17 @@ export function JobTimeline({ jobs, loading, selectedDate, isToday, filter, onSe
     return () => clearInterval(id);
   }, [isToday]);
 
-  // Auto-scroll: always land on the business day start with a one-hour lead-in
-  // so 9 AM sits 86px from the left edge — regardless of clock time or whether
-  // the selected date is today. The now-line still moves visually via the
-  // 60-second nowMinutes interval, but it no longer drives scroll position.
-  // After ~5:30 PM PST the now-line is off-screen-right on iPad portrait;
-  // staff scroll right manually to see late-day work (accepted trade-off).
+  // Auto-scroll: always land 9 AM at the leftmost visible position — regardless
+  // of clock time or whether the selected date is today. The now-line still
+  // moves visually via the 60-second nowMinutes interval, but it no longer
+  // drives scroll position. After ~5:30 PM PST the now-line is off-screen-right
+  // on iPad portrait; staff scroll right manually (accepted trade-off).
   // `loading` re-fires the effect after a refetch so the scroll container
   // remounting (loading false→true→false) gets the default scroll applied.
   // `filter` re-fires on user filter changes for the same reset behavior.
   useEffect(() => {
     if (!scrollRef.current) return;
-    const target = BUSINESS_DAY_START_HOUR * HOUR_WIDTH - HOUR_WIDTH;
+    const target = BUSINESS_DAY_START_HOUR * HOUR_WIDTH;
     scrollRef.current.scrollLeft = Math.max(0, target);
   }, [selectedDate, staff.length, filter, loading]);
 

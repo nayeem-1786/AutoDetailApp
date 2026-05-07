@@ -6,6 +6,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(pos): Timeline scroll lands 9 AM leftmost; reorder filters with All Jobs default
+
+Two small POS Jobs adjustments observed on iPad after the prior auto-scroll spec landed.
+
+### Timeline scroll target — 9 AM at exact leftmost visible edge
+
+The prior commit (`d4a15cd2`) set `target = BUSINESS_DAY_START_HOUR * HOUR_WIDTH - HOUR_WIDTH` = 688 px. The `- HOUR_WIDTH` was a leftover one-hour lead-in from the older "MAX(now, 9 AM)" spec, which existed to leave context to the left of "now" when the scroll was now-driven. With the spec reversed to "always land at 9 AM regardless of clock time," the lead-in offset no longer makes sense — it just shows an empty 8 AM column at the left edge of every iPad portrait viewport. Dropped the `- HOUR_WIDTH`: target now `BUSINESS_DAY_START_HOUR * HOUR_WIDTH` = 774 px exactly, putting the 9 AM column at the leftmost visible edge. Viewport 774..1464 covers ~9 AM through ~5 PM on iPad portrait — the full business day at a glance with no leading dead space.
+
+### Filter buttons — All Jobs → My Jobs → Unassigned, All Jobs default
+
+Two changes:
+
+- **Default filter:** `useState<FilterType>(isBookable ? 'mine' : 'all')` → `useState<FilterType>('all')`. Bookable users (detailers, bookable admins) previously landed on My Jobs by default. Now everyone lands on All Jobs — the global view is the more useful entry point because it surfaces queue depth and unassigned work that a detailer should know about even before drilling into their own jobs.
+- **Button order:** `['mine', 'all', 'unassigned']` → `['all', 'mine', 'unassigned']`. With All Jobs being the default, it should also be the leftmost button so the visual order matches the activation order.
+
+The existing `bookable_for_appointments` role gate (`.filter((f) => f !== 'mine' || isBookable)`) is **preserved**: non-bookable users (e.g., cashiers) still don't see the My Jobs pill at all — it's meaningless when the user can't be assigned jobs. Result:
+
+- **Bookable users:** `[All Jobs] [My Jobs] [Unassigned]`, default All Jobs.
+- **Non-bookable users:** `[All Jobs] [Unassigned]`, default All Jobs.
+
+### Files touched
+
+- `src/app/pos/jobs/components/job-timeline.tsx` (1 logic line + updated comment block)
+- `src/app/pos/jobs/components/job-queue.tsx` (1 useState init line, 1 array literal reorder; `isBookable` declaration and `.filter` clause untouched)
+
+### Out of scope
+
+- Trailing 12 PM hour label visual — separate session
+- iPad Pro 11" Convert-to-Appointment dialog width — separate session
+- Convert-to-Job rounding to next 15-min slot — separate session
+- Any change to non-bookable users' filter visibility (existing gating preserved)
+- Pre-existing `lastPollAt` unused-var warning at `job-queue.tsx:221` — not introduced
+
+---
+
 ## fix(pos): Timeline auto-scroll always to 9 AM, never follow now-time
 
 Spec reversal of commit `a19aebd6`. The previous spec was `target = isToday ? Math.max(businessDayStartLeft, nowLeft) - HOUR_WIDTH : businessDayStartLeft - HOUR_WIDTH`. Once the clock passed ~10 AM, `nowLeft` exceeded `businessDayStartLeft`, MAX selected `nowLeft`, and the scroll target became "now − 1 hour" rather than the business day start. Approved at the time on the assumption that following "now" during business hours was helpful. Production observation reversed that assumption: at 3:29 PM PST on iPad Pro 11", the timeline landed with ~2:30 PM as the leftmost visible hour, putting the user in the middle of the workday with the morning's completed work hidden to the left and no immediate "what does today look like overall" glance. The mental model the user actually wants is "Timeline always shows the work day starting at 9 AM."
