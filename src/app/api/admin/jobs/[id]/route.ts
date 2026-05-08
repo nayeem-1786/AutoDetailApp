@@ -17,7 +17,9 @@ export async function GET(
   const { id } = await params;
   const admin = createAdminClient();
 
-  // Fetch job with all relations
+  // Fetch job with all relations.
+  // Phase 0a: include the joined appointment's channel so the admin header pill
+  // can distinguish booked appointments from synthetic walk-in appointments.
   const { data: job, error } = await admin
     .from('jobs')
     .select(
@@ -25,7 +27,8 @@ export async function GET(
       *,
       customer:customers(id, first_name, last_name, phone, email),
       vehicle:vehicles(id, year, make, model, color, size_class),
-      assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name)
+      assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
+      appointment:appointments!jobs_appointment_id_fkey(channel)
     `
     )
     .eq('id', id)

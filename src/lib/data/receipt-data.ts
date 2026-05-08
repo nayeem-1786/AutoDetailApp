@@ -185,8 +185,12 @@ export async function fetchReceiptData(
   // Each row carries source_label (derived from the joined transaction's
   // notes prefix; same logic as POS Payments Received) so the renderer can
   // print "Online (pay link)" / "Booking deposit" / method name with date.
-  // Walk-in transactions (appointment_id IS NULL) keep raw.payments — no
-  // change to current behavior.
+  //
+  // Phase 0a: post-eager-creation, every walk-in transaction also runs
+  // through this aggregation path — single-payment walk-ins yield the same
+  // payments[] as the pre-0a local-join result.
+  // LEGACY: pre-Phase 0a walk-ins still have appointment_id IS NULL and
+  // keep raw.payments via the fallback. Eventual migration possible.
   let renderedPayments = raw.payments ?? [];
   let appointmentBalanceDue: number | undefined = undefined;
   let appointmentTotal: number | undefined = undefined;

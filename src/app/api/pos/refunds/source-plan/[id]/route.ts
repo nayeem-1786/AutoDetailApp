@@ -55,7 +55,10 @@ export async function GET(
       payments: (tx.payments ?? []) as Array<{ amount: number }>,
     });
 
-    // Walk-in transactions: empty plan, modal hides the section.
+    // LEGACY: pre-Phase 0a walk-in transactions (appointment_id IS NULL).
+    // Post-0a walk-ins carry a synthetic appointment_id and follow the
+    // appointment-linked plan path below. This branch only matches historical
+    // rows; eventual migration possible once all pre-0a walk-ins close out.
     if (!isCloseOut && !tx.appointment_id) {
       return NextResponse.json({ data: { isCloseOut: false, sources: [] } });
     }

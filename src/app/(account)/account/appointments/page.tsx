@@ -17,6 +17,8 @@ export default function AccountAppointmentsPage() {
 
     const supabase = createClient();
 
+    // Phase 0a: hide synthetic walk-in appointments from the customer portal —
+    // walk-ins are POS-side bookkeeping, not customer-facing appointments.
     const { data } = await supabase
       .from('appointments')
       .select(
@@ -26,6 +28,7 @@ export default function AccountAppointmentsPage() {
          vehicles(year, make, model, color)`
       )
       .eq('customer_id', customer.id)
+      .neq('channel', 'walk_in')
       .order('scheduled_date', { ascending: false });
 
     setAppointments(data ?? []);

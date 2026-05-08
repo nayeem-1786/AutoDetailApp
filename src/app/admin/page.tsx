@@ -71,6 +71,8 @@ export default function AdminDashboard() {
 
     const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes, stockRes, ordersTodayRes, ordersPendingRes, recentOrdersRes] = await Promise.all([
       // Today's appointments
+      // Phase 0a: exclude synthetic walk-in appointments — they belong to the
+      // POS jobs queue, not the admin appointment dashboard.
       supabase
         .from('appointments')
         .select(`
@@ -82,6 +84,7 @@ export default function AdminDashboard() {
         `)
         .eq('scheduled_date', today)
         .neq('status', 'cancelled')
+        .neq('channel', 'walk_in')
         .order('scheduled_start_time'),
 
       // This week's appointments (for Week at a Glance)
@@ -97,6 +100,7 @@ export default function AdminDashboard() {
         .gte('scheduled_date', weekStart)
         .lte('scheduled_date', weekEnd)
         .neq('status', 'cancelled')
+        .neq('channel', 'walk_in')
         .order('scheduled_start_time'),
 
       // Open quotes by status

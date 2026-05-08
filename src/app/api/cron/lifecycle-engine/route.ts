@@ -279,6 +279,12 @@ async function scheduleFromTransactions(
   lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
+  // Phase 0a note: post-eager-appointment-creation, walk-in service transactions
+  // carry a non-null appointment_id (and are also referenced by jobs.transaction_id),
+  // so they fall out of this query naturally — leaving "pure product POS sales"
+  // (retail-only checkout, no job ever attached) as the only remaining matches.
+  // Pre-Phase-0a walk-in service transactions still have appointment_id IS NULL;
+  // the secondary jobs.transaction_id filter below excludes those.
   const { data: transactions, error } = await admin
     .from('transactions')
     .select(`
@@ -415,6 +421,10 @@ async function scheduleFromAppointmentBooked(
   lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
+  // Phase 0a: walk-ins now eagerly create a synthetic appointment row, but they
+  // are not "bookings" in the lifecycle sense — booking-confirmation comms,
+  // welcome flows, etc. shouldn't fire for someone who walked in. Closed-job
+  // follow-ups still reach walk-ins via scheduleFromCompletedJobs.
   const { data: appointments, error } = await admin
     .from('appointments')
     .select(`
@@ -427,7 +437,8 @@ async function scheduleFromAppointmentBooked(
     `)
     .gte('created_at', lookbackWindow)
     .not('customer_id', 'is', null)
-    .not('status', 'in', '(cancelled,no_show)');
+    .not('status', 'in', '(cancelled,no_show)')
+    .neq('channel', 'walk_in');
 
   if (error || !appointments?.length) {
     if (error) console.error('Failed to query newly-booked appointments:', error);
@@ -468,6 +479,10 @@ async function scheduleFromAppointmentCancelled(
   lookbackWindow: string,
   thirtyDaysAgo: string
 ): Promise<number> {
+  // Phase 0a: walk-in cancellations now flip the synthetic appointment to
+  // cancelled too. But "after_appointment_cancelled" rules (e.g., rebooking
+  // offers, missed-you discounts) shouldn't fire for walk-in cancels —
+  // there was no booking to cancel.
   const { data: appointments, error } = await admin
     .from('appointments')
     .select(`
@@ -479,7 +494,8 @@ async function scheduleFromAppointmentCancelled(
     `)
     .eq('status', 'cancelled')
     .gte('updated_at', lookbackWindow)
-    .not('customer_id', 'is', null);
+    .not('customer_id', 'is', null)
+    .neq('channel', 'walk_in');
 
   if (error || !appointments?.length) {
     if (error) console.error('Failed to query cancelled appointments:', error);

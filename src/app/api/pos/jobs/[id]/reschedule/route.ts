@@ -115,8 +115,10 @@ export async function PATCH(
         changes.push(`time: ${currentApt.scheduled_start_time} → ${scheduled_start_time}`);
       }
     } else if (scheduled_start_time && !job.appointment_id) {
-      // Walk-in job: no appointment record — store time in estimated_pickup_at
-      // The timeline reads this as a fallback when appointment.scheduled_start_time is null
+      // LEGACY: pre-Phase 0a walk-ins with appointment_id IS NULL. Post-0a,
+      // every walk-in has a synthetic appointment so the branch above runs
+      // instead. Eventual migration possible — this branch can be retired
+      // once all pre-0a walk-ins close out.
       const today = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'America/Los_Angeles',
         year: 'numeric', month: '2-digit', day: '2-digit',

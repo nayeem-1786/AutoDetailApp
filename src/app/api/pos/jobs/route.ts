@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
       assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
       addons:job_addons(id, status),
-      appointment:appointments!jobs_appointment_id_fkey(scheduled_start_time),
+      appointment:appointments!jobs_appointment_id_fkey(scheduled_start_time, channel),
       photos:job_photos(id, zone, phase)
     `;
     // Only exclude cancelled — include closed for daily summary + list visibility
@@ -62,7 +62,11 @@ export async function GET(request: NextRequest) {
           .not('status', 'in', `(${excludeStatuses.join(',')})`)
       : null;
 
-    // Step 2b: Walk-in jobs (no appointment) created on target date in PST
+    // Step 2b: LEGACY — pre-Phase 0a walk-ins (appointment_id IS NULL) created
+    // on target date in PST. Post-Phase 0a, walk-ins eagerly create a synthetic
+    // appointment with channel='walk_in' + scheduled_date=today, so they are
+    // picked up by aptJobsQuery above. This branch covers historical rows only;
+    // it can be retired once all in-flight pre-0a walk-ins close out.
     const startUtc = dateToPstStartOfDay(targetDate);
     const endUtc = dateToPstEndOfDay(targetDate);
     let walkInQuery = supabase
@@ -225,7 +229,7 @@ export async function POST(request: NextRequest) {
       assignedStaffId = await findAvailableDetailer(supabase, pstDate, pstTime, estimatedEnd);
     }
 
-    // Compute estimated_pickup_at for timeline placement (walk-ins have no appointment)
+    // Compute estimated_pickup_at for timeline placement.
     // Use caller-provided value, or default to now rounded UP to the next 15-min slot
     // so the timeline displays a clean slot (e.g., 23:07 → 23:15) rather than an
     // arbitrary minute. The helper handles the midnight wrap by advancing the date.
@@ -234,13 +238,99 @@ export async function POST(request: NextRequest) {
       pickupAt = getNowPstRoundedTo15().iso;
     }
 
+    // Phase 0a: eager appointment creation for walk-ins.
+    // Every walk-in job now gets a synthetic appointments row with channel='walk_in'
+    // so jobs.appointment_id is always non-null. Eliminates the IS NULL branch in
+    // downstream consumers (receipt composer, refund plan, lifecycle engine, etc.).
+    //
+    // Times: scheduled_start_time uses the EXACT current PST time (HH:MM:SS) — no
+    // 15-min rounding — because rounding can wrap past midnight (23:53 → 00:00 next
+    // day) which would place the appointment on tomorrow's date and hide the new
+    // walk-in from today's queue (Site 2 filters by scheduled_date=today). The
+    // rounded value remains on jobs.estimated_pickup_at for clean timeline slots.
+    const pstTimeExact = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'America/Los_Angeles',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).format(now);
+    const apptStartTime = pstTimeExact; // HH:MM:SS PST
+    const apptEndTime = addMinutesToTime(apptStartTime.slice(0, 5), 60) + ':00';
+    const servicesTotal = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+
+    const { data: appointment, error: apptErr } = await supabase
+      .from('appointments')
+      .insert({
+        customer_id,
+        vehicle_id: vehicle_id || null,
+        employee_id: assignedStaffId,
+        status: 'in_progress',
+        channel: 'walk_in',
+        scheduled_date: pstDate,
+        scheduled_start_time: apptStartTime,
+        scheduled_end_time: apptEndTime,
+        is_mobile: false,
+        mobile_zone_id: null,
+        mobile_address: null,
+        mobile_surcharge: 0,
+        payment_status: 'pending',
+        subtotal: servicesTotal,
+        tax_amount: 0,
+        discount_amount: 0,
+        total_amount: servicesTotal,
+        payment_type: 'pay_on_site',
+        deposit_amount: null,
+        job_notes: notes || null,
+        internal_notes: null,
+      })
+      .select('id')
+      .single();
+
+    if (apptErr || !appointment) {
+      console.error('Walk-in appointment create error:', apptErr);
+      return NextResponse.json(
+        { error: 'Failed to create walk-in appointment' },
+        { status: 500 }
+      );
+    }
+
+    // Mirror booked-appointment behavior: populate appointment_services rows.
+    // Atomic with the appointment INSERT — failure rolls back the appointment
+    // (CASCADE cleans any partial appointment_services rows) so we never
+    // leave a synthetic appointment without its service join rows.
+    const apptServiceRows = services.map((s) => ({
+      appointment_id: appointment.id,
+      service_id: s.id,
+      price_at_booking: s.price,
+      tier_name: null,
+    }));
+    if (apptServiceRows.length > 0) {
+      const { error: svcErr } = await supabase
+        .from('appointment_services')
+        .insert(apptServiceRows);
+      if (svcErr) {
+        // Rollback: delete the synthetic appointment (ON DELETE CASCADE
+        // on appointment_services.appointment_id handles partial rows).
+        await supabase.from('appointments').delete().eq('id', appointment.id);
+        console.error(
+          '[POS jobs POST] appointment_services insert failed; rolled back appointment:',
+          svcErr.message
+        );
+        return NextResponse.json(
+          { error: 'Failed to link services to appointment' },
+          { status: 500 }
+        );
+      }
+    }
+
     const { data: job, error } = await supabase
       .from('jobs')
       .insert({
         customer_id,
         vehicle_id: vehicle_id || null,
         assigned_staff_id: assignedStaffId,
-        appointment_id: null, // walk-in
+        appointment_id: appointment.id,
         services,
         status: 'scheduled',
         estimated_pickup_at: pickupAt,
@@ -258,6 +348,9 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Job create error:', error);
+      // Roll back the synthetic appointment to avoid orphans.
+      // ON DELETE CASCADE on appointment_services.appointment_id cleans the join rows.
+      await supabase.from('appointments').delete().eq('id', appointment.id);
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
     }
 

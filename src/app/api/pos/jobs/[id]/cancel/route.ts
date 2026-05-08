@@ -149,8 +149,21 @@ export async function POST(
         })
         .eq('id', job.appointment_id);
 
+      // Phase 0a: walk-ins now carry a synthetic appointment_id, but the
+      // existing cancellation SMS/email templates phrase the message as
+      // "your appointment on <date> at <time> has been cancelled" + a
+      // "Rebook Appointment" CTA — semantically wrong for a walk-in who
+      // never booked. The POS UI bypasses the notify dialog for walk-ins
+      // (channel='walk_in'); this server-side guard is defense-in-depth.
+      const { data: apptForChannel } = await supabase
+        .from('appointments')
+        .select('channel')
+        .eq('id', job.appointment_id)
+        .maybeSingle();
+      const isWalkInAppt = apptForChannel?.channel === 'walk_in';
+
       // Send notification if requested
-      if (notify_method) {
+      if (notify_method && !isWalkInAppt) {
         const customer = job.customer as unknown as {
           id: string;
           first_name: string;

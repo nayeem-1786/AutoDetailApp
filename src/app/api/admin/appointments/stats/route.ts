@@ -59,11 +59,13 @@ export async function GET() {
     const thirtyDaysStr = toLocalDateString(thirtyDaysFromNow);
 
     // Query 1: All appointments from today to 30 days out (covers today, this week, pending, booked revenue)
+    // Phase 0a: exclude synthetic walk-in appointments — they aren't bookings.
     const { data: upcoming, error: upcomingError } = await supabase
       .from('appointments')
       .select('id, scheduled_date, status, total_amount, created_at')
       .gte('scheduled_date', todayStr)
-      .lte('scheduled_date', thirtyDaysStr);
+      .lte('scheduled_date', thirtyDaysStr)
+      .neq('channel', 'walk_in');
 
     if (upcomingError) {
       console.error('Error fetching upcoming appointments:', upcomingError);
@@ -74,7 +76,8 @@ export async function GET() {
     const { data: recentlyCreated, error: recentError } = await supabase
       .from('appointments')
       .select('id')
-      .gte('created_at', sevenDaysAgo.toISOString());
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .neq('channel', 'walk_in');
 
     if (recentError) {
       console.error('Error fetching recent bookings:', recentError);

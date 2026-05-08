@@ -146,8 +146,11 @@ export async function GET(request: NextRequest) {
 
       // 6. APPOINTMENTS — customer name via join, service names via nested join
       // Always fetches 50, filters client-side (Supabase can't .or() on joins)
+      // Phase 0a: exclude synthetic walk-in appointments — global search results
+      // for "appointments" should only surface real bookings.
       admin.from('appointments')
         .select('id, scheduled_date, scheduled_start_time, status, customer:customers!customer_id(first_name, last_name), appointment_services(service:services!service_id(name))')
+        .neq('channel', 'walk_in')
         .order('scheduled_date', { ascending: false })
         .limit(50),
 

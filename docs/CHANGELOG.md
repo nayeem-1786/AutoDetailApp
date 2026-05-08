@@ -6,6 +6,81 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(pos): eager appointment creation for walk-ins (receipt unification Phase 0a)
+
+Foundation for receipt unification. Every walk-in job now creates a synthetic `appointments` row with `channel='walk_in'` at job-creation time, eliminating the `appointment_id IS NULL` branch from forward-looking POS, refund, lifecycle, and receipt code paths. Phase 0b will extract a single receipt composer that no longer needs walk-in special-casing.
+
+### POST `/api/pos/jobs` — atomic 3-step insert
+
+The walk-in POST endpoint now performs three sequential inserts with rollback on any failure:
+
+1. **`appointments`** row with `channel='walk_in'`, `status='in_progress'`, `scheduled_date=today PST`, `scheduled_start_time=exact PST HH:MM:SS` (no rounding — rounding can wrap past midnight onto tomorrow's date and hide the job from today's queue), `scheduled_end_time=start+60min`, `total_amount=sum(services[i].price)` (NOT zero — required for pay-link math, close-out vs checkout discriminator, and pay-on-site UX), `payment_type='pay_on_site'`, `is_mobile=false`, `payment_status='pending'`. Failure → return 500 (no orphan to clean).
+2. **`appointment_services`** rows mirroring booked-appointment behavior. Failure → DELETE the synthetic appointment (CASCADE on `appointment_services.appointment_id` cleans partial rows), return 500.
+3. **`jobs`** row with `appointment_id` set (no longer `null`). Failure → DELETE the synthetic appointment (CASCADE cleans the join rows), return 500.
+
+`jobs.estimated_pickup_at` continues to use `getNowPstRoundedTo15().iso` for clean 15-min timeline slot rendering. Two different fields, two different consumers — appointments uses exact time for record-keeping, jobs uses rounded time for UX.
+
+### IS NULL filter sites — adjusted, removed, or commented
+
+Nine sites identified in the receipt-unification field-inventory audit:
+
+- **`/api/pos/jobs/route.ts:71` (GET walk-in branch)** — kept with `LEGACY` comment. Pre-Phase-0a walk-ins (DB rows where `appointment_id IS NULL`) still surface via this branch; post-0a walk-ins flow through `aptJobsQuery` since their synthetic appointment carries `scheduled_date=today`.
+- **`/api/cron/lifecycle-engine/route.ts:293` (`scheduleFromTransactions`)** — kept; clarifying comment added. Post-0a walk-in service transactions carry non-null `appointment_id` and are excluded by both the IS NULL filter AND the secondary `jobs.transaction_id` reference. Branch now correctly captures pure product POS sales only.
+- **`/api/pos/jobs/[id]/reschedule/route.ts:117` (walk-in time-update branch)** — `LEGACY` comment. Post-0a walk-ins have `appointment_id`, so the `appointment_id` branch above runs instead.
+- **`/api/pos/refunds/source-plan/[id]/route.ts:59`** — `LEGACY` comment. Post-0a walk-ins follow the appointment-linked plan path.
+- **`pos/components/refund/refund-dialog.tsx:98`** — `LEGACY` comment. Post-0a walk-ins fetch the source plan.
+- **`/api/pos/jobs/[id]/cancel/route.ts:141`** — no change to the appointment-cancel write itself (already correct: cancellation reason propagates from job to synthetic appointment via `cancellation_reason: reason.trim()`). Walk-in customer notification is suppressed (see below).
+- **`(public)/receipt/[token]/page.tsx:210`** — comment updated. Aggregation runs uniformly for new walk-ins; legacy null fallback preserved.
+- **`src/lib/data/receipt-data.ts:194`** — comment updated. Same as above.
+
+### Cancel flow — walk-in notification suppressed
+
+Existing cancellation SMS/email templates phrase the message as "your appointment on `<date>` at `<time>` has been cancelled" + "Rebook Appointment" CTA — semantically wrong for someone who walked in. Two-layer guard:
+
+- **Client (`pos/jobs/components/job-detail.tsx:589`)**: cancel-flow gate now reads `!job.appointment_id || job.appointment?.channel === 'walk_in'`. Walk-ins skip the notify dialog entirely and use the silent-cancel path, mirroring pre-0a behavior.
+- **Server (`/api/pos/jobs/[id]/cancel/route.ts:152-164`)**: defense-in-depth. Fetches `appointments.channel` after flipping the cancellation; if `walk_in`, skips the SMS/email block. Returns `notified: false, sent_via: []`.
+
+The synthetic appointment cancellation is still written (audit-trail benefit), and `cancellation_reason` propagates from job to appointment unchanged.
+
+### Header pill discriminator — channel-based, not `appointment_id` truthiness
+
+Five UI sites switched from `job.appointment_id ? 'Appointment' : 'Walk-In'` to channel-based logic:
+
+- **`pos/jobs/components/job-detail.tsx`**: header pill (lines 745–768), cancel-button label (line 1397), notify-dialog gate (line 589). Type field added: `appointment.channel?: string`. JOB selector in `/api/pos/jobs/[id]/route.ts` JOB_SELECT now joins `channel`. Same in `/api/pos/jobs/route.ts` GET selector.
+- **`admin/jobs/[id]/page.tsx:344`**: header pill. Type field added: `appointment: { channel: string | null } | null`. `/api/admin/jobs/[id]/route.ts` GET selector now joins `appointment(channel)`.
+
+`isCloseOut` (line 1198) needs no special guard because `total_amount = sum(services.price)` (non-zero) makes `amount_due_cents > 0` for unfulfilled walk-ins — Close-Out only triggers when actually pre-paid.
+
+### Lifecycle engine — walk-in exclusion on appointment-trigger rules
+
+`scheduleFromAppointmentBooked` and `scheduleFromAppointmentCancelled` now `.neq('channel', 'walk_in')`. Operator-configured "after_appointment_booked" rules (booking confirmations, welcome flows) and "after_appointment_cancelled" rules (rebooking offers, missed-you discounts) no longer fire for walk-ins — they didn't book an appointment in the lifecycle sense. Closed-job follow-ups still reach walk-ins via `scheduleFromCompletedJobs`. `booking-reminders` cron is naturally safe (filters `status IN (pending, confirmed)`; synthetic walk-ins are `in_progress`).
+
+### S1–S7 surface filters — synthetic walk-ins stay invisible to non-POS surfaces
+
+Eight queries gained `.neq('channel', 'walk_in')` so synthetic walk-ins don't leak:
+
+- `(account)/account/appointments/page.tsx` — customer portal upcoming/past appointments
+- `(account)/account/page.tsx` — customer portal home dashboard "next appointment" widget
+- `admin/appointments/page.tsx` — admin calendar (month view + day view)
+- `admin/page.tsx` — admin dashboard (today + this week appointments)
+- `admin/customers/page.tsx` — "customers with upcoming appts" indicator
+- `/api/admin/appointments/stats/route.ts` — stats (upcoming + recently-created)
+- `/api/admin/global-search/route.ts` — global search
+
+Several of these had `status IN (pending, confirmed)` filters that already excluded `in_progress` synthetic walk-ins; the channel filter is defense-in-depth for status changes during walk-in lifecycle.
+
+### Out of scope (explicitly deferred)
+
+Receipt composer extraction (Phase 0b), visual receipt changes (Phase 1), schema migrations for check_number / discount split (Phase 1.5), appointment-level receipt token (Phase 2), Bug #2 interim payment endpoint (Phase 2), backfill of pre-Phase-0a walk-ins (legacy fallbacks remain).
+
+### Verification
+
+- `npx tsc --noEmit` — exit 0
+- `npx eslint <changed files>` — clean (2 pre-existing unrelated warnings in `refund-dialog.tsx`)
+- `npx vitest run` — 561/561 tests pass across 38 files
+
+---
+
 ## fix(pos): drop trailing 12 PM Timeline label; round Walk-In/Create-Job time to 15-min
 
 Two POS fixes plus a small helper extension.

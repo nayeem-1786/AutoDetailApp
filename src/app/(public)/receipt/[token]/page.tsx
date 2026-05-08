@@ -207,8 +207,13 @@ async function getTransaction(token: string): Promise<TransactionWithRelations |
   // for that appointment (chronological), and compute Balance Due. Mirrors the
   // logic in src/lib/data/receipt-data.ts so the public page and the
   // template-rendered surfaces (HTML email, copier, thermal) stay in sync.
-  // Walk-in receipts (appointment_id IS NULL) keep the locally joined
-  // payments[] — no behavior change for those.
+  //
+  // Phase 0a: post-eager-creation, every walk-in transaction also has an
+  // appointment_id and runs through this aggregation path — for a single-
+  // payment walk-in the result is identical to the pre-0a local-join result.
+  // LEGACY: pre-Phase 0a walk-ins still have appointment_id IS NULL and keep
+  // the locally joined payments[] via the fallback below. Eventual migration
+  // possible.
   let renderedPayments = (data as unknown as TransactionWithRelations).payments;
   let appointmentBalanceDue: number | undefined;
   let appointmentTotal: number | undefined;

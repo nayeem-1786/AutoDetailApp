@@ -64,6 +64,10 @@ export default function AccountDashboardPage() {
 
     // Load appointments, coupons, and last service photos in parallel
     const [apptResult, couponResult, photosResult] = await Promise.all([
+      // Phase 0a: hide synthetic walk-in appointments from the customer
+      // portal home dashboard. The status filter (pending/confirmed) already
+      // excludes them (synthetic walk-ins are 'in_progress'), but the explicit
+      // channel filter is defense-in-depth.
       supabase
         .from('appointments')
         .select(
@@ -74,6 +78,7 @@ export default function AccountDashboardPage() {
         )
         .eq('customer_id', customer.id)
         .in('status', ['pending', 'confirmed'])
+        .neq('channel', 'walk_in')
         .gte('scheduled_date', today)
         .order('scheduled_date', { ascending: true })
         .limit(3),

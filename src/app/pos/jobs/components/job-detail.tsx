@@ -102,6 +102,8 @@ interface JobDetailData {
     status: string;
     payment_status: string;
     total_amount: number;
+    /** Synthetic walk-in appointments carry channel='walk_in'. */
+    channel?: string;
     /** Server-computed remaining balance in integer cents. */
     amount_due_cents?: number;
   } | null;
@@ -585,8 +587,13 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     const reason = cancelReason === 'Other' ? customReason.trim() : cancelReason;
     if (!reason) return;
 
-    // If appointment-based, show notification dialog instead of cancelling immediately
-    if (job.appointment_id) {
+    // If appointment-based (NOT a walk-in), show notification dialog instead of
+    // cancelling immediately. Walk-ins (channel='walk_in') skip the dialog —
+    // existing cancellation templates phrase the message as "your appointment
+    // on <date>..." which is wrong for someone who walked in. Server enforces
+    // the same suppression as defense-in-depth.
+    const isWalkIn = !job.appointment_id || job.appointment?.channel === 'walk_in';
+    if (!isWalkIn) {
       setShowCancelDialog(false);
       setNotifySuccess(false);
       setShowNotifyDialog(true);
@@ -739,20 +746,30 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   ? `${job.customer.first_name} ${job.customer.last_name}`
                   : 'Unknown Customer'}
               </h1>
-              <span
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-                  job.appointment_id
-                    ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                    : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
-                )}
-              >
-                {job.appointment_id ? (
-                  <><Calendar className="h-3 w-3" />Appointment</>
-                ) : (
-                  <><Footprints className="h-3 w-3" />Walk-In</>
-                )}
-              </span>
+              {(() => {
+                // Phase 0a: every walk-in carries a synthetic appointment_id,
+                // so the pill discriminator is now the joined appointment's
+                // channel. Legacy pre-0a walk-ins (appointment_id IS NULL) also
+                // resolve to "Walk-In" via the negation.
+                const isBookedAppt =
+                  !!job.appointment_id && job.appointment?.channel !== 'walk_in';
+                return (
+                  <span
+                    className={cn(
+                      'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+                      isBookedAppt
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                        : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400'
+                    )}
+                  >
+                    {isBookedAppt ? (
+                      <><Calendar className="h-3 w-3" />Appointment</>
+                    ) : (
+                      <><Footprints className="h-3 w-3" />Walk-In</>
+                    )}
+                  </span>
+                );
+              })()}
               <span
                 className={cn(
                   'inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
@@ -1394,7 +1411,11 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 }
                 className="flex-1 rounded-lg bg-red-600 dark:bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50"
               >
-                {cancelling ? 'Cancelling...' : job.appointment_id ? 'Next' : 'Cancel Job'}
+                {cancelling
+                  ? 'Cancelling...'
+                  : (job.appointment_id && job.appointment?.channel !== 'walk_in')
+                    ? 'Next'
+                    : 'Cancel Job'}
               </button>
             </div>
           </div>

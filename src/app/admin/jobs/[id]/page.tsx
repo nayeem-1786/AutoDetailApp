@@ -91,6 +91,7 @@ interface JobDetail {
   intake_notes: string | null;
   estimated_pickup_at: string | null;
   appointment_id: string | null;
+  appointment: { channel: string | null } | null;
   transaction_id: string | null;
   gallery_token: string | null;
   cancellation_reason: string | null;
@@ -341,7 +342,11 @@ export default function AdminJobDetailPage({
               >
                 {STATUS_LABELS[job.status] || job.status}
               </span>
-              {job.appointment_id ? (
+              {/* Phase 0a: walk-ins now carry a synthetic appointment_id, so
+                  the pill discriminator is the joined appointment.channel.
+                  Legacy pre-0a walk-ins (appointment_id IS NULL) also fall to
+                  "Walk-In" via the negation. */}
+              {job.appointment_id && job.appointment?.channel !== 'walk_in' ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
                   <CalendarDays className="h-3 w-3" /> Appointment
                 </span>

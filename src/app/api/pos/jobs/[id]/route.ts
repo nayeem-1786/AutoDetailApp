@@ -10,7 +10,7 @@ const JOB_SELECT = `
   customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email),
   vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
   assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
-  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount),
+  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount, channel),
   addons:job_addons(*)
 `;
 
@@ -23,6 +23,7 @@ interface JobWithAppointment {
     status: string;
     payment_status: string;
     total_amount: number;
+    channel?: string;
     amount_due_cents?: number;
   } | null;
   [key: string]: unknown;

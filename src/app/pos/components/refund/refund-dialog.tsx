@@ -89,10 +89,13 @@ export function RefundDialog({
   const [partialCents, setPartialCents] = useState(0);
 
   // Close-out / appointment-linked: fetch the LIFO source plan once when the
-  // dialog opens. Walk-in transactions get an empty plan and the
-  // "Refund will be issued from:" section never renders. The walk
-  // (walkLifoAllocation) runs in the summary on every selection change so
-  // the display tracks the staff's chosen subset.
+  // dialog opens. The walk (walkLifoAllocation) runs in the summary on every
+  // selection change so the display tracks the staff's chosen subset.
+  //
+  // LEGACY: pre-Phase 0a walk-ins (appointment_id=null) skip the fetch and
+  // get an empty plan — the "Refund will be issued from:" section hides.
+  // Post-0a walk-ins carry a synthetic appointment_id and follow the linked
+  // plan path. Eventual migration possible.
   const [sourcePlan, setSourcePlan] = useState<SourceEntry[]>([]);
   useEffect(() => {
     if (!open || !transaction.appointment_id) {
