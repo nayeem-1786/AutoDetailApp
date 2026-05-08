@@ -133,8 +133,9 @@ export default function AppointmentsPage() {
       const monthStart = format(startOfMonth(month), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(month), 'yyyy-MM-dd');
 
-      // Phase 0a: exclude synthetic walk-in appointments from the admin
-      // calendar — they're POS-side bookkeeping, not bookings to schedule.
+      // Phase 0a-2: walk-ins are visible on the admin calendar with a
+      // "Walk-In" channel badge so staff can see in-shop activity alongside
+      // booked appointments. The select * already pulls the channel column.
       const { data, error } = await supabase
         .from('appointments')
         .select(`
@@ -146,7 +147,6 @@ export default function AppointmentsPage() {
         `)
         .gte('scheduled_date', monthStart)
         .lte('scheduled_date', monthEnd)
-        .neq('channel', 'walk_in')
         .order('scheduled_date')
         .order('scheduled_start_time');
 
@@ -171,7 +171,6 @@ export default function AppointmentsPage() {
           appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
         `)
         .eq('scheduled_date', today)
-        .neq('channel', 'walk_in')
         .order('scheduled_start_time');
 
       if (error) {

@@ -1039,6 +1039,7 @@ src/lib/utils/email-consent.ts
 src/lib/utils/email.ts
 src/lib/utils/feature-flags.ts
 src/lib/utils/form.ts
+src/lib/utils/format-channel.ts
 src/lib/utils/format.ts
 src/lib/utils/idempotency.ts
 src/lib/utils/issue-types.ts

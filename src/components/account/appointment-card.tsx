@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatDate, formatTime, formatCurrency } from '@/lib/utils/format';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { formatChannelLabel } from '@/lib/utils/format-channel';
 import { toast } from 'sonner';
 import type { AppointmentStatus } from '@/lib/supabase/types';
 
@@ -27,6 +28,8 @@ interface AppointmentCardProps {
   appointment: {
     id: string;
     status: AppointmentStatus;
+    /** Source channel — drives the inline channel badge (Walk-In Visit / Phone / Online). */
+    channel?: string | null;
     scheduled_date: string;
     scheduled_start_time: string;
     scheduled_end_time: string;
@@ -61,6 +64,12 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
 
   const serviceName =
     appointment.appointment_services?.[0]?.services?.name ?? 'Service';
+
+  // Phase 0a-2: text-only channel badge (Walk-In Visit / Phone / Online).
+  // Walk-ins: tagged so customers see "this visit was a walk-in" in their
+  // history. Booked appointments: shown as Phone or Online to distinguish
+  // staff-entered vs self-served bookings.
+  const channelLabel = formatChannelLabel(appointment.channel, 'customer');
 
   const vehicle = appointment.vehicles;
   const vehicleLabel = vehicle
@@ -101,11 +110,14 @@ export function AppointmentCard({ appointment, onStatusChange }: AppointmentCard
       <div className="rounded-lg border border-site-border bg-brand-surface p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-semibold text-site-text truncate">
                 {serviceName}
               </h3>
               <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+              <span className="rounded-full border border-site-border px-2 py-0.5 text-xs font-medium text-site-text-faint">
+                {channelLabel}
+              </span>
             </div>
 
             <p className="mt-1 text-sm text-site-text-muted">

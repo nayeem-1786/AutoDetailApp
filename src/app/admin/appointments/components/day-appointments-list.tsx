@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { formatTime } from '@/lib/utils/format';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
+import { formatChannelLabel } from '@/lib/utils/format-channel';
 import type { AppointmentWithRelations } from '../types';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import type { AppointmentStatus } from '@/lib/supabase/types';
@@ -67,7 +68,7 @@ export function DayAppointmentsList({
                 onClick={() => onSelect(appt)}
                 className="w-full rounded-lg border border-gray-200 bg-white p-3 text-left transition-colors hover:border-gray-300 hover:bg-gray-50"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-gray-900">
                     {formatTime(appt.scheduled_start_time)}
                     {' - '}
@@ -76,6 +77,11 @@ export function DayAppointmentsList({
                   <Badge variant={STATUS_BADGE_VARIANT[appt.status]}>
                     {APPOINTMENT_STATUS_LABELS[appt.status]}
                   </Badge>
+                  {/* Phase 0a-2: channel pill so admin can scan for walk-ins
+                      vs phone-booked vs online bookings at a glance. */}
+                  <span className="rounded-full border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600">
+                    {formatChannelLabel(appt.channel, 'admin')}
+                  </span>
                 </div>
                 <p className="mt-1 truncate text-sm text-gray-700">
                   {appt.customer.first_name} {appt.customer.last_name}

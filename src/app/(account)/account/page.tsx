@@ -48,6 +48,10 @@ interface LastServiceData {
 export default function AccountDashboardPage() {
   const { customer } = useCustomerAuth();
   const { info: businessInfo } = useBusinessInfo();
+  const [activeAppointments, setActiveAppointments] = useState<
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    any[]
+  >([]);
   const [upcomingAppointments, setUpcomingAppointments] = useState<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     any[]
@@ -62,25 +66,33 @@ export default function AccountDashboardPage() {
     const supabase = createClient();
     const today = new Date().toISOString().split('T')[0];
 
-    // Load appointments, coupons, and last service photos in parallel
-    const [apptResult, couponResult, photosResult] = await Promise.all([
-      // Phase 0a: hide synthetic walk-in appointments from the customer
-      // portal home dashboard. The status filter (pending/confirmed) already
-      // excludes them (synthetic walk-ins are 'in_progress'), but the explicit
-      // channel filter is defense-in-depth.
+    // Phase 0a-2 dual-card support:
+    //   activeResult     — any in_progress appointment (no date filter so a
+    //                      walk-in started late and rolled past midnight still
+    //                      surfaces as "Currently being serviced" the next day).
+    //   upcomingResult   — future pending/confirmed bookings only ("Next
+    //                      appointment" card). Date filter avoids surfacing
+    //                      stale rows.
+    const apptSelect = `id, status, channel, scheduled_date, scheduled_start_time, scheduled_end_time,
+         total_amount, is_mobile, mobile_address,
+         appointment_services(price_at_booking, services(name)),
+         vehicles(year, make, model, color)`;
+
+    const [activeResult, upcomingResult, couponResult, photosResult] = await Promise.all([
       supabase
         .from('appointments')
-        .select(
-          `id, status, scheduled_date, scheduled_start_time, scheduled_end_time,
-           total_amount, is_mobile, mobile_address,
-           appointment_services(price_at_booking, services(name)),
-           vehicles(year, make, model, color)`
-        )
+        .select(apptSelect)
+        .eq('customer_id', customer.id)
+        .eq('status', 'in_progress')
+        .order('scheduled_start_time', { ascending: false }),
+      supabase
+        .from('appointments')
+        .select(apptSelect)
         .eq('customer_id', customer.id)
         .in('status', ['pending', 'confirmed'])
-        .neq('channel', 'walk_in')
         .gte('scheduled_date', today)
         .order('scheduled_date', { ascending: true })
+        .order('scheduled_start_time', { ascending: true })
         .limit(3),
       fetch('/api/customer/coupons').then(async (res) => {
         if (!res.ok) return { data: [] };
@@ -92,7 +104,8 @@ export default function AccountDashboardPage() {
       }),
     ]);
 
-    setUpcomingAppointments(apptResult.data ?? []);
+    setActiveAppointments(activeResult.data ?? []);
+    setUpcomingAppointments(upcomingResult.data ?? []);
     setCoupons(couponResult.data ?? []);
 
     // Extract last service with before/after pair
@@ -269,11 +282,31 @@ export default function AccountDashboardPage() {
         </div>
       )}
 
+      {/* Currently being serviced — Phase 0a-2 (Option Z): renders independently
+          of "Next appointment" so a customer can have both visible at once
+          (walk-in started + future booking on the calendar). */}
+      {!loading && activeAppointments.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-site-text">
+            Currently being serviced
+          </h2>
+          <div className="mt-4 space-y-3">
+            {activeAppointments.map((appt) => (
+              <AppointmentCard
+                key={appt.id}
+                appointment={appt}
+                onStatusChange={loadDashboard}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Upcoming Appointments */}
       <div>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-site-text">
-            Upcoming Appointments
+            {activeAppointments.length > 0 ? 'Next appointment' : 'Upcoming Appointments'}
           </h2>
           <Link href="/account/appointments">
             <Button variant="ghost" size="sm">
@@ -288,7 +321,9 @@ export default function AccountDashboardPage() {
           </div>
         ) : upcomingAppointments.length === 0 ? (
           <p className="mt-4 text-sm text-site-text-dim">
-            No upcoming appointments.
+            {activeAppointments.length > 0
+              ? 'No future appointments scheduled.'
+              : 'No upcoming appointments. Book your next service.'}
           </p>
         ) : (
           <div className="mt-4 space-y-3">

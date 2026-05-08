@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { formatTime, formatCurrency } from '@/lib/utils/format';
+import { formatChannelLabel } from '@/lib/utils/format-channel';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import { AppointmentDetailDialog } from './appointments/components/appointment-detail-dialog';
 import type { AppointmentWithRelations } from './appointments/types';
@@ -70,9 +71,8 @@ export default function AdminDashboard() {
     const monthStart = format(new Date(now.getFullYear(), now.getMonth(), 1), 'yyyy-MM-dd');
 
     const [todayRes, weekRes, quotesRes, custTotalRes, custWeekRes, custMonthRes, stockRes, ordersTodayRes, ordersPendingRes, recentOrdersRes] = await Promise.all([
-      // Today's appointments
-      // Phase 0a: exclude synthetic walk-in appointments — they belong to the
-      // POS jobs queue, not the admin appointment dashboard.
+      // Today's appointments (Phase 0a-2: walk-ins included with channel
+      // badge rendered downstream in the dashboard list/components).
       supabase
         .from('appointments')
         .select(`
@@ -84,7 +84,6 @@ export default function AdminDashboard() {
         `)
         .eq('scheduled_date', today)
         .neq('status', 'cancelled')
-        .neq('channel', 'walk_in')
         .order('scheduled_start_time'),
 
       // This week's appointments (for Week at a Glance)
@@ -100,7 +99,6 @@ export default function AdminDashboard() {
         .gte('scheduled_date', weekStart)
         .lte('scheduled_date', weekEnd)
         .neq('status', 'cancelled')
-        .neq('channel', 'walk_in')
         .order('scheduled_start_time'),
 
       // Open quotes by status
@@ -218,6 +216,11 @@ export default function AdminDashboard() {
   const completed = appointments.filter((a) => a.status === 'completed').length;
   const remaining = pending + confirmed + inProgress;
 
+  // Phase 0a-2: today's appointments split by source so admin can see at a
+  // glance how many are walk-ins vs booked. Sub-line under the KPI count.
+  const todayWalkIns = appointments.filter((a) => a.channel === 'walk_in').length;
+  const todayBooked = appointments.length - todayWalkIns;
+
   // Schedule display: only confirmed + in_progress (not pending/completed/no_show)
   const scheduleAppointments = appointments.filter((a) => a.status === 'confirmed' || a.status === 'in_progress');
 
@@ -312,7 +315,16 @@ export default function AdminDashboard() {
             {loading ? (
               <Spinner />
             ) : (
-              <p className="text-2xl font-bold">{appointments.length}</p>
+              <>
+                <p className="text-2xl font-bold">{appointments.length}</p>
+                {/* Phase 0a-2: source breakdown so admin can see walk-in
+                    activity alongside booked. Suppressed when both are 0. */}
+                {appointments.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {todayBooked} booked &middot; {todayWalkIns} walk-in
+                  </p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -606,7 +618,7 @@ export default function AdminDashboard() {
                     }}
                     className="w-full rounded-lg border border-gray-200 p-3 text-left transition-colors hover:border-gray-300 hover:bg-gray-50"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium text-gray-900">
                         {formatTime(appt.scheduled_start_time)}
                         {' - '}
@@ -615,6 +627,10 @@ export default function AdminDashboard() {
                       <Badge variant={STATUS_BADGE_VARIANT[appt.status]}>
                         {APPOINTMENT_STATUS_LABELS[appt.status]}
                       </Badge>
+                      {/* Phase 0a-2: channel pill (Walk-In / Phone / Online). */}
+                      <span className="rounded-full border border-gray-300 px-2 py-0.5 text-xs font-medium text-gray-600">
+                        {formatChannelLabel(appt.channel, 'admin')}
+                      </span>
                     </div>
                     <p className="mt-1 truncate text-sm text-gray-700">
                       {appt.customer.first_name} {appt.customer.last_name}

@@ -6,6 +6,83 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(walkin): show walk-ins in customer/admin views with channel badges (Phase 0a-2)
+
+Visibility correction + channel labeling, on top of Phase 0a's eager appointment creation. Walk-ins now appear alongside booked appointments across the customer portal and admin surfaces with a text-only channel pill that distinguishes how the appointment entered the system.
+
+### Filters reverted (S1–S7)
+
+Phase 0a added `.neq('channel', 'walk_in')` to seven surfaces to keep synthetic walk-in appointments invisible. The desired UX is the opposite — walk-ins should be visible to both customer and admin, with appropriate visual differentiation. Reverted across:
+
+- `(account)/account/appointments/page.tsx` — customer portal appointments page
+- `(account)/account/page.tsx` — customer portal home dashboard
+- `admin/appointments/page.tsx` — admin calendar (month view + day view)
+- `admin/page.tsx` — admin home dashboard (today + week)
+- `admin/customers/page.tsx` — "customers with upcoming appts" indicator (status filter pending/confirmed already excludes walk-ins, so the channel filter was redundant)
+- `/api/admin/appointments/stats/route.ts` — admin stats (upcoming + recently created)
+- `/api/admin/global-search/route.ts` — global search
+
+`channel` column added to selects that didn't previously fetch it (customer portal queries; global-search). The admin queries already used `select *` and so already had the column.
+
+### Customer portal appointments page — 3-section layout
+
+`(account)/account/appointments/page.tsx` rewritten to render three explicit sections:
+
+- **Currently in Service** — `status='in_progress'`, sorted by `scheduled_start_time DESC` (most recently started first). Empty state: "No service currently in progress."
+- **Upcoming Appointments** — `status IN ('pending', 'confirmed')`, sorted earliest-first. Empty state: "No upcoming appointments." + "Book your next service" CTA button.
+- **Service History** — `status IN ('completed', 'cancelled', 'no_show')`, sorted most-recent first. Empty state: "No past services yet."
+
+Each row uses `AppointmentCard` (extended) which now renders a text-only channel pill ("Walk-In Visit" / "Phone" / "Online") inline with the existing service-name + status badge.
+
+### Customer portal home — Option Z dual-card widget
+
+`(account)/account/page.tsx` now runs two parallel appointment queries:
+
+- **Active** — `status='in_progress'` for this customer, no date filter (lets a walk-in started late at night still surface as "Currently being serviced" the next morning).
+- **Upcoming** — `status IN ('pending', 'confirmed')` with `scheduled_date >= today`, limit 3.
+
+Both render simultaneously when both exist:
+
+- Section header "Currently being serviced" appears above the active card(s) when present.
+- Section header switches from "Upcoming Appointments" to "Next appointment" when active card(s) are also visible (cleaner phrasing in the dual-card mode).
+- Empty-state copy changes contextually: "No future appointments scheduled." (when an active card is present) vs "No upcoming appointments. Book your next service." (when neither is present).
+
+### `AppointmentCard` — channel pill
+
+`src/components/account/appointment-card.tsx` accepts an optional `channel` field on the appointment prop and renders an inline pill via `formatChannelLabel(channel, 'customer')` next to the service-name title and status badge. Pill styling: `rounded-full border border-site-border px-2 py-0.5 text-xs font-medium text-site-text-faint` — matches existing typography, no icons or colored backgrounds (per LOCKED-4).
+
+### Admin surfaces — channel badges
+
+- `admin/appointments/components/day-appointments-list.tsx` — channel pill alongside the start/end time + status badge in the day-list rows.
+- `admin/page.tsx` (today's-schedule list) — same pill treatment in the "Today's Schedule" widget.
+- `admin/page.tsx` ("Today's Appointments" KPI card) — sub-line under the count: `"{N} booked · {M} walk-in"` (suppressed when count is 0).
+
+The admin appointment-detail-dialog retains its existing descriptive `CHANNEL_LABELS` ("Client (Online Booking)" / "Staff (Walk-in)" etc.) — that dialog explains booking provenance in detail and is intentionally distinct from the pill-style badge surfaces.
+
+### Channel-label helper
+
+New `src/lib/utils/format-channel.ts`:
+
+```typescript
+formatChannelLabel(channel, surface = 'admin'): string
+//   'walk_in' → 'Walk-In Visit' (customer) / 'Walk-In' (admin)
+//   'phone'   → 'Phone'
+//   'portal'  → 'Online'
+//   'online'  → 'Online'
+//   null/undefined → 'Appointment'
+//   other → title-case
+```
+
+Used by both customer (`AppointmentCard`) and admin surfaces (`day-appointments-list`, admin home today-schedule). Centralized so future channel additions (e.g., voice agent) only need updating in one place.
+
+### Verification
+
+- `npx tsc --noEmit` — exit 0
+- `npx eslint <changed files>` — clean
+- `npx vitest run` — 561/561 tests pass across 38 files
+
+---
+
 ## feat(pos): eager appointment creation for walk-ins (receipt unification Phase 0a)
 
 Foundation for receipt unification. Every walk-in job now creates a synthetic `appointments` row with `channel='walk_in'` at job-creation time, eliminating the `appointment_id IS NULL` branch from forward-looking POS, refund, lifecycle, and receipt code paths. Phase 0b will extract a single receipt composer that no longer needs walk-in special-casing.

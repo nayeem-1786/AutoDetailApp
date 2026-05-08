@@ -353,11 +353,10 @@ export default function CustomersPage() {
       const [custRes, quotesRes, apptsRes] = await Promise.all([
         custQuery,
         supabase.from('quotes').select('customer_id').in('status', ['draft', 'sent', 'viewed']).not('customer_id', 'is', null),
-        // Phase 0a: walk-in synthetic appointments shouldn't drive the
-        // "has upcoming booking" indicator. The status filter already excludes
-        // them (synthetic walk-ins are 'in_progress'); the channel filter is
-        // defense-in-depth.
-        supabase.from('appointments').select('customer_id').gte('scheduled_date', todayStr).in('status', ['pending', 'confirmed']).neq('channel', 'walk_in').not('customer_id', 'is', null),
+        // Phase 0a-2: walk-ins are 'in_progress' so the existing status
+        // filter (pending/confirmed) already correctly scopes this to real
+        // upcoming bookings. No channel filter needed.
+        supabase.from('appointments').select('customer_id').gte('scheduled_date', todayStr).in('status', ['pending', 'confirmed']).not('customer_id', 'is', null),
       ]);
 
       if (custRes.error) console.error('Error loading customers:', custRes.error);
