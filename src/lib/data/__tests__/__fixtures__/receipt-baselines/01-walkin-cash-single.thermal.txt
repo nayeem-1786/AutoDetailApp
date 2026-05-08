@@ -1,0 +1,20 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0001             May 6, 2026, 8:00 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Express Wash                           $25.00   
+------------------------------------------------
+Subtotal                                  $25.00
+Tax                                        $0.00
+
+TOTAL                                     $25.00
+------------------------------------------------
+CASH                                      $25.00
+  Tendered                                $30.00
+  Change                                   $5.00
+Balance Due                                $0.00

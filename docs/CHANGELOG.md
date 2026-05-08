@@ -6,6 +6,80 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(receipts): composer foundation + unit tests with fixtures (Phase 0b.1)
+
+Foundation pass for the receipt-unification effort. Extracted a pure data-shaping module (`src/lib/data/receipt-composer.ts`, 380 LOC) that consolidates the three parallel appointment-payment aggregation paths and provides Phase 1 vocabulary constants without any visual or behavioral change today.
+
+### What ships
+
+**New `src/lib/data/receipt-composer.ts`** — pure (no DB) module exporting:
+- `RECEIPT_VOCAB` constants (`PAYMENT_SECTION`, `TOTAL_PAID`, `BALANCE_DUE`, `PAID_IN_FULL_HTML`, `PAID_IN_FULL_THERMAL`, `CUSTOMER`, `VEHICLE`, `DATE`, `DEPOSIT_ONLINE`, `DEPOSIT_IN_STORE`, `PAY_LINK_ONLINE`).
+- `PaymentSource` enum (`'online_booking_deposit' | 'online_pay_link' | 'in_store'`) + `detectPaymentSource(notes)` discriminator (LOCKED-5 — mirrors the durable notes-prefix contract used by `derivePaymentSourceLabel`).
+- `composeReceiptPaymentLines(payments, appointment)` → `RenderedPaymentBlock` with chronologically-sorted lines, total_paid_cents, balance_due_cents (clamped ≥ 0), appointment_total_cents, and is_paid_in_full flag.
+- `composeReceiptRefunds(refunds, items)` → refund_status (`'none' | 'partial' | 'full'`) and `refunded_item_map` keyed by transaction_item_id.
+- `composeReceiptTotals(transaction)` → cents projection of subtotal/tax/discount/loyalty/tip/total with the manual-vs-loyalty discount split the renderer expects.
+- `buildSuggestedPaymentLabel(line)` — Phase 1 informational label builder. Returns `DEPOSIT_ONLINE` / `DEPOSIT_IN_STORE` for first-payment-with-remainder rows, `PAY_LINK_ONLINE` for pay-link rows, plain method names otherwise. Phase 0b.1 surfaces ignore this output.
+- `sourceToLabel(source, method)` — round-trip helper that maps the composer's `PaymentSource` enum back to the human-readable string (`'Online (pay link)'` / `'Booking deposit'` / `'Cash'` / etc.) currently attached as `source_label` on payment rows.
+
+**`is_first_with_remainder` semantics (Interpretation B):** a payment row is flagged as such only when (a) it's the chronologically-first payment AND (b) `appointment_total_cents > 0` AND (c) `running_paid_cents < appointment_total_cents` after applying it. Captures the "this payment was effectively a deposit because more was still owed" property without requiring `payment_type='deposit'` chrome on the appointment.
+
+**Balance-due clamp:** the composer applies `Math.max(0, appointment_total_cents - total_paid_cents)`. Same semantic as the inline `Math.max(0, totalCents - paidCents)` clamp that previously lived in `receipt-data.ts` (commit 4129e784 era) and the public receipt page. Protects the "Balance Due" display from going negative when an in-store sale exceeds a stale `appointment.total_amount`.
+
+### Test coverage
+
+**New `src/lib/data/__tests__/receipt-composer.test.ts`** — 50 tests across three layers:
+1. **Pure composer functions** (24 tests): `detectPaymentSource` prefix matching, `composeReceiptPaymentLines` empty/null handling, chronological sort, source detection from notes vs source_label fallback, `is_first_with_remainder` edge cases (single full payment, overpay clamp), suggested-label vocabulary, `composeReceiptRefunds` status transitions (none/partial/full + multi-refund aggregation onto same item), `composeReceiptTotals` discount split, `buildSuggestedPaymentLabel` per-source rules, `sourceToLabel` round-trip.
+2. **Fixture byte-equality regression** (24 tests): one HTML + one thermal assertion per scenario. Re-renders the 12 baseline `ReceiptTransaction` inputs through `generateReceiptHtml` and `generateReceiptLines → receiptToPlainText` and asserts byte-equal to the captured `__fixtures__/receipt-baselines/<slug>.{html,thermal.txt}` files. This is the safety net for the receipt-data.ts + checkout-items refactors — any drift fails immediately.
+3. **Composer-driven integration** (1 test): for scenario 5 (deposit + close-out), feeds raw payments through `composeReceiptPaymentLines`, reconstructs the `ReceiptTransaction.payments[]` shape via `sourceToLabel`, renders, asserts byte-equal to fixture. Proves the composer's output, when fed back into the renderer pipeline, produces identical output to the inline-aggregation path it replaces.
+
+### Fixture capture
+
+**New `scripts/capture-receipt-baselines.ts`** — regeneration script that walks all 12 scenarios and writes `<slug>.html` + `<slug>.thermal.txt` to the fixtures dir. Idempotent. Re-run only when intentionally adopting a renderer change.
+
+**New `src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts`** — 12 `ReceiptTransaction` definitions covering the spectrum from walk-in cash through deposit + interim + split-final paid-in-full. Timestamps pinned to 2026-05-04..06 PDT (UTC-07:00) so renderer output is byte-deterministic across machines and DST boundaries. Shared by the capture script and the regression tests.
+
+**24 fixture files** in `src/lib/data/__tests__/__fixtures__/receipt-baselines/`:
+- `01-walkin-cash-single` (4696B html / 860B thermal)
+- `02-walkin-card-amex` (4341B / 762B)
+- `03-walkin-split-tender` (4846B / 909B)
+- `04-deposit-only-running` (5207B / 992B)
+- `05-deposit-plus-closeout-paid` (5231B / 1001B)
+- `06-paylink-multi-running` (4545B / 811B)
+- `07-closeout-no-deposit` (4701B / 860B)
+- `08-zero-closeout-prepaid` (4899B / 903B)
+- `09-voided` (5004B / 875B)
+- `10-full-refund` (5285B / 1047B)
+- `11-partial-refund` (5591B / 1100B)
+- `12-deposit-interim-split-final` (5739B / 1148B)
+
+### Consumer switches (output shape unchanged)
+
+**`src/lib/data/receipt-data.ts`** — `fetchReceiptData`'s appointment-payment aggregation block (was ~70 LOC of inline chronological sort + source label derivation + `Math.max(0, totalCents - paidCents)` math) now feeds through `composeReceiptPaymentLines` and re-attaches each composer line to its DB row via `sourceToLabel`. Output `ReceiptTransaction.payments[].source_label`, `appointment_balance_due` (cents), and `appointment_total` (dollars) all preserved bit-for-bit. Removes the inline `toCents` import + `derivePaymentSourceLabel` import; the composer encapsulates both.
+
+**`src/app/api/pos/jobs/[id]/checkout-items/route.ts`** — the prior-payments aggregation (lines 267-296 area) similarly feeds through `composeReceiptPaymentLines` with `appointment=null` (the route only needs the chronological list + cents totals, not balance-due). `prior_payments[]` rows preserve their `{amount_cents, method, paid_at, source_label, stripe_payment_intent_id}` shape; `prior_payments_total_cents` now comes from `block.total_paid_cents`. Client-side POS ticket panel sees no change.
+
+### Phase 0b.2/0b.3 scaffolding (not active this session)
+
+**New `scripts/seed-receipt-test-transactions.sql`** — DO NOT EXECUTE. Cleanup block + 12-scenario INSERT skeletons tagged `[receipt-test scenario N: ...]` with deterministic UUIDs (`00000000-0000-0000-0000-00000000000N`). Phase 0b.2's byte-diff harness will populate this with full INSERTs for each scenario and run on dev/staging DBs to verify composer-backed rendering of real DB rows matches the captured fixtures.
+
+**New `src/app/(dev)/receipt-preview/page.tsx`** — placeholder, gated `NODE_ENV !== 'production'`. Phase 0b.3 will replace this with a 12-scenario × 4-surface visual harness (Thermal / HTML / Public Page / POS Ticket Totals) for pre-Phase-1 UX review.
+
+### Out of scope (deferred to Phase 0b.2 / 0b.3 / 1)
+
+- Public receipt page (`src/app/(public)/receipt/[token]/page.tsx`) — its inline `getTransaction(token)` data-fetch (~190 LOC of duplication with `fetchReceiptData`) stays put. Phase 0b.2 consolidates.
+- Real-DB byte-diff verification on production transactions — requires running the harness against a staged DB. Phase 0b.2.
+- 12-scenario × 4-surface preview rendering — Phase 0b.3.
+- Visual changes to any production receipt — Phase 1.
+- Schema migrations (check_number, discount split) — Phase 1.5.
+
+### Verification
+
+- `npx tsc --noEmit` — exit 0
+- `npx eslint <changed files>` — clean
+- `npx vitest run` — **611/611 tests pass** across 39 files (561 prior + 50 new). All 24 fixture byte-equality assertions pass after the receipt-data.ts + checkout-items switches.
+
+---
+
 ## feat(walkin): show walk-ins in customer/admin views with channel badges (Phase 0a-2)
 
 Visibility correction + channel labeling, on top of Phase 0a's eager appointment creation. Walk-ins now appear alongside booked appointments across the customer portal and admin surfaces with a text-only channel pill that distinguishes how the appointment entered the system.

@@ -2,8 +2,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ReceiptTransaction, ReceiptContext, ReceiptImages } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig } from '@/lib/data/receipt-config';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
-import { derivePaymentSourceLabel, type PaymentMethodLike } from '@/lib/utils/payment-source-label';
-import { toCents } from '@/lib/utils/refund-math';
+import { type PaymentMethodLike } from '@/lib/utils/payment-source-label';
+import {
+  composeReceiptPaymentLines,
+  sourceToLabel,
+  type ComposerPaymentInput,
+} from '@/lib/data/receipt-composer';
 import {
   parseRefundSources,
   enrichRefundSources,
@@ -191,7 +195,8 @@ export async function fetchReceiptData(
   // payments[] as the pre-0a local-join result.
   // LEGACY: pre-Phase 0a walk-ins still have appointment_id IS NULL and
   // keep raw.payments via the fallback. Eventual migration possible.
-  let renderedPayments = raw.payments ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let renderedPayments: any[] = raw.payments ?? [];
   let appointmentBalanceDue: number | undefined = undefined;
   let appointmentTotal: number | undefined = undefined;
 
@@ -205,48 +210,62 @@ export async function fetchReceiptData(
       .eq('transaction.status', 'completed')
       .order('created_at', { ascending: true });
 
+    // Pull the appointment total to compute Balance Due on the receipt.
+    // Re-fetches even when isDeposit since we need it for both branches.
+    const { data: apptForBalance } = await supabase
+      .from('appointments')
+      .select('total_amount')
+      .eq('id', raw.appointment_id)
+      .maybeSingle();
+
     if (appPayments) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      renderedPayments = appPayments.map((p: any) => ({
+      // Phase 0b.1: composer takes over chronological sort + source detection
+      // + balance-due math. Output here preserves the pre-0b.1 contract:
+      //   - appointment_id-linked payments[] carry source_label string
+      //   - appointment_balance_due in cents, clamped >= 0
+      //   - appointment_total in dollars (renderer applies Math.max policy)
+      // The clamp semantics (Math.max(0, total-paid)) live inside the composer.
+      const composerInput: ComposerPaymentInput[] = appPayments.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (p: any) => ({
+          id: p.id,
+          method: p.method,
+          amount: Number(p.amount),
+          tip_amount: p.tip_amount,
+          card_brand: p.card_brand,
+          card_last_four: p.card_last_four,
+          cash_tendered: p.cash_tendered,
+          change_given: p.change_given,
+          created_at: p.created_at,
+          source_notes: p.transaction?.notes ?? null,
+          stripe_payment_intent_id: p.stripe_payment_intent_id,
+        })
+      );
+
+      const block = composeReceiptPaymentLines(
+        composerInput,
+        apptForBalance ? { total_amount: Number(apptForBalance.total_amount) } : null
+      );
+
+      // Re-attach the original DB row alongside composer-derived source_label
+      // so any consumer fields not surfaced by the composer (e.g., joined
+      // transaction relation) remain available. Order matches block.lines
+      // (composer sorts chronologically, same as the pre-0b.1 ORDER BY).
+      const sortedRaw = [...appPayments].sort(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      renderedPayments = sortedRaw.map((p, i) => ({
         ...p,
-        source_label: derivePaymentSourceLabel(
-          p.transaction?.notes ?? null,
-          p.method as PaymentMethodLike
+        source_label: sourceToLabel(
+          block.lines[i].source,
+          block.lines[i].method as PaymentMethodLike
         ),
       }));
 
-      // Pull the appointment total to compute Balance Due on the receipt.
-      // Reuses the appt fetch above when isDeposit; re-fetches otherwise so
-      // we always have the correct total for non-deposit appointment-linked
-      // transactions (close-out, partial pre-pay, in-store sale on a
-      // pay-link-paid appointment, etc).
-      const { data: apptForBalance } = await supabase
-        .from('appointments')
-        .select('total_amount')
-        .eq('id', raw.appointment_id)
-        .maybeSingle();
-
       if (apptForBalance) {
-        const totalCents = toCents(Number(apptForBalance.total_amount));
-        const paidCents = renderedPayments.reduce(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (sum: number, p: any) => sum + toCents(Number(p.amount)),
-          0
-        );
-        // appointmentBalanceDue uses Math.max(0, totalCents - paidCents) to
-        // CLAMP NEGATIVE values to zero — semantically distinct from the
-        // receipt-template.ts Math.max(appointment_total, transaction.total_amount)
-        // which selects the LARGER GROSS. Both are intentional. If an
-        // in-store sale ($78) exceeds a stale appointment.total_amount ($1),
-        // paidCents > totalCents → balance = max(0, -77) = 0 → "fully paid"
-        // semantic, which is correct UX (staff don't need a "you owe -$77"
-        // alert). The actual Total displayed on the receipt is fixed by the
-        // template-side Math.max policy; this clamp here only protects the
-        // separate "balance due" display.
-        appointmentBalanceDue = Math.max(0, totalCents - paidCents);
-        // Raw appointment.total_amount — the renderer applies a
-        // Math.max(appointment_total, transaction.total_amount) policy to
-        // pick the larger gross for the TOTAL line. See receipt-template.ts.
+        appointmentBalanceDue = block.balance_due_cents;
+        // Renderer expects raw appointment.total_amount in dollars.
         appointmentTotal = Number(apptForBalance.total_amount);
       }
     }

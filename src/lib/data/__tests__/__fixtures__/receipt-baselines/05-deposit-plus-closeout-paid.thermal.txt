@@ -1,0 +1,23 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0005-FINAL       May 6, 2026, 8:00 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Full Detail                           $175.00   
+------------------------------------------------
+Subtotal                                 $175.00
+Tax                                        $0.00
+Deposit Paid - Online on 05/04/2026      -$50.00
+
+TOTAL                                    $175.00
+     See also: Deposit Receipt #R-0005-DEP
+------------------------------------------------
+Booking deposit · May 4, 2026, 1:00 PM    $50.00
+CASH                                     $125.00
+  Tendered                               $125.00
+  Change                                   $0.00
+Balance Due                                $0.00

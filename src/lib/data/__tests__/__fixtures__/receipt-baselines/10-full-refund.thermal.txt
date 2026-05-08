@@ -1,0 +1,25 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0010             May 6, 2026, 8:00 PM
+                 ** REFUNDED **
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Premium Wash                           $50.00   
+             >> REFUNDED (1) -$50.00
+------------------------------------------------
+Subtotal                                  $50.00
+Tax                                        $0.00
+
+TOTAL                                     $50.00
+------------------------------------------------
+Visa ****4242                             $50.00
+Balance Due                                $0.00
+------------------------------------------------
+                 --- Refund ---
+Refund Date                          May 6, 2026
+            Reason: Customer request
+Refund Amount                            -$50.00

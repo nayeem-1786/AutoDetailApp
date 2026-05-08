@@ -785,6 +785,11 @@ src/app/(account)/account/transactions/page.tsx — Transaction history
 src/app/(account)/account/vehicles/page.tsx     — My vehicles
 ```
 
+### Dev-Only (`src/app/(dev)/`)
+```
+src/app/(dev)/receipt-preview/page.tsx          — Phase 0b.3 placeholder (NODE_ENV-gated). Future 12-scenario × 4-surface receipt visual harness.
+```
+
 ### POS Pages (`src/app/pos/`)
 ```
 src/app/pos/page.tsx                     — POS main workspace
@@ -856,8 +861,13 @@ src/lib/data/featured-photos.ts
 src/lib/data/homepage-settings.ts
 src/lib/data/page-content.ts
 src/lib/data/products.ts
+src/lib/data/receipt-composer.ts                    — Phase 0b.1: pure composer for payment/refund/totals aggregation
 src/lib/data/receipt-config.ts
 src/lib/data/receipt-data.ts
+src/lib/data/__tests__/receipt-composer.test.ts     — Phase 0b.1: composer unit tests + 24 fixture byte-equality regressions
+src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 12 ReceiptTransaction scenarios shared by capture script + tests
+src/lib/data/__tests__/__fixtures__/receipt-baselines/*.html       — 12 captured HTML fixtures (regenerable)
+src/lib/data/__tests__/__fixtures__/receipt-baselines/*.thermal.txt — 12 captured thermal fixtures (regenerable)
 src/lib/data/refund-sources.ts
 src/lib/data/reviews.ts
 src/lib/data/services.ts
@@ -1558,11 +1568,13 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 ## Scripts
 
 ```
+scripts/capture-receipt-baselines.ts        # Phase 0b.1: regenerates 12-scenario HTML+thermal fixtures
 scripts/import-square-data.mjs
 scripts/regen-db-schema.ts
 scripts/regen-sms-contracts.ts              # Codegen: SMS palette + per-slug typed contracts (Session 2A.5)
 scripts/seed-admin.ts
 scripts/seed-data.ts
+scripts/seed-receipt-test-transactions.sql  # Phase 0b.1: receipt-test seed scaffolding (NOT executed; for Phase 0b.2 byte-diff harness)
 ```
 
 ## Config

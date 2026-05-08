@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
-import { toCents } from '@/lib/utils/refund-math';
-import { derivePaymentSourceLabel } from '@/lib/utils/payment-source-label';
+import { type PaymentMethodLike } from '@/lib/utils/payment-source-label';
+import {
+  composeReceiptPaymentLines,
+  sourceToLabel,
+  type ComposerPaymentInput,
+} from '@/lib/data/receipt-composer';
 
 interface PriorPayment {
   amount_cents: number;
@@ -279,19 +283,42 @@ export async function GET(
         // Non-fatal: empty prior_payments is the safe fallback (no double-charge
         // protection on this load, but no crash either).
       } else if (appPayments) {
-        for (const row of appPayments) {
+        // Phase 0b.1: composer takes over chronological sort + source detection
+        // + cents conversion. Output here preserves the pre-0b.1 client contract:
+        //   - prior_payments[] in chronological order
+        //   - amount_cents per row (already cents, no conversion at consumer)
+        //   - source_label string ('Cash' | 'Online (pay link)' | 'Booking deposit' | etc.)
+        //   - paid_at = created_at ISO string
+        //   - stripe_payment_intent_id passthrough
+        const composerInput: ComposerPaymentInput[] = appPayments.map((row) => {
           const tx = row.transaction as unknown as { notes: string | null } | null;
-          const method = row.method as PriorPayment['method'];
-          const amountCents = toCents(Number(row.amount));
+          return {
+            method: row.method,
+            amount: Number(row.amount),
+            created_at: row.created_at,
+            source_notes: tx?.notes ?? null,
+            stripe_payment_intent_id: row.stripe_payment_intent_id ?? null,
+          };
+        });
+        const block = composeReceiptPaymentLines(composerInput, null);
+        // Re-merge composer output with original rows in the same chronological
+        // order to preserve fields the composer doesn't surface here (the POS
+        // ticket panel only needs the five fields above).
+        const sortedRaw = [...appPayments].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        for (let i = 0; i < block.lines.length; i++) {
+          const line = block.lines[i];
+          const row = sortedRaw[i];
           prior_payments.push({
-            amount_cents: amountCents,
-            method,
+            amount_cents: line.amount_cents,
+            method: line.method as PriorPayment['method'],
             paid_at: row.created_at,
-            source_label: derivePaymentSourceLabel(tx?.notes ?? null, method),
+            source_label: sourceToLabel(line.source, line.method as PaymentMethodLike),
             stripe_payment_intent_id: row.stripe_payment_intent_id ?? null,
           });
-          prior_payments_total_cents += amountCents;
         }
+        prior_payments_total_cents = block.total_paid_cents;
       }
     }
 

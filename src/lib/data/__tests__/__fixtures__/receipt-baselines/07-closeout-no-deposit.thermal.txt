@@ -1,0 +1,20 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0007             May 6, 2026, 8:00 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Full Detail                           $175.00   
+------------------------------------------------
+Subtotal                                 $175.00
+Tax                                        $0.00
+
+TOTAL                                    $175.00
+------------------------------------------------
+CASH                                     $175.00
+  Tendered                               $200.00
+  Change                                  $25.00
+Balance Due                                $0.00

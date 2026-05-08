@@ -1,0 +1,26 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0011             May 6, 2026, 8:00 PM
+            ** PARTIALLY REFUNDED **
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Premium Wash                           $25.00   
+Tire Shine Add-on                      $25.00   
+             >> REFUNDED (1) -$25.00
+------------------------------------------------
+Subtotal                                  $50.00
+Tax                                        $0.00
+
+TOTAL                                     $50.00
+------------------------------------------------
+Mastercard ****5555                       $50.00
+Balance Due                                $0.00
+------------------------------------------------
+                 --- Refund ---
+Refund Date                          May 6, 2026
+             Reason: Skipped add-on
+Refund Amount                            -$25.00

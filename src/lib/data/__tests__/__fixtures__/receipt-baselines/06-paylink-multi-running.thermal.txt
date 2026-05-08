@@ -1,0 +1,19 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0006             May 5, 2026, 5:00 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Full Detail                           $175.00   
+------------------------------------------------
+Subtotal                                 $175.00
+Tax                                        $0.00
+
+TOTAL                                    $175.00
+------------------------------------------------
+Online (pay link) · May 5, 2026, 3:00 PM  $50.00
+Online (pay link) · May 5, 2026, 5:00 PM  $75.00
+Balance Due                               $50.00
