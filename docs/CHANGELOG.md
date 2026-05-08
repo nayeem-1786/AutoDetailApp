@@ -6,6 +6,77 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## refactor(receipts): consolidate public receipt page through composer (Phase 0b.2)
+
+Eliminates the fourth parallel implementation in the receipt-unification effort. The public receipt page at `src/app/(public)/receipt/[token]/page.tsx` now consumes the same composer-driven `ReceiptTransaction` shape that the print, email, and thermal renderers do — instead of inline-duplicating ~190 LOC of deposit detection, appointment-payment aggregation, balance-due math, and refund-source enrichment.
+
+### Public page consolidation
+
+Replaced the inline `getTransaction(token)` (lines 110-298 of the prior file) with a 17-line `resolveTokenToReceipt(token)` that does one `transactions.id` lookup by `access_token`, then calls `fetchReceiptTransaction(supabase, id)`. JSX rendering below is unchanged — it consumes the exact `ReceiptTransaction` shape `fetchReceiptData`'s `tx` field provides. Deleted the local `TransactionWithRelations` interface (104 LOC) and all the duplicated logic.
+
+**Net page footprint: 353 LOC deleted, 41 added (−312 LOC).**
+
+### `fetchReceiptTransaction` sub-helper
+
+Extracted from `fetchReceiptData` so the public page can bypass the unused work (receipt config fetch, business_settings review URLs lookup, QR PNG generation × 2, bwip-js barcode generation). Those outputs are consumed only by `generateReceiptHtml` / `generateReceiptLines`; the public page renders JSX from the `tx` slice and drops everything else.
+
+- New exported entry point: `fetchReceiptTransaction(supabase, transactionId): Promise<ReceiptTransaction>`.
+- New internal helper: `mapTransactionRow(supabase, transactionRow)` that runs the deposit detection / linked-receipt lookup / composer-driven payment aggregation / refund-source enrichment. Both `fetchReceiptData` and `fetchReceiptTransaction` route through it so the composer-backed shape is single-sourced.
+- `fetchReceiptData` continues to wrap the same `tx` with config/context/images for the print/email/thermal pipelines — same external API, no behavior change for existing consumers.
+
+Saves an estimated 50-150ms of unused compute per public-page request (no QR PNG, no bwip-js barcode, no `business_settings` round-trip).
+
+### Type widening
+
+`ReceiptPayment` in `src/app/pos/lib/receipt-template.ts` gained an optional `id?: string` field. The DB row id is universally present at runtime (Supabase joined-row spread); declaring it gives the public page's `<div key={p.id}>` JSX a typed handle without an `as any` cast. Renderers ignore it.
+
+### Byte-diff harness — `scripts/diff-receipt-renders.ts`
+
+CC cannot access the production DB to verify byte-fidelity directly, so the session ships a self-contained Node harness that the user runs locally. Three modes:
+
+- `--capture before` — checkpoint at the prior commit (Phase 0b.1 head, `4d36eb46`), capture per-id outputs.
+- `--capture after` — checkpoint at the current Phase 0b.2 commit, capture again.
+- `--diff` — compare every captured pair, write a PASS/FAIL summary to `tmp/diff/SUMMARY.txt`.
+
+Captures four surfaces per transaction:
+
+1. **`tx.json`** — `fetchReceiptTransaction`'s `ReceiptTransaction` output, JSON-serialized with stable key ordering. Proves the composer-driven aggregation produces an identical data shape — the root cause check for any visual drift.
+2. **`html`** — `generateReceiptHtml(tx, config, images)` output. Print + email pipeline.
+3. **`thermal`** — `generateReceiptLines(tx, config, context)` → `receiptToPlainText()` output. Printer pipeline.
+4. **`public`** — fetched HTML from a running local dev server at `${publicUrl}/receipt/${access_token}`. The most critical artifact for this session — proves the page consolidation is byte-safe end-to-end. Optional via `--skip-public` (e.g., dev server not running).
+
+`--diff` mode reports PASS / FAIL / MISSING per id per surface with byte-delta counts on FAIL. Exit code 3 on any FAIL so the harness composes cleanly with shell-based CI gates.
+
+Env vars: `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (with fallbacks to the `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_KEY` names). Optional `--public-url` flag overrides the default `http://localhost:3000`.
+
+### Operator runbook — `docs/sessions/receipt-unification-phase-0b-2.md`
+
+End-to-end documentation for the harness run:
+
+- Surface table (what each PASS proves).
+- 10 SQL queries to find production candidates covering the matrix: walk-in cash; walk-in card; booking-deposit only; booking-deposit + close-out paid; pay-link multi-event; close-out only; $0 close-out; voided; full refund; partial refund.
+- Three-step capture/diff sequence with the exact commands.
+- Optional flag reference (`--public-url`, `--skip-public`).
+- Env-var requirements.
+- Output layout under `tmp/diff/` (gitignored).
+- **Deploy gate**: do not deploy Phase 0b.2 until the harness reports PASS for all surfaces across at least 10 production-representative transaction IDs covering the matrix above.
+
+### Out of scope (deferred)
+
+- 12-scenario × 4-surface preview page rendering — Phase 0b.3.
+- Visual changes to any receipt — Phase 1.
+- Schema migrations (`payments.check_number`, discount split) — Phase 1.5.
+
+### Verification
+
+- `npx tsc --noEmit` — exit 0
+- `npx eslint <changed files>` — clean
+- `npx vitest run` — **611/611 tests pass** across 39 files. All 24 fixture byte-equality assertions from Phase 0b.1 still pass after the sub-helper extraction (proves the composer's behavior is unchanged through the refactor).
+
+**Deploy gate active:** do not deploy this commit until the byte-diff harness reports PASS for all surfaces across 10 production transaction IDs covering the matrix above. If any FAIL, paste `tmp/diff/SUMMARY.txt` plus the failing-surface diff for analysis.
+
+---
+
 ## refactor(receipts): composer foundation + unit tests with fixtures (Phase 0b.1)
 
 Foundation pass for the receipt-unification effort. Extracted a pure data-shaping module (`src/lib/data/receipt-composer.ts`, 380 LOC) that consolidates the three parallel appointment-payment aggregation paths and provides Phase 1 vocabulary constants without any visual or behavioral change today.

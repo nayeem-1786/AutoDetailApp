@@ -44,6 +44,10 @@ interface ReceiptRefund {
 }
 
 interface ReceiptPayment {
+  /** DB row id. Universally present at runtime (set by Supabase joined-row
+   * spread); declared here to give consumers — public receipt page React
+   * key prop, etc. — a typed handle without a cast. Renderers ignore it. */
+  id?: string;
   method: string;
   amount: number;
   tip_amount: number;

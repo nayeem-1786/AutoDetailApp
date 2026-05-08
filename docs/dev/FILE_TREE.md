@@ -1569,6 +1569,7 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 
 ```
 scripts/capture-receipt-baselines.ts        # Phase 0b.1: regenerates 12-scenario HTML+thermal fixtures
+scripts/diff-receipt-renders.ts             # Phase 0b.2: byte-diff harness for production transactions; user runs locally
 scripts/import-square-data.mjs
 scripts/regen-db-schema.ts
 scripts/regen-sms-contracts.ts              # Codegen: SMS palette + per-slug typed contracts (Session 2A.5)
@@ -1600,6 +1601,7 @@ docs/dev/POS_SECURITY.md
 docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
+docs/sessions/receipt-unification-phase-0b-2.md   # Phase 0b.2: byte-diff harness operator runbook + 10-scenario SQL queries
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

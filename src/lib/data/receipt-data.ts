@@ -26,18 +26,19 @@ interface ReceiptData {
 }
 
 /**
- * Fetches all data needed to render a receipt for a given transaction.
- * Consolidates the duplicated logic from all 5 receipt API routes:
- * - Transaction fetch with relations
- * - Receipt config
- * - Review URLs (always fresh from business_settings)
- * - QR code + barcode image generation
- * - ReceiptTransaction mapping
+ * Fetches the rendered ReceiptTransaction for a given transaction id —
+ * the core composer-driven aggregation without the receipt-config / QR /
+ * barcode work that only the print/email/thermal renderers need.
+ *
+ * Phase 0b.2 extraction: the public receipt page consumes this directly
+ * (skipping ~50-150ms of unused QR/barcode compute on every page load),
+ * while fetchReceiptData layers config/context/images on top for the
+ * thermal + HTML print + email pipelines.
  */
-export async function fetchReceiptData(
+export async function fetchReceiptTransaction(
   supabase: SupabaseClient,
   transactionId: string
-): Promise<ReceiptData> {
+): Promise<ReceiptTransaction> {
   // 1. Fetch transaction with all relations
   const { data: transaction, error } = await supabase
     .from('transactions')
@@ -56,6 +57,27 @@ export async function fetchReceiptData(
   if (error || !transaction) {
     throw new Error('Transaction not found');
   }
+
+  return mapTransactionRow(supabase, transaction);
+}
+
+/**
+ * Fetches all data needed to render a receipt for a given transaction.
+ * Consolidates the duplicated logic from all 5 receipt API routes:
+ * - Transaction fetch with relations
+ * - Receipt config
+ * - Review URLs (always fresh from business_settings)
+ * - QR code + barcode image generation
+ * - ReceiptTransaction mapping
+ */
+export async function fetchReceiptData(
+  supabase: SupabaseClient,
+  transactionId: string
+): Promise<ReceiptData> {
+  // Delegate transaction fetch + ReceiptTransaction mapping to the shared
+  // sub-helper; both fetchReceiptData and the public receipt page route
+  // through it so the composer-backed shape is single-sourced.
+  const tx = await fetchReceiptTransaction(supabase, transactionId);
 
   // 2. Fetch receipt config
   const { merged, print_server_url } = await fetchReceiptConfig(supabase);
@@ -87,11 +109,11 @@ export async function fetchReceiptData(
   }
 
   // 6. Generate barcode image (for HTML rendering)
-  if (transaction.receipt_number) {
+  if (tx.receipt_number) {
     try {
       const buf = await bwipjs.toBuffer({
         bcid: 'code128',
-        text: transaction.receipt_number,
+        text: tx.receipt_number,
         scale: 2,
         height: 10,
         includetext: false,
@@ -100,6 +122,21 @@ export async function fetchReceiptData(
     } catch { /* barcode generation failed — fallback to text */ }
   }
 
+  return { tx, config: merged, context, images, print_server_url };
+}
+
+/**
+ * Inner mapper: takes an already-fetched transaction row (with relations
+ * spread) and runs the deposit detection / linked-receipt lookup / appointment
+ * payment aggregation / refund-source enrichment that produces a
+ * ReceiptTransaction. Pulled out of fetchReceiptData so fetchReceiptTransaction
+ * can reuse it without re-fetching.
+ */
+async function mapTransactionRow(
+  supabase: SupabaseClient,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  transaction: any
+): Promise<ReceiptTransaction> {
   // 7. Detect deposit receipt — check linked appointment for payment_type='deposit'
   let isDeposit = false;
   let depositAmount = 0;
@@ -351,5 +388,5 @@ export async function fetchReceiptData(
     appointment_total: appointmentTotal,
   };
 
-  return { tx, config: merged, context, images, print_server_url };
+  return tx;
 }
