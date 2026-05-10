@@ -21,6 +21,7 @@ import {
   type PaymentMethodLike,
 } from '@/lib/utils/payment-source-label';
 import { formatCardBrand } from '@/lib/utils/card-brand';
+import { formatReceiptDateTimeCompact } from '@/lib/utils/format';
 
 // ---------------------------------------------------------------------------
 // Vocabulary constants — LOCKED-4
@@ -42,6 +43,14 @@ export const RECEIPT_VOCAB = {
   DEPOSIT_ONLINE: 'Deposit (Online)',
   DEPOSIT_IN_STORE: 'Deposit (In-Store)',
   PAY_LINK_ONLINE: 'Pay Link (Online)',
+  // Loyalty redemption stays in the discount section above TOTAL —
+  // CDTFA Reg 1671.1 treats loyalty redemption as a discount that reduces
+  // the taxable base, NOT a tender. Phase 1A REVISED LOCKED-7.
+  LOYALTY_LABEL: 'Loyalty Discount',
+  // Loyalty footer (below Balance Due / Paid in Full).
+  LOYALTY_REDEEMED_PREFIX: 'Loyalty redeemed:',
+  LOYALTY_BALANCE_PREFIX: 'Loyalty balance:',
+  LOYALTY_BALANCE_SUFFIX: 'pts remaining',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -271,6 +280,160 @@ function buildMethodDetail(line: Pick<RenderedPaymentLine, 'method' | 'card_bran
   }
 }
 
+/**
+ * Phase 1A LOCKED-9: assemble the combined payment-row label per the locked
+ * format hierarchy. Returns ONE string composed of 2 or 3 ` · `-joined
+ * segments depending on the source:
+ *
+ *   - Online booking deposit  → `Deposit (Online) · Amex ****1074 · 5/4/26 9:15 AM`
+ *   - In-store deposit (rare) → `Deposit (In-Store) · Cash · 5/4/26 9:15 AM`
+ *   - Pay-link payment         → `Pay Link (Online) · Amex ****1074 · 5/4/26 9:15 AM`
+ *   - Regular cash             → `Cash · 5/6/26 10:32 AM`
+ *   - Regular card             → `Amex ****1074 · 5/6/26 10:32 AM` (method_detail leads;
+ *                                 bare "Card" is redundant when brand+last4 is known)
+ *   - Regular check            → `Check · 5/6/26 10:32 AM`
+ *
+ * 3-segment form is used when the primary label is a META label
+ * (Deposit/Pay Link) distinct from the physical method; otherwise the
+ * primary IS the method label and the method_detail segment is omitted
+ * (or for cards, replaces the bare 'Card' primary).
+ *
+ * Timestamp is omitted entirely when `createdAt` is null/missing — produces
+ * the leading segment(s) only.
+ */
+export function buildCombinedPaymentLabel(opts: {
+  primary: string;
+  methodDetail: string;
+  source: PaymentSource;
+  method: string;
+  createdAt: string | null | undefined;
+}): string {
+  const isMetaPrimary =
+    opts.primary === RECEIPT_VOCAB.DEPOSIT_ONLINE ||
+    opts.primary === RECEIPT_VOCAB.DEPOSIT_IN_STORE ||
+    opts.primary === RECEIPT_VOCAB.PAY_LINK_ONLINE;
+  const ts = formatReceiptDateTimeCompact(opts.createdAt);
+
+  // Leading segment(s): for meta-primary labels, primary + method_detail;
+  // for card method, method_detail alone (brand+last4 trumps bare "Card");
+  // for cash/check, primary alone (primary IS the method label).
+  let leading: string;
+  if (isMetaPrimary) {
+    leading = `${opts.primary} · ${opts.methodDetail}`;
+  } else if (opts.method === 'card') {
+    leading = opts.methodDetail;
+  } else {
+    leading = opts.primary;
+  }
+
+  return ts ? `${leading} · ${ts}` : leading;
+}
+
+// ---------------------------------------------------------------------------
+// Renderer-callable label helper (Phase 1A)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the combined payment-row label for a payment-row-shaped input
+ * without first constructing a full RenderedPaymentLine. Used by renderers
+ * that consume `ReceiptPayment` (which lacks composer-derived fields when
+ * the payment didn't flow through composeReceiptPaymentLines — e.g.,
+ * fixtures in inputs.ts, legacy walk-in paths).
+ *
+ * Caller supplies `isFirstWithRemainder` because the renderer has access
+ * to the chronological position + appointment_total to derive it cheaply.
+ */
+export function buildSuggestedLabelForPayment(
+  p: {
+    method: string;
+    card_brand?: string | null;
+    card_last_four?: string | null;
+    source_label?: string | null;
+    source_notes?: string | null;
+    created_at?: string | null;
+  },
+  isFirstWithRemainder: boolean
+): string {
+  const source: PaymentSource = p.source_notes
+    ? detectPaymentSource(p.source_notes)
+    : sourceFromLabel(p.source_label);
+
+  // Reuse the same primary/method-detail logic by constructing a partial
+  // RenderedPaymentLine shape.
+  const dummy: RenderedPaymentLine = {
+    payment_id: '',
+    date_short: '',
+    date_long: '',
+    source,
+    is_first_payment: isFirstWithRemainder, // unused by builders below
+    is_first_with_remainder: isFirstWithRemainder,
+    method: p.method,
+    card_brand: p.card_brand ?? null,
+    card_last_four: p.card_last_four ?? null,
+    amount_cents: 0,
+    cash_tendered_cents: null,
+    change_given_cents: null,
+    tip_amount_cents: 0,
+    suggested_primary_label: '',
+    suggested_method_detail: '',
+    suggested_label_combined: '',
+  };
+  const primary = buildSuggestedPaymentLabel(dummy);
+  const methodDetail = buildMethodDetail(dummy);
+  return buildCombinedPaymentLabel({
+    primary,
+    methodDetail,
+    source,
+    method: p.method,
+    createdAt: p.created_at,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty footer composer (Phase 1A REVISED LOCKED-7)
+// ---------------------------------------------------------------------------
+
+export interface RenderedLoyaltyFooter {
+  /** Whether to render the footer at all. False when no loyalty was
+   *  redeemed on this transaction. */
+  show: boolean;
+  /** Points redeemed on this transaction. >= 0. */
+  redeemed_pts: number;
+  /** Post-transaction loyalty balance snapshot from loyalty_ledger
+   *  (latest row for this transaction). NULL when the lookup couldn't
+   *  reconstruct a balance (pre-ledger historical rows / data corruption).
+   *  Renderers omit the balance line when null. */
+  balance_after_pts: number | null;
+}
+
+/**
+ * Compose the loyalty footer block that renders below Balance Due /
+ * Paid in Full when loyalty points were redeemed on this transaction.
+ *
+ * REVISED LOCKED-7: footer is the ONLY surface where loyalty appears
+ * "below the payment line". Loyalty discount itself stays in the
+ * discount section above TOTAL (per CDTFA Reg 1671.1 — loyalty
+ * redemption reduces the taxable base, it is not a tender).
+ */
+export function composeLoyaltyFooter(
+  loyalty_points_redeemed: number | null | undefined,
+  loyalty_balance_after_pts: number | null | undefined
+): RenderedLoyaltyFooter {
+  const redeemed = Number(loyalty_points_redeemed ?? 0);
+  if (redeemed <= 0) {
+    return { show: false, redeemed_pts: 0, balance_after_pts: null };
+  }
+  const balance =
+    loyalty_balance_after_pts == null
+      ? null
+      : Number(loyalty_balance_after_pts);
+  return {
+    show: true,
+    redeemed_pts: redeemed,
+    balance_after_pts: balance,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Payment composer
 // ---------------------------------------------------------------------------
@@ -344,20 +507,27 @@ export function composeReceiptPaymentLines(
 
     line.suggested_primary_label = buildSuggestedPaymentLabel(line);
     line.suggested_method_detail = buildMethodDetail(line);
-    // Combined: "Cash · 5/6" / "Pay Link (Online) · May 6, 2026, 1:43 PM" /
-    // "Amex ****1074 · 5/6". Phase 1 surfaces will pick combined or split.
-    const isOnline = source === 'online_pay_link' || source === 'online_booking_deposit';
-    const dateForCombined = isOnline ? line.date_long : line.date_short;
-    line.suggested_label_combined = dateForCombined
-      ? `${line.suggested_primary_label} · ${dateForCombined}`
-      : line.suggested_primary_label;
+    // Phase 1A LOCKED-9: combined label uses the meta-primary / method-detail
+    // hierarchy with compact PST timestamp (LOCKED-6 format M/D/YY h:MM AM/PM).
+    line.suggested_label_combined = buildCombinedPaymentLabel({
+      primary: line.suggested_primary_label,
+      methodDetail: line.suggested_method_detail,
+      source: line.source,
+      method: line.method,
+      createdAt: p.created_at,
+    });
 
     rawLines.push(line);
   }
 
   const totalPaidCents = runningPaidCents;
   const balanceDueCents = Math.max(0, appointmentTotalCents - totalPaidCents);
-  const isPaidInFull = appointment != null && balanceDueCents === 0 && totalPaidCents > 0;
+  // REVISED LOCKED-3: paid-in-full fires when a real bill existed and the
+  // balance is now zero — regardless of whether the bill was zeroed by
+  // tender, loyalty redemption, full coupon discount, etc. The earlier
+  // condition (`totalPaidCents > 0`) excluded the loyalty-only case where
+  // redemption fully discounts the appointment with no tender at all.
+  const isPaidInFull = appointment != null && balanceDueCents === 0 && appointmentTotalCents > 0;
 
   return {
     lines: rawLines.map(({ _index: _ignored, ...rest }) => rest),

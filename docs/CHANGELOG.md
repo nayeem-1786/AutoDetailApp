@@ -6,6 +6,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(receipts): visual UX changes — total paid, paid in full, retire deposit chrome (Phase 1A)
+
+First visual UX changes to receipts since the composer landed in Phase 0b.1. Customer-facing impact across all 4 surfaces (thermal, HTML print/copier, HTML email, public page). Historical receipts re-rendered today pick up the new presentation automatically.
+
+**Total Paid row added** below the unified Payments block, above Balance Due / Paid in Full. Format: `Total Paid:    $X.XX`. Rendered whenever the payments block has at least one row.
+
+**Paid in Full ✓ replaces Balance Due** when the appointment had a real bill and the balance hit zero (REVISED LOCKED-3: `appointment_balance_due === 0 AND appointment_total > 0`). Fires regardless of HOW the balance became zero — tender, loyalty redemption, full coupon discount, etc. The "Balance Due:" label disappears entirely in that state.
+
+**All `is_deposit` chrome retired** across all 4 surfaces:
+- BOOKING DEPOSIT banner — gone.
+- "TOTAL CHARGED" relabel — replaced by standard "Total".
+- "EST. BALANCE DUE AT SERVICE" amber row — gone.
+- "Final balance may include additional services" centered footnote — gone.
+- "Deposit Paid - Online on MM/DD/YYYY" subtotal-section lines (both `is_deposit` and `deposit_credit` branches) — gone. Deposits now appear as payment rows in the unified Payments block, identical to any other payment event.
+
+The `is_deposit` flag stays on `ReceiptTransaction` for data fidelity but no renderer reads it. Running deposit receipts now render with the standard partial-payment format.
+
+**Payment rows now show timestamps** in compact `Method · M/D/YY h:MM AM/PM` format (LOCKED-6). Label hierarchy per LOCKED-9:
+- Online booking deposit → `Deposit (Online) · Amex ****1074 · 5/4/26 9:15 AM`
+- In-store deposit (rare) → `Deposit (In-Store) · Cash · 5/4/26 9:15 AM`
+- Pay-link payment → `Pay Link (Online) · Amex ****1074 · 5/4/26 9:15 AM`
+- Regular cash → `Cash · 5/6/26 10:32 AM`
+- Regular card → `Amex ****1074 · 5/6/26 10:32 AM` (method_detail leads — bare "Card" is redundant when brand+last4 is known)
+- Regular check → `Check · 5/6/26 10:32 AM`
+
+**Thermal width wrap** (LOCKED-10): when `${label} + space + ${amount}` exceeds the 48-column thermal budget (the shop's printer width), split at the LAST ` · ` segment so line 1 carries `primary · method_detail` + amount, line 2 carries `  ${timestamp}` indented 2 spaces. HTML and public page get no wrap.
+
+**Loyalty redemption stays in the discount section** (REVISED LOCKED-7 — reverted from the original "virtual payment row" model per CDTFA Reg 1671.1, which treats loyalty redemption as a discount that reduces the taxable base, not a tender):
+- Label updated from `Loyalty (N pts)` → `Loyalty Discount (N pts)`.
+- Tax math unchanged — still computed on `subtotal − loyalty_discount`.
+- NEW footer below Balance Due / Paid in Full when `loyalty_points_redeemed > 0`:
+  ```
+  Loyalty redeemed: N pts
+  Loyalty balance: M pts remaining
+  ```
+- `M` is sourced from `loyalty_ledger.points_balance` (LATEST row for this transaction, `created_at DESC LIMIT 1`) so the displayed balance is a historical snapshot, not the customer's current balance. Lookup fires only when `loyalty_points_redeemed > 0`; null fallback when no ledger row found (footer renders only the "redeemed" line).
+
+**Sign convention locked** (LOCKED-1): payments POSITIVE, refunds NEGATIVE (refunds were already negative; reaffirmed).
+
+**Composer `RECEIPT_VOCAB`** extended with `TOTAL_PAID`, `PAID_IN_FULL_HTML`, `PAID_IN_FULL_THERMAL`, `LOYALTY_LABEL`, `LOYALTY_REDEEMED_PREFIX`, `LOYALTY_BALANCE_PREFIX`, `LOYALTY_BALANCE_SUFFIX` constants. New exported helpers:
+- `buildCombinedPaymentLabel(opts)` — single-source-of-truth for the LOCKED-9 label hierarchy.
+- `buildSuggestedLabelForPayment(p, isFirstWithRemainder)` — renderer-side helper that doesn't require constructing a full `RenderedPaymentLine`.
+- `composeLoyaltyFooter(redeemed, balanceAfter)` — returns `{ show, redeemed_pts, balance_after_pts }`.
+- `formatReceiptDateTimeCompact(iso)` — `M/D/YY h:MM AM/PM` PST formatter (in `src/lib/utils/format.ts`).
+
+**Fixture coverage**: added scenarios 13 (loyalty-only — paid in full by 200 pts, no tender) and 14 (loyalty + cash + tax — verifies CDTFA tax behavior on a partial-discount taxable base). 28 fixture files regenerated (14 × 2 surfaces). `receipt-composer.test.ts` extended with new describe blocks for `formatReceiptDateTimeCompact`, `buildCombinedPaymentLabel`, `buildSuggestedLabelForPayment`, `composeLoyaltyFooter`, REVISED LOCKED-3, and combined-label assembly inside `composeReceiptPaymentLines`. The 12-scenario fixture-equality loop now iterates 14 scenarios automatically. 635 tests pass.
+
+**Surfaces unified**: all 4 receipt surfaces consume the same composer label helpers and footer composer — no per-surface label divergence. The public page still renders its own React JSX (vs HTML template strings) but reads identical strings.
+
+Full session notes: `docs/sessions/receipt-unification-phase-1a.md`.
+
+---
+
 ## refactor(receipts): consolidate public receipt page through composer (Phase 0b.2)
 
 Eliminates the fourth parallel implementation in the receipt-unification effort. The public receipt page at `src/app/(public)/receipt/[token]/page.tsx` now consumes the same composer-driven `ReceiptTransaction` shape that the print, email, and thermal renderers do — instead of inline-duplicating ~190 LOC of deposit detection, appointment-payment aggregation, balance-due math, and refund-source enrichment.

@@ -5,6 +5,12 @@ import QRCode from 'qrcode';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { formatCardBrand } from '@/lib/utils/card-brand';
 import type { RefundSource } from '@/lib/data/refund-sources';
+import {
+  buildSuggestedLabelForPayment,
+  composeLoyaltyFooter,
+  RECEIPT_VOCAB,
+} from '@/lib/data/receipt-composer';
+import { toCents } from '@/lib/utils/refund-math';
 
 interface ReceiptItem {
   id: string;
@@ -115,6 +121,17 @@ export interface ReceiptTransaction {
    * transactions. Renderers use this as the Total line so close-out
    * receipts (total_amount=0) display the meaningful gross instead of $0. */
   appointment_total?: number;
+  /**
+   * Phase 1A REVISED LOCKED-7: customer's loyalty point balance AFTER this
+   * transaction's redemption+earning settled. Sourced from the LATEST
+   * loyalty_ledger row for this transaction (created_at DESC LIMIT 1) so
+   * the value is a historical snapshot, not the customer's current balance.
+   *
+   * NULL when loyalty_points_redeemed=0 (no footer rendered) OR when the
+   * ledger lookup found no row (pre-ledger historical transactions / data
+   * corruption — footer renders the "redeemed" line only).
+   */
+  loyalty_balance_after_pts?: number | null;
 }
 
 export interface ReceiptLine {
@@ -190,17 +207,6 @@ function getVehicleTypeLabel(vehicleType: string | null | undefined): string {
   }
 }
 
-/**
- * Build a vehicle description string: "Type | Year Color Make Model"
- */
-function formatDepositLabel(depositDate?: string): string {
-  if (!depositDate) return 'Deposit Paid - Online';
-  const formatted = new Date(depositDate).toLocaleDateString('en-US', {
-    month: '2-digit', day: '2-digit', year: 'numeric',
-    timeZone: 'America/Los_Angeles',
-  });
-  return `Deposit Paid - Online on ${formatted}`;
-}
 
 function buildVehicleDesc(v: ReceiptTransaction['vehicle']): string {
   if (!v) return '';
@@ -411,6 +417,67 @@ function formatRefundDate(dateStr: string): string {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Phase 1A payment-line helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Standard thermal width — 48 columns matches the shop's 80mm thermal
+ * printer print width (also the default in receiptToPlainText and escpos
+ * renderers in this file). Payment-row wrap (LOCKED-10) kicks in only when
+ * the combined label + amount overflows this budget.
+ */
+const THERMAL_WIDTH = 48;
+
+/**
+ * Pre-compute is_first_with_remainder per payment row, mirroring the
+ * composer's chronological-first + remainder-after-applying logic. Renderer
+ * needs this because tx.payments (the consumed shape) doesn't carry the
+ * flag — composeReceiptPaymentLines computes it internally; we replicate
+ * here so fixtures + legacy walk-ins get the same labels.
+ */
+function buildFirstWithRemainderFlags(payments: ReceiptPayment[], appointmentTotal: number | undefined): boolean[] {
+  if (payments.length === 0) return [];
+  const apptTotalCents = appointmentTotal == null ? 0 : toCents(appointmentTotal);
+  const flags = new Array<boolean>(payments.length).fill(false);
+  // First payment in chronological order. tx.payments is already sorted by
+  // receipt-data.ts (created_at ASC); for fixtures, the order in the array
+  // IS the chronological order.
+  let runningCents = 0;
+  for (let i = 0; i < payments.length; i++) {
+    const amt = toCents(Number(payments[i].amount ?? 0));
+    runningCents += amt;
+    if (i === 0) {
+      flags[i] = apptTotalCents > 0 && runningCents < apptTotalCents;
+    }
+  }
+  return flags;
+}
+
+/**
+ * Phase 1A LOCKED-10 (thermal wrap): if the combined label + " " + amount
+ * exceeds `width`, split at the LAST " · " segment so line 1 carries
+ * primary+method and line 2 carries the indented timestamp. Returns one or
+ * two strings.
+ */
+export function wrapPaymentLabelForThermal(
+  combined: string,
+  amountStr: string,
+  width: number = THERMAL_WIDTH
+): string[] {
+  // Budget = total width - amount length - 1 space separator
+  const budget = width - amountStr.length - 1;
+  if (combined.length <= budget) return [combined];
+  const lastSep = combined.lastIndexOf(' · ');
+  if (lastSep === -1) return [combined]; // no separator → caller's text-wrap takes over
+  return [
+    combined.substring(0, lastSep),
+    '  ' + combined.substring(lastSep + 3),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+
 export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedReceiptConfig, context?: ReceiptContext): ReceiptLine[] {
   const c = config ?? FALLBACK_CONFIG;
   const lines: ReceiptLine[] = [];
@@ -457,11 +524,11 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   const refundStatus = getRefundStatus(tx.refunds, tx.items);
   const refundedMap = buildRefundedMap(tx.refunds);
 
-  // Deposit receipt label
-  if (tx.is_deposit) {
-    lines.push({ type: 'text', text: '** BOOKING DEPOSIT **', alignment: 'center' });
-    lines.push({ type: 'divider' });
-  }
+  // Phase 1A LOCKED-5: BOOKING DEPOSIT banner retired. Running deposit
+  // receipts now render with standard partial-payment format — deposit
+  // chrome (banner, "TOTAL CHARGED", "EST. BALANCE DUE", "Final balance"
+  // note) deleted. The is_deposit flag remains on ReceiptTransaction for
+  // data fidelity but the renderer no longer reads it.
 
   // Receipt number & date with time
   lines.push({
@@ -595,10 +662,13 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   }
 
   if (tx.loyalty_discount && tx.loyalty_discount > 0) {
+    // REVISED LOCKED-7: label change "Loyalty (N pts)" → "Loyalty Discount (N pts)".
+    // Loyalty stays in the discount section (above TOTAL) per CDTFA Reg 1671.1
+    // — redemption reduces taxable base, not a tender.
     const ptsLabel = tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : '';
     lines.push({
       type: 'columns',
-      left: `Loyalty${ptsLabel}`,
+      left: `${RECEIPT_VOCAB.LOYALTY_LABEL}${ptsLabel}`,
       right: `-$${tx.loyalty_discount.toFixed(2)}`,
     });
   }
@@ -611,78 +681,24 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
-  // Deposit receipt: show deposit paid + balance due before TOTAL
-  if (tx.is_deposit && tx.deposit_amount != null && tx.balance_due != null) {
-    lines.push({
-      type: 'columns',
-      left: formatDepositLabel(tx.deposit_date),
-      right: `-$${tx.deposit_amount.toFixed(2)}`,
-    });
-
-    lines.push({
-      type: 'bold',
-      text: '',
-    });
-    lines.push({
-      type: 'columns',
-      left: 'TOTAL CHARGED',
-      right: `$${tx.total_amount.toFixed(2)}`,
-    });
-
-    lines.push({ type: 'spacer' });
-    lines.push({
-      type: 'columns',
-      left: 'EST. BALANCE DUE AT SERVICE',
-      right: `$${tx.balance_due.toFixed(2)}`,
-    });
-    lines.push({
-      type: 'text',
-      text: 'Final balance may include additional services',
-      alignment: 'center',
-    });
-  } else if (tx.deposit_credit && tx.deposit_credit > 0) {
-    // Balance payment receipt — deposit was subtracted at checkout
-    lines.push({
-      type: 'columns',
-      left: formatDepositLabel(tx.deposit_date),
-      right: `-$${tx.deposit_credit.toFixed(2)}`,
-    });
-
-    lines.push({
-      type: 'bold',
-      text: '',
-    });
-    // Use the larger of appointment_total and transaction.total_amount.
-    // Handles both close-out shells (transaction is $0, appointment carries
-    // gross) AND in-store sales that exceed appointment value (transaction
-    // carries gross, appointment is stale — e.g., a $1 pay-link booking that
-    // had $77 of in-store items added). Pre-fix used `?? null-coalescing`
-    // which only fell through on null/undefined, so a stale $1 appointment
-    // beat the correct $78 transaction. Math.max(0, ...) on each operand
-    // protects against negative values from corrupt data.
-    const balanceGrandTotal = Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount;
-    lines.push({
-      type: 'columns',
-      left: 'TOTAL',
-      right: `$${balanceGrandTotal.toFixed(2)}`,
-    });
-  } else {
-    lines.push({
-      type: 'bold',
-      text: '',
-    });
-    // Use the larger of appointment_total and transaction.total_amount.
-    // Handles both close-out shells (transaction is $0, appointment carries
-    // gross) AND in-store sales that exceed appointment value (transaction
-    // carries gross, appointment is stale). See balanceGrandTotal above for
-    // the full rationale and pre-fix-bug context.
-    const grandTotal = Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount;
-    lines.push({
-      type: 'columns',
-      left: 'TOTAL',
-      right: `$${grandTotal.toFixed(2)}`,
-    });
-  }
+  // Phase 1A LOCKED-5: deposit chrome retired. No more deposit-only branch
+  // with "TOTAL CHARGED" + "EST. BALANCE DUE AT SERVICE" + "Final balance may
+  // include additional services". No more deposit_credit subtotal line —
+  // deposits now appear as payment rows in the unified Payments block.
+  lines.push({
+    type: 'bold',
+    text: '',
+  });
+  // Use the larger of appointment_total and transaction.total_amount.
+  // Handles both close-out shells (transaction is $0, appointment carries
+  // gross) AND in-store sales that exceed appointment value (transaction
+  // carries gross, appointment is stale).
+  const grandTotal = Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount;
+  lines.push({
+    type: 'columns',
+    left: 'TOTAL',
+    right: `$${grandTotal.toFixed(2)}`,
+  });
 
   // Linked receipt cross-reference
   if (tx.linked_receipt) {
@@ -700,34 +716,37 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
 
   lines.push({ type: 'divider' });
 
-  // Payments
-  for (const p of tx.payments) {
-    // Online sources get a "Source · date" label; in-store card keeps
-    // brand+last-four; cash/check fall through to method.toUpperCase().
-    // Same logic as generateReceiptHtml above.
-    const isOnlineSource =
-      p.source_label === 'Online (pay link)' ||
-      p.source_label === 'Booking deposit';
-    let label: string;
-    if (isOnlineSource) {
-      const dateStr = p.created_at ? ` · ${formatReceiptDateTime(p.created_at)}` : '';
-      label = `${p.source_label}${dateStr}`;
-    } else if (p.method === 'card' && p.card_brand) {
-      label = `${formatCardBrand(p.card_brand)} ****${p.card_last_four}`;
-    } else {
-      label = p.method.toUpperCase();
-    }
+  // Phase 1A LOCKED-9 + LOCKED-6 + LOCKED-10: payment rows use the unified
+  // composer label format ("Deposit (Online) · Amex ****1074 · 5/4/26 9:15 AM")
+  // with thermal-width wrap to a second indented line when overflow occurs.
+  const firstWithRemainderFlags = buildFirstWithRemainderFlags(tx.payments, tx.appointment_total);
+  let totalPaidCents = 0;
+  for (let i = 0; i < tx.payments.length; i++) {
+    const p = tx.payments[i];
+    totalPaidCents += toCents(Number(p.amount ?? 0));
+    const combined = buildSuggestedLabelForPayment(
+      {
+        method: p.method,
+        card_brand: p.card_brand,
+        card_last_four: p.card_last_four,
+        source_label: p.source_label,
+        created_at: p.created_at,
+      },
+      firstWithRemainderFlags[i]
+    );
+    const amountStr = `$${p.amount.toFixed(2)}`;
+    const wrapped = wrapPaymentLabelForThermal(combined, amountStr);
     lines.push({
       type: 'columns',
-      left: label,
-      right: `$${p.amount.toFixed(2)}`,
+      left: wrapped[0],
+      right: amountStr,
     });
+    if (wrapped.length > 1) {
+      // Indented continuation line (timestamp on its own row).
+      lines.push({ type: 'text', text: wrapped[1] });
+    }
     // Cash-only Tendered + Change sub-rows. Two-space indent matches the
-    // muted treatment used in generateReceiptHtml + the public receipt page
-    // (commit 4129e784). The 'columns' renderer preserves leading whitespace
-    // in `left`. Historical cash rows have cash_tendered NULL → no sub-rows.
-    // Non-cash methods can never have these populated (server validates), so
-    // the method check is defensive only.
+    // muted treatment used in generateReceiptHtml + the public receipt page.
     if (p.method === 'cash' && p.cash_tendered != null) {
       lines.push({
         type: 'columns',
@@ -745,15 +764,61 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       });
     }
   }
-  // Balance Due — always render for appointment-linked transactions, even at
-  // $0.00 (mirrors POS ticket-totals invariant). Walk-in receipts have
-  // appointment_balance_due undefined so the row is skipped.
-  if (tx.appointment_balance_due !== undefined) {
+
+  // Phase 1A LOCKED-2: Total Paid row, between payments and Balance Due.
+  // Only rendered when at least one payment exists. Walk-in single-cash
+  // receipts get this row too (total_paid == total) — staff parity worth
+  // the extra line.
+  if (tx.payments.length > 0) {
     lines.push({
       type: 'columns',
-      left: 'Balance Due',
-      right: `$${(tx.appointment_balance_due / 100).toFixed(2)}`,
+      left: RECEIPT_VOCAB.TOTAL_PAID,
+      right: `$${(totalPaidCents / 100).toFixed(2)}`,
     });
+  }
+
+  // Phase 1A REVISED LOCKED-3: Paid in Full ✓ replaces Balance Due row when
+  // appointment had a real bill (appointment_total > 0) AND balance is zero.
+  // Original LOCKED-3 keyed off total_paid > 0, which excluded the
+  // loyalty-only case (bill fully discounted by redemption, zero tender).
+  // The new condition fires regardless of HOW the balance became zero —
+  // tender, loyalty redemption, full coupon discount — as long as a real
+  // bill existed.
+  if (tx.appointment_balance_due !== undefined) {
+    const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
+    if (tx.appointment_balance_due === 0 && appointmentTotalCents > 0) {
+      lines.push({
+        type: 'text',
+        text: RECEIPT_VOCAB.PAID_IN_FULL_THERMAL,
+        alignment: 'center',
+      });
+    } else {
+      lines.push({
+        type: 'columns',
+        left: RECEIPT_VOCAB.BALANCE_DUE,
+        right: `$${(tx.appointment_balance_due / 100).toFixed(2)}`,
+      });
+    }
+  }
+
+  // Phase 1A REVISED LOCKED-7: loyalty footer block below Balance Due /
+  // Paid in Full. Separated by a thin divider, renders below the payments
+  // section ONLY when points were redeemed on this transaction.
+  const loyaltyFooter = composeLoyaltyFooter(tx.loyalty_points_redeemed, tx.loyalty_balance_after_pts);
+  if (loyaltyFooter.show) {
+    lines.push({ type: 'divider' });
+    lines.push({
+      type: 'text',
+      text: `${RECEIPT_VOCAB.LOYALTY_REDEEMED_PREFIX} ${loyaltyFooter.redeemed_pts} pts`,
+      alignment: 'center',
+    });
+    if (loyaltyFooter.balance_after_pts != null) {
+      lines.push({
+        type: 'text',
+        text: `${RECEIPT_VOCAB.LOYALTY_BALANCE_PREFIX} ${loyaltyFooter.balance_after_pts} ${RECEIPT_VOCAB.LOYALTY_BALANCE_SUFFIX}`,
+        alignment: 'center',
+      });
+    }
   }
 
   // Refund summary sections
@@ -1038,43 +1103,36 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     totals.push(row(discountLabel, `-$${htmlNonLoyaltyDiscount.toFixed(2)}`, '#16a34a'));
   }
   if (tx.loyalty_discount && tx.loyalty_discount > 0) {
+    // REVISED LOCKED-7: label "Loyalty Discount (N pts)". Stays in the
+    // discount section (above TOTAL) per CDTFA Reg 1671.1.
     const ptsLabel = tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : '';
-    totals.push(row(`Loyalty${ptsLabel}`, `-$${tx.loyalty_discount.toFixed(2)}`, '#d97706'));
+    totals.push(row(`${RECEIPT_VOCAB.LOYALTY_LABEL}${ptsLabel}`, `-$${tx.loyalty_discount.toFixed(2)}`, '#d97706'));
   }
   if (tx.tip_amount > 0) totals.push(row('Tip', `$${tx.tip_amount.toFixed(2)}`));
-  if (tx.is_deposit && tx.deposit_amount != null) {
-    totals.push(row(esc(formatDepositLabel(tx.deposit_date)), `-$${tx.deposit_amount.toFixed(2)}`, '#16a34a'));
-  }
-  if (!tx.is_deposit && tx.deposit_credit && tx.deposit_credit > 0) {
-    totals.push(row(esc(formatDepositLabel(tx.deposit_date)), `-$${tx.deposit_credit.toFixed(2)}`, '#2563eb'));
-  }
+  // Phase 1A LOCKED-5: deposit chrome retired. The two "Deposit Paid - Online"
+  // subtotal-section rows (is_deposit branch + deposit_credit branch) are
+  // deleted. Deposits now appear as payment rows in the unified Payments block.
 
+  const htmlFirstWithRemainderFlags = buildFirstWithRemainderFlags(tx.payments, tx.appointment_total);
+  let htmlTotalPaidCents = 0;
   const paymentRows = (() => {
     let html = tx.payments
-      .map((p) => {
-        // Online sources (pay link, booking deposit) get a "Source · date" label.
-        // In-store card retains the existing "VISA ****1234" affordance because
-        // brand+last-four is more useful to staff than a generic "Card" label.
-        // Cash/check fall through to method.toUpperCase() (today's behavior),
-        // OR source_label when present (which renders the same casing as the
-        // POS Payments Received block).
-        const isOnlineSource =
-          p.source_label === 'Online (pay link)' ||
-          p.source_label === 'Booking deposit';
-        let label: string;
-        if (isOnlineSource) {
-          const dateStr = p.created_at ? ` · ${esc(formatReceiptDateTime(p.created_at))}` : '';
-          label = `${esc(p.source_label!)}${dateStr}`;
-        } else if (p.method === 'card' && p.card_brand) {
-          label = `${esc(formatCardBrand(p.card_brand))} ****${esc(p.card_last_four || '')}`;
-        } else {
-          label = p.method.toUpperCase();
-        }
-        let row_html = row(label, `$${p.amount.toFixed(2)}`);
-        // Cash-only: render Tendered + Change as indented sub-rows below the
-        // payment line. Historical cash rows have cash_tendered NULL → no extra
-        // rows. Non-cash methods can never have these populated (server
-        // validates), so we don't need a method guard here.
+      .map((p, i) => {
+        htmlTotalPaidCents += toCents(Number(p.amount ?? 0));
+        // Phase 1A LOCKED-9 + LOCKED-6: unified composer label format.
+        // No thermal-width wrap on HTML (HTML has no width constraint).
+        const combined = buildSuggestedLabelForPayment(
+          {
+            method: p.method,
+            card_brand: p.card_brand,
+            card_last_four: p.card_last_four,
+            source_label: p.source_label,
+            created_at: p.created_at,
+          },
+          htmlFirstWithRemainderFlags[i]
+        );
+        let row_html = row(esc(combined), `$${p.amount.toFixed(2)}`);
+        // Cash-only: render Tendered + Change as indented sub-rows.
         if (p.method === 'cash' && p.cash_tendered != null) {
           row_html += row('&nbsp;&nbsp;Tendered', `$${p.cash_tendered.toFixed(2)}`, '#666666');
           const change = p.change_given != null ? p.change_given : Math.max(0, p.cash_tendered - p.amount);
@@ -1083,12 +1141,34 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         return row_html;
       })
       .join('');
-    // Balance Due — appointment-linked transactions only. Always render, even
-    // at $0.00, mirroring the POS ticket-totals invariant. Walk-in transactions
-    // leave appointment_balance_due undefined and the row is skipped.
-    if (tx.appointment_balance_due !== undefined) {
-      html += row('Balance Due', `$${(tx.appointment_balance_due / 100).toFixed(2)}`);
+
+    // Phase 1A LOCKED-2: Total Paid row, between payments and Balance Due.
+    if (tx.payments.length > 0) {
+      html += row(RECEIPT_VOCAB.TOTAL_PAID, `$${(htmlTotalPaidCents / 100).toFixed(2)}`);
     }
+
+    // Phase 1A REVISED LOCKED-3: Paid in Full ✓ replaces Balance Due when
+    // appointment_total > 0 AND balance is zero. Fires regardless of HOW
+    // the balance became zero (tender, loyalty redemption, full coupon, etc.).
+    if (tx.appointment_balance_due !== undefined) {
+      const htmlAppointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
+      if (tx.appointment_balance_due === 0 && htmlAppointmentTotalCents > 0) {
+        html += `<tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">${RECEIPT_VOCAB.PAID_IN_FULL_HTML}</td></tr>`;
+      } else {
+        html += row(RECEIPT_VOCAB.BALANCE_DUE, `$${(tx.appointment_balance_due / 100).toFixed(2)}`);
+      }
+    }
+
+    // Phase 1A REVISED LOCKED-7: loyalty footer below Balance Due / Paid in Full.
+    const htmlLoyaltyFooter = composeLoyaltyFooter(tx.loyalty_points_redeemed, tx.loyalty_balance_after_pts);
+    if (htmlLoyaltyFooter.show) {
+      html += `<tr><td colspan="2" style="padding:6px 0;"><hr style="border:none;border-top:1px dashed #ccc;margin:0;"></td></tr>`;
+      html += `<tr><td colspan="2" style="padding:2px 0;font-size:12px;color:#555;text-align:center;">${RECEIPT_VOCAB.LOYALTY_REDEEMED_PREFIX} ${htmlLoyaltyFooter.redeemed_pts} pts</td></tr>`;
+      if (htmlLoyaltyFooter.balance_after_pts != null) {
+        html += `<tr><td colspan="2" style="padding:2px 0;font-size:12px;color:#555;text-align:center;">${RECEIPT_VOCAB.LOYALTY_BALANCE_PREFIX} ${htmlLoyaltyFooter.balance_after_pts} ${RECEIPT_VOCAB.LOYALTY_BALANCE_SUFFIX}</td></tr>`;
+      }
+    }
+
     return html;
   })();
 
@@ -1288,10 +1368,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     </tr>` : ''}
   </table>
 
-  ${tx.is_deposit ? `<div style="text-align:center;margin:8px 0;">
-    <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#2563eb;">BOOKING DEPOSIT</span>
-  </div>` : ''}
-
+  ${/* Phase 1A LOCKED-5: BOOKING DEPOSIT badge retired. */ ''}
   ${htmlIsVoided ? `<div style="text-align:center;margin:8px 0;">
     <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#dc2626;">VOIDED</span>
   </div>` : htmlRefundStatus !== 'none' ? `<div style="text-align:center;margin:8px 0;padding:6px 12px;display:inline-block;width:100%;box-sizing:border-box;">
@@ -1316,21 +1393,16 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       <td colspan="2" style="padding:4px 0;"><hr style="border:none;border-top:1px solid #333;margin:0;"></td>
     </tr>
     <tr>
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;">${tx.is_deposit ? 'TOTAL CHARGED' : 'TOTAL'}</td>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;">TOTAL</td>
       <!-- Use the larger of appointment_total and transaction.total_amount.
            Handles both close-out shells (transaction is $0, appointment carries
            gross) AND in-store sales that exceed appointment value (transaction
            carries gross, appointment is stale). Mirrors the thermal renderer's
-           policy in this same file (see balanceGrandTotal / grandTotal above). -->
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(tx.is_deposit ? tx.total_amount : (Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount)).toFixed(2)}</td>
+           policy in this same file. Phase 1A LOCKED-5: no longer branches on
+           tx.is_deposit ("TOTAL CHARGED" relabel + EST. BALANCE DUE row +
+           "Final balance may include additional services" footnote retired). -->
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$${(Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount).toFixed(2)}</td>
     </tr>
-    ${tx.is_deposit && tx.balance_due != null ? `<tr>
-      <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">EST. BALANCE DUE AT SERVICE</td>
-      <td style="padding:6px 0;font-size:14px;font-weight:bold;text-align:right;color:#d97706;">$${tx.balance_due.toFixed(2)}</td>
-    </tr>
-    <tr>
-      <td colspan="2" style="padding:0 0 4px;font-size:11px;color:#888;font-style:italic;text-align:center;">Final balance may include additional services</td>
-    </tr>` : ''}
     ${tx.linked_receipt ? `<tr>
       <td colspan="2" style="padding:6px 0;font-size:12px;color:#2563eb;text-align:center;">See also: ${esc(tx.linked_receipt.label)} #${esc(tx.linked_receipt.receipt_number)}</td>
     </tr>` : ''}

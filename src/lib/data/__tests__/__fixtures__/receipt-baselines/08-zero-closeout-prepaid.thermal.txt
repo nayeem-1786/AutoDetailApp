@@ -11,11 +11,13 @@ Full Detail                           $175.00
 ------------------------------------------------
 Subtotal                                 $175.00
 Tax                                        $0.00
-Deposit Paid - Online on 05/04/2026      -$50.00
 
 TOTAL                                    $175.00
      See also: Deposit Receipt #R-0008-DEP
 ------------------------------------------------
-Booking deposit · May 4, 2026, 1:00 PM    $50.00
-Online (pay link) · May 5, 2026, 5:00 PM $125.00
-Balance Due                                $0.00
+Deposit (Online) · Amex ****1234          $50.00
+                  5/4/26 1:00 PM
+Pay Link (Online) · Visa ****0001        $125.00
+                  5/5/26 5:00 PM
+Total Paid:                              $175.00
+                Paid in Full [v]

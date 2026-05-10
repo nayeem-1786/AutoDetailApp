@@ -55,7 +55,6 @@
   </table>
 
   
-
   
 
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
@@ -79,9 +78,6 @@
   </tr><tr>
     <td style="padding:3px 0;font-size:14px">Tax</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$0.00</td>
-  </tr><tr>
-    <td style="padding:3px 0;font-size:14px;color:#2563eb">Deposit Paid - Online on 05/04/2026</td>
-    <td style="padding:3px 0;font-size:14px;text-align:right;color:#2563eb">-$50.00</td>
   </tr>
     <tr>
       <td colspan="2" style="padding:4px 0;"><hr style="border:none;border-top:1px solid #333;margin:0;"></td>
@@ -92,10 +88,11 @@
            Handles both close-out shells (transaction is $0, appointment carries
            gross) AND in-store sales that exceed appointment value (transaction
            carries gross, appointment is stale). Mirrors the thermal renderer's
-           policy in this same file (see balanceGrandTotal / grandTotal above). -->
+           policy in this same file. Phase 1A LOCKED-5: no longer branches on
+           tx.is_deposit ("TOTAL CHARGED" relabel + EST. BALANCE DUE row +
+           "Final balance may include additional services" footnote retired). -->
       <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$175.00</td>
     </tr>
-    
     <tr>
       <td colspan="2" style="padding:6px 0;font-size:12px;color:#2563eb;text-align:center;">See also: Deposit Receipt #R-0008-DEP</td>
     </tr>
@@ -107,15 +104,15 @@
   <div style="font-size:13px;color:#333;margin-bottom:4px;font-weight:bold;">Payment</div>
   <table style="width:100%;border-collapse:collapse;">
     <tr>
-    <td style="padding:3px 0;font-size:14px">Booking deposit · May 4, 2026, 1:00 PM</td>
+    <td style="padding:3px 0;font-size:14px">Deposit (Online) · Amex ****1234 · 5/4/26 1:00 PM</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$50.00</td>
   </tr><tr>
-    <td style="padding:3px 0;font-size:14px">Online (pay link) · May 5, 2026, 5:00 PM</td>
+    <td style="padding:3px 0;font-size:14px">Pay Link (Online) · Visa ****0001 · 5/5/26 5:00 PM</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$125.00</td>
   </tr><tr>
-    <td style="padding:3px 0;font-size:14px">Balance Due</td>
-    <td style="padding:3px 0;font-size:14px;text-align:right">$0.00</td>
-  </tr>
+    <td style="padding:3px 0;font-size:14px">Total Paid:</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$175.00</td>
+  </tr><tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">Paid in Full ✓</td></tr>
   </table>
 
   

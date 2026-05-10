@@ -14,6 +14,9 @@ Tax                                        $0.00
 
 TOTAL                                    $175.00
 ------------------------------------------------
-Online (pay link) · May 5, 2026, 3:00 PM  $50.00
-Online (pay link) · May 5, 2026, 5:00 PM  $75.00
-Balance Due                               $50.00
+Pay Link (Online) · Visa ****0001         $50.00
+                  5/5/26 3:00 PM
+Pay Link (Online) · Visa ****0001         $75.00
+                  5/5/26 5:00 PM
+Total Paid:                              $125.00
+Balance Due:                              $50.00

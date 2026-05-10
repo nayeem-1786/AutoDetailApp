@@ -124,6 +124,34 @@ export function formatReceiptDateTime(dateStr: string): string {
   });
 }
 
+/**
+ * Compact PST date+time for per-payment-row timestamps on receipts.
+ * Produces: "5/6/26 1:43 PM" (M/D/YY h:MM AM/PM, no leading zeros).
+ *
+ * Phase 1A LOCKED-6 formatting contract. Consumed by composer label
+ * assembly and renderer inline label construction.
+ */
+export function formatReceiptDateTimeCompact(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  // Manual assembly because Intl en-US with year:'2-digit' still includes
+  // weekday on some runtimes; toLocaleDateString numeric parts are
+  // consistent across Node + browsers in LA tz.
+  const datePart = d.toLocaleDateString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'numeric',
+    day: 'numeric',
+    year: '2-digit',
+  });
+  const timePart = d.toLocaleTimeString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${datePart} ${timePart}`;
+}
+
 export function formatTime(time: string): string {
   const [hours, minutes] = time.split(':');
   const h = parseInt(hours);

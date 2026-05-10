@@ -8,14 +8,28 @@ import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { formatCardBrand } from '@/lib/utils/card-brand';
 import { fetchReceiptTransaction } from '@/lib/data/receipt-data';
 import type { ReceiptTransaction } from '@/app/pos/lib/receipt-template';
+import {
+  buildSuggestedLabelForPayment,
+  composeLoyaltyFooter,
+  RECEIPT_VOCAB,
+} from '@/lib/data/receipt-composer';
+import { toCents } from '@/lib/utils/refund-math';
 
-function formatDepositLabel(depositDate: string | null | undefined): string {
-  if (!depositDate) return 'Deposit Paid - Online';
-  const formatted = new Date(depositDate).toLocaleDateString('en-US', {
-    month: '2-digit', day: '2-digit', year: 'numeric',
-    timeZone: 'America/Los_Angeles',
-  });
-  return `Deposit Paid - Online on ${formatted}`;
+// Phase 1A: replicate the renderer-side first-with-remainder derivation so
+// the JSX payment loop can construct labels via the composer helper without
+// duplicating logic. Mirrors buildFirstWithRemainderFlags in receipt-template.ts.
+function buildFirstWithRemainderFlags(
+  payments: ReadonlyArray<{ amount: number }>,
+  appointmentTotal: number | undefined
+): boolean[] {
+  if (payments.length === 0) return [];
+  const apptCents = appointmentTotal == null ? 0 : toCents(appointmentTotal);
+  const flags = new Array<boolean>(payments.length).fill(false);
+  if (payments.length > 0) {
+    const firstCents = toCents(Number(payments[0].amount ?? 0));
+    flags[0] = apptCents > 0 && firstCents < apptCents;
+  }
+  return flags;
 }
 
 interface PageProps {
@@ -144,14 +158,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         </div>
       )}
 
-      {/* Deposit Badge */}
-      {tx.is_deposit && (
-        <div className="mb-4 text-center">
-          <span className="inline-block rounded px-3 py-1 text-sm font-bold text-white bg-blue-600">
-            BOOKING DEPOSIT
-          </span>
-        </div>
-      )}
+      {/* Phase 1A LOCKED-5: BOOKING DEPOSIT badge retired. */}
 
       {/* Receipt Header */}
       <div className="mb-8 rounded-lg border border-site-border bg-brand-dark p-6 shadow-sm">
@@ -277,7 +284,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
             {tx.loyalty_discount != null && tx.loyalty_discount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-site-text-muted">
-                  Loyalty{tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : ''}
+                  {RECEIPT_VOCAB.LOYALTY_LABEL}{tx.loyalty_points_redeemed ? ` (${tx.loyalty_points_redeemed} pts)` : ''}
                 </span>
                 <span className="font-medium text-amber-400">
                   -{formatCurrency(tx.loyalty_discount!)}
@@ -292,48 +299,22 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </span>
               </div>
             )}
-            {tx.is_deposit && (tx.deposit_amount ?? 0) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-site-text-muted">{formatDepositLabel(tx.deposit_date)}</span>
-                <span className="font-medium text-green-500">
-                  -{formatCurrency(tx.deposit_amount!)}
-                </span>
-              </div>
-            )}
-            {!tx.is_deposit && (tx.deposit_credit ?? 0) > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-site-text-muted">{formatDepositLabel(tx.deposit_date)}</span>
-                <span className="font-medium text-blue-500">
-                  -{formatCurrency(tx.deposit_credit!)}
-                </span>
-              </div>
-            )}
+            {/* Phase 1A LOCKED-5: deposit chrome retired. Deposit-paid lines
+                (both is_deposit and deposit_credit branches), "Total Charged"
+                relabel, "Est. Balance Due at Service" amber row, and the
+                "Final balance may include additional services" footnote
+                are all gone. Deposits appear as payment rows below. */}
             <div className="flex justify-between border-t border-site-border pt-2">
-              <span className="text-base font-semibold text-site-text">
-                {tx.is_deposit ? 'Total Charged' : 'Total'}
-              </span>
+              <span className="text-base font-semibold text-site-text">Total</span>
               <span className="text-lg font-bold text-site-text">
                 {/* Use the larger of appointment_total and transaction.total_amount.
                     Handles both close-out shells (transaction is $0, appointment carries
                     gross) AND in-store sales that exceed appointment value (transaction
                     carries gross, appointment is stale). Mirrors the receipt-template.ts
                     policy. */}
-                {formatCurrency(tx.is_deposit ? tx.total_amount : (Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount))}
+                {formatCurrency(Math.max(tx.appointment_total ?? 0, tx.total_amount ?? 0) + tx.tip_amount)}
               </span>
             </div>
-            {tx.is_deposit && (tx.balance_due ?? 0) > 0 && (
-              <>
-                <div className="flex justify-between pt-1">
-                  <span className="text-sm font-semibold text-amber-500">Est. Balance Due at Service</span>
-                  <span className="text-base font-bold text-amber-500">
-                    {formatCurrency(tx.balance_due!)}
-                  </span>
-                </div>
-                <p className="text-xs text-site-text-muted italic text-center mt-1">
-                  Final balance may include additional services
-                </p>
-              </>
-            )}
             {tx.linked_receipt && (
               <div className="pt-2 text-center">
                 <span className="text-xs text-blue-500">
@@ -408,70 +389,104 @@ export default async function PublicReceiptPage({ params }: PageProps) {
           appointment_balance_due flag opens the section even when payments
           is empty (which won't happen in practice — close-out always has
           at least one prior payment that triggered the close-out path). */}
-      {(tx.payments.length > 0 || tx.appointment_balance_due !== undefined) && (
-        <div className="mb-8 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
-          <h3 className="text-sm font-medium text-site-text-secondary">Payment</h3>
-          <div className="mt-2 space-y-1">
-            {tx.payments.map((p, i) => {
-              // Online sources (pay link, booking deposit) → "Source · date".
-              // In-store card → "VISA ending in 1234" (existing behavior).
-              // Cash/check → method.toUpperCase() OR source_label.
-              const isOnlineSource =
-                p.source_label === 'Online (pay link)' ||
-                p.source_label === 'Booking deposit';
-              let label: string;
-              if (isOnlineSource) {
-                label = `${p.source_label} · ${formatReceiptDateTime(p.created_at ?? '')}`;
-              } else if (p.method === 'card' && p.card_brand) {
-                label = `${formatCardBrand(p.card_brand)} ending in ${p.card_last_four || '****'}`;
-              } else {
-                label = p.method.charAt(0).toUpperCase() + p.method.slice(1);
-              }
-              // Cash-only Tendered/Change sub-rows. Historical cash rows have
-              // cash_tendered NULL → no extra rows render. Non-cash rows can
-              // never have these populated (server validates), so no method
-              // guard needed beyond the != null check.
-              const showTender = p.method === 'cash' && p.cash_tendered != null;
-              const change = showTender
-                ? p.change_given ?? Math.max(0, (p.cash_tendered as number) - p.amount)
-                : 0;
-              return (
-                <div key={p.id ?? i} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-site-text-muted">{label}</span>
-                    <span className="font-medium text-site-text">{formatCurrency(p.amount)}</span>
+      {(tx.payments.length > 0 || tx.appointment_balance_due !== undefined) && (() => {
+        // Phase 1A LOCKED-9 + LOCKED-6: unified composer label, no width wrap
+        // (public page has plenty of horizontal room). LOCKED-2 + LOCKED-3:
+        // Total Paid row + Paid in Full ✓ conditional. REVISED LOCKED-7:
+        // loyalty footer below balance row.
+        const firstWithRemainder = buildFirstWithRemainderFlags(tx.payments, tx.appointment_total);
+        let totalPaidCents = 0;
+        for (const p of tx.payments) totalPaidCents += toCents(Number(p.amount ?? 0));
+        const loyaltyFooter = composeLoyaltyFooter(tx.loyalty_points_redeemed, tx.loyalty_balance_after_pts);
+        // REVISED LOCKED-3: fires when appointment_total > 0 AND balance === 0
+        // (regardless of how the balance became zero — tender, loyalty, etc.).
+        const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
+        const isPaidInFull = tx.appointment_balance_due === 0 && appointmentTotalCents > 0;
+        return (
+          <div className="mb-8 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
+            <h3 className="text-sm font-medium text-site-text-secondary">Payment</h3>
+            <div className="mt-2 space-y-1">
+              {tx.payments.map((p, i) => {
+                const combined = buildSuggestedLabelForPayment(
+                  {
+                    method: p.method,
+                    card_brand: p.card_brand,
+                    card_last_four: p.card_last_four,
+                    source_label: p.source_label,
+                    created_at: p.created_at,
+                  },
+                  firstWithRemainder[i]
+                );
+                const showTender = p.method === 'cash' && p.cash_tendered != null;
+                const change = showTender
+                  ? p.change_given ?? Math.max(0, (p.cash_tendered as number) - p.amount)
+                  : 0;
+                return (
+                  <div key={p.id ?? i} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-site-text-muted">{combined}</span>
+                      <span className="font-medium text-site-text">{formatCurrency(p.amount)}</span>
+                    </div>
+                    {showTender && (
+                      <>
+                        <div className="flex justify-between text-xs pl-4">
+                          <span className="text-site-text-muted">Tendered</span>
+                          <span className="text-site-text-muted tabular-nums">
+                            {formatCurrency(p.cash_tendered as number)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs pl-4">
+                          <span className="text-site-text-muted">Change</span>
+                          <span className="text-site-text-muted tabular-nums">
+                            {formatCurrency(change)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  {showTender && (
-                    <>
-                      <div className="flex justify-between text-xs pl-4">
-                        <span className="text-site-text-muted">Tendered</span>
-                        <span className="text-site-text-muted tabular-nums">
-                          {formatCurrency(p.cash_tendered as number)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-xs pl-4">
-                        <span className="text-site-text-muted">Change</span>
-                        <span className="text-site-text-muted tabular-nums">
-                          {formatCurrency(change)}
-                        </span>
-                      </div>
-                    </>
+                );
+              })}
+              {/* Total Paid (LOCKED-2) — between payments and Balance Due / Paid in Full. */}
+              {tx.payments.length > 0 && (
+                <div className="flex justify-between text-sm pt-2 border-t border-site-border mt-2">
+                  <span className="font-medium text-site-text">{RECEIPT_VOCAB.TOTAL_PAID}</span>
+                  <span className="font-medium text-site-text tabular-nums">
+                    {formatCurrency(totalPaidCents / 100)}
+                  </span>
+                </div>
+              )}
+              {/* Paid in Full ✓ replaces Balance Due when balance=0 AND total_paid>0 (LOCKED-3). */}
+              {tx.appointment_balance_due !== undefined && (
+                isPaidInFull ? (
+                  <div className="text-center text-sm font-semibold text-green-500 pt-1">
+                    {RECEIPT_VOCAB.PAID_IN_FULL_HTML}
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium text-site-text">{RECEIPT_VOCAB.BALANCE_DUE}</span>
+                    <span className="font-medium text-site-text tabular-nums">
+                      {formatCurrency(tx.appointment_balance_due / 100)}
+                    </span>
+                  </div>
+                )
+              )}
+              {/* Loyalty footer (REVISED LOCKED-7). */}
+              {loyaltyFooter.show && (
+                <div className="pt-2 mt-2 border-t border-site-border space-y-0.5 text-center">
+                  <p className="text-xs text-site-text-muted">
+                    {RECEIPT_VOCAB.LOYALTY_REDEEMED_PREFIX} {loyaltyFooter.redeemed_pts} pts
+                  </p>
+                  {loyaltyFooter.balance_after_pts != null && (
+                    <p className="text-xs text-site-text-muted">
+                      {RECEIPT_VOCAB.LOYALTY_BALANCE_PREFIX} {loyaltyFooter.balance_after_pts} {RECEIPT_VOCAB.LOYALTY_BALANCE_SUFFIX}
+                    </p>
                   )}
                 </div>
-              );
-            })}
-            {/* Balance Due — appointment-linked only, always render. */}
-            {tx.appointment_balance_due !== undefined && (
-              <div className="flex justify-between text-sm pt-2 border-t border-site-border mt-2">
-                <span className="font-medium text-site-text">Balance Due</span>
-                <span className="font-medium text-site-text tabular-nums">
-                  {formatCurrency(tx.appointment_balance_due / 100)}
-                </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Points Earned */}
       {tx.customer && (tx.loyalty_points_earned ?? 0) > 0 && (

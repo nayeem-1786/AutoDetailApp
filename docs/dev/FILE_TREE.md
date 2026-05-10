@@ -864,10 +864,10 @@ src/lib/data/products.ts
 src/lib/data/receipt-composer.ts                    — Phase 0b.1: pure composer for payment/refund/totals aggregation
 src/lib/data/receipt-config.ts
 src/lib/data/receipt-data.ts
-src/lib/data/__tests__/receipt-composer.test.ts     — Phase 0b.1: composer unit tests + 24 fixture byte-equality regressions
-src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 12 ReceiptTransaction scenarios shared by capture script + tests
-src/lib/data/__tests__/__fixtures__/receipt-baselines/*.html       — 12 captured HTML fixtures (regenerable)
-src/lib/data/__tests__/__fixtures__/receipt-baselines/*.thermal.txt — 12 captured thermal fixtures (regenerable)
+src/lib/data/__tests__/receipt-composer.test.ts     — Phase 0b.1 / 1A: composer unit tests + 28 fixture byte-equality regressions
+src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 14 ReceiptTransaction scenarios shared by capture script + tests (Phase 1A: +scenarios 13 loyalty-only + 14 loyalty+cash+tax)
+src/lib/data/__tests__/__fixtures__/receipt-baselines/*.html       — 14 captured HTML fixtures (regenerable)
+src/lib/data/__tests__/__fixtures__/receipt-baselines/*.thermal.txt — 14 captured thermal fixtures (regenerable)
 src/lib/data/refund-sources.ts
 src/lib/data/reviews.ts
 src/lib/data/services.ts
@@ -1602,6 +1602,7 @@ docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
 docs/sessions/receipt-unification-phase-0b-2.md   # Phase 0b.2: byte-diff harness operator runbook + 10-scenario SQL queries
+docs/sessions/receipt-unification-phase-1a.md     # Phase 1A: visual UX changes (Total Paid, Paid in Full ✓, deposit chrome retired, payment timestamps)
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

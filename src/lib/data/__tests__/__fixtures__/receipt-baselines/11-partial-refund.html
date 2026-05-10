@@ -55,7 +55,6 @@
   </table>
 
   
-
   <div style="text-align:center;margin:8px 0;padding:6px 12px;display:inline-block;width:100%;box-sizing:border-box;">
     <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#d97706;">
       PARTIALLY REFUNDED
@@ -99,10 +98,11 @@
            Handles both close-out shells (transaction is $0, appointment carries
            gross) AND in-store sales that exceed appointment value (transaction
            carries gross, appointment is stale). Mirrors the thermal renderer's
-           policy in this same file (see balanceGrandTotal / grandTotal above). -->
+           policy in this same file. Phase 1A LOCKED-5: no longer branches on
+           tx.is_deposit ("TOTAL CHARGED" relabel + EST. BALANCE DUE row +
+           "Final balance may include additional services" footnote retired). -->
       <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$50.00</td>
     </tr>
-    
     
   </table>
 
@@ -112,12 +112,12 @@
   <div style="font-size:13px;color:#333;margin-bottom:4px;font-weight:bold;">Payment</div>
   <table style="width:100%;border-collapse:collapse;">
     <tr>
-    <td style="padding:3px 0;font-size:14px">Mastercard ****5555</td>
+    <td style="padding:3px 0;font-size:14px">Mastercard ****5555 · 5/6/26 8:05 PM</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$50.00</td>
   </tr><tr>
-    <td style="padding:3px 0;font-size:14px">Balance Due</td>
-    <td style="padding:3px 0;font-size:14px;text-align:right">$0.00</td>
-  </tr>
+    <td style="padding:3px 0;font-size:14px">Total Paid:</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$50.00</td>
+  </tr><tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">Paid in Full ✓</td></tr>
   </table>
 
   

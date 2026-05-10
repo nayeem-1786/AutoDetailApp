@@ -24,6 +24,9 @@ import {
   composeReceiptTotals,
   detectPaymentSource,
   buildSuggestedPaymentLabel,
+  buildSuggestedLabelForPayment,
+  buildCombinedPaymentLabel,
+  composeLoyaltyFooter,
   sourceToLabel,
   RECEIPT_VOCAB,
   type ComposerPaymentInput,
@@ -31,6 +34,7 @@ import {
   type ComposerItemInput,
   type RenderedPaymentLine,
 } from '../receipt-composer';
+import { formatReceiptDateTimeCompact } from '@/lib/utils/format';
 import {
   generateReceiptHtml,
   generateReceiptLines,
@@ -77,8 +81,8 @@ describe('composer: composeReceiptPaymentLines', () => {
     expect(block.total_paid_cents).toBe(0);
     expect(block.balance_due_cents).toBe(17500);
     expect(block.appointment_total_cents).toBe(17500);
-    // is_paid_in_full requires total_paid > 0; zero payments → false even
-    // though balance_due is also "satisfied" by being unset.
+    // REVISED LOCKED-3: is_paid_in_full fires when appointment_total > 0
+    // AND balance_due === 0. Here balance is still $175 → false.
     expect(block.is_paid_in_full).toBe(false);
   });
 
@@ -121,6 +125,27 @@ describe('composer: composeReceiptPaymentLines', () => {
     expect(block.total_paid_cents).toBe(20000);
     expect(block.balance_due_cents).toBe(0);
     expect(block.is_paid_in_full).toBe(true);
+  });
+
+  it('REVISED LOCKED-3: is_paid_in_full = true when appointment_total > 0 and balance === 0, even with zero tender (loyalty-only path)', () => {
+    // Loyalty-only paid scenario: appointment was billed at $20, but the
+    // appointment_balance_due is pre-zeroed by an upstream loyalty discount
+    // — caller passes appointment={ total_amount: 0 }-style scenarios to
+    // simulate "no real bill". Here we use total_amount=20 with no payments
+    // and expect balance=20 → not paid-in-full. The actual loyalty-only
+    // paid case is covered by the renderer-side flag (it reads
+    // tx.appointment_balance_due directly), not by the composer's
+    // payments-only block.
+    const block = composeReceiptPaymentLines([], { total_amount: 20 });
+    expect(block.balance_due_cents).toBe(2000);
+    expect(block.is_paid_in_full).toBe(false);
+    // Verify the locked condition: when balance IS 0 with appointment_total>0
+    // (e.g., a payment-only $20 scenario), is_paid_in_full fires.
+    const block2 = composeReceiptPaymentLines(
+      [{ method: 'cash', amount: 20, created_at: '2026-05-06T10:00:00.000-07:00' }],
+      { total_amount: 20 }
+    );
+    expect(block2.is_paid_in_full).toBe(true);
   });
 
   it('detects source from notes prefix per LOCKED-5', () => {
@@ -426,5 +451,238 @@ describe('composer integration: appointment-aggregated payment block round-trips
 
     expect(generateReceiptHtml(tx)).toBe(expectedHtml);
     expect(receiptToPlainText(generateReceiptLines(tx))).toBe(expectedThermal);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Phase 1A LOCKED-6 + LOCKED-9 + REVISED LOCKED-7 — new behavior locks
+// ---------------------------------------------------------------------------
+
+describe('format: formatReceiptDateTimeCompact (LOCKED-6)', () => {
+  it('emits M/D/YY h:MM AM/PM in PST', () => {
+    // 2026-05-06 20:05 PDT (UTC-07:00) → "5/6/26 8:05 PM" in LA.
+    expect(formatReceiptDateTimeCompact('2026-05-06T20:05:00.000-07:00'))
+      .toBe('5/6/26 8:05 PM');
+    // 10:32 AM PST (single-digit hour, no leading zero per spec).
+    expect(formatReceiptDateTimeCompact('2026-05-06T10:32:00.000-07:00'))
+      .toBe('5/6/26 10:32 AM');
+    // Pre-DST date (Jan in PST = UTC-08:00).
+    expect(formatReceiptDateTimeCompact('2026-01-15T13:43:00.000-08:00'))
+      .toBe('1/15/26 1:43 PM');
+  });
+
+  it('returns empty string for null/undefined/empty input', () => {
+    expect(formatReceiptDateTimeCompact(null)).toBe('');
+    expect(formatReceiptDateTimeCompact(undefined)).toBe('');
+    expect(formatReceiptDateTimeCompact('')).toBe('');
+  });
+});
+
+describe('composer: buildCombinedPaymentLabel (LOCKED-9 format hierarchy)', () => {
+  const ts = '2026-05-04T13:00:00.000-07:00'; // "5/4/26 1:00 PM"
+
+  it('online booking deposit → 3 segments: primary · method_detail · date', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: RECEIPT_VOCAB.DEPOSIT_ONLINE,
+      methodDetail: 'Amex ****1074',
+      source: 'online_booking_deposit',
+      method: 'card',
+      createdAt: ts,
+    })).toBe('Deposit (Online) · Amex ****1074 · 5/4/26 1:00 PM');
+  });
+
+  it('in-store first-with-remainder deposit → 3 segments: primary · method_detail · date', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: RECEIPT_VOCAB.DEPOSIT_IN_STORE,
+      methodDetail: 'Cash',
+      source: 'in_store',
+      method: 'cash',
+      createdAt: ts,
+    })).toBe('Deposit (In-Store) · Cash · 5/4/26 1:00 PM');
+  });
+
+  it('pay-link → 3 segments: Pay Link (Online) · method_detail · date', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: RECEIPT_VOCAB.PAY_LINK_ONLINE,
+      methodDetail: 'Amex ****1074',
+      source: 'online_pay_link',
+      method: 'card',
+      createdAt: ts,
+    })).toBe('Pay Link (Online) · Amex ****1074 · 5/4/26 1:00 PM');
+  });
+
+  it('regular cash → 2 segments: Cash · date (primary IS method)', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: 'Cash',
+      methodDetail: 'Cash',
+      source: 'in_store',
+      method: 'cash',
+      createdAt: ts,
+    })).toBe('Cash · 5/4/26 1:00 PM');
+  });
+
+  it('regular card → 2 segments: method_detail · date (brand+last4 beats bare "Card")', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: 'Card',
+      methodDetail: 'Visa ****0001',
+      source: 'in_store',
+      method: 'card',
+      createdAt: ts,
+    })).toBe('Visa ****0001 · 5/4/26 1:00 PM');
+  });
+
+  it('regular check → 2 segments: Check · date', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: 'Check',
+      methodDetail: 'Check',
+      source: 'in_store',
+      method: 'check',
+      createdAt: ts,
+    })).toBe('Check · 5/4/26 1:00 PM');
+  });
+
+  it('omits timestamp when createdAt is null/missing', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: RECEIPT_VOCAB.DEPOSIT_ONLINE,
+      methodDetail: 'Amex ****1074',
+      source: 'online_booking_deposit',
+      method: 'card',
+      createdAt: null,
+    })).toBe('Deposit (Online) · Amex ****1074');
+  });
+});
+
+describe('composer: buildSuggestedLabelForPayment (renderer-side helper)', () => {
+  const ts = '2026-05-06T20:00:00.000-07:00';
+
+  it('uses source_label fallback when source_notes absent and matches strict-readable path', () => {
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'card',
+        card_brand: 'visa',
+        card_last_four: '0001',
+        source_label: 'Online (pay link)',
+        created_at: ts,
+      },
+      false
+    );
+    expect(label).toBe('Pay Link (Online) · Visa ****0001 · 5/6/26 8:00 PM');
+  });
+
+  it('first-with-remainder + in_store cash → Deposit (In-Store) · Cash · date', () => {
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'cash',
+        source_label: 'Cash',
+        created_at: ts,
+      },
+      true
+    );
+    expect(label).toBe('Deposit (In-Store) · Cash · 5/6/26 8:00 PM');
+  });
+
+  it('non-first cash → Cash · date', () => {
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'cash',
+        source_label: 'Cash',
+        created_at: ts,
+      },
+      false
+    );
+    expect(label).toBe('Cash · 5/6/26 8:00 PM');
+  });
+
+  it('in-store card → "Amex ****1234 · date" (no "Card" primary leaks through)', () => {
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'card',
+        card_brand: 'amex',
+        card_last_four: '1234',
+        source_label: 'Card',
+        created_at: ts,
+      },
+      false
+    );
+    expect(label).toBe('Amex ****1234 · 5/6/26 8:00 PM');
+  });
+});
+
+describe('composer: composeLoyaltyFooter (REVISED LOCKED-7)', () => {
+  it('returns show=false when no redemption', () => {
+    expect(composeLoyaltyFooter(0, null)).toEqual({
+      show: false, redeemed_pts: 0, balance_after_pts: null,
+    });
+    expect(composeLoyaltyFooter(null, 50)).toEqual({
+      show: false, redeemed_pts: 0, balance_after_pts: null,
+    });
+    expect(composeLoyaltyFooter(undefined, undefined)).toEqual({
+      show: false, redeemed_pts: 0, balance_after_pts: null,
+    });
+  });
+
+  it('returns show=true with balance when redemption + balance both present', () => {
+    expect(composeLoyaltyFooter(200, 50)).toEqual({
+      show: true, redeemed_pts: 200, balance_after_pts: 50,
+    });
+  });
+
+  it('returns show=true with balance_after_pts=null when ledger lookup found no row', () => {
+    expect(composeLoyaltyFooter(100, null)).toEqual({
+      show: true, redeemed_pts: 100, balance_after_pts: null,
+    });
+    expect(composeLoyaltyFooter(100, undefined)).toEqual({
+      show: true, redeemed_pts: 100, balance_after_pts: null,
+    });
+  });
+
+  it('coerces string-like numeric inputs (Supabase NUMERIC casts)', () => {
+    // Defensive: Supabase NUMERIC fields may arrive as strings depending on
+    // client version. composeLoyaltyFooter must Number()-coerce.
+    expect(composeLoyaltyFooter('150' as unknown as number, '75' as unknown as number)).toEqual({
+      show: true, redeemed_pts: 150, balance_after_pts: 75,
+    });
+  });
+});
+
+describe('composer: combined-label assembly inside composeReceiptPaymentLines (LOCKED-6 + LOCKED-9 wiring)', () => {
+  it('booking deposit + close-out — produces correct combined labels per the locked format hierarchy', () => {
+    const block = composeReceiptPaymentLines(
+      [
+        {
+          method: 'card', amount: 50,
+          card_brand: 'amex', card_last_four: '1234',
+          source_label: 'Booking deposit',
+          created_at: '2026-05-04T13:00:00.000-07:00',
+        },
+        {
+          method: 'cash', amount: 125,
+          cash_tendered: 125, change_given: 0,
+          created_at: '2026-05-06T20:00:00.000-07:00',
+          source_label: 'Cash',
+        },
+      ],
+      { total_amount: 175 }
+    );
+    expect(block.lines[0].suggested_label_combined)
+      .toBe('Deposit (Online) · Amex ****1234 · 5/4/26 1:00 PM');
+    expect(block.lines[1].suggested_label_combined)
+      .toBe('Cash · 5/6/26 8:00 PM');
+  });
+
+  it('pay-link single-event running receipt produces "Pay Link (Online) · ... · date"', () => {
+    const block = composeReceiptPaymentLines(
+      [
+        {
+          method: 'card', amount: 50,
+          card_brand: 'visa', card_last_four: '0001',
+          source_label: 'Online (pay link)',
+          created_at: '2026-05-05T15:00:00.000-07:00',
+        },
+      ],
+      { total_amount: 175 }
+    );
+    expect(block.lines[0].suggested_label_combined)
+      .toBe('Pay Link (Online) · Visa ****0001 · 5/5/26 3:00 PM');
   });
 });

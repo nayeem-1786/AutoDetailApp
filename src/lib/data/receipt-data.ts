@@ -357,6 +357,27 @@ async function mapTransactionRow(
     refundsWithSources.push({ ...refund, sources: enriched });
   }
 
+  // 8e. Loyalty footer balance snapshot (Phase 1A REVISED LOCKED-7).
+  // Fires only when this transaction actually redeemed points — skip the
+  // round-trip on the common no-loyalty path. Pulls the LATEST loyalty_ledger
+  // row for this transaction (covers both the 'redeemed' write and any
+  // subsequent 'earned' write that landed in the same checkout); that row's
+  // points_balance is the post-transaction snapshot. NULL fallback when no
+  // ledger row exists (pre-ledger historical transactions or data corruption)
+  // — renderers degrade to showing only the "redeemed" line.
+  let loyaltyBalanceAfterPts: number | null = null;
+  if (Number(raw.loyalty_points_redeemed ?? 0) > 0) {
+    const { data: ledgerRow } = await supabase
+      .from('loyalty_ledger')
+      .select('points_balance')
+      .eq('transaction_id', raw.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    loyaltyBalanceAfterPts =
+      ledgerRow?.points_balance == null ? null : Number(ledgerRow.points_balance);
+  }
+
   // 9. Map database transaction to ReceiptTransaction interface
   const tx: ReceiptTransaction = {
     status: raw.status,
@@ -386,6 +407,7 @@ async function mapTransactionRow(
     linked_receipt: linkedReceipt,
     appointment_balance_due: appointmentBalanceDue,
     appointment_total: appointmentTotal,
+    loyalty_balance_after_pts: loyaltyBalanceAfterPts,
   };
 
   return tx;

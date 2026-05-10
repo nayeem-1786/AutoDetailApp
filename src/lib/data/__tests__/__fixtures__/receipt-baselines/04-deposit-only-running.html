@@ -54,10 +54,7 @@
     </tr>
   </table>
 
-  <div style="text-align:center;margin:8px 0;">
-    <span style="display:inline-block;padding:4px 12px;border-radius:4px;font-size:12px;font-weight:bold;color:#fff;background:#2563eb;">BOOKING DEPOSIT</span>
-  </div>
-
+  
   
 
   <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
@@ -81,28 +78,20 @@
   </tr><tr>
     <td style="padding:3px 0;font-size:14px">Tax</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$0.00</td>
-  </tr><tr>
-    <td style="padding:3px 0;font-size:14px;color:#16a34a">Deposit Paid - Online on 05/04/2026</td>
-    <td style="padding:3px 0;font-size:14px;text-align:right;color:#16a34a">-$50.00</td>
   </tr>
     <tr>
       <td colspan="2" style="padding:4px 0;"><hr style="border:none;border-top:1px solid #333;margin:0;"></td>
     </tr>
     <tr>
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;">TOTAL CHARGED</td>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;">TOTAL</td>
       <!-- Use the larger of appointment_total and transaction.total_amount.
            Handles both close-out shells (transaction is $0, appointment carries
            gross) AND in-store sales that exceed appointment value (transaction
            carries gross, appointment is stale). Mirrors the thermal renderer's
-           policy in this same file (see balanceGrandTotal / grandTotal above). -->
-      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$50.00</td>
-    </tr>
-    <tr>
-      <td style="padding:6px 0;font-size:14px;font-weight:bold;color:#d97706;">EST. BALANCE DUE AT SERVICE</td>
-      <td style="padding:6px 0;font-size:14px;font-weight:bold;text-align:right;color:#d97706;">$125.00</td>
-    </tr>
-    <tr>
-      <td colspan="2" style="padding:0 0 4px;font-size:11px;color:#888;font-style:italic;text-align:center;">Final balance may include additional services</td>
+           policy in this same file. Phase 1A LOCKED-5: no longer branches on
+           tx.is_deposit ("TOTAL CHARGED" relabel + EST. BALANCE DUE row +
+           "Final balance may include additional services" footnote retired). -->
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$175.00</td>
     </tr>
     
   </table>
@@ -113,10 +102,13 @@
   <div style="font-size:13px;color:#333;margin-bottom:4px;font-weight:bold;">Payment</div>
   <table style="width:100%;border-collapse:collapse;">
     <tr>
-    <td style="padding:3px 0;font-size:14px">Booking deposit · May 4, 2026, 1:00 PM</td>
+    <td style="padding:3px 0;font-size:14px">Deposit (Online) · Amex ****1234 · 5/4/26 1:00 PM</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$50.00</td>
   </tr><tr>
-    <td style="padding:3px 0;font-size:14px">Balance Due</td>
+    <td style="padding:3px 0;font-size:14px">Total Paid:</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$50.00</td>
+  </tr><tr>
+    <td style="padding:3px 0;font-size:14px">Balance Due:</td>
     <td style="padding:3px 0;font-size:14px;text-align:right">$125.00</td>
   </tr>
   </table>

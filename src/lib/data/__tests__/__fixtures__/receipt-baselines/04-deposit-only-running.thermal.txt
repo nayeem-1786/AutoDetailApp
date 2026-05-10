@@ -2,8 +2,6 @@
                         
                         
 ------------------------------------------------
-             ** BOOKING DEPOSIT **
-------------------------------------------------
 Receipt #R-0004-DEP         May 4, 2026, 1:00 PM
 Sample Customer, Enthusiast       (310) 555-1234
 sample@example.com      Customer Since: Aug 2024
@@ -13,12 +11,10 @@ Full Detail                           $175.00
 ------------------------------------------------
 Subtotal                                 $175.00
 Tax                                        $0.00
-Deposit Paid - Online on 05/04/2026      -$50.00
 
-TOTAL CHARGED                             $50.00
-
-EST. BALANCE DUE AT SERVICE              $125.00
- Final balance may include additional services
+TOTAL                                    $175.00
 ------------------------------------------------
-Booking deposit · May 4, 2026, 1:00 PM    $50.00
-Balance Due                              $125.00
+Deposit (Online) · Amex ****1234          $50.00
+                  5/4/26 1:00 PM
+Total Paid:                               $50.00
+Balance Due:                             $125.00

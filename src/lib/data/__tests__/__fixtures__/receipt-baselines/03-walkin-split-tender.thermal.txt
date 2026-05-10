@@ -14,8 +14,10 @@ Tax                                        $0.00
 
 TOTAL                                     $50.00
 ------------------------------------------------
-CASH                                      $30.00
+Deposit (In-Store) · Cash                 $30.00
+                  5/6/26 8:05 PM
   Tendered                                $30.00
   Change                                   $0.00
-Visa ****4242                             $20.00
-Balance Due                                $0.00
+Visa ****4242 · 5/6/26 8:06 PM            $20.00
+Total Paid:                               $50.00
+                Paid in Full [v]

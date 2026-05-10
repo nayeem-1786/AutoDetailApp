@@ -650,6 +650,97 @@ const scenario12: ReceiptScenario = {
   }),
 };
 
+// ===========================================================================
+// Scenario 13 — Loyalty redemption only (CDTFA Reg 1671.1 verification)
+// ===========================================================================
+// $20 service entirely paid by 200 points redeemed. Loyalty discount reduces
+// the taxable base BEFORE tax (REVISED LOCKED-7) — tax computed on $0.
+// Customer's post-redemption balance: 50 pts (started at 250).
+// No real payments, but is_paid_in_full = true via loyalty alone.
+
+const scenario13: ReceiptScenario = {
+  id: 13,
+  slug: '13-loyalty-only',
+  name: 'Loyalty redemption only — paid in full by 200 pts',
+  description: 'Customer pays $20 service entirely with 200 loyalty points. No tender. Tax on $0 taxable base per CDTFA Reg 1671.1.',
+  tx: baseStandard({
+    receipt_number: 'R-0013',
+    transaction_date: '2026-05-06T11:00:00.000-07:00',
+    subtotal: 20,
+    tax_amount: 0,
+    discount_amount: 20,
+    loyalty_discount: 20,
+    loyalty_points_redeemed: 200,
+    total_amount: 0,
+    loyalty_balance_after_pts: 50,
+    items: [
+      {
+        id: 'item-13-a',
+        item_name: 'Quick Wax',
+        quantity: 1,
+        unit_price: 20,
+        total_price: 20,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+    ],
+    payments: [],
+    appointment_balance_due: 0,
+    appointment_total: 20,
+  }),
+};
+
+// ===========================================================================
+// Scenario 14 — Mixed tender: loyalty + cash + tax
+// ===========================================================================
+// $20 subtotal − $10 loyalty discount = $10 taxable. 10% tax = $1.
+// Total = $11, paid by one cash payment.
+// Post-transaction balance: 150 pts (started 200, redeemed 100, earned 50 on
+// the $11 settlement — assumption noted in comment, plausible per typical
+// EARN_RATE 5pts/$1 or similar; exact rate isn't load-bearing for the fixture).
+
+const scenario14: ReceiptScenario = {
+  id: 14,
+  slug: '14-loyalty-plus-cash-plus-tax',
+  name: 'Mixed tender — loyalty + cash + tax',
+  description: '$20 service with 100 pts redeemed ($10 discount), 10% tax on $10 taxable = $1, paid $11 cash. Post-transaction loyalty balance 150 pts (200 start − 100 redeemed + 50 earned).',
+  tx: baseStandard({
+    receipt_number: 'R-0014',
+    transaction_date: '2026-05-06T10:32:00.000-07:00',
+    subtotal: 20,
+    tax_amount: 1,
+    discount_amount: 10,
+    loyalty_discount: 10,
+    loyalty_points_redeemed: 100,
+    total_amount: 11,
+    loyalty_balance_after_pts: 150,
+    items: [
+      {
+        id: 'item-14-a',
+        item_name: 'Quick Wax',
+        quantity: 1,
+        unit_price: 20,
+        total_price: 20,
+        tax_amount: 1,
+        item_type: 'service',
+      },
+    ],
+    payments: [
+      {
+        method: 'cash',
+        amount: 11,
+        tip_amount: 0,
+        cash_tendered: 15,
+        change_given: 4,
+        created_at: '2026-05-06T10:32:00.000-07:00',
+        source_label: 'Cash',
+      },
+    ],
+    appointment_balance_due: 0,
+    appointment_total: 11,
+  }),
+};
+
 export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario1,
   scenario2,
@@ -663,4 +754,6 @@ export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario10,
   scenario11,
   scenario12,
+  scenario13,
+  scenario14,
 ];
