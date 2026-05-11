@@ -694,6 +694,7 @@ src/app/admin/staff/roles/page.tsx
 ### Transactions
 ```
 src/app/admin/transactions/page.tsx
+src/app/admin/reports/payments/page.tsx           # Phase 1A.5: payments report grouped by method+platform, date-range, CSV export
 ```
 
 ### Website (CMS)
@@ -865,7 +866,7 @@ src/lib/data/receipt-composer.ts                    — Phase 0b.1: pure compose
 src/lib/data/receipt-config.ts
 src/lib/data/receipt-data.ts
 src/lib/data/__tests__/receipt-composer.test.ts     — Phase 0b.1 / 1A: composer unit tests + 28 fixture byte-equality regressions
-src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 14 ReceiptTransaction scenarios shared by capture script + tests (Phase 1A: +scenarios 13 loyalty-only + 14 loyalty+cash+tax)
+src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 15 ReceiptTransaction scenarios shared by capture script + tests (Phase 1A.5: +scenario 15 digital-zelle; Phase 1A: +scenarios 13 loyalty-only + 14 loyalty+cash+tax)
 src/lib/data/__tests__/__fixtures__/receipt-baselines/*.html       — 14 captured HTML fixtures (regenerable)
 src/lib/data/__tests__/__fixtures__/receipt-baselines/*.thermal.txt — 14 captured thermal fixtures (regenerable)
 src/lib/data/refund-sources.ts
@@ -1079,6 +1080,7 @@ src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
 src/lib/utils/refund-math.ts
 src/lib/utils/stock-adjustments.ts
+src/lib/utils/stripe-card-details.ts        # Phase 1A.5: extractCardDetailsFromCharge — Stripe brand/last4 helper for online card payment paths
 src/lib/utils/system-actors.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
@@ -1563,6 +1565,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260503024921_add_refunds_notes.sql
 20260503160000_add_payment_link_amount_cents.sql
 20260503181924_add_pos_walkin_consent_source.sql
+20260510000001_add_digital_payment_enum_value.sql     # Phase 1A.5: extend payment_method enum with 'digital'
+20260510000002_add_digital_platform_column.sql        # Phase 1A.5: payments.digital_platform column + biconditional CHECK + partial index
 ```
 
 ## Scripts
@@ -1576,6 +1580,7 @@ scripts/regen-sms-contracts.ts              # Codegen: SMS palette + per-slug ty
 scripts/seed-admin.ts
 scripts/seed-data.ts
 scripts/seed-receipt-test-transactions.sql  # Phase 0b.1: receipt-test seed scaffolding (NOT executed; for Phase 0b.2 byte-diff harness)
+scripts/fix-zelle-misclassification.sql     # Phase 1A.5: one-off SQL fix template for the Zelle-mismarked-as-Cash transaction (NOT executed)
 ```
 
 ## Config
@@ -1603,6 +1608,7 @@ docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
 docs/sessions/receipt-unification-phase-0b-2.md   # Phase 0b.2: byte-diff harness operator runbook + 10-scenario SQL queries
 docs/sessions/receipt-unification-phase-1a.md     # Phase 1A: visual UX changes (Total Paid, Paid in Full ✓, deposit chrome retired, payment timestamps)
+docs/sessions/receipt-unification-phase-1a-5.md   # Phase 1A.5: digital payment types (Zelle/Venmo/AppleCash/Other) + Stripe webhook brand/last4 capture
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

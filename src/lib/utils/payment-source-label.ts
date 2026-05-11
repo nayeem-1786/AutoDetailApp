@@ -15,7 +15,7 @@
  * If either prefix string ever changes in the source files above, this helper
  * stops recognizing those payments — keep the three sites in sync.
  */
-export type PaymentMethodLike = 'cash' | 'card' | 'check' | 'split';
+export type PaymentMethodLike = 'cash' | 'card' | 'check' | 'split' | 'digital';
 
 export function derivePaymentSourceLabel(
   notes: string | null | undefined,
@@ -32,5 +32,12 @@ export function derivePaymentSourceLabel(
       return 'Check';
     case 'split':
       return 'Split';
+    case 'digital':
+      // Generic fallback for the rare case a digital payment row reaches
+      // the source-label helper without composer enrichment. The composer's
+      // mapDigitalPlatformToFriendly produces the actual visible label
+      // (Zelle/Venmo/AppleCash/title-cased free-text) using the digital_platform
+      // field — which this method-only helper has no access to.
+      return 'Digital';
   }
 }

@@ -276,6 +276,8 @@ async function mapTransactionRow(
           created_at: p.created_at,
           source_notes: p.transaction?.notes ?? null,
           stripe_payment_intent_id: p.stripe_payment_intent_id,
+          // Phase 1A.5: pass digital_platform through to composer label assembly.
+          digital_platform: p.digital_platform ?? null,
         })
       );
 

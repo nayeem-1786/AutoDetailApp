@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(payments): digital payment types + Stripe brand/last4 webhook capture (Phase 1A.5)
+
+Two independent additions shipping together. Both surfaced in production this week — Part A from the Zelle mismarked-as-Cash incident during an internet outage, Part B from the Phase 1A diff-review noticing online Stripe payments render generic "Card" on receipts.
+
+**Part A — Digital payment types (Zelle, Venmo, AppleCash, Other)**
+
+DB: two migrations. `20260510000001_add_digital_payment_enum_value.sql` extends the `payment_method` enum with `'digital'` (in its own file because Postgres requires `ADD VALUE` to commit before the value is usable). `20260510000002_add_digital_platform_column.sql` adds `payments.digital_platform TEXT NULL` with a biconditional CHECK constraint (`method='digital' ⇔ digital_platform IS NOT NULL`) and a partial index on `digital_platform` filtered to `method='digital'` for reporting query performance.
+
+POS: new "Digital" button (Smartphone icon) on the checkout payment-method screen. Tap opens a platform picker — Zelle, Venmo, AppleCash, or "Other…" (free-text). Free-text rules: required, max 30 chars, alphanumeric + spaces + hyphens, rejects free-text that case-insensitively matches a canonical platform (cashier must use the dedicated button). Permission gates under `pos.process_cash` for now — a dedicated `pos.process_digital` permission may land in a future session if stricter gating is desired.
+
+Composer: `mapDigitalPlatformToFriendly` exported from `receipt-composer.ts`. `'zelle'` → `"Zelle"`, `'venmo'` → `"Venmo"`, `'apple_cash'` → `"AppleCash"` (intentional camelCase wordmark), everything else → `toTitleCase(value)` via the new helper in `format.ts`. `buildSuggestedPaymentLabel` short-circuits on `method='digital'` and returns the friendly platform name as primary; `buildCombinedPaymentLabel` treats digital like cash/check (primary IS the user-visible label, no redundant `method_detail` segment). Final composed label across all 4 receipt surfaces: `"Zelle · 5/26/26 11:34 AM    $245.00"`. **Receipts never render the literal string "Digital Payment".**
+
+Admin: `/admin/transactions` gains a "Payment Method" filter dropdown (All / Cash / Card / Check / Split / Digital). When Digital is selected, a "Digital Platform" sub-filter appears with the 3 canonical platforms. Sub-filter deduplicates client-side via a JS `Set<transaction_id>` from a separate `payments` lookup, then constrains the main transactions query with `.in('id', txIds)` — avoids inner-join row duplication when a transaction has multiple payments. New `/admin/reports/payments` page with date range picker (default: this month PST), grouped table by method+platform showing count/total/percentage, and client-side CSV export (`payments-report-YYYY-MM-DD-to-YYYY-MM-DD.csv`). Sidebar gains a "Reports" parent with one child (Payments).
+
+SQL fix template: `scripts/fix-zelle-misclassification.sql` ships as a three-step template (VERIFY → UPDATE both payments + transactions → VERIFY). Operator pastes the affected transaction id and runs manually post-deploy. Not executed in this session.
+
+15th fixture scenario: `15-digital-zelle` — $75 Zelle paid in full. Thermal/HTML output verified: `"Zelle · 5/6/26 9:15 AM    $75.00"` + Paid in Full ✓. All 30 fixtures regenerated.
+
+**Part B — Stripe webhook brand/last4 capture**
+
+New helper `src/lib/utils/stripe-card-details.ts` — `extractCardDetailsFromCharge(stripe, chargeId, context)` returns `{ card_brand, card_last_four }` from `charge.payment_method_details.card`. Title-cases the brand for storage consistency with the in-store Stripe Terminal path. Returns nulls on any failure (missing latest_charge, non-card method like ACH/Apple Pay, Stripe API error) — never throws, so webhook processing never blocks on enrichment.
+
+Wired into the two online payment paths that previously inserted payments rows with NULL brand/last4:
+- `src/app/api/webhooks/stripe/route.ts` pay-link `payment_intent.succeeded` branch — pulls brand+last4 before the payments insert.
+- `src/app/api/book/route.ts` booking-deposit branch — adds a Stripe SDK instance + `paymentIntents.retrieve` to access `latest_charge`, then extracts brand+last4. Wrapped in try/catch so PI retrieve failures don't block booking confirmation.
+
+**Going-forward only** (LOCKED-B1). Historical pay-link and booking-deposit rows remain `card_brand=NULL, card_last_four=NULL`; re-opening their receipts continues to show generic "Card". No backfill planned.
+
+In-store Stripe Terminal paths (`split-payment.tsx`, `card-payment.tsx`) already captured brand+last4 correctly; verified-correct baseline in Phase 1A byte-diff. No changes to those.
+
+**Type system updates**: `'digital'` added to `PaymentMethod`, `PaymentMethodLike`, both Zod schemas (`paymentSchema.method` + `transactionCreateSchema.payment_method`), `PriorPayment.method`, `CheckoutStep`. `digital_platform?: string | null` added to `ReceiptPayment`, `ComposerPaymentInput`, `RenderedPaymentLine`, and `paymentSchema`. `/api/pos/transactions` route gains method-vs-field biconditional validation that mirrors the DB CHECK (returns 422 with a useful message instead of a 500 constraint violation).
+
+**Testing**: `receipt-composer.test.ts` gains 25 new tests covering `toTitleCase`, `mapDigitalPlatformToFriendly` (canonical + free-text + case-insensitivity + defensive fallback), digital combined-label assembly via `composeReceiptPaymentLines` + `buildSuggestedLabelForPayment` + `buildCombinedPaymentLabel`, free-text validation rules (length, character set, canonical-clash rejection), end-to-end "Other" path (`digital_platform='wise transfer'` → `"Wise Transfer · 5/6/26 11:34 AM"`), and Stripe `extractCardDetailsFromCharge` (success, uppercase brand, null chargeId, non-card method, API error path, missing fields). Total suite: 660/660 pass.
+
+Full session notes: `docs/sessions/receipt-unification-phase-1a-5.md`.
+
+**Deferred items**: dedicated `pos.process_digital` permission; digital tender inside split payments (split flow currently hardcodes cash/card branches); historical Stripe PaymentIntent backfill (intentional per LOCKED-B1); mass Cash→Digital backfill beyond the one Zelle transaction.
+
+---
+
 ## feat(receipts): visual UX changes — total paid, paid in full, retire deposit chrome (Phase 1A)
 
 First visual UX changes to receipts since the composer landed in Phase 0b.1. Customer-facing impact across all 4 surfaces (thermal, HTML print/copier, HTML email, public page). Historical receipts re-rendered today pick up the new presentation automatically.

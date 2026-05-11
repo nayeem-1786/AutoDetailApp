@@ -21,7 +21,7 @@ import {
   type PaymentMethodLike,
 } from '@/lib/utils/payment-source-label';
 import { formatCardBrand } from '@/lib/utils/card-brand';
-import { formatReceiptDateTimeCompact } from '@/lib/utils/format';
+import { formatReceiptDateTimeCompact, toTitleCase } from '@/lib/utils/format';
 
 // ---------------------------------------------------------------------------
 // Vocabulary constants — LOCKED-4
@@ -79,6 +79,11 @@ export interface ComposerPaymentInput {
    *  it short-circuits source_notes-based detection. */
   source_label?: string | null;
   stripe_payment_intent_id?: string | null;
+  /** Phase 1A.5: canonical digital platform identifier (lowercase) when
+   *  method='digital'. Composer maps via mapDigitalPlatformToFriendly to
+   *  produce the receipt-visible primary label. NULL/undefined for all
+   *  non-digital methods. */
+  digital_platform?: string | null;
 }
 
 export interface RenderedPaymentLine {
@@ -102,6 +107,10 @@ export interface RenderedPaymentLine {
   cash_tendered_cents: number | null;
   change_given_cents: number | null;
   tip_amount_cents: number;
+  /** Phase 1A.5: canonical digital platform identifier (lowercase). NULL
+   *  for all non-digital methods. Composer surfaces the receipt-visible
+   *  label via mapDigitalPlatformToFriendly on the primary label. */
+  digital_platform: string | null;
   /** Suggested label parts for Phase 1 consumption. Phase 0b.1 renderers
    *  ignore these and continue using their inline label construction. */
   suggested_primary_label: string;
@@ -243,6 +252,30 @@ function formatDateLong(iso: string | null | undefined): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Phase 1A.5 Part A: map a canonical lowercase digital_platform identifier
+ * to its receipt-visible label. Three fixed identifiers get hand-styled
+ * labels; everything else is title-cased.
+ *
+ * Examples:
+ *   'zelle'          → 'Zelle'
+ *   'venmo'          → 'Venmo'
+ *   'apple_cash'     → 'AppleCash'    (intentional camelCase to match the
+ *                                       brand wordmark — toTitleCase would
+ *                                       drop the underscore)
+ *   'cash app'       → 'Cash App'
+ *   'wise transfer'  → 'Wise Transfer'
+ *   ''               → 'Digital'      (defensive fallback for corrupt rows)
+ */
+export function mapDigitalPlatformToFriendly(platform: string | null | undefined): string {
+  if (!platform) return 'Digital';
+  const key = platform.trim().toLowerCase();
+  if (key === 'zelle') return 'Zelle';
+  if (key === 'venmo') return 'Venmo';
+  if (key === 'apple_cash') return 'AppleCash';
+  return toTitleCase(key);
+}
+
+/**
  * Construct a suggested primary label for a payment line per Phase 1 rules:
  *   - first-payment-with-remainder + online_booking_deposit → 'Deposit (Online)'
  *   - first-payment-with-remainder + in_store              → 'Deposit (In-Store)'
@@ -253,6 +286,15 @@ function formatDateLong(iso: string | null | undefined): string {
  * Phase 0b.1 surfaces ignore these. Phase 1 will adopt.
  */
 export function buildSuggestedPaymentLabel(line: RenderedPaymentLine): string {
+  // Phase 1A.5 Part A: digital payments use the platform name as the primary
+  // label. Composer NEVER renders the word "Digital" on a customer-visible
+  // receipt — the platform identifier carries all the information.
+  // Falls through to 'Digital' generic when digital_platform is missing
+  // (defensive — DB CHECK should prevent this state, but render rather
+  // than crash on corrupt data).
+  if (line.method === 'digital') {
+    return mapDigitalPlatformToFriendly(line.digital_platform);
+  }
   if (line.is_first_with_remainder) {
     if (line.source === 'online_booking_deposit') return RECEIPT_VOCAB.DEPOSIT_ONLINE;
     if (line.source === 'in_store') return RECEIPT_VOCAB.DEPOSIT_IN_STORE;
@@ -267,7 +309,7 @@ export function buildSuggestedPaymentLabel(line: RenderedPaymentLine): string {
   }
 }
 
-function buildMethodDetail(line: Pick<RenderedPaymentLine, 'method' | 'card_brand' | 'card_last_four'>): string {
+function buildMethodDetail(line: Pick<RenderedPaymentLine, 'method' | 'card_brand' | 'card_last_four' | 'digital_platform'>): string {
   if (line.method === 'card' && line.card_brand) {
     return `${formatCardBrand(line.card_brand)} ****${line.card_last_four ?? '????'}`;
   }
@@ -276,6 +318,12 @@ function buildMethodDetail(line: Pick<RenderedPaymentLine, 'method' | 'card_bran
     case 'check': return 'Check';
     case 'card': return 'Card';
     case 'split': return 'Split';
+    case 'digital':
+      // Phase 1A.5: method_detail mirrors the primary label for digital so
+      // the buildCombinedPaymentLabel 2-segment path produces "Zelle · date"
+      // without a redundant repeat. Combined-label assembly recognizes the
+      // method as digital and elides method_detail from the rendered string.
+      return mapDigitalPlatformToFriendly(line.digital_platform);
     default: return line.method;
   }
 }
@@ -316,13 +364,15 @@ export function buildCombinedPaymentLabel(opts: {
 
   // Leading segment(s): for meta-primary labels, primary + method_detail;
   // for card method, method_detail alone (brand+last4 trumps bare "Card");
-  // for cash/check, primary alone (primary IS the method label).
+  // for cash/check/digital, primary alone (primary IS the user-visible label —
+  // method_detail would be a redundant repeat).
   let leading: string;
   if (isMetaPrimary) {
     leading = `${opts.primary} · ${opts.methodDetail}`;
   } else if (opts.method === 'card') {
     leading = opts.methodDetail;
   } else {
+    // Includes cash, check, digital, split.
     leading = opts.primary;
   }
 
@@ -351,6 +401,7 @@ export function buildSuggestedLabelForPayment(
     source_label?: string | null;
     source_notes?: string | null;
     created_at?: string | null;
+    digital_platform?: string | null;
   },
   isFirstWithRemainder: boolean
 ): string {
@@ -374,6 +425,7 @@ export function buildSuggestedLabelForPayment(
     cash_tendered_cents: null,
     change_given_cents: null,
     tip_amount_cents: 0,
+    digital_platform: p.digital_platform ?? null,
     suggested_primary_label: '',
     suggested_method_detail: '',
     suggested_label_combined: '',
@@ -499,6 +551,9 @@ export function composeReceiptPaymentLines(
       cash_tendered_cents: p.cash_tendered != null ? toCents(Number(p.cash_tendered)) : null,
       change_given_cents: p.change_given != null ? toCents(Number(p.change_given)) : null,
       tip_amount_cents: p.tip_amount != null ? toCents(Number(p.tip_amount)) : 0,
+      // Phase 1A.5: pass digital_platform through so renderer-side label
+      // construction can recover the platform identifier without re-fetching.
+      digital_platform: p.digital_platform ?? null,
       // Filled below.
       suggested_primary_label: '',
       suggested_method_detail: '',

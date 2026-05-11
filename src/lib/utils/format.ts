@@ -125,6 +125,29 @@ export function formatReceiptDateTime(dateStr: string): string {
 }
 
 /**
+ * Title-case a free-text string: split on whitespace, capitalize the
+ * first letter of each word, lowercase the rest, rejoin with single
+ * spaces. Used by the composer's digital-platform label mapping
+ * (Phase 1A.5) for free-text platform names.
+ *
+ * Examples:
+ *   "cash app"       → "Cash App"
+ *   "wise transfer"  → "Wise Transfer"
+ *   "PAYPAL"         → "Paypal"
+ *   "  bitcoin  "    → "Bitcoin"
+ *   ""               → ""
+ */
+export function toTitleCase(input: string | null | undefined): string {
+  if (!input) return '';
+  return input
+    .trim()
+    .split(/\s+/)
+    .map((word) => (word.length === 0 ? '' : word[0].toUpperCase() + word.slice(1).toLowerCase()))
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
  * Compact PST date+time for per-payment-row timestamps on receipts.
  * Produces: "5/6/26 1:43 PM" (M/D/YY h:MM AM/PM, no leading zeros).
  *

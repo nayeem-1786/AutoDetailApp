@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Banknote, CreditCard, FileText, Split, WifiOff, CheckCircle2, Loader2 } from 'lucide-react';
+import { Banknote, CreditCard, FileText, Split, Smartphone, WifiOff, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
@@ -26,7 +26,7 @@ export function PaymentMethodScreen() {
   // jump to the Payment Complete screen, bypassing the tender selector.
   const isCloseOut = ticket.total === 0 && ticket.priorPayments.length > 0;
 
-  function handleSelect(method: 'cash' | 'card' | 'check' | 'split') {
+  function handleSelect(method: 'cash' | 'card' | 'check' | 'split' | 'digital') {
     setPaymentMethod(method);
     setStep(method);
   }
@@ -213,6 +213,27 @@ export function PaymentMethodScreen() {
         >
           <Split className="h-8 w-8 text-purple-600" />
           <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Split</span>
+        </button>
+
+        {/* Phase 1A.5 Part A: Digital payment (Zelle/Venmo/AppleCash/Other).
+            Gates under pos.process_cash — digital is cash-equivalent for
+            settlement (no card fee, no PCI scope). Offline path is allowed:
+            digital payments don't require an online round-trip, but staff
+            should be online to log them so the transaction reaches the
+            offline queue cleanly. */}
+        <button
+          onClick={() => handleSelect('digital')}
+          disabled={!canProcessCash}
+          className={cn(
+            'flex h-32 w-32 flex-col items-center justify-center gap-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 transition-all',
+            canProcessCash
+              ? 'hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 active:scale-[0.97]'
+              : 'cursor-not-allowed opacity-40'
+          )}
+          title={!canProcessCash ? 'You do not have permission to process digital payments' : undefined}
+        >
+          <Smartphone className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">Digital</span>
         </button>
       </div>
 

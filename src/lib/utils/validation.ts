@@ -500,7 +500,7 @@ const transactionItemSchema = z.object({
 });
 
 export const paymentSchema = z.object({
-  method: z.enum(['cash', 'card', 'check', 'split']),
+  method: z.enum(['cash', 'card', 'check', 'split', 'digital']),
   amount: positiveNumber,
   tip_amount: positiveNumber.default(0),
   stripe_payment_intent_id: optionalString,
@@ -513,6 +513,11 @@ export const paymentSchema = z.object({
   // failure mode is a 422 with a useful message instead of a Zod 400.
   cash_tendered: positiveNumber.optional().nullable(),
   change_given: positiveNumber.optional().nullable(),
+  // Digital-only: canonical platform identifier (lowercase). Required when
+  // method='digital', forbidden otherwise. DB CHECK constraint enforces the
+  // biconditional; the route handler validates method-vs-field consistency
+  // (returns 422 on mismatch, mirroring the cash_tendered pattern above).
+  digital_platform: optionalString,
 });
 
 export const transactionCreateSchema = z.object({
@@ -527,7 +532,7 @@ export const transactionCreateSchema = z.object({
   // Nullable to support close-out transactions (fully pre-paid appointments
   // that need a $0 transaction row without a tender). Existing cash/card/
   // check/split paths always pass a non-null method.
-  payment_method: z.enum(['cash', 'card', 'check', 'split']).nullable(),
+  payment_method: z.enum(['cash', 'card', 'check', 'split', 'digital']).nullable(),
   coupon_id: z.string().uuid().optional().nullable(),
   coupon_code: z.string().optional().nullable(),
   loyalty_points_redeemed: positiveInt.default(0),

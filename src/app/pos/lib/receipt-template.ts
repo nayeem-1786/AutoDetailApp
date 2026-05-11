@@ -71,6 +71,11 @@ interface ReceiptPayment {
    * where the renderer iterates the FULL appointment payment history;
    * absent on walk-in transactions where local payments[] is the source. */
   source_label?: string | null;
+  /** Phase 1A.5 Part A: canonical digital platform identifier (lowercase)
+   * when method='digital'. Composer's mapDigitalPlatformToFriendly converts
+   * this to the receipt-visible label (e.g., 'zelle' → 'Zelle', 'cash app'
+   * → 'Cash App'). NULL for all non-digital methods (DB CHECK enforced). */
+  digital_platform?: string | null;
 }
 
 export interface ReceiptTransaction {
@@ -731,6 +736,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
         card_last_four: p.card_last_four,
         source_label: p.source_label,
         created_at: p.created_at,
+        digital_platform: p.digital_platform,
       },
       firstWithRemainderFlags[i]
     );
@@ -1128,6 +1134,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
             card_last_four: p.card_last_four,
             source_label: p.source_label,
             created_at: p.created_at,
+            digital_platform: p.digital_platform,
           },
           htmlFirstWithRemainderFlags[i]
         );

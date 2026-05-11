@@ -58,6 +58,16 @@ export async function POST(request: NextRequest) {
         if (!granted) {
           return NextResponse.json({ error: 'Forbidden: cannot process split payments' }, { status: 403 });
         }
+      } else if (paymentMethod === 'digital') {
+        // Phase 1A.5: digital payments gate under pos.process_cash. Zelle/Venmo/
+        // AppleCash/etc. settle out-of-band (no card fee, no PCI scope), so the
+        // existing cash permission is the natural fit. A dedicated
+        // pos.process_digital permission may land in a future session if stricter
+        // gating is desired.
+        const granted = await checkPosPermission(supabase, posEmployee.role, posEmployee.employee_id, 'pos.process_cash');
+        if (!granted) {
+          return NextResponse.json({ error: 'Forbidden: cannot process digital payments' }, { status: 403 });
+        }
       }
     }
 
@@ -259,6 +269,28 @@ export async function POST(request: NextRequest) {
             { status: 422 }
           );
         }
+        // Phase 1A.5 Part A: digital_platform is required for method='digital'
+        // and forbidden for all other methods. Mirrors the DB CHECK constraint
+        // (payments_digital_platform_check) so the error is returned as a
+        // useful 422 instead of a 500 from the constraint violation.
+        if (p.method === 'digital') {
+          const platform = (p.digital_platform ?? '').trim();
+          if (!platform) {
+            return NextResponse.json(
+              {
+                error: `digital_platform is required when method='digital'`,
+              },
+              { status: 422 }
+            );
+          }
+        } else if (p.digital_platform != null) {
+          return NextResponse.json(
+            {
+              error: `digital_platform is only valid for method='digital' (got method='${p.method}')`,
+            },
+            { status: 422 }
+          );
+        }
       }
 
       const paymentRows = data.payments.map((p: {
@@ -270,6 +302,7 @@ export async function POST(request: NextRequest) {
         card_last_four?: string | null;
         cash_tendered?: number | null;
         change_given?: number | null;
+        digital_platform?: string | null;
       }) => {
         // Server is the source of truth for change_given. If the client sent
         // a value that disagrees with max(0, cash_tendered - amount), normalize
@@ -304,6 +337,11 @@ export async function POST(request: NextRequest) {
           card_last_four: p.card_last_four || null,
           cash_tendered: cashTendered,
           change_given: changeGiven,
+          // Phase 1A.5: persist canonical lowercase platform identifier when
+          // method='digital'. Trimmed to defend against client whitespace.
+          digital_platform: p.method === 'digital'
+            ? (p.digital_platform ?? '').trim().toLowerCase()
+            : null,
         };
       });
 

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-modes" content="light dark">
+<style>
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1a1a !important; }
+    .receipt-wrap { background: #222 !important; border-color: #444 !important; color: #e0e0e0 !important; }
+    .receipt-wrap a { color: #cccccc !important; }
+    .receipt-wrap hr { border-color: #555 !important; }
+    .receipt-wrap td, .receipt-wrap div { color: #e0e0e0 !important; }
+    .receipt-wrap .tx-col { color: #aaa !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:20px;background:#f5f5f5;">
+<div class="receipt-wrap" style="max-width:400px;margin:0 auto;background:#fff;border:1px solid #ddd;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#222;line-height:1.5;position:relative;overflow:hidden;">
+  
+
+  <!-- Header -->
+  
+  <div style="text-align:center;margin-bottom:16px;">
+    <div style="font-size:18px;font-weight:bold;letter-spacing:1px;"></div>
+    
+    <div style="font-size:13px;margin-top:4px;"><a style="color:#444444;text-decoration:none;"></a></div>
+    <div style="font-size:13px;"><a href="tel:" style="color:#444444;text-decoration:none;"></a></div>
+    
+    
+  </div>
+
+  <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+
+  
+
+  <!-- Receipt info (3 lines: receipt#/date, name/phone, email/since) -->
+  <table style="width:100%;font-size:14px;margin-bottom:4px;">
+    <tr>
+      <td>Receipt #R-0015</td>
+      <td style="text-align:right;">May 6, 2026, 9:15 AM</td>
+    </tr>
+    <tr>
+      <td>Sample Customer, Enthusiast</td>
+      <td style="text-align:right;">(310) 555-1234</td>
+    </tr>
+    <tr>
+      <td>sample@example.com</td>
+      <td style="text-align:right;">Customer Since: Aug 2024</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="font-size:13px;color:#444;">Vehicle | 2022 White Tesla Model 3</td>
+    </tr>
+  </table>
+
+  
+  
+
+  <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+
+  <!-- Items -->
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+        <td style="padding:4px 0;font-size:14px;">Mini Detail</td>
+        <td style="padding:4px 0;font-size:14px;text-align:right;white-space:nowrap;">$75.00</td>
+        <td style="padding:4px 0 4px 8px;font-size:11px;color:#555;white-space:nowrap;width:20px;"></td>
+      </tr>
+  </table>
+
+  <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+
+  <!-- Totals -->
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+    <td style="padding:3px 0;font-size:14px">Subtotal</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$75.00</td>
+  </tr><tr>
+    <td style="padding:3px 0;font-size:14px">Tax</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$0.00</td>
+  </tr>
+    <tr>
+      <td colspan="2" style="padding:4px 0;"><hr style="border:none;border-top:1px solid #333;margin:0;"></td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;">TOTAL</td>
+      <!-- Use the larger of appointment_total and transaction.total_amount.
+           Handles both close-out shells (transaction is $0, appointment carries
+           gross) AND in-store sales that exceed appointment value (transaction
+           carries gross, appointment is stale). Mirrors the thermal renderer's
+           policy in this same file. Phase 1A LOCKED-5: no longer branches on
+           tx.is_deposit ("TOTAL CHARGED" relabel + EST. BALANCE DUE row +
+           "Final balance may include additional services" footnote retired). -->
+      <td style="padding:6px 0;font-size:15px;font-weight:bold;text-align:right;">$75.00</td>
+    </tr>
+    
+  </table>
+
+  <hr style="border:none;border-top:1px dashed #ccc;margin:12px 0;">
+
+  <!-- Payments -->
+  <div style="font-size:13px;color:#333;margin-bottom:4px;font-weight:bold;">Payment</div>
+  <table style="width:100%;border-collapse:collapse;">
+    <tr>
+    <td style="padding:3px 0;font-size:14px">Zelle · 5/6/26 9:15 AM</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$75.00</td>
+  </tr><tr>
+    <td style="padding:3px 0;font-size:14px">Total Paid:</td>
+    <td style="padding:3px 0;font-size:14px;text-align:right">$75.00</td>
+  </tr><tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">Paid in Full ✓</td></tr>
+  </table>
+
+  
+
+  
+
+  
+  
+
+  <!-- Footer zones -->
+  
+</div>
+</body>
+</html>

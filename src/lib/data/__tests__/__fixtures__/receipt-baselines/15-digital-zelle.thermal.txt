@@ -1,0 +1,19 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0015             May 6, 2026, 9:15 AM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Mini Detail                            $75.00   
+------------------------------------------------
+Subtotal                                  $75.00
+Tax                                        $0.00
+
+TOTAL                                     $75.00
+------------------------------------------------
+Zelle · 5/6/26 9:15 AM                    $75.00
+Total Paid:                               $75.00
+                Paid in Full [v]

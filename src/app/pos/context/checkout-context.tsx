@@ -15,6 +15,7 @@ export type CheckoutStep =
   | 'card'
   | 'check'
   | 'split'
+  | 'digital'
   | 'complete';
 
 interface CheckoutState {

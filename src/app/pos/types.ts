@@ -65,7 +65,7 @@ export interface TicketItem {
 
 export interface PriorPayment {
   amount_cents: number;
-  method: 'cash' | 'card' | 'check' | 'split';
+  method: 'cash' | 'card' | 'check' | 'split' | 'digital';
   paid_at: string; // ISO timestamp
   source_label: string; // e.g. "Online (pay link)", "Booking deposit", "Cash"
   stripe_payment_intent_id: string | null;

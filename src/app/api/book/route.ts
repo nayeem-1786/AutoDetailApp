@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bookingSubmitSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
+import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { APPOINTMENT, FEATURE_FLAGS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
@@ -455,6 +457,32 @@ export async function POST(request: NextRequest) {
             console.error('[Booking] Deposit transaction items insert failed:', itemsErr.message);
           }
 
+          // Phase 1A.5 Part B: retrieve the PaymentIntent + latest_charge to
+          // extract card brand + last4 so the deposit receipt renders
+          // "Visa ****1074" instead of generic "Card". Going-forward only —
+          // historical booking-deposit rows remain null per LOCKED-B1.
+          // Helper returns nulls on any failure (missing latest_charge,
+          // non-card method, Stripe API error); booking flow never blocks
+          // on enrichment.
+          let depositCardDetails: { card_brand: string | null; card_last_four: string | null } = {
+            card_brand: null,
+            card_last_four: null,
+          };
+          try {
+            const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!);
+            const pi = await stripeClient.paymentIntents.retrieve(data.payment_intent_id);
+            depositCardDetails = await extractCardDetailsFromCharge(
+              stripeClient,
+              pi.latest_charge as string | null,
+              `booking deposit PI ${data.payment_intent_id}`
+            );
+          } catch (piErr) {
+            console.error(
+              `[Booking] PI retrieve failed for ${data.payment_intent_id} — receipt will show generic Card label:`,
+              piErr
+            );
+          }
+
           // Insert payment row so receipt shows payment method
           const { error: payErr } = await supabase.from('payments').insert({
             transaction_id: depositTx.id,
@@ -463,6 +491,8 @@ export async function POST(request: NextRequest) {
             tip_amount: 0,
             tip_net: 0,
             stripe_payment_intent_id: data.payment_intent_id,
+            card_brand: depositCardDetails.card_brand,
+            card_last_four: depositCardDetails.card_last_four,
           });
 
           if (payErr) {

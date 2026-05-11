@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/refund-math';
+import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -169,7 +170,20 @@ export async function POST(request: NextRequest) {
               throw new Error(`transaction insert failed: ${txErr?.message ?? 'no row'}`);
             }
 
-            // Mirror booking-deposit payments shape (book/route.ts:459).
+            // Phase 1A.5 Part B: extract card brand + last4 from the Stripe
+            // Charge so receipts render "Visa ****1074" instead of generic
+            // "Card". Going-forward only — historical pay-link rows remain
+            // null per LOCKED-B1. Helper returns nulls on any failure
+            // (missing latest_charge, non-card method, Stripe API error) so
+            // webhook processing never blocks on enrichment.
+            const cardDetails = await extractCardDetailsFromCharge(
+              stripe,
+              pi.latest_charge as string | null,
+              `pay_link PI ${pi.id}`
+            );
+
+            // Mirror booking-deposit payments shape (book/route.ts:459) +
+            // card_brand/card_last_four when extraction succeeds.
             const { error: payErr } = await admin
               .from('payments')
               .insert({
@@ -179,6 +193,8 @@ export async function POST(request: NextRequest) {
                 tip_amount: 0,
                 tip_net: 0,
                 stripe_payment_intent_id: pi.id,
+                card_brand: cardDetails.card_brand,
+                card_last_four: cardDetails.card_last_four,
               });
 
             if (payErr) {

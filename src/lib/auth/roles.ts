@@ -23,6 +23,20 @@ export const SIDEBAR_NAV: NavItem[] = [
     href: '/admin/transactions',
     icon: 'ArrowRightLeft',
   },
+  // Phase 1A.5 Part A: Reports parent with one child (Payments). Future
+  // reports land as siblings under this entry.
+  {
+    label: 'Reports',
+    href: '/admin/reports/payments',
+    icon: 'BarChart3',
+    children: [
+      {
+        label: 'Payments',
+        href: '/admin/reports/payments',
+        icon: 'CreditCard',
+      },
+    ],
+  },
   {
     label: 'Quotes',
     href: '/admin/quotes',

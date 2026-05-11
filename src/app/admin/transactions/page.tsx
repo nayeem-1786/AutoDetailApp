@@ -129,6 +129,10 @@ const DATE_PRESETS: DatePreset[] = ['today', 'yesterday', 'this_week', 'this_mon
 const DEFAULT_FILTERS = {
   status: 'all',
   datePreset: 'this_month' as string,
+  // Phase 1A.5 Part A: payment-method filter (top-level) + digital_platform
+  // sub-filter (only consulted when method='digital').
+  paymentMethod: 'all',
+  digitalPlatform: 'all',
 };
 
 export default function AdminTransactionsPage() {
@@ -154,6 +158,8 @@ export default function AdminTransactionsPage() {
   // Convenience filter accessors
   const statusFilter = (table.filters.status as string) || 'all';
   const activePreset = (table.filters.datePreset as string) || 'this_month';
+  const paymentMethodFilter = (table.filters.paymentMethod as string) || 'all';
+  const digitalPlatformFilter = (table.filters.digitalPlatform as string) || 'all';
 
   // Compute date range from the active preset
   const dateRange = useMemo(() => computeDateRange(activePreset as DatePreset), [activePreset]);
@@ -233,6 +239,36 @@ export default function AdminTransactionsPage() {
         // Status filter
         if (status !== 'all') {
           query = query.eq('status', status);
+        }
+
+        // Phase 1A.5 Part A: payment-method filter + optional digital-platform
+        // sub-filter. The transactions.payment_method column carries the
+        // aggregate ('cash'/'card'/'check'/'split'/'digital'). For digital
+        // sub-filter, we need to query payments.digital_platform — but a raw
+        // inner join would duplicate transaction rows when a transaction has
+        // multiple payments. Instead we resolve via a separate query for
+        // matching transaction_ids and constrain with .in() — guarantees
+        // dedupe and preserves the existing pagination shape.
+        if (paymentMethodFilter !== 'all') {
+          query = query.eq('payment_method', paymentMethodFilter);
+        }
+        if (paymentMethodFilter === 'digital' && digitalPlatformFilter !== 'all') {
+          const { data: matchingPaymentTxs } = await supabase
+            .from('payments')
+            .select('transaction_id')
+            .eq('digital_platform', digitalPlatformFilter)
+            .limit(1000);
+          const txIds = Array.from(
+            new Set((matchingPaymentTxs ?? []).map((p: { transaction_id: string }) => p.transaction_id))
+          );
+          if (txIds.length === 0) {
+            // No transactions match the sub-filter — short-circuit to empty.
+            setTransactions([]);
+            setTotalCount(0);
+            setLoading(false);
+            return;
+          }
+          query = query.in('id', txIds);
         }
 
         // Date range filter
@@ -350,7 +386,7 @@ export default function AdminTransactionsPage() {
       fetchStats(statusFilter, dateRange.from, dateRange.to);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [table.debouncedSearch, statusFilter, dateRange.from, dateRange.to, table.page, table.sort?.column, table.sort?.direction]);
+  }, [table.debouncedSearch, statusFilter, dateRange.from, dateRange.to, table.page, table.sort?.column, table.sort?.direction, paymentMethodFilter, digitalPlatformFilter]);
 
   // Handle preset click — fires via filter change, which triggers fetchTransactions via the effect above
   function handlePresetClick(preset: DatePreset) {
@@ -359,21 +395,52 @@ export default function AdminTransactionsPage() {
   }
 
   // Toolbar filters
-  const toolbarFilters: FilterConfig[] = useMemo(() => [
-    {
-      key: 'status',
-      label: 'Status',
-      type: 'select',
-      options: [
-        { label: 'All Statuses', value: 'all' },
-        { label: 'Completed', value: 'completed' },
-        { label: 'Voided', value: 'voided' },
-        { label: 'Refunded', value: 'refunded' },
-        { label: 'Partial Refund', value: 'partial_refund' },
-        { label: 'Open', value: 'open' },
-      ],
-    },
-  ], []);
+  const toolbarFilters: FilterConfig[] = useMemo(() => {
+    const filters: FilterConfig[] = [
+      {
+        key: 'status',
+        label: 'Status',
+        type: 'select',
+        options: [
+          { label: 'All Statuses', value: 'all' },
+          { label: 'Completed', value: 'completed' },
+          { label: 'Voided', value: 'voided' },
+          { label: 'Refunded', value: 'refunded' },
+          { label: 'Partial Refund', value: 'partial_refund' },
+          { label: 'Open', value: 'open' },
+        ],
+      },
+      // Phase 1A.5 Part A: payment-method filter.
+      {
+        key: 'paymentMethod',
+        label: 'Payment Method',
+        type: 'select',
+        options: [
+          { label: 'All Methods', value: 'all' },
+          { label: 'Cash', value: 'cash' },
+          { label: 'Card', value: 'card' },
+          { label: 'Check', value: 'check' },
+          { label: 'Split', value: 'split' },
+          { label: 'Digital', value: 'digital' },
+        ],
+      },
+    ];
+    // Sub-filter for digital platform — only surfaced when method='digital'.
+    if (paymentMethodFilter === 'digital') {
+      filters.push({
+        key: 'digitalPlatform',
+        label: 'Digital Platform',
+        type: 'select',
+        options: [
+          { label: 'All Platforms', value: 'all' },
+          { label: 'Zelle', value: 'zelle' },
+          { label: 'Venmo', value: 'venmo' },
+          { label: 'AppleCash', value: 'apple_cash' },
+        ],
+      });
+    }
+    return filters;
+  }, [paymentMethodFilter]);
 
   // Sort helper for column headers
   function handleHeaderSort(column: string) {

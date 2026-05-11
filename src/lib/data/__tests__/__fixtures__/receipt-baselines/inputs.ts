@@ -741,6 +741,48 @@ const scenario14: ReceiptScenario = {
   }),
 };
 
+// ===========================================================================
+// Scenario 15 — Digital payment (Zelle) — single payment, paid in full
+// ===========================================================================
+// Customer paid $75 via Zelle (out-of-band transfer; no card / no cash).
+// Receipt should render: "Zelle · 5/6/26 9:15 AM    $75.00".
+
+const scenario15: ReceiptScenario = {
+  id: 15,
+  slug: '15-digital-zelle',
+  name: 'Digital payment (Zelle) — single payment, paid in full',
+  description: 'Customer paid $75 service via Zelle. method=digital, digital_platform=zelle. No tender/no card.',
+  tx: baseStandard({
+    receipt_number: 'R-0015',
+    transaction_date: '2026-05-06T09:15:00.000-07:00',
+    subtotal: 75,
+    total_amount: 75,
+    items: [
+      {
+        id: 'item-15-a',
+        item_name: 'Mini Detail',
+        quantity: 1,
+        unit_price: 75,
+        total_price: 75,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+    ],
+    payments: [
+      {
+        method: 'digital',
+        amount: 75,
+        tip_amount: 0,
+        digital_platform: 'zelle',
+        created_at: '2026-05-06T09:15:00.000-07:00',
+        source_label: 'Digital',
+      },
+    ],
+    appointment_balance_due: 0,
+    appointment_total: 75,
+  }),
+};
+
 export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario1,
   scenario2,
@@ -756,4 +798,5 @@ export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario12,
   scenario13,
   scenario14,
+  scenario15,
 ];

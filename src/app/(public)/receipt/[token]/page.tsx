@@ -414,6 +414,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                     card_last_four: p.card_last_four,
                     source_label: p.source_label,
                     created_at: p.created_at,
+                    digital_platform: p.digital_platform,
                   },
                   firstWithRemainder[i]
                 );

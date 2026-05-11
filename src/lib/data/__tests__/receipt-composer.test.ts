@@ -27,6 +27,7 @@ import {
   buildSuggestedLabelForPayment,
   buildCombinedPaymentLabel,
   composeLoyaltyFooter,
+  mapDigitalPlatformToFriendly,
   sourceToLabel,
   RECEIPT_VOCAB,
   type ComposerPaymentInput,
@@ -34,7 +35,7 @@ import {
   type ComposerItemInput,
   type RenderedPaymentLine,
 } from '../receipt-composer';
-import { formatReceiptDateTimeCompact } from '@/lib/utils/format';
+import { formatReceiptDateTimeCompact, toTitleCase } from '@/lib/utils/format';
 import {
   generateReceiptHtml,
   generateReceiptLines,
@@ -335,7 +336,7 @@ describe('composer: buildSuggestedPaymentLabel', () => {
       source: 'in_store', is_first_payment: false, is_first_with_remainder: false,
       method: 'cash', card_brand: null, card_last_four: null,
       amount_cents: 0, cash_tendered_cents: null, change_given_cents: null,
-      tip_amount_cents: 0,
+      tip_amount_cents: 0, digital_platform: null,
       suggested_primary_label: '', suggested_method_detail: '', suggested_label_combined: '',
       ...overrides,
     };
@@ -684,5 +685,286 @@ describe('composer: combined-label assembly inside composeReceiptPaymentLines (L
     );
     expect(block.lines[0].suggested_label_combined)
       .toBe('Pay Link (Online) · Visa ****0001 · 5/5/26 3:00 PM');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Phase 1A.5 Part A — digital payment label mapping + free-text rules
+// ---------------------------------------------------------------------------
+
+describe('format: toTitleCase (Phase 1A.5)', () => {
+  it('capitalizes each whitespace-separated word and lowercases the rest', () => {
+    expect(toTitleCase('cash app')).toBe('Cash App');
+    expect(toTitleCase('wise transfer')).toBe('Wise Transfer');
+    expect(toTitleCase('PAYPAL')).toBe('Paypal');
+    expect(toTitleCase('bitcoin')).toBe('Bitcoin');
+  });
+
+  it('trims whitespace and collapses internal runs', () => {
+    expect(toTitleCase('  bitcoin  ')).toBe('Bitcoin');
+    expect(toTitleCase('cash   app')).toBe('Cash App');
+  });
+
+  it('returns empty for null / undefined / blank input', () => {
+    expect(toTitleCase(null)).toBe('');
+    expect(toTitleCase(undefined)).toBe('');
+    expect(toTitleCase('')).toBe('');
+    expect(toTitleCase('   ')).toBe('');
+  });
+});
+
+describe('composer: mapDigitalPlatformToFriendly (Phase 1A.5 LOCKED-A4)', () => {
+  it('maps fixed canonical keys to brand wordmarks', () => {
+    expect(mapDigitalPlatformToFriendly('zelle')).toBe('Zelle');
+    expect(mapDigitalPlatformToFriendly('venmo')).toBe('Venmo');
+    expect(mapDigitalPlatformToFriendly('apple_cash')).toBe('AppleCash');
+  });
+
+  it('title-cases free-text platform names', () => {
+    expect(mapDigitalPlatformToFriendly('cash app')).toBe('Cash App');
+    expect(mapDigitalPlatformToFriendly('wise transfer')).toBe('Wise Transfer');
+    expect(mapDigitalPlatformToFriendly('PAYPAL')).toBe('Paypal');
+    expect(mapDigitalPlatformToFriendly('bitcoin')).toBe('Bitcoin');
+  });
+
+  it('falls back to "Digital" on null/undefined/blank (defensive — DB CHECK should prevent)', () => {
+    expect(mapDigitalPlatformToFriendly(null)).toBe('Digital');
+    expect(mapDigitalPlatformToFriendly(undefined)).toBe('Digital');
+    expect(mapDigitalPlatformToFriendly('')).toBe('Digital');
+  });
+
+  it('is case-insensitive on canonical key lookup', () => {
+    expect(mapDigitalPlatformToFriendly('ZELLE')).toBe('Zelle');
+    expect(mapDigitalPlatformToFriendly('Venmo')).toBe('Venmo');
+    expect(mapDigitalPlatformToFriendly('APPLE_CASH')).toBe('AppleCash');
+  });
+});
+
+describe('composer: digital payment combined-label assembly', () => {
+  const ts = '2026-05-06T11:34:00.000-07:00';
+
+  it('Zelle payment via composeReceiptPaymentLines → "Zelle · M/D/YY h:MM AM/PM"', () => {
+    const block = composeReceiptPaymentLines(
+      [
+        {
+          method: 'digital',
+          amount: 245,
+          digital_platform: 'zelle',
+          created_at: ts,
+          source_label: 'Digital',
+        },
+      ],
+      { total_amount: 245 }
+    );
+    expect(block.lines[0].suggested_label_combined).toBe('Zelle · 5/6/26 11:34 AM');
+  });
+
+  it('free-text platform (Cash App) via buildSuggestedLabelForPayment renderer helper', () => {
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'digital',
+        digital_platform: 'cash app',
+        source_label: 'Digital',
+        created_at: ts,
+      },
+      false
+    );
+    expect(label).toBe('Cash App · 5/6/26 11:34 AM');
+  });
+
+  it('Venmo first-payment-with-remainder does NOT get "Deposit (...)" wrapper (digital primary always wins)', () => {
+    // Digital payments are not deposits even if they're first-with-remainder —
+    // a $50 Venmo against a $175 appointment is still labeled "Venmo · date",
+    // not "Deposit (In-Store) · Venmo · date". The composer's primary-label
+    // short-circuit on method='digital' enforces this.
+    const block = composeReceiptPaymentLines(
+      [
+        {
+          method: 'digital',
+          amount: 50,
+          digital_platform: 'venmo',
+          created_at: ts,
+          source_label: 'Digital',
+        },
+      ],
+      { total_amount: 175 }
+    );
+    expect(block.lines[0].suggested_primary_label).toBe('Venmo');
+    expect(block.lines[0].suggested_label_combined).toBe('Venmo · 5/6/26 11:34 AM');
+  });
+
+  it('buildCombinedPaymentLabel for digital → primary + date (no method_detail repeat)', () => {
+    expect(
+      buildCombinedPaymentLabel({
+        primary: 'Zelle',
+        methodDetail: 'Zelle',
+        source: 'in_store',
+        method: 'digital',
+        createdAt: ts,
+      })
+    ).toBe('Zelle · 5/6/26 11:34 AM');
+  });
+
+  it('end-to-end free-text "Other" path — POS payload shape → composer → combined label', () => {
+    // Simulates the exact payment-row shape /api/pos/transactions persists
+    // when a cashier picks "Other..." and types "wise transfer" into the
+    // free-text input. The route lowercases + trims before insert, so the
+    // composer ALWAYS sees the canonical lowercase form. End-to-end assertion:
+    //   POS payload {method:'digital', digital_platform:'wise transfer', ...}
+    //   → composer label = "Wise Transfer · M/D/YY h:MM AM/PM"
+    const block = composeReceiptPaymentLines(
+      [
+        {
+          method: 'digital',
+          amount: 89.5,
+          digital_platform: 'wise transfer', // canonical lowercase from /api/pos/transactions
+          created_at: '2026-05-06T11:34:00.000-07:00',
+          source_label: 'Digital',
+        },
+      ],
+      { total_amount: 89.5 }
+    );
+    expect(block.lines[0].method).toBe('digital');
+    expect(block.lines[0].digital_platform).toBe('wise transfer');
+    expect(block.lines[0].suggested_primary_label).toBe('Wise Transfer');
+    expect(block.lines[0].suggested_label_combined)
+      .toBe('Wise Transfer · 5/6/26 11:34 AM');
+    expect(block.is_paid_in_full).toBe(true);
+    expect(block.balance_due_cents).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Phase 1A.5 Part A — validation of free-text digital_platform input
+//    Mirrors POS DigitalPayment screen's validateOtherPlatform but exercised
+//    here as a pure-function lock to keep the canonical rules in one place.
+// ---------------------------------------------------------------------------
+
+describe('digital platform free-text validation rules', () => {
+  // Mirror of validateOtherPlatform from src/app/pos/components/checkout/digital-payment.tsx.
+  // Kept in sync with that copy; this test asserts the contract.
+  function validate(input: string): string | null {
+    const trimmed = input.trim();
+    if (trimmed.length === 0) return 'empty';
+    if (trimmed.length > 30) return 'too_long';
+    if (!/^[a-zA-Z0-9 \-]+$/.test(trimmed)) return 'bad_chars';
+    const lower = trimmed.toLowerCase();
+    if (lower === 'zelle' || lower === 'venmo' || lower === 'applecash' || lower === 'apple cash' || lower === 'apple_cash') {
+      return 'canonical_clash';
+    }
+    return null;
+  }
+
+  it('accepts valid free-text platform names', () => {
+    expect(validate('Cash App')).toBeNull();
+    expect(validate('Wise Transfer')).toBeNull();
+    expect(validate('Bitcoin')).toBeNull();
+    expect(validate('PayPal')).toBeNull();
+    expect(validate('Western-Union')).toBeNull();
+  });
+
+  it('rejects empty and whitespace-only input', () => {
+    expect(validate('')).toBe('empty');
+    expect(validate('   ')).toBe('empty');
+  });
+
+  it('rejects input longer than 30 characters', () => {
+    expect(validate('a'.repeat(31))).toBe('too_long');
+    expect(validate('a'.repeat(30))).toBeNull(); // boundary: 30 is allowed
+  });
+
+  it('rejects non-alphanumeric special characters', () => {
+    expect(validate('Cash@App')).toBe('bad_chars');
+    expect(validate('Pay/Pal')).toBe('bad_chars');
+    expect(validate('emoji 🚀')).toBe('bad_chars');
+  });
+
+  it('rejects free-text that matches a canonical platform (case-insensitive)', () => {
+    expect(validate('Zelle')).toBe('canonical_clash');
+    expect(validate('ZELLE')).toBe('canonical_clash');
+    expect(validate('venmo')).toBe('canonical_clash');
+    expect(validate('Apple Cash')).toBe('canonical_clash');
+    expect(validate('AppleCash')).toBe('canonical_clash');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Phase 1A.5 Part B — Stripe brand/last4 extraction
+// ---------------------------------------------------------------------------
+
+describe('extractCardDetailsFromCharge (Phase 1A.5 Part B)', () => {
+  // Lazy import so the rest of the test file doesn't load the helper if these
+  // describe blocks are filtered out.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function run(stripeStub: any, chargeId: string | null | undefined) {
+    const { extractCardDetailsFromCharge } = await import('@/lib/utils/stripe-card-details');
+    return extractCardDetailsFromCharge(stripeStub, chargeId, 'test');
+  }
+
+  it('returns title-cased brand and last4 on successful card retrieve', async () => {
+    const stub = {
+      charges: {
+        retrieve: async () => ({
+          payment_method_details: { card: { brand: 'visa', last4: '4242' } },
+        }),
+      },
+    };
+    expect(await run(stub, 'ch_test')).toEqual({ card_brand: 'Visa', card_last_four: '4242' });
+  });
+
+  it('handles uppercase brand from Stripe gracefully (title-cases)', async () => {
+    const stub = {
+      charges: {
+        retrieve: async () => ({
+          payment_method_details: { card: { brand: 'AMEX', last4: '1074' } },
+        }),
+      },
+    };
+    expect(await run(stub, 'ch_test')).toEqual({ card_brand: 'Amex', card_last_four: '1074' });
+  });
+
+  it('returns nulls when chargeId is null/undefined (no Stripe call)', async () => {
+    const stub = {
+      charges: {
+        retrieve: async () => {
+          throw new Error('should not be called');
+        },
+      },
+    };
+    expect(await run(stub, null)).toEqual({ card_brand: null, card_last_four: null });
+    expect(await run(stub, undefined)).toEqual({ card_brand: null, card_last_four: null });
+  });
+
+  it('returns nulls when charge has no payment_method_details.card (e.g., ACH / Apple Pay)', async () => {
+    const stub = {
+      charges: {
+        retrieve: async () => ({
+          payment_method_details: { ach_debit: { last4: '6789' } },
+        }),
+      },
+    };
+    expect(await run(stub, 'ch_test')).toEqual({ card_brand: null, card_last_four: null });
+  });
+
+  it('returns nulls on Stripe API error — does NOT throw', async () => {
+    const stub = {
+      charges: {
+        retrieve: async () => {
+          throw new Error('Stripe API down');
+        },
+      },
+    };
+    expect(await run(stub, 'ch_test')).toEqual({ card_brand: null, card_last_four: null });
+  });
+
+  it('returns nulls when card object exists but brand/last4 are missing', async () => {
+    const stub = {
+      charges: {
+        retrieve: async () => ({
+          payment_method_details: { card: {} },
+        }),
+      },
+    };
+    expect(await run(stub, 'ch_test')).toEqual({ card_brand: null, card_last_four: null });
   });
 });

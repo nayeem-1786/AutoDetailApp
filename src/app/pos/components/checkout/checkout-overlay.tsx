@@ -7,6 +7,7 @@ import { CashPayment } from './cash-payment';
 import { CardPayment } from './card-payment';
 import { CheckPayment } from './check-payment';
 import { SplitPayment } from './split-payment';
+import { DigitalPayment } from './digital-payment';
 import { PaymentComplete } from './payment-complete';
 
 export function CheckoutOverlay() {
@@ -51,6 +52,7 @@ export function CheckoutOverlay() {
           {step === 'card' && <CardPayment />}
           {step === 'check' && <CheckPayment />}
           {step === 'split' && <SplitPayment />}
+          {step === 'digital' && <DigitalPayment />}
           {step === 'complete' && <PaymentComplete />}
         </div>
       </div>
