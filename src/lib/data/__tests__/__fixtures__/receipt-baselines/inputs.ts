@@ -867,6 +867,124 @@ const scenario17: ReceiptScenario = {
   }),
 };
 
+// ===========================================================================
+// Scenario 18 — Online booking deposit including Zone-1 mobile fee (Option D2)
+// ===========================================================================
+// Mirrors SD-006253 production case post-fix:
+//   $85 Express Interior Clean + $60 Pet Hair add-on + $40 Zone 1 mobile fee
+//   = $185 charged in full at booking time. Receipt renders three line items
+//   summing to $185 and Subtotal matches.
+
+const scenario18: ReceiptScenario = {
+  id: 18,
+  slug: '18-online-mobile-deposit',
+  name: 'Online booking deposit, Zone-1 mobile fee, paid in full',
+  description: 'Booking flow materialized mobile_fee transaction_item alongside service + addon. Subtotal $185 matches items sum.',
+  tx: baseStandard({
+    receipt_number: 'R-0018',
+    transaction_date: '2026-05-06T15:48:48.000-07:00',
+    subtotal: 185,
+    total_amount: 185,
+    employee: { first_name: 'Online', last_name: 'Booking' },
+    items: [
+      {
+        id: 'item-18-a',
+        item_name: 'Express Interior Clean',
+        quantity: 1,
+        unit_price: 85,
+        total_price: 85,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+      {
+        id: 'item-18-b',
+        item_name: 'Pet Hair & Dander Removal',
+        quantity: 1,
+        unit_price: 60,
+        total_price: 60,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+      {
+        id: 'item-18-c',
+        item_name: 'Zone 1 (0-5 miles)',
+        quantity: 1,
+        unit_price: 40,
+        total_price: 40,
+        tax_amount: 0,
+        item_type: 'mobile_fee',
+      },
+    ],
+    payments: [
+      {
+        method: 'card',
+        amount: 185,
+        tip_amount: 0,
+        card_brand: 'visa',
+        card_last_four: '4242',
+        created_at: '2026-05-06T15:48:49.000-07:00',
+        source_label: 'Card',
+      },
+    ],
+    appointment_balance_due: 0,
+    appointment_total: 185,
+  }),
+};
+
+// ===========================================================================
+// Scenario 19 — Walk-in close-out with custom-override mobile fee
+// ===========================================================================
+// Cashier toggled "Custom..." in the picker for an out-of-zone trip. Custom
+// label "Custom (PV Estates)" with $65 surcharge. Walk-in close-out pays $145
+// total ($80 service + $65 mobile) in cash. Confirms the mobile_fee line
+// renders with the staff-entered label.
+
+const scenario19: ReceiptScenario = {
+  id: 19,
+  slug: '19-walkin-mobile-custom',
+  name: 'Walk-in close-out with custom-override mobile fee, $145 cash',
+  description: 'Cashier picked Custom... in the mobile picker (no zone match). Custom label + custom surcharge persist on the receipt line.',
+  tx: baseStandard({
+    receipt_number: 'R-0019',
+    transaction_date: '2026-05-06T14:30:00.000-07:00',
+    subtotal: 145,
+    total_amount: 145,
+    items: [
+      {
+        id: 'item-19-a',
+        item_name: 'Standard Wash',
+        quantity: 1,
+        unit_price: 80,
+        total_price: 80,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+      {
+        id: 'item-19-b',
+        item_name: 'Custom (PV Estates)',
+        quantity: 1,
+        unit_price: 65,
+        total_price: 65,
+        tax_amount: 0,
+        item_type: 'mobile_fee',
+      },
+    ],
+    payments: [
+      {
+        method: 'cash',
+        amount: 145,
+        tip_amount: 0,
+        cash_tendered: 150,
+        change_given: 5,
+        created_at: '2026-05-06T14:31:00.000-07:00',
+        source_label: 'Cash',
+      },
+    ],
+    appointment_balance_due: 0,
+    appointment_total: 145,
+  }),
+};
+
 export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario1,
   scenario2,
@@ -885,4 +1003,6 @@ export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario15,
   scenario16,
   scenario17,
+  scenario18,
+  scenario19,
 ];

@@ -46,7 +46,10 @@ export async function POST(request: NextRequest) {
         employee_id,
         scheduled_date,
         scheduled_end_time,
-        status
+        status,
+        is_mobile,
+        mobile_surcharge,
+        mobile_zone_name_snapshot
       `)
       .eq('scheduled_date', targetDate)
       .in('status', ['confirmed', 'in_progress']);
@@ -122,12 +125,28 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Append mobile entry to the services JSONB snapshot when the
+      // appointment is mobile, so POS ticket UI renders the mobile line.
+      const baseServices = servicesByApt.get(apt.id) ?? [];
+      const mobileSurchargeNum = Number(apt.mobile_surcharge ?? 0);
+      const services = apt.is_mobile && mobileSurchargeNum > 0
+        ? [
+            ...baseServices,
+            {
+              id: null,
+              name: apt.mobile_zone_name_snapshot || 'Mobile Service Fee',
+              price: mobileSurchargeNum,
+              is_mobile_fee: true,
+            } as JobServiceSnapshot,
+          ]
+        : baseServices;
+
       return {
         appointment_id: apt.id,
         customer_id: apt.customer_id,
         vehicle_id: apt.vehicle_id,
         assigned_staff_id: apt.employee_id,
-        services: servicesByApt.get(apt.id) ?? [],
+        services,
         status: 'scheduled' as const,
         estimated_pickup_at: estimatedPickup,
         created_by: posEmployee.employee_id,

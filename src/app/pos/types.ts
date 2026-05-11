@@ -150,6 +150,19 @@ export type FavoriteColor = 'red' | 'orange' | 'fuchsia' | 'lime' | 'cyan' | 'te
 
 export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'expired' | 'converted';
 
+export interface QuoteMobileState {
+  isMobile: boolean;
+  zoneId: string | null;
+  address: string;
+  surcharge: number;
+  /** Snapshot of the zone label OR the custom-override label.
+   *  Empty string for "no mobile" state. */
+  zoneNameSnapshot: string;
+  /** True when cashier picked "Custom..." (zoneId is null but surcharge is set
+   *  by hand). Lets the picker UI re-open in custom mode on load. */
+  isCustom: boolean;
+}
+
 export interface QuoteState {
   // Same shape as TicketState for item management
   items: TicketItem[];
@@ -170,6 +183,8 @@ export interface QuoteState {
   quoteNumber: string | null;
   validUntil: string | null;
   status: QuoteStatus | null;
+  // Mobile service state (Option D2)
+  mobile: QuoteMobileState;
 }
 
 export type QuoteAction =
@@ -190,4 +205,6 @@ export type QuoteAction =
   | { type: 'LOAD_QUOTE'; state: QuoteState }
   | { type: 'SET_VALID_UNTIL'; date: string | null }
   | { type: 'SET_QUOTE_META'; quoteId: string; quoteNumber: string; status: QuoteStatus }
+  | { type: 'SET_MOBILE'; mobile: QuoteMobileState }
+  | { type: 'CLEAR_MOBILE' }
   | { type: 'CLEAR_QUOTE'; validityDays?: number };

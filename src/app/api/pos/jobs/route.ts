@@ -175,6 +175,11 @@ export async function POST(request: NextRequest) {
       estimated_pickup_at,
       quote_id,
       notes,
+      is_mobile: rawIsMobile,
+      mobile_zone_id: rawMobileZoneId,
+      mobile_address: rawMobileAddress,
+      mobile_surcharge: rawMobileSurcharge,
+      mobile_zone_name_snapshot: rawMobileLabel,
     } = body as {
       customer_id: string;
       vehicle_id?: string;
@@ -183,6 +188,11 @@ export async function POST(request: NextRequest) {
       estimated_pickup_at?: string;
       quote_id?: string;
       notes?: string;
+      is_mobile?: boolean;
+      mobile_zone_id?: string | null;
+      mobile_address?: string | null;
+      mobile_surcharge?: number;
+      mobile_zone_name_snapshot?: string | null;
     };
 
     if (!customer_id) {
@@ -191,6 +201,62 @@ export async function POST(request: NextRequest) {
 
     if (!services || !Array.isArray(services) || services.length === 0) {
       return NextResponse.json({ error: 'At least one service is required' }, { status: 400 });
+    }
+
+    // Walk-in mobile resolution. Two paths (LOCKED-3):
+    //   Zone path:   mobile_zone_id present → server re-fetches zone, validates
+    //                client-supplied surcharge matches, snapshots zone name.
+    //   Custom path: mobile_zone_id null → cashier override, trust staff-supplied
+    //                surcharge (bounded 0 < x <= 500) and label (defaults to "Custom").
+    const isMobile = rawIsMobile === true;
+    let mobileZoneId: string | null = null;
+    let mobileSurcharge = 0;
+    let mobileZoneNameSnapshot: string | null = null;
+    let mobileAddress: string | null = null;
+    if (isMobile) {
+      const address = (rawMobileAddress ?? '').trim();
+      if (!address) {
+        return NextResponse.json(
+          { error: 'Mobile service address is required when is_mobile=true' },
+          { status: 400 }
+        );
+      }
+      mobileAddress = address.slice(0, 200);
+
+      if (rawMobileZoneId) {
+        const { data: zone, error: zoneErr } = await supabase
+          .from('mobile_zones')
+          .select('id, name, surcharge, is_available')
+          .eq('id', rawMobileZoneId)
+          .single();
+        if (zoneErr || !zone) {
+          return NextResponse.json({ error: 'Invalid mobile zone' }, { status: 400 });
+        }
+        if (!zone.is_available) {
+          return NextResponse.json({ error: 'Mobile zone is not available' }, { status: 400 });
+        }
+        const clientSurcharge = Number(rawMobileSurcharge ?? 0);
+        if (Math.abs(Number(zone.surcharge) - clientSurcharge) > 0.01) {
+          return NextResponse.json(
+            { error: 'Mobile surcharge mismatch — please refresh and try again' },
+            { status: 400 }
+          );
+        }
+        mobileZoneId = zone.id;
+        mobileSurcharge = Number(zone.surcharge);
+        mobileZoneNameSnapshot = zone.name;
+      } else {
+        const customAmount = Number(rawMobileSurcharge ?? 0);
+        if (!(customAmount > 0) || customAmount > 500) {
+          return NextResponse.json(
+            { error: 'Custom mobile surcharge must be a positive number up to $500' },
+            { status: 400 }
+          );
+        }
+        mobileSurcharge = Math.round(customAmount * 100) / 100;
+        const customLabel = (rawMobileLabel ?? '').trim().slice(0, 100);
+        mobileZoneNameSnapshot = customLabel || 'Custom';
+      }
     }
 
     // Prevent duplicate job from same quote
@@ -258,6 +324,7 @@ export async function POST(request: NextRequest) {
     const apptStartTime = pstTimeExact; // HH:MM:SS PST
     const apptEndTime = addMinutesToTime(apptStartTime.slice(0, 5), 60) + ':00';
     const servicesTotal = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
+    const appointmentTotal = servicesTotal + mobileSurcharge;
 
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
@@ -270,15 +337,16 @@ export async function POST(request: NextRequest) {
         scheduled_date: pstDate,
         scheduled_start_time: apptStartTime,
         scheduled_end_time: apptEndTime,
-        is_mobile: false,
-        mobile_zone_id: null,
-        mobile_address: null,
-        mobile_surcharge: 0,
+        is_mobile: isMobile,
+        mobile_zone_id: mobileZoneId,
+        mobile_address: mobileAddress,
+        mobile_surcharge: mobileSurcharge,
+        mobile_zone_name_snapshot: mobileZoneNameSnapshot,
         payment_status: 'pending',
-        subtotal: servicesTotal,
+        subtotal: appointmentTotal,
         tax_amount: 0,
         discount_amount: 0,
-        total_amount: servicesTotal,
+        total_amount: appointmentTotal,
         payment_type: 'pay_on_site',
         deposit_amount: null,
         job_notes: notes || null,
@@ -324,6 +392,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Append mobile entry to the services JSONB snapshot so POS ticket UI
+    // (which reads jobs.services) renders the mobile line alongside services.
+    // The id=null + is_mobile_fee flag distinguishes it from real catalog rows.
+    const jobServicesSnapshot = isMobile && mobileSurcharge > 0
+      ? [
+          ...services,
+          {
+            id: null,
+            name: mobileZoneNameSnapshot || 'Mobile Service Fee',
+            price: mobileSurcharge,
+            is_mobile_fee: true,
+          } as JobServiceSnapshot,
+        ]
+      : services;
+
     const { data: job, error } = await supabase
       .from('jobs')
       .insert({
@@ -331,7 +414,7 @@ export async function POST(request: NextRequest) {
         vehicle_id: vehicle_id || null,
         assigned_staff_id: assignedStaffId,
         appointment_id: appointment.id,
-        services,
+        services: jobServicesSnapshot,
         status: 'scheduled',
         estimated_pickup_at: pickupAt,
         created_by: posEmployee.employee_id,

@@ -20,6 +20,15 @@ export const initialQuoteState: QuoteState = {
   quoteNumber: null,
   validUntil: null,
   status: null,
+  // Mobile (Option D2)
+  mobile: {
+    isMobile: false,
+    zoneId: null,
+    address: '',
+    surcharge: 0,
+    zoneNameSnapshot: '',
+    isCustom: false,
+  },
 };
 
 function generateId(): string {
@@ -47,7 +56,8 @@ function recalculateTotals(state: QuoteState): QuoteState {
 
   const discountAmount =
     (state.coupon?.discount ?? 0) + state.loyaltyDiscount + manualDiscountAmount;
-  const totals = calculateTicketTotals(state.items, discountAmount);
+  const mobileSurcharge = state.mobile?.isMobile ? state.mobile.surcharge : 0;
+  const totals = calculateTicketTotals(state.items, discountAmount, 0, 0, mobileSurcharge);
   return { ...state, ...totals };
 }
 
@@ -524,6 +534,14 @@ export function quoteReducer(
         quoteNumber: action.quoteNumber,
         status: action.status,
       };
+    }
+
+    case 'SET_MOBILE': {
+      return recalculateTotals({ ...state, mobile: action.mobile });
+    }
+
+    case 'CLEAR_MOBILE': {
+      return recalculateTotals({ ...state, mobile: initialQuoteState.mobile });
     }
 
     case 'CLEAR_QUOTE': {

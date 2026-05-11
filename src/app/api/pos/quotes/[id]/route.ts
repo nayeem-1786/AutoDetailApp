@@ -8,6 +8,7 @@ import {
   softDeleteQuote,
   QuoteNotFoundError,
   QuoteDraftOnlyError,
+  QuoteValidationError,
 } from '@/lib/quotes/quote-service';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
@@ -76,6 +77,9 @@ export async function PATCH(
   } catch (err) {
     if (err instanceof QuoteNotFoundError) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+    }
+    if (err instanceof QuoteValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
     console.error('POS Quote PATCH error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

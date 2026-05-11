@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { createQuoteSchema } from '@/lib/utils/validation';
-import { listQuotes, createQuote } from '@/lib/quotes/quote-service';
+import { listQuotes, createQuote, QuoteValidationError } from '@/lib/quotes/quote-service';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 
 export async function GET(request: NextRequest) {
@@ -71,6 +71,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
+    if (err instanceof QuoteValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
     console.error('POS Quotes POST error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

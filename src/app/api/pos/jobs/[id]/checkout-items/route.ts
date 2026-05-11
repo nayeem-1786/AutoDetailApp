@@ -97,17 +97,21 @@ export async function GET(
       }
     }
 
-    // Build ticket items from services JSONB
+    // Build ticket items from services JSONB. Skip entries flagged
+    // is_mobile_fee — those are rendered via the appointment-based synth
+    // block below so the item_type is set to 'mobile_fee' rather than
+    // 'service' (which would mis-classify the row as a real catalog service).
     const services = (job.services as Array<{
-      id: string;
+      id: string | null;
       name: string;
       price: number;
       quantity?: number;
       tier_name?: string;
+      is_mobile_fee?: boolean;
     }>) || [];
 
     const items: Array<{
-      item_type: 'service' | 'product' | 'custom';
+      item_type: 'service' | 'product' | 'custom' | 'mobile_fee';
       service_id?: string;
       product_id?: string;
       item_name: string;
@@ -121,6 +125,8 @@ export async function GET(
     }> = [];
 
     for (const svc of services) {
+      if (svc.is_mobile_fee) continue;
+      if (!svc.id) continue;
       const meta = serviceMetaMap.get(svc.id);
       items.push({
         item_type: 'service',
@@ -230,15 +236,40 @@ export async function GET(
       }
     }
 
-    // Look up deposit from linked appointment + deposit transaction date
+    // Look up deposit from linked appointment + deposit transaction date.
+    // Also fetch mobile fields so we can synthesize the mobile_fee display
+    // line (Write Point 3) — gives the cashier visibility and flows the line
+    // through to checkout submit naturally.
     let deposit_amount = 0;
     let deposit_date: string | null = null;
     if (job.appointment_id) {
       const { data: appt } = await supabase
         .from('appointments')
-        .select('payment_type, deposit_amount')
+        .select('payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot')
         .eq('id', job.appointment_id)
         .single();
+
+      // Synthesize mobile_fee line when appointment is mobile and the line
+      // hasn't already been materialized through job.services (defense in
+      // depth: jobs created post-fix already include it via populate/POST,
+      // but pre-fix jobs and any future divergence get covered here too).
+      if (appt?.is_mobile && Number(appt.mobile_surcharge ?? 0) > 0) {
+        const surcharge = Number(appt.mobile_surcharge);
+        const alreadyInItems = items.some(
+          (it) => it.item_type === 'mobile_fee'
+            || ((it as { is_mobile_fee?: boolean }).is_mobile_fee === true)
+        );
+        if (!alreadyInItems) {
+          items.push({
+            item_type: 'mobile_fee',
+            item_name: appt.mobile_zone_name_snapshot || 'Mobile Service Fee',
+            quantity: 1,
+            unit_price: surcharge,
+            is_addon: false,
+            is_taxable: false,
+          });
+        }
+      }
 
       if (appt?.payment_type === 'deposit' && appt.deposit_amount != null && Number(appt.deposit_amount) > 0) {
         deposit_amount = Number(appt.deposit_amount);

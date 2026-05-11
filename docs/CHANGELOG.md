@@ -6,6 +6,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(mobile): materialize mobile fee as transaction_item, security fix, walk-in/quote support (Option D2)
+
+Closes the SD-006253 phantom-refund bug: the $40 mobile surcharge was stored on `appointments.mobile_surcharge` but never materialized as a `transaction_items` row, so every line-item-driven renderer (POS ticket, receipt, admin dialog) read $145 instead of $185, triggering "we owe customer $40" reconciliation.
+
+**Schema.** Two migrations: `20260511000001_add_mobile_fee_item_type.sql` extends the `transaction_item_type` enum with `'mobile_fee'`; `20260511000002_add_mobile_zone_snapshot_and_quote_mobile.sql` adds `appointments.mobile_zone_name_snapshot`, the five `quotes.mobile_*` columns, and `*_mobile_consistency` CHECKs. Enum extension is alone in its file because Postgres requires `ALTER TYPE ... ADD VALUE` to commit outside the using transaction. CHECK constraints verified safe — 0 existing rows violate either constraint.
+
+**Three write points materialize the line.** `POST /api/book` inserts the row directly when a booking deposit involves mobile. `POST /api/pos/transactions` performs **defensive injection** at close-out — when the linked appointment is mobile and the client items[] lacks a matching `mobile_fee` row, the server injects it before writing `transaction_items`. Logs `[mobile-fee] Defensive injection fired for appointment <id>`. `GET /api/pos/jobs/[id]/checkout-items` returns a synthetic `mobile_fee` line in `items[]` for cashier display so the cashier sees the mobile fee on the ticket. The synthetic line flows back through the POST endpoint naturally on close-out submit. Idempotency: every write path checks for an existing `mobile_fee` row whose `total_price` matches `appointment.mobile_surcharge` within 1¢.
+
+**Security fix.** `POST /api/book` previously trusted client-supplied `mobile_surcharge` (tampered client could send `mobile_surcharge=0` and bypass the fee). New behavior: anonymous booking requires `mobile_zone_id` matching an existing `mobile_zones` row; server re-fetches the zone and validates `zone.surcharge === client.mobile_surcharge`. 400 on mismatch. `mobile_zone_name_snapshot` written from zone.name at booking time so receipts survive zone rename/delete. Same validation in `POST /api/pos/jobs`, `POST /api/pos/quotes`, `PATCH /api/pos/quotes/[id]` via shared `resolveMobileForQuote()` helper.
+
+**Walk-in custom override (LOCKED-3).** New `MobileFeePicker` component at `src/app/pos/components/quotes/mobile-fee-picker.tsx` embedded in `QuoteTicketPanel` (serves both quote and walk-in modes). Picker shows toggle → address → zone dropdown with `Custom…` option at bottom. Zone path: zone re-fetched + validated server-side. Custom path: `mobile_zone_id=NULL`, server trusts staff-supplied surcharge bounded $0 < x ≤ $500 with optional label defaulting to "Custom". `pos.process_cash` permission gating matches Phase 1A.5 digital-payment pattern; dedicated `pos.process_mobile` deferred.
+
+**Quote → conversion propagates mobile state.** `src/lib/quotes/convert-service.ts:73-74` previously hardcoded `is_mobile=false, mobile_surcharge=0`. Now reads mobile_* fields from the quote row and writes them to the appointment. No transaction is created at conversion — materialization happens at close-out via Write Point #2.
+
+**Admin appointment dialog.** Mobile fee now renders as a participating line item in the services list so the list sums to `appointment.subtotal`. Mobile address moved to a separate metadata line below the services list.
+
+**Tax treatment (LOCKED-2).** Mobile fee `is_taxable=false` per CDTFA Publication 100 (separately-stated delivery/mobile fees non-taxable when separately invoiced). Tax math in `src/app/pos/utils/tax.ts` unchanged — items where `is_taxable=true` form the taxable base.
+
+**Test coverage.** Two new receipt baseline scenarios: 18 (SD-006253 post-fix shape — $85 service + $60 addon + $40 Zone-1 mobile = $185 paid) and 19 (walk-in custom override — $80 service + $65 "Custom (PV Estates)" = $145 cash). Fixtures regenerated; 668 tests pass (664 prior + 4 new).
+
+**Deferred.** Voice agent (`/api/voice-agent/appointments`, `/api/voice-agent/quotes`) continues hardcoding `is_mobile=false` — picker UI added in a later phase that touches the agent prompt. Distance verification / geocoding deferred to Phase Mobile-2 (status quo: customer/cashier self-selects zone; no Google Maps / shop coordinates).
+
+**Backfill.** `scripts/fix-mobile-backfill.sql` — manual SQL with verification queries for the single affected production case: INSERT mobile_fee row on SD-006253 deposit tx; UPDATE the mislabeled "Pet hair clean up" custom row on SD-006278 close-out to `item_type='mobile_fee'`, `item_name='Zone 1 (0-5 miles)'`; UPDATE `appointments.mobile_zone_name_snapshot`; UPDATE `jobs.services` JSONB. STEP 2 is commented out by default — operator uncomments after STEP 1 verification. Run manually post-deploy via Supabase SQL Editor.
+
+Full session notes: `docs/sessions/mobile-fee-fix.md`.
+
+---
+
 ## fix(receipts+admin): thermal ✓ rendering + admin search global scope (Phase 1A-followup-2)
 
 Two cosmetic/UX fixes after Phase 1A-followup verification.

@@ -1,0 +1,21 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0018             May 6, 2026, 3:48 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Express Interior Clean                 $85.00   
+Pet Hair & Dander Removal              $60.00   
+Zone 1 (0-5 miles)                     $40.00   
+------------------------------------------------
+Subtotal                                 $185.00
+Tax                                        $0.00
+
+TOTAL                                    $185.00
+------------------------------------------------
+Visa ****4242 · 5/6/26 3:48 PM           $185.00
+Total Paid:                              $185.00
+                 Paid in Full ✓

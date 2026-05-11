@@ -409,6 +409,7 @@ src/app/api/pos/jobs/route.ts
 src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
 src/app/api/pos/loyalty/redeem/route.ts
+src/app/api/pos/mobile-zones/route.ts
 src/app/api/pos/my-permissions/route.ts
 src/app/api/pos/products/barcode-lookup/route.ts
 src/app/api/pos/promotions/available/route.ts
@@ -1567,6 +1568,8 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
 20260503181924_add_pos_walkin_consent_source.sql
 20260510000001_add_digital_payment_enum_value.sql     # Phase 1A.5: extend payment_method enum with 'digital'
 20260510000002_add_digital_platform_column.sql        # Phase 1A.5: payments.digital_platform column + biconditional CHECK + partial index
+20260511000001_add_mobile_fee_item_type.sql           # Mobile fix D2: extend transaction_item_type enum with 'mobile_fee'
+20260511000002_add_mobile_zone_snapshot_and_quote_mobile.sql # Mobile fix D2: appointments.mobile_zone_name_snapshot + quotes mobile_* columns + consistency CHECKs
 ```
 
 ## Scripts
@@ -1581,6 +1584,7 @@ scripts/seed-admin.ts
 scripts/seed-data.ts
 scripts/seed-receipt-test-transactions.sql  # Phase 0b.1: receipt-test seed scaffolding (NOT executed; for Phase 0b.2 byte-diff harness)
 scripts/fix-zelle-misclassification.sql     # Phase 1A.5: one-off SQL fix template for the Zelle-mismarked-as-Cash transaction (NOT executed)
+scripts/fix-mobile-backfill.sql             # Mobile fix D2: backfill template for SD-006253 + SD-006278 (NOT executed; operator runs manually post-deploy)
 ```
 
 ## Config

@@ -19,6 +19,7 @@ import { QuoteItemRow } from './quote-item-row';
 import { QuoteTotals } from './quote-totals';
 import { QuoteCouponInput } from './quote-coupon-input';
 import { QuoteLoyaltyPanel } from './quote-loyalty-panel';
+import { MobileFeePicker } from './mobile-fee-picker';
 import { CustomerVehicleSummary } from '../customer-vehicle-summary';
 import { CustomerLookup } from '../customer-lookup';
 import { CustomerCreateDialog } from '../customer-create-dialog';
@@ -73,7 +74,36 @@ function computeQuoteHash(q: QuoteState): string {
     notes: q.notes,
     validUntil: q.validUntil,
     couponCode: q.coupon?.code ?? null,
+    mobile: {
+      on: q.mobile?.isMobile ?? false,
+      zone: q.mobile?.zoneId ?? null,
+      addr: q.mobile?.address ?? '',
+      sur: q.mobile?.surcharge ?? 0,
+      label: q.mobile?.zoneNameSnapshot ?? '',
+    },
   });
+}
+
+// Build the mobile section of an API write payload. The {is_mobile=false}
+// branch is shared explicitly between POST + PATCH so removing the toggle
+// resets all five columns server-side.
+function buildMobilePayload(q: QuoteState) {
+  if (!q.mobile?.isMobile) {
+    return {
+      is_mobile: false,
+      mobile_zone_id: null,
+      mobile_address: null,
+      mobile_surcharge: 0,
+      mobile_zone_name_snapshot: null,
+    };
+  }
+  return {
+    is_mobile: true,
+    mobile_zone_id: q.mobile.zoneId,
+    mobile_address: q.mobile.address || null,
+    mobile_surcharge: q.mobile.surcharge,
+    mobile_zone_name_snapshot: q.mobile.zoneNameSnapshot || null,
+  };
 }
 
 export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps) {
@@ -156,6 +186,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               valid_until: q.validUntil,
               coupon_code: q.coupon?.code || null,
               items,
+              ...buildMobilePayload(q),
             }),
           });
           if (!res.ok) {
@@ -190,6 +221,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               valid_until: q.validUntil,
               coupon_code: q.coupon?.code || null,
               items,
+              ...buildMobilePayload(q),
             }),
           });
           if (!res.ok) {
@@ -523,6 +555,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       const couponCode = quote.coupon?.code || null;
       let savedQuoteId = quote.quoteId;
 
+      const mobilePayload = buildMobilePayload(quote);
       if (savedQuoteId) {
         // Update existing quote and mark as converted
         const res = await posFetch(`/api/pos/quotes/${savedQuoteId}`, {
@@ -536,6 +569,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             status: 'converted',
             coupon_code: couponCode,
             items,
+            ...mobilePayload,
           }),
         });
         if (!res.ok) {
@@ -555,6 +589,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             status: 'converted',
             coupon_code: couponCode,
             items,
+            ...mobilePayload,
           }),
         });
         if (!res.ok) {
@@ -591,6 +626,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           services: jobServices,
           quote_id: savedQuoteId,
           notes: jobNotes || undefined,
+          ...mobilePayload,
         }),
       });
 
@@ -800,6 +836,15 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           />
         </div>
       )}
+
+      {/* Mobile service picker (Option D2). Visible for both quote and walk-in
+          modes. Cashier discretion — toggle off when the customer is on-site. */}
+      <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
+        <MobileFeePicker
+          value={quote.mobile}
+          onChange={(mobile) => dispatch({ type: 'SET_MOBILE', mobile })}
+        />
+      </div>
 
       {/* Notes */}
       <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-4 py-2">

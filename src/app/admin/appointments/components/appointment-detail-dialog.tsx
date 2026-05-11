@@ -175,7 +175,8 @@ export function AppointmentDetailDialog({
           )}
         </dl>
 
-        {/* Services list */}
+        {/* Services list — mobile fee participates as a line item (Option D2)
+            so the list sum matches appointment.subtotal. */}
         <div className="mt-3">
           <p className="text-xs font-medium text-gray-500">Services</p>
           <div className="mt-1 space-y-0.5">
@@ -185,21 +186,25 @@ export function AppointmentDetailDialog({
                 <span className="text-gray-500">{formatCurrency(as.price_at_booking)}</span>
               </div>
             ))}
+            {appointment.is_mobile && appointment.mobile_surcharge > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-900">
+                  {appointment.mobile_zone_name_snapshot || 'Mobile Service Fee'}
+                </span>
+                <span className="text-gray-500">
+                  {formatCurrency(appointment.mobile_surcharge)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Mobile info */}
-        {appointment.is_mobile && (
+        {/* Mobile address — kept separate from the line item since it's
+            location metadata, not a price contributor. */}
+        {appointment.is_mobile && appointment.mobile_address && (
           <div className="mt-2 text-sm">
-            <span className="text-xs font-medium text-gray-500">Mobile Service: </span>
-            <span className="text-gray-900">
-              {appointment.mobile_address || 'Yes'}
-              {appointment.mobile_surcharge > 0 && (
-                <span className="ml-1 text-gray-500">
-                  (+{formatCurrency(appointment.mobile_surcharge)} surcharge)
-                </span>
-              )}
-            </span>
+            <span className="text-xs font-medium text-gray-500">Mobile Service Address: </span>
+            <span className="text-gray-900">{appointment.mobile_address}</span>
           </div>
         )}
 

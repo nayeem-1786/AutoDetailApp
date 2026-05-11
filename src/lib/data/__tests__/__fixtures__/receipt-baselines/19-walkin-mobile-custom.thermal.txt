@@ -1,0 +1,22 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0019             May 6, 2026, 2:30 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Standard Wash                          $80.00   
+Custom (PV Estates)                    $65.00   
+------------------------------------------------
+Subtotal                                 $145.00
+Tax                                        $0.00
+
+TOTAL                                    $145.00
+------------------------------------------------
+Cash · 5/6/26 2:31 PM                    $145.00
+  Tendered                               $150.00
+  Change                                   $5.00
+Total Paid:                              $145.00
+                 Paid in Full ✓

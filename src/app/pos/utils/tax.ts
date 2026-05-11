@@ -23,9 +23,11 @@ export function calculateTicketTotals(
   items: TicketItem[],
   discountAmount: number = 0,
   depositCredit: number = 0,
-  priorPaymentsTotal: number = 0
+  priorPaymentsTotal: number = 0,
+  mobileSurcharge: number = 0
 ) {
-  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const itemsSubtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const subtotal = itemsSubtotal + mobileSurcharge;
   const taxAmount = items.reduce((sum, item) => sum + item.taxAmount, 0);
   const total = Math.max(
     0,

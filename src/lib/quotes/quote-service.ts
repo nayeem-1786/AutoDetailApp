@@ -120,11 +120,18 @@ export async function createQuote(
 ): Promise<CreateQuoteResult> {
   const quoteNumber = await generateQuoteNumber(supabase);
 
-  const subtotal = data.items.reduce((sum, item) => {
+  // Resolve mobile fields server-side. Zone path re-fetches mobile_zones and
+  // verifies the client-supplied surcharge; Custom path trusts authenticated
+  // staff input within bounds.
+  const mobileResolved = await resolveMobileForQuote(supabase, data);
+
+  const itemsSubtotal = data.items.reduce((sum, item) => {
     return sum + item.quantity * item.unit_price;
   }, 0);
+  const subtotal = Math.round((itemsSubtotal + mobileResolved.surcharge) * 100) / 100;
 
-  // Tax: apply TAX_RATE to items with product_id (products are taxable)
+  // Tax: apply TAX_RATE to items with product_id (products are taxable).
+  // Mobile fee is NOT taxable (CDTFA Pub 100 — separately-stated delivery).
   const taxableAmount = data.items.reduce((sum, item) => {
     if (item.product_id) {
       return sum + item.quantity * item.unit_price;
@@ -151,6 +158,11 @@ export async function createQuote(
     valid_until: data.valid_until || null,
     access_token: accessToken,
     coupon_code: data.coupon_code || null,
+    is_mobile: mobileResolved.isMobile,
+    mobile_zone_id: mobileResolved.zoneId,
+    mobile_address: mobileResolved.address,
+    mobile_surcharge: mobileResolved.surcharge,
+    mobile_zone_name_snapshot: mobileResolved.snapshotName,
   };
 
   if (createdBy) {
@@ -256,11 +268,37 @@ export async function updateQuote(
   if (data.status !== undefined) update.status = data.status;
   if (data.coupon_code !== undefined) update.coupon_code = data.coupon_code || null;
 
-  // If items provided, recalculate totals
+  // Mobile fields: resolve via the same helper as createQuote so server-side
+  // validation runs identically. Only patch the columns when the caller
+  // signaled mobile state in this update (is_mobile field present in body).
+  const hasMobileUpdate = data.is_mobile !== undefined;
+  let mobileResolved: ResolvedMobile | null = null;
+  if (hasMobileUpdate) {
+    mobileResolved = await resolveMobileForQuote(supabase, data);
+    update.is_mobile = mobileResolved.isMobile;
+    update.mobile_zone_id = mobileResolved.zoneId;
+    update.mobile_address = mobileResolved.address;
+    update.mobile_surcharge = mobileResolved.surcharge;
+    update.mobile_zone_name_snapshot = mobileResolved.snapshotName;
+  }
+
+  // If items provided, recalculate totals. Use the resolved mobile surcharge
+  // (or look up the existing one) so subtotal stays consistent with the
+  // stored mobile_surcharge.
   if (data.items && data.items.length > 0) {
-    const subtotal = data.items.reduce((sum, item) => {
+    let effectiveSurcharge = mobileResolved?.surcharge ?? 0;
+    if (!mobileResolved) {
+      const { data: existing } = await supabase
+        .from('quotes')
+        .select('mobile_surcharge')
+        .eq('id', quoteId)
+        .single();
+      effectiveSurcharge = Number(existing?.mobile_surcharge ?? 0);
+    }
+    const itemsSubtotal = data.items.reduce((sum, item) => {
       return sum + item.quantity * item.unit_price;
     }, 0);
+    const subtotal = Math.round((itemsSubtotal + effectiveSurcharge) * 100) / 100;
 
     const taxableAmount = data.items.reduce((sum, item) => {
       if (item.product_id) {
@@ -617,4 +655,85 @@ export class QuoteDraftOnlyError extends Error {
     super('Only draft quotes can be deleted');
     this.name = 'QuoteDraftOnlyError';
   }
+}
+
+export class QuoteValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'QuoteValidationError';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mobile resolution helper — shared by createQuote + updateQuote
+// ---------------------------------------------------------------------------
+
+interface ResolvedMobile {
+  isMobile: boolean;
+  zoneId: string | null;
+  address: string | null;
+  surcharge: number;
+  snapshotName: string | null;
+}
+
+type MobileInput = {
+  is_mobile?: boolean;
+  mobile_zone_id?: string | null;
+  mobile_address?: string | null;
+  mobile_surcharge?: number;
+  mobile_zone_name_snapshot?: string | null;
+};
+
+async function resolveMobileForQuote(
+  supabase: SupabaseClient,
+  data: MobileInput
+): Promise<ResolvedMobile> {
+  if (!data.is_mobile) {
+    return { isMobile: false, zoneId: null, address: null, surcharge: 0, snapshotName: null };
+  }
+  const address = (data.mobile_address ?? '').trim();
+  if (!address) {
+    throw new QuoteValidationError('Mobile service address is required when is_mobile=true');
+  }
+  if (data.mobile_zone_id) {
+    const { data: zone, error: zoneErr } = await supabase
+      .from('mobile_zones')
+      .select('id, name, surcharge, is_available')
+      .eq('id', data.mobile_zone_id)
+      .single();
+    if (zoneErr || !zone) {
+      throw new QuoteValidationError('Invalid mobile zone');
+    }
+    if (!zone.is_available) {
+      throw new QuoteValidationError('Mobile zone is not available');
+    }
+    const clientSurcharge = Number(data.mobile_surcharge ?? 0);
+    if (Math.abs(Number(zone.surcharge) - clientSurcharge) > 0.01) {
+      throw new QuoteValidationError('Mobile surcharge mismatch — please refresh and try again');
+    }
+    return {
+      isMobile: true,
+      zoneId: zone.id,
+      address: address.slice(0, 200),
+      surcharge: Number(zone.surcharge),
+      snapshotName: zone.name,
+    };
+  }
+  // Custom override path — authenticated staff can supply any positive
+  // surcharge up to $500 with an optional label.
+  const customAmount = Number(data.mobile_surcharge ?? 0);
+  if (!(customAmount > 0) || customAmount > 500) {
+    throw new QuoteValidationError(
+      'Custom mobile surcharge must be a positive number up to $500'
+    );
+  }
+  const surcharge = Math.round(customAmount * 100) / 100;
+  const label = (data.mobile_zone_name_snapshot ?? '').trim().slice(0, 100);
+  return {
+    isMobile: true,
+    zoneId: null,
+    address: address.slice(0, 200),
+    surcharge,
+    snapshotName: label || 'Custom',
+  };
 }

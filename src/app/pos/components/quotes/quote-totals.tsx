@@ -5,8 +5,28 @@ import { useQuote } from '../../context/quote-context';
 export function QuoteTotals() {
   const { quote } = useQuote();
 
+  // Subtotal includes mobile surcharge (matches appointments convention +
+  // transactions.subtotal). The mobile fee is rendered on its own line above
+  // Subtotal so the breakdown reads naturally: items + mobile = subtotal.
+  const itemsSubtotal = quote.mobile?.isMobile && quote.mobile.surcharge > 0
+    ? Math.max(0, quote.subtotal - quote.mobile.surcharge)
+    : quote.subtotal;
+
   return (
     <div className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-3">
+      {quote.mobile?.isMobile && quote.mobile.surcharge > 0 && (
+        <>
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+            <span>Items</span>
+            <span className="tabular-nums">${itemsSubtotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+            <span>{quote.mobile.zoneNameSnapshot || 'Mobile Service Fee'}</span>
+            <span className="tabular-nums">${quote.mobile.surcharge.toFixed(2)}</span>
+          </div>
+        </>
+      )}
+
       <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
         <span>Subtotal</span>
         <span className="tabular-nums">${quote.subtotal.toFixed(2)}</span>

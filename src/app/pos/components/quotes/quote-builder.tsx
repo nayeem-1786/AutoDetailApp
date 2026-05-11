@@ -170,6 +170,16 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
           quoteNumber: q.quote_number,
           validUntil: q.valid_until,
           status: q.status,
+          mobile: {
+            isMobile: !!q.is_mobile,
+            zoneId: q.mobile_zone_id ?? null,
+            address: q.mobile_address ?? '',
+            surcharge: Number(q.mobile_surcharge ?? 0),
+            zoneNameSnapshot: q.mobile_zone_name_snapshot ?? '',
+            // If a quote was saved with no zone_id but is_mobile=true, the
+            // cashier picked the Custom path.
+            isCustom: !!q.is_mobile && !q.mobile_zone_id,
+          },
         };
 
         dispatch({ type: 'LOAD_QUOTE', state: loadState });

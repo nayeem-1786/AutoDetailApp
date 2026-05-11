@@ -207,6 +207,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Defensive mobile_fee injection (Option D2 Write Point 2).
+    // If the linked appointment is mobile but the client did not include a
+    // mobile_fee line (stale client, manual close-out, or future bug), inject
+    // it here so the materialized line item always appears on the receipt.
+    // Idempotent: if a matching mobile_fee row is already present we trust
+    // the client.
+    if (linkedApptId && data.items && data.items.length > 0) {
+      const { data: apptMobile } = await supabase
+        .from('appointments')
+        .select('is_mobile, mobile_surcharge, mobile_zone_name_snapshot')
+        .eq('id', linkedApptId)
+        .maybeSingle();
+      const apptSurcharge = Number(apptMobile?.mobile_surcharge ?? 0);
+      if (apptMobile?.is_mobile && apptSurcharge > 0) {
+        const hasMobileFeeRow = data.items.some(
+          (it) => it.item_type === 'mobile_fee'
+            && Math.abs(Number(it.total_price) - apptSurcharge) < 0.01
+        );
+        if (!hasMobileFeeRow) {
+          console.warn(
+            `[mobile-fee] Defensive injection fired for appointment ${linkedApptId} (tx will materialize)`
+          );
+          data.items = [
+            ...data.items,
+            {
+              item_type: 'mobile_fee',
+              product_id: null,
+              service_id: null,
+              item_name: apptMobile.mobile_zone_name_snapshot || 'Mobile Service Fee',
+              quantity: 1,
+              unit_price: apptSurcharge,
+              total_price: apptSurcharge,
+              tax_amount: 0,
+              is_taxable: false,
+              tier_name: null,
+              vehicle_size_class: null,
+              notes: null,
+              standard_price: apptSurcharge,
+              pricing_type: 'standard',
+              is_addon: false,
+              prerequisite_note: null,
+            } as (typeof data.items)[number],
+          ];
+        }
+      }
+    }
+
     // 2. Insert transaction items
     if (data.items && data.items.length > 0) {
       const itemRows = data.items.map((item: {

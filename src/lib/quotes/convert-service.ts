@@ -58,7 +58,12 @@ export async function convertQuote(
     assignedEmployeeId = await findAvailableDetailer(supabase, date, time, endTimeWithBuffer);
   }
 
-  // Create the appointment
+  // Create the appointment. Mobile fields propagate from the quote — quote
+  // builder captures them once, conversion mirrors them onto the appointment
+  // so the subsequent close-out (defensive injection in /api/pos/transactions)
+  // materializes the mobile_fee transaction_items row automatically.
+  const quoteIsMobile = !!quote.is_mobile;
+  const quoteMobileSurcharge = Number(quote.mobile_surcharge ?? 0);
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
     .insert({
@@ -70,8 +75,11 @@ export async function convertQuote(
       scheduled_date: date,
       scheduled_start_time: time,
       scheduled_end_time: endTime,
-      is_mobile: false,
-      mobile_surcharge: 0,
+      is_mobile: quoteIsMobile,
+      mobile_zone_id: quoteIsMobile ? (quote.mobile_zone_id ?? null) : null,
+      mobile_address: quoteIsMobile ? (quote.mobile_address ?? null) : null,
+      mobile_surcharge: quoteIsMobile ? quoteMobileSurcharge : 0,
+      mobile_zone_name_snapshot: quoteIsMobile ? (quote.mobile_zone_name_snapshot ?? null) : null,
       payment_status: 'pending',
       subtotal: quote.subtotal,
       tax_amount: quote.tax_amount,

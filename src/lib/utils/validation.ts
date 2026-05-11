@@ -479,7 +479,7 @@ export const appointmentCancelSchema = z.object({
 // ---------------------------------------------------------------------------
 
 const transactionItemSchema = z.object({
-  item_type: z.enum(['product', 'service', 'package', 'custom']),
+  item_type: z.enum(['product', 'service', 'package', 'custom', 'mobile_fee']),
   product_id: z.string().uuid().optional().nullable(),
   service_id: z.string().uuid().optional().nullable(),
   item_name: requiredString,
@@ -628,6 +628,14 @@ export const quoteItemSchema = z.object({
   notes: optionalString,
 });
 
+const quoteMobileFields = {
+  is_mobile: z.boolean().optional(),
+  mobile_zone_id: z.string().uuid().optional().nullable(),
+  mobile_address: optionalString,
+  mobile_surcharge: z.coerce.number().min(0).max(500).optional(),
+  mobile_zone_name_snapshot: optionalString,
+};
+
 export const createQuoteSchema = z.object({
   customer_id: z.string().uuid().nullable().optional(),
   vehicle_id: z.string().uuid().optional().nullable(),
@@ -636,6 +644,7 @@ export const createQuoteSchema = z.object({
   valid_until: z.string().optional().nullable(),
   status: z.enum(['draft', 'converted']).optional(),
   coupon_code: optionalString,
+  ...quoteMobileFields,
 });
 
 export const updateQuoteSchema = z.object({
@@ -646,6 +655,7 @@ export const updateQuoteSchema = z.object({
   valid_until: z.string().optional().nullable(),
   status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'expired', 'converted']).optional(),
   coupon_code: optionalString,
+  ...quoteMobileFields,
 });
 
 export const convertSchema = z.object({

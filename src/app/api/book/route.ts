@@ -272,7 +272,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const mobileSurcharge = data.is_mobile ? (data.mobile_surcharge || 0) : 0;
+    // Server-side mobile zone validation. Anonymous booking clients can't be
+    // trusted with the surcharge value — re-fetch the zone and verify the
+    // client-supplied surcharge matches. Closes the prior gap where a
+    // tampered request could send is_mobile=true with mobile_surcharge=0.
+    let mobileZoneNameSnapshot: string | null = null;
+    let mobileSurcharge = 0;
+    if (data.is_mobile) {
+      if (!data.mobile_zone_id) {
+        return NextResponse.json(
+          { error: 'Mobile zone required for online booking' },
+          { status: 400 }
+        );
+      }
+      const { data: zone, error: zoneErr } = await supabase
+        .from('mobile_zones')
+        .select('id, name, surcharge, is_available')
+        .eq('id', data.mobile_zone_id)
+        .single();
+      if (zoneErr || !zone) {
+        return NextResponse.json({ error: 'Invalid mobile zone' }, { status: 400 });
+      }
+      if (!zone.is_available) {
+        return NextResponse.json({ error: 'Mobile zone is not available' }, { status: 400 });
+      }
+      const clientSurcharge = Number(data.mobile_surcharge ?? 0);
+      if (Math.abs(Number(zone.surcharge) - clientSurcharge) > 0.01) {
+        return NextResponse.json(
+          { error: 'Mobile surcharge mismatch — please refresh and try again' },
+          { status: 400 }
+        );
+      }
+      mobileSurcharge = Number(zone.surcharge);
+      mobileZoneNameSnapshot = zone.name;
+    }
+
     const subtotal = data.price + addonTotal + mobileSurcharge;
     const scheduledEndTime = addMinutesToTime(
       data.time,
@@ -311,6 +345,7 @@ export async function POST(request: NextRequest) {
         mobile_zone_id: data.is_mobile ? data.mobile_zone_id : null,
         mobile_address: data.is_mobile ? data.mobile_address : null,
         mobile_surcharge: mobileSurcharge,
+        mobile_zone_name_snapshot: mobileZoneNameSnapshot,
         subtotal,
         tax_amount: 0,
         discount_amount: couponDiscount + loyaltyDiscount,
@@ -447,6 +482,32 @@ export async function POST(request: NextRequest) {
               is_addon: true,
               prerequisite_note: null,
             })),
+            // Mobile fee materialization (Option D2). Visible line item on
+            // the deposit transaction so receipts + ticket displays show
+            // "<zone name> — $40.00" alongside the services. Non-taxable
+            // per CDTFA Pub 100 (separately-stated delivery fee).
+            ...(data.is_mobile && mobileSurcharge > 0
+              ? [{
+                  transaction_id: depositTx.id,
+                  item_type: 'mobile_fee' as const,
+                  product_id: null,
+                  service_id: null,
+                  package_id: null,
+                  item_name: mobileZoneNameSnapshot || 'Mobile Service Fee',
+                  quantity: 1,
+                  unit_price: mobileSurcharge,
+                  total_price: mobileSurcharge,
+                  tax_amount: 0,
+                  is_taxable: false,
+                  tier_name: null,
+                  vehicle_size_class: null,
+                  notes: null,
+                  standard_price: mobileSurcharge,
+                  pricing_type: 'standard',
+                  is_addon: false,
+                  prerequisite_note: null,
+                }]
+              : []),
           ];
 
           const { error: itemsErr } = await supabase

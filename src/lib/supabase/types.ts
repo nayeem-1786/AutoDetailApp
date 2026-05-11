@@ -351,6 +351,7 @@ export interface Appointment {
   mobile_zone_id: string | null;
   mobile_address: string | null;
   mobile_surcharge: number;
+  mobile_zone_name_snapshot: string | null;
   payment_status: PaymentStatus;
   stripe_payment_intent_id: string | null;
   subtotal: number;
@@ -978,9 +979,16 @@ export type JobPhotoPhase = 'intake' | 'progress' | 'completion';
 export type JobAddonStatus = 'pending' | 'approved' | 'declined' | 'expired';
 
 export interface JobServiceSnapshot {
-  id: string;
+  id: string | null;
   name: string;
   price: number;
+  quantity?: number;
+  tier_name?: string | null;
+  /** True only for the synthetic mobile-fee entry appended to the services
+   *  snapshot when an appointment is mobile (Option D2 materialization).
+   *  Distinguishes the row from real catalog services (id=null without this
+   *  flag would also indicate a custom item). */
+  is_mobile_fee?: boolean;
 }
 
 export interface Job {
