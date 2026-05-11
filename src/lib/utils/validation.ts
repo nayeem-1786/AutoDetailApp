@@ -346,32 +346,44 @@ export const bookingAddonSchema = z.object({
   tier_name: z.string().optional().nullable(),
 });
 
-export const bookingSubmitSchema = z.object({
-  service_id: z.string().uuid(),
-  tier_name: z.string().optional().nullable(),
-  price: positiveNumber,
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-  time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
-  duration_minutes: z.coerce.number().int().min(1),
-  is_mobile: z.boolean().default(false),
-  mobile_zone_id: z.string().uuid().optional().nullable(),
-  mobile_address: z.string().optional().nullable(),
-  mobile_surcharge: positiveNumber.default(0),
-  customer: bookingCustomerSchema,
-  vehicle: bookingVehicleSchema,
-  addons: z.array(bookingAddonSchema).default([]),
-  notes: optionalString,
-  channel: z.enum(['online', 'portal']).default('online'),
-  payment_intent_id: optionalString,
-  // Payment options
-  payment_option: z.enum(['deposit', 'pay_on_site', 'full']).optional(),
-  deposit_amount: positiveNumber.optional().nullable(),
-  coupon_code: optionalString,
-  coupon_discount: positiveNumber.optional().nullable(),
-  // Loyalty points
-  loyalty_points_used: z.number().int().min(0).optional(),
-  loyalty_discount: positiveNumber.optional().nullable(),
-});
+export const bookingSubmitSchema = z
+  .object({
+    service_id: z.string().uuid(),
+    tier_name: z.string().optional().nullable(),
+    price: positiveNumber,
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+    time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
+    duration_minutes: z.coerce.number().int().min(1),
+    is_mobile: z.boolean().default(false),
+    mobile_zone_id: z.string().uuid().optional().nullable(),
+    // Phase Mobile-1.1: cap at 200 chars to match POS storage limits.
+    mobile_address: z.string().max(200).optional().nullable(),
+    mobile_surcharge: positiveNumber.default(0),
+    customer: bookingCustomerSchema,
+    vehicle: bookingVehicleSchema,
+    addons: z.array(bookingAddonSchema).default([]),
+    notes: optionalString,
+    channel: z.enum(['online', 'portal']).default('online'),
+    payment_intent_id: optionalString,
+    // Payment options
+    payment_option: z.enum(['deposit', 'pay_on_site', 'full']).optional(),
+    deposit_amount: positiveNumber.optional().nullable(),
+    coupon_code: optionalString,
+    coupon_discount: positiveNumber.optional().nullable(),
+    // Loyalty points
+    loyalty_points_used: z.number().int().min(0).optional(),
+    loyalty_discount: positiveNumber.optional().nullable(),
+  })
+  // Phase Mobile-1.1: server-side mandatory address when mobile is on.
+  // Match POS-side guard (`(rawMobileAddress ?? '').trim()` must be
+  // non-empty) so the three booking paths share one rule.
+  .refine(
+    (data) => !data.is_mobile || ((data.mobile_address ?? '').trim().length > 0),
+    {
+      message: 'Address is required for mobile service',
+      path: ['mobile_address'],
+    }
+  );
 
 // Business hours day schema (open/close times or null for closed)
 const dayHoursSchema = z.object({

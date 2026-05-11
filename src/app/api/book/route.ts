@@ -13,6 +13,7 @@ import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
 import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 import { sendSms } from '@/lib/utils/sms';
+import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
@@ -834,6 +835,16 @@ ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
       source: 'customer_portal',
     });
 
+    // Phase Mobile-1.1: save-to-customer action. Returns null when mobile
+    // is off / no customer / empty address. Performs silent-save UPDATE
+    // atomically when the customer has no existing profile address — for
+    // new customers, this captures their first address from the booking.
+    const mobile_address_action = await resolveMobileAddressAction(supabase, {
+      customerId,
+      isMobile: data.is_mobile,
+      enteredAddress: data.mobile_address ?? null,
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -844,6 +855,7 @@ ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
           end_time: appointment.scheduled_end_time,
           total: appointment.total_amount,
         },
+        mobile_address_action,
       },
       { status: 201 }
     );

@@ -104,6 +104,12 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           last_name: customer.last_name,
           phone: customer.phone,
           email: customer.email,
+          // Phase Mobile-1.1: structured address for mobile pre-fill.
+          address_line_1: customer.address_line_1,
+          address_line_2: customer.address_line_2,
+          city: customer.city,
+          state: customer.state,
+          zip: customer.zip,
         },
         vehicles: vehicles ?? [],
       };
@@ -120,7 +126,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       const adminClient = createAdminClient();
       const { data: cust } = await adminClient
         .from('customers')
-        .select('id, first_name, last_name, phone, email')
+        // Phase Mobile-1.1: include structured address columns for pre-fill.
+        .select('id, first_name, last_name, phone, email, address_line_1, address_line_2, city, state, zip')
         .eq('email', decodeURIComponent(params.email))
         .single();
       if (cust) {
@@ -130,7 +137,17 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           .eq('customer_id', cust.id)
           .order('created_at', { ascending: false });
         campaignCustomerData = {
-          customer: { first_name: cust.first_name, last_name: cust.last_name, phone: cust.phone, email: cust.email },
+          customer: {
+            first_name: cust.first_name,
+            last_name: cust.last_name,
+            phone: cust.phone,
+            email: cust.email,
+            address_line_1: cust.address_line_1,
+            address_line_2: cust.address_line_2,
+            city: cust.city,
+            state: cust.state,
+            zip: cust.zip,
+          },
           vehicles: vehicles ?? [],
         };
       }

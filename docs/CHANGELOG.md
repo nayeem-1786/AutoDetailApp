@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(mobile): address pre-fill + save-to-customer + mandatory validation (Phase Mobile-1.1)
+
+Builds on Phase Mobile-1 (`7056becd`). Adds pre-fill, an X clear button, mandatory address validation when mobile is on, and a save-to-customer conflict prompt — across POS walk-in, POS quote, and online booking.
+
+**Architecture — Option X+ (per prior audit).** No schema change. `mobile_address` stays single TEXT on `appointments` and `quotes`. Customers' existing 5 structured columns (`address_line_1`, `address_line_2`, `city`, `state`, `zip`) remain the canonical customer record. New utilities in `src/lib/utils/format-address.ts`: `formatCustomerAddress` (structured → display, for pre-fill), `parseAddressString` (display → structured, best-effort, with `high`/`low` confidence), `normalizeAddressForCompare` (for diff detection — case/punctuation/whitespace-insensitive). Low-confidence parses save the full input to `address_line_1` with other fields `null`.
+
+**Pre-fill.** `MobileFeePicker` accepts a `customerProfileAddress` prop; pre-fills the empty address field on mount and on customer-swap, but never overwrites typed input (LOCKED-10). `quote-ticket-panel.tsx` memoizes the formatted address from `quote.customer`. The POS customer-search endpoint (`GET /api/pos/customers/search`) now selects the structured columns so the result carries them. Online booking: `BookingWizard` initializes `matchedCustomerAddress` from `customerData.customer.address_*` (portal user) and backfills from the `check-customer` response when a guest's phone resolves to an existing customer with an address.
+
+**Mandatory validation.** Client-side: `gateMobileAddress()` in POS quote panel, `handleContinue` gate in booking wizard's Step 2 — both surface an inline "Address is required for mobile service" error and block submit. Server-side: `bookingSubmitSchema.refine()` requires non-empty `mobile_address` when `is_mobile=true` and caps at 200 chars. POS jobs/quotes endpoints already enforced this via `resolveMobileForQuote()`.
+
+**X clear button.** Single lucide X positioned `absolute right-2 top-1/2 -translate-y-1/2`, matches `search-input.tsx`. Renders only when the field has content; ARIA-labeled "Clear address". Same pattern in POS picker + booking step.
+
+**Save-to-customer.** Server-side helper `resolveMobileAddressAction` (`src/lib/utils/mobile-address-action.ts`) compares the entered address (normalized) against the customer's profile address. Three outcomes:
+- `silently_saved=true` — customer had no profile address; server has already written the parsed address atomically. Client toast.
+- `diff=true` — addresses differ. Client surfaces the conflict prompt (POS dialog or booking confirmation banner). Skip closes without writing; the explicit confirm PATCHes the address endpoint.
+- otherwise — addresses match; no prompt.
+
+**POS prompt UX.** New `SaveAddressDialog` (`src/app/pos/components/checkout/save-address-dialog.tsx`) shows on-file vs entered diff. Confirm PATCHes `/api/pos/customers/[id]/address`. The dialog defers navigation/cleanup until close so the cashier always sees the prompt before the panel transitions.
+
+**Online booking prompt UX.** `BookingConfirmation` (thank-you page) renders an inline banner under the order summary when `diff=true`; confirm PATCHes `/api/customer/profile/address` (session-authenticated, booking-ownership verified); dismiss removes the banner. Silent-save fires a toast on mount.
+
+**New endpoints.**
+- `PATCH /api/pos/customers/[id]/address` — POS HMAC (`authenticatePosRequest`), mirrors the existing `/api/pos/customers/[id]/route.ts` PATCH auth pattern. Audit-logged. Permission gating for customer edit endpoints is inconsistent across the codebase; full audit + cleanup deferred to staff permissions audit session.
+- `PATCH /api/customer/profile/address` — Customer Supabase session. Verifies `booking_id` belongs to the authenticated customer.
+
+**Server data flow changes.** `check-customer` response now includes the matched `customer` with `id` + 5 address columns (or `null` for new customers). `(public)/book/page.tsx` threads `customer.address_*` into `customerData` for both portal and campaign-deep-link paths. `quote-service.ts` `QUOTE_DETAIL_SELECT` adds `address_line_2` (others were already selected).
+
+**Test coverage.** 42 new tests; 710 pass total (was 668).
+- `format-address.test.ts` — 26 cases (formatter, parser, normalizer)
+- `validation-mobile-address.test.ts` — 7 cases (Zod refinement)
+- `mobile-fee-picker.test.tsx` — 5 cases (pre-fill, no-overwrite, X clear, inline error)
+- `save-address-dialog.test.tsx` — 4 cases (diff render, PATCH on confirm, no request on skip, none fallback)
+
+**Receipt fixture scenarios 20+21 — skipped.** The session prompt called for two new fixtures covering the silent-save and diff paths. Receipt rendering does not consume `mobile_address` or `customers.address_*` — receipts emit only the mobile-fee line-item label (e.g., `Zone 1 (0-5 miles)`) and customer name/phone. The two scenarios would produce visually identical fixtures to scenario 18 (`18-online-mobile-deposit`). Coverage for Phase Mobile-1.1 lives in the four test files above instead. Documented in `docs/sessions/mobile-fee-1-1-address-handling.md`.
+
+**Deferred.** Customer portal self-edit of structured address (portal profile UI currently edits name/phone/email/consents only). Geocoding / Google Places address validation (Phase Mobile-2). Structured address inputs (5 fields). Reverse-parser for partial addresses. Voice agent + admin-new mobile paths (still deferred).
+
+---
+
 ## feat(mobile): materialize mobile fee as transaction_item, security fix, walk-in/quote support (Option D2)
 
 Closes the SD-006253 phantom-refund bug: the $40 mobile surcharge was stored on `appointments.mobile_surcharge` but never materialized as a `transaction_items` row, so every line-item-driven renderer (POS ticket, receipt, admin dialog) read $145 instead of $185, triggering "we owe customer $40" reconciliation.

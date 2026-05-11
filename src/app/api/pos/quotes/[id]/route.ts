@@ -11,6 +11,7 @@ import {
   QuoteValidationError,
 } from '@/lib/quotes/quote-service';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
 
 export async function GET(
   request: NextRequest,
@@ -73,7 +74,23 @@ export async function PATCH(
       source: 'pos',
     });
 
-    return NextResponse.json({ quote: updated });
+    // Phase Mobile-1.1: save-to-customer action.
+    // Use the resolved customer_id from the persisted row — the PATCH body
+    // may not include customer_id if the cashier didn't change it.
+    const persistedCustomerId =
+      (updated as { customer_id?: string | null } | null)?.customer_id ?? null;
+    const persistedIsMobile =
+      (updated as { is_mobile?: boolean } | null)?.is_mobile ?? false;
+    const persistedAddress =
+      (updated as { mobile_address?: string | null } | null)?.mobile_address ??
+      null;
+    const mobile_address_action = await resolveMobileAddressAction(supabase, {
+      customerId: persistedCustomerId,
+      isMobile: persistedIsMobile,
+      enteredAddress: persistedAddress,
+    });
+
+    return NextResponse.json({ quote: updated, mobile_address_action });
   } catch (err) {
     if (err instanceof QuoteNotFoundError) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });

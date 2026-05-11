@@ -6,6 +6,7 @@ import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-deta
 import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15 } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
 
 /**
  * GET /api/pos/jobs — List jobs for a date
@@ -454,7 +455,21 @@ export async function POST(request: NextRequest) {
       source: 'pos',
     });
 
-    return NextResponse.json({ data: job }, { status: 201 });
+    // Phase Mobile-1.1: compute save-to-customer action.
+    // Returns null when mobile is off / no customer / empty address.
+    // Performs silent-save UPDATE atomically when customer has no existing
+    // profile address. Diff-only outcomes return non-null with diff=true
+    // and the client surfaces the conflict prompt.
+    const mobile_address_action = await resolveMobileAddressAction(supabase, {
+      customerId: customer_id,
+      isMobile,
+      enteredAddress: mobileAddress,
+    });
+
+    return NextResponse.json(
+      { data: job, mobile_address_action },
+      { status: 201 }
+    );
   } catch (err) {
     console.error('Job create route error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

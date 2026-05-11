@@ -19,6 +19,7 @@ import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } fro
 import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import { customerSignOut } from '@/lib/auth/customer-signout';
 import { SpecialtyVehicleBlock } from './specialty-vehicle-block';
+import { formatCustomerAddress } from '@/lib/utils/format-address';
 
 interface CustomerDataProp {
   customer: {
@@ -26,6 +27,12 @@ interface CustomerDataProp {
     last_name: string;
     phone: string | null;
     email: string | null;
+    // Phase Mobile-1.1: structured address fields for mobile-address pre-fill.
+    address_line_1?: string | null;
+    address_line_2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
   };
   vehicles: {
     id: string;
@@ -108,6 +115,16 @@ interface ConfirmationData {
   amountCharged: number;
   grandTotal: number;
   customerEmail: string | null;
+  // Phase Mobile-1.1: server-computed save-to-customer action. Null when
+  // mobile is off / no customer linked / empty address. Drives the
+  // thank-you banner + silent-save toast on the confirmation screen.
+  mobileAddressAction: {
+    diff: boolean;
+    silently_saved: boolean;
+    current_profile_address: string | null;
+    entered_address: string;
+    customer_id: string;
+  } | null;
 }
 
 // Step mapping (4-step wizard):
@@ -463,6 +480,25 @@ export function BookingWizard({
   // Declared here (not below the confirmation early-return) so hook order is stable.
   const [showSpecialtyBlock, setShowSpecialtyBlock] = useState(false);
 
+  // Phase Mobile-1.1: customer's formatted profile address used to pre-fill
+  // the mobile address input in Step 2.
+  //   - Initial source: customerData (portal user or campaign deep-link).
+  //   - Backfill source: check-customer endpoint resolution at Step 4 when
+  //     a guest's phone matches an existing customer with an address. The
+  //     setter is invoked in handleConfirmBook below.
+  const [matchedCustomerAddress, setMatchedCustomerAddress] =
+    useState<string | null>(() =>
+      customerData?.customer
+        ? formatCustomerAddress({
+            address_line_1: customerData.customer.address_line_1 ?? null,
+            address_line_2: customerData.customer.address_line_2 ?? null,
+            city: customerData.customer.city ?? null,
+            state: customerData.customer.state ?? null,
+            zip: customerData.customer.zip ?? null,
+          })
+        : null
+    );
+
   // --- URL state sync ---
   const updateUrl = useCallback((newStep: number, newState: BookingState) => {
     const params = new URLSearchParams();
@@ -570,6 +606,7 @@ export function BookingWizard({
         vehicleDescription={state.vehicleData
           ? cleanVehicleDescription({ year: state.vehicleData.year, color: state.vehicleData.color, make: state.vehicleData.make, model: state.vehicleData.model }) || null
           : null}
+        mobileAddressAction={confirmation.mobileAddressAction}
       />
     );
   }
@@ -729,6 +766,18 @@ export function BookingWizard({
           const data = await res.json();
           updatedState.isExistingCustomer = data.isExisting;
           setState((prev) => ({ ...prev, isExistingCustomer: data.isExisting }));
+          // Phase Mobile-1.1: backfill the matched customer's formatted
+          // profile address so a return-to-Step-2 re-renders with pre-fill.
+          if (data.customer) {
+            const formatted = formatCustomerAddress({
+              address_line_1: data.customer.address_line_1 ?? null,
+              address_line_2: data.customer.address_line_2 ?? null,
+              city: data.customer.city ?? null,
+              state: data.customer.state ?? null,
+              zip: data.customer.zip ?? null,
+            });
+            setMatchedCustomerAddress(formatted);
+          }
         }
       } catch {
         // Continue even if check fails
@@ -947,6 +996,7 @@ export function BookingWizard({
       amountCharged,
       grandTotal,
       customerEmail: customer.email || null,
+      mobileAddressAction: result.mobile_address_action ?? null,
     });
 
     // Clear URL params so refresh doesn't restore the booking form
@@ -1038,6 +1088,7 @@ export function BookingWizard({
             initialConfig={state.config ?? undefined}
             vehicleSizeClass={(state.vehicleData?.size_class as VehicleSizeClass) ?? null}
             vehicleSpecialtyTier={state.vehicleData?.specialty_tier ?? null}
+            customerProfileAddress={matchedCustomerAddress}
           />
           {editEntryStep !== null && (
             <div className="mt-4">

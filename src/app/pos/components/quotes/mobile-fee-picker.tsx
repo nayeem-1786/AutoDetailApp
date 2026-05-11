@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Truck } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Truck, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { formatCurrency } from '@/lib/utils/format';
@@ -20,13 +20,33 @@ interface MobileFeePickerProps {
   onChange: (next: QuoteMobileState) => void;
   /** Disabled when the cashier hasn't selected a customer yet, etc. */
   disabled?: boolean;
+  /**
+   * Customer's formatted profile address (Phase Mobile-1.1). When the
+   * address input is empty and this prop is non-null, we pre-fill on mount
+   * and when the prop value changes (customer swap). We do NOT overwrite a
+   * non-empty typed value — LOCKED-10.
+   */
+  customerProfileAddress?: string | null;
+  /**
+   * When true, the picker renders the "Address is required for mobile
+   * service" inline error if the toggle is on and the field is empty.
+   * Parent owns submit gating; this is the display-side hint.
+   */
+  showAddressRequiredError?: boolean;
 }
 
 const CUSTOM_VALUE = '__custom__';
 
-export function MobileFeePicker({ value, onChange, disabled }: MobileFeePickerProps) {
+export function MobileFeePicker({
+  value,
+  onChange,
+  disabled,
+  customerProfileAddress,
+  showAddressRequiredError,
+}: MobileFeePickerProps) {
   const [zones, setZones] = useState<MobileZoneRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +68,19 @@ export function MobileFeePicker({ value, onChange, disabled }: MobileFeePickerPr
     };
   }, []);
 
+  // Pre-fill the address from the customer's profile when:
+  //   (a) mobile toggle is on, AND
+  //   (b) the address field is empty (LOCKED-10 — don't overwrite typed input),
+  //   (c) a profile address exists.
+  // Re-runs when customerProfileAddress changes (customer swap mid-ticket).
+  useEffect(() => {
+    if (!value.isMobile) return;
+    if (!customerProfileAddress) return;
+    if (value.address && value.address.trim().length > 0) return;
+    onChange({ ...value, address: customerProfileAddress });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerProfileAddress, value.isMobile]);
+
   function handleToggle(checked: boolean) {
     if (!checked) {
       onChange({
@@ -60,7 +93,13 @@ export function MobileFeePicker({ value, onChange, disabled }: MobileFeePickerPr
       });
       return;
     }
-    onChange({ ...value, isMobile: true });
+    // When turning the toggle on, seed the address from the customer's
+    // profile if available — saves a round-trip through the effect above.
+    onChange({
+      ...value,
+      isMobile: true,
+      address: value.address || customerProfileAddress || '',
+    });
   }
 
   function handleZoneSelect(selected: string) {
@@ -98,6 +137,14 @@ export function MobileFeePicker({ value, onChange, disabled }: MobileFeePickerPr
     });
   }
 
+  function handleClearAddress() {
+    onChange({ ...value, address: '' });
+    addressInputRef.current?.focus();
+  }
+
+  const addressIsEmpty = !value.address || value.address.trim().length === 0;
+  const showError = !!showAddressRequiredError && value.isMobile && addressIsEmpty;
+
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 space-y-3">
       <label className="flex items-center justify-between gap-3">
@@ -118,18 +165,41 @@ export function MobileFeePicker({ value, onChange, disabled }: MobileFeePickerPr
         <div className="space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-600 dark:text-gray-400">
-              Address
+              Address <span className="text-red-500">*</span>
             </label>
-            <Input
-              placeholder="123 Main St, Torrance, CA"
-              value={value.address}
-              maxLength={200}
-              onChange={(e) =>
-                onChange({ ...value, address: e.target.value })
-              }
-              disabled={disabled}
-              className="mt-1"
-            />
+            <div className="relative mt-1">
+              <Input
+                ref={addressInputRef}
+                placeholder="123 Main St, Torrance, CA 90501"
+                value={value.address}
+                maxLength={200}
+                onChange={(e) =>
+                  onChange({ ...value, address: e.target.value })
+                }
+                disabled={disabled}
+                className={`pr-8 ${showError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                aria-invalid={showError || undefined}
+                aria-describedby={showError ? 'mobile-address-error' : undefined}
+              />
+              {!addressIsEmpty && !disabled && (
+                <button
+                  type="button"
+                  onClick={handleClearAddress}
+                  aria-label="Clear address"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {showError && (
+              <p
+                id="mobile-address-error"
+                className="mt-1 text-xs text-red-600 dark:text-red-400"
+              >
+                Address is required for mobile service
+              </p>
+            )}
           </div>
 
           <div>

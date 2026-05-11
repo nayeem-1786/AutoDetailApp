@@ -17,7 +17,7 @@ const QUOTE_LIST_SELECT = `
 
 const QUOTE_DETAIL_SELECT = `
   *,
-  customer:customers(id, first_name, last_name, phone, email, address_line_1, city, state, zip, loyalty_points_balance),
+  customer:customers(id, first_name, last_name, phone, email, address_line_1, address_line_2, city, state, zip, loyalty_points_balance),
   vehicle:vehicles(id, year, make, model, color, vehicle_type, size_class),
   items:quote_items(*)
 `;

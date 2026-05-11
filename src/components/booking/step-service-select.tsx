@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import {
   Clock, Truck, Check, Car, Sparkles, Shield, Paintbrush,
@@ -75,6 +75,13 @@ interface StepServiceSelectProps {
   vehicleSizeClass?: VehicleSizeClass | null;
   /** Vehicle specialty tier from Step 1 — when set, hides the tier picker and uses this for pricing */
   vehicleSpecialtyTier?: string | null;
+  /**
+   * Phase Mobile-1.1: customer's formatted profile address. Pre-fills the
+   * mobile address input on mount + when the prop changes (Step 4 phone
+   * resolution can backfill this), but ONLY when the input is currently
+   * empty (LOCKED-10 — don't overwrite typed input).
+   */
+  customerProfileAddress?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +98,7 @@ export function StepServiceSelect({
   initialConfig,
   vehicleSizeClass,
   vehicleSpecialtyTier,
+  customerProfileAddress,
 }: StepServiceSelectProps) {
   // Helper to find a service by ID across all categories
   function findService(id: string | null): BookableService | null {
@@ -143,7 +151,25 @@ export function StepServiceSelect({
   const [mobileZoneId, setMobileZoneId] = useState<string | null>(
     initialConfig?.mobile_zone_id ?? null
   );
-  const [mobileAddress, setMobileAddress] = useState(initialConfig?.mobile_address ?? '');
+  const [mobileAddress, setMobileAddress] = useState(
+    initialConfig?.mobile_address ?? customerProfileAddress ?? ''
+  );
+  // Phase Mobile-1.1: surfaces "Address is required for mobile service" when
+  // the user hits Continue with mobile=on and the field empty. Cleared as
+  // soon as the user types.
+  const [addressTouchedEmpty, setAddressTouchedEmpty] = useState(false);
+  const mobileAddressInputRef = useRef<HTMLInputElement>(null);
+
+  // Phase Mobile-1.1: pre-fill the mobile address from the customer's
+  // profile when it becomes available (Step 4 guest-phone resolution
+  // backfills this prop), but ONLY when the field is currently empty
+  // (LOCKED-10).
+  useEffect(() => {
+    if (!customerProfileAddress) return;
+    if (mobileAddress.trim().length > 0) return;
+    setMobileAddress(customerProfileAddress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerProfileAddress]);
   const [selectedAddons, setSelectedAddons] = useState<AddonSelection[]>(
     initialConfig?.addons ?? []
   );
@@ -261,7 +287,17 @@ export function StepServiceSelect({
   }
 
   function handleContinue() {
-    if (!selectedService || !canContinue) return;
+    if (!selectedService) return;
+    // Phase Mobile-1.1: surface inline error if mobile is on but address
+    // is empty. Continue is still gated by canContinue, but this lets the
+    // picker render the validation error message rather than silently
+    // refusing to advance.
+    if (showMobileFields && mobileAddress.trim().length === 0) {
+      setAddressTouchedEmpty(true);
+      mobileAddressInputRef.current?.focus();
+      return;
+    }
+    if (!canContinue) return;
     const tierLabel = tier?.tier_label ?? null;
     onSelect(selectedService, {
       tier_name: selectedTier,
@@ -429,14 +465,56 @@ export function StepServiceSelect({
                   <p className="text-sm font-medium text-site-text">Mobile Service</p>
                 </div>
 
-                <FormField label="Service Address" required htmlFor="mobile-address-field" labelClassName="text-site-text-secondary dark:text-site-text-secondary">
-                  <Input
-                    id="mobile-address-field"
-                    placeholder="123 Main St, City, CA 90000"
-                    value={mobileAddress}
-                    onChange={(e) => setMobileAddress(e.target.value)}
-                    className="border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim"
-                  />
+                <FormField
+                  label="Service Address"
+                  required
+                  htmlFor="mobile-address-field"
+                  labelClassName="text-site-text-secondary dark:text-site-text-secondary"
+                  error={
+                    addressTouchedEmpty && mobileAddress.trim().length === 0
+                      ? 'Address is required for mobile service'
+                      : undefined
+                  }
+                >
+                  <div className="relative">
+                    <Input
+                      id="mobile-address-field"
+                      ref={mobileAddressInputRef}
+                      placeholder="123 Main St, City, CA 90000"
+                      value={mobileAddress}
+                      maxLength={200}
+                      onChange={(e) => {
+                        setMobileAddress(e.target.value);
+                        if (addressTouchedEmpty && e.target.value.trim().length > 0) {
+                          setAddressTouchedEmpty(false);
+                        }
+                      }}
+                      className={cn(
+                        'pr-8 border-site-border bg-brand-surface text-site-text placeholder:text-site-text-dim focus-visible:ring-accent-ui dark:border-site-border dark:bg-brand-surface dark:text-site-text dark:placeholder:text-site-text-dim text-base sm:text-sm',
+                        addressTouchedEmpty && mobileAddress.trim().length === 0
+                          ? 'border-red-500 focus-visible:ring-red-500'
+                          : ''
+                      )}
+                      aria-invalid={
+                        addressTouchedEmpty && mobileAddress.trim().length === 0
+                          ? true
+                          : undefined
+                      }
+                    />
+                    {mobileAddress.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileAddress('');
+                          mobileAddressInputRef.current?.focus();
+                        }}
+                        aria-label="Clear address"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-site-text-dim hover:text-site-text-secondary"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </FormField>
 
                 <FormField label="Zone" required htmlFor="mobile-zone-field" labelClassName="text-site-text-secondary dark:text-site-text-secondary">

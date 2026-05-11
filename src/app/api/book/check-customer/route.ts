@@ -59,14 +59,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Try to find customer by phone first (primary identifier)
+    // Phase Mobile-1.1: include structured address columns so the booking
+    // wizard can backfill the mobile address pre-fill when a guest's phone
+    // resolves to an existing customer mid-flow.
     let customer = null;
+
+    const CUSTOMER_LOOKUP_SELECT =
+      'id, visit_count, address_line_1, address_line_2, city, state, zip';
 
     if (phone) {
       const e164Phone = normalizePhone(phone);
       if (e164Phone) {
         const { data: byPhone } = await supabase
           .from('customers')
-          .select('id, visit_count')
+          .select(CUSTOMER_LOOKUP_SELECT)
           .eq('phone', e164Phone)
           .is('deleted_at', null)
           .single();
@@ -78,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (!customer && email) {
       const { data: byEmail } = await supabase
         .from('customers')
-        .select('id, visit_count')
+        .select(CUSTOMER_LOOKUP_SELECT)
         .eq('email', email.toLowerCase().trim())
         .is('deleted_at', null)
         .single();
@@ -91,6 +97,7 @@ export async function POST(request: NextRequest) {
         isExisting: false,
         visitCount: 0,
         availableCoupons: [],
+        customer: null,
       });
     }
 
@@ -181,6 +188,17 @@ export async function POST(request: NextRequest) {
       isExisting: (customer.visit_count ?? 0) > 0,
       visitCount: customer.visit_count ?? 0,
       availableCoupons,
+      // Phase Mobile-1.1: surface address columns so the booking wizard
+      // can pre-fill the mobile address field (LOCKED-8B) when a guest's
+      // phone resolves to an existing customer with a profile address.
+      customer: {
+        id: customer.id,
+        address_line_1: customer.address_line_1 ?? null,
+        address_line_2: customer.address_line_2 ?? null,
+        city: customer.city ?? null,
+        state: customer.state ?? null,
+        zip: customer.zip ?? null,
+      },
     });
   } catch (err) {
     console.error('Check customer error:', err);

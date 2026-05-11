@@ -1,11 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import confetti from 'canvas-confetti';
-import { CheckCircle, CalendarDays, Clock, MapPin, Car } from 'lucide-react';
+import { CheckCircle, CalendarDays, Clock, MapPin, Car, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils/format';
 import Link from 'next/link';
+
+interface MobileAddressActionProp {
+  diff: boolean;
+  silently_saved: boolean;
+  current_profile_address: string | null;
+  entered_address: string;
+  customer_id: string;
+}
 
 interface BookingConfirmationProps {
   appointment: {
@@ -26,6 +35,11 @@ interface BookingConfirmationProps {
   customerEmail?: string | null;
   isPortal?: boolean;
   vehicleDescription?: string | null;
+  // Phase Mobile-1.1: server-computed save-to-customer action.
+  //   silently_saved=true → show toast on mount (first-time profile save)
+  //   diff=true → render the inline save-address banner
+  //   null → not applicable (no mobile / no customer / empty address)
+  mobileAddressAction?: MobileAddressActionProp | null;
 }
 
 function getPaymentFootnote(
@@ -68,8 +82,56 @@ export function BookingConfirmation({
   customerEmail,
   isPortal,
   vehicleDescription,
+  mobileAddressAction,
 }: BookingConfirmationProps) {
   const footnote = getPaymentFootnote(paymentOption, amountCharged, grandTotal, appointment.total);
+
+  // Phase Mobile-1.1: save-to-customer banner state.
+  // Dismissed locally once the user taps Update or Dismiss; either way we
+  // collapse the banner so it doesn't reappear on re-render.
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const [bannerSaved, setBannerSaved] = useState(false);
+
+  // Silent-save toast — fires once on mount when the server already
+  // persisted the first-time profile address (LOCKED-7).
+  useEffect(() => {
+    if (mobileAddressAction?.silently_saved) {
+      toast.success("We've saved your address to your profile.");
+    }
+  }, [mobileAddressAction?.silently_saved]);
+
+  async function handleUpdateProfileAddress() {
+    if (!mobileAddressAction) return;
+    setBannerSaving(true);
+    try {
+      const res = await fetch('/api/customer/profile/address', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entered_address: mobileAddressAction.entered_address,
+          booking_id: appointment.id,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || 'Failed to update address');
+      }
+      setBannerSaved(true);
+      toast.success('Your address has been updated.');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update address');
+    } finally {
+      setBannerSaving(false);
+    }
+  }
+
+  const showBanner =
+    !!mobileAddressAction &&
+    mobileAddressAction.diff &&
+    !mobileAddressAction.silently_saved &&
+    !bannerDismissed &&
+    !bannerSaved;
 
   useEffect(() => {
     const duration = 10 * 1000;
@@ -186,6 +248,55 @@ export function BookingConfirmation({
           )}
         </dl>
       </div>
+
+      {/* Phase Mobile-1.1: save-to-customer banner (LOCKED-6 Context B) */}
+      {showBanner && mobileAddressAction && (
+        <div className="mt-6 rounded-lg border border-site-border bg-brand-surface p-5 text-left">
+          <div className="flex items-start gap-3">
+            <Home className="mt-0.5 h-5 w-5 shrink-0 text-accent-brand" />
+            <div className="flex-1">
+              <h3 className="text-base font-semibold text-site-text">
+                Save this address to your profile?
+              </h3>
+              <dl className="mt-3 space-y-1.5 text-sm">
+                <div className="grid grid-cols-[auto_1fr] gap-x-2">
+                  <dt className="font-medium text-site-text-secondary">
+                    Your account address:
+                  </dt>
+                  <dd className="text-site-text">
+                    {mobileAddressAction.current_profile_address ?? '(none)'}
+                  </dd>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-2">
+                  <dt className="font-medium text-site-text-secondary">
+                    Booking address:
+                  </dt>
+                  <dd className="text-site-text">
+                    {mobileAddressAction.entered_address}
+                  </dd>
+                </div>
+              </dl>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={handleUpdateProfileAddress}
+                  disabled={bannerSaving}
+                  className="bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover"
+                >
+                  {bannerSaving ? 'Saving…' : 'Update my address'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setBannerDismissed(true)}
+                  disabled={bannerSaving}
+                  className="text-sm font-medium text-site-text-secondary hover:text-site-text"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isPortal && (
         <div className="mt-8 flex justify-center">

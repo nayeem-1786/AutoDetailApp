@@ -28,10 +28,13 @@ import { VehicleCreateDialog } from '../vehicle-create-dialog';
 import { QuoteSendDialog } from './quote-send-dialog';
 import { PrerequisiteRemovalDialog } from '../prerequisite-removal-dialog';
 import { ManagerPinDialog } from '../manager-pin-dialog';
+import { SaveAddressDialog } from '../checkout/save-address-dialog';
 import type { Customer, Vehicle } from '@/lib/supabase/types';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import type { TicketItem, QuoteState } from '../../types';
+import { formatCustomerAddress } from '@/lib/utils/format-address';
+import type { MobileAddressAction } from '@/lib/utils/mobile-address-action';
 
 interface QuoteTicketPanelProps {
   onSaved: (quoteId: string) => void;
@@ -136,6 +139,32 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     dependentName: string;
   } | null>(null);
 
+  // Phase Mobile-1.1: address validation + save-to-customer state.
+  // showAddressError is flipped on when the user attempts to save/create
+  // with mobile=on and the address field empty — picker renders inline error.
+  const [showAddressError, setShowAddressError] = useState(false);
+  // saveAddressAction is the post-success diff payload from the server; the
+  // dialog renders when this is non-null.
+  const [saveAddressAction, setSaveAddressAction] =
+    useState<MobileAddressAction | null>(null);
+  // Pending continuation runs after the user closes the dialog (Skip or
+  // Update profile). Used to defer navigation/cleanup so the dialog appears
+  // before route changes.
+  const pendingAfterDialogRef = useRef<(() => void) | null>(null);
+
+  function handleSaveAddressDialogClose() {
+    setSaveAddressAction(null);
+    const cont = pendingAfterDialogRef.current;
+    pendingAfterDialogRef.current = null;
+    if (cont) cont();
+  }
+
+  // Memoize the customer's formatted profile address for pre-fill. Recomputes
+  // when the linked customer changes (LOCKED-10: picker preserves typed input).
+  const customerProfileAddress = quote.customer
+    ? formatCustomerAddress(quote.customer)
+    : null;
+
   // Auto-save plumbing. The debounced effect persists drafts as the user edits;
   // savingRef + dirtyRef coalesce concurrent change bursts; lastSavedHashRef
   // doubles as the load-snapshot on resume so the first render of an existing
@@ -206,8 +235,22 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               `[QUOTE_AUTO_SAVE] save success (quoteId=${q.quoteId}, quote_number=${q.quoteNumber ?? 'unchanged'})`
             );
           } else {
+            // Phase Mobile-1.1: inspect mobile_address_action.
+            const data = await res.json().catch(() => ({}));
+            const action: MobileAddressAction | null =
+              data?.mobile_address_action ?? null;
             toast.success('Quote updated');
-            onSaved(q.quoteId!);
+            if (action?.silently_saved) {
+              toast.success('Address saved to customer profile');
+            }
+            const savedId = q.quoteId!;
+            if (action?.diff) {
+              // Defer onSaved until dialog closes (LOCKED-6 Context A).
+              pendingAfterDialogRef.current = () => onSaved(savedId);
+              setSaveAddressAction(action);
+            } else {
+              onSaved(savedId);
+            }
           }
           return true;
         } else {
@@ -251,8 +294,19 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             );
           } else {
             toast.success(`Quote ${data.quote.quote_number} created`);
+            const newQuoteId = data.quote.id;
+            const action: MobileAddressAction | null =
+              data?.mobile_address_action ?? null;
+            if (action?.silently_saved) {
+              toast.success('Address saved to customer profile');
+            }
             dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
-            onSaved(data.quote.id);
+            if (action?.diff) {
+              pendingAfterDialogRef.current = () => onSaved(newQuoteId);
+              setSaveAddressAction(action);
+            } else {
+              onSaved(newQuoteId);
+            }
           }
           return true;
         }
@@ -472,7 +526,20 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     toast.info('Discount removed');
   }
 
+  // Phase Mobile-1.1: client-side mandatory-address gate. Returns true if
+  // OK to proceed, false if blocked (and flips the picker error on).
+  function gateMobileAddress(): boolean {
+    if (quote.mobile?.isMobile && !(quote.mobile.address ?? '').trim()) {
+      setShowAddressError(true);
+      toast.error('Address is required for mobile service');
+      return false;
+    }
+    setShowAddressError(false);
+    return true;
+  }
+
   async function handleSaveDraft() {
+    if (!gateMobileAddress()) return;
     await persistDraft({ silent: false });
   }
 
@@ -485,6 +552,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       toast.error('Select a customer before sending');
       return;
     }
+    if (!gateMobileAddress()) return;
 
     setSaving(true);
     try {
@@ -537,6 +605,8 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       toast.error('At least one service is required to create a job');
       return;
     }
+
+    if (!gateMobileAddress()) return;
 
     setSaving(true);
     try {
@@ -635,7 +705,9 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         throw new Error(data.error || 'Failed to create job');
       }
 
-      await jobRes.json();
+      const jobData = await jobRes.json();
+      const action: MobileAddressAction | null =
+        jobData?.mobile_address_action ?? null;
 
       // Step 5: Notify about products + coupon carryover
       const productItems = quote.items.filter((i) => i.itemType === 'product');
@@ -647,10 +719,19 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       }
 
       toast.success(`Walk-in job created for ${quote.customer.first_name} ${quote.customer.last_name}`);
+      if (action?.silently_saved) {
+        toast.success('Address saved to customer profile');
+      }
       dispatch({ type: 'CLEAR_QUOTE', validityDays: quoteValidityDays });
 
-      // Step 6: Navigate to jobs tab
-      router.push('/pos/jobs');
+      // Step 6: Navigate to jobs tab — deferred when the address dialog
+      // needs to appear first (LOCKED-6 Context A).
+      if (action?.diff) {
+        pendingAfterDialogRef.current = () => router.push('/pos/jobs');
+        setSaveAddressAction(action);
+      } else {
+        router.push('/pos/jobs');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create job');
     } finally {
@@ -838,11 +919,21 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       )}
 
       {/* Mobile service picker (Option D2). Visible for both quote and walk-in
-          modes. Cashier discretion — toggle off when the customer is on-site. */}
+          modes. Cashier discretion — toggle off when the customer is on-site.
+          Phase Mobile-1.1: customerProfileAddress drives pre-fill;
+          showAddressRequiredError surfaces validation inline. */}
       <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
         <MobileFeePicker
           value={quote.mobile}
-          onChange={(mobile) => dispatch({ type: 'SET_MOBILE', mobile })}
+          onChange={(mobile) => {
+            // Clear the error as soon as the cashier types something.
+            if (showAddressError && (mobile.address ?? '').trim()) {
+              setShowAddressError(false);
+            }
+            dispatch({ type: 'SET_MOBILE', mobile });
+          }}
+          customerProfileAddress={customerProfileAddress}
+          showAddressRequiredError={showAddressError}
         />
       </div>
 
@@ -1031,6 +1122,17 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             </div>
           </div>
         </div>
+      )}
+
+      {/* Phase Mobile-1.1: save-to-customer prompt (LOCKED-6 Context A) */}
+      {saveAddressAction && (
+        <SaveAddressDialog
+          open={!!saveAddressAction}
+          onClose={handleSaveAddressDialogClose}
+          customerId={saveAddressAction.customer_id}
+          currentProfileAddress={saveAddressAction.current_profile_address}
+          enteredAddress={saveAddressAction.entered_address}
+        />
       )}
     </div>
   );

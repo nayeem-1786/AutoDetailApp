@@ -26,6 +26,13 @@ interface SearchResult {
   visit_count: number;
   tags: string[];
   customer_type: import('@/lib/supabase/types').CustomerType | null;
+  // Phase Mobile-1.1: structured address columns ride along so the mobile
+  // picker can pre-fill from the selected customer's profile.
+  address_line_1: string | null;
+  address_line_2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
 }
 
 export function CustomerLookup({

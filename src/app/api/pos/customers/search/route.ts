@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminClient();
 
     const { data: customers, error } = await searchCustomers(supabase, q, {
+      // Phase Mobile-1.1: include structured address columns so the mobile
+      // address field can pre-fill from the selected customer's profile.
       select:
-        'id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type',
+        'id, first_name, last_name, phone, email, loyalty_points_balance, visit_count, tags, customer_type, address_line_1, address_line_2, city, state, zip',
       limit: 10,
     });
 

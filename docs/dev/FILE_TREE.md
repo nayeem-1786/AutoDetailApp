@@ -327,6 +327,7 @@ src/app/api/customer/email/verify-code/route.ts
 src/app/api/customer/link-by-phone/route.ts
 src/app/api/customer/loyalty/route.ts
 src/app/api/customer/profile/route.ts
+src/app/api/customer/profile/address/route.ts
 src/app/api/customer/receipts/html/route.ts
 src/app/api/customer/transactions/[id]/route.ts
 src/app/api/customer/transactions/route.ts
@@ -384,6 +385,7 @@ src/app/api/pos/auth/verify-override/route.ts
 src/app/api/pos/card-customer/route.ts
 src/app/api/pos/coupons/validate/route.ts
 src/app/api/pos/customers/[id]/route.ts
+src/app/api/pos/customers/[id]/address/route.ts
 src/app/api/pos/customers/[id]/type/route.ts
 src/app/api/pos/customers/[id]/vehicles/route.ts
 src/app/api/pos/customers/__tests__/route.test.ts
@@ -1051,6 +1053,7 @@ src/lib/utils/email-consent.ts
 src/lib/utils/email.ts
 src/lib/utils/feature-flags.ts
 src/lib/utils/form.ts
+src/lib/utils/format-address.ts
 src/lib/utils/format-channel.ts
 src/lib/utils/format.ts
 src/lib/utils/idempotency.ts
@@ -1059,6 +1062,7 @@ src/lib/utils/job-zones.ts
 src/lib/utils/light-mode-vars.ts
 src/lib/utils/link-tracking.ts
 src/lib/utils/mailgun-signature.ts
+src/lib/utils/mobile-address-action.ts
 src/lib/utils/order-emails.ts
 src/lib/utils/order-number.ts
 src/lib/utils/phone-validation.ts
@@ -1086,8 +1090,10 @@ src/lib/utils/system-actors.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
 src/lib/utils/__tests__/constants.test.ts
+src/lib/utils/__tests__/format-address.test.ts
 src/lib/utils/__tests__/refund-math.test.ts
 src/lib/utils/__tests__/stock-adjustments.test.ts
+src/lib/utils/__tests__/validation-mobile-address.test.ts
 src/lib/utils/__tests__/validation-refund-shopuse.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/webhook.ts
@@ -1316,6 +1322,11 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         utils/__tests__/pricing.test.ts
                                                         quotes/
 ```
+
+Phase Mobile-1.1 additions:
+- `src/app/pos/components/checkout/save-address-dialog.tsx`
+- `src/app/pos/components/checkout/__tests__/save-address-dialog.test.tsx`
+- `src/app/pos/components/quotes/__tests__/mobile-fee-picker.test.tsx`
 
 ---
 
@@ -1615,6 +1626,7 @@ docs/sessions/receipt-unification-phase-1a.md     # Phase 1A: visual UX changes 
 docs/sessions/receipt-unification-phase-1a-5.md   # Phase 1A.5: digital payment types (Zelle/Venmo/AppleCash/Other) + Stripe webhook brand/last4 capture
 docs/sessions/receipt-unification-phase-1a-followup.md  # Phase 1A-followup: admin filter stale-closure fix, legacy Paid-in-Full fallback, thermal middle-dot CP437 0xFA
 docs/sessions/receipt-unification-phase-1a-followup-2.md  # Phase 1A-followup-2: thermal ✓ via CP437 0xFB + admin search bypasses all filters + PAID_IN_FULL consolidated
+docs/sessions/mobile-fee-1-1-address-handling.md  # Phase Mobile-1.1: address pre-fill + X clear + mandatory validation + save-to-customer (Option X+)
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md
