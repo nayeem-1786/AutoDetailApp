@@ -2,21 +2,20 @@
                         
                         
 ------------------------------------------------
-                 *** VOIDED ***
-------------------------------------------------
-Receipt #R-0009             May 6, 2026, 8:00 PM
+Receipt #R-0017             May 6, 2026, 4:00 PM
 Sample Customer, Enthusiast       (310) 555-1234
 sample@example.com      Customer Since: Aug 2024
 Vehicle | 2022 White Tesla Model 3              
 ------------------------------------------------
-Premium Wash                           $50.00   
+Quick Wash                             $50.00   
 ------------------------------------------------
 Subtotal                                  $50.00
 Tax                                        $0.00
 
 TOTAL                                     $50.00
-                 *** VOIDED ***
 ------------------------------------------------
-Visa ****4242 · 5/6/26 8:05 PM            $50.00
-Total Paid:                               $50.00
-Balance Due:                               $0.00
+Cash · 5/6/26 4:00 PM                     $30.00
+  Tendered                                $30.00
+  Change                                   $0.00
+Total Paid:                               $30.00
+Balance Due:                              $20.00

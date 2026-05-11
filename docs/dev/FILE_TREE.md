@@ -866,7 +866,7 @@ src/lib/data/receipt-composer.ts                    — Phase 0b.1: pure compose
 src/lib/data/receipt-config.ts
 src/lib/data/receipt-data.ts
 src/lib/data/__tests__/receipt-composer.test.ts     — Phase 0b.1 / 1A: composer unit tests + 28 fixture byte-equality regressions
-src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 15 ReceiptTransaction scenarios shared by capture script + tests (Phase 1A.5: +scenario 15 digital-zelle; Phase 1A: +scenarios 13 loyalty-only + 14 loyalty+cash+tax)
+src/lib/data/__tests__/__fixtures__/receipt-baselines/inputs.ts — 17 ReceiptTransaction scenarios shared by capture script + tests (Phase 1A-followup: +scenarios 16 legacy-paid-in-full + 17 legacy-partial-payment; Phase 1A.5: +scenario 15 digital-zelle; Phase 1A: +scenarios 13 loyalty-only + 14 loyalty+cash+tax)
 src/lib/data/__tests__/__fixtures__/receipt-baselines/*.html       — 14 captured HTML fixtures (regenerable)
 src/lib/data/__tests__/__fixtures__/receipt-baselines/*.thermal.txt — 14 captured thermal fixtures (regenerable)
 src/lib/data/refund-sources.ts
@@ -1609,6 +1609,7 @@ docs/dev/SERVICE_CATALOG.md
 docs/sessions/receipt-unification-phase-0b-2.md   # Phase 0b.2: byte-diff harness operator runbook + 10-scenario SQL queries
 docs/sessions/receipt-unification-phase-1a.md     # Phase 1A: visual UX changes (Total Paid, Paid in Full ✓, deposit chrome retired, payment timestamps)
 docs/sessions/receipt-unification-phase-1a-5.md   # Phase 1A.5: digital payment types (Zelle/Venmo/AppleCash/Other) + Stripe webhook brand/last4 capture
+docs/sessions/receipt-unification-phase-1a-followup.md  # Phase 1A-followup: admin filter stale-closure fix, legacy Paid-in-Full fallback, thermal middle-dot CP437 0xFA
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

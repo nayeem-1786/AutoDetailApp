@@ -398,10 +398,18 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         let totalPaidCents = 0;
         for (const p of tx.payments) totalPaidCents += toCents(Number(p.amount ?? 0));
         const loyaltyFooter = composeLoyaltyFooter(tx.loyalty_points_redeemed, tx.loyalty_balance_after_pts);
-        // REVISED LOCKED-3: fires when appointment_total > 0 AND balance === 0
-        // (regardless of how the balance became zero — tender, loyalty, etc.).
+        // Phase 1A-followup FIX 2: legacy walk-in fallback. Falls back to
+        // transaction-level totals when appointment_balance_due is undefined
+        // (pre-Phase-0a txns without an appointment).
         const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
-        const isPaidInFull = tx.appointment_balance_due === 0 && appointmentTotalCents > 0;
+        const transactionTotalCents = toCents(Number(tx.total_amount ?? 0));
+        const fallbackBalanceCents = Math.max(0, transactionTotalCents - totalPaidCents);
+        const resolvedBalanceCents = tx.appointment_balance_due !== undefined
+          ? tx.appointment_balance_due
+          : (tx.payments.length > 0 && transactionTotalCents > 0 ? fallbackBalanceCents : undefined);
+        const billingTotalCents = Math.max(appointmentTotalCents, transactionTotalCents);
+        const isPaidInFullStatus = tx.status !== 'voided' && tx.status !== 'refunded' && tx.status !== 'partial_refund';
+        const isPaidInFull = resolvedBalanceCents === 0 && billingTotalCents > 0 && isPaidInFullStatus;
         return (
           <div className="mb-8 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
             <h3 className="text-sm font-medium text-site-text-secondary">Payment</h3>
@@ -456,8 +464,10 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                   </span>
                 </div>
               )}
-              {/* Paid in Full ✓ replaces Balance Due when balance=0 AND total_paid>0 (LOCKED-3). */}
-              {tx.appointment_balance_due !== undefined && (
+              {/* Phase 1A-followup FIX 2: Paid in Full ✓ or Balance Due,
+                  using the resolved balance (appointment-aggregated or
+                  transaction-level fallback for legacy walk-ins). */}
+              {resolvedBalanceCents !== undefined && (
                 isPaidInFull ? (
                   <div className="text-center text-sm font-semibold text-green-500 pt-1">
                     {RECEIPT_VOCAB.PAID_IN_FULL_HTML}
@@ -466,7 +476,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-site-text">{RECEIPT_VOCAB.BALANCE_DUE}</span>
                     <span className="font-medium text-site-text tabular-nums">
-                      {formatCurrency(tx.appointment_balance_due / 100)}
+                      {formatCurrency(resolvedBalanceCents / 100)}
                     </span>
                   </div>
                 )

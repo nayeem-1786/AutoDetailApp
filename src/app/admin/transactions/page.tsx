@@ -215,7 +215,16 @@ export default function AdminTransactionsPage() {
       to: string,
       pageNum: number,
       sortCol?: string,
-      sortDir?: 'asc' | 'desc'
+      sortDir?: 'asc' | 'desc',
+      // Phase 1A-followup FIX 1: pass payment-method + digital-platform filters
+      // as arguments. Phase 1A.5 had these as captured closure values inside a
+      // useCallback with deps=[], which froze the values at first render
+      // ('all'/'all') — the filter UI updated but the query body always saw
+      // stale 'all'. Routing through arguments matches the existing pattern
+      // (status filter is already passed in this way) and keeps the empty
+      // deps array semantically correct.
+      paymentMethod: string = 'all',
+      digitalPlatform: string = 'all'
     ) => {
       setLoading(true);
       try {
@@ -249,14 +258,19 @@ export default function AdminTransactionsPage() {
         // multiple payments. Instead we resolve via a separate query for
         // matching transaction_ids and constrain with .in() — guarantees
         // dedupe and preserves the existing pagination shape.
-        if (paymentMethodFilter !== 'all') {
-          query = query.eq('payment_method', paymentMethodFilter);
+        if (paymentMethod !== 'all') {
+          query = query.eq('payment_method', paymentMethod);
         }
-        if (paymentMethodFilter === 'digital' && digitalPlatformFilter !== 'all') {
+        // The .in('id', txIds) clause below is the server-side EXISTS-equivalent:
+        // it generates `WHERE id IN (uuid1, uuid2, ...)` which Postgres dedupes
+        // automatically (id is PK). The JS `new Set()` only defends against the
+        // unlikely case of duplicate transaction_id values in the payments
+        // lookup (which can't happen given the schema, but is cheap insurance).
+        if (paymentMethod === 'digital' && digitalPlatform !== 'all') {
           const { data: matchingPaymentTxs } = await supabase
             .from('payments')
             .select('transaction_id')
-            .eq('digital_platform', digitalPlatformFilter)
+            .eq('digital_platform', digitalPlatform)
             .limit(1000);
           const txIds = Array.from(
             new Set((matchingPaymentTxs ?? []).map((p: { transaction_id: string }) => p.transaction_id))
@@ -379,7 +393,9 @@ export default function AdminTransactionsPage() {
       dateRange.to,
       table.page - 1,
       table.sort?.column,
-      table.sort?.direction
+      table.sort?.direction,
+      paymentMethodFilter,
+      digitalPlatformFilter
     );
     // Also refresh stats when on page 1
     if (table.page === 1) {

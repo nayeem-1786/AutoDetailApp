@@ -1,0 +1,21 @@
+                        
+                        
+                        
+------------------------------------------------
+Receipt #R-0016             May 6, 2026, 3:20 PM
+Sample Customer, Enthusiast       (310) 555-1234
+sample@example.com      Customer Since: Aug 2024
+Vehicle | 2022 White Tesla Model 3              
+------------------------------------------------
+Tire Shine                             $40.00   
+------------------------------------------------
+Subtotal                                  $40.00
+Tax                                        $0.00
+
+TOTAL                                     $40.00
+------------------------------------------------
+Cash · 5/6/26 3:20 PM                     $40.00
+  Tendered                                $40.00
+  Change                                   $0.00
+Total Paid:                               $40.00
+                Paid in Full [v]

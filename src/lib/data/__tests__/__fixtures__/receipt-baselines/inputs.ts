@@ -783,6 +783,90 @@ const scenario15: ReceiptScenario = {
   }),
 };
 
+// ===========================================================================
+// Scenario 16 — Legacy pre-Phase-0a walk-in, paid in full via cash
+// ===========================================================================
+// Pre-Phase-0a walk-ins had no appointment_id, so appointment_balance_due
+// and appointment_total are undefined. FIX 2 falls back to transaction-level
+// totals (total_amount + payments) to compute balance and trigger Paid in Full ✓.
+
+const scenario16: ReceiptScenario = {
+  id: 16,
+  slug: '16-legacy-walkin-paid-in-full',
+  name: 'Legacy walk-in (no appointment) — $40 cash paid in full',
+  description: 'Pre-Phase-0a walk-in. No appointment_id, no aggregated balance. Renderer falls back to transaction-level totals to render Paid in Full ✓.',
+  tx: baseStandard({
+    receipt_number: 'R-0016',
+    transaction_date: '2026-05-06T15:20:00.000-07:00',
+    subtotal: 40,
+    total_amount: 40,
+    items: [
+      {
+        id: 'item-16-a',
+        item_name: 'Tire Shine',
+        quantity: 1,
+        unit_price: 40,
+        total_price: 40,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+    ],
+    payments: [
+      {
+        method: 'cash',
+        amount: 40,
+        tip_amount: 0,
+        cash_tendered: 40,
+        change_given: 0,
+        created_at: '2026-05-06T15:20:00.000-07:00',
+        source_label: 'Cash',
+      },
+    ],
+    // No appointment_balance_due / appointment_total — legacy pre-0a shape.
+  }),
+};
+
+// ===========================================================================
+// Scenario 17 — Legacy walk-in, partial payment ($30 of $50 cash)
+// ===========================================================================
+// Confirms the FIX 2 fallback renders "Balance Due: $20.00" (not Paid in Full)
+// when total_paid < total_amount on a no-appointment transaction.
+
+const scenario17: ReceiptScenario = {
+  id: 17,
+  slug: '17-legacy-walkin-partial-payment',
+  name: 'Legacy walk-in (no appointment) — $30 cash on $50 service, balance due $20',
+  description: 'Pre-Phase-0a walk-in with partial payment. Renderer falls back to transaction-level totals; should render Balance Due: $20.00, NOT Paid in Full.',
+  tx: baseStandard({
+    receipt_number: 'R-0017',
+    transaction_date: '2026-05-06T16:00:00.000-07:00',
+    subtotal: 50,
+    total_amount: 50,
+    items: [
+      {
+        id: 'item-17-a',
+        item_name: 'Quick Wash',
+        quantity: 1,
+        unit_price: 50,
+        total_price: 50,
+        tax_amount: 0,
+        item_type: 'service',
+      },
+    ],
+    payments: [
+      {
+        method: 'cash',
+        amount: 30,
+        tip_amount: 0,
+        cash_tendered: 30,
+        change_given: 0,
+        created_at: '2026-05-06T16:00:00.000-07:00',
+        source_label: 'Cash',
+      },
+    ],
+  }),
+};
+
 export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario1,
   scenario2,
@@ -799,4 +883,6 @@ export const RECEIPT_SCENARIOS: ReceiptScenario[] = [
   scenario13,
   scenario14,
   scenario15,
+  scenario16,
+  scenario17,
 ];

@@ -6,6 +6,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(receipts): admin filter, legacy Paid in Full, thermal middle-dot (Phase 1A-followup)
+
+Three production fixes surfaced after Phase 1A.5 dev verification, bundled atomically.
+
+**FIX 1: Admin transactions Digital filter (stale-closure bug).** Phase 1A.5 introduced the Payment Method + Digital Platform filter but the `fetchTransactions` function was wrapped in `useCallback([])` which froze the filter values at first render. The UI updated, the useEffect fired, but the query body always saw stale `'all'`. Fix: pass `paymentMethod` + `digitalPlatform` as function arguments (matching the existing pattern for `status`). Server-side `.in('id', txIds)` after a separate `payments` lookup is the EXISTS-equivalent (Postgres dedupes by PK).
+
+**FIX 2: Paid in Full ✓ fallback for legacy walk-in transactions.** Phase 1A's LOCKED-3 keyed only off `appointment_balance_due`. Pre-Phase-0a walk-ins (no appointment row) never rendered the Balance Due / Paid in Full block at all. Renderer-side gate widened to fall back to transaction-level totals when `tx.payments.length > 0 && tx.total_amount > 0`. Voided/refunded guard added so `tx.status ∈ {voided, refunded, partial_refund}` shows "Balance Due" instead of "Paid in Full ✓" (the VOIDED banner conveys the actual state). Applied identically across thermal, HTML, and public page. Composer's `is_paid_in_full` stays appointment-keyed (its data scope); renderers compute their own flag for the wider gate.
+
+**FIX 3: Thermal middle-dot rendered as CP437 byte 0xFA.** Phase 1A's substitution map mapped `'·' → '-'` (ASCII hyphen), losing the design intent on thermal output. Audit: Star TSP100III's default character table (CP437) contains middle-dot at byte 0xFA — no codepage switch needed. Refactored `THERMAL_ASCII_SUBSTITUTIONS` → `THERMAL_SUBSTITUTIONS` (type `Record<string, number[]>`). Map values are byte arrays so chars can emit one or more bytes — `'·' → [0xFA]` preserves the actual middle dot; other typography (em dash, smart quotes, ellipsis, NBSP, ✓) degrades to ASCII bytes as before. Iteration simplified from "replace-then-encode" to per-character lookup-then-emit. HTML/public/email surfaces unchanged (UTF-8 native).
+
+**Additional checks performed:**
+- Payments report page (`/admin/reports/payments`) audited for the same stale-closure pattern — pattern is correct (state passed as fn arguments). No fix needed.
+- SMS receipt route audited for FIX 2 + FIX 3 parity — SMS is just a summary line + receipt link, no payment block or middle-dot. Independent of these fixes.
+
+Fixture coverage: scenarios 16 (legacy walk-in paid in full) and 17 (legacy walk-in partial $30/$50) added. All 34 fixtures (17 × 2 surfaces) regenerated. Test suite: 664/664 pass.
+
+Full session notes: `docs/sessions/receipt-unification-phase-1a-followup.md`.
+
+---
+
 ## feat(payments): digital payment types + Stripe brand/last4 webhook capture (Phase 1A.5)
 
 Two independent additions shipping together. Both surfaced in production this week — Part A from the Zelle mismarked-as-Cash incident during an internet outage, Part B from the Phase 1A diff-review noticing online Stripe payments render generic "Card" on receipts.

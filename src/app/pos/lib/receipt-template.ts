@@ -783,16 +783,26 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     });
   }
 
-  // Phase 1A REVISED LOCKED-3: Paid in Full ✓ replaces Balance Due row when
-  // appointment had a real bill (appointment_total > 0) AND balance is zero.
-  // Original LOCKED-3 keyed off total_paid > 0, which excluded the
-  // loyalty-only case (bill fully discounted by redemption, zero tender).
-  // The new condition fires regardless of HOW the balance became zero —
-  // tender, loyalty redemption, full coupon discount — as long as a real
-  // bill existed.
-  if (tx.appointment_balance_due !== undefined) {
-    const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
-    if (tx.appointment_balance_due === 0 && appointmentTotalCents > 0) {
+  // Phase 1A-followup FIX 2: legacy walk-in fallback for Balance Due / Paid
+  // in Full. Pre-Phase-0a transactions have no appointment_balance_due
+  // (no appointment to aggregate against) but DO have a non-zero
+  // total_amount and a payments[] that may cover it. Compute a fallback
+  // balance from transaction-level totals when the appointment-aggregated
+  // value is missing.
+  const appointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
+  const transactionTotalCents = toCents(Number(tx.total_amount ?? 0));
+  const fallbackBalanceCents = Math.max(0, transactionTotalCents - totalPaidCents);
+  const balanceCents = tx.appointment_balance_due !== undefined
+    ? tx.appointment_balance_due
+    : (tx.payments.length > 0 && transactionTotalCents > 0 ? fallbackBalanceCents : undefined);
+  const billingTotalCents = Math.max(appointmentTotalCents, transactionTotalCents);
+
+  if (balanceCents !== undefined) {
+    // Paid in Full ✓ when balance is zero AND there was a real bill AND
+    // the transaction is not voided/refunded (those carry their own banners
+    // and "Paid in Full" would be a confusing claim on top of REFUNDED).
+    const isPaidInFullStatus = tx.status !== 'voided' && tx.status !== 'refunded' && tx.status !== 'partial_refund';
+    if (balanceCents === 0 && billingTotalCents > 0 && isPaidInFullStatus) {
       lines.push({
         type: 'text',
         text: RECEIPT_VOCAB.PAID_IN_FULL_THERMAL,
@@ -802,7 +812,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       lines.push({
         type: 'columns',
         left: RECEIPT_VOCAB.BALANCE_DUE,
-        right: `$${(tx.appointment_balance_due / 100).toFixed(2)}`,
+        right: `$${(balanceCents / 100).toFixed(2)}`,
       });
     }
   }
@@ -1154,15 +1164,22 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       html += row(RECEIPT_VOCAB.TOTAL_PAID, `$${(htmlTotalPaidCents / 100).toFixed(2)}`);
     }
 
-    // Phase 1A REVISED LOCKED-3: Paid in Full ✓ replaces Balance Due when
-    // appointment_total > 0 AND balance is zero. Fires regardless of HOW
-    // the balance became zero (tender, loyalty redemption, full coupon, etc.).
-    if (tx.appointment_balance_due !== undefined) {
-      const htmlAppointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
-      if (tx.appointment_balance_due === 0 && htmlAppointmentTotalCents > 0) {
+    // Phase 1A-followup FIX 2: legacy walk-in fallback for Balance Due / Paid
+    // in Full. Same logic as the thermal renderer — falls back to
+    // transaction-level totals when appointment_balance_due is undefined.
+    const htmlAppointmentTotalCents = toCents(Number(tx.appointment_total ?? 0));
+    const htmlTransactionTotalCents = toCents(Number(tx.total_amount ?? 0));
+    const htmlFallbackBalanceCents = Math.max(0, htmlTransactionTotalCents - htmlTotalPaidCents);
+    const htmlBalanceCents = tx.appointment_balance_due !== undefined
+      ? tx.appointment_balance_due
+      : (tx.payments.length > 0 && htmlTransactionTotalCents > 0 ? htmlFallbackBalanceCents : undefined);
+    const htmlBillingTotalCents = Math.max(htmlAppointmentTotalCents, htmlTransactionTotalCents);
+    if (htmlBalanceCents !== undefined) {
+      const htmlIsPaidInFullStatus = tx.status !== 'voided' && tx.status !== 'refunded' && tx.status !== 'partial_refund';
+      if (htmlBalanceCents === 0 && htmlBillingTotalCents > 0 && htmlIsPaidInFullStatus) {
         html += `<tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">${RECEIPT_VOCAB.PAID_IN_FULL_HTML}</td></tr>`;
       } else {
-        html += row(RECEIPT_VOCAB.BALANCE_DUE, `$${(tx.appointment_balance_due / 100).toFixed(2)}`);
+        html += row(RECEIPT_VOCAB.BALANCE_DUE, `$${(htmlBalanceCents / 100).toFixed(2)}`);
       }
     }
 
@@ -1519,40 +1536,47 @@ const CMD_CUT = [0x1D, 0x56, 0x01];            // GS V partial cut (at end only)
 // emit so we don't end up with "?" placeholders on the thermal print.
 // Add to this map when you discover a new offender (logs will surface it
 // via the console.warn below).
-const THERMAL_ASCII_SUBSTITUTIONS: Record<string, string> = {
-  '·': '-', // · (middle dot — used as separator in receipt source labels)
-  '—': '-', // — (em dash)
-  '–': '-', // – (en dash)
-  '‘': "'", // left single quote
-  '’': "'", // right single quote / apostrophe
-  '“': '"', // left double quote
-  '”': '"', // right double quote
-  '…': '...', // ellipsis
-  ' ': ' ', // non-breaking space
+// Phase 1A-followup FIX 3: map shape changed from Record<string, string> to
+// Record<string, number[]>. Some chars (e.g., middle dot) have a CP437
+// codepoint and should emit that byte directly to preserve design intent;
+// others fall through to ASCII substitution.
+const THERMAL_SUBSTITUTIONS: Record<string, number[]> = {
+  '·': [0xFA], // middle dot — CP437 byte 0xFA renders the actual character
+  '—': [0x2D], // em dash → ASCII -
+  '–': [0x2D], // en dash → ASCII -
+  '‘': [0x27], // left single quote → '
+  '’': [0x27], // right single quote / apostrophe → '
+  '“': [0x22], // left double quote → "
+  '”': [0x22], // right double quote → "
+  '…': [0x2E, 0x2E, 0x2E], // ellipsis → ...
+  ' ': [0x20], // non-breaking space → regular space
+  '✓': [0x76], // check mark → 'v' (PAID_IN_FULL_THERMAL uses '[v]' already; defense against stray leaks)
 };
 
 function textToBytes(text: string): number[] {
   const bytes: number[] = [];
-  // Apply known ASCII substitutions in one pass before the byte emit.
-  let normalized = text;
-  for (const [from, to] of Object.entries(THERMAL_ASCII_SUBSTITUTIONS)) {
-    if (normalized.includes(from)) {
-      normalized = normalized.split(from).join(to);
+  // Per-character pass: substitution map values are byte arrays so each
+  // char emits one or more bytes (e.g., '·' → [0xFA] preserves middle-dot
+  // via CP437; '…' → [0x2E, 0x2E, 0x2E] degrades to ASCII '...').
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const subs = THERMAL_SUBSTITUTIONS[ch];
+    if (subs) {
+      bytes.push(...subs);
+      continue;
     }
-  }
-  for (let i = 0; i < normalized.length; i++) {
-    const code = normalized.charCodeAt(i);
+    const code = text.charCodeAt(i);
     if (code < 128) {
       bytes.push(code);
-    } else {
-      // Unmapped non-ASCII — surface in dev logs so future regressions
-      // (e.g. someone adding a new emoji or accent to a template) are
-      // immediately visible. Then substitute '?' as today.
-      console.warn(
-        `[ESC/POS] Non-ASCII char U+${code.toString(16).padStart(4, '0').toUpperCase()} in receipt text — substituting '?'. Add to THERMAL_ASCII_SUBSTITUTIONS if recurring.`
-      );
-      bytes.push(0x3F);
+      continue;
     }
+    // Unmapped non-ASCII — surface in dev logs so future regressions
+    // (e.g. someone adding a new emoji or accent to a template) are
+    // immediately visible. Then substitute '?' as today.
+    console.warn(
+      `[ESC/POS] Non-ASCII char U+${code.toString(16).padStart(4, '0').toUpperCase()} in receipt text — substituting '?'. Add to THERMAL_SUBSTITUTIONS if recurring.`
+    );
+    bytes.push(0x3F);
   }
   return bytes;
 }
