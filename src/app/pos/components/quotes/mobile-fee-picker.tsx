@@ -68,12 +68,16 @@ export function MobileFeePicker({
   const [zones, setZones] = useState<MobileZoneRow[]>([]);
   const [loading, setLoading] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
-  // Phase Mobile-1.2: revised LOCKED-10. Tracks whether the current value
-  // in the address field originated from a pre-fill (vs cashier typing).
-  // - flipped TRUE whenever the effect below writes customerProfileAddress
-  // - flipped FALSE whenever the cashier types or clears the field
+  // Phase Mobile-1.2 (revised in 1.3): tracks whether the current value in
+  // the address field is in an "auto-prefill state" — meaning a customer
+  // swap may safely overwrite or clear it. Flag transitions:
+  //   - TRUE: effect writes customerProfileAddress, OR effect observes
+  //           value.address already equals customerProfileAddress (Phase
+  //           1.3 — recovers the flag for loaded quotes / re-mounts where
+  //           useState(false) would otherwise wedge it)
+  //   - FALSE: cashier types, pastes, or clears the field; toggle off
   // Customer-swap behavior consults this flag to decide whether to
-  // clear/overwrite (auto-prefilled = yes) or preserve (typed = no).
+  // clear/overwrite (auto-prefilled) or preserve (user-typed).
   const [addressWasAutoPrefilled, setAddressWasAutoPrefilled] = useState(false);
 
   useEffect(() => {
@@ -117,8 +121,20 @@ export function MobileFeePicker({
     }
 
     // Case 2: new customer has a profile address.
-    if (fieldIsEmpty || addressWasAutoPrefilled) {
-      // Either nothing to preserve, or prior value was auto-prefilled.
+    // Phase Mobile-1.3 — extend the "auto-prefill" predicate to also
+    // include the case where value.address already equals
+    // customerProfileAddress. Without this, a picker mounted with a
+    // pre-filled address (e.g. loaded quote, or toggle-on path) would
+    // start with addressWasAutoPrefilled=false even though the field is
+    // semantically in an auto-prefill state — wedging the customer-swap
+    // clear behavior.
+    if (
+      fieldIsEmpty ||
+      addressWasAutoPrefilled ||
+      value.address === customerProfileAddress
+    ) {
+      // Either nothing to preserve, or prior value was auto-prefilled,
+      // or the field already mirrors the customer's profile.
       if (value.address !== customerProfileAddress) {
         onChange({ ...value, address: customerProfileAddress });
       }

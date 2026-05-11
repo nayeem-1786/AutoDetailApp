@@ -281,6 +281,55 @@ describe('MobileFeePicker — Phase Mobile-1.2 (revised LOCKED-10)', () => {
     });
   });
 
+  it('Phase 1.3: when picker mounts with value.address already matching profile, swap to no-profile clears (loaded-quote scenario)', async () => {
+    // Simulates loading an existing quote where mobile_address was saved
+    // earlier and happens to equal the linked customer's profile address.
+    // Pre-1.3 the addressWasAutoPrefilled flag was stuck at false on mount,
+    // so a subsequent customer swap to a no-profile customer would NOT
+    // clear the field. With the 1.3 fix the effect normalizes the flag on
+    // mount and the swap clears correctly.
+    const initial: QuoteMobileState = {
+      ...baseMobile,
+      address: '123 Main St, Torrance, CA 90501',
+    };
+    render(
+      <SwappablePicker
+        initial={initial}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+
+    // Swap to a customer with no profile address.
+    fireEvent.click(screen.getByTestId('swap-to-empty'));
+    await waitFor(() => {
+      expect(input.value).toBe('');
+    });
+  });
+
+  it('Phase 1.3: matching-at-mount also recovers the overwrite path on swap to a different profile', async () => {
+    // Same loaded-quote setup, but swap to Customer B (different profile).
+    // Expect overwrite, not preserve — the field was never user-typed.
+    const initial: QuoteMobileState = {
+      ...baseMobile,
+      address: '123 Main St, Torrance, CA 90501',
+    };
+    render(
+      <SwappablePicker
+        initial={initial}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+
+    fireEvent.click(screen.getByTestId('swap-to-b'));
+    await waitFor(() => {
+      expect(input.value).toBe('456 Oak Ave, Lomita, CA 90717');
+    });
+  });
+
   it('renders "Please select a service area for the mobile fee" when showZoneRequiredError && no zone', () => {
     render(
       <ControlledPicker

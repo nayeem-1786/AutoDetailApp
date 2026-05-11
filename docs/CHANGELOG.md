@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(mobile): recover auto-prefill state when picker mounts with matching address (Phase Mobile-1.3)
+
+Bug fix on top of Phase Mobile-1.2 (`0633be08`). No schema, no API contract changes, no new endpoints. Single-condition extension to the pre-fill effect plus removal of the interim debug instrumentation.
+
+**The wedged-flag bug.** Phase 1.2's `addressWasAutoPrefilled` state initialized to `false` on every mount. The pre-fill effect's Case 2 only set the flag to true when `fieldIsEmpty || addressWasAutoPrefilled`. When the picker mounted with `value.isMobile=true` AND a non-empty `value.address` that already equaled `customerProfileAddress` — the realistic state for loaded quotes — neither branch fired, and the flag stayed `false`. A subsequent customer swap to a no-profile customer then hit Case 1 with `addressWasAutoPrefilled=false`, skipping the clear. Path 1 (X-clear-first) worked around this incidentally; Path 2 (phone-click-direct-pick) did not. Both paths dispatch `SET_CUSTOMER` — the bug was not in the dispatch, action shape, or reducer; it was in the mount-time flag initialization.
+
+**Fix.** Extend the effect's Case 2 conditional in both files to also treat "value already matches profile" as auto-prefill state, so the flag is normalized on mount whenever the field's value mirrors the linked customer's profile address:
+
+```ts
+// before (Phase 1.2)
+if (fieldIsEmpty || addressWasAutoPrefilled) {
+// after (Phase 1.3)
+if (fieldIsEmpty || addressWasAutoPrefilled || value.address === customerProfileAddress) {
+```
+
+Applied to `src/app/pos/components/quotes/mobile-fee-picker.tsx` and `src/components/booking/step-service-select.tsx`. The booking flow's `useState` lazy initializer (which had attempted partial mount-time recovery) was simplified to `useState(false)` since the effect now handles all initialization correctly.
+
+**Safety under user-typed input.** If the cashier typed an address that happens to be identical to the customer's profile, treating it as auto-prefill (overwritten/cleared on swap) loses no unique information — the field was already showing the customer's canonical address.
+
+**Test coverage.** 722 vitest tests pass (up from 720). Two new tests in `mobile-fee-picker.test.tsx`: matching-at-mount + swap-to-no-profile clears (the exact production-failure shape), and matching-at-mount + swap-to-different-profile overwrites (symmetric correctness on the overwrite branch).
+
+**Debug log cleanup.** All interim `[MOBILE_DEBUG]` instrumentation removed from `mobile-fee-picker.tsx` and `quote-ticket-panel.tsx`. `grep -rn MOBILE_DEBUG src/` returns zero matches.
+
+**Session doc.** `docs/sessions/mobile-fee-1-3-prefill-state-recovery.md` documents the root cause, fix, extended Bug-2 truth table (with two new "field equals profile" rows that were unreachable pre-1.3), and the simplified booking-flow initializer.
+
+---
+
 ## fix(mobile): UX errors from Phase Mobile-1.1 UAT (Phase Mobile-1.2)
 
 Three UX bugs surfaced during dev UAT of Phase Mobile-1.1 (`35cb2127`). No schema changes; one new optional request field (`is_custom`). Builds on Phase Mobile-1 + Phase Mobile-1.1.

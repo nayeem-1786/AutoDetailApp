@@ -159,24 +159,22 @@ export function StepServiceSelect({
   // soon as the user types.
   const [addressTouchedEmpty, setAddressTouchedEmpty] = useState(false);
   const mobileAddressInputRef = useRef<HTMLInputElement>(null);
-  // Phase Mobile-1.2: revised LOCKED-10. Tracks whether the current value
-  // in the address field originated from a pre-fill (vs user typing).
-  // Initialized true iff the field was seeded from customerProfileAddress
-  // and not from initialConfig (which preserves an already-typed value).
-  const [addressWasAutoPrefilled, setAddressWasAutoPrefilled] = useState(
-    () =>
-      !initialConfig?.mobile_address &&
-      !!customerProfileAddress &&
-      (initialConfig?.mobile_address ?? customerProfileAddress ?? '') ===
-        (customerProfileAddress ?? '')
-  );
+  // Phase Mobile-1.2 (revised in 1.3): tracks whether the current value in
+  // the address field is in an "auto-prefill state" — meaning a customer
+  // swap may safely overwrite or clear it. Initialized false; the effect
+  // below runs on mount and normalizes the flag based on the actual
+  // relationship between mobileAddress and customerProfileAddress
+  // (including the "already matches" recovery case added in Phase 1.3).
+  const [addressWasAutoPrefilled, setAddressWasAutoPrefilled] = useState(false);
 
-  // Phase Mobile-1.1 + 1.2: pre-fill / customer-swap handling.
+  // Phase Mobile-1.1 / 1.2 / 1.3: pre-fill / customer-swap handling.
   //   - new customer has no profile address AND prior value was
   //     auto-prefilled → clear the field
-  //   - new customer has a profile address AND (field empty OR prior
-  //     value was auto-prefilled) → pre-fill with new address
-  //   - otherwise (user typed something) → preserve
+  //   - new customer has a profile address AND (field empty OR prior value
+  //     was auto-prefilled OR field already matches profile) → pre-fill
+  //     and normalize the flag
+  //   - otherwise (user typed something distinct from the profile) →
+  //     preserve
   useEffect(() => {
     const fieldIsEmpty = mobileAddress.trim().length === 0;
 
@@ -188,7 +186,11 @@ export function StepServiceSelect({
       return;
     }
 
-    if (fieldIsEmpty || addressWasAutoPrefilled) {
+    if (
+      fieldIsEmpty ||
+      addressWasAutoPrefilled ||
+      mobileAddress === customerProfileAddress
+    ) {
       if (mobileAddress !== customerProfileAddress) {
         setMobileAddress(customerProfileAddress);
       }
