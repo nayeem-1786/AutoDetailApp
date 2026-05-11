@@ -682,6 +682,10 @@ type MobileInput = {
   mobile_address?: string | null;
   mobile_surcharge?: number;
   mobile_zone_name_snapshot?: string | null;
+  // Phase Mobile-1.2: distinguishes "Custom path" from "no zone selected"
+  // when mobile_zone_id is null. Optional + defaults to false for
+  // backward compat with older clients.
+  is_custom?: boolean;
 };
 
 async function resolveMobileForQuote(
@@ -693,7 +697,7 @@ async function resolveMobileForQuote(
   }
   const address = (data.mobile_address ?? '').trim();
   if (!address) {
-    throw new QuoteValidationError('Mobile service address is required when is_mobile=true');
+    throw new QuoteValidationError('Address is required for mobile service');
   }
   if (data.mobile_zone_id) {
     const { data: zone, error: zoneErr } = await supabase
@@ -719,12 +723,19 @@ async function resolveMobileForQuote(
       snapshotName: zone.name,
     };
   }
+  // No zone selected — distinguish "Custom path" from "placeholder still
+  // showing" via the is_custom client flag.
+  if (data.is_custom !== true) {
+    throw new QuoteValidationError(
+      'Please select a service area for the mobile fee'
+    );
+  }
   // Custom override path — authenticated staff can supply any positive
   // surcharge up to $500 with an optional label.
   const customAmount = Number(data.mobile_surcharge ?? 0);
   if (!(customAmount > 0) || customAmount > 500) {
     throw new QuoteValidationError(
-      'Custom mobile surcharge must be a positive number up to $500'
+      'Enter a custom fee between $1 and $500'
     );
   }
   const surcharge = Math.round(customAmount * 100) / 100;

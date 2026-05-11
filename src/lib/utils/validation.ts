@@ -646,6 +646,9 @@ const quoteMobileFields = {
   mobile_address: optionalString,
   mobile_surcharge: z.coerce.number().min(0).max(500).optional(),
   mobile_zone_name_snapshot: optionalString,
+  // Phase Mobile-1.2: distinguishes Custom path from "no zone selected"
+  // when mobile_zone_id is null.
+  is_custom: z.boolean().optional(),
 };
 
 export const createQuoteSchema = z.object({

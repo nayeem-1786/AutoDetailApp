@@ -21,10 +21,17 @@ interface MobileFeePickerProps {
   /** Disabled when the cashier hasn't selected a customer yet, etc. */
   disabled?: boolean;
   /**
-   * Customer's formatted profile address (Phase Mobile-1.1). When the
-   * address input is empty and this prop is non-null, we pre-fill on mount
-   * and when the prop value changes (customer swap). We do NOT overwrite a
-   * non-empty typed value — LOCKED-10.
+   * Customer's formatted profile address. Pre-fill source.
+   *
+   * Phase Mobile-1.2 revision of LOCKED-10: pre-fill OVERWRITES a prior
+   * pre-fill, but NEVER overwrites user-typed input. The picker tracks
+   * this via an internal `addressWasAutoPrefilled` flag. Behavior on
+   * customer swap:
+   *   - new customer has no profile address AND prior value was
+   *     auto-prefilled → clear the field
+   *   - new customer has a profile address AND (field empty OR prior
+   *     value was auto-prefilled) → pre-fill with new address
+   *   - otherwise (user typed something they want to keep) → preserve
    */
   customerProfileAddress?: string | null;
   /**
@@ -33,6 +40,18 @@ interface MobileFeePickerProps {
    * Parent owns submit gating; this is the display-side hint.
    */
   showAddressRequiredError?: boolean;
+  /**
+   * When true, render "Please select a service area for the mobile fee"
+   * under the zone dropdown. Used by the parent submit gate when mobile
+   * is on but no zone is selected (and the cashier did NOT choose Custom).
+   */
+  showZoneRequiredError?: boolean;
+  /**
+   * When true, render "Enter a custom fee between $1 and $500" under the
+   * Custom surcharge input. Used by the parent submit gate when the
+   * cashier chose Custom but the surcharge is empty / 0 / > 500.
+   */
+  showCustomFeeError?: boolean;
 }
 
 const CUSTOM_VALUE = '__custom__';
@@ -43,10 +62,19 @@ export function MobileFeePicker({
   disabled,
   customerProfileAddress,
   showAddressRequiredError,
+  showZoneRequiredError,
+  showCustomFeeError,
 }: MobileFeePickerProps) {
   const [zones, setZones] = useState<MobileZoneRow[]>([]);
   const [loading, setLoading] = useState(false);
   const addressInputRef = useRef<HTMLInputElement>(null);
+  // Phase Mobile-1.2: revised LOCKED-10. Tracks whether the current value
+  // in the address field originated from a pre-fill (vs cashier typing).
+  // - flipped TRUE whenever the effect below writes customerProfileAddress
+  // - flipped FALSE whenever the cashier types or clears the field
+  // Customer-swap behavior consults this flag to decide whether to
+  // clear/overwrite (auto-prefilled = yes) or preserve (typed = no).
+  const [addressWasAutoPrefilled, setAddressWasAutoPrefilled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -68,16 +96,35 @@ export function MobileFeePicker({
     };
   }, []);
 
-  // Pre-fill the address from the customer's profile when:
-  //   (a) mobile toggle is on, AND
-  //   (b) the address field is empty (LOCKED-10 — don't overwrite typed input),
-  //   (c) a profile address exists.
-  // Re-runs when customerProfileAddress changes (customer swap mid-ticket).
+  // Pre-fill / customer-swap handling (revised LOCKED-10 — see prop docs).
+  // Re-runs when customerProfileAddress changes (e.g. cashier swaps the
+  // linked customer mid-ticket) and when the toggle flips on.
   useEffect(() => {
     if (!value.isMobile) return;
-    if (!customerProfileAddress) return;
-    if (value.address && value.address.trim().length > 0) return;
-    onChange({ ...value, address: customerProfileAddress });
+    const fieldIsEmpty = (value.address ?? '').trim().length === 0;
+
+    // Case 1: new customer has no profile address.
+    if (!customerProfileAddress) {
+      // Clear if the current value was auto-prefilled from a prior
+      // customer (the cashier never typed it).
+      if (addressWasAutoPrefilled && !fieldIsEmpty) {
+        onChange({ ...value, address: '' });
+        setAddressWasAutoPrefilled(false);
+      }
+      // Otherwise: nothing to do — empty field stays empty, typed field
+      // stays as-is.
+      return;
+    }
+
+    // Case 2: new customer has a profile address.
+    if (fieldIsEmpty || addressWasAutoPrefilled) {
+      // Either nothing to preserve, or prior value was auto-prefilled.
+      if (value.address !== customerProfileAddress) {
+        onChange({ ...value, address: customerProfileAddress });
+      }
+      setAddressWasAutoPrefilled(true);
+    }
+    // Otherwise: user typed something they want to keep, preserve.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerProfileAddress, value.isMobile]);
 
@@ -91,15 +138,21 @@ export function MobileFeePicker({
         zoneNameSnapshot: '',
         isCustom: false,
       });
+      setAddressWasAutoPrefilled(false);
       return;
     }
     // When turning the toggle on, seed the address from the customer's
     // profile if available — saves a round-trip through the effect above.
+    const seedFromProfile =
+      !value.address && !!customerProfileAddress;
     onChange({
       ...value,
       isMobile: true,
       address: value.address || customerProfileAddress || '',
     });
+    if (seedFromProfile) {
+      setAddressWasAutoPrefilled(true);
+    }
   }
 
   function handleZoneSelect(selected: string) {
@@ -139,11 +192,31 @@ export function MobileFeePicker({
 
   function handleClearAddress() {
     onChange({ ...value, address: '' });
+    setAddressWasAutoPrefilled(false);
     addressInputRef.current?.focus();
+  }
+
+  function handleAddressChange(next: string) {
+    // Cashier typed (or pasted) — the value is no longer an auto-prefill.
+    setAddressWasAutoPrefilled(false);
+    onChange({ ...value, address: next });
   }
 
   const addressIsEmpty = !value.address || value.address.trim().length === 0;
   const showError = !!showAddressRequiredError && value.isMobile && addressIsEmpty;
+  // Zone-required error fires only when the picker is on, no real zone is
+  // selected, and the cashier hasn't chosen the Custom path.
+  const showZoneError =
+    !!showZoneRequiredError &&
+    value.isMobile &&
+    !value.zoneId &&
+    !value.isCustom;
+  // Custom-fee error fires only on the Custom path with an invalid surcharge.
+  const showCustomError =
+    !!showCustomFeeError &&
+    value.isMobile &&
+    value.isCustom &&
+    !(value.surcharge > 0 && value.surcharge <= 500);
 
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 space-y-3">
@@ -173,9 +246,7 @@ export function MobileFeePicker({
                 placeholder="123 Main St, Torrance, CA 90501"
                 value={value.address}
                 maxLength={200}
-                onChange={(e) =>
-                  onChange({ ...value, address: e.target.value })
-                }
+                onChange={(e) => handleAddressChange(e.target.value)}
                 disabled={disabled}
                 className={`pr-8 ${showError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                 aria-invalid={showError || undefined}
@@ -210,7 +281,13 @@ export function MobileFeePicker({
               value={value.isCustom ? CUSTOM_VALUE : value.zoneId ?? ''}
               onChange={(e) => handleZoneSelect(e.target.value)}
               disabled={disabled || loading}
-              className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-ui"
+              aria-invalid={showZoneError || undefined}
+              aria-describedby={showZoneError ? 'mobile-zone-error' : undefined}
+              className={`mt-1 block w-full rounded-md border bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-accent-ui ${
+                showZoneError
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-700'
+              }`}
             >
               <option value="">Select zone…</option>
               {zones.map((z) => (
@@ -220,6 +297,14 @@ export function MobileFeePicker({
               ))}
               <option value={CUSTOM_VALUE}>Custom…</option>
             </select>
+            {showZoneError && (
+              <p
+                id="mobile-zone-error"
+                className="mt-1 text-xs text-red-600 dark:text-red-400"
+              >
+                Please select a service area for the mobile fee
+              </p>
+            )}
           </div>
 
           {value.isCustom && (
@@ -246,9 +331,21 @@ export function MobileFeePicker({
                       });
                     }}
                     disabled={disabled}
-                    className="pl-6"
+                    aria-invalid={showCustomError || undefined}
+                    aria-describedby={showCustomError ? 'mobile-custom-fee-error' : undefined}
+                    className={`pl-6 ${
+                      showCustomError ? 'border-red-500 focus-visible:ring-red-500' : ''
+                    }`}
                   />
                 </div>
+                {showCustomError && (
+                  <p
+                    id="mobile-custom-fee-error"
+                    className="mt-1 text-xs text-red-600 dark:text-red-400"
+                  >
+                    Enter a custom fee between $1 and $500
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400">

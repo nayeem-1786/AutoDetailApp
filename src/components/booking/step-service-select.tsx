@@ -159,15 +159,41 @@ export function StepServiceSelect({
   // soon as the user types.
   const [addressTouchedEmpty, setAddressTouchedEmpty] = useState(false);
   const mobileAddressInputRef = useRef<HTMLInputElement>(null);
+  // Phase Mobile-1.2: revised LOCKED-10. Tracks whether the current value
+  // in the address field originated from a pre-fill (vs user typing).
+  // Initialized true iff the field was seeded from customerProfileAddress
+  // and not from initialConfig (which preserves an already-typed value).
+  const [addressWasAutoPrefilled, setAddressWasAutoPrefilled] = useState(
+    () =>
+      !initialConfig?.mobile_address &&
+      !!customerProfileAddress &&
+      (initialConfig?.mobile_address ?? customerProfileAddress ?? '') ===
+        (customerProfileAddress ?? '')
+  );
 
-  // Phase Mobile-1.1: pre-fill the mobile address from the customer's
-  // profile when it becomes available (Step 4 guest-phone resolution
-  // backfills this prop), but ONLY when the field is currently empty
-  // (LOCKED-10).
+  // Phase Mobile-1.1 + 1.2: pre-fill / customer-swap handling.
+  //   - new customer has no profile address AND prior value was
+  //     auto-prefilled → clear the field
+  //   - new customer has a profile address AND (field empty OR prior
+  //     value was auto-prefilled) → pre-fill with new address
+  //   - otherwise (user typed something) → preserve
   useEffect(() => {
-    if (!customerProfileAddress) return;
-    if (mobileAddress.trim().length > 0) return;
-    setMobileAddress(customerProfileAddress);
+    const fieldIsEmpty = mobileAddress.trim().length === 0;
+
+    if (!customerProfileAddress) {
+      if (addressWasAutoPrefilled && !fieldIsEmpty) {
+        setMobileAddress('');
+        setAddressWasAutoPrefilled(false);
+      }
+      return;
+    }
+
+    if (fieldIsEmpty || addressWasAutoPrefilled) {
+      if (mobileAddress !== customerProfileAddress) {
+        setMobileAddress(customerProfileAddress);
+      }
+      setAddressWasAutoPrefilled(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerProfileAddress]);
   const [selectedAddons, setSelectedAddons] = useState<AddonSelection[]>(
@@ -276,6 +302,7 @@ export function StepServiceSelect({
     setShowMobileFields(false);
     setMobileZoneId(null);
     setMobileAddress('');
+    setAddressWasAutoPrefilled(false);
     setSelectedAddons([]);
     setShowAllAddons(false);
 
@@ -484,6 +511,9 @@ export function StepServiceSelect({
                       value={mobileAddress}
                       maxLength={200}
                       onChange={(e) => {
+                        // Phase Mobile-1.2: user typed (or pasted) — the
+                        // value is no longer an auto-prefill.
+                        setAddressWasAutoPrefilled(false);
                         setMobileAddress(e.target.value);
                         if (addressTouchedEmpty && e.target.value.trim().length > 0) {
                           setAddressTouchedEmpty(false);
@@ -506,6 +536,7 @@ export function StepServiceSelect({
                         type="button"
                         onClick={() => {
                           setMobileAddress('');
+                          setAddressWasAutoPrefilled(false);
                           mobileAddressInputRef.current?.focus();
                         }}
                         aria-label="Clear address"
@@ -546,6 +577,7 @@ export function StepServiceSelect({
                     setShowMobileFields(false);
                     setMobileZoneId(null);
                     setMobileAddress('');
+                    setAddressWasAutoPrefilled(false);
                   }}
                   className="text-sm text-site-text-muted hover:text-red-400 font-medium"
                 >

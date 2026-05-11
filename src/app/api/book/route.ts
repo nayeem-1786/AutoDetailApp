@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
     if (data.is_mobile) {
       if (!data.mobile_zone_id) {
         return NextResponse.json(
-          { error: 'Mobile zone required for online booking' },
+          { error: 'Please select a service area for the mobile fee' },
           { status: 400 }
         );
       }

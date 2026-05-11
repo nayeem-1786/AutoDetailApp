@@ -6,6 +6,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(mobile): UX errors from Phase Mobile-1.1 UAT (Phase Mobile-1.2)
+
+Three UX bugs surfaced during dev UAT of Phase Mobile-1.1 (`35cb2127`). No schema changes; one new optional request field (`is_custom`). Builds on Phase Mobile-1 + Phase Mobile-1.1.
+
+**Bug 1 — server validation message leaked internal field name.** Two server endpoints (`/api/pos/jobs` POST and `lib/quotes/quote-service.ts`'s `resolveMobileForQuote`) returned `"Mobile service address is required when is_mobile=true"` to the user. Replaced with the existing canonical client-side wording: `"Address is required for mobile service"`. 4 other locations already used the canonical text.
+
+**Bug 2 — address field didn't clear on customer swap.** Phase Mobile-1.1 LOCKED-10 guard (`if (mobileAddress.trim().length > 0) return`) blocked overwriting any non-empty value — including auto-prefilled values from a prior customer. Cashier links Customer A (with profile address), picker pre-fills; swaps to Customer B (no profile address); A's address stuck in the field. Revised LOCKED-10 via new `addressWasAutoPrefilled` state flag (LOCKED-A in this phase). Behavior on customer swap: clears the field when prior value was auto-prefilled AND new customer has no profile address; overwrites prior pre-fill when new customer has an address; preserves user-typed input always. Flag flipped TRUE by the pre-fill effect; flipped FALSE by `onChange` (typed/pasted), X clear, toggle-off, service-deselect, and "Remove mobile service" in booking. Applied to both `mobile-fee-picker.tsx` (POS) and `step-service-select.tsx` (online booking).
+
+**Bug 3 — misleading validation when no zone selected.** When mobile was on with a valid address but the zone dropdown was still on the placeholder, the server returned `"Custom mobile surcharge must be a positive number up to $500"` — confusing, since the cashier hadn't picked the Custom path. Server couldn't distinguish "nothing selected" from "Custom chosen" because both arrive with `mobile_zone_id=null`. Fix: added optional `is_custom: boolean` to the request payload (backward compatible — older clients default to false). Server now branches: (a) zone selected → validate against zone, (b) no zone + `is_custom=true` → validate custom fee with `"Enter a custom fee between $1 and $500"`, (c) no zone + `is_custom=false` → `"Please select a service area for the mobile fee"`. Same distinction surfaced client-side via two new picker props (`showZoneRequiredError`, `showCustomFeeError`) that render the appropriate inline error at the offending field. The submit gate in `quote-ticket-panel.tsx` flips them on; the reactive onChange wrapper clears them as the cashier resolves each field.
+
+**Audit-driven secondary rewordings.** Three error endpoints had `entered_address` / `booking_id` internal field names in user-facing messages; all rewritten. `/api/book/route.ts` no-zone branch unified to the canonical `"Please select a service area for the mobile fee"`.
+
+**Permission-gate note.** The `/api/pos/customers/[id]/address` endpoint introduced in Phase Mobile-1.1 was originally specced to gate on `pos.process_cash` but landed using `authenticatePosRequest` only (matching the existing `/api/pos/customers/[id]/route.ts` PATCH). Permission gating for customer edit endpoints is inconsistent across the codebase; full audit + cleanup deferred to a future staff permissions audit session.
+
+**Test coverage.** 10 new tests; 720 vitest tests pass total (up from 710). Picker tests cover all six customer-swap permutations from the Bug-2 truth table plus zone-required + custom-fee error rendering. Zod test asserts the refinement message text is human-friendly with no `is_mobile` / `=true` leak.
+
+**Session doc.** `docs/sessions/mobile-fee-1-2-uat-fixes.md`.
+
+---
+
 ## feat(mobile): address pre-fill + save-to-customer + mandatory validation (Phase Mobile-1.1)
 
 Builds on Phase Mobile-1 (`7056becd`). Adds pre-fill, an X clear button, mandatory address validation when mobile is on, and a save-to-customer conflict prompt — across POS walk-in, POS quote, and online booking.

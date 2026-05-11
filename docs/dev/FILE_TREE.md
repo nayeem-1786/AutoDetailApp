@@ -1627,6 +1627,7 @@ docs/sessions/receipt-unification-phase-1a-5.md   # Phase 1A.5: digital payment 
 docs/sessions/receipt-unification-phase-1a-followup.md  # Phase 1A-followup: admin filter stale-closure fix, legacy Paid-in-Full fallback, thermal middle-dot CP437 0xFA
 docs/sessions/receipt-unification-phase-1a-followup-2.md  # Phase 1A-followup-2: thermal ✓ via CP437 0xFB + admin search bypasses all filters + PAID_IN_FULL consolidated
 docs/sessions/mobile-fee-1-1-address-handling.md  # Phase Mobile-1.1: address pre-fill + X clear + mandatory validation + save-to-customer (Option X+)
+docs/sessions/mobile-fee-1-2-uat-fixes.md         # Phase Mobile-1.2: UAT bug fixes — error wording, customer-swap clear, zone vs Custom-path error distinction
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

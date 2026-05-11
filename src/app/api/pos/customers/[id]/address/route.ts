@@ -40,13 +40,13 @@ export async function PATCH(
 
     if (!trimmed) {
       return NextResponse.json(
-        { error: 'entered_address is required' },
+        { error: 'Address is required' },
         { status: 400 }
       );
     }
     if (trimmed.length > 200) {
       return NextResponse.json(
-        { error: 'entered_address must be 200 characters or fewer' },
+        { error: 'Address is too long (max 200 characters)' },
         { status: 400 }
       );
     }

@@ -181,6 +181,7 @@ export async function POST(request: NextRequest) {
       mobile_address: rawMobileAddress,
       mobile_surcharge: rawMobileSurcharge,
       mobile_zone_name_snapshot: rawMobileLabel,
+      is_custom: rawIsCustom,
     } = body as {
       customer_id: string;
       vehicle_id?: string;
@@ -194,6 +195,11 @@ export async function POST(request: NextRequest) {
       mobile_address?: string | null;
       mobile_surcharge?: number;
       mobile_zone_name_snapshot?: string | null;
+      // Phase Mobile-1.2: client-supplied "Custom path" disambiguator. When
+      // mobile_zone_id is null, this distinguishes "no zone selected yet"
+      // (false) from "cashier chose Custom" (true). Optional + defaults to
+      // false for backward compat with older clients.
+      is_custom?: boolean;
     };
 
     if (!customer_id) {
@@ -218,7 +224,7 @@ export async function POST(request: NextRequest) {
       const address = (rawMobileAddress ?? '').trim();
       if (!address) {
         return NextResponse.json(
-          { error: 'Mobile service address is required when is_mobile=true' },
+          { error: 'Address is required for mobile service' },
           { status: 400 }
         );
       }
@@ -246,17 +252,25 @@ export async function POST(request: NextRequest) {
         mobileZoneId = zone.id;
         mobileSurcharge = Number(zone.surcharge);
         mobileZoneNameSnapshot = zone.name;
-      } else {
+      } else if (rawIsCustom === true) {
+        // Custom path: cashier explicitly chose "Custom…" — validate the
+        // staff-supplied surcharge as a positive number bounded at $500.
         const customAmount = Number(rawMobileSurcharge ?? 0);
         if (!(customAmount > 0) || customAmount > 500) {
           return NextResponse.json(
-            { error: 'Custom mobile surcharge must be a positive number up to $500' },
+            { error: 'Enter a custom fee between $1 and $500' },
             { status: 400 }
           );
         }
         mobileSurcharge = Math.round(customAmount * 100) / 100;
         const customLabel = (rawMobileLabel ?? '').trim().slice(0, 100);
         mobileZoneNameSnapshot = customLabel || 'Custom';
+      } else {
+        // No zone selected at all (placeholder still showing).
+        return NextResponse.json(
+          { error: 'Please select a service area for the mobile fee' },
+          { status: 400 }
+        );
       }
     }
 

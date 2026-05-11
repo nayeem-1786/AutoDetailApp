@@ -32,16 +32,19 @@ export async function PATCH(request: NextRequest) {
     const trimmed = enteredAddress.trim();
 
     if (!trimmed) {
-      return NextResponse.json({ error: 'entered_address is required' }, { status: 400 });
+      return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
     if (trimmed.length > 200) {
       return NextResponse.json(
-        { error: 'entered_address must be 200 characters or fewer' },
+        { error: 'Address is too long (max 200 characters)' },
         { status: 400 }
       );
     }
     if (!bookingId) {
-      return NextResponse.json({ error: 'booking_id is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Booking information is missing — please refresh and try again' },
+        { status: 400 }
+      );
     }
 
     const admin = createAdminClient();

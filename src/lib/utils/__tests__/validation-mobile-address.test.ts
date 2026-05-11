@@ -52,6 +52,25 @@ describe('bookingSubmitSchema mobile_address refinement', () => {
     }
   });
 
+  // Phase Mobile-1.2: confirm the refinement message is human-friendly —
+  // no "is_mobile=true" technical jargon leak.
+  it('produces a user-friendly error message (no field-name leak)', () => {
+    const r = bookingSubmitSchema.safeParse({
+      ...baseValid,
+      is_mobile: true,
+      mobile_address: '',
+    });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const addressIssue = r.error.issues.find(
+        (i) => i.path.join('.') === 'mobile_address'
+      );
+      expect(addressIssue?.message).toBe('Address is required for mobile service');
+      expect(addressIssue?.message).not.toMatch(/is_mobile/i);
+      expect(addressIssue?.message).not.toMatch(/=true/);
+    }
+  });
+
   it('rejects is_mobile=true with whitespace-only mobile_address', () => {
     const r = bookingSubmitSchema.safeParse({
       ...baseValid,

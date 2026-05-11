@@ -90,6 +90,11 @@ function computeQuoteHash(q: QuoteState): string {
 // Build the mobile section of an API write payload. The {is_mobile=false}
 // branch is shared explicitly between POST + PATCH so removing the toggle
 // resets all five columns server-side.
+//
+// Phase Mobile-1.2: includes `is_custom` so the server can distinguish
+// "Custom path chosen" from "no zone selected yet" — without that the
+// server's no-zone branch produced a custom-fee error message even when
+// the cashier hadn't picked anything.
 function buildMobilePayload(q: QuoteState) {
   if (!q.mobile?.isMobile) {
     return {
@@ -98,6 +103,7 @@ function buildMobilePayload(q: QuoteState) {
       mobile_address: null,
       mobile_surcharge: 0,
       mobile_zone_name_snapshot: null,
+      is_custom: false,
     };
   }
   return {
@@ -106,6 +112,7 @@ function buildMobilePayload(q: QuoteState) {
     mobile_address: q.mobile.address || null,
     mobile_surcharge: q.mobile.surcharge,
     mobile_zone_name_snapshot: q.mobile.zoneNameSnapshot || null,
+    is_custom: !!q.mobile.isCustom,
   };
 }
 
@@ -143,6 +150,11 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   // showAddressError is flipped on when the user attempts to save/create
   // with mobile=on and the address field empty — picker renders inline error.
   const [showAddressError, setShowAddressError] = useState(false);
+  // Phase Mobile-1.2: zone + custom-fee inline errors. Flipped on when the
+  // submit gate fires and the corresponding picker field is invalid;
+  // cleared as the cashier resolves the field.
+  const [showZoneError, setShowZoneError] = useState(false);
+  const [showCustomFeeError, setShowCustomFeeError] = useState(false);
   // saveAddressAction is the post-success diff payload from the server; the
   // dialog renders when this is non-null.
   const [saveAddressAction, setSaveAddressAction] =
@@ -526,15 +538,49 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     toast.info('Discount removed');
   }
 
-  // Phase Mobile-1.1: client-side mandatory-address gate. Returns true if
-  // OK to proceed, false if blocked (and flips the picker error on).
+  // Phase Mobile-1.1 + 1.2: client-side mobile-section gate. Returns true if
+  // OK to proceed, false if blocked. Flips on the appropriate picker error
+  // (address / zone / custom-fee) so the cashier sees inline feedback at
+  // the offending field rather than a single generic toast.
   function gateMobileAddress(): boolean {
-    if (quote.mobile?.isMobile && !(quote.mobile.address ?? '').trim()) {
+    if (!quote.mobile?.isMobile) {
+      setShowAddressError(false);
+      setShowZoneError(false);
+      setShowCustomFeeError(false);
+      return true;
+    }
+
+    const m = quote.mobile;
+    const addressEmpty = !(m.address ?? '').trim();
+    if (addressEmpty) {
       setShowAddressError(true);
+      setShowZoneError(false);
+      setShowCustomFeeError(false);
       toast.error('Address is required for mobile service');
       return false;
     }
+
+    // No zone selected AND cashier did not choose Custom.
+    if (!m.zoneId && !m.isCustom) {
+      setShowAddressError(false);
+      setShowZoneError(true);
+      setShowCustomFeeError(false);
+      toast.error('Please select a service area for the mobile fee');
+      return false;
+    }
+
+    // Custom path with invalid surcharge.
+    if (m.isCustom && !(m.surcharge > 0 && m.surcharge <= 500)) {
+      setShowAddressError(false);
+      setShowZoneError(false);
+      setShowCustomFeeError(true);
+      toast.error('Enter a custom fee between $1 and $500');
+      return false;
+    }
+
     setShowAddressError(false);
+    setShowZoneError(false);
+    setShowCustomFeeError(false);
     return true;
   }
 
@@ -921,19 +967,33 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       {/* Mobile service picker (Option D2). Visible for both quote and walk-in
           modes. Cashier discretion — toggle off when the customer is on-site.
           Phase Mobile-1.1: customerProfileAddress drives pre-fill;
-          showAddressRequiredError surfaces validation inline. */}
+          showAddressRequiredError surfaces validation inline.
+          Phase Mobile-1.2: showZoneRequiredError + showCustomFeeError
+          surface the zone-vs-custom validation distinctions inline. */}
       <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-4 py-2">
         <MobileFeePicker
           value={quote.mobile}
           onChange={(mobile) => {
-            // Clear the error as soon as the cashier types something.
+            // Clear each inline error as soon as the cashier resolves it.
             if (showAddressError && (mobile.address ?? '').trim()) {
               setShowAddressError(false);
+            }
+            if (showZoneError && (mobile.zoneId || mobile.isCustom)) {
+              setShowZoneError(false);
+            }
+            if (
+              showCustomFeeError &&
+              (!mobile.isCustom ||
+                (mobile.surcharge > 0 && mobile.surcharge <= 500))
+            ) {
+              setShowCustomFeeError(false);
             }
             dispatch({ type: 'SET_MOBILE', mobile });
           }}
           customerProfileAddress={customerProfileAddress}
           showAddressRequiredError={showAddressError}
+          showZoneRequiredError={showZoneError}
+          showCustomFeeError={showCustomFeeError}
         />
       </div>
 

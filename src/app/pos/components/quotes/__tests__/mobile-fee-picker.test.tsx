@@ -1,8 +1,9 @@
-// Phase Mobile-1.1 — MobileFeePicker:
-//   - pre-fills empty address from customerProfileAddress on mount
-//   - does NOT overwrite a non-empty typed address on customer change (LOCKED-10)
-//   - X clear button clears + focuses the input
-//   - inline error renders when showAddressRequiredError && empty
+// Phase Mobile-1.1 / Mobile-1.2 — MobileFeePicker behaviors:
+//   1.1: pre-fill from customerProfileAddress, preserve typed input,
+//        X clear, inline address-required error
+//   1.2: revised LOCKED-10 — clear on swap to address-less customer,
+//        re-pre-fill on swap back, typed input always preserved,
+//        zone-required + custom-fee inline errors
 
 import { useState } from 'react';
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -41,6 +42,8 @@ function ControlledPicker(props: {
   initial: QuoteMobileState;
   customerProfileAddress?: string | null;
   showAddressRequiredError?: boolean;
+  showZoneRequiredError?: boolean;
+  showCustomFeeError?: boolean;
 }) {
   const [value, setValue] = useState(props.initial);
   return (
@@ -49,7 +52,46 @@ function ControlledPicker(props: {
       onChange={setValue}
       customerProfileAddress={props.customerProfileAddress}
       showAddressRequiredError={props.showAddressRequiredError}
+      showZoneRequiredError={props.showZoneRequiredError}
+      showCustomFeeError={props.showCustomFeeError}
     />
+  );
+}
+
+// Two-phase harness: lets the test swap customerProfileAddress after mount
+// (simulates the cashier swapping linked customer mid-ticket).
+function SwappablePicker({
+  initial,
+  initialProfile,
+}: {
+  initial: QuoteMobileState;
+  initialProfile: string | null;
+}) {
+  const [value, setValue] = useState(initial);
+  const [profile, setProfile] = useState<string | null>(initialProfile);
+  return (
+    <div>
+      <MobileFeePicker
+        value={value}
+        onChange={setValue}
+        customerProfileAddress={profile}
+      />
+      <button onClick={() => setProfile(null)} data-testid="swap-to-empty">
+        swap to empty
+      </button>
+      <button
+        onClick={() => setProfile('123 Main St, Torrance, CA 90501')}
+        data-testid="swap-to-a"
+      >
+        swap to A
+      </button>
+      <button
+        onClick={() => setProfile('456 Oak Ave, Lomita, CA 90717')}
+        data-testid="swap-to-b"
+      >
+        swap to B
+      </button>
+    </div>
   );
 }
 
@@ -125,6 +167,175 @@ describe('MobileFeePicker — Phase Mobile-1.1', () => {
     );
     expect(
       screen.queryByText(/address is required for mobile service/i)
+    ).toBeNull();
+  });
+});
+
+describe('MobileFeePicker — Phase Mobile-1.2 (revised LOCKED-10)', () => {
+  it('clears the address when switching to a customer with NO profile address (Bug 2)', async () => {
+    // Customer A → has profile address, picker pre-fills.
+    render(
+      <SwappablePicker
+        initial={baseMobile}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    await waitFor(() => {
+      expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+    });
+
+    // Swap to customer B (no profile address).
+    fireEvent.click(screen.getByTestId('swap-to-empty'));
+
+    await waitFor(() => {
+      expect(input.value).toBe('');
+    });
+  });
+
+  it('re-pre-fills when swapping back to a customer WITH a profile address', async () => {
+    render(
+      <SwappablePicker
+        initial={baseMobile}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    await waitFor(() => {
+      expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+    });
+
+    fireEvent.click(screen.getByTestId('swap-to-empty'));
+    await waitFor(() => expect(input.value).toBe(''));
+
+    fireEvent.click(screen.getByTestId('swap-to-a'));
+    await waitFor(() => {
+      expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+    });
+  });
+
+  it('overwrites prior pre-fill when swapping between two customers each with a profile address', async () => {
+    render(
+      <SwappablePicker
+        initial={baseMobile}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    await waitFor(() => {
+      expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+    });
+
+    fireEvent.click(screen.getByTestId('swap-to-b'));
+    await waitFor(() => {
+      expect(input.value).toBe('456 Oak Ave, Lomita, CA 90717');
+    });
+  });
+
+  it('preserves user-typed input across customer swap', async () => {
+    render(
+      <SwappablePicker
+        initial={baseMobile}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    await waitFor(() => {
+      expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+    });
+
+    // Cashier types over the pre-fill.
+    fireEvent.change(input, {
+      target: { value: '999 Manual Override Ln' },
+    });
+    expect(input.value).toBe('999 Manual Override Ln');
+
+    // Swap to a different customer.
+    fireEvent.click(screen.getByTestId('swap-to-b'));
+    // The typed value must be preserved.
+    expect(input.value).toBe('999 Manual Override Ln');
+
+    // Also: swap to no-address customer should preserve typed value.
+    fireEvent.click(screen.getByTestId('swap-to-empty'));
+    expect(input.value).toBe('999 Manual Override Ln');
+  });
+
+  it('after X clear, a customer swap re-pre-fills (X clear unsets the auto-prefill flag)', async () => {
+    render(
+      <SwappablePicker
+        initial={baseMobile}
+        initialProfile="123 Main St, Torrance, CA 90501"
+      />
+    );
+    const input = screen.getByPlaceholderText(/123 Main St/i) as HTMLInputElement;
+    await waitFor(() => {
+      expect(input.value).toBe('123 Main St, Torrance, CA 90501');
+    });
+
+    fireEvent.click(screen.getByLabelText(/clear address/i));
+    await waitFor(() => expect(input.value).toBe(''));
+
+    fireEvent.click(screen.getByTestId('swap-to-b'));
+    await waitFor(() => {
+      expect(input.value).toBe('456 Oak Ave, Lomita, CA 90717');
+    });
+  });
+
+  it('renders "Please select a service area for the mobile fee" when showZoneRequiredError && no zone', () => {
+    render(
+      <ControlledPicker
+        initial={{ ...baseMobile, address: '123 Main' }}
+        showZoneRequiredError={true}
+      />
+    );
+    expect(
+      screen.getByText(/please select a service area for the mobile fee/i)
+    ).toBeTruthy();
+  });
+
+  it('does NOT render zone-required error when isCustom is true', () => {
+    render(
+      <ControlledPicker
+        initial={{ ...baseMobile, address: '123 Main', isCustom: true }}
+        showZoneRequiredError={true}
+      />
+    );
+    expect(
+      screen.queryByText(/please select a service area for the mobile fee/i)
+    ).toBeNull();
+  });
+
+  it('renders "Enter a custom fee between $1 and $500" on Custom path with invalid surcharge', () => {
+    render(
+      <ControlledPicker
+        initial={{
+          ...baseMobile,
+          address: '123 Main',
+          isCustom: true,
+          surcharge: 0,
+        }}
+        showCustomFeeError={true}
+      />
+    );
+    expect(
+      screen.getByText(/enter a custom fee between \$1 and \$500/i)
+    ).toBeTruthy();
+  });
+
+  it('does NOT render custom-fee error when isCustom path has a valid surcharge', () => {
+    render(
+      <ControlledPicker
+        initial={{
+          ...baseMobile,
+          address: '123 Main',
+          isCustom: true,
+          surcharge: 50,
+        }}
+        showCustomFeeError={true}
+      />
+    );
+    expect(
+      screen.queryByText(/enter a custom fee between \$1 and \$500/i)
     ).toBeNull();
   });
 });
