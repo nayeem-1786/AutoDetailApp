@@ -20,4 +20,4 @@ Deposit (In-Store) · Cash                 $30.00
   Change                                   $0.00
 Visa ****4242 · 5/6/26 8:06 PM            $20.00
 Total Paid:                               $50.00
-                Paid in Full [v]
+                 Paid in Full ✓

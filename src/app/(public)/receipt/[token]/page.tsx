@@ -470,7 +470,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               {resolvedBalanceCents !== undefined && (
                 isPaidInFull ? (
                   <div className="text-center text-sm font-semibold text-green-500 pt-1">
-                    {RECEIPT_VOCAB.PAID_IN_FULL_HTML}
+                    {RECEIPT_VOCAB.PAID_IN_FULL_INDICATOR}
                   </div>
                 ) : (
                   <div className="flex justify-between text-sm">

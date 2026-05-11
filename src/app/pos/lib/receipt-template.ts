@@ -805,7 +805,7 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     if (balanceCents === 0 && billingTotalCents > 0 && isPaidInFullStatus) {
       lines.push({
         type: 'text',
-        text: RECEIPT_VOCAB.PAID_IN_FULL_THERMAL,
+        text: RECEIPT_VOCAB.PAID_IN_FULL_INDICATOR,
         alignment: 'center',
       });
     } else {
@@ -1177,7 +1177,7 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
     if (htmlBalanceCents !== undefined) {
       const htmlIsPaidInFullStatus = tx.status !== 'voided' && tx.status !== 'refunded' && tx.status !== 'partial_refund';
       if (htmlBalanceCents === 0 && htmlBillingTotalCents > 0 && htmlIsPaidInFullStatus) {
-        html += `<tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">${RECEIPT_VOCAB.PAID_IN_FULL_HTML}</td></tr>`;
+        html += `<tr><td colspan="2" style="padding:6px 0;font-size:14px;font-weight:bold;text-align:center;color:#16a34a;">${RECEIPT_VOCAB.PAID_IN_FULL_INDICATOR}</td></tr>`;
       } else {
         html += row(RECEIPT_VOCAB.BALANCE_DUE, `$${(htmlBalanceCents / 100).toFixed(2)}`);
       }
@@ -1550,7 +1550,7 @@ const THERMAL_SUBSTITUTIONS: Record<string, number[]> = {
   '”': [0x22], // right double quote → "
   '…': [0x2E, 0x2E, 0x2E], // ellipsis → ...
   ' ': [0x20], // non-breaking space → regular space
-  '✓': [0x76], // check mark → 'v' (PAID_IN_FULL_THERMAL uses '[v]' already; defense against stray leaks)
+  '✓': [0xFB], // check mark → CP437 0xFB (RADICAL √). Phase 1A-followup-2: CP437 has no exact ✓; 0xFB is the industry-standard thermal "almost-check" glyph, visually a tick.
 };
 
 function textToBytes(text: string): number[] {

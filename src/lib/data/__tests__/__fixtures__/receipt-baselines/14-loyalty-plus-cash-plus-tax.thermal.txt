@@ -19,7 +19,7 @@ Cash · 5/6/26 10:32 AM                    $11.00
   Tendered                                $15.00
   Change                                   $4.00
 Total Paid:                               $11.00
-                Paid in Full [v]
+                 Paid in Full ✓
 ------------------------------------------------
            Loyalty redeemed: 100 pts
        Loyalty balance: 150 pts remaining

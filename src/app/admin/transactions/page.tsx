@@ -245,57 +245,59 @@ export default function AdminTransactionsPage() {
           .order(dbSortCol, { ascending })
           .range(offset, offset + PAGE_SIZE - 1);
 
-        // Status filter
-        if (status !== 'all') {
-          query = query.eq('status', status);
-        }
+        // Phase 1A-followup-2 LOCKED-2: when search is non-empty, ALL filters
+        // (status, payment method, digital platform sub-filter, date range)
+        // are bypassed so the user can find any transaction by receipt # or
+        // customer name/phone regardless of the active filter chrome. When
+        // search is empty, all filters apply normally.
+        const isSearchActive = searchQuery.trim().length > 0;
 
-        // Phase 1A.5 Part A: payment-method filter + optional digital-platform
-        // sub-filter. The transactions.payment_method column carries the
-        // aggregate ('cash'/'card'/'check'/'split'/'digital'). For digital
-        // sub-filter, we need to query payments.digital_platform — but a raw
-        // inner join would duplicate transaction rows when a transaction has
-        // multiple payments. Instead we resolve via a separate query for
-        // matching transaction_ids and constrain with .in() — guarantees
-        // dedupe and preserves the existing pagination shape.
-        if (paymentMethod !== 'all') {
-          query = query.eq('payment_method', paymentMethod);
-        }
-        // The .in('id', txIds) clause below is the server-side EXISTS-equivalent:
-        // it generates `WHERE id IN (uuid1, uuid2, ...)` which Postgres dedupes
-        // automatically (id is PK). The JS `new Set()` only defends against the
-        // unlikely case of duplicate transaction_id values in the payments
-        // lookup (which can't happen given the schema, but is cheap insurance).
-        if (paymentMethod === 'digital' && digitalPlatform !== 'all') {
-          const { data: matchingPaymentTxs } = await supabase
-            .from('payments')
-            .select('transaction_id')
-            .eq('digital_platform', digitalPlatform)
-            .limit(1000);
-          const txIds = Array.from(
-            new Set((matchingPaymentTxs ?? []).map((p: { transaction_id: string }) => p.transaction_id))
-          );
-          if (txIds.length === 0) {
-            // No transactions match the sub-filter — short-circuit to empty.
-            setTransactions([]);
-            setTotalCount(0);
-            setLoading(false);
-            return;
+        if (!isSearchActive) {
+          // Status filter
+          if (status !== 'all') {
+            query = query.eq('status', status);
           }
-          query = query.in('id', txIds);
-        }
 
-        // Date range filter
-        if (from) {
-          const [y, m, d] = from.split('-').map(Number);
-          query = query.gte('transaction_date', new Date(y, m - 1, d).toISOString());
-        }
-        if (to) {
-          const [y, m, d] = to.split('-').map(Number);
-          query = query.lte(
-            'transaction_date',
-            new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
-          );
+          // Phase 1A.5 Part A: payment-method filter + optional digital-platform
+          // sub-filter. The transactions.payment_method column carries the
+          // aggregate ('cash'/'card'/'check'/'split'/'digital'). For the digital
+          // sub-filter, the .in('id', txIds) clause is the server-side
+          // EXISTS-equivalent: Postgres dedupes by PK; the JS `new Set()` is
+          // defense against unlikely duplicate transaction_id values.
+          if (paymentMethod !== 'all') {
+            query = query.eq('payment_method', paymentMethod);
+          }
+          if (paymentMethod === 'digital' && digitalPlatform !== 'all') {
+            const { data: matchingPaymentTxs } = await supabase
+              .from('payments')
+              .select('transaction_id')
+              .eq('digital_platform', digitalPlatform)
+              .limit(1000);
+            const txIds = Array.from(
+              new Set((matchingPaymentTxs ?? []).map((p: { transaction_id: string }) => p.transaction_id))
+            );
+            if (txIds.length === 0) {
+              // No transactions match the sub-filter — short-circuit to empty.
+              setTransactions([]);
+              setTotalCount(0);
+              setLoading(false);
+              return;
+            }
+            query = query.in('id', txIds);
+          }
+
+          // Date range filter
+          if (from) {
+            const [y, m, d] = from.split('-').map(Number);
+            query = query.gte('transaction_date', new Date(y, m - 1, d).toISOString());
+          }
+          if (to) {
+            const [y, m, d] = to.split('-').map(Number);
+            query = query.lte(
+              'transaction_date',
+              new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
+            );
+          }
         }
 
         // Search filter

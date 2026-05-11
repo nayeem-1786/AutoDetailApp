@@ -35,8 +35,12 @@ export const RECEIPT_VOCAB = {
   PAYMENT_SECTION: 'Payment(s)',
   TOTAL_PAID: 'Total Paid:',
   BALANCE_DUE: 'Balance Due:',
-  PAID_IN_FULL_HTML: 'Paid in Full ✓',
-  PAID_IN_FULL_THERMAL: 'Paid in Full [v]',
+  // Phase 1A-followup-2: PAID_IN_FULL_HTML + PAID_IN_FULL_THERMAL consolidated
+  // into one constant. The literal '✓' character is universal across HTML /
+  // public / email surfaces (UTF-8 native) AND thermal — the receipt-template's
+  // THERMAL_SUBSTITUTIONS maps '✓' → CP437 byte 0xFB (√, the industry-standard
+  // thermal "almost-check" glyph; CP437 has no exact ✓).
+  PAID_IN_FULL_INDICATOR: 'Paid in Full ✓',
   CUSTOMER: 'Customer:',
   VEHICLE: 'Vehicle:',
   DATE: 'Date:',

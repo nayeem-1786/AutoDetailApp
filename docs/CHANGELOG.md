@@ -6,6 +6,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(receipts+admin): thermal ✓ rendering + admin search global scope (Phase 1A-followup-2)
+
+Two cosmetic/UX fixes after Phase 1A-followup verification.
+
+**Thermal ✓ indicator (CP437 byte 0xFB):** CP437 has no exact ✓ glyph. Investigation confirmed 0xFB is `√` (RADICAL) — industry-standard thermal "almost-check" convention; reads as a tick to customers. Changed `'✓' → [0xFB]` in `THERMAL_SUBSTITUTIONS`. Consolidated `PAID_IN_FULL_HTML` + `PAID_IN_FULL_THERMAL` into one `PAID_IN_FULL_INDICATOR: 'Paid in Full ✓'` constant. Literal `✓` is universal across HTML/email/public (UTF-8 native) and thermal (substituted to CP437 0xFB at print time). Pre-implementation checks confirmed zero stray `[v]` literals outside the deleted vocab field, and the HTML constant propagates to email automatically (single `generateReceiptHtml` shared by `/api/pos/receipts/email`, `print-copier`, `html`, and the admin printer-settings preview).
+
+**Admin search bypasses all filters:** when search text is non-empty in `/admin/transactions`, the entire filter chain (status, payment method, digital platform sub-filter, date range) is bypassed so receipt # or customer name/phone finds any matching transaction regardless of current filter state. Empty search restores normal filter behavior. Implementation: wrap all four filter blocks in `if (!isSearchActive)` in `fetchTransactions`. No new UI element (no "searching all dates" hint — clean and predictable). Phase 1A-followup-1's stale-closure fix preserved (filter values flow through fn args). Payments report page has no search input; LOCKED-2 doesn't apply.
+
+SMS receipt audit (re-confirmed): SMS is summary + link only. No `PAID_IN_FULL_*` reference anywhere. Independent of this change.
+
+Fixture regeneration: all 34 fixtures regenerated; paid-in-full scenarios (1, 2, 3, 5, 8, 14, 15, 16) now show `Paid in Full ✓` consistently across HTML and thermal (discrepancy between `[v]` thermal and `✓` HTML is gone). 664/664 tests pass.
+
+Full session notes: `docs/sessions/receipt-unification-phase-1a-followup-2.md`.
+
+---
+
 ## fix(receipts): admin filter, legacy Paid in Full, thermal middle-dot (Phase 1A-followup)
 
 Three production fixes surfaced after Phase 1A.5 dev verification, bundled atomically.

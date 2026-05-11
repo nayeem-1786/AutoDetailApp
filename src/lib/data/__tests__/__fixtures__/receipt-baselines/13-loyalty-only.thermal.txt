@@ -15,7 +15,7 @@ Loyalty Discount (200 pts)               -$20.00
 
 TOTAL                                     $20.00
 ------------------------------------------------
-                Paid in Full [v]
+                 Paid in Full ✓
 ------------------------------------------------
            Loyalty redeemed: 200 pts
        Loyalty balance: 50 pts remaining
