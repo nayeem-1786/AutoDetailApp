@@ -1637,6 +1637,7 @@ docs/sessions/mobile-fee-1-4-parser-improvements.md  # Phase Mobile-1.4: parseAd
 docs/sessions/mobile-fee-1-5-zip-only-format.md      # Phase Mobile-1.5: parser Format E (Street, City ZIP) + "CA" state default (two-pass regex)
 docs/sessions/mobile-fee-1-6-address-display-edit.md # Phase Mobile-1.6: mobile_address display + edit on POS jobs detail + admin appointment dialog
 docs/sessions/mobile-fee-1-7-display-composer.md     # Phase Mobile-1.7: shared composeLineItems utility — adds mobile fee as synthetic line on quote/appointment display surfaces
+docs/sessions/mobile-fee-1-8-composer-idempotency.md # Phase Mobile-1.8: composer idempotency (skip synthetic append when jobs.services JSONB already carries mobile entry) + POS quote detail wiring
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

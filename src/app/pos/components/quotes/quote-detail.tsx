@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import { useQuote } from '../../context/quote-context';
@@ -53,6 +54,13 @@ interface QuoteData {
   sent_at: string | null;
   updated_at: string;
   converted_appointment_id: string | null;
+  // Phase Mobile-1.8: surface mobile-fee metadata so composeLineItems
+  // can append the synthetic mobile-fee row to the services list. The
+  // POS quotes GET endpoint already returns these via `SELECT *`; the
+  // type widening matches the admin slide-over.
+  is_mobile?: boolean;
+  mobile_surcharge?: number | string | null;
+  mobile_zone_name_snapshot?: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -463,7 +471,10 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
             </div>
           </div>
 
-          {/* Items */}
+          {/* Items — Phase Mobile-1.8: route through composeLineItems so
+              the synthetic mobile-fee row is appended at end on mobile
+              quotes. This surface was missed in Phase 1.7 audit; pattern
+              mirrors src/app/admin/quotes/components/quote-slide-over.tsx. */}
           <div className="rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="border-b border-gray-200 dark:border-gray-700 px-4 py-3">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -471,25 +482,38 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
               </h3>
             </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800">
-              {quote.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.item_name}</p>
-                    {item.tier_name && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{item.tier_name}</p>
-                    )}
-                    {item.notes && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 italic">{item.notes}</p>
-                    )}
+              {composeLineItems(
+                {
+                  is_mobile: quote.is_mobile ?? false,
+                  mobile_surcharge: quote.mobile_surcharge ?? 0,
+                  mobile_zone_name_snapshot: quote.mobile_zone_name_snapshot ?? null,
+                },
+                quote.items || []
+              ).map((item, idx) => {
+                const sourceItem = item.is_mobile_fee ? null : quote.items[idx];
+                const rowKey = item.is_mobile_fee
+                  ? `mobile-fee-${idx}`
+                  : (sourceItem?.id ?? `item-${idx}`);
+                return (
+                  <div key={rowKey} className="flex items-center justify-between px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</p>
+                      {item.tier_name && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{item.tier_name}</p>
+                      )}
+                      {sourceItem?.notes && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 italic">{sourceItem.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">x{item.quantity}</span>
+                      <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                        {formatCurrency(item.total_price)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">x{item.quantity}</span>
-                    <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                      {formatCurrency(item.total_price)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Totals */}

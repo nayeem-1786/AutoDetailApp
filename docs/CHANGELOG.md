@@ -6,6 +6,50 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Mobile-1.8 — composer idempotency fix + POS quote detail wiring
+
+Two display bugs that surfaced during production testing of Phase Mobile-1.7 (`35d0fb3d`). One regression introduced by the composer rollout, one surface missed in the Phase 1.7 audit. No schema changes, no API contract changes — composer behavior change is strictly additive (skip-if-already-present) so every other Phase 1.7 call site is unaffected.
+
+**Bug A — Duplicate mobile fee on POS jobs detail.** Walk-in mobile job for Nayeem Khan (appointment `524d02a5...`). `jobs.services` JSONB has Express Exterior Wash ($75) + Mobile Service (0-3 miles) ($40). Job's appointment row also has `is_mobile=true`, `mobile_surcharge=$40`. POS jobs detail screen rendered THREE rows totaling $155: Express, Mobile, Mobile (duplicate). Expected: TWO rows totaling $115. Root cause: Phase Mobile-1 (`/api/pos/jobs/populate`) materializes a mobile entry into `jobs.services` JSONB at job creation, flagged `is_mobile_fee: true`. Phase Mobile-1.7's composer then unconditionally appended a synthetic mobile-fee row whenever `source.is_mobile === true` — so for `jobs.services` callers, the row got duplicated. The composer call site at `pos/jobs/components/job-detail.tsx` also stripped the `is_mobile_fee` flag via manual projection, making it invisible to any post-hoc detection.
+
+**Bug B — POS quote detail page missed in Phase 1.7 audit.** `src/app/pos/components/quotes/quote-detail.tsx` (the POS view of a quote, separate from the admin slide-over) renders quote-detail pages with services list. Phase 1.7 wired the admin slide-over but missed this POS-side counterpart, so mobile-fee rows were invisible on POS-rendered quote details despite Phase 1.7 reaching the public web / PDF / email / admin slide-over surfaces.
+
+**Idempotency strategy.** `composeLineItems` now detects pre-existing `is_mobile_fee === true` entries in the mapped output and skips the synthetic append when one is present. The mapper preserves `is_mobile_fee` (strict `=== true`, so `false`/`null`/`undefined` stay absent from the output and the contract remains stable). The check is strict equality so a `false`-flagged source row doesn't poison the detection. RawLineItem also accepts a flat `price` field as fallback for unit_price/total_price — `jobs.services` JSONB uses `price`, not the unit/total pair that `quote_items` and `appointment_services` use. Net effect: `jobs.services` callers (carrying the materialized flag) bypass the synthetic append; `quote_items` and `appointment_services` callers (no flag) still get the synthetic row.
+
+**POS quote detail wiring.** `quote-detail.tsx` imports `composeLineItems` and routes the services list through it (mirroring the admin slide-over pattern). `QuoteData` widened with `is_mobile`, `mobile_surcharge`, `mobile_zone_name_snapshot` — the POS GET endpoint already returned them via `SELECT *`, the type was just narrower than reality. Row keys follow the established pattern: `mobile-fee-${idx}` for synthetic rows, real quote-item id for real rows.
+
+**Type cascade.** `JobDetailData.services` widened to `JobServiceSnapshot[]` so the materialized `is_mobile_fee` flag is type-visible (previously narrowed to `{ id: string; name: string; price: number }` which hid the flag from compile-time view). The `FlagIssueFlowProps.job.services` shape was widened in tandem (allows `id: string | null` since the synthetic row has null id, plus optional `is_mobile_fee`); the `addedServiceIds` loop now skips null ids so the mobile-fee row doesn't pollute the duplicate-check set.
+
+**Tests.** 6 new cases in `compose-line-items.test.ts`:
+- `jobs.services` JSONB shape WITH `is_mobile_fee=true` — composer does NOT append duplicate.
+- `jobs.services` JSONB shape — `price` field aliased to unit_price + total_price.
+- `jobs.services` JSONB shape WITHOUT `is_mobile_fee` entry, `source.is_mobile=true` — composer appends synthetic (no regression).
+- `quote_items` shape (no `is_mobile_fee` anywhere), `source.is_mobile=true` — synthetic still appended (regression check).
+- Mixed: `is_mobile_fee=false` entry + `source.is_mobile=true` — composer still appends synthetic (strict `===true` check verified).
+- SD jobs-detail bug repro verbatim: Express + materialized Mobile entry renders TWO rows totaling $115, NOT three totaling $155.
+
+Vitest: 771/771 pass (17 prior composer tests retained + 6 new + others unchanged).
+
+**Phase 1.7 surfaces — verified no regression.** Admin quote slide-over, admin appointment dialog, quote PDF, public quote web, quote email, POS jobs detail — all render mobile fee correctly. The composer change is additive: callers without the flag continue to receive the synthetic row.
+
+**Out of scope (deferred to Phase Mobile-1.9):**
+- Mobile picker UI on the jobs detail card (toggle / zone / custom-amount edit post-creation).
+- Editing the materialized `jobs.services` mobile entry inline.
+- SD-006253 backfill (still pending — defer to after Phase 1.8/1.9).
+- Customer portal cards (still out of scope).
+
+**Files changed:**
+- `src/lib/utils/compose-line-items.ts`
+- `src/lib/utils/__tests__/compose-line-items.test.ts`
+- `src/app/pos/components/quotes/quote-detail.tsx`
+- `src/app/pos/jobs/components/job-detail.tsx`
+- `src/app/pos/jobs/components/flag-issue-flow.tsx`
+- `docs/sessions/mobile-fee-1-8-composer-idempotency.md` (new)
+- `docs/dev/FILE_TREE.md` (session doc only)
+- `docs/CHANGELOG.md`
+
+---
+
 ## fix(mobile): mobile fee on quote/appointment display surfaces via shared composer (Phase Mobile-1.7)
 
 Display-only fix on top of Phase Mobile-1.6 (`c1f18883`). No schema changes, no migration. One new utility (`src/lib/utils/compose-line-items.ts`), 17 unit tests, six renderer call-sites updated, one type extension. Fixes the production-reported Q-0051 case: `quotes.is_mobile=true`, `mobile_surcharge=$40`, `mobile_zone_name_snapshot="Mobile Service (0-3 miles)"` all stored correctly, but the quote PDF / public web page / email / admin slide-over all showed line items summing to $75 against a displayed subtotal of $115 — the $40 mobile fee was on the parent record but never rendered as a line item. Same shape on POS jobs detail services breakdown.

@@ -47,7 +47,14 @@ export interface MobileFeeSource {
  * Raw item shape accepted by `composeLineItems`. Different upstreams use
  * different field names (`item_name` for `quote_items`, `name` for the
  * `jobs.services` JSONB and ad-hoc projections), so both are accepted.
+ * Likewise the `jobs.services` JSONB uses a flat `price` field while
+ * `quote_items` / `appointment_services` use `unit_price` + `total_price`.
  * Price fields can also arrive as strings from DB numeric types.
+ *
+ * Phase Mobile-1.8: accepts `is_mobile_fee` so upstreams that have already
+ * materialized a mobile-fee row (notably `jobs.services` JSONB — populated
+ * by /api/pos/jobs/populate per Phase Mobile-1) can flag it. The composer
+ * uses this signal to skip appending a duplicate synthetic row.
  */
 export interface RawLineItem {
   item_name?: string | null;
@@ -55,7 +62,9 @@ export interface RawLineItem {
   quantity?: number | null;
   unit_price?: number | string | null;
   total_price?: number | string | null;
+  price?: number | string | null;
   tier_name?: string | null;
+  is_mobile_fee?: boolean | null;
 }
 
 const FALLBACK_MOBILE_FEE_NAME = 'Mobile Service Fee';
@@ -65,28 +74,42 @@ const FALLBACK_MOBILE_FEE_NAME = 'Mobile Service Fee';
  * raw children. Maps each raw item to the `DisplayLineItem` shape and
  * appends a synthetic mobile-fee row at the END iff
  * `source.is_mobile === true` AND the surcharge is a positive finite
- * number. The synthetic row's name comes from
- * `source.mobile_zone_name_snapshot` (falls back to
- * `"Mobile Service Fee"` when null/empty).
+ * number AND no raw item already carries `is_mobile_fee === true`. The
+ * synthetic row's name comes from `source.mobile_zone_name_snapshot`
+ * (falls back to `"Mobile Service Fee"` when null/empty).
+ *
+ * Phase Mobile-1.8 idempotency: `jobs.services` JSONB already contains
+ * the mobile entry (materialized by /api/pos/jobs/populate at job
+ * creation). Without the pre-existence check the composer would append
+ * a duplicate row, double-counting the surcharge on the POS jobs detail
+ * screen. The strict `=== true` check leaves `quote_items` /
+ * `appointment_services` callers (which never carry the flag) on the
+ * append path.
  */
 export function composeLineItems(
   source: MobileFeeSource,
   rawItems: RawLineItem[]
 ): DisplayLineItem[] {
   const items: DisplayLineItem[] = rawItems.map((raw) => {
-    const unit = toFiniteNumber(raw.unit_price);
-    const total = toFiniteNumber(raw.total_price);
-    return {
+    const unit = toFiniteNumber(raw.unit_price ?? raw.price);
+    const total = toFiniteNumber(raw.total_price ?? raw.price);
+    const item: DisplayLineItem = {
       name: raw.item_name ?? raw.name ?? '',
       quantity: toFiniteNumber(raw.quantity, 1),
       unit_price: unit,
       total_price: total,
       tier_name: raw.tier_name ?? null,
     };
+    if (raw.is_mobile_fee === true) {
+      item.is_mobile_fee = true;
+    }
+    return item;
   });
 
+  const alreadyHasMobileFee = items.some((item) => item.is_mobile_fee === true);
+
   const surcharge = toFiniteNumber(source.mobile_surcharge);
-  if (source.is_mobile === true && surcharge > 0) {
+  if (source.is_mobile === true && surcharge > 0 && !alreadyHasMobileFee) {
     const zone = (source.mobile_zone_name_snapshot ?? '').trim();
     items.push({
       name: zone || FALLBACK_MOBILE_FEE_NAME,

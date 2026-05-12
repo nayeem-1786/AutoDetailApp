@@ -240,4 +240,134 @@ describe('composeLineItems', () => {
     expect(result[2].name).toBe('Mobile Service (0-3 miles)');
     expect(result[2].is_mobile_fee).toBe(true);
   });
+
+  // Phase Mobile-1.8 — idempotency: composer must not duplicate the
+  // mobile-fee row when the upstream items already carry it (notably the
+  // `jobs.services` JSONB, materialized by /api/pos/jobs/populate).
+
+  it('jobs.services JSONB shape WITH is_mobile_fee=true: composer does NOT append duplicate', () => {
+    // Shape mirrors `JobServiceSnapshot` from jobs.services JSONB
+    // (id, name, price, optional is_mobile_fee). RawLineItem ignores
+    // the `id` field — only `name`, `price`, and `is_mobile_fee` matter
+    // to the composer.
+    const result = composeLineItems(
+      {
+        is_mobile: true,
+        mobile_surcharge: 40,
+        mobile_zone_name_snapshot: 'Mobile Service (0-3 miles)',
+      },
+      [
+        { name: 'Express Exterior Wash', price: 75 },
+        {
+          name: 'Mobile Service (0-3 miles)',
+          price: 40,
+          is_mobile_fee: true,
+        },
+      ]
+    );
+    expect(result).toHaveLength(2);
+    expect(result[0].name).toBe('Express Exterior Wash');
+    expect(result[0].is_mobile_fee).not.toBe(true);
+    expect(result[1].name).toBe('Mobile Service (0-3 miles)');
+    expect(result[1].is_mobile_fee).toBe(true);
+    const sum = result.reduce((acc, r) => acc + r.total_price, 0);
+    expect(sum).toBe(115);
+  });
+
+  it('jobs.services JSONB shape: `price` field aliased to unit_price + total_price', () => {
+    const result = composeLineItems(noMobile, [
+      { name: 'From price field', price: 60 },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].unit_price).toBe(60);
+    expect(result[0].total_price).toBe(60);
+  });
+
+  it('jobs.services JSONB shape WITHOUT is_mobile_fee entry, source.is_mobile=true: composer appends synthetic', () => {
+    const result = composeLineItems(
+      {
+        is_mobile: true,
+        mobile_surcharge: 40,
+        mobile_zone_name_snapshot: 'Mobile Service (0-3 miles)',
+      },
+      [{ name: 'Express Exterior Wash', price: 75 }]
+    );
+    expect(result).toHaveLength(2);
+    expect(result[1].is_mobile_fee).toBe(true);
+    expect(result[1].name).toBe('Mobile Service (0-3 miles)');
+    expect(result[1].total_price).toBe(40);
+  });
+
+  it('quote_items shape (no is_mobile_fee anywhere), source.is_mobile=true: synthetic still appended (regression)', () => {
+    const result = composeLineItems(
+      {
+        is_mobile: true,
+        mobile_surcharge: 40,
+        mobile_zone_name_snapshot: 'Zone A',
+      },
+      [
+        {
+          item_name: 'Quote Item',
+          quantity: 1,
+          unit_price: 50,
+          total_price: 50,
+          tier_name: null,
+        },
+      ]
+    );
+    expect(result).toHaveLength(2);
+    expect(result[1].is_mobile_fee).toBe(true);
+  });
+
+  it('mixed: input has is_mobile_fee=false entry + source.is_mobile=true: composer still appends synthetic', () => {
+    // false-flagged entries don't count as pre-existing mobile fees;
+    // the idempotency check is strict `=== true`.
+    const result = composeLineItems(
+      {
+        is_mobile: true,
+        mobile_surcharge: 40,
+        mobile_zone_name_snapshot: 'Zone A',
+      },
+      [
+        {
+          item_name: 'Regular Service',
+          quantity: 1,
+          unit_price: 50,
+          total_price: 50,
+          is_mobile_fee: false,
+        },
+      ]
+    );
+    expect(result).toHaveLength(2);
+    // The false-flagged source row is NOT marked as mobile fee in output.
+    expect(result[0].is_mobile_fee).not.toBe(true);
+    expect(result[1].is_mobile_fee).toBe(true);
+  });
+
+  it('SD-jobs-detail bug repro: Express + materialized mobile entry renders TWO rows totaling $115, not three totaling $155', () => {
+    // Production reproduction — appointment 524d02a5... (Nayeem Khan
+    // walk-in mobile). jobs.services JSONB has Express + Mobile entry;
+    // appointment.is_mobile=true with $40 surcharge. Before the fix,
+    // composer appended a duplicate row → 3 rows summing to $155.
+    const result = composeLineItems(
+      {
+        is_mobile: true,
+        mobile_surcharge: 40,
+        mobile_zone_name_snapshot: 'Mobile Service (0-3 miles)',
+      },
+      [
+        { name: 'Express Exterior Wash', price: 75 },
+        {
+          name: 'Mobile Service (0-3 miles)',
+          price: 40,
+          is_mobile_fee: true,
+        },
+      ]
+    );
+    expect(result).toHaveLength(2);
+    const sum = result.reduce((acc, r) => acc + r.total_price, 0);
+    expect(sum).toBe(115);
+    // Confirm only ONE row is flagged mobile fee.
+    expect(result.filter((r) => r.is_mobile_fee === true)).toHaveLength(1);
+  });
 });

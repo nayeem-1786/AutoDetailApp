@@ -44,7 +44,11 @@ interface FlagIssueFlowProps {
   jobId: string;
   job: {
     id: string;
-    services: { id: string; name: string; price: number }[];
+    // Phase Mobile-1.8: `services` widened to allow null `id` (the
+    // mobile-fee row materialized into `jobs.services` JSONB by
+    // /api/pos/jobs/populate carries `id: null` + `is_mobile_fee:
+    // true`). Real catalog rows still have string ids.
+    services: { id: string | null; name: string; price: number; is_mobile_fee?: boolean }[];
     estimated_pickup_at: string | null;
     customer: {
       id: string;
@@ -126,10 +130,13 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
   // Vehicle size class for pricing
   const vehicleSizeClass = (job.vehicle?.size_class ?? null) as VehicleSizeClass | null;
 
-  // Build set of service IDs already on this job
+  // Build set of service IDs already on this job. The synthetic
+  // mobile-fee row in `jobs.services` carries `id: null` — skip it.
   const addedServiceIds = useMemo(() => {
     const ids = new Set<string>();
-    job.services.forEach((s) => ids.add(s.id));
+    job.services.forEach((s) => {
+      if (s.id) ids.add(s.id);
+    });
     (job.addons ?? [])
       .filter((a) => a.status === 'approved' && a.service_id)
       .forEach((a) => ids.add(a.service_id!));

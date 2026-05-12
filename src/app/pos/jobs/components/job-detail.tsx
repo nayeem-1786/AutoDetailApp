@@ -69,7 +69,7 @@ interface JobDetailData {
   id: string;
   status: JobStatus;
   appointment_id: string | null;
-  services: { id: string; name: string; price: number }[];
+  services: JobServiceSnapshot[];
   estimated_pickup_at: string | null;
   created_at: string;
   work_started_at: string | null;
@@ -800,6 +800,13 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   // the synthetic mobile-fee row appears in the breakdown on mobile jobs.
   // Totals derive from the composed list so the sum matches the visible
   // rows (mobile surcharge included when applicable).
+  //
+  // Phase Mobile-1.8: pass raw `job.services` (the `jobs.services` JSONB)
+  // directly — the composer handles the `price`-vs-`unit_price` field
+  // aliasing and preserves the `is_mobile_fee=true` flag on the entry
+  // materialized by /api/pos/jobs/populate. That flag signals the
+  // composer to skip its synthetic-row append, preventing the duplicate
+  // mobile-fee line that surfaced before this fix.
   const displayServices = composeLineItems(
     {
       is_mobile: job.appointment?.is_mobile ?? false,
@@ -807,12 +814,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       mobile_zone_name_snapshot:
         job.appointment?.mobile_zone_name_snapshot ?? null,
     },
-    job.services.map((s) => ({
-      name: s.name,
-      quantity: 1,
-      unit_price: s.price,
-      total_price: s.price,
-    }))
+    job.services
   );
   const servicesTotal = displayServices.reduce((sum, s) => sum + s.total_price, 0);
   const allAddons = job.addons ?? [];
