@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency, formatDate, formatDateTime, formatPhone } from '@/lib/utils/format';
 import { QUOTE_STATUS_LABELS, QUOTE_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
+import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 interface QuoteSlideOverProps {
   quoteId: string | null;
@@ -120,27 +121,38 @@ export function QuoteSlideOver({ quoteId, open, onClose }: QuoteSlideOverProps) 
             <p className="text-sm text-gray-900">{vehicleLabel}</p>
           </div>
 
-          {/* Items section */}
-          {quote.items && quote.items.length > 0 && (
-            <div className="rounded-lg border border-gray-200 p-4">
-              <p className="text-xs font-semibold uppercase text-gray-500 mb-3">Services</p>
-              <div className="space-y-2">
-                {quote.items.map((item) => (
-                  <div key={item.id} className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-gray-900">{item.item_name}</p>
-                      {item.tier_name && (
-                        <p className="text-xs text-gray-500">({item.tier_name})</p>
-                      )}
-                    </div>
-                    <p className="text-sm font-medium tabular-nums text-gray-900">
-                      {formatCurrency(item.total_price)}
-                    </p>
-                  </div>
-                ))}
+          {/* Items section — Phase Mobile-1.7: render through
+              composeLineItems so the synthetic mobile-fee row is
+              appended at end when is_mobile=true. */}
+          {(() => {
+            const displayItems = composeLineItems(quote, quote.items || []);
+            if (displayItems.length === 0) return null;
+            return (
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-xs font-semibold uppercase text-gray-500 mb-3">Services</p>
+                <div className="space-y-2">
+                  {displayItems.map((item, idx) => {
+                    const rowKey = item.is_mobile_fee
+                      ? `mobile-fee-${idx}`
+                      : (quote.items?.[idx]?.id ?? `item-${idx}`);
+                    return (
+                      <div key={rowKey} className="flex items-start justify-between">
+                        <div>
+                          <p className="text-sm text-gray-900">{item.name}</p>
+                          {item.tier_name && (
+                            <p className="text-xs text-gray-500">({item.tier_name})</p>
+                          )}
+                        </div>
+                        <p className="text-sm font-medium tabular-nums text-gray-900">
+                          {formatCurrency(item.total_price)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Totals */}
           <div className="rounded-lg border border-gray-200 p-4">

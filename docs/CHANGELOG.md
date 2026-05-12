@@ -6,6 +6,64 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(mobile): mobile fee on quote/appointment display surfaces via shared composer (Phase Mobile-1.7)
+
+Display-only fix on top of Phase Mobile-1.6 (`c1f18883`). No schema changes, no migration. One new utility (`src/lib/utils/compose-line-items.ts`), 17 unit tests, six renderer call-sites updated, one type extension. Fixes the production-reported Q-0051 case: `quotes.is_mobile=true`, `mobile_surcharge=$40`, `mobile_zone_name_snapshot="Mobile Service (0-3 miles)"` all stored correctly, but the quote PDF / public web page / email / admin slide-over all showed line items summing to $75 against a displayed subtotal of $115 — the $40 mobile fee was on the parent record but never rendered as a line item. Same shape on POS jobs detail services breakdown.
+
+**Root cause.** Phase Mobile-1 (`7056becd`) materialized `mobile_fee` rows into `transaction_items` so all 4 receipt surfaces (POS Copier, thermal, SMS, email — verified working in this session's Verify 1) render a balanced item list. The parallel tables `quote_items` and `appointment_services` were NOT given the same treatment — `quote_items` has no `item_type` column to hold a synthetic-row tag. Renderers that looped these tables produced the line-item-sum-doesn't-equal-subtotal gap on every mobile quote/job since Phase Mobile-1 D2.
+
+**Strategy: composer, not migration (LOCKED-1).** New utility `composeLineItems(source, rawItems)` in `src/lib/utils/compose-line-items.ts`:
+- Maps raw rows to `DisplayLineItem` shape (accepts both `item_name` and `name` field shapes; numeric-coerces string DB values; defaults `quantity` to 1; passes through `tier_name`).
+- If `source.is_mobile === true` AND surcharge > 0 (numeric-coerced), appends a synthetic row at the END with `is_mobile_fee: true` (stable exported flag for future styling).
+- Synthetic row name = `mobile_zone_name_snapshot` (trimmed) with `"Mobile Service Fee"` fallback.
+
+Why composer over migration: `quote_items` has no `item_type` column — adding one is a schema change with backfill. The synthetic-display approach already worked in the admin appointment dialog (Phase Mobile-1 Option D2), so the pattern is established. No risk to historical records: existing quotes / appointments render correctly the moment the renderer calls the composer.
+
+**Renderer call-sites updated (per Phase 1.7 audit + Verify 1 + Verify 2):**
+
+*Tier 1 — customer-facing, must-fix:*
+- Quote PDF (`/api/quotes/[id]/pdf/route.ts`) — `QuoteData` interface and DB `SELECT` extended with the three mobile columns; `quote.items.forEach` replaced with composer iteration.
+- Quote public web page (`(public)/quote/[token]/page.tsx`) — composer iteration; sale-aware display fields (`pricing_type`, `standard_price`, `notes`) preserved by index-aligned lookup of the original `quote_items` row (composer preserves order, synthetic at end).
+- Quote email (`lib/quotes/send-service.ts`) — composer called once at the email-send call-site; the three private builders (`buildItemsTableHtml`, `buildEmailText`, `buildEmailHtml`) now take `DisplayLineItem[]` instead of `QuoteItem[]`.
+
+*Tier 2 — internal:*
+- Admin quote slide-over (`admin/quotes/components/quote-slide-over.tsx`) — composer iteration.
+- POS jobs detail services breakdown (`pos/jobs/components/job-detail.tsx`) — `JOB_SELECT` extended on the appointment join (`mobile_surcharge`, `mobile_zone_name_snapshot`); `JobDetailData` interface mirrors; `displayServices` derived once from `composeLineItems`; both render copies (editable / read-only) iterate the composed list; `servicesTotal` re-derived so the total matches the visible rows.
+- Admin appointment detail dialog (`appointment-detail-dialog.tsx`) — refactored the existing ad-hoc inline append (Phase Mobile-1 Option D2 pattern) to use `composeLineItems`. Visual output identical (same fallback name, same currency formatting) — consolidates the rendering logic with all other surfaces.
+
+**Type extension.** `src/lib/supabase/types.ts` — the hand-written `Quote` interface predated Phase Mobile-1 D2 and was missing `is_mobile`, `mobile_zone_id`, `mobile_address`, `mobile_surcharge`, `mobile_zone_name_snapshot`. Added in this phase. The DB columns themselves are unchanged — only the TypeScript surface was stale. `Appointment` already had them.
+
+**Verifications + scope guards:**
+- *Verify 1* — Print (Copier) receipt path (192.168.1.81:8080 → Edge headless HTML→PDF → 9100 raw TCP) reads `transaction_items(*)` via `generateReceiptHtml`, includes the materialized `mobile_fee` row. Regression-locked by baseline fixtures `18-online-mobile-deposit` and `19-walkin-mobile-custom` with byte-equality tests in `receipt-composer.test.ts`. No change needed.
+- *Verify 2* — No "Print Quote" / "Print Appointment" / "Print Job" routes to the OptiPlex copier exist. `/api/pos/receipts/print-copier` is invoked exclusively by transaction-receipt call sites. Quote PDF flows through email link / access-token URL; public quote page has no print button; customer-portal Print button uses `window.open` + `window.print()` on already-fetched receipt HTML. No new surfaces in scope.
+
+**Intentionally untouched (per audit):**
+- All 4 receipt surfaces (working — Phase Mobile-1).
+- POS quote builder ticket panel items list (cashier already sees mobile fee in adjacent `QuoteTotals` component).
+- Customer portal appointment cards (display only total, not line items).
+- Quote SMS, online booking confirmation, detailer SMS (no per-line enumeration on these surfaces).
+- Admin appointments day-view list (service names only, no per-line price column).
+
+**Testing.** 765 vitest tests pass (was 748 in Phase 1.6; +17 new composer tests). No new tests for the rendering call-sites — visual diffs are hard to byte-test cheaply, the composer is the only logic that needed exercising, and the admin appointment dialog refactor is a visual no-op (same output, consolidated source).
+
+**Files changed:**
+- `src/lib/utils/compose-line-items.ts` (new)
+- `src/lib/utils/__tests__/compose-line-items.test.ts` (new)
+- `src/lib/supabase/types.ts` — `Quote`: +5 mobile fields
+- `src/app/api/quotes/[id]/pdf/route.ts` (Tier 1)
+- `src/app/(public)/quote/[token]/page.tsx` (Tier 1)
+- `src/lib/quotes/send-service.ts` (Tier 1 — 3 email builders)
+- `src/app/admin/quotes/components/quote-slide-over.tsx` (Tier 2)
+- `src/app/api/pos/jobs/[id]/route.ts` (JOB_SELECT: +mobile_surcharge, +mobile_zone_name_snapshot)
+- `src/app/pos/jobs/components/job-detail.tsx` (Tier 2)
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (Tier 2 refactor)
+- `docs/sessions/mobile-fee-1-7-display-composer.md` (new)
+- `docs/dev/FILE_TREE.md` (composer + test + session doc entries)
+
+**Out of scope:** Schema migration to add `item_type` to `quote_items` or materialize `mobile_fee` rows in `appointment_services` / `jobs.services` (composer-only fix per LOCKED-1). Customer portal line-item display redesign. Visual styling differentiation for the synthetic row (use the `is_mobile_fee` flag on the type if needed later).
+
+---
+
 ## feat(mobile): display + edit mobile_address on POS / admin + canonical structured-field diff (Phase Mobile-1.6)
 
 UI + endpoint + diff-helper follow-up on top of Phase Mobile-1.5 (`74ed5cbd`). No schema changes, no migration. Two concerns landed in one commit: Concern 1 replaced the diff-detection helper that decides whether the save-to-customer prompt fires; Concern 2 surfaced `appointments.mobile_address` on the POS jobs detail page and the admin appointment dialog with an edit affordance on both surfaces.

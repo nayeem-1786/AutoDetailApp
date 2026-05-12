@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessInfo, type BusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
+import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 // --- Types -----------------------------------------------------------
 
@@ -25,6 +26,13 @@ interface QuoteData {
   valid_until: string | null;
   created_at: string;
   access_token: string | null;
+  // Phase Mobile-1.7: mobile-fee metadata pulled into PDF generation
+  // so composeLineItems can append a synthetic mobile-fee row when
+  // is_mobile=true. Without this, the line-item sum doesn't equal the
+  // displayed subtotal on mobile quotes.
+  is_mobile: boolean;
+  mobile_surcharge: number | string | null;
+  mobile_zone_name_snapshot: string | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -229,7 +237,13 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
     // Table rows
     doc.font('Helvetica').fontSize(9).fillColor(darkText);
 
-    quote.items.forEach((item, index) => {
+    // Phase Mobile-1.7: render through composeLineItems so the synthetic
+    // mobile-fee row (when is_mobile=true) is appended at end. Without
+    // this, the line-item sum doesn't match the displayed subtotal on
+    // mobile quotes (the surcharge lives on the parent record only).
+    const displayItems = composeLineItems(quote, quote.items);
+
+    displayItems.forEach((item, index) => {
       // Check if we need a new page
       if (y > doc.page.height - 150) {
         doc.addPage();
@@ -246,9 +260,9 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
 
       // Item name (truncate if too long)
       const itemName =
-        item.item_name.length > 35
-          ? item.item_name.substring(0, 35) + '...'
-          : item.item_name;
+        item.name.length > 35
+          ? item.name.substring(0, 35) + '...'
+          : item.name;
       doc.text(itemName, colItem + 8, y + 5);
 
       // Tier
@@ -413,6 +427,7 @@ export async function GET(
         `
         id, quote_number, status, subtotal, tax_amount, total_amount,
         valid_until, created_at, access_token,
+        is_mobile, mobile_surcharge, mobile_zone_name_snapshot,
         customer:customers(first_name, last_name, phone, email),
         vehicle:vehicles(year, make, model, color),
         items:quote_items(item_name, tier_name, quantity, unit_price, total_price)

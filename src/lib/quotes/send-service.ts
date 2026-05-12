@@ -8,6 +8,10 @@ import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import {
+  composeLineItems,
+  type DisplayLineItem,
+} from '@/lib/utils/compose-line-items';
 
 interface QuoteCustomer {
   id: string;
@@ -130,8 +134,14 @@ export async function sendQuote(
           ? cleanVehicleDescription({ year: vehicle.year, make: vehicle.make, model: vehicle.model }) || 'N/A'
           : 'N/A';
 
+        // Phase Mobile-1.7: compose display items once (appends synthetic
+        // mobile-fee row when is_mobile=true) and pass to all three email
+        // builders below. Without this, the items table sum doesn't equal
+        // the displayed subtotal on mobile quotes.
+        const displayItems = composeLineItems(quote, items);
+
         // Pre-render items table for template variable
-        const itemsTableHtml = buildItemsTableHtml(items);
+        const itemsTableHtml = buildItemsTableHtml(displayItems);
 
         // Template-first
         const templated = await sendTemplatedEmail(customer.email, 'quote_sent', {
@@ -162,8 +172,8 @@ export async function sendQuote(
           emailError = templated.error || 'Template email failed';
         } else {
           // Fallback: send via sendEmail() (uses noreply@ for consistency)
-          const textBody = buildEmailText(business, quote, customerName, vehicleStr, items, quoteLink, validityDays);
-          const htmlBody = buildEmailHtml(business, quote, customerName, vehicleStr, items, quoteLink, validityDays);
+          const textBody = buildEmailText(business, quote, customerName, vehicleStr, displayItems, quoteLink, validityDays);
+          const htmlBody = buildEmailHtml(business, quote, customerName, vehicleStr, displayItems, quoteLink, validityDays);
           const result = await sendEmail(
             customer.email,
             `Estimate ${quote.quote_number} from ${business.name}`,
@@ -289,15 +299,18 @@ export async function sendQuote(
 // Email template builders
 // ---------------------------------------------------------------------------
 
-/** Build a standalone items table HTML for the {items_table} template variable */
-function buildItemsTableHtml(items: QuoteItem[]): string {
+/** Build a standalone items table HTML for the {items_table} template variable.
+ *  Phase Mobile-1.7: receives the composed display list (raw quote_items
+ *  + synthetic mobile-fee row when applicable) so the items-table sum
+ *  matches the displayed subtotal on mobile quotes. */
+function buildItemsTableHtml(items: DisplayLineItem[]): string {
   if (items.length === 0) return '';
 
   const rows = items
     .map(
       (i) =>
         `<tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${i.item_name}${i.tier_name ? ` <span style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
+          <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${i.name}${i.tier_name ? ` <span style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
           <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${i.quantity}</td>
           <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(i.total_price)}</td>
         </tr>`
@@ -321,14 +334,14 @@ function buildEmailText(
   quote: { quote_number: string; created_at: string; subtotal: number; tax_amount: number; total_amount: number },
   customerName: string,
   vehicleStr: string,
-  items: QuoteItem[],
+  items: DisplayLineItem[],
   quoteLink: string,
   validityDays: number
 ): string {
   const itemLines = items
     .map(
       (i) =>
-        `  ${i.item_name}${i.tier_name ? ` (${i.tier_name})` : ''} x${i.quantity} — ${formatCurrency(i.total_price)}`
+        `  ${i.name}${i.tier_name ? ` (${i.tier_name})` : ''} x${i.quantity} — ${formatCurrency(i.total_price)}`
     )
     .join('\n');
 
@@ -360,7 +373,7 @@ function buildEmailHtml(
   quote: { quote_number: string; created_at: string; subtotal: number; tax_amount: number; total_amount: number },
   customerName: string,
   vehicleStr: string,
-  items: QuoteItem[],
+  items: DisplayLineItem[],
   quoteLink: string,
   validityDays: number
 ): string {
@@ -368,7 +381,7 @@ function buildEmailHtml(
     .map(
       (i) =>
         `<tr>
-                    <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${i.item_name}${i.tier_name ? ` <span class="email-text-muted" style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
+                    <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${i.name}${i.tier_name ? ` <span class="email-text-muted" style="color: #6b7280;">(${i.tier_name})</span>` : ''}</td>
                     <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #374151;">${i.quantity}</td>
                     <td class="email-td" style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(i.total_price)}</td>
                   </tr>`

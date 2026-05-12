@@ -45,6 +45,7 @@ import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
 import { CustomerLookup } from '../../components/customer-lookup';
 import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
+import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 type ZonePickerMode = 'intake' | 'completion' | 'progress' | null;
 
@@ -110,6 +111,10 @@ interface JobDetailData {
     /** Phase Mobile-1.6: surface mobile address for display + edit. */
     is_mobile?: boolean;
     mobile_address?: string | null;
+    /** Phase Mobile-1.7: surcharge + zone snapshot for the services
+     * breakdown composer (renders synthetic mobile-fee row). */
+    mobile_surcharge?: number | string | null;
+    mobile_zone_name_snapshot?: string | null;
   } | null;
   addons: AddonData[] | null;
 }
@@ -791,7 +796,25 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   }
 
   const statusConfig = STATUS_CONFIG[job.status];
-  const servicesTotal = job.services.reduce((sum, s) => sum + s.price, 0);
+  // Phase Mobile-1.7: services list rendered through composeLineItems so
+  // the synthetic mobile-fee row appears in the breakdown on mobile jobs.
+  // Totals derive from the composed list so the sum matches the visible
+  // rows (mobile surcharge included when applicable).
+  const displayServices = composeLineItems(
+    {
+      is_mobile: job.appointment?.is_mobile ?? false,
+      mobile_surcharge: job.appointment?.mobile_surcharge ?? 0,
+      mobile_zone_name_snapshot:
+        job.appointment?.mobile_zone_name_snapshot ?? null,
+    },
+    job.services.map((s) => ({
+      name: s.name,
+      quantity: 1,
+      unit_price: s.price,
+      total_price: s.price,
+    }))
+  );
+  const servicesTotal = displayServices.reduce((sum, s) => sum + s.total_price, 0);
   const allAddons = job.addons ?? [];
   const pendingAddons = allAddons.filter((a) => a.status === 'pending');
   const _approvedAddons = allAddons.filter((a) => a.status === 'approved');
@@ -946,12 +969,17 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
               <div className="mt-2 space-y-1">
-                {job.services.map((svc) => (
-                  <div key={svc.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-900 dark:text-gray-100">{svc.name}</span>
-                    <span className="text-gray-600 dark:text-gray-400">${svc.price.toFixed(2)}</span>
-                  </div>
-                ))}
+                {displayServices.map((svc, idx) => {
+                  const rowKey = svc.is_mobile_fee
+                    ? `mobile-fee-${idx}`
+                    : (job.services[idx]?.id ?? `svc-${idx}`);
+                  return (
+                    <div key={rowKey} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-900 dark:text-gray-100">{svc.name}</span>
+                      <span className="text-gray-600 dark:text-gray-400">${svc.total_price.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
                 <div className="mt-1 border-t border-gray-100 dark:border-gray-800 pt-1">
                   <div className="flex items-center justify-between text-sm font-medium">
                     <span className="text-gray-700 dark:text-gray-300">Total</span>
@@ -967,12 +995,17 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 <span>Services</span>
               </div>
               <div className="mt-2 space-y-1">
-                {job.services.map((svc) => (
-                  <div key={svc.id} className="flex items-center justify-between text-sm">
-                    <span className="text-gray-900 dark:text-gray-100">{svc.name}</span>
-                    <span className="text-gray-600 dark:text-gray-400">${svc.price.toFixed(2)}</span>
-                  </div>
-                ))}
+                {displayServices.map((svc, idx) => {
+                  const rowKey = svc.is_mobile_fee
+                    ? `mobile-fee-${idx}`
+                    : (job.services[idx]?.id ?? `svc-${idx}`);
+                  return (
+                    <div key={rowKey} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-900 dark:text-gray-100">{svc.name}</span>
+                      <span className="text-gray-600 dark:text-gray-400">${svc.total_price.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
                 <div className="mt-1 border-t border-gray-100 dark:border-gray-800 pt-1">
                   <div className="flex items-center justify-between text-sm font-medium">
                     <span className="text-gray-700 dark:text-gray-300">Total</span>

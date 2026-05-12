@@ -21,6 +21,7 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { appointmentUpdateSchema, type AppointmentUpdateInput } from '@/lib/utils/validation';
+import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { APPOINTMENT_STATUS_LABELS, ROLE_LABELS } from '@/lib/utils/constants';
 import { STATUS_TRANSITIONS } from '../types';
 import type { AppointmentWithRelations } from '../types';
@@ -235,27 +236,32 @@ export function AppointmentDetailDialog({
           )}
         </dl>
 
-        {/* Services list — mobile fee participates as a line item (Option D2)
-            so the list sum matches appointment.subtotal. */}
+        {/* Services list — Phase Mobile-1.7 refactor: render through the
+            shared composeLineItems so the synthetic mobile-fee row stays
+            consistent across surfaces. Visual output identical to the
+            prior ad-hoc append (Phase Mobile-1 Option D2). */}
         <div className="mt-3">
           <p className="text-xs font-medium text-gray-500">Services</p>
           <div className="mt-1 space-y-0.5">
-            {services.map((as) => (
-              <div key={as.id} className="flex justify-between text-sm">
-                <span className="text-gray-900">{as.service?.name || 'Service'}</span>
-                <span className="text-gray-500">{formatCurrency(as.price_at_booking)}</span>
-              </div>
-            ))}
-            {appointment.is_mobile && appointment.mobile_surcharge > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-900">
-                  {appointment.mobile_zone_name_snapshot || 'Mobile Service Fee'}
-                </span>
-                <span className="text-gray-500">
-                  {formatCurrency(appointment.mobile_surcharge)}
-                </span>
-              </div>
-            )}
+            {composeLineItems(
+              appointment,
+              services.map((as) => ({
+                name: as.service?.name || 'Service',
+                quantity: 1,
+                unit_price: as.price_at_booking,
+                total_price: as.price_at_booking,
+              }))
+            ).map((item, idx) => {
+              const rowKey = item.is_mobile_fee
+                ? `mobile-fee-${idx}`
+                : (services[idx]?.id ?? `svc-${idx}`);
+              return (
+                <div key={rowKey} className="flex justify-between text-sm">
+                  <span className="text-gray-900">{item.name}</span>
+                  <span className="text-gray-500">{formatCurrency(item.total_price)}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

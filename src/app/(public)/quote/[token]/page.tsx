@@ -6,6 +6,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { AcceptQuoteButton } from './accept-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -223,41 +224,54 @@ export default async function PublicQuotePage({ params }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {(quote.items || []).map((item) => {
+              {/* Phase Mobile-1.7: iterate composeLineItems output so the
+                  synthetic mobile-fee row is appended at end. Sale-aware
+                  display still reads from the original quote_items row via
+                  index alignment (composer preserves order; synthetic at
+                  end). The synthetic mobile row has is_mobile_fee=true
+                  and no sale fields. */}
+              {composeLineItems(quote, quote.items || []).map((displayItem, idx) => {
+                const original =
+                  displayItem.is_mobile_fee
+                    ? null
+                    : ((quote.items as QuoteItem[] | undefined)?.[idx] ?? null);
                 const isSaleItem =
-                  item.pricing_type === 'sale' &&
-                  item.standard_price != null &&
-                  item.standard_price > item.unit_price;
-                const savings = isSaleItem ? item.standard_price! - item.unit_price : 0;
+                  !!original &&
+                  original.pricing_type === 'sale' &&
+                  original.standard_price != null &&
+                  original.standard_price > original.unit_price;
+                const savings =
+                  isSaleItem && original ? original.standard_price! - original.unit_price : 0;
+                const rowKey = original?.id ?? `mobile-fee-${idx}`;
 
                 return (
-                  <tr key={item.id} className="border-b border-site-border">
+                  <tr key={rowKey} className="border-b border-site-border">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-site-text">{item.item_name}</div>
-                      {item.tier_name && (
-                        <div className="text-xs text-site-text-muted">{item.tier_name}</div>
+                      <div className="font-medium text-site-text">{displayItem.name}</div>
+                      {displayItem.tier_name && (
+                        <div className="text-xs text-site-text-muted">{displayItem.tier_name}</div>
                       )}
-                      {item.notes && (
-                        <div className="mt-1 text-xs text-site-text-dim">{item.notes}</div>
+                      {original?.notes && (
+                        <div className="mt-1 text-xs text-site-text-dim">{original.notes}</div>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-center text-site-text-muted">{item.quantity}</td>
+                    <td className="px-4 py-4 text-center text-site-text-muted">{displayItem.quantity}</td>
                     <td className="px-4 py-4 text-right">
-                      {isSaleItem ? (
+                      {isSaleItem && original ? (
                         <div>
                           <span className="text-site-text-muted line-through text-xs">
-                            {formatCurrency(item.standard_price!)}
+                            {formatCurrency(original.standard_price!)}
                           </span>
                           <div className="font-semibold text-green-500">
-                            {formatCurrency(item.unit_price)}
+                            {formatCurrency(displayItem.unit_price)}
                           </div>
                         </div>
                       ) : (
-                        <span className="text-site-text-muted">{formatCurrency(item.unit_price)}</span>
+                        <span className="text-site-text-muted">{formatCurrency(displayItem.unit_price)}</span>
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="font-medium text-site-text">{formatCurrency(item.total_price)}</div>
+                      <div className="font-medium text-site-text">{formatCurrency(displayItem.total_price)}</div>
                       {isSaleItem && (
                         <div className="text-xs text-green-500">
                           Save {formatCurrency(savings)}

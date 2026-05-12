@@ -1055,6 +1055,7 @@ src/lib/utils/email-consent.ts
 src/lib/utils/email.ts
 src/lib/utils/feature-flags.ts
 src/lib/utils/form.ts
+src/lib/utils/compose-line-items.ts                     # Phase Mobile-1.7: display-only line-item composer; appends synthetic mobile-fee row for quote/appointment renderers
 src/lib/utils/format-address.ts
 src/lib/utils/format-channel.ts
 src/lib/utils/format.ts
@@ -1091,6 +1092,7 @@ src/lib/utils/stripe-card-details.ts        # Phase 1A.5: extractCardDetailsFrom
 src/lib/utils/system-actors.ts
 src/lib/utils/vehicle-categories.ts
 src/lib/utils/vehicle-helpers.ts
+src/lib/utils/__tests__/compose-line-items.test.ts      # Phase Mobile-1.7: 17 cases — synthetic mobile-fee row, field normalization, Q-0051 regression
 src/lib/utils/__tests__/constants.test.ts
 src/lib/utils/__tests__/format-address.test.ts
 src/lib/utils/__tests__/refund-math.test.ts
@@ -1634,6 +1636,7 @@ docs/sessions/mobile-fee-1-3-prefill-state-recovery.md  # Phase Mobile-1.3: addr
 docs/sessions/mobile-fee-1-4-parser-improvements.md  # Phase Mobile-1.4: parseAddressString handles 4 common US address formats (anchored-from-end strategy)
 docs/sessions/mobile-fee-1-5-zip-only-format.md      # Phase Mobile-1.5: parser Format E (Street, City ZIP) + "CA" state default (two-pass regex)
 docs/sessions/mobile-fee-1-6-address-display-edit.md # Phase Mobile-1.6: mobile_address display + edit on POS jobs detail + admin appointment dialog
+docs/sessions/mobile-fee-1-7-display-composer.md     # Phase Mobile-1.7: shared composeLineItems utility — adds mobile fee as synthetic line on quote/appointment display surfaces
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

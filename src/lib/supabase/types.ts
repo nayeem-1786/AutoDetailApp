@@ -659,6 +659,15 @@ export interface Quote {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  // Phase Mobile-1 D2: mobile-service metadata mirrors `appointments`.
+  // Surfaced on the type so display renderers can call
+  // `composeLineItems(quote, ...)` (Phase Mobile-1.7) to append the
+  // synthetic mobile-fee row at display time.
+  is_mobile: boolean;
+  mobile_zone_id: string | null;
+  mobile_address: string | null;
+  mobile_surcharge: number;
+  mobile_zone_name_snapshot: string | null;
   // Joined relations
   customer?: Customer;
   vehicle?: Vehicle;
