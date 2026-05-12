@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { MapPin, Pencil, X } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogHeader,
@@ -56,6 +58,15 @@ export function AppointmentDetailDialog({
   canAddNotes = true,
 }: AppointmentDetailDialogProps) {
   const [saving, setSaving] = useState(false);
+  // Phase Mobile-1.6: editable mobile address. Mirrors the always-editable
+  // notes pattern in this same dialog — pencil swaps the read view for an
+  // inline input, save calls a dedicated endpoint, cancel reverts.
+  const [editingMobileAddress, setEditingMobileAddress] = useState(false);
+  const [mobileAddressValue, setMobileAddressValue] = useState('');
+  const [savingMobileAddress, setSavingMobileAddress] = useState(false);
+  // Local override so the dialog reflects the saved value without waiting
+  // for the parent to re-fetch the whole appointment list.
+  const [mobileAddressOverride, setMobileAddressOverride] = useState<string | null>(null);
 
   const {
     register,
@@ -77,8 +88,57 @@ export function AppointmentDetailDialog({
         job_notes: appointment.job_notes || '',
         internal_notes: appointment.internal_notes || '',
       });
+      // Reset Phase Mobile-1.6 inline edit state when a different
+      // appointment loads or the dialog reopens.
+      setEditingMobileAddress(false);
+      setMobileAddressOverride(null);
     }
   }, [appointment, open, reset]);
+
+  async function handleSaveMobileAddress() {
+    if (!appointment) return;
+    const trimmed = mobileAddressValue.trim();
+    if (!trimmed) {
+      toast.error('Address is required for mobile service');
+      return;
+    }
+    if (trimmed.length > 200) {
+      toast.error('Address is too long (max 200 characters)');
+      return;
+    }
+    // Optimistic update — apply locally immediately so the dialog reflects
+    // the new value while the request is in flight. On failure (network or
+    // server error), revert the override and re-open the editor with the
+    // attempted value so the cashier can retry.
+    const previousOverride = mobileAddressOverride;
+    setMobileAddressOverride(trimmed);
+    setEditingMobileAddress(false);
+    setSavingMobileAddress(true);
+    try {
+      const res = await fetch(
+        `/api/admin/appointments/${appointment.id}/mobile-address`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile_address: trimmed }),
+        }
+      );
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMobileAddressOverride(previousOverride);
+        setEditingMobileAddress(true);
+        toast.error(result.error || 'Failed to update mobile address');
+        return;
+      }
+      toast.success('Mobile address updated');
+    } catch {
+      setMobileAddressOverride(previousOverride);
+      setEditingMobileAddress(true);
+      toast.error('Failed to update mobile address');
+    } finally {
+      setSavingMobileAddress(false);
+    }
+  }
 
   if (!appointment) return null;
 
@@ -199,12 +259,86 @@ export function AppointmentDetailDialog({
           </div>
         </div>
 
-        {/* Mobile address — kept separate from the line item since it's
-            location metadata, not a price contributor. */}
-        {appointment.is_mobile && appointment.mobile_address && (
-          <div className="mt-2 text-sm">
-            <span className="text-xs font-medium text-gray-500">Mobile Service Address: </span>
-            <span className="text-gray-900">{appointment.mobile_address}</span>
+        {/* Mobile Service Address — Phase Mobile-1.6 made this editable.
+            Display + pencil → inline edit (mirrors the notes pattern in
+            this dialog). Same `appointments.add_notes` permission gates
+            the edit endpoint server-side. */}
+        {appointment.is_mobile && (
+          <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>Mobile Service Address</span>
+              </div>
+              {canAddNotes && !editingMobileAddress && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileAddressValue(
+                      mobileAddressOverride ?? appointment.mobile_address ?? ''
+                    );
+                    setEditingMobileAddress(true);
+                  }}
+                  aria-label="Edit mobile address"
+                  className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            {editingMobileAddress ? (
+              <div className="mt-2 space-y-2">
+                <div className="relative">
+                  <Input
+                    value={mobileAddressValue}
+                    onChange={(e) => setMobileAddressValue(e.target.value)}
+                    placeholder="123 Main St, Torrance, CA 90501"
+                    maxLength={200}
+                    autoFocus
+                    className="pr-8"
+                  />
+                  {mobileAddressValue && (
+                    <button
+                      type="button"
+                      onClick={() => setMobileAddressValue('')}
+                      aria-label="Clear address"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingMobileAddress(false)}
+                    disabled={savingMobileAddress}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveMobileAddress}
+                    disabled={
+                      savingMobileAddress || !mobileAddressValue.trim()
+                    }
+                  >
+                    {savingMobileAddress ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-gray-900">
+                {mobileAddressOverride ?? appointment.mobile_address ?? (
+                  <span className="italic text-gray-400">
+                    No address on file
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         )}
 

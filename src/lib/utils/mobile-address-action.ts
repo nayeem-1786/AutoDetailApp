@@ -16,7 +16,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   formatCustomerAddress,
-  normalizeAddressForCompare,
+  addressesDiffer,
   parseAddressString,
   type CustomerLike,
 } from './format-address';
@@ -90,10 +90,12 @@ export async function resolveMobileAddressAction(
     };
   }
 
-  // Diff detection: compare normalized strings.
-  const enteredNorm = normalizeAddressForCompare(entered);
-  const profileNorm = normalizeAddressForCompare(currentFormatted);
-  const diff = enteredNorm !== profileNorm;
+  // Phase Mobile-1.6 — diff detection via field-by-field structured
+  // comparison through `parseAddressString`, replacing the previous
+  // "concat-then-normalize" approach. Both sides go through the same
+  // canonical extraction, so cashier-typed `"2021 Lomita Blvd., Lomita
+  // CA 90717"` and a profile with those structured fields agree.
+  const diff = addressesDiffer(profile, entered);
 
   return {
     diff,

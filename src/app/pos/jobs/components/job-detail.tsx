@@ -27,6 +27,7 @@ import {
   FileText,
   Search,
   ShoppingCart,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { toast } from 'sonner';
@@ -106,6 +107,9 @@ interface JobDetailData {
     channel?: string;
     /** Server-computed remaining balance in integer cents. */
     amount_due_cents?: number;
+    /** Phase Mobile-1.6: surface mobile address for display + edit. */
+    is_mobile?: boolean;
+    mobile_address?: string | null;
   } | null;
   addons: AddonData[] | null;
 }
@@ -266,6 +270,10 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  // Phase Mobile-1.6: inline edit for mobile_address (mirrors the Notes pattern).
+  const [editingMobileAddress, setEditingMobileAddress] = useState(false);
+  const [mobileAddressValue, setMobileAddressValue] = useState('');
+  const [savingMobileAddress, setSavingMobileAddress] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
 
   async function handleCheckout() {
@@ -563,6 +571,87 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   async function handleSaveNotes() {
     const ok = await handlePatchJob({ intake_notes: notesValue.trim() || null });
     if (ok) setEditingNotes(false);
+  }
+
+  function handleStartEditMobileAddress() {
+    setMobileAddressValue(job?.appointment?.mobile_address || '');
+    setEditingMobileAddress(true);
+  }
+
+  async function handleSaveMobileAddress() {
+    const trimmed = mobileAddressValue.trim();
+    if (!trimmed) {
+      toast.error('Address is required for mobile service');
+      return;
+    }
+    if (trimmed.length > 200) {
+      toast.error('Address is too long (max 200 characters)');
+      return;
+    }
+    const appointmentId = job?.appointment?.id;
+    if (!appointmentId) {
+      toast.error('No appointment linked to this job');
+      return;
+    }
+    // Optimistic update — apply locally and close the modal immediately
+    // so the card reflects the new value while the request is in flight.
+    // On failure (network or server error), revert the address and
+    // re-open the modal with the attempted value so the cashier can retry.
+    const previousAddress = job?.appointment?.mobile_address ?? null;
+    setJob((prev) =>
+      prev && prev.appointment
+        ? {
+            ...prev,
+            appointment: { ...prev.appointment, mobile_address: trimmed },
+          }
+        : prev
+    );
+    setEditingMobileAddress(false);
+    setSavingMobileAddress(true);
+    try {
+      const res = await posFetch(
+        `/api/pos/appointments/${appointmentId}/mobile-address`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile_address: trimmed }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setJob((prev) =>
+          prev && prev.appointment
+            ? {
+                ...prev,
+                appointment: {
+                  ...prev.appointment,
+                  mobile_address: previousAddress,
+                },
+              }
+            : prev
+        );
+        setEditingMobileAddress(true);
+        toast.error(err.error || 'Failed to update mobile address');
+        return;
+      }
+      toast.success('Mobile address updated');
+    } catch {
+      setJob((prev) =>
+        prev && prev.appointment
+          ? {
+              ...prev,
+              appointment: {
+                ...prev.appointment,
+                mobile_address: previousAddress,
+              },
+            }
+          : prev
+      );
+      setEditingMobileAddress(true);
+      toast.error('Failed to update mobile address');
+    } finally {
+      setSavingMobileAddress(false);
+    }
   }
 
   // Determine if cancel button should be visible (permission-gated)
@@ -892,6 +981,47 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Mobile Service Address — Phase Mobile-1.6. Rendered only when
+              the linked appointment is mobile. Pencil opens the same modal
+              pattern used by Notes / Edit Services on this page. */}
+          {job.appointment?.is_mobile && (
+            isEditable ? (
+              <button
+                onClick={handleStartEditMobileAddress}
+                className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <MapPin className="h-4 w-4" />
+                    <span>Mobile Service Address</span>
+                  </div>
+                  <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                </div>
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {job.appointment.mobile_address || (
+                    <span className="italic text-gray-400 dark:text-gray-500">
+                      Tap to add address
+                    </span>
+                  )}
+                </p>
+              </button>
+            ) : (
+              <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <MapPin className="h-4 w-4" />
+                  <span>Mobile Service Address</span>
+                </div>
+                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {job.appointment.mobile_address || (
+                    <span className="italic text-gray-400 dark:text-gray-500">
+                      No address on file
+                    </span>
+                  )}
+                </p>
+              </div>
+            )
           )}
 
           {/* Timing */}
@@ -1603,6 +1733,72 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Mobile Service Address Modal — Phase Mobile-1.6.
+          Mirrors the Notes modal shape (same surface, same pattern). */}
+      {editingMobileAddress && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+          onClick={() => setEditingMobileAddress(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:rounded-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  Edit Mobile Service Address
+                </h3>
+                <button
+                  onClick={() => setEditingMobileAddress(false)}
+                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={mobileAddressValue}
+                  onChange={(e) => setMobileAddressValue(e.target.value)}
+                  placeholder="123 Main St, Torrance, CA 90501"
+                  maxLength={200}
+                  autoFocus
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 p-3 pr-8 text-base sm:text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+                {mobileAddressValue && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileAddressValue('')}
+                    aria-label="Clear address"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setEditingMobileAddress(false)}
+                  className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveMobileAddress}
+                  disabled={savingMobileAddress || !mobileAddressValue.trim()}
+                  className="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {savingMobileAddress ? 'Saving...' : 'Save'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

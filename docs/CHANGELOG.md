@@ -6,6 +6,64 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## feat(mobile): display + edit mobile_address on POS / admin + canonical structured-field diff (Phase Mobile-1.6)
+
+UI + endpoint + diff-helper follow-up on top of Phase Mobile-1.5 (`74ed5cbd`). No schema changes, no migration. Two concerns landed in one commit: Concern 1 replaced the diff-detection helper that decides whether the save-to-customer prompt fires; Concern 2 surfaced `appointments.mobile_address` on the POS jobs detail page and the admin appointment dialog with an edit affordance on both surfaces.
+
+**Concern 1 — `addressesDiffer` (canonical structured-field diff).** The pre-1.6 path in `mobile-address-action.ts:resolveMobileAddressAction` ran both sides through `normalizeAddressForCompare` (lowercase + strip punctuation + collapse whitespace on the full string). That was vulnerable to false positives when the customer's stored fields didn't round-trip through `formatCustomerAddress` to a character-identical string as what the cashier typed. New helper `addressesDiffer(customer: CustomerLike, enteredString: string): boolean` in `format-address.ts` runs the entered side through `parseAddressString` (canonical extraction: title-cased line/city, uppercased state, "CA" default on Format E from Phase 1.5) and compares field-by-field against the customer's structured columns with `trim + lowercase` normalization. Single call-site swap in `mobile-address-action.ts`; the 4 endpoints listed in the original spec (`/api/pos/jobs/route.ts`, `/api/pos/quotes/route.ts`, `/api/pos/quotes/[id]/route.ts`, `/api/book/route.ts`) all reach the diff path through this helper, so the swap covers all four endpoint surfaces in one change. `normalizeAddressForCompare` retained as a general loose-string utility; nothing else in the codebase used it for diff detection. Seven new tests in `format-address.test.ts`: bug case (Format B input vs structured profile) returns false; different street returns true; both-empty returns false; case-insensitive equivalence returns false; whitespace tolerance returns false; profile-has-line_2-but-entered-omits-it returns true; Format E entered vs CA-state profile returns false (Phase 1.5 default makes the comparison correctly agree).
+
+**The invisible-address bug (Concern 2).** `appointments.mobile_address` is stored at job creation (Phase Mobile-1) but was never surfaced on the post-creation work surfaces. The POS jobs detail page showed the mobile fee as a service line item but the address text was nowhere on the page — a detailer dispatched to a mobile job had no way to see where to drive. The admin appointment dialog displayed the address read-only — cashiers couldn't fix typos and customer phone corrections had no admin path.
+
+**Display + edit on both surfaces.** Conditional on `appointments.is_mobile=true`:
+- POS jobs detail page (`src/app/pos/jobs/components/job-detail.tsx`) — new section between Services and Timing with MapPin icon + pencil edit button. Pencil opens a modal matching the existing Notes pattern (text input, X clear, Cancel/Save). The card renders read-only on terminal-state jobs (completed/closed/cancelled), mirroring how Notes and other editable fields are gated client-side.
+- Admin appointment dialog (`src/app/admin/appointments/components/appointment-detail-dialog.tsx`) — the previously-read-only display block becomes an editable card. Pencil swaps the read view for an inline input + Cancel/Save buttons. Gated on `canAddNotes` to match the existing notes textarea on this same dialog.
+
+Both surfaces use **optimistic-with-revert** updates: Save applies the new value to local state immediately and closes the editor; on PATCH failure (network or non-OK), local state reverts and the editor re-opens with the typed text intact so the cashier/admin can retry without losing input. Error toast on failure, success toast on resolution.
+
+**Two dedicated endpoints (LOCKED-C).** Single-purpose, single-field updates with isolated permission gates and audit shape:
+
+```
+PATCH /api/pos/appointments/[id]/mobile-address
+  Auth:       authenticatePosRequest
+  Permission: pos.jobs.manage (mirrors cashier-edit-job pattern)
+  Body:       { mobile_address: string }, trimmed, ≤200, non-empty
+  Guards:     existence + is_mobile=true (defense in depth)
+  Audit:      action="update", details={field, before, after}, source="pos"
+
+PATCH /api/admin/appointments/[id]/mobile-address
+  Auth:       getEmployeeFromSession
+  Permission: appointments.add_notes (mirrors notes-edit gate)
+  Body:       same shape, same validation
+  Guards:     same
+  Audit:      same shape, source="admin"
+```
+
+Server only touches `appointments.mobile_address` and `updated_at`. The zone snapshot (`mobile_zone_id`, `mobile_surcharge`, `mobile_zone_name_snapshot`) stays locked at creation time per the Phase Mobile-1 design — only the address text can change post-creation. Neither endpoint gates on appointment status: admin can correct historical records on completed or cancelled appointments; POS is gated client-side (`isEditable` only when status isn't completed/closed/cancelled) as a UX choice — cashier-facing surfaces don't surface retroactive edits.
+
+**Permission-gate note.** The admin endpoint uses `appointments.add_notes` as a pragmatic match for the established notes-edit pattern on the same dialog (textarea fields wrapped in `FormField` directly above this new card). A broader permission-gating audit for customer-edit and appointment-edit endpoints remains on the deferred staff permissions audit queue (originally flagged in Phase Mobile-1.2).
+
+**No save-to-customer prompt on edit (LOCKED-D).** The Phase Mobile-1.1 save-to-customer flow is for *create-time* address capture; post-creation edits are explicit and don't re-prompt. Cashier can update customer profile separately if needed.
+
+**Data flow.** `GET /api/pos/jobs/[id]` extends the joined appointment select to include `is_mobile, mobile_address` so the data is available client-side without an extra round-trip. The admin dialog already had access to these fields via `AppointmentWithRelations`.
+
+**Out of scope:** Customer portal self-edit of mobile address (LOCKED-E — deferred). Map link / geocoding on display (Phase Mobile-2). Mobile zone change post-creation (refund/credit flow, separate). Multi-state config (Phase 1.5 LOCKED-3 — still deferred).
+
+**Testing.** 748 vitest tests pass (was 741 in Phase 1.5; +7 new `addressesDiffer` cases). No new endpoint unit tests for the two PATCH routes: the directly-analogous `/api/pos/customers/[id]/address` and `/api/customer/profile/address` PATCH endpoints have no unit tests in this codebase either, so this session matches that precedent. Validation is straightforward (trim, length ≤200, `is_mobile=true` guard); endpoint integration validated by dev UAT.
+
+**Files changed:**
+- `src/lib/utils/format-address.ts` — new `addressesDiffer` helper; comment on `normalizeAddressForCompare` pointing future readers at the canonical diff path
+- `src/lib/utils/mobile-address-action.ts` — diff call site swapped to `addressesDiffer`
+- `src/lib/utils/__tests__/format-address.test.ts` — +7 `addressesDiffer` tests
+- `src/app/api/pos/appointments/[id]/mobile-address/route.ts` (new)
+- `src/app/api/admin/appointments/[id]/mobile-address/route.ts` (new)
+- `src/app/api/pos/jobs/[id]/route.ts` — `JOB_SELECT` extended with `is_mobile, mobile_address`
+- `src/app/pos/jobs/components/job-detail.tsx` — display section + edit modal + optimistic-with-revert state
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — read-only block replaced with editable card + optimistic-with-revert handler
+- `docs/sessions/mobile-fee-1-6-address-display-edit.md` (new)
+- `docs/dev/FILE_TREE.md` (entries for new endpoints + session doc)
+
+---
+
 ## fix(mobile): address parser handles Street City ZIP format with CA state default (Phase Mobile-1.5)
 
 Parser-only follow-up on top of Phase Mobile-1.4 (`86b37793`). No schema, no API contract changes, no new endpoints. `parseAddressString` extended with a second regex pass plus a HIGH-confidence title-case pass. Test coverage extended to 45 cases in `format-address.test.ts`; full project at 741 vitest tests (up from 729).

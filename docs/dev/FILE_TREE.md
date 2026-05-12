@@ -20,6 +20,7 @@ src/app/api/account/services/route.ts
 
 ### Admin
 ```
+src/app/api/admin/appointments/[id]/mobile-address/route.ts  # PATCH mobile_address only (Phase Mobile-1.6)
 src/app/api/admin/appointments/stats/route.ts
 src/app/api/admin/audit-log/export/route.ts
 src/app/api/admin/audit-log/route.ts
@@ -377,6 +378,7 @@ src/app/api/migration/vehicles/route.ts
 
 ### POS
 ```
+src/app/api/pos/appointments/[id]/mobile-address/route.ts     # PATCH mobile_address only (Phase Mobile-1.6)
 src/app/api/pos/appointments/[id]/notify/route.ts
 src/app/api/pos/appointments/[id]/send-payment-link/route.ts   — Send pay-link via SMS/email/both (Pay-Link Session 3)
 src/app/api/pos/auth/logout/route.ts
@@ -1631,6 +1633,7 @@ docs/sessions/mobile-fee-1-2-uat-fixes.md         # Phase Mobile-1.2: UAT bug fi
 docs/sessions/mobile-fee-1-3-prefill-state-recovery.md  # Phase Mobile-1.3: addressWasAutoPrefilled flag recovery on mount (loaded-quote scenario)
 docs/sessions/mobile-fee-1-4-parser-improvements.md  # Phase Mobile-1.4: parseAddressString handles 4 common US address formats (anchored-from-end strategy)
 docs/sessions/mobile-fee-1-5-zip-only-format.md      # Phase Mobile-1.5: parser Format E (Street, City ZIP) + "CA" state default (two-pass regex)
+docs/sessions/mobile-fee-1-6-address-display-edit.md # Phase Mobile-1.6: mobile_address display + edit on POS jobs detail + admin appointment dialog
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

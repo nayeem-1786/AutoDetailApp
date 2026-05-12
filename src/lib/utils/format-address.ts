@@ -211,6 +211,13 @@ export function parseAddressString(input: string): ParsedAddress {
  * Two strings producing the same normalized form are treated as "same
  * address" for prompt-suppression purposes (e.g. "123 Main St." vs
  * "123 main st"). null/undefined normalize to "" so empty values match.
+ *
+ * NOTE (Phase Mobile-1.6): `addressesDiffer` below is now the canonical
+ * diff path for `mobile_address_action`. This helper is retained as a
+ * general utility (still used by tests and any caller that wants
+ * loose-string comparison) but is NOT what the save-to-customer prompt
+ * consults anymore. Prefer `addressesDiffer` for any new diff use case
+ * that has access to structured customer fields.
  */
 export function normalizeAddressForCompare(input: string | null | undefined): string {
   if (!input) return '';
@@ -219,4 +226,46 @@ export function normalizeAddressForCompare(input: string | null | undefined): st
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Compare a customer's structured profile address against a cashier-typed
+ * string. Returns true when the entered string represents a different
+ * address than the profile, false when they agree.
+ *
+ * Phase Mobile-1.6 — supersedes the previous "concat both sides then
+ * `normalizeAddressForCompare`" approach (kept as a utility above). That
+ * approach worked field-equivalent inputs through string-shape munging,
+ * which produced occasional false positives when the customer's stored
+ * line_2 wasn't separated cleanly from line_1 after concatenation, or
+ * when `formatCustomerAddress` produced a different punctuation than the
+ * cashier typed. Field-by-field comparison through `parseAddressString`
+ * uses the same canonical extraction on both sides and avoids those
+ * edge cases.
+ *
+ * `parseAddressString` already does:
+ *   - trim, title-case line_1/line_2/city on HIGH
+ *   - uppercase state (Phase 1.4)
+ *   - "CA" default on Format E (Phase 1.5 LOCKED-3)
+ *
+ * The `norm` here applies trim + lowercase on both sides so the
+ * comparison is case-insensitive even when one side is a raw stored
+ * field (e.g. customer.address_line_1 saved as "2021 Lomita Blvd."
+ * versus parsed entered "2021 Lomita Blvd." — both normalize identically).
+ * null/undefined normalize to "" so missing line_2 on both sides matches.
+ */
+export function addressesDiffer(
+  customer: CustomerLike,
+  enteredString: string
+): boolean {
+  const parsedEntered = parseAddressString(enteredString);
+  const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+  return (
+    norm(customer.address_line_1) !== norm(parsedEntered.address_line_1) ||
+    norm(customer.address_line_2) !== norm(parsedEntered.address_line_2) ||
+    norm(customer.city) !== norm(parsedEntered.city) ||
+    norm(customer.state) !== norm(parsedEntered.state) ||
+    norm(customer.zip) !== norm(parsedEntered.zip)
+  );
 }

@@ -10,7 +10,7 @@ const JOB_SELECT = `
   customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone, email),
   vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color, size_class),
   assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name),
-  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount, channel),
+  appointment:appointments!jobs_appointment_id_fkey(id, status, payment_status, total_amount, channel, is_mobile, mobile_address),
   addons:job_addons(*)
 `;
 

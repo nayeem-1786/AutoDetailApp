@@ -3,6 +3,7 @@ import {
   formatCustomerAddress,
   parseAddressString,
   normalizeAddressForCompare,
+  addressesDiffer,
 } from '@/lib/utils/format-address';
 
 describe('formatCustomerAddress', () => {
@@ -458,5 +459,111 @@ describe('normalizeAddressForCompare', () => {
   it('empty values equal each other', () => {
     expect(normalizeAddressForCompare(null)).toBe(normalizeAddressForCompare(''));
     expect(normalizeAddressForCompare('   ')).toBe(normalizeAddressForCompare(undefined));
+  });
+});
+
+describe('addressesDiffer (Phase Mobile-1.6 canonical diff)', () => {
+  // The bug case that motivated Concern 1: cashier-typed Format-B input
+  // against a profile holding the same structured fields. Pre-1.6 the
+  // concat-then-normalize path was the diff source of truth; the new
+  // path compares fields directly through parseAddressString.
+  it('returns false when entered Format B matches structured profile (the bug case)', () => {
+    const r = addressesDiffer(
+      {
+        address_line_1: '2021 Lomita Blvd.',
+        address_line_2: null,
+        city: 'Lomita',
+        state: 'CA',
+        zip: '90717',
+      },
+      '2021 Lomita Blvd., Lomita CA 90717'
+    );
+    expect(r).toBe(false);
+  });
+
+  it('returns true when entered street differs from profile street', () => {
+    const r = addressesDiffer(
+      {
+        address_line_1: '2021 Lomita Blvd.',
+        address_line_2: null,
+        city: 'Lomita',
+        state: 'CA',
+        zip: '90717',
+      },
+      '456 Oak Ave, Lomita 90717'
+    );
+    expect(r).toBe(true);
+  });
+
+  it('returns false when both sides are empty/null', () => {
+    const r = addressesDiffer(
+      {
+        address_line_1: null,
+        address_line_2: null,
+        city: null,
+        state: null,
+        zip: null,
+      },
+      ''
+    );
+    expect(r).toBe(false);
+  });
+
+  it('returns false on case-insensitive equivalence', () => {
+    const r = addressesDiffer(
+      {
+        address_line_1: '2021 Lomita Blvd.',
+        address_line_2: null,
+        city: 'Lomita',
+        state: 'CA',
+        zip: '90717',
+      },
+      '2021 LOMITA BLVD., LOMITA CA 90717'
+    );
+    expect(r).toBe(false);
+  });
+
+  it('returns false when entered string has surrounding whitespace', () => {
+    const r = addressesDiffer(
+      {
+        address_line_1: '2021 Lomita Blvd.',
+        address_line_2: null,
+        city: 'Lomita',
+        state: 'CA',
+        zip: '90717',
+      },
+      '  2021 Lomita Blvd., Lomita CA 90717  '
+    );
+    expect(r).toBe(false);
+  });
+
+  it('returns true when profile has line_2 but entered string omits it', () => {
+    const r = addressesDiffer(
+      {
+        address_line_1: '2021 Lomita Blvd.',
+        address_line_2: 'Apt 4',
+        city: 'Lomita',
+        state: 'CA',
+        zip: '90717',
+      },
+      '2021 Lomita Blvd., Lomita CA 90717'
+    );
+    expect(r).toBe(true);
+  });
+
+  it('returns false when Format E (no state code) entered matches a CA-state profile', () => {
+    // Phase 1.5: parseAddressString defaults state to "CA" when omitted.
+    // A CA-state profile must therefore agree with the parsed default.
+    const r = addressesDiffer(
+      {
+        address_line_1: '1234 Main St',
+        address_line_2: null,
+        city: 'Lomita',
+        state: 'CA',
+        zip: '90717',
+      },
+      '1234 Main St, Lomita 90717'
+    );
+    expect(r).toBe(false);
   });
 });
