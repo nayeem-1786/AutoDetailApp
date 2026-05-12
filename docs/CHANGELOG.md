@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(mobile): address parser handles Street City ZIP format with CA state default (Phase Mobile-1.5)
+
+Parser-only follow-up on top of Phase Mobile-1.4 (`86b37793`). No schema, no API contract changes, no new endpoints. `parseAddressString` extended with a second regex pass plus a HIGH-confidence title-case pass. Test coverage extended to 45 cases in `format-address.test.ts`; full project at 741 vitest tests (up from 729).
+
+**The state-less-shorthand bug.** Smart Details Auto Spa operates exclusively in California (LOCKED-3). Cashiers commonly type shorthand like `"1234 test st., lomita 90717"` — no state code at all. Phase 1.4 required a 2-letter state code immediately before the zip, so the Phase 1.1 silent-save flow classified these as LOW and left the structured columns null.
+
+**Format E (new) — `Line1, City ZIP`.** Now HIGH confidence with `state` defaulted to `"CA"`. Apt/line_2 supported via `Line1, Line2, ..., City ZIP`. ZIP+4 preserved.
+
+**LOCKED-2 (comma required).** Fully comma-less inputs stay LOW even when they end in a zip — `"1234 Main St Lomita 90717"` cannot be safely segmented (where does the street end and the city begin?) and remains LOW with the full input in `address_line_1`.
+
+**Two-pass strategy, with two non-fallthrough guards:**
+
+```
+Pass 1 (Phase 1.4): state code + zip suffix
+  match /\s*\b([A-Za-z]{2})\s*,?\s*(\d{5}(?:-\d{4})?)\s*$/
+  if matched → HIGH (if segments≥2) or LOW (return; no fallthrough)
+
+Pass 2 (Phase 1.5, new): zip-only suffix, state="CA" defaulted
+  match /\s*(\d{5}(?:-\d{4})?)\s*$/
+  if matched and segments≥2 → HIGH with state="CA"
+  else fall through to LOW
+
+Final: LOW with line_1=full input
+```
+
+Guard 1: Pass 1 success-but-LOW does NOT fall through to Pass 2. When the user typed a state code, we don't silently overwrite it with `"CA"` by default. Guard 2: Pass 2 partial extractions are discarded on segmentation failure — `lowFallback` returns the full input with every structured field null, including `state` (LOCKED-5).
+
+**Title-casing on HIGH.** `address_line_1`, `address_line_2`, and `city` are now title-cased on HIGH returns (`\b\w+` regex + per-word capitalize). Lowercase cashier input round-trips as properly-cased records. LOW returns preserve the user's typed string verbatim. Lossy edge cases accepted: `"McDonald"` → `"Mcdonald"`, `"Apt 4B"` → `"Apt 4b"` — a real dictionary-based capitalizer is out of scope.
+
+**`"CA"` is hardcoded** per LOCKED-3. No `business_settings` lookup, no env var. Multi-state expansion would require moving `'CA'` into a config lookup and threading it through `parseAddressString` (currently zero-dependency); deferred as out-of-scope per LOCKED-6.
+
+**Phase 1.4 regression — one test re-asserted.** The test `"LOW: full state name instead of 2-letter code"` (input `"23742 Falena Ave, Torrance, California 90501"`) changed outcome under Phase 1.5: Pass 2 now matches the zip suffix and segments the 3-comma remainder into 3 parts, so the full state name `"California"` lands in the city field with state defaulted to `"CA"`. This is an algorithm artifact — distinguishing `"Line2, City"` from `"City, FullStateName"` requires a state-name dictionary, which Phase 1.5 deliberately did not add (LOCKED-6). The new behavior is internally consistent — `"CA"` is California's abbreviation, so `formatCustomerAddress` round-trips the saved structure with only minor distortion. Cashier guidance: use the 2-letter state code, or omit state entirely; typing the full state name produces an oddly-shaped record. The test was renamed to `"Phase 1.5 artifact: full state name typed lands in city, state defaulted to CA"` with a header comment.
+
+**Files changed:**
+- `src/lib/utils/format-address.ts` — `parseAddressString` extended with Pass 2 and `titleCase` helper.
+- `src/lib/utils/__tests__/format-address.test.ts` — 33 → 45 `parseAddressString` cases (12 new: 4 Format E HIGH, 5 LOW, 3 title-case).
+- `docs/sessions/mobile-fee-1-5-zip-only-format.md` — session doc.
+- `docs/dev/FILE_TREE.md` — session doc entry.
+
+**Out of scope:** Multi-state business configuration (deferred per LOCKED-3). Greedy no-comma parsing (rejected per LOCKED-2). State-name dictionary to distinguish "Line2, City" from "City, FullStateName" (rare, cashier guidance handles it). Default `state = "CA"` on new-customer creation forms (cosmetic UI, separate issue). Migration of historical LOW-confidence records. Geocoding integration.
+
+---
+
 ## fix(mobile): address parser handles common single-comma format (Phase Mobile-1.4)
 
 Parser-only follow-up on top of Phase Mobile-1.3 (`9b8d7aca`). No schema, no API contract changes, no new endpoints. `parseAddressString` rewritten in `src/lib/utils/format-address.ts`; test coverage extended in `src/lib/utils/__tests__/format-address.test.ts` (12 → 17 `parseAddressString` cases, 33 tests total in the file).

@@ -188,13 +188,13 @@ describe('parseAddressString', () => {
     expect(r.zip).toBe('90501-1234');
   });
 
-  // Cross-format normalization + whitespace
-  it('normalizes lowercase state to uppercase (city case preserved)', () => {
+  // Cross-format normalization + whitespace + title-casing
+  it('normalizes lowercase state to uppercase and title-cases line/city', () => {
     const r = parseAddressString('23742 falena ave, torrance, ca 90501');
     expect(r.confidence).toBe('high');
     expect(r.state).toBe('CA');
-    expect(r.address_line_1).toBe('23742 falena ave');
-    expect(r.city).toBe('torrance');
+    expect(r.address_line_1).toBe('23742 Falena Ave');
+    expect(r.city).toBe('Torrance');
   });
 
   it('trims surrounding whitespace', () => {
@@ -245,12 +245,25 @@ describe('parseAddressString', () => {
     expect(r.zip).toBeNull();
   });
 
-  it('LOW: full state name instead of 2-letter code', () => {
-    const r = parseAddressString('23742 Falena Ave, Torrance, California 90501');
-    expect(r.confidence).toBe('low');
-    expect(r.address_line_1).toBe(
+  // Phase Mobile-1.4 expected this input to be LOW because no 2-letter
+  // state code is present. Phase Mobile-1.5 added Pass 2 (zip-only with
+  // "CA" defaulted), which now matches the zip suffix and segments the
+  // 3-comma remainder into line_1 / line_2 / city. The result: the full
+  // state name "California" lands in the city field. This is an algorithm
+  // artifact — distinguishing "Line2, City" from "City, FullStateName"
+  // requires a state-name dictionary, which Phase 1.5 deliberately did
+  // not add (LOCKED-6 stays narrow: no greedy parsing, no extra heuristics).
+  // Cashier guidance: use the 2-letter state code, or omit state entirely.
+  it('Phase 1.5 artifact: full state name typed lands in city, state defaulted to CA', () => {
+    const r = parseAddressString(
       '23742 Falena Ave, Torrance, California 90501'
     );
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('23742 Falena Ave');
+    expect(r.address_line_2).toBe('Torrance');
+    expect(r.city).toBe('California');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90501');
   });
 
   it('LOW: malformed zip (4 digits)', () => {
@@ -288,6 +301,132 @@ describe('parseAddressString', () => {
     const r = parseAddressString('Just some random text');
     expect(r.confidence).toBe('low');
     expect(r.address_line_1).toBe('Just some random text');
+  });
+
+  // Format E (Phase Mobile-1.5) — "Line1, City ZIP" (no state code), state
+  // defaulted to "CA". Common cashier shorthand for a single-state business.
+  it('Format E: "Street, City ZIP" defaults state to CA', () => {
+    const r = parseAddressString('1234 Main St, Lomita 90717');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('1234 Main St');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBe('Lomita');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90717');
+  });
+
+  it('Format E: title-cases lowercase line/city; state defaulted to CA', () => {
+    const r = parseAddressString('1234 test st., lomita 90717');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('1234 Test St.');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBe('Lomita');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90717');
+  });
+
+  it('Format E: with line_2', () => {
+    const r = parseAddressString('1234 Main St, Apt 4, Lomita 90717');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('1234 Main St');
+    expect(r.address_line_2).toBe('Apt 4');
+    expect(r.city).toBe('Lomita');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90717');
+  });
+
+  it('Format E: preserves ZIP+4', () => {
+    const r = parseAddressString('1234 Main St, Lomita 90717-1234');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('1234 Main St');
+    expect(r.city).toBe('Lomita');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90717-1234');
+  });
+
+  // LOCKED-2: comma between street and city REQUIRED. Fully comma-less
+  // inputs are LOW even when they end in a recognizable zip.
+  // LOCKED-5: LOW never defaults state — partial extractions discarded.
+  it('LOW: Format E shape without a comma — state stays null (not "CA")', () => {
+    const r = parseAddressString('1234 Main St Lomita 90717');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('1234 Main St Lomita 90717');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
+  });
+
+  it('LOW: lowercase no-comma Format E shape — state stays null', () => {
+    const r = parseAddressString('1234 test st. lomita 90717');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('1234 test st. lomita 90717');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
+  });
+
+  it('LOW: "City ZIP" alone (no comma, no street) — state stays null', () => {
+    const r = parseAddressString('Lomita 90717');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('Lomita 90717');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
+  });
+
+  it('LOW: bare ZIP — state stays null', () => {
+    const r = parseAddressString('90717');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('90717');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
+  });
+
+  // Title-casing — HIGH applies it to line_1/line_2/city; LOW preserves
+  // the user's typed string verbatim.
+  it('title-case: Format E lowercase input title-cases line_1 and city', () => {
+    const r = parseAddressString('2012 lomita blvd., lomita 90717');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('2012 Lomita Blvd.');
+    expect(r.city).toBe('Lomita');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90717');
+  });
+
+  it('title-case: Format A with line_2 title-cases all three fields', () => {
+    const r = parseAddressString('456 oak ave, apt 4b, santa monica, ca 90401');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('456 Oak Ave');
+    expect(r.address_line_2).toBe('Apt 4b');
+    expect(r.city).toBe('Santa Monica');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90401');
+  });
+
+  it('title-case: LOW input is preserved verbatim (no title-casing)', () => {
+    const r = parseAddressString('random unparseable text');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('random unparseable text');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
+  });
+
+  // Regression guard: Pass 1 matched a state code but couldn't segment.
+  // After Phase 1.5 the two-pass strategy must NOT fall through to Pass 2's
+  // CA default — the user typed a state, we don't overwrite it.
+  it('LOW (Pass 1 detected state code, segments<2): state stays null, not "CA"', () => {
+    const r = parseAddressString('Lomita CA 90717');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('Lomita CA 90717');
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
   });
 });
 
