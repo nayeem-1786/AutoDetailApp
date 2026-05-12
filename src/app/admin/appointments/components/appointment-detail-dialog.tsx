@@ -67,7 +67,14 @@ export function AppointmentDetailDialog({
   // address-only inline editor. State drives the shared modal + the
   // post-save mismatch banner. Local overrides so the dialog reflects
   // the saved snapshot without waiting on a list re-fetch.
-  const [editingMobile, setEditingMobile] = useState(false);
+  // Phase Mobile-1.9 — union state distinguishes the two entry points:
+  //  - 'edit'   — appointment already mobile, picker pre-fills snapshot
+  //  - 'enable' — appointment non-mobile, picker opens with toggle ON +
+  //               blank fields (creation-time parity follow-up)
+  //  - null     — modal closed.
+  const [editingMobile, setEditingMobile] = useState<'edit' | 'enable' | null>(
+    null
+  );
   const [mobileOverride, setMobileOverride] = useState<
     EditMobileModalSavedResult | null
   >(null);
@@ -99,7 +106,7 @@ export function AppointmentDetailDialog({
       });
       // Reset Phase Mobile-1.9 picker state when a different appointment
       // loads or the dialog reopens.
-      setEditingMobile(false);
+      setEditingMobile(null);
       setMobileOverride(null);
       setPaymentMismatch(null);
     }
@@ -261,7 +268,7 @@ export function AppointmentDetailDialog({
               {canAddNotes && (
                 <button
                   type="button"
-                  onClick={() => setEditingMobile(true)}
+                  onClick={() => setEditingMobile('edit')}
                   aria-label="Edit mobile service"
                   className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
                 >
@@ -301,6 +308,28 @@ export function AppointmentDetailDialog({
               </p>
             </div>
           </div>
+        )}
+
+        {/* Enable mobile service entry point — Phase Mobile-1.9. When
+            the appointment is non-mobile, expose an "Enable" button so
+            admin can convert it. Opens the same modal with is_mobile
+            defaulting to true. Gated on `appointments.add_notes`, same
+            as the edit pencil. */}
+        {!(mobileOverride?.is_mobile ?? appointment.is_mobile) && canAddNotes && (
+          <button
+            type="button"
+            onClick={() => setEditingMobile('enable')}
+            className="mt-3 flex w-full items-center justify-between rounded-md border border-dashed border-gray-300 bg-gray-50 p-2 text-left hover:bg-gray-100"
+          >
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <MapPin className="h-3.5 w-3.5" />
+              <span>Mobile Service</span>
+              <span className="ml-2 text-gray-400">
+                — not currently a mobile job
+              </span>
+            </div>
+            <span className="text-xs font-medium text-blue-600">+ Enable</span>
+          </button>
         )}
 
         {paymentMismatch && (
@@ -420,28 +449,42 @@ export function AppointmentDetailDialog({
       <DialogClose onClose={() => onOpenChange(false)} />
       {/* Phase Mobile-1.9 full mobile picker modal. Rendered alongside
           the dialog so its own backdrop sits above the dialog content.
-          Initial state reads from the optimistic `mobileOverride`
-          when present (covers the case where the modal is re-opened
-          after a prior save in the same session). */}
+          Initial state reads from the optimistic `mobileOverride` when
+          present (covers re-open after prior save in same session). In
+          'enable' mode the initial is forced to is_mobile=true with
+          blank fields so admin lands in the picker ready to fill in
+          zone + address (creation-time parity). */}
       {editingMobile && (
         <EditMobileModal
-          open={editingMobile}
+          open
           mode="admin"
           appointmentId={appointment.id}
-          initial={{
-            is_mobile: mobileOverride?.is_mobile ?? appointment.is_mobile,
-            mobile_zone_id:
-              mobileOverride?.mobile_zone_id ?? appointment.mobile_zone_id,
-            mobile_surcharge: Number(
-              mobileOverride?.mobile_surcharge ?? appointment.mobile_surcharge ?? 0
-            ),
-            mobile_address:
-              mobileOverride?.mobile_address ?? appointment.mobile_address,
-            mobile_zone_name_snapshot:
-              mobileOverride?.mobile_zone_name_snapshot ??
-              appointment.mobile_zone_name_snapshot,
-          }}
-          onClose={() => setEditingMobile(false)}
+          initial={
+            editingMobile === 'enable'
+              ? {
+                  is_mobile: true,
+                  mobile_zone_id: null,
+                  mobile_surcharge: 0,
+                  mobile_address: null,
+                  mobile_zone_name_snapshot: null,
+                }
+              : {
+                  is_mobile: mobileOverride?.is_mobile ?? appointment.is_mobile,
+                  mobile_zone_id:
+                    mobileOverride?.mobile_zone_id ?? appointment.mobile_zone_id,
+                  mobile_surcharge: Number(
+                    mobileOverride?.mobile_surcharge ??
+                      appointment.mobile_surcharge ??
+                      0
+                  ),
+                  mobile_address:
+                    mobileOverride?.mobile_address ?? appointment.mobile_address,
+                  mobile_zone_name_snapshot:
+                    mobileOverride?.mobile_zone_name_snapshot ??
+                    appointment.mobile_zone_name_snapshot,
+                }
+          }
+          onClose={() => setEditingMobile(null)}
           onSaved={handleMobileEditSaved}
         />
       )}

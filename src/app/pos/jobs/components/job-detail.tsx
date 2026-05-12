@@ -287,7 +287,16 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   // Phase Mobile-1.9 — full mobile picker edit replaces the Phase 1.6
   // address-only modal. State drives the shared `EditMobileModal` and
   // the post-save mismatch banner.
-  const [editingMobile, setEditingMobile] = useState(false);
+  //
+  // Union state distinguishes the two entry points:
+  //  - 'edit'   — appointment is already mobile, picker pre-fills snapshot
+  //  - 'enable' — appointment is non-mobile, picker opens with toggle ON
+  //               and blank fields so admin can convert the job to mobile
+  //               (creation-time parity per the Phase 1.9 follow-up).
+  //  - null     — modal closed.
+  const [editingMobile, setEditingMobile] = useState<'edit' | 'enable' | null>(
+    null
+  );
   const [paymentMismatch, setPaymentMismatch] = useState<{
     amount: number;
     newTotal: number;
@@ -992,11 +1001,14 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
           {/* Mobile Service — Phase Mobile-1.9 expanded card. Replaces the
               Phase 1.6 address-only card. Shows zone snapshot (frozen at
               save time per LOCKED-7.6) + surcharge + address. Pencil opens
-              the full picker modal. Card is hidden when is_mobile=false. */}
+              the full picker modal. When is_mobile=false on an editable
+              job, an "Enable mobile service" affordance is rendered in
+              its place so admin can convert the job to mobile (creation-
+              time parity). */}
           {job.appointment?.is_mobile && (
             isEditable ? (
               <button
-                onClick={() => setEditingMobile(true)}
+                onClick={() => setEditingMobile('edit')}
                 className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
               >
                 <div className="flex items-center justify-between">
@@ -1069,6 +1081,31 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                 </div>
               </div>
             )
+          )}
+
+          {/* Enable mobile service entry point — Phase Mobile-1.9. When the
+              appointment is non-mobile but editable, expose a button to
+              convert it. Opens the same EditMobileModal with is_mobile
+              defaulting to true so admin lands in the picker ready to set
+              zone + address. */}
+          {job.appointment && !job.appointment.is_mobile && isEditable && (
+            <button
+              onClick={() => setEditingMobile('enable')}
+              className="w-full rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <MapPin className="h-4 w-4" />
+                  <span>Mobile Service</span>
+                </div>
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  + Enable
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                This job is not currently a mobile job.
+              </p>
+            </button>
           )}
 
           {/* Phase Mobile-1.9 — payment mismatch banner rendered after the
@@ -1800,21 +1837,36 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
       {/* Edit Mobile Service Modal — Phase Mobile-1.9.
           Replaces the Phase 1.6 address-only modal. Shared component;
-          admin appointment dialog uses the same one with mode='admin'. */}
+          admin appointment dialog uses the same one with mode='admin'.
+          In 'enable' mode the initial state is forced to is_mobile=true
+          with blank fields so admin starts in the picker ready to set
+          zone + address (creation-time parity). */}
       {editingMobile && job?.appointment?.id && (
         <EditMobileModal
-          open={editingMobile}
+          open
           mode="pos"
           appointmentId={job.appointment.id}
-          initial={{
-            is_mobile: job.appointment.is_mobile ?? false,
-            mobile_zone_id: job.appointment.mobile_zone_id ?? null,
-            mobile_surcharge: Number(job.appointment.mobile_surcharge ?? 0),
-            mobile_address: job.appointment.mobile_address ?? null,
-            mobile_zone_name_snapshot:
-              job.appointment.mobile_zone_name_snapshot ?? null,
-          }}
-          onClose={() => setEditingMobile(false)}
+          initial={
+            editingMobile === 'enable'
+              ? {
+                  is_mobile: true,
+                  mobile_zone_id: null,
+                  mobile_surcharge: 0,
+                  mobile_address: null,
+                  mobile_zone_name_snapshot: null,
+                }
+              : {
+                  is_mobile: job.appointment.is_mobile ?? false,
+                  mobile_zone_id: job.appointment.mobile_zone_id ?? null,
+                  mobile_surcharge: Number(
+                    job.appointment.mobile_surcharge ?? 0
+                  ),
+                  mobile_address: job.appointment.mobile_address ?? null,
+                  mobile_zone_name_snapshot:
+                    job.appointment.mobile_zone_name_snapshot ?? null,
+                }
+          }
+          onClose={() => setEditingMobile(null)}
           onSaved={handleMobileEditSaved}
         />
       )}

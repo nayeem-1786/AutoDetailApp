@@ -118,6 +118,33 @@ PATCH /api/{pos|admin}/appointments/[id]/mobile-service
   8. Return { data: { ...saved snapshot }, mismatch_amount }
 ```
 
+## "Enable mobile service" affordance (LOCKED-7 follow-up)
+
+The original LOCKED-7 statement ("When is_mobile=false: card hidden
+entirely") left no UI path to convert a previously non-mobile job
+TO mobile. Phase 1.9 follow-up restores creation-time parity by
+exposing a discreet "+ Enable" entry point on both surfaces when
+the appointment is non-mobile:
+
+```
+┌────────────────────────────────────────────┐
+│ 📍 Mobile Service               + Enable  │
+│ This job is not currently a mobile job.   │
+└────────────────────────────────────────────┘
+```
+
+Implementation:
+
+- `editingMobile` state is a `'edit' | 'enable' | null` union on
+  both `job-detail.tsx` and `appointment-detail-dialog.tsx`.
+- Modal's `initial` prop is conditionally swapped: in `'enable'`
+  mode it's forced to `is_mobile: true` with blank zone/surcharge/
+  address so admin lands in the picker ready to fill in.
+- POS gated on `isEditable` (job not in terminal state); admin
+  gated on `appointments.add_notes` (same as the edit pencil).
+- Server endpoints unchanged — they already accept a transition
+  from `is_mobile=false` to `is_mobile=true` via the same flow.
+
 ## Modal component (`src/components/jobs/edit-mobile-modal.tsx`)
 
 Reuses the visual + behavior patterns from
