@@ -58,14 +58,21 @@ export function formatCustomerAddress(customer: CustomerLike): string | null {
   return `${street}, ${tailParts.join(', ')}`;
 }
 
-const STATE_RE = /^[A-Za-z]{2}$/;
-const ZIP_RE = /^\d{5}(-\d{4})?$/;
-
 /**
- * Parse a display address into structured fields. Confidence is 'high' iff
- * the trailing segment matches "<STATE> <ZIP>" exactly (2-letter state +
- * 5-digit or 5+4 zip). Anything else returns {line1: trimmed input, rest:
- * null, confidence: 'low'} so the save still preserves what the user typed.
+ * Parse a display address into structured fields. Confidence is 'high' when
+ * a 2-letter state + 5-digit (or 5+4) zip suffix is found AND the remainder
+ * before that suffix has at least 2 comma-separated segments (street + city,
+ * with optional line_2 in between). Anything else returns {line1: trimmed
+ * input, rest: null, confidence: 'low'} so the save still preserves what
+ * the user typed.
+ *
+ * Phase Mobile-1.4 (anchored-from-end strategy): handles four common US
+ * address formats as HIGH confidence:
+ *   A. "Line1, City, ST ZIP"           — canonical
+ *   B. "Line1, City ST ZIP"            — single comma (what users type)
+ *   C. "Line1, City, ST, ZIP"          — Square import legacy
+ *   D. "Line1, City, ST ZIP-NNNN"      — ZIP+4
+ * Apt/line_2 is supported via "Line1, Line2, City, ST ZIP".
  */
 export function parseAddressString(input: string): ParsedAddress {
   const trimmed = (input ?? '').trim();
@@ -89,35 +96,50 @@ export function parseAddressString(input: string): ParsedAddress {
     confidence: 'low',
   };
 
-  const segments = trimmed.split(',').map((s) => s.trim()).filter(Boolean);
-  if (segments.length < 3) return lowFallback;
+  // Anchor from end: locate state code + zip suffix. The optional comma
+  // between state and zip handles the legacy Square import pattern
+  // "City, ST, ZIP". ZIP+4 ("ZIP-NNNN") is preserved when present. The
+  // \b before the state code prevents matching a 2-letter substring
+  // embedded inside a longer word (e.g. "Lo" inside "Lomita").
+  const stateZipMatch = trimmed.match(
+    /\s*\b([A-Za-z]{2})\s*,?\s*(\d{5}(?:-\d{4})?)\s*$/
+  );
+  if (!stateZipMatch || stateZipMatch.index === undefined) {
+    return lowFallback;
+  }
 
-  // Trailing segment must be "<STATE> <ZIP>"
-  const tail = segments[segments.length - 1];
-  const tailParts = tail.split(/\s+/);
-  if (tailParts.length < 2) return lowFallback;
+  const state = stateZipMatch[1].toUpperCase();
+  const zip = stateZipMatch[2];
 
-  const zipRaw = tailParts[tailParts.length - 1];
-  const stateRaw = tailParts.slice(0, -1).join(' ');
-  if (!STATE_RE.test(stateRaw) || !ZIP_RE.test(zipRaw)) return lowFallback;
+  // Everything before the matched state+zip suffix. Comma-split into
+  // address segments; filter(Boolean) drops empty pieces caused by
+  // trailing commas ("..., CA 90501" or "..., CA, 90501").
+  const beforeStateZip = trimmed.slice(0, stateZipMatch.index).trim();
+  if (!beforeStateZip) {
+    // "CA 90501" alone — no street or city to attribute.
+    return lowFallback;
+  }
+  const segments = beforeStateZip
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (segments.length < 2) {
+    // Single segment can't disambiguate street from city without a comma
+    // ("123 Main St Torrance CA 90501" is too ambiguous to segment).
+    return lowFallback;
+  }
 
-  // City is the segment before the state/zip tail.
-  const city = segments[segments.length - 2];
-  if (!city) return lowFallback;
-
-  // Everything before the city is line1 [+ optional line2].
-  const lineSegments = segments.slice(0, segments.length - 2);
-  if (lineSegments.length === 0) return lowFallback;
-  const line1 = lineSegments[0];
-  const line2 =
-    lineSegments.length > 1 ? lineSegments.slice(1).join(', ') : null;
+  const city = segments[segments.length - 1];
+  const address_line_1 = segments[0];
+  const address_line_2 =
+    segments.length > 2 ? segments.slice(1, -1).join(', ') : null;
 
   return {
-    address_line_1: line1,
-    address_line_2: line2,
+    address_line_1,
+    address_line_2,
     city,
-    state: stateRaw.toUpperCase(),
-    zip: zipRaw,
+    state,
+    zip,
     confidence: 'high',
   };
 }

@@ -1629,6 +1629,7 @@ docs/sessions/receipt-unification-phase-1a-followup-2.md  # Phase 1A-followup-2:
 docs/sessions/mobile-fee-1-1-address-handling.md  # Phase Mobile-1.1: address pre-fill + X clear + mandatory validation + save-to-customer (Option X+)
 docs/sessions/mobile-fee-1-2-uat-fixes.md         # Phase Mobile-1.2: UAT bug fixes — error wording, customer-swap clear, zone vs Custom-path error distinction
 docs/sessions/mobile-fee-1-3-prefill-state-recovery.md  # Phase Mobile-1.3: addressWasAutoPrefilled flag recovery on mount (loaded-quote scenario)
+docs/sessions/mobile-fee-1-4-parser-improvements.md  # Phase Mobile-1.4: parseAddressString handles 4 common US address formats (anchored-from-end strategy)
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

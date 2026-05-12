@@ -116,7 +116,8 @@ describe('formatCustomerAddress', () => {
 });
 
 describe('parseAddressString', () => {
-  it('parses canonical "line1, city, ST zip" as high confidence', () => {
+  // Format A — canonical "Line1, City, ST ZIP"
+  it('Format A: parses canonical "line1, city, ST zip" as high confidence', () => {
     const r = parseAddressString('23742 Falena Ave, Torrance, CA 90501');
     expect(r.confidence).toBe('high');
     expect(r.address_line_1).toBe('23742 Falena Ave');
@@ -126,7 +127,7 @@ describe('parseAddressString', () => {
     expect(r.zip).toBe('90501');
   });
 
-  it('parses with line2 — "line1, line2, city, ST zip" as high', () => {
+  it('Format A: parses with line2 — "line1, line2, city, ST zip"', () => {
     const r = parseAddressString('23742 Falena Ave, Apt 4, Torrance, CA 90501');
     expect(r.confidence).toBe('high');
     expect(r.address_line_1).toBe('23742 Falena Ave');
@@ -136,13 +137,59 @@ describe('parseAddressString', () => {
     expect(r.zip).toBe('90501');
   });
 
-  it('preserves zip+4', () => {
+  // Format B — single-comma "Line1, City ST ZIP" (the format users type)
+  it('Format B: single comma "2021 Lomita Blvd., Lomita CA 90717"', () => {
+    const r = parseAddressString('2021 Lomita Blvd., Lomita CA 90717');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('2021 Lomita Blvd.');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBe('Lomita');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90717');
+  });
+
+  it('Format B: single comma "1785 W. 220th St, Torrance CA 90501"', () => {
+    const r = parseAddressString('1785 W. 220th St, Torrance CA 90501');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('1785 W. 220th St');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBe('Torrance');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90501');
+  });
+
+  it('Format B: short street/city names "12 A St, B City CA 90501"', () => {
+    const r = parseAddressString('12 A St, B City CA 90501');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('12 A St');
+    expect(r.city).toBe('B City');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90501');
+  });
+
+  // Format C — Square import legacy "Line1, City, ST, ZIP"
+  it('Format C: extra comma between state and zip', () => {
+    const r = parseAddressString('23742 Falena Ave, Torrance, CA, 90501');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('23742 Falena Ave');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBe('Torrance');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90501');
+  });
+
+  // Format D — ZIP+4
+  it('Format D: preserves zip+4', () => {
     const r = parseAddressString('23742 Falena Ave, Torrance, CA 90501-1234');
     expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('23742 Falena Ave');
+    expect(r.city).toBe('Torrance');
+    expect(r.state).toBe('CA');
     expect(r.zip).toBe('90501-1234');
   });
 
-  it('normalizes lowercase state to uppercase', () => {
+  // Cross-format normalization + whitespace
+  it('normalizes lowercase state to uppercase (city case preserved)', () => {
     const r = parseAddressString('23742 falena ave, torrance, ca 90501');
     expect(r.confidence).toBe('high');
     expect(r.state).toBe('CA');
@@ -150,38 +197,85 @@ describe('parseAddressString', () => {
     expect(r.city).toBe('torrance');
   });
 
-  it('falls back to low confidence — no commas', () => {
-    const r = parseAddressString('23742 Falena Ave Torrance California 90501');
+  it('trims surrounding whitespace', () => {
+    const r = parseAddressString('  23742 Falena Ave, Torrance, CA 90501  ');
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('23742 Falena Ave');
+  });
+
+  it('tolerates extra interior whitespace and stray spaces around commas', () => {
+    const r = parseAddressString(
+      '  123 Main St ,  Torrance ,  CA   90501  '
+    );
+    expect(r.confidence).toBe('high');
+    expect(r.address_line_1).toBe('123 Main St');
+    expect(r.city).toBe('Torrance');
+    expect(r.state).toBe('CA');
+    expect(r.zip).toBe('90501');
+  });
+
+  // LOW-confidence fallbacks (must always leave non-line_1 fields null)
+  it('LOW: no commas anywhere — too ambiguous to delimit street from city', () => {
+    const r = parseAddressString('123 Main St Torrance CA 90501');
     expect(r.confidence).toBe('low');
-    expect(r.address_line_1).toBe('23742 Falena Ave Torrance California 90501');
+    expect(r.address_line_1).toBe('123 Main St Torrance CA 90501');
     expect(r.address_line_2).toBeNull();
     expect(r.city).toBeNull();
     expect(r.state).toBeNull();
     expect(r.zip).toBeNull();
   });
 
-  it('falls back to low confidence — just street', () => {
+  it('LOW: just street, no city/state/zip', () => {
     const r = parseAddressString('23742 Falena Ave');
     expect(r.confidence).toBe('low');
     expect(r.address_line_1).toBe('23742 Falena Ave');
+    expect(r.address_line_2).toBeNull();
     expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
   });
 
-  it('falls back to low confidence — full state name instead of 2-letter', () => {
+  it('LOW: state+zip but no street/city ("CA 90501" alone)', () => {
+    const r = parseAddressString('CA 90501');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('CA 90501');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
+  });
+
+  it('LOW: full state name instead of 2-letter code', () => {
     const r = parseAddressString('23742 Falena Ave, Torrance, California 90501');
     expect(r.confidence).toBe('low');
-    expect(r.address_line_1).toBe('23742 Falena Ave, Torrance, California 90501');
+    expect(r.address_line_1).toBe(
+      '23742 Falena Ave, Torrance, California 90501'
+    );
   });
 
-  it('falls back to low confidence — bad zip', () => {
+  it('LOW: malformed zip (4 digits)', () => {
     const r = parseAddressString('23742 Falena Ave, Torrance, CA 9050');
     expect(r.confidence).toBe('low');
+  });
+
+  it('LOW: text with trailing digits but no state code', () => {
+    const r = parseAddressString('Random text 90501');
+    expect(r.confidence).toBe('low');
+    expect(r.address_line_1).toBe('Random text 90501');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
   });
 
   it('empty string → low with empty line1', () => {
     const r = parseAddressString('');
     expect(r.confidence).toBe('low');
     expect(r.address_line_1).toBe('');
+    expect(r.address_line_2).toBeNull();
+    expect(r.city).toBeNull();
+    expect(r.state).toBeNull();
+    expect(r.zip).toBeNull();
   });
 
   it('whitespace-only string → low with empty line1', () => {
@@ -194,12 +288,6 @@ describe('parseAddressString', () => {
     const r = parseAddressString('Just some random text');
     expect(r.confidence).toBe('low');
     expect(r.address_line_1).toBe('Just some random text');
-  });
-
-  it('trims surrounding whitespace', () => {
-    const r = parseAddressString('  23742 Falena Ave, Torrance, CA 90501  ');
-    expect(r.confidence).toBe('high');
-    expect(r.address_line_1).toBe('23742 Falena Ave');
   });
 });
 

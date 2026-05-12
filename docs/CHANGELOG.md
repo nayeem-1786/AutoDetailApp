@@ -6,6 +6,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## fix(mobile): address parser handles common single-comma format (Phase Mobile-1.4)
+
+Parser-only follow-up on top of Phase Mobile-1.3 (`9b8d7aca`). No schema, no API contract changes, no new endpoints. `parseAddressString` rewritten in `src/lib/utils/format-address.ts`; test coverage extended in `src/lib/utils/__tests__/format-address.test.ts` (12 → 17 `parseAddressString` cases, 33 tests total in the file).
+
+**The wedged-format bug.** Dev UAT after Phase 1.3 surfaced a parser problem unrelated to the auto-prefill state machine. A cashier typed `"2021 Lomita Blvd., Lomita CA 90717"` as a mobile-service address. The Phase 1.1 silent-save flow routed this through `parseAddressString`, which classified it as LOW — falling back to `address_line_1 = <whole string>` with every other structured column null. Root cause: the old parser split on commas and required `segments.length >= 3` (street, city, "ST ZIP"). The user's input has only one comma — real cashiers commonly omit the comma between city and state — so it never reached HIGH confidence.
+
+**Formats now supported as HIGH.** `parseAddressString` now recognizes four common US address shapes:
+
+| Format | Example | Phase 1.1–1.3 | Phase 1.4 |
+|---|---|---|---|
+| A — `Line1, City, ST ZIP` | `123 Main St, Torrance, CA 90501` | HIGH | HIGH |
+| B — `Line1, City ST ZIP` | `2021 Lomita Blvd., Lomita CA 90717` | LOW | **HIGH** |
+| C — `Line1, City, ST, ZIP` | `23742 Falena Ave, Torrance, CA, 90501` | LOW | **HIGH** |
+| D — `Line1, City, ST ZIP-NNNN` | `123 Main St, Torrance, CA 90501-1234` | HIGH | HIGH |
+
+Format C is the canonical legacy shape from the Square CSV import. Apartment / line_2 is supported via `Line1, Line2, City, ST ZIP`.
+
+**Strategy: anchored-from-end.** The Phase 1.1 strategy was "split by comma, then check trailing segment shape" — conflating *where the state/zip suffix ends* with *how many comma-separated segments there are*. Phase 1.4 reverses the order. The parser first locates the state-code + zip suffix anchored at end:
+
+```ts
+/\s*\b([A-Za-z]{2})\s*,?\s*(\d{5}(?:-\d{4})?)\s*$/
+```
+
+The `\s*,?\s*` between state and zip is a single token that covers `CA 90501`, `CA, 90501`, and `CA,90501`. The `\b` before the state code prevents matching a 2-letter substring buried inside a longer word (e.g. `Lo` inside `Lomita`). Once the suffix is located, the parser slices it off and splits the remainder on commas. `filter(Boolean)` drops empty pieces caused by trailing commas, so no separate "strip trailing comma" branch is needed.
+
+**HIGH requires both:** a state+zip suffix AND at least 2 comma-separated segments before it. The `segments.length < 2` branch (no comma to disambiguate street from city) and the `beforeStateZip === ''` branch (state+zip alone, e.g. `"CA 90501"`) both fall to LOW.
+
+**LOW-confidence behavior — unchanged.** Per LOCKED-2, LOW returns the trimmed input as `address_line_1` with every other column hard-coded to `null`. Any partial state/zip extraction performed by the regex is discarded — we never surface a half-parsed result that would mislead callers into thinking the structured columns are reliable.
+
+**Test coverage.** 729 vitest tests pass. New HIGH coverage: Format B (3 cases including short street/city names), Format C (Square legacy), aggressive whitespace tolerance. New LOW coverage: `"123 Main St Torrance CA 90501"` (no commas), `"CA 90501"` alone, `"Random text 90501"` (trailing digits without state code). All Phase 1.1 cases preserved.
+
+**Files changed:**
+- `src/lib/utils/format-address.ts` — `parseAddressString` rewritten; removed now-unused `STATE_RE` / `ZIP_RE` constants.
+- `src/lib/utils/__tests__/format-address.test.ts` — test set expanded with format and edge-case coverage.
+- `docs/sessions/mobile-fee-1-4-parser-improvements.md` — session doc.
+- `docs/dev/FILE_TREE.md` — session doc entry.
+
+**Out of scope:** Default `state = "CA"` in new-customer creation forms (cosmetic UI default, deferred to a future session). Backfill / migration of historical LOW-confidence records. Customer profile UI state dropdown rendering. Customer-portal self-edit of address. Geocoding integration.
+
+---
+
 ## fix(mobile): recover auto-prefill state when picker mounts with matching address (Phase Mobile-1.3)
 
 Bug fix on top of Phase Mobile-1.2 (`0633be08`). No schema, no API contract changes, no new endpoints. Single-condition extension to the pre-fill effect plus removal of the interim debug instrumentation.
