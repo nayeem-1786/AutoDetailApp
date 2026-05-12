@@ -91,11 +91,73 @@ interface QuoteData {
 interface Communication {
   id: string;
   channel: 'email' | 'sms';
-  sent_to: string;
-  status: 'sent' | 'failed';
+  sent_to: string | null;
+  // Phase Messaging-1+2: 3-status enum at send time. delivery_* fields
+  // come from the JOIN to sms_delivery_log and reflect Twilio's webhook.
+  status: 'sent' | 'failed' | 'blocked';
   error_message: string | null;
   created_at: string;
+  twilio_sid: string | null;
+  delivery_status: string | null;
+  delivery_error_code: string | null;
+  delivery_updated_at: string | null;
 }
+
+type PillTone = 'green' | 'yellow' | 'red' | 'orange';
+
+interface PillState {
+  tone: PillTone;
+  label: string;
+  detail: string | null;
+}
+
+// Phase Messaging-1+2 pill semantics:
+//   green  = delivered (handset confirmed) OR email/legacy SMS sent
+//   yellow = in-flight (queued/sent/sending) OR SMS pending webhook
+//   red    = undelivered / send failed
+//   orange = blocked (pre-flight gate prevented attempt)
+function deriveCommPill(comm: Communication): PillState {
+  if (comm.status === 'failed') {
+    return { tone: 'red', label: 'Failed', detail: comm.error_message };
+  }
+  if (comm.status === 'blocked') {
+    return { tone: 'orange', label: 'Blocked', detail: comm.error_message };
+  }
+
+  // status === 'sent' — overlay Twilio delivery status for SMS rows that
+  // carry a twilio_sid (everything else stays green "Sent").
+  if (comm.channel === 'sms' && comm.twilio_sid) {
+    switch (comm.delivery_status) {
+      case 'delivered':
+        return { tone: 'green', label: 'Delivered', detail: null };
+      case 'undelivered':
+      case 'failed':
+        return {
+          tone: 'red',
+          label: comm.delivery_status === 'undelivered' ? 'Undelivered' : 'Failed',
+          detail: comm.delivery_error_code ? `Twilio ${comm.delivery_error_code}` : null,
+        };
+      case 'queued':
+      case 'sending':
+      case 'accepted':
+      case 'sent':
+        return { tone: 'yellow', label: 'Sending…', detail: null };
+      case null:
+      default:
+        // Webhook hasn't arrived yet (or pre-Phase-Messaging-2 message).
+        return { tone: 'yellow', label: 'Pending', detail: null };
+    }
+  }
+
+  return { tone: 'green', label: 'Sent', detail: null };
+}
+
+const PILL_TONE_CLASSES: Record<PillTone, string> = {
+  green: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400',
+  yellow: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400',
+  red: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400',
+  orange: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400',
+};
 
 export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailProps) {
   const router = useRouter();
@@ -579,37 +641,44 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 </h3>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
-                {communications.map((comm) => (
-                  <div key={comm.id} className="flex items-center gap-3 px-4 py-2.5">
-                    {comm.channel === 'email' ? (
-                      <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    ) : (
-                      <MessageSquare className="h-4 w-4 text-gray-400 dark:text-gray-500" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
-                          {comm.channel}
-                        </span>
-                        <span
-                          className={cn(
-                            'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
-                            comm.status === 'sent'
-                              ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                              : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
-                          )}
-                        >
-                          {comm.status}
-                        </span>
+                {communications.map((comm) => {
+                  const pill = deriveCommPill(comm);
+                  return (
+                    <div key={comm.id} className="flex items-center gap-3 px-4 py-2.5">
+                      {comm.channel === 'email' ? (
+                        <Mail className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
+                            {comm.channel}
+                          </span>
+                          <span
+                            className={cn(
+                              'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                              PILL_TONE_CLASSES[pill.tone]
+                            )}
+                            title={pill.detail ?? undefined}
+                          >
+                            {pill.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {comm.sent_to ?? '—'}
+                        </p>
+                        {pill.detail && (
+                          <p className="text-xs text-red-500 dark:text-red-400">{pill.detail}</p>
+                        )}
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{comm.sent_to}</p>
+                      <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+                        <Clock className="h-3 w-3" />
+                        {formatQuoteDateTime(comm.created_at)}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
-                      <Clock className="h-3 w-3" />
-                      {formatQuoteDateTime(comm.created_at)}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

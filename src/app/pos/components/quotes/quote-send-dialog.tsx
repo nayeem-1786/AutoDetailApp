@@ -34,21 +34,41 @@ export function QuoteSendDialog({
         body: JSON.stringify({ method }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send');
+      // Phase Messaging-1+2: server returns 422 when no channel succeeded
+      // (total failure / all-blocked). Treat it as a soft error so the modal
+      // stays interactive and the user can retry or close.
+      if (res.status === 422) {
+        toast.error(data?.error || 'Quote could not be sent');
+        return;
       }
 
-      const sentVia = data.sent_via?.join(' & ') || method;
-      toast.success(`Quote sent via ${sentVia}`);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to send');
+      }
 
-      if (data.errors?.length) {
-        data.errors.forEach((err: string) => toast.warning(err));
+      // Success path — at least one channel landed. `errors` may still carry
+      // per-channel failures for a partial outcome.
+      const sentVia: string[] = Array.isArray(data?.sent_via) ? data.sent_via : [];
+      const sentLabel = sentVia.length > 0 ? sentVia.join(' & ') : method;
+      toast.success(`Quote sent via ${sentLabel}`);
+
+      const partialErrors: { channel: string; reason: string }[] = Array.isArray(data?.errors)
+        ? data.errors
+        : [];
+      if (partialErrors.length > 0) {
+        // Consolidated single warning toast (was: one per error).
+        toast.warning(
+          partialErrors
+            .map((e) => `${e.channel}: ${e.reason}`)
+            .join(' • ')
+        );
       }
 
       setSuccess(true);
       setTimeout(() => {
+        setSuccess(false);
         onSent();
       }, 3000);
     } catch (err) {

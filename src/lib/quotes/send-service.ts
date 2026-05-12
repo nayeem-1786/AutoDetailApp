@@ -36,8 +36,41 @@ interface QuoteVehicle {
   model: string;
 }
 
-type SendQuoteResult =
-  | { success: true; link: string; sent_via: string[]; errors?: string[]; quote: unknown }
+/**
+ * Per-channel error captured during a send attempt. `status` mirrors the row
+ * written to `quote_communications`:
+ *   - 'failed'  — send attempted, infrastructure returned an error
+ *   - 'blocked' — pre-flight gate prevented the attempt (no contact info,
+ *                 localhost guard, template silenced)
+ */
+export interface SendQuoteChannelError {
+  channel: 'email' | 'sms';
+  reason: string;
+  status: 'failed' | 'blocked';
+}
+
+export type SendQuoteResult =
+  | {
+      success: true;
+      link: string;
+      sent_via: string[];
+      blocked_via: string[];
+      failed_via: string[];
+      errors: SendQuoteChannelError[];
+      quote: unknown;
+    }
+  | {
+      success: false;
+      error: string;
+      link: string;
+      sent_via: string[];
+      blocked_via: string[];
+      failed_via: string[];
+      errors: SendQuoteChannelError[];
+      quote: unknown;
+    }
+  // Fatal early-exits (quote not found, update failed) — route translates
+  // `status` directly into the HTTP response code.
   | { success: false; error: string; status: number };
 
 async function getQuoteValidityDays(supabase: SupabaseClient): Promise<number> {
@@ -117,7 +150,43 @@ export async function sendQuote(
   }
 
   const sentVia: string[] = [];
-  const errors: string[] = [];
+  const blockedVia: string[] = [];
+  const failedVia: string[] = [];
+  const errors: SendQuoteChannelError[] = [];
+
+  // Phase Messaging-1+2: every attempted channel produces exactly one
+  // quote_communications row. recordCommunication is the single insert path
+  // — it also feeds the outcome buckets so the final return shape and the
+  // history table stay in sync.
+  type CommRowStatus = 'sent' | 'failed' | 'blocked';
+  async function recordCommunication(args: {
+    channel: 'email' | 'sms';
+    status: CommRowStatus;
+    sentTo: string | null;
+    reason?: string;
+    twilioSid?: string | null;
+  }) {
+    const { channel, status, sentTo, reason, twilioSid } = args;
+    if (status === 'sent') {
+      sentVia.push(channel);
+    } else if (status === 'blocked') {
+      blockedVia.push(channel);
+      errors.push({ channel, reason: reason ?? 'Blocked', status: 'blocked' });
+    } else {
+      failedVia.push(channel);
+      errors.push({ channel, reason: reason ?? 'Send failed', status: 'failed' });
+    }
+
+    const { error: commErr } = await supabase.from('quote_communications').insert({
+      quote_id: quoteId,
+      channel,
+      sent_to: sentTo,
+      status,
+      error_message: reason ?? null,
+      twilio_sid: twilioSid ?? null,
+    });
+    if (commErr) console.error('Failed to record communication:', commErr.message);
+  }
 
   const shouldEmail = method === 'email' || method === 'both';
   const shouldSms = method === 'sms' || method === 'both';
@@ -125,7 +194,12 @@ export async function sendQuote(
   // --- Send via Email ---
   if (shouldEmail) {
     if (!customer?.email) {
-      errors.push('Customer has no email address');
+      await recordCommunication({
+        channel: 'email',
+        status: 'blocked',
+        sentTo: null,
+        reason: 'Customer has no email address',
+      });
     } else {
       try {
         const customerName = `${customer.first_name} ${customer.last_name}`;
@@ -185,28 +259,27 @@ export async function sendQuote(
         }
 
         if (emailSuccess) {
-          sentVia.push('email');
-          const { error: commErr } = await supabase.from('quote_communications').insert({
-            quote_id: quoteId,
+          await recordCommunication({
             channel: 'email',
-            sent_to: customer.email,
             status: 'sent',
+            sentTo: customer.email,
           });
-          if (commErr) console.error('Failed to record communication:', commErr.message);
         } else {
-          errors.push('Failed to send email');
-          const { error: commErr } = await supabase.from('quote_communications').insert({
-            quote_id: quoteId,
+          await recordCommunication({
             channel: 'email',
-            sent_to: customer.email,
             status: 'failed',
-            error_message: emailError,
+            sentTo: customer.email,
+            reason: emailError || 'Failed to send email',
           });
-          if (commErr) console.error('Failed to record communication:', commErr.message);
         }
       } catch (emailErr) {
         console.error('Email send error:', emailErr);
-        errors.push('Failed to send email');
+        await recordCommunication({
+          channel: 'email',
+          status: 'failed',
+          sentTo: customer?.email ?? null,
+          reason: emailErr instanceof Error ? emailErr.message : 'Email send threw',
+        });
       }
     }
   }
@@ -214,9 +287,19 @@ export async function sendQuote(
   // --- Send via SMS/MMS (via shared utility) ---
   if (shouldSms) {
     if (!customer?.phone) {
-      errors.push('Customer has no phone number');
+      await recordCommunication({
+        channel: 'sms',
+        status: 'blocked',
+        sentTo: null,
+        reason: 'Customer has no phone number',
+      });
     } else if (appUrl.includes('localhost') || appUrl.includes('127.0.0.1')) {
-      errors.push('SMS with PDF requires a public URL. Set NEXT_PUBLIC_APP_URL to your production domain.');
+      await recordCommunication({
+        channel: 'sms',
+        status: 'blocked',
+        sentTo: customer.phone,
+        reason: 'SMS with PDF requires a public URL. Set NEXT_PUBLIC_APP_URL to your production domain.',
+      });
     } else {
       try {
         // Session 3C: migrated from hardcoded body to chip-driven slug
@@ -238,8 +321,13 @@ export async function sendQuote(
         }, fallback);
 
         if (!tpl.isActive || !tpl.body) {
-          // Template inactive (operator silenced) — skip SMS, no error
-          console.log('[SendQuote] quote_sms_admin template disabled — skipping SMS');
+          // Template silenced — log as blocked so admin sees why no SMS went out.
+          await recordCommunication({
+            channel: 'sms',
+            status: 'blocked',
+            sentTo: customer.phone,
+            reason: 'SMS template inactive (quote_sms_admin)',
+          });
         } else {
           // Only attach PDF for production domains (ngrok free tier blocks MMS fetches)
           const isProductionUrl = !appUrl.includes('ngrok') && !appUrl.includes('localhost');
@@ -256,29 +344,31 @@ export async function sendQuote(
           });
 
           if (smsResult.success) {
-            sentVia.push('sms');
-            const { error: commErr } = await supabase.from('quote_communications').insert({
-              quote_id: quoteId,
+            // Phase Messaging-2: capture twilio_sid so the comm-history JOIN
+            // to sms_delivery_log surfaces delivery status from the webhook.
+            await recordCommunication({
               channel: 'sms',
-              sent_to: customer.phone,
               status: 'sent',
+              sentTo: customer.phone,
+              twilioSid: smsResult.sid,
             });
-            if (commErr) console.error('Failed to record communication:', commErr.message);
           } else {
-            errors.push(smsResult.error);
-            const { error: commErr } = await supabase.from('quote_communications').insert({
-              quote_id: quoteId,
+            await recordCommunication({
               channel: 'sms',
-              sent_to: customer.phone,
               status: 'failed',
-              error_message: smsResult.error,
+              sentTo: customer.phone,
+              reason: smsResult.error,
             });
-            if (commErr) console.error('Failed to record communication:', commErr.message);
           }
         }
       } catch (smsErr) {
         console.error('SMS send error:', smsErr);
-        errors.push('Failed to send SMS');
+        await recordCommunication({
+          channel: 'sms',
+          status: 'failed',
+          sentTo: customer?.phone ?? null,
+          reason: smsErr instanceof Error ? smsErr.message : 'SMS send threw',
+        });
       }
     }
   }
@@ -286,11 +376,29 @@ export async function sendQuote(
   // Fire webhook with quote data + link
   fireWebhook('quote_sent', { ...quote, link: quoteLink }, supabase).catch(() => {});
 
+  // success: true when at least one channel landed (full or partial).
+  // success: false when no channels succeeded — route maps this to HTTP 422.
+  if (sentVia.length === 0) {
+    const primaryReason = errors[0]?.reason ?? 'Quote could not be sent';
+    return {
+      success: false,
+      error: primaryReason,
+      link: quoteLink,
+      sent_via: sentVia,
+      blocked_via: blockedVia,
+      failed_via: failedVia,
+      errors,
+      quote: updated,
+    };
+  }
+
   return {
     success: true,
     link: quoteLink,
     sent_via: sentVia,
-    ...(errors.length > 0 ? { errors } : {}),
+    blocked_via: blockedVia,
+    failed_via: failedVia,
+    errors,
     quote: updated,
   };
 }

@@ -4159,8 +4159,9 @@ export type Database = {
           message: string | null
           quote_id: string
           sent_by: string | null
-          sent_to: string
+          sent_to: string | null
           status: string
+          twilio_sid: string | null
         }
         Insert: {
           channel: string
@@ -4170,8 +4171,9 @@ export type Database = {
           message?: string | null
           quote_id: string
           sent_by?: string | null
-          sent_to: string
+          sent_to?: string | null
           status?: string
+          twilio_sid?: string | null
         }
         Update: {
           channel?: string
@@ -4181,8 +4183,9 @@ export type Database = {
           message?: string | null
           quote_id?: string
           sent_by?: string | null
-          sent_to?: string
+          sent_to?: string | null
           status?: string
+          twilio_sid?: string | null
         }
         Relationships: [
           {

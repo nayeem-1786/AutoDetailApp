@@ -1595,6 +1595,7 @@ Phase Mobile-1.1 additions:
 20260510000002_add_digital_platform_column.sql        # Phase 1A.5: payments.digital_platform column + biconditional CHECK + partial index
 20260511000001_add_mobile_fee_item_type.sql           # Mobile fix D2: extend transaction_item_type enum with 'mobile_fee'
 20260511000002_add_mobile_zone_snapshot_and_quote_mobile.sql # Mobile fix D2: appointments.mobile_zone_name_snapshot + quotes mobile_* columns + consistency CHECKs
+20260512152847_quote_communications_delivery_tracking.sql    # Phase Messaging-1+2: twilio_sid column + 3-status enum (sent/failed/blocked) on quote_communications
 ```
 
 ## Scripts
@@ -1648,6 +1649,7 @@ docs/sessions/mobile-fee-1-5-zip-only-format.md      # Phase Mobile-1.5: parser 
 docs/sessions/mobile-fee-1-6-address-display-edit.md # Phase Mobile-1.6: mobile_address display + edit on POS jobs detail + admin appointment dialog
 docs/sessions/mobile-fee-1-7-display-composer.md     # Phase Mobile-1.7: shared composeLineItems utility — adds mobile fee as synthetic line on quote/appointment display surfaces
 docs/sessions/mobile-fee-1-8-composer-idempotency.md # Phase Mobile-1.8: composer idempotency (skip synthetic append when jobs.services JSONB already carries mobile entry) + POS quote detail wiring
+docs/sessions/messaging-1-2-send-flow-and-delivery.md # Phase Messaging-1+2: send pipeline overhaul (HTTP 422 on total failure, 3-status enum, twilio_sid JOIN for delivery tracking)
 docs/sessions/mobile-fee-1-9-full-picker-edit.md     # Phase Mobile-1.9: full mobile picker edit on POS jobs detail + admin appointment dialog — toggle/zone/custom/address with live zone reads, save-time snapshot, payment-mismatch banner
 docs/sessions/mobile-fee-1-9-1-zone-dropdown-fix.md  # Phase Mobile-1.9.1: zone-dropdown shows correct selection in edit mode (JOB_SELECT +mobile_zone_id, zonesLoaded resync, deleted-zone recovery)
 docs/manual/README.md

@@ -26,7 +26,13 @@ export async function POST(
     const result = await sendQuote(supabase, id, method);
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      // Fatal early-exit (quote not found, update failed) carries an explicit
+      // HTTP `status`. Outcome failures (every channel blocked/failed) map to
+      // 422 so the client can distinguish them from total success.
+      if ('status' in result) {
+        return NextResponse.json({ error: result.error }, { status: result.status });
+      }
+      return NextResponse.json(result, { status: 422 });
     }
 
     return NextResponse.json(result);

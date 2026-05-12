@@ -22,6 +22,70 @@ type QuoteWithRelations = Quote & {
   items?: QuoteItem[];
 };
 
+type AdminComm = {
+  id: string;
+  channel: 'email' | 'sms';
+  sent_to: string | null;
+  status: 'sent' | 'failed' | 'blocked';
+  error_message: string | null;
+  created_at: string;
+  twilio_sid: string | null;
+  delivery_status: string | null;
+  delivery_error_code: string | null;
+  delivery_updated_at: string | null;
+};
+
+type AdminPillTone = 'green' | 'yellow' | 'red' | 'orange';
+
+// Mirrors deriveCommPill in POS quote-detail.tsx. Kept locally to avoid
+// dragging a POS-internal helper across the admin/POS boundary.
+function deriveAdminCommPill(comm: AdminComm): {
+  tone: AdminPillTone;
+  label: string;
+  detail: string | null;
+} {
+  if (comm.status === 'failed') {
+    return { tone: 'red', label: 'Failed', detail: comm.error_message };
+  }
+  if (comm.status === 'blocked') {
+    return { tone: 'orange', label: 'Blocked', detail: comm.error_message };
+  }
+  if (comm.channel === 'sms' && comm.twilio_sid) {
+    switch (comm.delivery_status) {
+      case 'delivered':
+        return { tone: 'green', label: 'Delivered', detail: null };
+      case 'undelivered':
+        return {
+          tone: 'red',
+          label: 'Undelivered',
+          detail: comm.delivery_error_code ? `Twilio ${comm.delivery_error_code}` : null,
+        };
+      case 'failed':
+        return {
+          tone: 'red',
+          label: 'Failed',
+          detail: comm.delivery_error_code ? `Twilio ${comm.delivery_error_code}` : null,
+        };
+      case 'queued':
+      case 'sending':
+      case 'accepted':
+      case 'sent':
+        return { tone: 'yellow', label: 'Sending…', detail: null };
+      case null:
+      default:
+        return { tone: 'yellow', label: 'Pending', detail: null };
+    }
+  }
+  return { tone: 'green', label: 'Sent', detail: null };
+}
+
+const ADMIN_PILL_ICON_CLASS: Record<AdminPillTone, string> = {
+  green: 'text-green-600',
+  yellow: 'text-yellow-600',
+  red: 'text-red-500',
+  orange: 'text-orange-600',
+};
+
 
 export default function QuoteDetailPage() {
   const { granted: canAccess, loading: permLoading } = usePermission('quotes.create');
@@ -32,14 +96,19 @@ export default function QuoteDetailPage() {
   const [quote, setQuote] = useState<QuoteWithRelations | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Communication history
+  // Communication history. Phase Messaging-1+2: 3-status enum (sent/failed/
+  // blocked) plus delivery_* fields populated from sms_delivery_log JOIN.
   const [communications, setCommunications] = useState<{
     id: string;
     channel: 'email' | 'sms';
-    sent_to: string;
-    status: 'sent' | 'failed';
+    sent_to: string | null;
+    status: 'sent' | 'failed' | 'blocked';
     error_message: string | null;
     created_at: string;
+    twilio_sid: string | null;
+    delivery_status: string | null;
+    delivery_error_code: string | null;
+    delivery_updated_at: string | null;
   }[]>([]);
 
   // Customer stats
@@ -76,14 +145,69 @@ export default function QuoteDetailPage() {
     const q = data as QuoteWithRelations;
     setQuote(q);
 
-    // Load communication history
+    // Load communication history + JOIN sms_delivery_log via twilio_sid so
+    // the rendered pill reflects Twilio's latest status (delivered/undelivered).
     const { data: commData, error: commErr } = await supabase
       .from('quote_communications')
       .select('*')
       .eq('quote_id', id)
       .order('created_at', { ascending: false });
     if (commErr) console.error('Failed to load communications:', commErr.message);
-    if (commData) setCommunications(commData);
+    if (commData) {
+      type CommRow = {
+        id: string;
+        channel: string;
+        sent_to: string | null;
+        status: string;
+        error_message: string | null;
+        created_at: string;
+        twilio_sid: string | null;
+      };
+      type DeliveryRow = {
+        message_sid: string;
+        status: string;
+        error_code: string | null;
+        updated_at: string | null;
+      };
+      const typedComms = commData as CommRow[];
+      const sids = typedComms
+        .map((c) => c.twilio_sid)
+        .filter((s): s is string => Boolean(s));
+      let deliveryBySid: Record<
+        string,
+        { status: string; error_code: string | null; updated_at: string | null }
+      > = {};
+      if (sids.length > 0) {
+        const { data: deliveryRows } = await supabase
+          .from('sms_delivery_log')
+          .select('message_sid, status, error_code, updated_at')
+          .in('message_sid', sids);
+        deliveryBySid = ((deliveryRows ?? []) as DeliveryRow[]).reduce(
+          (acc, row) => {
+            acc[row.message_sid] = {
+              status: row.status,
+              error_code: row.error_code,
+              updated_at: row.updated_at,
+            };
+            return acc;
+          },
+          {} as typeof deliveryBySid
+        );
+      }
+      setCommunications(
+        typedComms.map((c) => {
+          const delivery = c.twilio_sid ? deliveryBySid[c.twilio_sid] : undefined;
+          return {
+            ...c,
+            status: c.status as 'sent' | 'failed' | 'blocked',
+            channel: c.channel as 'email' | 'sms',
+            delivery_status: delivery?.status ?? null,
+            delivery_error_code: delivery?.error_code ?? null,
+            delivery_updated_at: delivery?.updated_at ?? null,
+          };
+        })
+      );
+    }
 
     // Load customer stats if customer exists
     if (q.customer_id) {
@@ -409,35 +533,37 @@ export default function QuoteDetailPage() {
             <p className="text-sm text-gray-400">No messages sent yet</p>
           ) : (
             <div className="space-y-3">
-              {communications.map((comm) => (
-                <div
-                  key={comm.id}
-                  className="flex items-start justify-between rounded-md border border-gray-100 bg-gray-50 p-3"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 rounded-full p-1.5 ${comm.channel === 'email' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                      {comm.channel === 'email' ? (
-                        <Mail className={`h-4 w-4 ${comm.status === 'sent' ? 'text-blue-600' : 'text-red-500'}`} />
-                      ) : (
-                        <MessageSquare className={`h-4 w-4 ${comm.status === 'sent' ? 'text-green-600' : 'text-red-500'}`} />
-                      )}
+              {communications.map((comm) => {
+                const pill = deriveAdminCommPill(comm);
+                return (
+                  <div
+                    key={comm.id}
+                    className="flex items-start justify-between rounded-md border border-gray-100 bg-gray-50 p-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 rounded-full p-1.5 ${comm.channel === 'email' ? 'bg-blue-100' : 'bg-green-100'}`}>
+                        {comm.channel === 'email' ? (
+                          <Mail className={`h-4 w-4 ${ADMIN_PILL_ICON_CLASS[pill.tone]}`} />
+                        ) : (
+                          <MessageSquare className={`h-4 w-4 ${ADMIN_PILL_ICON_CLASS[pill.tone]}`} />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {comm.channel === 'email' ? 'Email' : 'SMS'} {pill.label.toLowerCase()}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          To: {comm.sent_to ? (comm.channel === 'email' ? comm.sent_to : formatPhone(comm.sent_to)) : '—'}
+                        </p>
+                        {(pill.detail || comm.error_message) && (
+                          <p className="mt-1 text-xs text-red-500">{pill.detail ?? comm.error_message}</p>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {comm.channel === 'email' ? 'Email' : 'SMS'}{' '}
-                        {comm.status === 'sent' ? 'sent' : 'failed'}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        To: {comm.channel === 'email' ? comm.sent_to : formatPhone(comm.sent_to)}
-                      </p>
-                      {comm.error_message && (
-                        <p className="mt-1 text-xs text-red-500">{comm.error_message}</p>
-                      )}
-                    </div>
+                    <p className="text-xs text-gray-400">{formatDateTime(comm.created_at)}</p>
                   </div>
-                  <p className="text-xs text-gray-400">{formatDateTime(comm.created_at)}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

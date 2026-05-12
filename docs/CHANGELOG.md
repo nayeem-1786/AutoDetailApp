@@ -6,6 +6,50 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Messaging-1+2 — send pipeline architectural overhaul + Twilio delivery tracking
+
+Server returns HTTP 422 on total-failure send (was 200 + dual-toast bug). All 6 pre-flight/exception paths now log to `quote_communications` with new granular status enum (`sent` | `failed` | `blocked`). Twilio SMS delivery status surfaced to dashboard via JOIN to `sms_delivery_log` (`twilio_sid` captured at send time). Status pill semantics: green = delivered, yellow = sending/pending, red = undelivered/failed, orange = blocked. Modal success state now resets across opens (mirrors `send-payment-link-dialog` pattern). Dual-toast bug eliminated; max 2 toasts per send (primary + optional consolidated secondary). `NotifyCustomerDialog` patched in parallel.
+
+**Schema.** Migration `20260512152847_quote_communications_delivery_tracking.sql`:
+- `ADD COLUMN twilio_sid TEXT` (indexed partial WHERE NOT NULL)
+- `status` CHECK relaxed from (`sent`|`failed`) to (`sent`|`failed`|`blocked`)
+- `sent_to DROP NOT NULL` so blocked-no-contact rows can land
+
+**Server (`src/lib/quotes/send-service.ts`).** Refactored to a single `recordCommunication()` helper that writes one row per attempted channel. Six previously-silent paths now log: no email, no phone, localhost SMS+PDF guard, template-inactive SMS, email exception, SMS exception. Return shape adds `blocked_via`, `failed_via`, `errors: { channel, reason, status }[]`. `success: false` when no channel succeeded; route handlers map to HTTP 422.
+
+**Server (read).** `/api/pos/quotes/[id]/communications` and admin inline query now do a two-step JOIN: fetch comm rows, collect `twilio_sid`s, fetch matching `sms_delivery_log` rows, merge `delivery_status` / `delivery_error_code` / `delivery_updated_at` into the response.
+
+**Client (dialogs).** `QuoteSendDialog` + `NotifyCustomerDialog`:
+- Branch on HTTP 422 → single error toast, modal stays interactive
+- HTTP 200 partial success → one success toast + one consolidated warning (was: one warning per error)
+- `setSuccess(false)` inside the 3s setTimeout — fixes the "modal locked after first send" bug that previously required a page refresh
+
+**Client (renderer).** New `deriveCommPill()` / `deriveAdminCommPill()` produce the 4-tone pill from `(status, delivery_status, channel, twilio_sid)`. Backward-compatible: rows without `twilio_sid` (email + pre-deployment SMS) fall through to plain "Sent".
+
+**Webhook handler unchanged.** `/api/webhooks/twilio/status` still updates `sms_delivery_log` only; the JOIN-based read picks it up automatically.
+
+**Tests.** 10 new (+823 total). 8 cover all six log-write paths and total/partial outcome branching in `send-service`; 2 cover the dialog's 422 interactive path and consolidated-warning behaviour.
+
+**Out of scope.** Mailgun email-delivery webhooks (future Phase Messaging-1.7), receipt resend UI (no such surface exists), voice-agent send path, `QuoteBookDialog`, `quote-reminders` cron, audit log UI (future Phase Audit-1), backfill of historical SMS delivery linkage, `messages` (conversation thread) webhook updates, `appointment_communications` parity (no such table — `NotifyCustomerDialog` got UI fixes only).
+
+**Files changed:**
+- `supabase/migrations/20260512152847_quote_communications_delivery_tracking.sql` (new)
+- `src/lib/quotes/send-service.ts`
+- `src/app/api/pos/quotes/[id]/send/route.ts`
+- `src/app/api/quotes/[id]/send/route.ts`
+- `src/app/api/pos/quotes/[id]/communications/route.ts`
+- `src/app/admin/quotes/[id]/page.tsx`
+- `src/app/pos/components/quotes/quote-detail.tsx`
+- `src/app/pos/components/quotes/quote-send-dialog.tsx`
+- `src/components/quotes/notify-customer-dialog.tsx`
+- `src/lib/supabase/database.types.ts`
+- `src/lib/quotes/__tests__/send-service.test.ts` (new)
+- `src/app/pos/components/quotes/__tests__/quote-send-dialog.test.tsx` (new)
+- `docs/sessions/messaging-1-2-send-flow-and-delivery.md` (new)
+- `docs/dev/DB_SCHEMA.md`, `docs/dev/FILE_TREE.md`
+
+---
+
 ## Session: Phase Mobile-1.9.1 — zone-dropdown shows correct selection in edit mode
 
 Targeted UI fix on top of Phase Mobile-1.9 (`c55bd987`). Production testing surfaced that the edit modal's zone dropdown rendered "Custom…" as selected for valid zone records on the POS jobs detail surface, even when the appointment's `mobile_zone_id` matched a real available zone. Card display elsewhere was correct (zone name + price from snapshot fields); only the dropdown's matching logic was broken. Save still worked manually but UX was wrong — re-opening kept showing "Custom…" for an appointment clearly tied to a real zone.

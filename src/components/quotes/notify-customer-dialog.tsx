@@ -35,21 +35,43 @@ export function NotifyCustomerDialog({
         body: JSON.stringify({ method }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to send');
+      // Phase Messaging-1+2 parity: treat 422 as soft-error so the modal
+      // stays interactive. (Appointment-notify server may not emit 422 today
+      // — falls through to the !res.ok path which already does the right
+      // thing.)
+      if (res.status === 422) {
+        toast.error(data?.error || 'Confirmation could not be sent');
+        return;
       }
 
-      const sentVia = data.sent_via?.join(' & ') || method;
-      toast.success(`Confirmation sent via ${sentVia}`);
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to send');
+      }
 
-      if (data.errors?.length) {
-        data.errors.forEach((err: string) => toast.warning(err));
+      const sentVia: string[] = Array.isArray(data?.sent_via) ? data.sent_via : [];
+      const sentLabel = sentVia.length > 0 ? sentVia.join(' & ') : method;
+      toast.success(`Confirmation sent via ${sentLabel}`);
+
+      // Tolerate both shapes: legacy string[] and new {channel, reason}[].
+      const rawErrors = Array.isArray(data?.errors) ? data.errors : [];
+      if (rawErrors.length > 0) {
+        const summary = rawErrors
+          .map((e: unknown) =>
+            typeof e === 'string'
+              ? e
+              : e && typeof e === 'object' && 'reason' in e
+                ? `${(e as { channel?: string }).channel ?? 'channel'}: ${(e as { reason: string }).reason}`
+                : String(e)
+          )
+          .join(' • ');
+        toast.warning(summary);
       }
 
       setSuccess(true);
       setTimeout(() => {
+        setSuccess(false);
         onClose();
       }, 3000);
     } catch (err) {
