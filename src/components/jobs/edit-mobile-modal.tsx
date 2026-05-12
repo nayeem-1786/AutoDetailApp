@@ -75,6 +75,11 @@ export function EditMobileModal({
 }: EditMobileModalProps) {
   const [zones, setZones] = useState<MobileZoneRow[]>([]);
   const [zonesLoading, setZonesLoading] = useState(false);
+  // `zonesLoaded` flips true ONCE the fetch completes (success or error)
+  // so the resync effect can distinguish "haven't fetched yet" from
+  // "fetched and got an empty list". Reset on every open so re-opens
+  // wait for a fresh fetch.
+  const [zonesLoaded, setZonesLoaded] = useState(false);
 
   const [isMobile, setIsMobile] = useState(initial.is_mobile);
   const [zoneId, setZoneId] = useState<string | null>(initial.mobile_zone_id);
@@ -100,26 +105,73 @@ export function EditMobileModal({
 
   const addressInputRef = useRef<HTMLInputElement>(null);
 
-  // Re-seed local state when the modal opens with a new `initial` payload.
-  // Without this, re-opening after a save would retain stale local state.
+  // Re-seed non-zone state on open. Zone state (zoneId + isCustom) is
+  // intentionally left provisional here — the resync effect below
+  // computes its authoritative value once live zones are loaded, so
+  // we don't have to guess from `initial` alone (which doesn't know
+  // about Settings renames or deleted zones).
   useEffect(() => {
     if (!open) return;
     setIsMobile(initial.is_mobile);
-    setZoneId(initial.mobile_zone_id);
-    setIsCustom(
-      initial.is_mobile && !initial.mobile_zone_id && Number(initial.mobile_surcharge ?? 0) > 0
-    );
     setSurcharge(Number(initial.mobile_surcharge ?? 0));
     setCustomLabel(initial.mobile_zone_name_snapshot ?? '');
     setAddress(initial.mobile_address ?? '');
     setErrors({});
+    setZoneId(initial.mobile_zone_id);
+    setIsCustom(false);
   }, [open, initial]);
+
+  // Phase Mobile-1.9.1 — zone-dropdown resync. Runs after live zones
+  // are loaded and derives the authoritative `(zoneId, isCustom)` pair
+  // from `initial.mobile_zone_id` + `mobile_surcharge` + live zones.
+  // Four cases:
+  //   1. `mobile_zone_id` matches a live zone → select that zone.
+  //   2. `mobile_zone_id` set but NOT in live zones (deleted-zone
+  //      recovery): switch to Custom path. `surcharge` + `customLabel`
+  //      are already populated from snapshot by the reseed effect, so
+  //      admin sees the historical label preserved and can re-pick or
+  //      save as Custom (server will write `mobile_zone_id = null`).
+  //   3. `mobile_zone_id` null + `surcharge > 0` (Custom path record):
+  //      select Custom; inputs already pre-filled from initial.
+  //   4. `mobile_zone_id` null + `surcharge = 0` + `is_mobile = true`
+  //      (bug state): leave placeholder.
+  // Skipped entirely when modal is in enable mode (`!initial.is_mobile`)
+  // — those opens get a blank picker.
+  useEffect(() => {
+    if (!open) return;
+    if (!initial.is_mobile) return;
+    // Wait for the zones fetch to actually complete before deciding.
+    // Without this guard, the resync would fire on the first render
+    // (when `zones` is still the initial empty array) and incorrectly
+    // trigger Case 2 — flipping `isCustom=true` and clobbering a valid
+    // `mobile_zone_id` until the fetch eventually resolved.
+    if (!zonesLoaded) return;
+
+    if (initial.mobile_zone_id) {
+      const match = zones.find((z) => z.id === initial.mobile_zone_id);
+      if (match) {
+        setZoneId(match.id);
+        setIsCustom(false);
+      } else {
+        // Case 2 — deleted-zone recovery.
+        setZoneId(null);
+        setIsCustom(true);
+      }
+    } else if (Number(initial.mobile_surcharge ?? 0) > 0) {
+      // Case 3 — Custom path record.
+      setIsCustom(true);
+      setZoneId(null);
+    }
+    // Case 4 falls through; placeholder is the provisional state set by
+    // the reseed effect.
+  }, [open, zones, zonesLoaded, initial]);
 
   // Fetch live zones every time the modal opens (LOCKED-7.5 — admin
   // renames in Settings reflect immediately).
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    setZonesLoaded(false);
     setZonesLoading(true);
     const endpoint =
       mode === 'pos' ? '/api/pos/mobile-zones' : '/api/admin/mobile-zones';
@@ -131,8 +183,14 @@ export function EditMobileModal({
         setZones(
           ((data.zones ?? []) as MobileZoneRow[]).filter((z) => z.is_available)
         );
+        setZonesLoaded(true);
       })
-      .catch(() => {})
+      .catch(() => {
+        // Mark loaded even on error so the resync effect can fall back to
+        // the deleted-zone recovery path (better to surface Custom inputs
+        // than wedge the dropdown waiting forever).
+        if (!cancelled) setZonesLoaded(true);
+      })
       .finally(() => {
         if (!cancelled) setZonesLoading(false);
       });

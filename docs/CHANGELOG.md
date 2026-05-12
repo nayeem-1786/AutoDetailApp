@@ -6,6 +6,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Mobile-1.9.1 — zone-dropdown shows correct selection in edit mode
+
+Targeted UI fix on top of Phase Mobile-1.9 (`c55bd987`). Production testing surfaced that the edit modal's zone dropdown rendered "Custom…" as selected for valid zone records on the POS jobs detail surface, even when the appointment's `mobile_zone_id` matched a real available zone. Card display elsewhere was correct (zone name + price from snapshot fields); only the dropdown's matching logic was broken. Save still worked manually but UX was wrong — re-opening kept showing "Custom…" for an appointment clearly tied to a real zone.
+
+**Root cause (two layers).**
+
+1. **POS data path missing `mobile_zone_id`.** `JOB_SELECT` in `/api/pos/jobs/[id]/route.ts` joined the appointment with `is_mobile, mobile_address, mobile_surcharge, mobile_zone_name_snapshot` but NOT `mobile_zone_id`. So `job.appointment.mobile_zone_id` was `undefined` client-side → modal's `?? null` normalized to null → `isCustom` useState initializer (`is_mobile && !mobile_zone_id && surcharge > 0`) computed `true` → dropdown showed "Custom…". Admin path unaffected — it uses `select('*')` on appointments which includes the column.
+
+2. **No zones-load resync.** Even with the data fix, the modal had no provision for `mobile_zone_id` referencing a deleted zone (live zones list doesn't contain it). The dropdown would render `<select value="z-deleted">` with no matching `<option>` and visually fall back to whatever the browser picked. State machine was synchronous-only — `isCustom` decision was frozen at mount and couldn't re-derive after live zones loaded.
+
+**Fix.** Two parts:
+
+- **Server (one line, LOCKED-4 scope expansion approved):** `JOB_SELECT` extended to include `mobile_zone_id` in the appointment join. Same pattern as Phase 1.6 (`is_mobile, mobile_address`) and Phase 1.7 (`mobile_surcharge, mobile_zone_name_snapshot`) — pure data exposure, no behavior change.
+- **Client (resync effect):** Added a `zonesLoaded` flag that flips true once the zones fetch completes (success or error) — distinguishes "haven't fetched yet" from "fetched and got empty". Reseed effect now sets zone state to provisional defaults; new resync effect keyed on `[open, zones, zonesLoaded, initial]` derives the authoritative `(zoneId, isCustom)` from `initial` + live zones across four cases: (1) matching zone → select it; (2) `mobile_zone_id` set but not in live zones → deleted-zone recovery, switch to Custom with snapshot label + surcharge pre-filled; (3) `mobile_zone_id` null + surcharge>0 → Custom path record; (4) `mobile_zone_id` null + surcharge=0 → placeholder. Skipped entirely in enable mode (`!initial.is_mobile`).
+
+**Deleted-zone recovery semantics.** When the resync hits Case 2 (referenced zone no longer exists):
+- Dropdown switches to Custom path.
+- Custom label input pre-filled from `mobile_zone_name_snapshot` (historical label preserved, not blank).
+- Custom surcharge input pre-filled from `mobile_surcharge` (dollar amount preserved).
+- On save the server writes `mobile_zone_id = null` (Custom path), preserving the snapshot architecture (Option α — historical accuracy) while giving admin a recovery path.
+
+**Tests.** +5 new modal cases (813 total, was 808 in Phase 1.9): edit-mode matching zone, edit-mode Custom path record with pre-fill, deleted-zone recovery with snapshot pre-fill, enable-mode placeholder, end-to-end save body shape for the primary-bug regression.
+
+**Files changed:**
+- `src/app/api/pos/jobs/[id]/route.ts` (JOB_SELECT +`mobile_zone_id`)
+- `src/components/jobs/edit-mobile-modal.tsx` (zonesLoaded flag + resync effect)
+- `src/components/jobs/__tests__/edit-mobile-modal.test.tsx` (+5 cases)
+- `docs/sessions/mobile-fee-1-9-1-zone-dropdown-fix.md` (new)
+- `docs/dev/FILE_TREE.md`
+- `docs/CHANGELOG.md`
+
+---
+
 ## Session: Phase Mobile-1.9 — full mobile picker edit on POS jobs detail + admin appointment dialog
 
 Replaces Phase 1.6 address-only modal with full picker (toggle, zone, custom pricing, address). Picker dropdown reads live zones from Settings via `GET /api/pos/mobile-zones` (POS) and the new `GET /api/admin/mobile-zones` (admin). Snapshot architecture preserved: zone name + surcharge frozen at save time, never updated by later Settings renames/repricing (LOCKED-7.6 / 7.7 — Phase Mobile-1 Option α historical accuracy).
