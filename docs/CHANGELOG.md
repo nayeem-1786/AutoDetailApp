@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Mobile-1.9 — full mobile picker edit on POS jobs detail + admin appointment dialog
+
+Replaces Phase 1.6 address-only modal with full picker (toggle, zone, custom pricing, address). Picker dropdown reads live zones from Settings via `GET /api/pos/mobile-zones` (POS) and the new `GET /api/admin/mobile-zones` (admin). Snapshot architecture preserved: zone name + surcharge frozen at save time, never updated by later Settings renames/repricing (LOCKED-7.6 / 7.7 — Phase Mobile-1 Option α historical accuracy).
+
+**Server-side.** Two new PATCH endpoints — `/api/pos/appointments/[id]/mobile-service` (HMAC POS, `pos.jobs.manage`) and `/api/admin/appointments/[id]/mobile-service` (session admin, `appointments.add_notes`). Same body shape, same response. Atomically updates `appointments` (all five mobile fields + subtotal/total delta) and re-materializes the `jobs.services` JSONB entry for every linked job (toggle on appends, toggle off removes, zone change rewrites). Mobile fee is non-taxable so the surcharge delta adjusts subtotal + total only — `tax_amount` and `discount_amount` are preserved, keeping the math invariant for online-booking appointments with a tax base. Audit log entry with before/after of all four mobile fields + total.
+
+**Shared resolver.** New `src/lib/utils/resolve-mobile-fields.ts` — generic version of `quote-service.ts:resolveMobileForQuote` extracted as a shared module. Single source of truth for the five-field validation rules now consumed by quote create / quote update / appointment mobile-service edit (3 sites). `resolveMobileForQuote` is now a thin wrapper that re-throws `MobileFieldsError` as `QuoteValidationError` for backward compat. Booking path (`/api/book`) retains inline validation — not migrated this phase, can move in a future tidy pass.
+
+**Shared math/sync helpers.** New `src/lib/utils/mobile-service-edit.ts` — pure functions split out of the endpoints for unit testability. `computeAppointmentDelta` (cents-internal arithmetic, preserves tax/discount via mutate-subtotal+total-only strategy), `applyMobileEditToJobServices` (idempotent JSONB sync — strips all `is_mobile_fee=true` entries, conditionally appends fresh one; handles defensive multi-stale-entry case), `computePaidCentsForAppointment` (mirrors `attachAmountDueCents` pattern from `/api/pos/jobs/[id]`).
+
+**Client-side.** New shared `EditMobileModal` (`src/components/jobs/edit-mobile-modal.tsx`) and `PaymentMismatchBanner` (`src/components/jobs/payment-mismatch-banner.tsx`). Modal mode prop (`'pos' | 'admin'`) swaps the underlying auth surface; endpoints have the same shape so submit logic is shared. Reuses visual + state patterns from the create-time `MobileFeePicker` (toggle/zone/custom/address/X-clear/inline errors) but as a self-contained modal that fetches live zones on open. Forwards `mismatch_amount` from server response to `onSaved` callback. Banner is non-blocking, dismissable, signed-delta: positive → "may need to be charged", negative → "may need to be refunded".
+
+**POS jobs detail.** Phase 1.6 address-only inline modal removed; expanded "Mobile Service" card now shows zone snapshot + surcharge + address from the appointment record. Pencil opens the shared `EditMobileModal` (mode=pos). On save: optimistic local merge of the new snapshot + background `fetchJob` for canonical state (jobs.services JSONB → composer-rendered breakdown). Mismatch banner renders above the card when the new total ≠ paid amount.
+
+**Admin appointment dialog.** Same expansion (mode=admin). Inline address editor removed in favor of the picker modal. Same validation, same mismatch banner. Card displays zone + surcharge + address with the same snapshot-not-live-reference semantics.
+
+**transaction_items NOT modified (LOCKED-9).** Historical receipts remain accurate. Admin reconciles any payment mismatch via existing refund / send-payment-link flows. This phase enables the edit; money handling stays manual per admin context.
+
+**Tests.** +37 new (808 total, was 771 in Phase 1.8): 13 `resolve-mobile-fields` cases (validation paths, zone re-fetch, snapshot semantics, address truncation, error type), 13 `mobile-service-edit` cases (delta math including tax-base preservation + float precision; JSONB sync including idempotency + defensive multi-stale-entry), 11 `EditMobileModal` cases (render with snapshot pre-fill, zone fetch on open, available-zone filter, validation messages, save body shape for zone path + toggle-off, mismatch_amount handoff, mode=admin endpoint routing).
+
+**Files changed:**
+- `src/lib/utils/resolve-mobile-fields.ts` (new)
+- `src/lib/utils/mobile-service-edit.ts` (new)
+- `src/lib/utils/__tests__/resolve-mobile-fields.test.ts` (new)
+- `src/lib/utils/__tests__/mobile-service-edit.test.ts` (new)
+- `src/lib/quotes/quote-service.ts` (delegate to shared resolver)
+- `src/app/api/pos/appointments/[id]/mobile-service/route.ts` (new)
+- `src/app/api/admin/appointments/[id]/mobile-service/route.ts` (new)
+- `src/app/api/admin/mobile-zones/route.ts` (new)
+- `src/components/jobs/edit-mobile-modal.tsx` (new)
+- `src/components/jobs/payment-mismatch-banner.tsx` (new)
+- `src/components/jobs/__tests__/edit-mobile-modal.test.tsx` (new)
+- `src/app/pos/jobs/components/job-detail.tsx` (full picker wiring)
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (full picker wiring)
+- `docs/sessions/mobile-fee-1-9-full-picker-edit.md` (new)
+- `docs/dev/FILE_TREE.md`
+- `docs/CHANGELOG.md`
+
+---
+
 ## Session: Phase Mobile-1.8 — composer idempotency fix + POS quote detail wiring
 
 Two display bugs that surfaced during production testing of Phase Mobile-1.7 (`35d0fb3d`). One regression introduced by the composer rollout, one surface missed in the Phase 1.7 audit. No schema changes, no API contract changes — composer behavior change is strictly additive (skip-if-already-present) so every other Phase 1.7 call site is unaffected.

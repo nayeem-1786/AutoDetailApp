@@ -21,6 +21,7 @@ src/app/api/account/services/route.ts
 ### Admin
 ```
 src/app/api/admin/appointments/[id]/mobile-address/route.ts  # PATCH mobile_address only (Phase Mobile-1.6)
+src/app/api/admin/appointments/[id]/mobile-service/route.ts  # PATCH full mobile picker — toggle/zone/custom/address (Phase Mobile-1.9)
 src/app/api/admin/appointments/stats/route.ts
 src/app/api/admin/audit-log/export/route.ts
 src/app/api/admin/audit-log/route.ts
@@ -379,6 +380,7 @@ src/app/api/migration/vehicles/route.ts
 ### POS
 ```
 src/app/api/pos/appointments/[id]/mobile-address/route.ts     # PATCH mobile_address only (Phase Mobile-1.6)
+src/app/api/pos/appointments/[id]/mobile-service/route.ts     # PATCH full mobile picker — toggle/zone/custom/address (Phase Mobile-1.9)
 src/app/api/pos/appointments/[id]/notify/route.ts
 src/app/api/pos/appointments/[id]/send-payment-link/route.ts   — Send pay-link via SMS/email/both (Pay-Link Session 3)
 src/app/api/pos/auth/logout/route.ts
@@ -413,6 +415,7 @@ src/app/api/pos/jobs/route.ts
 src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
 src/app/api/pos/loyalty/redeem/route.ts
+src/app/api/admin/mobile-zones/route.ts                       # GET (admin auth, Phase Mobile-1.9 — modal picker dropdown)
 src/app/api/pos/mobile-zones/route.ts
 src/app/api/pos/my-permissions/route.ts
 src/app/api/pos/products/barcode-lookup/route.ts
@@ -1066,6 +1069,8 @@ src/lib/utils/light-mode-vars.ts
 src/lib/utils/link-tracking.ts
 src/lib/utils/mailgun-signature.ts
 src/lib/utils/mobile-address-action.ts
+src/lib/utils/mobile-service-edit.ts                            # Pure helpers: delta math + JSONB sync + paid-cents (Phase Mobile-1.9)
+src/lib/utils/resolve-mobile-fields.ts                          # Shared mobile-fields validation/resolver (Phase Mobile-1.9, consumed by quote-service + mobile-service PATCH endpoints)
 src/lib/utils/order-emails.ts
 src/lib/utils/order-number.ts
 src/lib/utils/phone-validation.ts
@@ -1097,6 +1102,8 @@ src/lib/utils/__tests__/constants.test.ts
 src/lib/utils/__tests__/format-address.test.ts
 src/lib/utils/__tests__/refund-math.test.ts
 src/lib/utils/__tests__/stock-adjustments.test.ts
+src/lib/utils/__tests__/mobile-service-edit.test.ts
+src/lib/utils/__tests__/resolve-mobile-fields.test.ts
 src/lib/utils/__tests__/validation-mobile-address.test.ts
 src/lib/utils/__tests__/validation-refund-shopuse.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
@@ -1263,6 +1270,9 @@ src/components/quotes/quote-book-dialog.tsx
 ```
 src/components/jobs/send-payment-link-dialog.tsx   — POS Send Payment Link channel-pick modal (Pay-Link Session 3b)
 src/components/jobs/payment-link-amount-modal.tsx  — POS Pre-send amount selector (25/50/75/Full + Custom) (Pay-Link Session 5)
+src/components/jobs/edit-mobile-modal.tsx          — Shared full mobile picker edit modal (POS + admin, mode prop) (Phase Mobile-1.9)
+src/components/jobs/payment-mismatch-banner.tsx    — Non-blocking warning after mobile edit when total ≠ paid (Phase Mobile-1.9)
+src/components/jobs/__tests__/edit-mobile-modal.test.tsx
 ```
 
 ### Other
@@ -1638,6 +1648,7 @@ docs/sessions/mobile-fee-1-5-zip-only-format.md      # Phase Mobile-1.5: parser 
 docs/sessions/mobile-fee-1-6-address-display-edit.md # Phase Mobile-1.6: mobile_address display + edit on POS jobs detail + admin appointment dialog
 docs/sessions/mobile-fee-1-7-display-composer.md     # Phase Mobile-1.7: shared composeLineItems utility — adds mobile fee as synthetic line on quote/appointment display surfaces
 docs/sessions/mobile-fee-1-8-composer-idempotency.md # Phase Mobile-1.8: composer idempotency (skip synthetic append when jobs.services JSONB already carries mobile entry) + POS quote detail wiring
+docs/sessions/mobile-fee-1-9-full-picker-edit.md     # Phase Mobile-1.9: full mobile picker edit on POS jobs detail + admin appointment dialog — toggle/zone/custom/address with live zone reads, save-time snapshot, payment-mismatch banner
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

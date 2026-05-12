@@ -2,6 +2,12 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { TAX_RATE } from '@/lib/utils/constants';
+import {
+  resolveMobileFields,
+  MobileFieldsError,
+  type MobileFieldsInput,
+  type ResolvedMobileFields,
+} from '@/lib/utils/resolve-mobile-fields';
 import type { CreateQuoteInput, UpdateQuoteInput } from '@/lib/utils/validation';
 
 // ---------------------------------------------------------------------------
@@ -272,7 +278,7 @@ export async function updateQuote(
   // validation runs identically. Only patch the columns when the caller
   // signaled mobile state in this update (is_mobile field present in body).
   const hasMobileUpdate = data.is_mobile !== undefined;
-  let mobileResolved: ResolvedMobile | null = null;
+  let mobileResolved: ResolvedMobileFields | null = null;
   if (hasMobileUpdate) {
     mobileResolved = await resolveMobileForQuote(supabase, data);
     update.is_mobile = mobileResolved.isMobile;
@@ -668,83 +674,26 @@ export class QuoteValidationError extends Error {
 // Mobile resolution helper — shared by createQuote + updateQuote
 // ---------------------------------------------------------------------------
 
-interface ResolvedMobile {
-  isMobile: boolean;
-  zoneId: string | null;
-  address: string | null;
-  surcharge: number;
-  snapshotName: string | null;
-}
-
-type MobileInput = {
-  is_mobile?: boolean;
-  mobile_zone_id?: string | null;
-  mobile_address?: string | null;
-  mobile_surcharge?: number;
-  mobile_zone_name_snapshot?: string | null;
-  // Phase Mobile-1.2: distinguishes "Custom path" from "no zone selected"
-  // when mobile_zone_id is null. Optional + defaults to false for
-  // backward compat with older clients.
-  is_custom?: boolean;
-};
-
+/**
+ * Phase Mobile-1.9 — delegates to the shared `resolveMobileFields` helper.
+ * Rationale: the same five-field validation + zone re-fetch + surcharge
+ * re-snapshot rules now run on quote write (this file), booking write
+ * (`/api/book`), and appointment mobile-service edit (Phase 1.9 PATCH
+ * endpoints). Duplicating the rules in three places risked drift; the
+ * shared resolver is the single source of truth. We re-throw the
+ * generic `MobileFieldsError` as `QuoteValidationError` so existing
+ * quote API callers (which catch the latter) keep working unchanged.
+ */
 async function resolveMobileForQuote(
   supabase: SupabaseClient,
-  data: MobileInput
-): Promise<ResolvedMobile> {
-  if (!data.is_mobile) {
-    return { isMobile: false, zoneId: null, address: null, surcharge: 0, snapshotName: null };
-  }
-  const address = (data.mobile_address ?? '').trim();
-  if (!address) {
-    throw new QuoteValidationError('Address is required for mobile service');
-  }
-  if (data.mobile_zone_id) {
-    const { data: zone, error: zoneErr } = await supabase
-      .from('mobile_zones')
-      .select('id, name, surcharge, is_available')
-      .eq('id', data.mobile_zone_id)
-      .single();
-    if (zoneErr || !zone) {
-      throw new QuoteValidationError('Invalid mobile zone');
+  data: MobileFieldsInput
+): Promise<ResolvedMobileFields> {
+  try {
+    return await resolveMobileFields(supabase, data);
+  } catch (err) {
+    if (err instanceof MobileFieldsError) {
+      throw new QuoteValidationError(err.message);
     }
-    if (!zone.is_available) {
-      throw new QuoteValidationError('Mobile zone is not available');
-    }
-    const clientSurcharge = Number(data.mobile_surcharge ?? 0);
-    if (Math.abs(Number(zone.surcharge) - clientSurcharge) > 0.01) {
-      throw new QuoteValidationError('Mobile surcharge mismatch — please refresh and try again');
-    }
-    return {
-      isMobile: true,
-      zoneId: zone.id,
-      address: address.slice(0, 200),
-      surcharge: Number(zone.surcharge),
-      snapshotName: zone.name,
-    };
+    throw err;
   }
-  // No zone selected — distinguish "Custom path" from "placeholder still
-  // showing" via the is_custom client flag.
-  if (data.is_custom !== true) {
-    throw new QuoteValidationError(
-      'Please select a service area for the mobile fee'
-    );
-  }
-  // Custom override path — authenticated staff can supply any positive
-  // surcharge up to $500 with an optional label.
-  const customAmount = Number(data.mobile_surcharge ?? 0);
-  if (!(customAmount > 0) || customAmount > 500) {
-    throw new QuoteValidationError(
-      'Enter a custom fee between $1 and $500'
-    );
-  }
-  const surcharge = Math.round(customAmount * 100) / 100;
-  const label = (data.mobile_zone_name_snapshot ?? '').trim().slice(0, 100);
-  return {
-    isMobile: true,
-    zoneId: null,
-    address: address.slice(0, 200),
-    surcharge,
-    snapshotName: label || 'Custom',
-  };
 }

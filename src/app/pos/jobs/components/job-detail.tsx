@@ -39,6 +39,11 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 import { SendPaymentLinkDialog } from '@/components/jobs/send-payment-link-dialog';
 import { PaymentLinkAmountModal } from '@/components/jobs/payment-link-amount-modal';
+import {
+  EditMobileModal,
+  type EditMobileModalSavedResult,
+} from '@/components/jobs/edit-mobile-modal';
+import { PaymentMismatchBanner } from '@/components/jobs/payment-mismatch-banner';
 import { fromCents } from '@/lib/utils/refund-math';
 import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
@@ -115,6 +120,10 @@ interface JobDetailData {
      * breakdown composer (renders synthetic mobile-fee row). */
     mobile_surcharge?: number | string | null;
     mobile_zone_name_snapshot?: string | null;
+    /** Phase Mobile-1.9: surfaced for the full mobile picker edit
+     * (zone re-select on existing job). The picker uses this to
+     * pre-select the current zone in the dropdown. */
+    mobile_zone_id?: string | null;
   } | null;
   addons: AddonData[] | null;
 }
@@ -275,10 +284,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
-  // Phase Mobile-1.6: inline edit for mobile_address (mirrors the Notes pattern).
-  const [editingMobileAddress, setEditingMobileAddress] = useState(false);
-  const [mobileAddressValue, setMobileAddressValue] = useState('');
-  const [savingMobileAddress, setSavingMobileAddress] = useState(false);
+  // Phase Mobile-1.9 — full mobile picker edit replaces the Phase 1.6
+  // address-only modal. State drives the shared `EditMobileModal` and
+  // the post-save mismatch banner.
+  const [editingMobile, setEditingMobile] = useState(false);
+  const [paymentMismatch, setPaymentMismatch] = useState<{
+    amount: number;
+    newTotal: number;
+    paidAmount: number;
+  } | null>(null);
   const [checkingOut, setCheckingOut] = useState(false);
 
   async function handleCheckout() {
@@ -578,84 +592,41 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     if (ok) setEditingNotes(false);
   }
 
-  function handleStartEditMobileAddress() {
-    setMobileAddressValue(job?.appointment?.mobile_address || '');
-    setEditingMobileAddress(true);
-  }
-
-  async function handleSaveMobileAddress() {
-    const trimmed = mobileAddressValue.trim();
-    if (!trimmed) {
-      toast.error('Address is required for mobile service');
-      return;
-    }
-    if (trimmed.length > 200) {
-      toast.error('Address is too long (max 200 characters)');
-      return;
-    }
-    const appointmentId = job?.appointment?.id;
-    if (!appointmentId) {
-      toast.error('No appointment linked to this job');
-      return;
-    }
-    // Optimistic update — apply locally and close the modal immediately
-    // so the card reflects the new value while the request is in flight.
-    // On failure (network or server error), revert the address and
-    // re-open the modal with the attempted value so the cashier can retry.
-    const previousAddress = job?.appointment?.mobile_address ?? null;
+  // Phase Mobile-1.9 — full mobile picker edit. Modal owns its own
+  // validation + PATCH lifecycle; this callback runs after the server
+  // confirms the write, merging the saved snapshot into local state and
+  // surfacing the payment-mismatch banner when the new total no longer
+  // matches what's been paid.
+  function handleMobileEditSaved(result: EditMobileModalSavedResult) {
     setJob((prev) =>
       prev && prev.appointment
         ? {
             ...prev,
-            appointment: { ...prev.appointment, mobile_address: trimmed },
+            appointment: {
+              ...prev.appointment,
+              is_mobile: result.is_mobile,
+              mobile_zone_id: result.mobile_zone_id,
+              mobile_address: result.mobile_address,
+              mobile_surcharge: result.mobile_surcharge,
+              mobile_zone_name_snapshot: result.mobile_zone_name_snapshot,
+              total_amount: result.total_amount,
+            },
           }
         : prev
     );
-    setEditingMobileAddress(false);
-    setSavingMobileAddress(true);
-    try {
-      const res = await posFetch(
-        `/api/pos/appointments/${appointmentId}/mobile-address`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobile_address: trimmed }),
-        }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setJob((prev) =>
-          prev && prev.appointment
-            ? {
-                ...prev,
-                appointment: {
-                  ...prev.appointment,
-                  mobile_address: previousAddress,
-                },
-              }
-            : prev
-        );
-        setEditingMobileAddress(true);
-        toast.error(err.error || 'Failed to update mobile address');
-        return;
-      }
-      toast.success('Mobile address updated');
-    } catch {
-      setJob((prev) =>
-        prev && prev.appointment
-          ? {
-              ...prev,
-              appointment: {
-                ...prev.appointment,
-                mobile_address: previousAddress,
-              },
-            }
-          : prev
-      );
-      setEditingMobileAddress(true);
-      toast.error('Failed to update mobile address');
-    } finally {
-      setSavingMobileAddress(false);
+    // Re-fetch in the background so derived fields (amount_due_cents,
+    // jobs.services JSONB → composer-rendered list) reflect the
+    // canonical server-side state. The optimistic merge above keeps
+    // the card responsive in the meantime.
+    fetchJob();
+    if (Math.abs(result.mismatch_amount) >= 0.005) {
+      setPaymentMismatch({
+        amount: result.mismatch_amount,
+        newTotal: result.total_amount,
+        paidAmount: result.total_amount - result.mismatch_amount,
+      });
+    } else {
+      setPaymentMismatch(null);
     }
   }
 
@@ -1018,45 +989,99 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             </div>
           )}
 
-          {/* Mobile Service Address — Phase Mobile-1.6. Rendered only when
-              the linked appointment is mobile. Pencil opens the same modal
-              pattern used by Notes / Edit Services on this page. */}
+          {/* Mobile Service — Phase Mobile-1.9 expanded card. Replaces the
+              Phase 1.6 address-only card. Shows zone snapshot (frozen at
+              save time per LOCKED-7.6) + surcharge + address. Pencil opens
+              the full picker modal. Card is hidden when is_mobile=false. */}
           {job.appointment?.is_mobile && (
             isEditable ? (
               <button
-                onClick={handleStartEditMobileAddress}
+                onClick={() => setEditingMobile(true)}
                 className="w-full rounded-lg bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-800"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                     <MapPin className="h-4 w-4" />
-                    <span>Mobile Service Address</span>
+                    <span>Mobile Service</span>
                   </div>
                   <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
                 </div>
-                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {job.appointment.mobile_address || (
-                    <span className="italic text-gray-400 dark:text-gray-500">
-                      Tap to add address
+                <div className="mt-1 space-y-0.5 text-sm">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Zone:{' '}
                     </span>
-                  )}
-                </p>
+                    {job.appointment.mobile_zone_name_snapshot || (
+                      <span className="italic text-gray-400 dark:text-gray-500">
+                        Not set
+                      </span>
+                    )}
+                    {Number(job.appointment.mobile_surcharge ?? 0) > 0 && (
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {' '}— ${Number(job.appointment.mobile_surcharge).toFixed(2)}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Address:{' '}
+                    </span>
+                    {job.appointment.mobile_address || (
+                      <span className="italic text-gray-400 dark:text-gray-500">
+                        Tap to add address
+                      </span>
+                    )}
+                  </p>
+                </div>
               </button>
             ) : (
               <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                   <MapPin className="h-4 w-4" />
-                  <span>Mobile Service Address</span>
+                  <span>Mobile Service</span>
                 </div>
-                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {job.appointment.mobile_address || (
-                    <span className="italic text-gray-400 dark:text-gray-500">
-                      No address on file
+                <div className="mt-1 space-y-0.5 text-sm">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Zone:{' '}
                     </span>
-                  )}
-                </p>
+                    {job.appointment.mobile_zone_name_snapshot || (
+                      <span className="italic text-gray-400 dark:text-gray-500">
+                        Not set
+                      </span>
+                    )}
+                    {Number(job.appointment.mobile_surcharge ?? 0) > 0 && (
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {' '}— ${Number(job.appointment.mobile_surcharge).toFixed(2)}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Address:{' '}
+                    </span>
+                    {job.appointment.mobile_address || (
+                      <span className="italic text-gray-400 dark:text-gray-500">
+                        No address on file
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             )
+          )}
+
+          {/* Phase Mobile-1.9 — payment mismatch banner rendered after the
+              picker save when the new total no longer matches what's been
+              paid. Informational only; admin uses existing refund / send-
+              payment-link flows to reconcile. */}
+          {paymentMismatch && (
+            <PaymentMismatchBanner
+              mismatchAmount={paymentMismatch.amount}
+              newTotal={paymentMismatch.newTotal}
+              paidAmount={paymentMismatch.paidAmount}
+              onDismiss={() => setPaymentMismatch(null)}
+            />
           )}
 
           {/* Timing */}
@@ -1773,70 +1798,25 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         </div>
       )}
 
-      {/* Edit Mobile Service Address Modal — Phase Mobile-1.6.
-          Mirrors the Notes modal shape (same surface, same pattern). */}
-      {editingMobileAddress && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
-          onClick={() => setEditingMobileAddress(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:rounded-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Edit Mobile Service Address
-                </h3>
-                <button
-                  onClick={() => setEditingMobileAddress(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                </button>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={mobileAddressValue}
-                  onChange={(e) => setMobileAddressValue(e.target.value)}
-                  placeholder="123 Main St, Torrance, CA 90501"
-                  maxLength={200}
-                  autoFocus
-                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 p-3 pr-8 text-base sm:text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
-                {mobileAddressValue && (
-                  <button
-                    type="button"
-                    onClick={() => setMobileAddressValue('')}
-                    aria-label="Clear address"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={() => setEditingMobileAddress(false)}
-                  className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveMobileAddress}
-                  disabled={savingMobileAddress || !mobileAddressValue.trim()}
-                  className="flex-1 rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
-                >
-                  {savingMobileAddress ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Edit Mobile Service Modal — Phase Mobile-1.9.
+          Replaces the Phase 1.6 address-only modal. Shared component;
+          admin appointment dialog uses the same one with mode='admin'. */}
+      {editingMobile && job?.appointment?.id && (
+        <EditMobileModal
+          open={editingMobile}
+          mode="pos"
+          appointmentId={job.appointment.id}
+          initial={{
+            is_mobile: job.appointment.is_mobile ?? false,
+            mobile_zone_id: job.appointment.mobile_zone_id ?? null,
+            mobile_surcharge: Number(job.appointment.mobile_surcharge ?? 0),
+            mobile_address: job.appointment.mobile_address ?? null,
+            mobile_zone_name_snapshot:
+              job.appointment.mobile_zone_name_snapshot ?? null,
+          }}
+          onClose={() => setEditingMobile(false)}
+          onSaved={handleMobileEditSaved}
+        />
       )}
 
       {/* Edit Notes Modal */}
