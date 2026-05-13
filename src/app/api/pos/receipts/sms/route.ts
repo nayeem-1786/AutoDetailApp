@@ -8,6 +8,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { buildSummaryLine } from '@/lib/sms/composites';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { normalizePhone } from '@/lib/utils/format';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +28,18 @@ export async function POST(request: NextRequest) {
     if (!transaction_id || !phone) {
       return NextResponse.json(
         { error: 'transaction_id and phone are required' },
+        { status: 400 }
+      );
+    }
+
+    // Phase Normalization-1: receipt SMS input boxes (POS + admin
+    // receipt-dialog) format phone for display while typing. Defense-in-depth
+    // alongside the chokepoint in sendSms() — reject 400 here so the operator
+    // sees a clear error rather than a generic "SMS failed" message.
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      return NextResponse.json(
+        { error: 'Invalid phone number format' },
         { status: 400 }
       );
     }
@@ -104,7 +117,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, skipped: 'template_disabled' });
     }
 
-    const result = await sendSms(phone, rendered.body, {
+    const result = await sendSms(normalizedPhone, rendered.body, {
       logToConversation: true,
       notificationType: 'receipt_sent',
       contextId: transaction_id,

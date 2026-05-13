@@ -8,7 +8,7 @@ import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { employeeUpdateSchema, type EmployeeUpdateInput } from '@/lib/utils/validation';
-import { formatPhoneInput } from '@/lib/utils/format';
+import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import type { Employee, UserRole, EmployeeSchedule } from '@/lib/supabase/types';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -322,6 +322,19 @@ export default function StaffDetailPage() {
   }
 
   async function onSaveProfile(data: EmployeeUpdateInput) {
+    // Phase Normalization-1: normalize the display-formatted phone before
+    // hitting the API. The server-side endpoint also normalizes, but checking
+    // here gives a cleaner inline error message.
+    let phonePayload: string | null = null;
+    if (data.phone && data.phone.trim()) {
+      const normalized = normalizePhone(data.phone);
+      if (!normalized) {
+        toast.error('Please enter a valid US mobile number');
+        return;
+      }
+      phonePayload = normalized;
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/staff/${id}`, {
@@ -331,7 +344,7 @@ export default function StaffDetailPage() {
           first_name: data.first_name,
           last_name: data.last_name,
           email: data.email,
-          phone: data.phone || null,
+          phone: phonePayload,
           role: data.role as UserRole,
           pin_code: data.pin_code || null,
           hourly_rate: data.hourly_rate ?? null,

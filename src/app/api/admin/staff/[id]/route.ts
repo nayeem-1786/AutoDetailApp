@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
+import { normalizePhone } from '@/lib/utils/format';
 
 export async function PATCH(
   request: NextRequest,
@@ -20,6 +21,20 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
     const { first_name, last_name, email, phone, role, pin_code, hourly_rate, bookable_for_appointments } = body;
+
+    // Phase Normalization-1: employees.phone is unprotected at the DB layer
+    // until the constraint migration applies. Normalize here so display-
+    // formatted strings from the admin form don't reach the column.
+    let normalizedEmployeePhone: string | null = null;
+    if (phone) {
+      normalizedEmployeePhone = normalizePhone(phone);
+      if (!normalizedEmployeePhone) {
+        return NextResponse.json(
+          { error: 'Invalid phone number format' },
+          { status: 400 }
+        );
+      }
+    }
 
     const supabase = createAdminClient();
 
@@ -72,7 +87,7 @@ export async function PATCH(
       first_name,
       last_name,
       email,
-      phone: phone || null,
+      phone: normalizedEmployeePhone,
       role: roleEnum ?? role,
       pin_code: pin_code || null,
       hourly_rate: hourly_rate ?? null,

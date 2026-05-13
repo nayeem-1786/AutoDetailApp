@@ -6,6 +6,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Normalization-1 — phone format integrity
+
+Audit of `sms_delivery_log` over the past month surfaced 38 malformed phones (6 distinct numbers) across two shapes — display-formatted `(XXX) XXX-XXXX` and missing-`+` `13107564789`. Twilio's API silently accepted them so no customer messages were missed, but the audit trail was inconsistent and downstream joins were at risk. Three independent root causes converged at `sms_delivery_log`: `sendSms()` didn't normalize, five unprotected DB write endpoints accepted display strings, and `findOrCreateConversation()` created shadow conversations that fragment threads.
+
+**Chokepoint normalization.** `src/lib/utils/sms.ts` — `sendSms()` and `sendMarketingSms()` now call `normalizePhone()` at entry; unparseable input returns `{success:false, error:'Invalid phone number format'}` without touching Twilio or `sms_delivery_log`. `src/lib/utils/conversation-helpers.ts` — `findOrCreateConversation()` normalizes at the boundary; returns `null` on unparseable input.
+
+**Five unprotected write endpoints normalized.** `/api/staff/create` and `/api/admin/staff/[id]` reject 400 on malformed phone before INSERT/UPDATE. `/api/pos/receipts/sms` rejects 400 before send (covers POS receipt-options + admin receipt-dialog). Admin messaging settings page (`/admin/settings/messaging`) normalizes `sms_test_phone_number` and `sms_business_phone_override` client-side before Supabase upsert.
+
+**Form-side hygiene.** Admin staff new/edit pages, POS `receipt-options`, and admin `receipt-dialog` now normalize on submit via `normalizePhone()` (display formatting preserved). Inline toast on invalid input.
+
+**Migration `20260513022648_phone_normalization_phase_1.sql`.** Backfilled 3 `employees.phone` rows, 1 `business_settings.sms_test_phone_number` JSONB value, and 38 `sms_delivery_log.to_phone` rows. Added `valid_phone` CHECK on `employees.phone` mirroring `customers.valid_phone` (gated by a `DO $$` block that verifies cleanliness before the ALTER).
+
+**Shadow conversations deferred.** Four `conversations.phone_number` rows remain in display format. Three have no E.164 sibling (recommend straight normalize); one (`+13107564789`) has a 36-message E.164 sibling and 5 shadow messages — recommend merge. Per-row operator decision pending. CHECK constraints on `conversations.phone_number`, `sms_delivery_log.to_phone`, `sms_conversations.phone_number`, `sms_consent_log.phone`, `quote_communications.sent_to` deferred to follow-up.
+
+**Tests.** +12 cases across `src/lib/utils/__tests__/sms-normalization.test.ts` and `src/lib/utils/__tests__/conversation-helpers-normalization.test.ts` covering empty/garbage/short-digit rejection, normalization of `(310) 756-4789` and `13107564789`, E.164 pass-through, and conversation-helper normalized lookup + insert. 849 total tests pass (was 837).
+
+**Files changed:**
+- `src/lib/utils/sms.ts`
+- `src/lib/utils/conversation-helpers.ts`
+- `src/app/api/staff/create/route.ts`
+- `src/app/api/admin/staff/[id]/route.ts`
+- `src/app/api/pos/receipts/sms/route.ts`
+- `src/app/admin/settings/messaging/page.tsx`
+- `src/app/admin/staff/new/page.tsx`
+- `src/app/admin/staff/[id]/page.tsx`
+- `src/app/pos/components/receipt-options.tsx`
+- `src/components/admin/receipt-dialog.tsx`
+- `src/lib/utils/__tests__/sms-normalization.test.ts` (new)
+- `src/lib/utils/__tests__/conversation-helpers-normalization.test.ts` (new)
+- `supabase/migrations/20260513022648_phone_normalization_phase_1.sql` (new)
+- `docs/sessions/normalization-1-phone-format-integrity.md` (new)
+- `docs/dev/DB_SCHEMA.md` (regenerated)
+
+---
+
 ## Session: Phase Messaging-1+2 follow-up — `sent` is success + toast stacking
 
 Two regressions surfaced during production testing of the prior shipment, both renderer-only (no schema changes).

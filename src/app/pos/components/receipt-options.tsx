@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
-import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 
 interface ReceiptOptionsProps {
   transactionId: string;
@@ -157,12 +157,20 @@ export function ReceiptOptions({
 
   async function handleSms(phone: string) {
     if (!phone) return;
+    // Phase Normalization-1: the input runs formatPhoneInput while typing.
+    // Normalize before submit so the API receives E.164 (matches server-side
+    // guard, surfaces a clean inline error otherwise).
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      toast.error('Please enter a valid US mobile number');
+      return;
+    }
     setSmsing(true);
     try {
       const res = await posFetch('/api/pos/receipts/sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: transactionId, phone }),
+        body: JSON.stringify({ transaction_id: transactionId, phone: normalized }),
       });
 
       const json = await res.json();

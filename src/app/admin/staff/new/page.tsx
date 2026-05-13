@@ -7,7 +7,7 @@ import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { employeeCreateSchema, type EmployeeCreateInput } from '@/lib/utils/validation';
-import { formatPhoneInput } from '@/lib/utils/format';
+import { formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -69,12 +69,25 @@ export default function NewStaffPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onSubmit(data: EmployeeCreateInput) {
+    // Phase Normalization-1: the phone input runs formatPhoneInput while typing
+    // for UX, so `data.phone` is the formatted display string. Normalize to
+    // E.164 before submit so the server-side check accepts it.
+    let phonePayload: string = '';
+    if (data.phone && data.phone.trim()) {
+      const normalized = normalizePhone(data.phone);
+      if (!normalized) {
+        toast.error('Please enter a valid US mobile number');
+        return;
+      }
+      phonePayload = normalized;
+    }
+
     setSaving(true);
     try {
       const res = await fetch('/api/staff/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, phone: phonePayload }),
       });
 
       const result = await res.json();

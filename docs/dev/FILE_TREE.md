@@ -1107,6 +1107,8 @@ src/lib/utils/__tests__/resolve-mobile-fields.test.ts
 src/lib/utils/__tests__/validation-mobile-address.test.ts
 src/lib/utils/__tests__/validation-refund-shopuse.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
+src/lib/utils/__tests__/sms-normalization.test.ts         # Phase Normalization-1: 8 cases — sendSms/sendMarketingSms rejection on invalid, normalization of (XXX) XXX-XXXX and 11-digit shapes, E.164 pass-through
+src/lib/utils/__tests__/conversation-helpers-normalization.test.ts # Phase Normalization-1: 4 cases — findOrCreateConversation rejection on invalid + normalized lookup/insert
 src/lib/utils/webhook.ts
 ```
 
@@ -1596,6 +1598,7 @@ Phase Mobile-1.1 additions:
 20260511000001_add_mobile_fee_item_type.sql           # Mobile fix D2: extend transaction_item_type enum with 'mobile_fee'
 20260511000002_add_mobile_zone_snapshot_and_quote_mobile.sql # Mobile fix D2: appointments.mobile_zone_name_snapshot + quotes mobile_* columns + consistency CHECKs
 20260512152847_quote_communications_delivery_tracking.sql    # Phase Messaging-1+2: twilio_sid column + 3-status enum (sent/failed/blocked) on quote_communications
+20260513022648_phone_normalization_phase_1.sql               # Phase Normalization-1: backfill 3 employees + 1 business_settings + 38 sms_delivery_log + ALTER employees ADD CONSTRAINT valid_phone
 ```
 
 ## Scripts
@@ -1652,6 +1655,7 @@ docs/sessions/mobile-fee-1-8-composer-idempotency.md # Phase Mobile-1.8: compose
 docs/sessions/messaging-1-2-send-flow-and-delivery.md # Phase Messaging-1+2: send pipeline overhaul (HTTP 422 on total failure, 3-status enum, twilio_sid JOIN for delivery tracking)
 docs/sessions/mobile-fee-1-9-full-picker-edit.md     # Phase Mobile-1.9: full mobile picker edit on POS jobs detail + admin appointment dialog — toggle/zone/custom/address with live zone reads, save-time snapshot, payment-mismatch banner
 docs/sessions/mobile-fee-1-9-1-zone-dropdown-fix.md  # Phase Mobile-1.9.1: zone-dropdown shows correct selection in edit mode (JOB_SELECT +mobile_zone_id, zonesLoaded resync, deleted-zone recovery)
+docs/sessions/normalization-1-phone-format-integrity.md  # Phase Normalization-1: chokepoint phone normalization in sendSms/findOrCreateConversation, 5 unprotected endpoints, form-side hygiene, backfill + CHECK on employees.phone, 4 shadow conversations deferred
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

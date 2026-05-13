@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, normalizePhone } from '@/lib/utils/format';
 import {
   Dialog,
   DialogHeader,
@@ -160,12 +160,20 @@ export function ReceiptDialog({
 
   async function handleSms(phone: string) {
     if (!phone || !txId) return;
+    // Phase Normalization-1: this dialog's input is free-text. Normalize
+    // before submit so the API receives E.164 (matches server-side guard,
+    // surfaces a clean inline error otherwise).
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      toast.error('Please enter a valid US mobile number');
+      return;
+    }
     setSmsing(true);
     try {
       const res = await fetch('/api/pos/receipts/sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transaction_id: txId, phone }),
+        body: JSON.stringify({ transaction_id: txId, phone: normalized }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'SMS failed');

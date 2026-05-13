@@ -4,6 +4,7 @@ import { employeeCreateSchema } from '@/lib/utils/validation';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { normalizePhone } from '@/lib/utils/format';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,6 +28,21 @@ export async function POST(request: NextRequest) {
     }
 
     const { password, pin_code, ...employeeData } = parsed.data;
+
+    // Phase Normalization-1: employees.phone is unprotected at the DB layer
+    // until the constraint migration applies. Normalize here so display-
+    // formatted strings from the admin form don't reach the column.
+    let normalizedEmployeePhone: string | null = null;
+    if (employeeData.phone) {
+      normalizedEmployeePhone = normalizePhone(employeeData.phone);
+      if (!normalizedEmployeePhone) {
+        return NextResponse.json(
+          { error: 'Invalid phone number format' },
+          { status: 400 }
+        );
+      }
+    }
+
     const adminClient = createAdminClient();
 
     // Look up role_id from roles table
@@ -94,7 +110,7 @@ export async function POST(request: NextRequest) {
         first_name: employeeData.first_name,
         last_name: employeeData.last_name,
         email: employeeData.email,
-        phone: employeeData.phone || null,
+        phone: normalizedEmployeePhone,
         role: roleEnum,
         role_id: roleRow.id,
         pin_code: pin_code || null,

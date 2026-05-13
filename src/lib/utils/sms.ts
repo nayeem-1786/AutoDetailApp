@@ -2,6 +2,7 @@
 // Delivery tracking via sms_delivery_log table + Twilio status callback webhook.
 
 import { wrapUrlsInMessage } from '@/lib/utils/link-tracking';
+import { normalizePhone } from '@/lib/utils/format';
 
 interface SmsResult {
   success: true;
@@ -61,13 +62,22 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
     };
   }
 
+  // Phase Normalization-1: enforce E.164 at the chokepoint. Every caller passes
+  // through here; reject malformed phones before touching Twilio so we don't
+  // log unparseable numbers to sms_delivery_log (no SID to track anyway).
+  const normalized = normalizePhone(to);
+  if (!normalized) {
+    console.warn(`[SMS] Rejected send to invalid phone: ${JSON.stringify(to)}`);
+    return { success: false, error: 'Invalid phone number format' };
+  }
+
   try {
     const formData = new URLSearchParams();
     // MessagingServiceSid and From are mutually exclusive — the Twilio API
     // rejects requests that include both. Sticking with the Service for A2P
     // 10DLC routing.
     formData.append('MessagingServiceSid', twilioMessagingServiceSid);
-    formData.append('To', to);
+    formData.append('To', normalized);
     formData.append('Body', body);
 
     if (options?.mediaUrl) {
@@ -99,12 +109,12 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
     if (!res.ok) {
       const errText = await res.text();
       console.error('[SMS] Twilio error:', errText);
-      console.log(`[SMS] type=transactional to=${to} status=failed`);
+      console.log(`[SMS] type=transactional to=${normalized} status=failed`);
       return { success: false, error: 'Failed to send SMS' };
     }
 
     const data = await res.json();
-    console.log(`[SMS] type=transactional to=${to} status=sent sid=${data.sid}${options?.mediaUrl ? ' mms=true' : ''}`);
+    console.log(`[SMS] type=transactional to=${normalized} status=sent sid=${data.sid}${options?.mediaUrl ? ' mms=true' : ''}`);
 
     // Insert initial delivery tracking row
     try {
@@ -112,7 +122,7 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
       const adminClient = createAdminClient();
       await adminClient.from('sms_delivery_log').insert({
         message_sid: data.sid,
-        to_phone: to,
+        to_phone: normalized,
         from_phone: twilioFrom ?? null,
         status: 'queued',
         customer_id: options?.customerId || null,
@@ -133,7 +143,7 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
         const admin = createAdmin();
 
         const convId = options.conversationId
-          || await findOrCreateConversation(admin, to, options.customerId);
+          || await findOrCreateConversation(admin, normalized, options.customerId);
 
         if (convId) {
           const metadata: Record<string, string> = {};
@@ -173,7 +183,7 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
     return { success: true, sid: data.sid };
   } catch (err) {
     console.error('[SMS] Send error:', err);
-    console.log(`[SMS] type=transactional to=${to} status=error`);
+    console.log(`[SMS] type=transactional to=${normalized} status=error`);
     return { success: false, error: 'SMS send failed' };
   }
 }
@@ -194,6 +204,16 @@ export interface MarketingSmsOptions {
  * If customerId is provided, verifies sms_consent and frequency cap before sending.
  */
 export async function sendMarketingSms(to: string, body: string, customerId?: string, marketingOptions?: MarketingSmsOptions): Promise<SendSmsResult> {
+  // Phase Normalization-1: normalize at the chokepoint. sendSms() also
+  // normalizes, but we do it here too so the rejection logs surface the
+  // marketing-specific context (customerId) and so the marketing-status logs
+  // below display the cleaned number.
+  const normalized = normalizePhone(to);
+  if (!normalized) {
+    console.warn(`[SMS] Rejected marketing send to invalid phone: ${JSON.stringify(to)}${customerId ? ` customerId=${customerId}` : ''}`);
+    return { success: false, error: 'Invalid phone number format' };
+  }
+
   // Lazy import to avoid circular deps — admin client is server-only
   const { createAdminClient } = await import('@/lib/supabase/admin');
   const admin = createAdminClient();
@@ -237,7 +257,7 @@ export async function sendMarketingSms(to: string, body: string, customerId?: st
     }
   }
 
-  const result = await sendSms(to, `${finalBody}\nReply STOP to unsubscribe`, {
+  const result = await sendSms(normalized, `${finalBody}\nReply STOP to unsubscribe`, {
     customerId: customerId || undefined,
     campaignId: marketingOptions?.campaignId,
     lifecycleExecutionId: marketingOptions?.lifecycleExecutionId,
@@ -245,9 +265,9 @@ export async function sendMarketingSms(to: string, body: string, customerId?: st
   });
 
   if (result.success) {
-    console.log(`[SMS] type=marketing to=${to} status=sent sid=${result.sid}${customerId ? ` customerId=${customerId}` : ''}`);
+    console.log(`[SMS] type=marketing to=${normalized} status=sent sid=${result.sid}${customerId ? ` customerId=${customerId}` : ''}`);
   } else {
-    console.log(`[SMS] type=marketing to=${to} status=failed${customerId ? ` customerId=${customerId}` : ''}`);
+    console.log(`[SMS] type=marketing to=${normalized} status=failed${customerId ? ` customerId=${customerId}` : ''}`);
   }
 
   return result;

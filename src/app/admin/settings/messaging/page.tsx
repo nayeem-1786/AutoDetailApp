@@ -16,6 +16,7 @@ import { TogglePill } from '@/components/ui/toggle-pill';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { normalizePhone } from '@/lib/utils/format';
 
 interface MessagingSettings {
   messaging_ai_unknown_enabled: string;
@@ -152,12 +153,33 @@ export default function MessagingSettingsPage() {
   }, []);
 
   async function handleSave() {
+    // Phase Normalization-1: normalize phone-bearing settings before upsert.
+    // This page writes business_settings directly via Supabase RLS, so the
+    // normalize step lives client-side (no server-side handler to host it).
+    const phoneSettings: Record<string, string> = {};
+    if (settings.sms_test_phone_number.trim()) {
+      const normalized = normalizePhone(settings.sms_test_phone_number);
+      if (!normalized) {
+        toast.error('SMS Test Phone Number is not a valid US phone');
+        return;
+      }
+      phoneSettings.sms_test_phone_number = normalized;
+    }
+    if (settings.sms_business_phone_override.trim()) {
+      const normalized = normalizePhone(settings.sms_business_phone_override);
+      if (!normalized) {
+        toast.error('Business Phone Override is not a valid US phone');
+        return;
+      }
+      phoneSettings.sms_business_phone_override = normalized;
+    }
+
     setSaving(true);
     const supabase = createClient();
 
     const entries = SETTINGS_KEYS.map((key) => ({
       key,
-      value: settings[key] as unknown,
+      value: (phoneSettings[key] ?? settings[key]) as unknown,
       updated_at: new Date().toISOString(),
     }));
 
@@ -175,8 +197,12 @@ export default function MessagingSettingsPage() {
       }
     }
 
+    // Reflect the normalized values back into local state so the dirty check
+    // doesn't treat the typed input vs. saved E.164 as unsaved changes.
+    const next = { ...settings, ...phoneSettings } as MessagingSettings;
+    setSettings(next);
+    setInitial(next);
     toast.success('Messaging settings updated');
-    setInitial({ ...settings });
     setSaving(false);
   }
 
