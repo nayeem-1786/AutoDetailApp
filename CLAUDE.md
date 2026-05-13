@@ -19,7 +19,7 @@
 2. **Internal cron only**: ALL scheduling via `src/lib/cron/scheduler.ts` + `src/instrumentation.ts`. NEVER suggest n8n, Vercel Cron, or external schedulers.
 3. **Hostinger only**: Currently delpoyed locally on MBP, but once fully developed it will become Deployed on dedicated Hostinger server. Never reference or suggest Vercel.
 4. **No quick fixes**: Provide fully thought-out solutions covering all scenarios and edge cases.
-5. **Session end**: Update docs/CHANGELOG.md and relevant docs/dev/ files. Only update CLAUDE.md if the tech stack, project structure, critical rules, or current phase changed. For feature work and bug fixes, CHANGELOG.md is sufficient. Then: `git add -A && git commit -m "..." && git push && rm -rf .next`
+5. **Session end**: Update docs/CHANGELOG.md and relevant docs/dev/ files. Only update CLAUDE.md if the tech stack, project structure, critical rules, or current phase changed. For feature work and bug fixes, CHANGELOG.md is sufficient. Write or update an ADR in `docs/adr/` if the session made an architecturally significant decision per the trigger criteria in `docs/adr/README.md`. Then: `git add -A && git commit -m "..." && git push && rm -rf .next`
 After commit, push, and cache clear, print: `⚠️ Session complete. Run: npm run dev`
 6. **Commit format**: Conventional commits — `feat:`, `fix:`, `docs:`, `refactor:`, `chore:`
 7. **Multi-session prompts**: Separate files per session (session-1.md, session-2.md) — never combine.

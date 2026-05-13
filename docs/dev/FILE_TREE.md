@@ -1639,6 +1639,14 @@ eslint-rules/__tests__/phone-no-raw-display.test.js        # 23 RuleTester cases
 
 ```
 docs/CHANGELOG.md
+docs/adr/                                              # Architecture Decision Records (Phase ADR-1)
+docs/adr/README.md                                     # Index + when-to-write criteria + how-to
+docs/adr/_template.md                                  # Canonical ADR template (≤800 words, 6 sections)
+docs/adr/0001-canonical-form-pattern.md                # Meta-pattern: storage canonical + wire canonical + display formatted + input formatted
+docs/adr/0002-phone-format-integrity.md                # 5-layer defense for phones — application of ADR-0001
+docs/adr/0003-money-math-via-integer-cents.md          # Integer-cents arithmetic + 4 invariants — application of ADR-0001
+docs/adr/0004-receipt-four-surface-synchronization.md  # Thermal + HTML print + public page + email update together
+docs/adr/0005-timezone-policy-pacific.md               # America/Los_Angeles everywhere; never UTC at the app layer
 docs/dev/ARCHITECTURE.md
 docs/dev/DB_SCHEMA.md          # Full database schema reference (70+ tables)
 docs/dev/CONVENTIONS.md
@@ -1671,6 +1679,7 @@ docs/sessions/normalization-1-phone-format-integrity.md  # Phase Normalization-1
 docs/sessions/phone-ux-1-display-and-input.md            # Phase Phone-UX-1: canonical phone display + input formatting — null-safe formatPhone, palette-driven SMS chip auto-format, 22 HIGH + 5 MEDIUM display sites, 7 input forms, 3 duplicate impls consolidated
 docs/sessions/schema-hardening-1-phone-checks.md         # Phase Schema-Hardening-1: 5 phone CHECK constraints (4 new + 1 retroactive channel-aware on quote_communications.sent_to), inline DB-contract doc in send-service.ts, defense-in-depth complete
 docs/sessions/lint-hardening-1.2-and-1.3-leak-fixes-and-rule-tightening.md  # Phase Lint-Hardening-1.2+1.3: 4 phone display leaks fixed (formatPhone wraps) + 11 tel: hrefs wrapped with phoneToE164 + 5 phone/no-raw-display rule adjustments (skip &&/?: test, recognize formatPhone(x)||x fallback, skip key/input value attrs, drop cell/mobile bare generics). Warning count 90→19. +15 rule tests.
+docs/sessions/adr-1-establish-decision-records-practice.md  # Phase ADR-1: established docs/adr/ as ongoing practice. 5 initial ADRs (canonical form pattern, phone integrity, money cents, receipt 4-surface, timezone). 15 candidate ADRs identified for follow-up. CLAUDE.md Rule 5 updated to include ADR step at session end.
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

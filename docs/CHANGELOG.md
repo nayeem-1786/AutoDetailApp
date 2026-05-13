@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase ADR-1 — Architecture Decision Records as ongoing practice
+
+Established `docs/adr/` as the canonical home for architectural decisions and wrote 5 initial ADRs. The corpus is **ongoing practice**, not a one-time consolidation — every future session that makes an architecturally significant decision writes or updates an ADR alongside the usual CHANGELOG entry.
+
+**5 initial ADRs (each ≤ 800 words):**
+1. [ADR-0001](adr/0001-canonical-form-pattern.md) — Canonical form pattern (storage canonical + wire canonical + display formatted + input formatted). Meta-pattern that ADR-0002 and ADR-0003 apply to specific domains.
+2. [ADR-0002](adr/0002-phone-format-integrity.md) — Phone format integrity: E.164 storage, 5-layer defense (DB CHECK + wire chokepoint + display + input + lint), US/Canada-only. References commits Normalization-1, Phone-UX-1, Lint-Hardening-1, Schema-Hardening-1, Lint-Hardening-1.2+1.3.
+3. [ADR-0003](adr/0003-money-math-via-integer-cents.md) — Money math via integer cents: `toCents`/`fromCents`, round once per line, residual distribution, server tolerance 0. Rooted in Session-35 refund bug.
+4. [ADR-0004](adr/0004-receipt-four-surface-synchronization.md) — Receipt 4-surface rule: thermal + HTML print + public page + email update together. 19-scenario fixture suite catches divergence.
+5. [ADR-0005](adr/0005-timezone-policy-pacific.md) — Timezone policy: `America/Los_Angeles` at the application layer, UTC at storage only. Single-shop business, configurable timezone rejected.
+
+**Template + index + practice integration:**
+- `docs/adr/_template.md` — canonical 6-section structure (Context, Decision, Consequences, Alternatives, Related, header). Hard caps: ≤800 words, ≤3 paragraphs per section, ≤2 rendered pages.
+- `docs/adr/README.md` — when-to-write criteria, how-to steps, lifecycle (Proposed → Accepted → Deprecated / Superseded), index table.
+- `CLAUDE.md` Rule 5 — single sentence added to the session-end checklist: "Write or update an ADR in `docs/adr/` if the session made an architecturally significant decision per the trigger criteria in `docs/adr/README.md`."
+
+**LOCKED-5 audit** of remaining architectural decisions surfaced **15 candidate ADRs** (10 HIGH, 4 MEDIUM, 1 LOW) — top of list: RLS policy pattern, customer authentication architecture, Stripe Terminal manual capture, POS vs admin separation, customer soft-delete, Supabase CLI for schema changes. **Treated as reference for future sessions, not a mandatory backlog.** Excluded as non-architectural: coupon-helpers refactor, iOS Safari workarounds, POS dark-mode discipline, component-reuse cultural rule.
+
+**Fact-checks before commit caught and corrected:**
+- ADR-0001: original example claimed `customers.phone` had malformed rows; actual audit found that column was constraint-protected and clean — the 38 malformed rows were in `sms_delivery_log.to_phone`. Correction makes the canonical-form pattern argument stronger (constraint-protected stayed clean; unprotected drifted).
+- ADR-0004: fixture suite count was stale — claimed 14 scenarios, actual count is 19 (scenarios 15-19 added in subsequent phases for digital-zelle, legacy walk-ins, online-mobile-deposit).
+- ADR-0005: CLAUDE.md Rule 1 reference verified accurate, no change.
+
+**Files changed (10):** 8 new (`docs/adr/_template.md`, `README.md`, 5 ADR files, session doc) + 2 modified (`CLAUDE.md` +1 sentence, `docs/dev/FILE_TREE.md` new ADR block). No source code touched. Test suite 903 / 903 passing as sanity check.
+
+---
+
 ## Session: Phase Lint-Hardening-1.2 + 1.3 — leak fixes + rule tightening
 
 Combined session resolving the 90 `phone/no-raw-display` warnings triaged in Phase 1.1. **Warning count: 90 → 19 (79% reduction).** Remaining 19 are exclusively prop-pass-through and pre-formatted-display patterns deferred to Phase 1.4 (architectural decision on branded `PreFormattedPhone` type vs per-site opt-outs).
