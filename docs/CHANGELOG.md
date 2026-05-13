@@ -6,6 +6,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Schema-Hardening-1 — CHECK constraints on 5 phone-bearing columns
+
+Closes the perimeter at the database layer. Phases Normalization-1 + Phone-UX-1 + Lint-Hardening-1 enforced the phone-format contract at the wire, display, input, and lint layers; this phase pins it at storage. **4 new CHECK constraints** on `conversations.phone_number`, `sms_delivery_log.to_phone`, `sms_conversations.phone_number`, `sms_consent_log.phone` (all E.164: `~ '^\+1\d{10}$'`, NOT NULL columns so no OR-NULL clause). **1 retroactive capture** of `quote_communications.valid_sent_to` — applied to prod via the Supabase SQL editor weeks ago but never in source control. Idempotent `DROP IF EXISTS + ADD` so fresh dev environments now match prod.
+
+**Channel-aware Option B on `quote_communications.sent_to`:** `sent_to IS NULL OR (channel='sms' AND sent_to ~ E.164) OR (channel='email' AND sent_to ~ email-shape)`. Catches channel/value mismatches, missing normalization on SMS path, and forces future channel additions (voice, push, etc.) to update the constraint before code writes the new value. Inline DB-contract doc block added above `recordCommunication` in `src/lib/quotes/send-service.ts` (the canonical single insert path for `quote_communications` per Phase Messaging-1+2).
+
+**Pre-flight audit verified zero malformed rows** across all 4 target columns before the migration ran. Migration includes defensive DO blocks that re-run the same audit at apply time — if anything drifted between offline audit and apply, the block raises and the entire transaction rolls back (`supabase db push` wraps each file). Final DO block enumerates the 5 expected `(table, constraint)` pairs against `pg_constraint` and raises on any miss.
+
+**Defense-in-depth contract now complete:**
+| Layer | Mechanism |
+|---|---|
+| Storage | DB CHECK constraints on 5 phone columns (**this phase**) |
+| Wire | `sendSms` / `sendMarketingSms` / `findOrCreateConversation` chokepoint (Normalization-1) |
+| Display | `formatPhone()` across ~30 sites (Phone-UX-1) |
+| Input | `formatPhoneInput()` + `normalizePhone()` on submit (Phone-UX-1) |
+| Lint | `phone/no-raw-display` ESLint rule (Lint-Hardening-1) |
+
+**Files changed (4):** migration `supabase/migrations/20260513050241_phone_schema_hardening.sql`, `src/lib/quotes/send-service.ts` (inline doc), `docs/dev/DB_SCHEMA.md` (regenerated), `docs/sessions/schema-hardening-1-phone-checks.md`. CLAUDE.md updated with channel-aware contract note. Future schema-hardening-2 candidates documented in session doc: `vendors.phone`, `orders.phone`, `voice_call_log.phone` (each needs its own audit + backfill before CHECK).
+
+---
+
 ## Session: Phase Phone-UX-1 — phone display + input formatting
 
 Phase Normalization-1 (commit `655d8631`) locked phone STORAGE to E.164. Human-facing surfaces were still leaking raw E.164 (`+13105551234`) in ~28 display sites and ~7 input forms had no live formatting. This session establishes the canonical UX layer: `formatPhone()` for displays, `formatPhoneInput()` for inputs, `normalizePhone()` for storage/wire. Doc block in `format.ts` codifies the four-helper contract and makes the **US/Canada-only assumption** explicit.

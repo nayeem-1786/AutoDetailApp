@@ -158,6 +158,23 @@ export async function sendQuote(
   // quote_communications row. recordCommunication is the single insert path
   // — it also feeds the outcome buckets so the final return shape and the
   // history table stay in sync.
+  //
+  // DB CONTRACT — quote_communications.sent_to
+  //
+  // Enforced by CHECK constraint `valid_sent_to`:
+  //   - sent_to IS NULL allowed (e.g., status-only update rows)
+  //   - channel='sms'   → sent_to must match E.164: +1XXXXXXXXXX
+  //   - channel='email' → sent_to must be email-shaped
+  //
+  // Any future channel value (voice, push, etc.) MUST be added to the
+  // constraint definition before code writes that value, OR writes will be
+  // rejected by the DB.
+  //
+  // Migration: supabase/migrations/20260513050241_phone_schema_hardening.sql
+  //
+  // Phone normalization happens upstream:
+  //   - sendSms() / sendMarketingSms() normalize at chokepoint
+  //   - normalizePhone() returns E.164 or null (src/lib/utils/format.ts)
   type CommRowStatus = 'sent' | 'failed' | 'blocked';
   async function recordCommunication(args: {
     channel: 'email' | 'sms';

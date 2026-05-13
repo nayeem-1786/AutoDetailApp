@@ -437,6 +437,7 @@ CREATE INDEX idx_city_pages_active ON public.city_landing_pages USING btree (is_
 **CHECK constraints:**
 - `conversations_last_channel_check`: `CHECK ((last_channel = ANY (ARRAY['sms'::text, 'voice'::text])))`
 - `conversations_status_check`: `CHECK ((status = ANY (ARRAY['open'::text, 'closed'::text, 'archived'::text])))`
+- `valid_phone_number`: `CHECK ((phone_number ~ '^\+1\d{10}$'::text))`
 
 **Indexes:**
 ```
@@ -2024,6 +2025,7 @@ CREATE UNIQUE INDEX quote_activities_pkey ON public.quote_activities USING btree
 **CHECK constraints:**
 - `quote_communications_channel_check`: `CHECK ((channel = ANY (ARRAY['email'::text, 'sms'::text])))`
 - `quote_communications_status_check`: `CHECK ((status = ANY (ARRAY['sent'::text, 'failed'::text, 'blocked'::text])))`
+- `valid_sent_to`: `CHECK (((sent_to IS NULL) OR ((channel = 'sms'::text) AND (sent_to ~ '^\+1\d{10}$'::text)) OR ((channel = 'email'::text) AND (sent_to ~ '^[^@]+@[^@]+\.[^@]+$'::text))))`
 
 **Indexes:**
 ```
@@ -2589,6 +2591,7 @@ CREATE UNIQUE INDEX site_theme_settings_pkey ON public.site_theme_settings USING
 **CHECK constraints:**
 - `sms_consent_log_action_check`: `CHECK ((action = ANY (ARRAY['opt_out'::text, 'opt_in'::text])))`
 - `sms_consent_log_source_check`: `CHECK ((source = ANY (ARRAY['inbound_sms'::text, 'admin_manual'::text, 'unsubscribe_page'::text, 'booking_form'::text, 'customer_portal'::text, 'system'::text, 'pos_walkin'::text])))`
+- `valid_phone`: `CHECK ((phone ~ '^\+1\d{10}$'::text))`
 
 **Indexes:**
 ```
@@ -2614,6 +2617,7 @@ CREATE UNIQUE INDEX sms_consent_log_pkey ON public.sms_consent_log USING btree (
 
 **CHECK constraints:**
 - `sms_conversations_direction_check`: `CHECK ((direction = ANY (ARRAY['inbound'::text, 'outbound'::text])))`
+- `valid_phone_number`: `CHECK ((phone_number ~ '^\+1\d{10}$'::text))`
 
 **Indexes:**
 ```
@@ -2641,6 +2645,9 @@ CREATE UNIQUE INDEX sms_conversations_pkey ON public.sms_conversations USING btr
 | source | TEXT | NOT NULL |  |
 | created_at | TIMESTAMPTZ | DEFAULT now() |  |
 | updated_at | TIMESTAMPTZ | DEFAULT now() |  |
+
+**CHECK constraints:**
+- `valid_to_phone`: `CHECK ((to_phone ~ '^\+1\d{10}$'::text))`
 
 **Indexes:**
 ```

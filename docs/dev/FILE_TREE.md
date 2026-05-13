@@ -1599,6 +1599,7 @@ Phase Mobile-1.1 additions:
 20260511000002_add_mobile_zone_snapshot_and_quote_mobile.sql # Mobile fix D2: appointments.mobile_zone_name_snapshot + quotes mobile_* columns + consistency CHECKs
 20260512152847_quote_communications_delivery_tracking.sql    # Phase Messaging-1+2: twilio_sid column + 3-status enum (sent/failed/blocked) on quote_communications
 20260513022648_phone_normalization_phase_1.sql               # Phase Normalization-1: backfill 3 employees + 1 business_settings + 38 sms_delivery_log + ALTER employees ADD CONSTRAINT valid_phone
+20260513050241_phone_schema_hardening.sql                    # Phase Schema-Hardening-1: 4 new E.164 CHECK constraints (conversations.phone_number, sms_delivery_log.to_phone, sms_conversations.phone_number, sms_consent_log.phone) + retroactive idempotent capture of quote_communications.valid_sent_to (channel-aware Option B)
 ```
 
 ## Scripts
@@ -1668,6 +1669,7 @@ docs/sessions/mobile-fee-1-9-full-picker-edit.md     # Phase Mobile-1.9: full mo
 docs/sessions/mobile-fee-1-9-1-zone-dropdown-fix.md  # Phase Mobile-1.9.1: zone-dropdown shows correct selection in edit mode (JOB_SELECT +mobile_zone_id, zonesLoaded resync, deleted-zone recovery)
 docs/sessions/normalization-1-phone-format-integrity.md  # Phase Normalization-1: chokepoint phone normalization in sendSms/findOrCreateConversation, 5 unprotected endpoints, form-side hygiene, backfill + CHECK on employees.phone, 4 shadow conversations deferred
 docs/sessions/phone-ux-1-display-and-input.md            # Phase Phone-UX-1: canonical phone display + input formatting — null-safe formatPhone, palette-driven SMS chip auto-format, 22 HIGH + 5 MEDIUM display sites, 7 input forms, 3 duplicate impls consolidated
+docs/sessions/schema-hardening-1-phone-checks.md         # Phase Schema-Hardening-1: 5 phone CHECK constraints (4 new + 1 retroactive channel-aware on quote_communications.sent_to), inline DB-contract doc in send-service.ts, defense-in-depth complete
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md
