@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { CONSENT_ACTION_LABELS } from '@/lib/utils/constants';
-import { formatDateTime } from '@/lib/utils/format';
+import { formatDateTime, formatPhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
@@ -288,7 +288,7 @@ export default function CompliancePage() {
                           className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-gray-50"
                         >
                           <span>{c.first_name} {c.last_name}</span>
-                          <span className="text-xs text-gray-400">{c.phone || c.email}</span>
+                          <span className="text-xs text-gray-400">{formatPhone(c.phone) || c.email}</span>
                         </button>
                       ))}
                     </div>

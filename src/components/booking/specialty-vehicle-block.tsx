@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Phone, ArrowLeft, CheckCircle } from 'lucide-react';
-import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput, normalizePhone, phoneToE164 } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { VehicleSelection } from './step-vehicle';
 
@@ -103,7 +103,7 @@ export function SpecialtyVehicleBlock({
 
       {/* Phone CTA */}
       <a
-        href={`tel:${businessPhone}`}
+        href={`tel:${phoneToE164(businessPhone)}`}
         className="inline-flex items-center gap-2 rounded-lg bg-lime-600 px-6 py-3 text-lg font-semibold text-white shadow-md hover:bg-lime-700 transition-colors"
       >
         <Phone className="h-5 w-5" />

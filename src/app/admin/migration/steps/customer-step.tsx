@@ -344,6 +344,7 @@ export function CustomerStep({ state, onStateChange, onContinue }: CustomerStepP
                     return (
                       <tr key={i} className="border-b last:border-0">
                         <td className="whitespace-nowrap px-3 py-1.5 font-mono">
+                          {/* eslint-disable-next-line phone/no-raw-display -- Square CSV preview, intentional raw display */}
                           {dup.phone}
                         </td>
                         <td className="px-3 py-1.5">

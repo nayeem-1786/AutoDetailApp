@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Mail, MessageSquare, Send, CheckCircle } from 'lucide-react';
+import { formatPhone } from '@/lib/utils/format';
 
 export type SendMethod = 'email' | 'sms' | 'both';
 
@@ -90,7 +91,7 @@ export function SendMethodDialog({
             <div>
               <div className="text-sm font-medium">SMS (with PDF)</div>
               <div className="text-xs text-ui-text-muted">
-                {customerPhone || 'No phone on file'}
+                {formatPhone(customerPhone) || 'No phone on file'}
               </div>
             </div>
           </label>

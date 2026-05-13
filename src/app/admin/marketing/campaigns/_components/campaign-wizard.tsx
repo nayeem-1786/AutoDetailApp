@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import type { Coupon, CouponReward, Service } from '@/lib/supabase/types';
 import { VARIABLE_GROUPS, CAMPAIGN_GROUPS, renderTemplate } from '@/lib/utils/template';
+import { formatPhone } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1741,7 +1742,7 @@ export function CampaignWizard({ initialData }: CampaignWizardProps) {
                         <div className="mb-2">
                           <p className="mb-1 text-xs font-medium text-gray-500">
                             SMS to{' '}
-                            {previewCustomers[previewIndex].phone || 'N/A'}
+                            {formatPhone(previewCustomers[previewIndex].phone) || 'N/A'}
                           </p>
                           <div className="rounded-lg border border-green-200 bg-green-50 p-3">
                             <p className="whitespace-pre-wrap text-sm">

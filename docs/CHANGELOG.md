@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Lint-Hardening-1.2 + 1.3 — leak fixes + rule tightening
+
+Combined session resolving the 90 `phone/no-raw-display` warnings triaged in Phase 1.1. **Warning count: 90 → 19 (79% reduction).** Remaining 19 are exclusively prop-pass-through and pre-formatted-display patterns deferred to Phase 1.4 (architectural decision on branded `PreFormattedPhone` type vs per-site opt-outs).
+
+**4 GENUINE_LEAK fixes wrapped with `formatPhone()`:** campaign-wizard preview (`SMS to {phone}`), marketing compliance customer picker, receipt-printer override-phone placeholder (plus wired `formatPhoneInput` onChange + `normalizePhone` on save + inline validation error), and the shared `SendMethodDialog` SMS recipient label (high-leverage — covers `QuoteSendDialog`, `NotifyCustomerDialog`, `SendPaymentLinkDialog` consumers).
+
+**11 `tel:` href sites wrapped with `phoneToE164()`** to align with the rule's canonical scheme-context wrapper: pay page (3), quote page, terms page, authorize page (2), specialty-vehicle-block, content-block-renderer, footer-client (2). `phoneToE164()` is permissive — behavior-neutral on already-E.164 input.
+
+**5 rule adjustments tightened `phone/no-raw-display`:**
+1. Skip `&&` left operand and `?:` test position — truthy guards never render.
+2. Recognize `formatPhone(x) || x` canonical fallback (right side skipped) and `x || 'literal'` placeholder idiom (left skipped when right is a Literal). Still flags wrong-order swaps and double-leak patterns.
+3. Skip JSX `key={x}` attributes — React keys are not visible.
+4. Skip `<input value={x}>` / `<Input value={x}>` bindings — form state tracks typing, not storage.
+5. Remove bare `cell` and `mobile` from identifier watchlist (TanStack Table / mobile-fee collisions). Compound forms (`cell_phone`, `cellPhone`, `mobile_phone`, `mobilePhone`) ADDED as backstop.
+
+**1 opt-out comment** added on Square CSV import preview (`customer-step.tsx:347` — intentional pre-normalization technical surface).
+
+**Tests:** 15 new RuleTester cases (12 valid + 5 invalid) covering each adjustment, plus 3 existing cases updated to match new behavior. Total rule tests 23 → 38. Full suite 888 → 903, all passing.
+
+`docs/dev/PHONE_LINT.md` updated with the 6 new context-aware skip patterns and the 5 still-flagged negative patterns. Severity stays at `'warn'` — flip to `'error'` deferred to Phase 1.5 after Phase 1.4 lands the remaining 19 at zero.
+
+**Out of scope:** prop-pass-through architectural fix (Phase 1.4), severity upgrade (Phase 1.5), unrelated phone migrations, schema changes.
+
+**Files changed (15):** rule + tests (2), leak fixes (4), tel: wraps (8 files / 11 sites), opt-out comment (1). See `docs/sessions/lint-hardening-1.2-and-1.3-leak-fixes-and-rule-tightening.md` for the full file map, before/after warning categories, and Phase 1.4 / 1.5 plan.
+
+---
+
 ## Session: Phase Schema-Hardening-1 — CHECK constraints on 5 phone-bearing columns
 
 Closes the perimeter at the database layer. Phases Normalization-1 + Phone-UX-1 + Lint-Hardening-1 enforced the phone-format contract at the wire, display, input, and lint layers; this phase pins it at storage. **4 new CHECK constraints** on `conversations.phone_number`, `sms_delivery_log.to_phone`, `sms_conversations.phone_number`, `sms_consent_log.phone` (all E.164: `~ '^\+1\d{10}$'`, NOT NULL columns so no OR-NULL clause). **1 retroactive capture** of `quote_communications.valid_sent_to` — applied to prod via the Supabase SQL editor weeks ago but never in source control. Idempotent `DROP IF EXISTS + ADD` so fresh dev environments now match prod.

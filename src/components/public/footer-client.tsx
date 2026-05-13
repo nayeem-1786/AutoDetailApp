@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { FooterData, FooterColumn as FooterColumnType, FooterBottomLink } from '@/lib/supabase/types';
 import type { BusinessInfo } from '@/lib/data/business';
+import { phoneToE164 } from '@/lib/utils/format';
 
 interface ReviewBadge {
   platform: string;
@@ -249,7 +250,7 @@ function BrandColumn({
         <div className="mt-6 space-y-3">
           {showPhone && (
             <a
-              href={`tel:${businessInfo.phone}`}
+              href={`tel:${phoneToE164(businessInfo.phone)}`}
               className="flex items-center gap-3 text-sm text-site-text-muted hover:text-site-text transition-colors"
             >
               <Phone className="w-4 h-4 text-site-icon-accent shrink-0" />
@@ -324,7 +325,7 @@ function BusinessInfoColumn({
       </Link>
       <div className="mt-4 space-y-2">
         <a
-          href={`tel:${businessInfo.phone}`}
+          href={`tel:${phoneToE164(businessInfo.phone)}`}
           className="flex items-center gap-2 text-sm text-site-text-muted hover:text-site-text transition-colors"
         >
           <Phone className="w-3.5 h-3.5 text-site-icon-accent shrink-0" />

@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { formatCurrency, formatDate, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatPhone, phoneToE164 } from '@/lib/utils/format';
 import { Phone } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
@@ -112,7 +112,7 @@ export default async function PublicQuotePage({ params }: PageProps) {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
             <a
-              href={`tel:${businessInfo.phone}`}
+              href={`tel:${phoneToE164(businessInfo.phone)}`}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-site-border-medium px-6 py-3 text-sm font-semibold text-site-text-secondary hover:bg-site-border-light transition-colors"
             >
               <Phone className="h-4 w-4" />

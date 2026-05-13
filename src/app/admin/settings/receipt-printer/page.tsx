@@ -19,6 +19,7 @@ import { generateReceiptHtml, generateReceiptLines, receiptToEscPos } from '@/ap
 import type { ReceiptImages, ReceiptContext } from '@/app/pos/lib/receipt-template';
 import type { MergedReceiptConfig, CustomTextZone } from '@/lib/data/receipt-config';
 import { BUSINESS_DEFAULTS } from '@/lib/data/business-defaults';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import QRCode from 'qrcode';
 import { usePermission } from '@/lib/hooks/use-permission';
 
@@ -252,7 +253,9 @@ export default function ReceiptPrinterPage() {
         printer_ip: (rc.printer_ip as string) || legacyIp || '',
         print_server_url: (rc.print_server_url as string) || '',
         override_name: (rc.override_name as string) || '',
-        override_phone: (rc.override_phone as string) || '',
+        override_phone: (rc.override_phone as string)
+          ? (formatPhone(rc.override_phone as string) || (rc.override_phone as string))
+          : '',
         override_address: (rc.override_address as string) || '',
         override_email: (rc.override_email as string) || '',
         override_website: (rc.override_website as string) || '',
@@ -341,6 +344,17 @@ export default function ReceiptPrinterPage() {
   }
 
   async function handleSave() {
+    // Phase Lint-Hardening-1.2: normalize override_phone to E.164 before persist.
+    let normalizedOverridePhone: string | null = null;
+    if (config.override_phone.trim()) {
+      const normalized = normalizePhone(config.override_phone);
+      if (!normalized) {
+        toast.error('Override phone is not a valid US phone');
+        return;
+      }
+      normalizedOverridePhone = normalized;
+    }
+
     setSaving(true);
     const supabase = createClient();
 
@@ -351,7 +365,7 @@ export default function ReceiptPrinterPage() {
       printer_ip: config.printer_ip || null,
       print_server_url: config.print_server_url || null,
       override_name: config.override_name || null,
-      override_phone: config.override_phone || null,
+      override_phone: normalizedOverridePhone,
       override_address: config.override_address || null,
       override_email: config.override_email || null,
       override_website: config.override_website || null,
@@ -620,11 +634,14 @@ export default function ReceiptPrinterPage() {
               <FormField label="Phone" htmlFor="override_phone">
                 <Input
                   id="override_phone"
-                  placeholder={defaults.business_phone || 'Business Profile value'}
+                  placeholder={formatPhone(defaults.business_phone) || 'Business Profile value'}
                   value={config.override_phone}
-                  onChange={(e) => updateConfig('override_phone', e.target.value)}
+                  onChange={(e) => updateConfig('override_phone', formatPhoneInput(e.target.value))}
                   {...enterSubmitHeader}
                 />
+                {config.override_phone && !normalizePhone(config.override_phone) && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid US phone number.</p>
+                )}
               </FormField>
 
               <FormField label="Address" htmlFor="override_address">

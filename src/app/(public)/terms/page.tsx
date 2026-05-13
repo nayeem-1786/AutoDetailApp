@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { SITE_URL } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, phoneToE164 } from '@/lib/utils/format';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { getPageBySlug } from '@/lib/data/website-pages';
 import { getPageContentBlocks } from '@/lib/data/page-content';
@@ -112,7 +112,7 @@ export default async function TermsPage() {
                   {biz.email}
                 </a>
               ) : (
-                <a href={`tel:${biz.phone}`} className="text-accent-brand hover:underline">
+                <a href={`tel:${phoneToE164(biz.phone)}`} className="text-accent-brand hover:underline">
                   {formatPhone(biz.phone)}
                 </a>
               )}

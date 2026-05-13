@@ -1670,6 +1670,7 @@ docs/sessions/mobile-fee-1-9-1-zone-dropdown-fix.md  # Phase Mobile-1.9.1: zone-
 docs/sessions/normalization-1-phone-format-integrity.md  # Phase Normalization-1: chokepoint phone normalization in sendSms/findOrCreateConversation, 5 unprotected endpoints, form-side hygiene, backfill + CHECK on employees.phone, 4 shadow conversations deferred
 docs/sessions/phone-ux-1-display-and-input.md            # Phase Phone-UX-1: canonical phone display + input formatting — null-safe formatPhone, palette-driven SMS chip auto-format, 22 HIGH + 5 MEDIUM display sites, 7 input forms, 3 duplicate impls consolidated
 docs/sessions/schema-hardening-1-phone-checks.md         # Phase Schema-Hardening-1: 5 phone CHECK constraints (4 new + 1 retroactive channel-aware on quote_communications.sent_to), inline DB-contract doc in send-service.ts, defense-in-depth complete
+docs/sessions/lint-hardening-1.2-and-1.3-leak-fixes-and-rule-tightening.md  # Phase Lint-Hardening-1.2+1.3: 4 phone display leaks fixed (formatPhone wraps) + 11 tel: hrefs wrapped with phoneToE164 + 5 phone/no-raw-display rule adjustments (skip &&/?: test, recognize formatPhone(x)||x fallback, skip key/input value attrs, drop cell/mobile bare generics). Warning count 90→19. +15 rule tests.
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md
