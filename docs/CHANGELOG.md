@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Lint-Hardening-1 — phone/no-raw-display ESLint rule
+
+Phase Normalization-1 locked phone STORAGE to E.164. Phase Phone-UX-1 (parallel session) is fixing 35+ display + input sites. After both ship, the canonical pattern is `formatPhone()` for display, `phoneToE164()` for `tel:`/JSON-LD, and `formatPhoneInput()` for inputs — but nothing prevents future leaks. The 28 leaks Phase Phone-UX-1 had to repair accumulated because no mechanism flagged them at write time. This session adds that mechanism.
+
+**Custom ESLint rule** `phone/no-raw-display` at `eslint-rules/phone-no-raw-display.js`. Walks JSX expression containers and flags raw references whose name matches a phone-suggestive set (`phone`, `phone_number`, `phoneNumber`, `mobile`, `cell`, `to_phone`, `from_phone`, `recipient_phone`, `business_phone`, `customer_phone`, `sms_phone` — case-insensitive, exact match). Recurses through MemberExpression, Identifier, computed property access, template literal substitutions, ternary/logical/binary branches, TypeScript `as`/non-null assertions, spread, array & object literals, and arguments of NON-allowed function calls. Subtrees under the canonical wrappers (`formatPhone`, `phoneToE164`, `normalizePhone`, `formatPhoneInput`) short-circuit and are not inspected.
+
+**Configured `'warn'`** in `eslint.config.mjs` under a synthetic `phone` plugin. TODO comment marks the line for upgrading to `'error'` after Phase Phone-UX-1 ships and the warning count drops to zero. Standard ESLint inline opt-out works: `// eslint-disable-next-line phone/no-raw-display`.
+
+**Tests.** 23 RuleTester cases (10 valid, 13 invalid) at `eslint-rules/__tests__/phone-no-raw-display.test.js`. Vitest config extended to pick up the new directory. Coverage: wrapped helpers, non-phone fields, partial-name tokens (`formattedPhone`), namespace-method calls, inline disable, non-JSX template literals, raw display across JSX text/attribute/template/ternary/computed/bare-identifier/TS-cast/non-allowed-call. All 23 pass.
+
+**Detection validated against the live codebase.** Running the rule across `src/` surfaces **97 warnings across 49 files** — every one a genuine raw `customer.phone`/`user.phone` leak. None fixed in this session per scope (Phase Phone-UX-1 owns those repairs).
+
+**Documentation** at `docs/dev/PHONE_LINT.md`: rule rationale, detection scope, fix patterns with code examples, opt-out usage, severity-upgrade plan, file map, and run commands.
+
+**Files changed:**
+- `eslint.config.mjs` — register `phone` plugin + `phone/no-raw-display: 'warn'` + TODO
+- `vitest.config.ts` — `include` extended to `eslint-rules/__tests__/**`
+
+**New files:**
+- `eslint-rules/phone-no-raw-display.js`
+- `eslint-rules/__tests__/phone-no-raw-display.test.js`
+- `docs/dev/PHONE_LINT.md`
+
+**Verification:** all 23 new tests pass; rule files lint clean; tsc errors and the 1 vitest failure are pre-existing in files Phase Phone-UX-1 is editing in a parallel session — confirmed unchanged here by stash diff.
+
+---
+
 ## Session: Phase Normalization-1 — phone format integrity
 
 Audit of `sms_delivery_log` over the past month surfaced 38 malformed phones (6 distinct numbers) across two shapes — display-formatted `(XXX) XXX-XXXX` and missing-`+` `13107564789`. Twilio's API silently accepted them so no customer messages were missed, but the audit trail was inconsistent and downstream joins were at risk. Three independent root causes converged at `sms_delivery_log`: `sendSms()` didn't normalize, five unprotected DB write endpoints accepted display strings, and `findOrCreateConversation()` created shadow conversations that fragment threads.

@@ -1620,6 +1620,16 @@ scripts/fix-mobile-backfill.sql             # Mobile fix D2: backfill template f
 
 ```
 vitest.config.ts
+eslint.config.mjs
+```
+
+---
+
+## ESLint — Custom Rules (`eslint-rules/`)
+
+```
+eslint-rules/phone-no-raw-display.js                       # Phase Lint-Hardening-1: flags raw {customer.phone} in JSX without formatPhone() wrapper
+eslint-rules/__tests__/phone-no-raw-display.test.js        # 23 RuleTester cases (10 valid, 13 invalid) — vitest picks up via include
 ```
 
 ---
@@ -1635,6 +1645,7 @@ docs/dev/DASHBOARD_RULES.md
 docs/dev/DATA_MIGRATION_RULES.md
 docs/dev/DESIGN_SYSTEM.md
 docs/dev/FILE_TREE.md          ← this file
+docs/dev/PHONE_LINT.md       # Phase Lint-Hardening-1: phone/no-raw-display rule rationale, scope, opt-out, severity-upgrade plan
 docs/dev/POS_SECURITY.md
 docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md
