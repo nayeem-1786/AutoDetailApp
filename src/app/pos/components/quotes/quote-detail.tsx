@@ -19,6 +19,10 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
+import {
+  deriveCommPillState,
+  type CommPillTone,
+} from '@/lib/quotes/derive-comm-pill';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import { useQuote } from '../../context/quote-context';
@@ -103,56 +107,7 @@ interface Communication {
   delivery_updated_at: string | null;
 }
 
-type PillTone = 'green' | 'yellow' | 'red' | 'orange';
-
-interface PillState {
-  tone: PillTone;
-  label: string;
-  detail: string | null;
-}
-
-// Phase Messaging-1+2 pill semantics:
-//   green  = delivered (handset confirmed) OR email/legacy SMS sent
-//   yellow = in-flight (queued/sent/sending) OR SMS pending webhook
-//   red    = undelivered / send failed
-//   orange = blocked (pre-flight gate prevented attempt)
-function deriveCommPill(comm: Communication): PillState {
-  if (comm.status === 'failed') {
-    return { tone: 'red', label: 'Failed', detail: comm.error_message };
-  }
-  if (comm.status === 'blocked') {
-    return { tone: 'orange', label: 'Blocked', detail: comm.error_message };
-  }
-
-  // status === 'sent' — overlay Twilio delivery status for SMS rows that
-  // carry a twilio_sid (everything else stays green "Sent").
-  if (comm.channel === 'sms' && comm.twilio_sid) {
-    switch (comm.delivery_status) {
-      case 'delivered':
-        return { tone: 'green', label: 'Delivered', detail: null };
-      case 'undelivered':
-      case 'failed':
-        return {
-          tone: 'red',
-          label: comm.delivery_status === 'undelivered' ? 'Undelivered' : 'Failed',
-          detail: comm.delivery_error_code ? `Twilio ${comm.delivery_error_code}` : null,
-        };
-      case 'queued':
-      case 'sending':
-      case 'accepted':
-      case 'sent':
-        return { tone: 'yellow', label: 'Sending…', detail: null };
-      case null:
-      default:
-        // Webhook hasn't arrived yet (or pre-Phase-Messaging-2 message).
-        return { tone: 'yellow', label: 'Pending', detail: null };
-    }
-  }
-
-  return { tone: 'green', label: 'Sent', detail: null };
-}
-
-const PILL_TONE_CLASSES: Record<PillTone, string> = {
+const PILL_TONE_CLASSES: Record<CommPillTone, string> = {
   green: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400',
   yellow: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400',
   red: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400',
@@ -642,7 +597,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
               </div>
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {communications.map((comm) => {
-                  const pill = deriveCommPill(comm);
+                  const pill = deriveCommPillState(comm);
                   return (
                     <div key={comm.id} className="flex items-center gap-3 px-4 py-2.5">
                       {comm.channel === 'email' ? (

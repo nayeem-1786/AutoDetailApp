@@ -15,6 +15,10 @@ import { ArrowLeft, Car, Mail, MessageSquare, User, Calendar, DollarSign, Award,
 import Link from 'next/link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { usePermission } from '@/lib/hooks/use-permission';
+import {
+  deriveCommPillState,
+  type CommPillTone,
+} from '@/lib/quotes/derive-comm-pill';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -22,64 +26,7 @@ type QuoteWithRelations = Quote & {
   items?: QuoteItem[];
 };
 
-type AdminComm = {
-  id: string;
-  channel: 'email' | 'sms';
-  sent_to: string | null;
-  status: 'sent' | 'failed' | 'blocked';
-  error_message: string | null;
-  created_at: string;
-  twilio_sid: string | null;
-  delivery_status: string | null;
-  delivery_error_code: string | null;
-  delivery_updated_at: string | null;
-};
-
-type AdminPillTone = 'green' | 'yellow' | 'red' | 'orange';
-
-// Mirrors deriveCommPill in POS quote-detail.tsx. Kept locally to avoid
-// dragging a POS-internal helper across the admin/POS boundary.
-function deriveAdminCommPill(comm: AdminComm): {
-  tone: AdminPillTone;
-  label: string;
-  detail: string | null;
-} {
-  if (comm.status === 'failed') {
-    return { tone: 'red', label: 'Failed', detail: comm.error_message };
-  }
-  if (comm.status === 'blocked') {
-    return { tone: 'orange', label: 'Blocked', detail: comm.error_message };
-  }
-  if (comm.channel === 'sms' && comm.twilio_sid) {
-    switch (comm.delivery_status) {
-      case 'delivered':
-        return { tone: 'green', label: 'Delivered', detail: null };
-      case 'undelivered':
-        return {
-          tone: 'red',
-          label: 'Undelivered',
-          detail: comm.delivery_error_code ? `Twilio ${comm.delivery_error_code}` : null,
-        };
-      case 'failed':
-        return {
-          tone: 'red',
-          label: 'Failed',
-          detail: comm.delivery_error_code ? `Twilio ${comm.delivery_error_code}` : null,
-        };
-      case 'queued':
-      case 'sending':
-      case 'accepted':
-      case 'sent':
-        return { tone: 'yellow', label: 'Sending…', detail: null };
-      case null:
-      default:
-        return { tone: 'yellow', label: 'Pending', detail: null };
-    }
-  }
-  return { tone: 'green', label: 'Sent', detail: null };
-}
-
-const ADMIN_PILL_ICON_CLASS: Record<AdminPillTone, string> = {
+const ADMIN_PILL_ICON_CLASS: Record<CommPillTone, string> = {
   green: 'text-green-600',
   yellow: 'text-yellow-600',
   red: 'text-red-500',
@@ -534,7 +481,7 @@ export default function QuoteDetailPage() {
           ) : (
             <div className="space-y-3">
               {communications.map((comm) => {
-                const pill = deriveAdminCommPill(comm);
+                const pill = deriveCommPillState(comm);
                 return (
                   <div
                     key={comm.id}

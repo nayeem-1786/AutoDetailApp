@@ -6,6 +6,34 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Messaging-1+2 follow-up — `sent` is success + toast stacking
+
+Two regressions surfaced during production testing of the prior shipment, both renderer-only (no schema changes).
+
+**Issue A — pill stuck on yellow "Sending…" forever.** The original state machine grouped Twilio's `sent` with the in-flight statuses (`queued` / `accepted` / `sending`). But `sent` is the **terminal success** state for Twilio test numbers, MMS, and any carrier path that doesn't return a delivery receipt — `delivered` never arrives. Pills got wedged on yellow indefinitely.
+
+**Fix.** `delivery_status='sent'` now renders green "Sent" (alongside `delivered` → green "Delivered"). Yellow "Sending…" is reserved for `queued` / `accepted` / `sending`. Added a defensive branch that surfaces unknown Twilio statuses as the raw value (yellow) rather than mislabeling.
+
+**Legacy-row fallback.** SMS rows with `twilio_sid` populated but no `sms_delivery_log` match (webhook race, or pre-Phase-Messaging-2 messages whose SIDs came from `messages` without a delivery-log insert) now render optimistic green "Sent" instead of perpetual yellow "Pending". Send-time `failed`/`blocked` still wins.
+
+**Issue B — partial-failure toasts overlapped visually.** Sonner's default collapses multiple toasts into a hover-to-expand pile. The two toasts emitted by a partial-failure send (success + consolidated warning) landed on top of each other.
+
+**Fix.** `<Toaster expand visibleToasts={5}>` in `src/app/layout.tsx`. Multi-toast outcomes now form a true vertical stack.
+
+**Shared-helper refactor.** The previous session kept `deriveCommPill()` (POS) and `deriveAdminCommPill()` (admin) as separate inline functions citing the admin/POS boundary. The two diverged on the same bug, so the boundary had a real cost. Both call sites now use a single `deriveCommPillState()` at `src/lib/quotes/derive-comm-pill.ts`; each surface still owns its own class palette (`PILL_TONE_CLASSES` POS, `ADMIN_PILL_ICON_CLASS` admin). Removed dead local types accordingly.
+
+**Tests.** +14 cases at `src/lib/quotes/__tests__/derive-comm-pill.test.ts` covering all LOCKED-1 scenarios — the `sent`-is-success regression, the unknown-Twilio-status defensive branch, the null-delivery_status legacy-row fallback, and the full happy / failed / blocked / email matrix. 837 total tests pass (was 823).
+
+**Files changed:**
+- `src/lib/quotes/derive-comm-pill.ts` (new)
+- `src/lib/quotes/__tests__/derive-comm-pill.test.ts` (new)
+- `src/app/pos/components/quotes/quote-detail.tsx`
+- `src/app/admin/quotes/[id]/page.tsx`
+- `src/app/layout.tsx`
+- `docs/sessions/messaging-1-2-send-flow-and-delivery.md`
+
+---
+
 ## Session: Phase Messaging-1+2 — send pipeline architectural overhaul + Twilio delivery tracking
 
 Server returns HTTP 422 on total-failure send (was 200 + dual-toast bug). All 6 pre-flight/exception paths now log to `quote_communications` with new granular status enum (`sent` | `failed` | `blocked`). Twilio SMS delivery status surfaced to dashboard via JOIN to `sms_delivery_log` (`twilio_sid` captured at send time). Status pill semantics: green = delivered, yellow = sending/pending, red = undelivered/failed, orange = blocked. Modal success state now resets across opens (mirrors `send-payment-link-dialog` pattern). Dual-toast bug eliminated; max 2 toasts per send (primary + optional consolidated secondary). `NotifyCustomerDialog` patched in parallel.

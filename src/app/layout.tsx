@@ -42,7 +42,11 @@ export default function RootLayout({
         className={`${urbanist.variable} ${dmSans.variable} antialiased`}
       >
         {children}
-        <Toaster position="top-right" richColors closeButton visibleToasts={3} duration={2000} />
+        {/* `expand` keeps multiple toasts vertically stacked instead of
+            collapsed-with-hover-expand. Phase Messaging-1+2 follow-up: partial
+            send outcomes emit a success + a warning together, and the default
+            collapsed layout overlapped them visually. */}
+        <Toaster position="top-right" richColors closeButton expand visibleToasts={5} duration={2000} />
       </body>
     </html>
   );
