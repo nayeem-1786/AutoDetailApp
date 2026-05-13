@@ -16,6 +16,7 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { renderTemplate } from '@/lib/utils/template';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import type { VariableDefinition } from '@/lib/email/variables';
 import { usePermission } from '@/lib/hooks/use-permission';
 
@@ -319,7 +320,7 @@ export default function SmsTemplatesPage() {
         toast.error(data.error || 'Test send failed');
         return;
       }
-      toast.success(`Test sent to ${data.phone}`);
+      toast.success(`Test sent to ${formatPhone(data.phone) || data.phone}`);
     } catch {
       toast.error('Test send failed');
     } finally {
@@ -331,15 +332,16 @@ export default function SmsTemplatesPage() {
   function addPhone() {
     const phone = phoneInput.trim();
     if (!phone) return;
-    if (!/^\+[1-9]\d{9,14}$/.test(phone)) {
-      toast.error('Invalid phone number. Use E.164 format: +1XXXXXXXXXX');
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
+      toast.error('Enter a valid US phone number.');
       return;
     }
-    if (editPhones.includes(phone)) {
+    if (editPhones.includes(normalized)) {
       toast.error('Phone number already added');
       return;
     }
-    setEditPhones((prev) => [...prev, phone]);
+    setEditPhones((prev) => [...prev, normalized]);
     setPhoneInput('');
   }
 
@@ -517,7 +519,7 @@ export default function SmsTemplatesPage() {
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {editPhones.map((phone) => (
                     <span key={phone} className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                      {phone}
+                      {formatPhone(phone) || phone}
                       <button
                         type="button"
                         onClick={() => setEditPhones((prev) => prev.filter((p) => p !== phone))}
@@ -532,7 +534,7 @@ export default function SmsTemplatesPage() {
                   <input
                     type="tel"
                     value={phoneInput}
-                    onChange={(e) => setPhoneInput(e.target.value)}
+                    onChange={(e) => setPhoneInput(formatPhoneInput(e.target.value))}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPhone())}
                     placeholder="Add phone number..."
                     className="h-8 flex-1 rounded border border-gray-200 px-2 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"

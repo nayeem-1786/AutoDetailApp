@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import {
   Truck,
   CheckCircle2,
@@ -183,7 +184,7 @@ export default function ShippingSettingsPage() {
           ship_from_state: data.ship_from_state || 'CA',
           ship_from_zip: data.ship_from_zip || '',
           ship_from_country: data.ship_from_country || 'US',
-          ship_from_phone: data.ship_from_phone || '',
+          ship_from_phone: data.ship_from_phone ? (formatPhone(data.ship_from_phone) || data.ship_from_phone) : '',
           ship_from_email: data.ship_from_email || '',
           default_parcel_length: String(data.default_parcel_length ?? '10'),
           default_parcel_width: String(data.default_parcel_width ?? '8'),
@@ -337,10 +338,22 @@ export default function ShippingSettingsPage() {
 
   // Save
   async function handleSave() {
+    // Phase Phone-UX-1: normalize ship_from_phone to E.164 before send (or reject if invalid).
+    let normalizedShipPhone = '';
+    if (form.ship_from_phone.trim()) {
+      const normalized = normalizePhone(form.ship_from_phone);
+      if (!normalized) {
+        toast.error('Ship-from phone is not a valid US phone');
+        return;
+      }
+      normalizedShipPhone = normalized;
+    }
+
     setSaving(true);
     try {
       const payload = {
         ...form,
+        ship_from_phone: normalizedShipPhone,
         // Convert dollar amounts to cents for storage
         free_shipping_threshold: Math.round(parseFloat(form.free_shipping_threshold || '0') * 100),
         flat_rate_amount: Math.round(parseFloat(form.flat_rate_amount || '0') * 100),
@@ -367,11 +380,13 @@ export default function ShippingSettingsPage() {
 
       const { data } = await res.json();
 
-      // Update form with returned (masked) values
+      // Update form with returned (masked) values. Format normalized phone
+      // back to display form so dirty-check doesn't see typed vs. E.164.
       const updated: ShippingFormData = {
         ...form,
         shippo_api_key_live: data.shippo_api_key_live || '',
         shippo_api_key_test: data.shippo_api_key_test || '',
+        ship_from_phone: normalizedShipPhone ? (formatPhone(normalizedShipPhone) || normalizedShipPhone) : '',
       };
       setForm(updated);
       setInitial(updated);
@@ -653,10 +668,13 @@ export default function ShippingSettingsPage() {
               <Input
                 id="ship_from_phone"
                 value={form.ship_from_phone}
-                onChange={(e) => updateField('ship_from_phone', e.target.value)}
+                onChange={(e) => updateField('ship_from_phone', formatPhoneInput(e.target.value))}
                 placeholder="(310) 555-1234"
                 {...enterSubmit}
               />
+              {form.ship_from_phone && !normalizePhone(form.ship_from_phone) && (
+                <p className="mt-1 text-xs text-red-500">Enter a valid US phone number.</p>
+              )}
             </FormField>
 
             <FormField label="Email" htmlFor="ship_from_email">

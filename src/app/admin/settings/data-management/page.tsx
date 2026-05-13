@@ -11,6 +11,7 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
 import { X, Trash2, AlertTriangle, UserX } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
+import { formatPhone } from '@/lib/utils/format';
 
 interface CustomerResult {
   id: string;
@@ -160,16 +161,6 @@ export default function DataManagementPage() {
     });
   }
 
-  function formatPhone(phone: string | null) {
-    if (!phone) return '—';
-    const digits = phone.replace(/\D/g, '');
-    const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-    if (local.length === 10) {
-      return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-    }
-    return phone;
-  }
-
   function renderCounts(item: PurgeQueueItem) {
     if (item.loadingCounts) return <Spinner className="h-4 w-4" />;
     if (!item.counts) return <span className="text-xs text-gray-400">Counts unavailable</span>;
@@ -255,7 +246,7 @@ export default function DataManagementPage() {
                       {customer.first_name} {customer.last_name}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {formatPhone(customer.phone)}
+                      {formatPhone(customer.phone) || '—'}
                       {customer.email ? ` · ${customer.email}` : ''}
                       {customer.created_at ? ` · Created ${formatDate(customer.created_at)}` : ''}
                     </p>
@@ -307,7 +298,7 @@ export default function DataManagementPage() {
                         {item.customer.first_name} {item.customer.last_name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {formatPhone(item.customer.phone)}
+                        {formatPhone(item.customer.phone) || '—'}
                         {item.customer.email ? ` · ${item.customer.email}` : ''}
                       </p>
                       <div className="mt-1">{renderCounts(item)}</div>

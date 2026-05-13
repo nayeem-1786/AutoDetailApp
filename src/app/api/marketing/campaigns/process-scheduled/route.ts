@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { buildAudienceQuery } from '@/lib/utils/audience';
-import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines, formatDollar, formatNumber } from '@/lib/utils/template';
+import { formatPhone } from '@/lib/utils/format';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { fireWebhook } from '@/lib/utils/webhook';
@@ -234,7 +235,7 @@ async function runProcessScheduled(): Promise<ProcessScheduledResult> {
         last_name: customer.last_name,
         coupon_code: couponCode,
         business_name: businessInfo.name,
-        business_phone: formatPhoneDisplay(businessInfo.phone),
+        business_phone: formatPhone(businessInfo.phone),
         business_address: businessInfo.address,
         booking_url: `${appUrl}/book`,
         book_url: bookUrl,

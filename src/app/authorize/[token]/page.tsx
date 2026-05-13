@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { getIssueHumanReadable } from '@/lib/utils/issue-types';
 import { AuthorizationClient } from './authorization-client';
 import { AnnotationOverlay } from '@/app/pos/jobs/components/photo-annotation';
@@ -118,7 +119,7 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
           <p className="mt-2 text-sm text-gray-500">
             This authorization has expired. Please contact {biz.name} at{' '}
             <a href={`tel:${biz.phone}`} className="text-blue-600 hover:underline">
-              {biz.phone}
+              {formatPhone(biz.phone)}
             </a>{' '}
             if you&apos;d like to proceed.
           </p>
@@ -302,7 +303,7 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
           {biz.phone && (
             <p className="mt-1">
               <a href={`tel:${biz.phone}`} className="text-xs text-blue-600 hover:underline">
-                {biz.phone}
+                {formatPhone(biz.phone)}
               </a>
             </p>
           )}

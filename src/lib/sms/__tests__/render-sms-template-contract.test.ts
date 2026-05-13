@@ -322,7 +322,9 @@ describe('contract — business_* auto-inject preserved', () => {
 
     const result = await renderSmsTemplate('t_phone_override', {}, 'fb');
     expect(result.isActive).toBe(true);
-    expect(result.body).toBe('Call +15558881234');
+    // Phase Phone-UX-1 (LOCKED-1): business_phone is `format: 'phone'` in
+    // SMS_PALETTE — engine pretty-formats it before substitution.
+    expect(result.body).toBe('Call (555) 888-1234');
   });
 });
 

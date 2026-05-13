@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { sendTemplatedEmail } from './send-templated-email';
 import { sendEmail } from '@/lib/utils/email';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
@@ -96,7 +97,7 @@ export async function sendCancellationNotifications(
         appointment_time: displayTime,
         cancellation_reason: cancellationReason,
         business_name: business.name,
-        business_phone: business.phone,
+        business_phone: formatPhone(business.phone),
         booking_url: bookingUrl,
       });
 
@@ -114,7 +115,7 @@ export async function sendCancellationNotifications(
           `Service: ${allServiceNames}\n` +
           `Date: ${dateStr}\n` +
           (displayTime ? `Time: ${displayTime}\n` : '') +
-          `\nIf you\u2019d like to reschedule, please call us at ${business.phone} or book online at ${business.website}.\n\n` +
+          `\nIf you\u2019d like to reschedule, please call us at ${formatPhone(business.phone)} or book online at ${business.website}.\n\n` +
           `We apologize for any inconvenience.\n\n` +
           `${business.name}\n${business.address}`;
 
@@ -157,7 +158,7 @@ export async function sendCancellationNotifications(
           <a href="${bookingUrl}" style="display: inline-block; background-color: #1e3a5f; color: #ffffff; text-decoration: none; padding: 12px 32px; border-radius: 6px; font-weight: 600; font-size: 14px;">Rebook Appointment</a>
         </div>
         <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
-          Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
+          Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${formatPhone(business.phone)}</a>
         </p>
       </div>
       <div class="email-footer" style="background-color: #f9fafb; padding: 24px 32px; text-align: center;">
@@ -182,7 +183,7 @@ export async function sendCancellationNotifications(
       const smsFallback =
         `Hi ${customer.first_name}, your ${allServiceNames} appointment on ${dateStr}` +
         (displayTime ? ` at ${displayTime}` : '') +
-        ` has been cancelled. Please contact us to reschedule. - ${business.name} ${business.phone}`;
+        ` has been cancelled. Please contact us to reschedule. - ${business.name} ${formatPhone(business.phone)}`;
 
       const smsTemplateResult = await renderSmsTemplate('appointment_cancelled', {
         first_name: customer.first_name,

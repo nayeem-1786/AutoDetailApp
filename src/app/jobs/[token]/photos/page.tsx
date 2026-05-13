@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getZoneLabel } from '@/lib/utils/job-zones';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { formatPhone } from '@/lib/utils/format';
 import { GalleryClient } from './gallery-client';
 
 interface Props {
@@ -232,7 +233,7 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
       <div className="mt-12 border-t border-gray-200 pt-6 text-center">
         <p className="text-sm text-gray-400">{businessInfo.name}</p>
         {businessInfo.phone && (
-          <p className="mt-1 text-sm text-gray-400">{businessInfo.phone}</p>
+          <p className="mt-1 text-sm text-gray-400">{formatPhone(businessInfo.phone)}</p>
         )}
       </div>
     </div>

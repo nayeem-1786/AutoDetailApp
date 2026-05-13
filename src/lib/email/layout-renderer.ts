@@ -3,6 +3,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { renderBlocks } from './block-renderers';
 import { resolvePhotoPairs } from './photo-resolver';
 import { renderTemplate } from '@/lib/utils/template';
@@ -241,7 +242,7 @@ export async function renderEmail(
   const footerParts = [
     businessInfo.name,
     businessInfo.address,
-    businessInfo.phone,
+    formatPhone(businessInfo.phone),
   ];
   if (brandKit.footer_text) footerParts.push(brandKit.footer_text);
   const footerContent = footerParts.join('<br>');

@@ -6,6 +6,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Phone-UX-1 — phone display + input formatting
+
+Phase Normalization-1 (commit `655d8631`) locked phone STORAGE to E.164. Human-facing surfaces were still leaking raw E.164 (`+13105551234`) in ~28 display sites and ~7 input forms had no live formatting. This session establishes the canonical UX layer: `formatPhone()` for displays, `formatPhoneInput()` for inputs, `normalizePhone()` for storage/wire. Doc block in `format.ts` codifies the four-helper contract and makes the **US/Canada-only assumption** explicit.
+
+**SMS chip engine — single point of enforcement.** `render-sms-template.ts` now consults `SMS_PALETTE` at substitution time. Chips declared as `format: 'phone'` (business_phone, customer_phone) pass through `formatPhone()` before the value is written into the template body. Eliminates the manual `formatPhoneDisplay(businessInfo.phone)` ritual previously required in 4 caller sites (lifecycle-engine, campaigns/send, campaigns/process-scheduled, drip-engine).
+
+**Null-safe `formatPhone()`.** Signature widened to `string | null | undefined`. Empty / unparseable input returns `""` (was: returned original string). Each renderer decides the empty-case placeholder (`formatPhone(value) || '—'`). 5 new unit tests pin null-safety, 7 pin live-typing formatting, 1 covers round-trip through `normalizePhone`.
+
+**3 duplicate `formatPhone` implementations consolidated.** `formatPhoneDisplay()` removed from `src/lib/utils/template.ts`; 4 callers migrated. Local `formatPhone()` deleted from `account-shell.tsx` and `data-management/page.tsx` (the latter's `—` placeholder moved to the render site).
+
+**22 HIGH display sites wired** (customer-facing payments page, photos gallery, authorize page, terms page, content-block-renderer, 4 email files, quote PDF, POS quote detail, admin jobs/orders pages). **5 MEDIUM admin display sites wired** (campaigns recipient/analytics, coupons customer picker, customer archived-match dialogs, SMS templates test toast).
+
+**7 input forms** gained live formatting + submit-side normalization (checkout, specialty-vehicle callback, messaging business phone override, messaging SMS test phone, SMS templates recipient chip input, shipping ship-from phone, receipt-dialog SMS phone). Settings pages with persisted phones reformat E.164 → pretty on load and after save so the dirty-check doesn't mis-fire.
+
+**Tests added.** 13 new cases in `format-phone.test.ts` (null safety + live formatting + round-trip). 3 new cases in `render-sms-template.test.ts` (chip auto-format / auto-injected business_phone / non-phone chip passthrough). 1 updated assertion in `render-sms-template-contract.test.ts` reflecting the new `business_phone` pretty-format contract. Total: **888 / 888 passing**, `npx tsc --noEmit` clean.
+
+**Email QA required.** Trigger test sends for: booking cancellation, transaction void, any DB-templated email, marketing emails (footer phone), order ready-for-pickup / shipped / delivered / refunded. Visual check that "Questions? Call X" prose and footer phone render `(310) 555-1234` not `+13105551234`.
+
+**Out of scope (LOCKED-8).** No ESLint config changes (parallel Phase Lint-Hardening-1 session owns that). No schema migrations. No CHECK constraints added beyond what Normalization-1 already ships. `phoneToE164()` kept as permissive coercer for tel: hrefs and JSON-LD telephone field (E.164 per schema.org spec).
+
+**Files changed:** 36 (3 library/contract + 4 formatPhoneDisplay caller migrations + 14 display + 5 medium + 2 duplicate deletions + 7 input forms + 3 test files). See `docs/sessions/phone-ux-1-display-and-input.md` for full file map and Future Phase Lint-Hardening considerations.
+
+---
+
 ## Session: Phase Lint-Hardening-1 — phone/no-raw-display ESLint rule
 
 Phase Normalization-1 locked phone STORAGE to E.164. Phase Phone-UX-1 (parallel session) is fixing 35+ display + input sites. After both ship, the canonical pattern is `formatPhone()` for display, `phoneToE164()` for `tel:`/JSON-LD, and `formatPhoneInput()` for inputs — but nothing prevents future leaks. The 28 leaks Phase Phone-UX-1 had to repair accumulated because no mechanism flagged them at write time. This session adds that mechanism.

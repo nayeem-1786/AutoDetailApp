@@ -3,7 +3,7 @@ import PDFDocument from 'pdfkit';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { getBusinessInfo, type BusinessInfo } from '@/lib/data/business';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 // --- Types -----------------------------------------------------------
@@ -166,7 +166,7 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
       ry += 14;
 
       if (quote.customer.phone) {
-        doc.text(quote.customer.phone, col2X, ry);
+        doc.text(formatPhone(quote.customer.phone) || quote.customer.phone, col2X, ry);
         ry += 14;
       }
 

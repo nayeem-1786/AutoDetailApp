@@ -1,5 +1,27 @@
 // Formatting utilities
 
+// PHONE NUMBER UTILITIES
+//
+// Use these consistently across the codebase:
+//
+// - formatPhone(): for ALL human-facing display
+//   (returns "(XXX) XXX-XXXX" or "" for null/unparseable)
+//
+// - formatPhoneInput(): for input onChange handlers
+//   (live formats partial typing as user goes)
+//
+// - normalizePhone(): for storage/wire (returns E.164 or null)
+//   (used by sendSms, sendMarketingSms, findOrCreateConversation,
+//    and all DB write paths)
+//
+// - phoneToE164(): ONLY for tel: link hrefs and JSON-LD telephone
+//   field (permissive — returns input unchanged if unparseable)
+//
+// ASSUMPTION: US/Canada phone numbers only (+1 country code).
+// This codebase does not support international phone numbers.
+// If business expands beyond US/Canada, these utilities need
+// to be rebuilt with a library like libphonenumber-js.
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -7,8 +29,16 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatPhone(phone: string): string {
-  // Convert E.164 (+1XXXXXXXXXX) to (XXX) XXX-XXXX
+/**
+ * Format a phone number for human-facing display.
+ *
+ * Returns "(XXX) XXX-XXXX" for any parseable US/Canada phone (E.164 or
+ * 10-digit). Returns "" for null, undefined, empty string, or any value
+ * that cannot be parsed to a 10-digit number. Callers decide how to
+ * present the empty case — e.g. `formatPhone(value) || "—"`.
+ */
+export function formatPhone(phone: string | null | undefined): string {
+  if (phone === null || phone === undefined || phone === '') return '';
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) {
     const area = digits.slice(1, 4);
@@ -22,7 +52,7 @@ export function formatPhone(phone: string): string {
     const line = digits.slice(6, 10);
     return `(${area}) ${prefix}-${line}`;
   }
-  return phone;
+  return '';
 }
 
 export function normalizePhone(input: string): string | null {

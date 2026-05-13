@@ -274,3 +274,66 @@ describe('C2 — required-variable hard skip', () => {
     expect(result.body).toContain('Hi Sarah!');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase Phone-UX-1 (LOCKED-1) — palette-driven phone auto-format
+// Chips declared as `format: 'phone'` in SMS_PALETTE (e.g. business_phone,
+// customer_phone) get passed through formatPhone() before substitution.
+// Single point of enforcement — caller no longer needs to format.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Phase Phone-UX-1 — palette phone auto-format', () => {
+  it('formats a phone-typed chip value (customer_phone) before substitution', async () => {
+    state.templates = [{
+      slug: 't_customer_phone',
+      body_template: 'Call back at {customer_phone}.',
+      is_active: true,
+      can_silence: true,
+      recipient_type: 'staff',
+      recipient_phones: null,
+      required_variables: ['customer_phone'],
+      optional_variables: [],
+    }];
+
+    const result = await renderSmsTemplate('t_customer_phone', { customer_phone: '+13105551234' }, 'fb');
+    expect(result.isActive).toBe(true);
+    expect(result.body).toBe('Call back at (310) 555-1234.');
+    expect(result.body).not.toContain('+1');
+  });
+
+  it('formats auto-injected business_phone (caller did not pass it)', async () => {
+    // getBusinessInfo mock returns phone '+15551234567'.
+    state.templates = [{
+      slug: 't_business_phone',
+      body_template: 'Questions? {business_phone}',
+      is_active: true,
+      can_silence: true,
+      recipient_type: 'customer',
+      recipient_phones: null,
+      required_variables: [],
+      optional_variables: [],
+    }];
+
+    const result = await renderSmsTemplate('t_business_phone', {}, 'fb');
+    expect(result.isActive).toBe(true);
+    expect(result.body).toBe('Questions? (555) 123-4567');
+  });
+
+  it('non-phone chips pass through unchanged', async () => {
+    // {first_name} has format: 'plain' in SMS_PALETTE — must not be touched.
+    state.templates = [{
+      slug: 't_passthrough',
+      body_template: 'Hi {first_name}, your address is {business_address}.',
+      is_active: true,
+      can_silence: true,
+      recipient_type: 'customer',
+      recipient_phones: null,
+      required_variables: [],
+      optional_variables: [],
+    }];
+
+    const result = await renderSmsTemplate('t_passthrough', { first_name: '+13105551234' }, 'fb');
+    // first_name is NOT a phone chip — its literal value (even if it looks like a phone) is passed through verbatim.
+    expect(result.body).toBe('Hi +13105551234, your address is 123 Main St.');
+  });
+});

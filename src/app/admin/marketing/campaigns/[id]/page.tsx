@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatPhone } from '@/lib/utils/format';
 import { CAMPAIGN_STATUS_LABELS, CAMPAIGN_CHANNEL_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -274,7 +274,7 @@ export default function CampaignDetailPage() {
                         <tr key={r.id} className="hover:bg-gray-50">
                           <td className="py-2.5 pr-4 font-medium text-gray-900">{r.name}</td>
                           <td className="py-2.5 pr-4 text-gray-500">
-                            {r.phone && <div>{r.phone}</div>}
+                            {r.phone && <div>{formatPhone(r.phone) || r.phone}</div>}
                             {r.email && <div>{r.email}</div>}
                           </td>
                           <td className="py-2.5 pr-4">

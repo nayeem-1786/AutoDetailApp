@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
-import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines, formatDollar, formatNumber } from '@/lib/utils/template';
+import { formatPhone } from '@/lib/utils/format';
 import { getBusinessInfo, BUSINESS_DEFAULTS } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
@@ -1046,7 +1047,7 @@ async function executePending(
         vehicle_description: vehicleDisplay, // RPB-1: alias of vehicle_info
         detailer_first_name: detailerFirstName, // RPB-1: 'We' fallback when no job/detailer
         business_name: businessName,
-        business_phone: formatPhoneDisplay(businessInfo.phone),
+        business_phone: formatPhone(businessInfo.phone),
         business_address: businessInfo.address,
         google_review_link: shortGoogleUrl,
         yelp_review_link: shortYelpUrl,

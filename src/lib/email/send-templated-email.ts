@@ -4,6 +4,7 @@
 import { sendEmail } from '@/lib/utils/email';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { fetchBrandKit, renderEmail } from './layout-renderer';
 import { resolveEmailTemplate, fetchDefaultLayout } from './template-resolver';
 import type { CustomerAttributes, EmailBlock, RenderOptions, RenderedEmail } from './types';
@@ -65,7 +66,7 @@ export async function sendTemplatedEmail(
     // 1b. Auto-resolve business variables from DB when not provided by caller
     const biz = await getBusinessInfo();
     variables.business_name ??= biz.name;
-    variables.business_phone ??= biz.phone;
+    variables.business_phone ??= formatPhone(biz.phone);
     variables.business_email ??= biz.email || '';
     variables.business_address ??= biz.address;
     variables.business_website ??= biz.website || '';

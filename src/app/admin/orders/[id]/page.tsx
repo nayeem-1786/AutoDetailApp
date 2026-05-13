@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -494,7 +494,7 @@ export default function AdminOrderDetailPage() {
                 {order.first_name} {order.last_name}
               </p>
               <p className="text-sm text-gray-500">{order.email}</p>
-              {order.phone && <p className="text-sm text-gray-500">{order.phone}</p>}
+              {order.phone && <p className="text-sm text-gray-500">{formatPhone(order.phone) || order.phone}</p>}
               {order.customer && (
                 <Link
                   href={`/admin/customers/${order.customer.id}`}

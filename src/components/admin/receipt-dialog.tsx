@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { formatPhone, normalizePhone } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import {
   Dialog,
   DialogHeader,
@@ -306,7 +306,7 @@ export function ReceiptDialog({
               <Input
                 type="tel"
                 value={smsInput}
-                onChange={(e) => setSmsInput(e.target.value)}
+                onChange={(e) => setSmsInput(formatPhoneInput(e.target.value))}
                 placeholder="(310) 555-0123"
                 className="h-8 text-xs"
                 onKeyDown={(e) => {

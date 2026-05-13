@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { Phone, ArrowLeft, CheckCircle } from 'lucide-react';
-import { formatPhone } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { VehicleSelection } from './step-vehicle';
 
@@ -55,9 +55,13 @@ export function SpecialtyVehicleBlock({
     model: vehicle.model,
   });
 
+  const callbackPhoneValid = !callbackPhone || normalizePhone(callbackPhone) !== null;
+
   async function handleCallbackSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!callbackName.trim() || !callbackPhone.trim()) return;
+    const normalized = normalizePhone(callbackPhone);
+    if (!normalized) return;
 
     setSubmitting(true);
     try {
@@ -66,7 +70,7 @@ export function SpecialtyVehicleBlock({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: callbackName.trim(),
-          phone: callbackPhone.trim(),
+          phone: normalized,
           email: callbackEmail.trim() || null,
           preferred_time: callbackTime.trim() || null,
           vehicle_year: vehicle.year,
@@ -140,11 +144,14 @@ export function SpecialtyVehicleBlock({
             <Input
               type="tel"
               value={callbackPhone}
-              onChange={(e) => setCallbackPhone(e.target.value)}
+              onChange={(e) => setCallbackPhone(formatPhoneInput(e.target.value))}
               placeholder="(555) 555-5555"
               required
               className="text-base sm:text-sm"
             />
+            {callbackPhone && !callbackPhoneValid && (
+              <p className="mt-1 text-xs text-red-500">Enter a valid US phone number.</p>
+            )}
           </FormField>
           <FormField label="Email">
             <Input

@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { ProfileCompletionBanner } from '@/components/account/profile-completion-banner';
 import { AlertTriangle, Phone } from 'lucide-react';
+import { formatPhone } from '@/lib/utils/format';
 
 const ACCOUNT_TABS = [
   { label: 'Dashboard', href: '/account' },
@@ -20,16 +21,6 @@ const ACCOUNT_TABS = [
   { label: 'Loyalty', href: '/account/loyalty' },
   { label: 'Profile', href: '/account/profile' },
 ] as const;
-
-// Format phone for display: +13109551779 -> (310) 955-1779
-function formatPhone(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  const national = digits.startsWith('1') ? digits.slice(1) : digits;
-  if (national.length === 10) {
-    return `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`;
-  }
-  return phone;
-}
 
 export function AccountShell({ children }: { children: React.ReactNode }) {
   const { user, customer, loading, signingOut, signOut } = useCustomerAuth();

@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { sendEmail } from '@/lib/utils/email';
 import { sendSms } from '@/lib/utils/sms';
 import { buildJobCancelledLine, buildReasonLine } from '@/lib/sms/composites';
@@ -69,7 +70,7 @@ export async function notifyTransactionVoided(
         `Hi ${customer.first_name},\n\n` +
         `Your transaction (#${receiptNumber}) has been voided.${reasonSuffix}\n\n` +
         jobLine +
-        `If you have any questions, please call us at ${business.phone}.\n\n` +
+        `If you have any questions, please call us at ${formatPhone(business.phone)}.\n\n` +
         `${business.name}\n${business.address}`;
 
       const jobBlock = input.jobCancelled
@@ -116,7 +117,7 @@ export async function notifyTransactionVoided(
           ${jobBlock}
         </div>
         <p class="email-text-muted" style="margin: 0; color: #6b7280; font-size: 14px; text-align: center;">
-          Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${business.phone}</a>
+          Questions? Call us at <a href="tel:${business.phone}" style="color: #1e3a5f;">${formatPhone(business.phone)}</a>
         </p>
       </div>
       <div class="email-footer" style="background-color: #f9fafb; padding: 24px 32px; text-align: center;">
@@ -140,7 +141,7 @@ export async function notifyTransactionVoided(
       const jobLine = buildJobCancelledLine(input.jobCancelled);
       const smsBody =
         `Hi ${customer.first_name}, transaction #${receiptNumber} at ${business.name} has been voided.${jobLine}` +
-        ` Questions? Call ${business.phone}.`;
+        ` Questions? Call ${formatPhone(business.phone)}.`;
 
       const smsResult = await sendSms(customer.phone, smsBody, {
         logToConversation: true,

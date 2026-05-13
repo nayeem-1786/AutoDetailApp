@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { toCents, fromCents } from '@/lib/utils/refund-math';
-import { formatCurrency, formatTime, formatReceiptDateTime } from '@/lib/utils/format';
+import { formatCurrency, formatTime, formatReceiptDateTime, formatPhone } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { PayForm } from './pay-form';
 import { ProcessingRefresh } from './processing-refresh';
@@ -352,7 +352,7 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
           <p className="mt-2 text-sm text-site-text-muted">
             If you believe this is a mistake, please reach out to us at{' '}
             <a href={`tel:${businessInfo.phone}`} className="text-accent-brand">
-              {businessInfo.phone}
+              {formatPhone(businessInfo.phone)}
             </a>
             .
           </p>
@@ -406,7 +406,7 @@ function PaidCard({
       <p className="mt-4 text-xs text-site-text-muted">
         Questions? Call {businessName} at{' '}
         <a href={`tel:${phone}`} className="text-accent-brand">
-          {phone}
+          {formatPhone(phone)}
         </a>
         .
       </p>
@@ -454,7 +454,7 @@ function LinkPaidCard({
       <p className="mt-4 text-xs text-site-text-muted">
         Questions? Call {businessName} at{' '}
         <a href={`tel:${phone}`} className="text-accent-brand">
-          {phone}
+          {formatPhone(phone)}
         </a>
         .
       </p>

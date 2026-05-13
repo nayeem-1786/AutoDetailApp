@@ -24,6 +24,7 @@ import {
   type CommPillTone,
 } from '@/lib/quotes/derive-comm-pill';
 import { useRouter } from 'next/navigation';
+import { formatPhone } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
 import { useQuote } from '../../context/quote-context';
 import { usePosPermission } from '../../context/pos-permission-context';
@@ -477,7 +478,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{quote.customer.email}</p>
               )}
               {quote.customer?.phone && (
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{quote.customer.phone}</p>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{formatPhone(quote.customer.phone) || quote.customer.phone}</p>
               )}
             </div>
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -621,7 +622,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                           </span>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {comm.sent_to ?? '—'}
+                          {comm.sent_to ? (formatPhone(comm.sent_to) || comm.sent_to) : '—'}
                         </p>
                         {pill.detail && (
                           <p className="text-xs text-red-500 dark:text-red-400">{pill.detail}</p>

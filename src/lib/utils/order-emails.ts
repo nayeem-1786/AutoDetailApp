@@ -1,7 +1,7 @@
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import type { Order, OrderItem } from '@/lib/supabase/types';
 
 type OrderWithItems = Order & { items?: OrderItem[] };
@@ -59,7 +59,7 @@ function orderTemplateVars(order: OrderWithItems, biz: { name: string; phone: st
     order_number: order.order_number,
     items_table: order.items?.length ? itemsTable(order.items) : '',
     business_name: biz.name,
-    business_phone: biz.phone,
+    business_phone: formatPhone(biz.phone),
     business_email: biz.email || '',
     business_address: biz.address,
     business_website: biz.website || '',
@@ -85,7 +85,7 @@ export async function sendReadyForPickupEmail(order: OrderWithItems) {
     (order.items?.length
       ? card(`<h2 style="color:#FFFFFF;font-size:16px;margin:0 0 16px;">Order Items</h2>${itemsTable(order.items)}`)
       : ''),
-    `${biz.name}<br>${biz.phone}<br>${biz.email}`
+    `${biz.name}<br>${formatPhone(biz.phone)}<br>${biz.email}`
   );
 
   await sendEmail(
@@ -124,7 +124,7 @@ export async function sendShippedEmail(order: OrderWithItems) {
       <p style="color:#D1D5DB;margin:0;">Your order <strong style="color:#CCFF00;">${order.order_number}</strong> is on its way!</p>
       ${trackingHtml}
     `),
-    `${biz.name}<br>${biz.phone}<br>${biz.email}`
+    `${biz.name}<br>${formatPhone(biz.phone)}<br>${biz.email}`
   );
 
   await sendEmail(
@@ -150,7 +150,7 @@ export async function sendDeliveredEmail(order: OrderWithItems) {
       <p style="color:#D1D5DB;margin:0 0 16px;">Your order <strong style="color:#CCFF00;">${order.order_number}</strong> has been delivered. We hope you enjoy your purchase!</p>
       <p style="color:#D1D5DB;margin:0;">If you have any questions or concerns, don't hesitate to reach out.</p>
     `),
-    `${biz.name}<br>${biz.phone}<br>${biz.email}`
+    `${biz.name}<br>${formatPhone(biz.phone)}<br>${biz.email}`
   );
 
   await sendEmail(
@@ -181,7 +181,7 @@ export async function sendRefundEmail(order: OrderWithItems, amountCents: number
       <p style="color:#D1D5DB;margin:0 0 16px;">A ${isFullRefund ? 'full' : 'partial'} refund of <strong style="color:#CCFF00;">${formatCurrency(amountCents / 100)}</strong> has been processed for your order <strong style="color:#FFFFFF;">${order.order_number}</strong>.</p>
       <p style="color:#D1D5DB;margin:0;">The refund should appear in your account within 5-10 business days, depending on your bank.</p>
     `),
-    `${biz.name}<br>${biz.phone}<br>${biz.email}`
+    `${biz.name}<br>${formatPhone(biz.phone)}<br>${biz.email}`
   );
 
   await sendEmail(

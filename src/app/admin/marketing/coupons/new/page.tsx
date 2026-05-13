@@ -17,6 +17,7 @@ import type { CouponReward } from '@/lib/supabase/types';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { Spinner } from '@/components/ui/spinner';
+import { formatPhone } from '@/lib/utils/format';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1449,7 +1450,7 @@ export default function NewCouponPage() {
                                 {c.first_name} {c.last_name}
                               </span>
                               {c.phone && (
-                                <span className="text-xs text-gray-500">{c.phone}</span>
+                                <span className="text-xs text-gray-500">{formatPhone(c.phone) || c.phone}</span>
                               )}
                             </button>
                           ))}

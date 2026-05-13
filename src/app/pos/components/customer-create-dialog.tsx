@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
-import { formatPhoneInput, formatDate } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput, formatDate } from '@/lib/utils/format';
 import type { Customer, CustomerType } from '@/lib/supabase/types';
 
 interface ArchivedMatch {
@@ -444,7 +444,7 @@ export function CustomerCreateDialog({
           <div className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm text-gray-700 dark:text-gray-300">
-                <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
+                <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({formatPhone(archivedMatch.phone) || archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Restoring will reactivate their account with full history. Loyalty points will be reset to zero.

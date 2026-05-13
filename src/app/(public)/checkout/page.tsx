@@ -25,7 +25,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import { TAX_RATE } from '@/lib/utils/constants';
 import { toast } from 'sonner';
 
@@ -376,12 +376,14 @@ function CheckoutContent() {
 
   const couponCode = searchParams.get('coupon') || undefined;
 
-  // Validate contact
+  // Validate contact. Phone is optional — but if provided, must parse to E.164.
+  const phoneValid = !phone || normalizePhone(phone) !== null;
   const contactValid =
     email.includes('@') &&
     email.includes('.') &&
     firstName.trim().length > 0 &&
-    lastName.trim().length > 0;
+    lastName.trim().length > 0 &&
+    phoneValid;
 
   // Is address valid?
   const shippingAddressValid =
@@ -431,15 +433,7 @@ function CheckoutContent() {
           if (!firstName && c.first_name) setFirstName(c.first_name);
           if (!lastName && c.last_name) setLastName(c.last_name);
           if (!phone && c.phone) {
-            const digits = c.phone.replace(/\D/g, '');
-            const national = digits.startsWith('1') ? digits.slice(1) : digits;
-            if (national.length === 10) {
-              setPhone(
-                `(${national.slice(0, 3)}) ${national.slice(3, 6)}-${national.slice(6)}`
-              );
-            } else {
-              setPhone(c.phone);
-            }
+            setPhone(formatPhone(c.phone) || c.phone);
           }
           if (!shipStreet1 && c.address_line_1) setShipStreet1(c.address_line_1);
           if (!shipStreet2 && c.address_line_2) setShipStreet2(c.address_line_2);
@@ -580,6 +574,7 @@ function CheckoutContent() {
     validateShippingAddress();
 
     try {
+      const normalizedShipPhone = phone ? normalizePhone(phone) : null;
       const res = await fetch('/api/checkout/shipping-rates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -592,7 +587,7 @@ function CheckoutContent() {
             state: shipState.trim().toUpperCase(),
             zip: shipZip.trim(),
             country: 'US',
-            phone: phone || undefined,
+            phone: normalizedShipPhone ?? undefined,
             email: email || undefined,
           },
           items: items.map((i) => ({
@@ -679,6 +674,7 @@ function CheckoutContent() {
     setLoading(true);
     setError(null);
 
+    const normalizedPhone = phone ? normalizePhone(phone) : null;
     try {
       const payload: Record<string, unknown> = {
         items: items.map((i) => ({ id: i.id, quantity: i.quantity })),
@@ -687,7 +683,7 @@ function CheckoutContent() {
           email,
           firstName: firstName.trim(),
           lastName: lastName.trim(),
-          phone: phone || undefined,
+          phone: normalizedPhone ?? undefined,
         },
         fulfillmentMethod,
         customerNotes: customerNotes || undefined,
@@ -888,10 +884,13 @@ function CheckoutContent() {
                       <input
                         type="tel"
                         value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
+                        onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                         placeholder="(310) 555-0100"
                         className={inputClass}
                       />
+                      {phone && !phoneValid && (
+                        <p className="mt-1 text-xs text-red-500">Enter a valid US phone number.</p>
+                      )}
                     </div>
                   </div>
                 </div>

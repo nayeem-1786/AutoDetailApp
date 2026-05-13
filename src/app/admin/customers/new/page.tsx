@@ -7,7 +7,7 @@ import { formResolver } from '@/lib/utils/form';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { customerCreateSchema, type CustomerCreateInput } from '@/lib/utils/validation';
-import { formatPhoneInput } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -503,7 +503,7 @@ export default function NewCustomerPage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <p>
-                  <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
+                  <strong>{archivedMatch.first_name} {archivedMatch.last_name}</strong> ({formatPhone(archivedMatch.phone) || archivedMatch.phone}) was archived on {formatDate(archivedMatch.deleted_at)}.
                 </p>
                 <p className="text-sm text-gray-600">
                   Restoring will reactivate their account with full history. Loyalty points will be reset to zero.

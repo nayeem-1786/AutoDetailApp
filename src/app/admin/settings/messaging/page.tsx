@@ -16,7 +16,7 @@ import { TogglePill } from '@/components/ui/toggle-pill';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
-import { normalizePhone } from '@/lib/utils/format';
+import { formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 
 interface MessagingSettings {
   messaging_ai_unknown_enabled: string;
@@ -138,6 +138,15 @@ export default function MessagingSettingsPage() {
         loaded.messaging_ai_instructions = getDefaultSystemPrompt();
       }
 
+      // Display stored E.164 phones as "(XXX) XXX-XXXX" in the input; submit
+      // path re-normalizes to E.164.
+      if (loaded.sms_business_phone_override) {
+        loaded.sms_business_phone_override = formatPhone(loaded.sms_business_phone_override) || loaded.sms_business_phone_override;
+      }
+      if (loaded.sms_test_phone_number) {
+        loaded.sms_test_phone_number = formatPhone(loaded.sms_test_phone_number) || loaded.sms_test_phone_number;
+      }
+
       setSettings(loaded);
       setInitial(loaded);
       setLoading(false);
@@ -198,8 +207,14 @@ export default function MessagingSettingsPage() {
     }
 
     // Reflect the normalized values back into local state so the dirty check
-    // doesn't treat the typed input vs. saved E.164 as unsaved changes.
-    const next = { ...settings, ...phoneSettings } as MessagingSettings;
+    // doesn't treat the typed input vs. saved E.164 as unsaved changes. Phones
+    // are stored as E.164 in the DB but displayed pretty-formatted in inputs,
+    // so re-format here too.
+    const displayPhoneSettings: Record<string, string> = {};
+    for (const [key, val] of Object.entries(phoneSettings)) {
+      displayPhoneSettings[key] = formatPhone(val) || val;
+    }
+    const next = { ...settings, ...displayPhoneSettings } as MessagingSettings;
     setSettings(next);
     setInitial(next);
     toast.success('Messaging settings updated');
@@ -255,7 +270,7 @@ export default function MessagingSettingsPage() {
               placeholder="Default business phone"
               value={settings.sms_business_phone_override}
               onChange={(e) =>
-                setSettings((prev) => ({ ...prev, sms_business_phone_override: e.target.value }))
+                setSettings((prev) => ({ ...prev, sms_business_phone_override: formatPhoneInput(e.target.value) }))
               }
               className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
             />
@@ -268,10 +283,10 @@ export default function MessagingSettingsPage() {
             <input
               id="sms_test_phone"
               type="tel"
-              placeholder="+1XXXXXXXXXX"
+              placeholder="(310) 555-1234"
               value={settings.sms_test_phone_number}
               onChange={(e) =>
-                setSettings((prev) => ({ ...prev, sms_test_phone_number: e.target.value }))
+                setSettings((prev) => ({ ...prev, sms_test_phone_number: formatPhoneInput(e.target.value) }))
               }
               className="h-9 w-full rounded-lg border border-gray-200 px-3 text-base text-gray-900 outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200 sm:text-sm"
             />

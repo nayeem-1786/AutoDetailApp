@@ -4,7 +4,8 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/utils/email';
 import { sendMarketingSms } from '@/lib/utils/sms';
-import { renderTemplate, cleanEmptyReviewLines, formatPhoneDisplay, formatDollar, formatNumber } from '@/lib/utils/template';
+import { renderTemplate, cleanEmptyReviewLines, formatDollar, formatNumber } from '@/lib/utils/template';
+import { formatPhone } from '@/lib/utils/format';
 import { getBusinessInfo, BUSINESS_DEFAULTS } from '@/lib/data/business';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
@@ -323,7 +324,7 @@ export async function executeStep(
     first_name: customer.first_name || 'there',
     last_name: customer.last_name || '',
     business_name: businessName,
-    business_phone: formatPhoneDisplay(businessInfo.phone),
+    business_phone: formatPhone(businessInfo.phone),
     business_address: businessInfo.address,
     coupon_code: couponCode,
     booking_url: `${appUrl}/book`,

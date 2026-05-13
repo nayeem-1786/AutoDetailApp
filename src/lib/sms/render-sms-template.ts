@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { renderTemplate } from '@/lib/utils/template';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { parseContractFromRow, ContractValidationError } from './contract';
+import { SMS_PALETTE } from './palette';
 import type { SmsSlug, RenderVarsBySlug } from './generated-contracts';
 
 // ---------------------------------------------------------------------------
@@ -323,6 +325,20 @@ export async function renderSmsTemplate<S extends SmsSlug>(
     const val = enriched[key];
     if (val === undefined || val === '') {
       enriched[key] = '\x00REMOVE_LINE\x00';
+    }
+  }
+
+  // Phase Phone-UX-1 (LOCKED-1): format chips declared as `format: 'phone'`
+  // in SMS_PALETTE through formatPhone() before substitution. Single point of
+  // enforcement — callers no longer need to format business_phone /
+  // customer_phone by hand. Empty / unparseable formatPhone result substitutes
+  // empty string; if such a chip is in the optional list and was already
+  // REMOVE_LINE'd above we leave the sentinel intact.
+  for (const [key, val] of Object.entries(enriched)) {
+    if (val === undefined || val === '\x00REMOVE_LINE\x00') continue;
+    const meta = SMS_PALETTE[key];
+    if (meta?.format === 'phone' && val !== '') {
+      enriched[key] = formatPhone(val);
     }
   }
 

@@ -1667,6 +1667,7 @@ docs/sessions/messaging-1-2-send-flow-and-delivery.md # Phase Messaging-1+2: sen
 docs/sessions/mobile-fee-1-9-full-picker-edit.md     # Phase Mobile-1.9: full mobile picker edit on POS jobs detail + admin appointment dialog — toggle/zone/custom/address with live zone reads, save-time snapshot, payment-mismatch banner
 docs/sessions/mobile-fee-1-9-1-zone-dropdown-fix.md  # Phase Mobile-1.9.1: zone-dropdown shows correct selection in edit mode (JOB_SELECT +mobile_zone_id, zonesLoaded resync, deleted-zone recovery)
 docs/sessions/normalization-1-phone-format-integrity.md  # Phase Normalization-1: chokepoint phone normalization in sendSms/findOrCreateConversation, 5 unprotected endpoints, form-side hygiene, backfill + CHECK on employees.phone, 4 shadow conversations deferred
+docs/sessions/phone-ux-1-display-and-input.md            # Phase Phone-UX-1: canonical phone display + input formatting — null-safe formatPhone, palette-driven SMS chip auto-format, 22 HIGH + 5 MEDIUM display sites, 7 input forms, 3 duplicate impls consolidated
 docs/manual/README.md
 docs/manual/01-getting-started.md
 docs/manual/02-dashboard.md

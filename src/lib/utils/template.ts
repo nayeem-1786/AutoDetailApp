@@ -138,19 +138,6 @@ export function cleanEmptyReviewLines(message: string): string {
 }
 
 /**
- * Format a phone number for display: +13107564789 → "(310) 756-4789"
- */
-export function formatPhoneDisplay(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
-  // Remove leading country code 1 if present
-  const local = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
-  if (local.length === 10) {
-    return `(${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6)}`;
-  }
-  return phone;
-}
-
-/**
  * Format a dollar amount: 2069.50 → "$2,069.50", 0 → "$0"
  */
 export function formatDollar(amount: number): string {

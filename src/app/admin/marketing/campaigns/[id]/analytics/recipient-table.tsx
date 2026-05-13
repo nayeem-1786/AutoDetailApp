@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -133,7 +133,7 @@ export function RecipientTable({
                           {r.firstName} {r.lastName}
                         </td>
                         <td className="px-4 py-3 text-gray-500">
-                          {r.phone && <div className="text-xs">{r.phone}</div>}
+                          {r.phone && <div className="text-xs">{formatPhone(r.phone) || r.phone}</div>}
                           {r.email && <div className="text-xs">{r.email}</div>}
                         </td>
                         {hasVariants && (

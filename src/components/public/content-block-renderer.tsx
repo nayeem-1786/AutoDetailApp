@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, CheckCircle, Star, Quote } from 'lucide-react';
 import { getBusinessInfo } from '@/lib/data/business';
+import { formatPhone } from '@/lib/utils/format';
 import { getActiveTeamMembers } from '@/lib/data/team-members';
 import { getActiveCredentials } from '@/lib/data/credentials';
 import { GalleryLightbox } from './gallery-lightbox';
@@ -544,7 +545,7 @@ async function TermsSectionsBlock({ block }: { block: PageContentBlock }) {
             </a>
           ) : (
             <a href={`tel:${biz.phone}`} className="text-accent-brand hover:underline">
-              {biz.phone}
+              {formatPhone(biz.phone)}
             </a>
           )}
           .

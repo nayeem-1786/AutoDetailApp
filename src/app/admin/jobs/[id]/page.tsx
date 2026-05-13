@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { getZoneLabel } from '@/lib/utils/job-zones';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -400,7 +400,7 @@ export default function AdminJobDetailPage({
                           <p className="text-sm text-gray-600">-</p>
                         )}
                         {job.customer?.phone && (
-                          <p className="text-xs text-gray-400">{job.customer.phone}</p>
+                          <p className="text-xs text-gray-400">{formatPhone(job.customer.phone) || job.customer.phone}</p>
                         )}
                       </div>
                     </div>
