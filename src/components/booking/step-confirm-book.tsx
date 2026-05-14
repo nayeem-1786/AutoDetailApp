@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { formatCurrency, formatDate, formatTime, formatPhone } from '@/lib/utils/format';
-import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { FEATURE_FLAGS, LOYALTY } from '@/lib/utils/constants';
+import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { isSpecialtyCategory, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import type { VehicleSelection } from './step-vehicle';
@@ -181,13 +182,12 @@ export function StepConfirmBook({
   }, []);
 
   // --- Price calculations ---
-  const REDEEM_RATE = 0.05;
   const REDEEM_MINIMUM = 100;
 
   const addonTotal = addons.reduce((sum, a) => sum + a.price, 0);
   const subtotal = price + addonTotal + mobileSurcharge;
   const couponDiscount = appliedCoupon?.discount ?? 0;
-  const loyaltyDiscount = loyaltyPointsToUse * REDEEM_RATE;
+  const loyaltyDiscount = loyaltyPointsToUse * LOYALTY.REDEEM_RATE;
   const grandTotal = Math.max(0, subtotal - couponDiscount - loyaltyDiscount);
 
   const isFullPaymentRequired = grandTotal < 100;
@@ -200,18 +200,17 @@ export function StepConfirmBook({
 
   const maxLoyaltyPointsRaw = Math.min(
     loyaltyPointsBalance,
-    Math.floor((subtotal - couponDiscount) / REDEEM_RATE)
+    Math.floor((subtotal - couponDiscount) / LOYALTY.REDEEM_RATE)
   );
   const maxLoyaltyPointsUsable = Math.floor(maxLoyaltyPointsRaw / REDEEM_MINIMUM) * REDEEM_MINIMUM;
-  const loyaltyPointsValue = loyaltyPointsBalance * REDEEM_RATE;
+  const loyaltyPointsValue = loyaltyPointsBalance * LOYALTY.REDEEM_RATE;
 
   // Loyalty-related flags
   const hasLoyaltyDiscount = loyaltyPointsToUse > 0 && loyaltyDiscount > 0;
   const pointsCoverOrder = grandTotal <= 0;
 
   // Determine if Stripe needed
-  const STRIPE_MINIMUM = 0.50;
-  const discountsCoverAmount = grandTotal < STRIPE_MINIMUM;
+  const discountsCoverAmount = grandTotal < STRIPE_MIN_DOLLARS;
   const needsStripePayment = requirePayment && paymentOption !== 'pay_on_site' && paymentOption !== null && !discountsCoverAmount && grandTotal > 0 && !pointsCoverOrder;
 
   // Auto-switch from deposit when it becomes hidden (returning customer or loyalty active)
@@ -802,7 +801,7 @@ export function StepConfirmBook({
                       )}
 
                       <p className="mt-2 text-xs text-site-text-muted">
-                        Points are redeemed in increments of {REDEEM_MINIMUM}. Each {REDEEM_MINIMUM} points = {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off.
+                        Points are redeemed in increments of {REDEEM_MINIMUM}. Each {REDEEM_MINIMUM} points = {formatCurrency(REDEEM_MINIMUM * LOYALTY.REDEEM_RATE)} off.
                       </p>
                     </div>
                   ) : (
@@ -822,7 +821,7 @@ export function StepConfirmBook({
                     <Coins className="h-4 w-4 text-warning" />
                     <p className="text-sm text-warning">
                       You have <span className="font-semibold">{loyaltyPointsBalance} points</span>. Earn {REDEEM_MINIMUM - loyaltyPointsBalance} more to redeem for{' '}
-                      {formatCurrency(REDEEM_MINIMUM * REDEEM_RATE)} off!
+                      {formatCurrency(REDEEM_MINIMUM * LOYALTY.REDEEM_RATE)} off!
                     </p>
                   </div>
                 </div>

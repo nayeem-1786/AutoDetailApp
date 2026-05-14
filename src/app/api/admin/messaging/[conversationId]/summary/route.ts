@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
+import { LOYALTY } from '@/lib/utils/constants';
 
 export async function GET(
   request: NextRequest,
@@ -104,7 +105,7 @@ export async function GET(
 
       loyaltyData = {
         points: customer.loyalty_points_balance || 0,
-        value: ((customer.loyalty_points_balance || 0) * 0.05).toFixed(2),
+        value: ((customer.loyalty_points_balance || 0) * LOYALTY.REDEEM_RATE).toFixed(2),
       };
 
       engagementData = {

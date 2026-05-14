@@ -6,6 +6,7 @@ import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 import { getPendingAddonsForCustomer, buildAddonPromptSection } from '@/lib/services/job-addons';
 import type { Message } from '@/lib/supabase/types';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { LOYALTY } from '@/lib/utils/constants';
 
 export { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
 
@@ -412,7 +413,7 @@ SYSTEM NOTIFICATION AWARENESS:
       })
       .join('\n');
 
-    const loyaltyValue = (customerContext.loyalty_points * 0.05).toFixed(2);
+    const loyaltyValue = (customerContext.loyalty_points * LOYALTY.REDEEM_RATE).toFixed(2);
 
     const engagementParts: string[] = [];
     if (customerContext.first_visit) engagementParts.push(`Customer since ${customerContext.first_visit}`);

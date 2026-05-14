@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
 
 // Initialize Stripe (server-side only)
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -13,11 +14,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
-    // Stripe minimum is $0.50 USD
-    const STRIPE_MINIMUM = 0.50;
-    if (amount < STRIPE_MINIMUM) {
+    if (amount < STRIPE_MIN_DOLLARS) {
       return NextResponse.json(
-        { error: `Amount must be at least $${STRIPE_MINIMUM.toFixed(2)}` },
+        { error: `Amount must be at least $${STRIPE_MIN_DOLLARS.toFixed(2)}` },
         { status: 400 }
       );
     }

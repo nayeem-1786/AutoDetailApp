@@ -28,6 +28,7 @@ import {
   fromCents,
   toCents,
 } from '@/lib/utils/refund-math';
+import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
 import type { RefundDisposition } from '@/lib/utils/validation';
 import {
   walkLifoAllocation,
@@ -36,11 +37,6 @@ import {
 } from '@/lib/refunds/source-plan';
 import { derivePaymentSourceLabel } from '@/lib/utils/payment-source-label';
 import { formatDateTime } from '@/lib/utils/format';
-
-// Mirrors STRIPE_MIN_AMOUNT_CENTS in src/app/api/pay/[token]/intent/route.ts
-// and src/components/jobs/payment-link-amount-modal.tsx. Stripe rejects card
-// refunds below $0.50.
-const STRIPE_MIN_AMOUNT_CENTS = 50;
 
 interface RefundDialogProps {
   open: boolean;

@@ -18,6 +18,7 @@ import {
   VEHICLE_SIZE_CLASS_KEYS,
   TRANSACTION_STATUS_LABELS,
   QUOTE_STATUS_LABELS,
+  LOYALTY,
 } from '@/lib/utils/constants';
 import {
   VEHICLE_CATEGORIES,
@@ -1538,7 +1539,7 @@ export default function CustomerProfilePage() {
                       {formatPoints(customer.loyalty_points_balance)}
                     </p>
                     <p className="mt-1 text-sm text-gray-500">
-                      Worth {formatCurrency(customer.loyalty_points_balance * 0.05)}
+                      Worth {formatCurrency(customer.loyalty_points_balance * LOYALTY.REDEEM_RATE)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

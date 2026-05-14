@@ -1091,7 +1091,8 @@ src/lib/utils/template.ts
 src/lib/utils/ticker-sections.ts
 src/lib/utils/validation.ts
 src/lib/utils/service-extraction.ts
-src/lib/utils/refund-math.ts
+src/lib/utils/refund-math.ts        # Phase Money-Unify-1: deprecated re-export shim — `export * from './money'`. Removed at Unify-Final.
+src/lib/utils/money.ts              # Phase Money-Unify-1: canonical money module (renamed from refund-math.ts). Exports toCents/fromCents, STRIPE_MIN_AMOUNT_CENTS=50, STRIPE_MIN_DOLLARS, refund-math helpers, invariants
 src/lib/utils/stock-adjustments.ts
 src/lib/utils/stripe-card-details.ts        # Phase 1A.5: extractCardDetailsFromCharge — Stripe brand/last4 helper for online card payment paths
 src/lib/utils/system-actors.ts
@@ -1101,6 +1102,8 @@ src/lib/utils/__tests__/compose-line-items.test.ts      # Phase Mobile-1.7: 17 c
 src/lib/utils/__tests__/constants.test.ts
 src/lib/utils/__tests__/format-address.test.ts
 src/lib/utils/__tests__/refund-math.test.ts
+src/lib/utils/__tests__/money.test.ts                   # Phase Money-Unify-1: 11 tests — STRIPE_MIN_AMOUNT_CENTS/STRIPE_MIN_DOLLARS, LOYALTY.REDEEM_RATE_CENTS, refund-math re-export shim
+src/lib/utils/__tests__/format-money.test.ts            # Phase Money-Unify-1: 25 tests — formatMoney/formatMoneyForInput edges, 1M-iter byte-identical equivalence vs formatCurrency
 src/lib/utils/__tests__/stock-adjustments.test.ts
 src/lib/utils/__tests__/mobile-service-edit.test.ts
 src/lib/utils/__tests__/resolve-mobile-fields.test.ts
@@ -1631,6 +1634,8 @@ eslint.config.mjs
 ```
 eslint-rules/phone-no-raw-display.js                       # Phase Lint-Hardening-1: flags raw {customer.phone} in JSX without formatPhone() wrapper
 eslint-rules/__tests__/phone-no-raw-display.test.js        # 23 RuleTester cases (10 valid, 13 invalid) — vitest picks up via include
+eslint-rules/money-no-unsuffixed-money-prop.js             # Phase Money-Unify-1: flags cents-typed values bound to identifiers lacking Cents/_cents suffix
+eslint-rules/__tests__/money-no-unsuffixed-money-prop.test.js  # 21 RuleTester cases (14 valid, 7 invalid)
 ```
 
 ---
@@ -1655,6 +1660,7 @@ docs/dev/DATA_MIGRATION_RULES.md
 docs/dev/DESIGN_SYSTEM.md
 docs/dev/FILE_TREE.md          ← this file
 docs/dev/PHONE_LINT.md       # Phase Lint-Hardening-1: phone/no-raw-display rule rationale, scope, opt-out, severity-upgrade plan
+docs/dev/MONEY.md            # Phase Money-Unify-1: canonical money model, helper API, naming convention, money/no-unsuffixed-money-prop rule, cross-system sync points (Stripe min DB CHECK + REDEEM_RATE float/int duality)
 docs/dev/POS_SECURITY.md
 docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md

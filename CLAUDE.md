@@ -35,6 +35,7 @@ After commit, push, and cache clear, print: `⚠️ Session complete. Run: npm r
 17. **Schema reference**: Read `docs/dev/DB_SCHEMA.md` when session touches pricing, services, or booking.
 18. **Customer soft delete**: Customers table uses soft delete (`deleted_at` column). All forward-looking queries (search, selection, eligibility, enrollment, creation uniqueness) MUST filter `.is('deleted_at', null)`. Historical joins (transactions, receipts, refunds, analytics, lifecycle engine) are intentionally unfiltered. One phone = one customer record; archived match surfaced on creation with restore as default path.
 19. **Vehicle size taxonomy**: `size_class` is the canonical vehicle size taxonomy (5 values: sedan, truck_suv_2row, suv_3row_van, exotic, classic). All vehicle attributes that influence size-based pricing, booking gating, or agent handoff MUST be expressed as `size_class` values. Do NOT introduce parallel boolean flags (is_exotic, is_classic, requires_custom_quote, etc.). The admin vehicle edit dropdown uses `size_class_manual_override` to persist staff overrides across classifier runs.
+20. **Money (Money-Unify epic in progress, Phase Unify-1 complete)**: New money-handling code MUST use integer cents — column suffix `_cents`, variable suffix `Cents` (camelCase) or `_cents` (snake_case). Canonical helpers live in `src/lib/utils/money.ts`: `toCents()`, `fromCents()`, `STRIPE_MIN_AMOUNT_CENTS = 50`, `STRIPE_MIN_DOLLARS` (derived). Format helpers in `src/lib/utils/format.ts`: `formatMoney(cents)` for all display, `formatMoneyForInput(cents)` for controlled dollar-edit inputs. The legacy `formatCurrency(dollars)` survives the epic and is removed at Unify-Final. Loyalty: `LOYALTY.REDEEM_RATE_CENTS = 5` for cents-context math (alongside legacy `LOYALTY.REDEEM_RATE = 0.05`). The `money/no-unsuffixed-money-prop` ESLint rule (`eslint-rules/money-no-unsuffixed-money-prop.js`, currently `'warn'`, scheduled for `'error'` at Unify-Final once all family phases land) flags violations at write time. Existing dollars-canonical code in families not yet migrated stays as-is until that family's phase. The Stripe minimum value (50 cents = $0.50) is duplicated at the DB layer via `appointments.payment_link_amount_cents_check` — changing it requires both a code change AND a migration. Loyalty `REDEEM_RATE` is duplicated as both the float (`0.05`) and the integer (`5`) until Unify-Final. See `docs/dev/MONEY.md` for full canonical-model documentation, opt-out details, and the per-family migration status table.
 
 ## Project Structure
 
@@ -223,6 +224,7 @@ Read the relevant doc when working on that system:
 | Data migrations | `docs/dev/DATA_MIGRATION_RULES.md` |
 | Troubleshooting (WSOD, auth, build) | `docs/dev/TROUBLESHOOTING.md` |
 | Phone format lint rule | `docs/dev/PHONE_LINT.md` |
+| Money canonical model + lint rule | `docs/dev/MONEY.md` |
 | Version history | `docs/CHANGELOG.md` |
 | Roadmap & specs | `docs/planning/` |
 | System audits | `docs/audits/` |

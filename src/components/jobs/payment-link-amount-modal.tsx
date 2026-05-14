@@ -11,11 +11,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { fromCents, toCents } from '@/lib/utils/refund-math';
+import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
 import { PinPad } from '@/app/pos/components/pin-pad';
-
-// Mirrors STRIPE_MIN_AMOUNT_CENTS in src/app/api/pay/[token]/intent/route.ts.
-// Inlined to avoid coupling client bundles to a server-only file.
-const STRIPE_MIN_AMOUNT_CENTS = 50;
 
 type Preset = '25' | '50' | '75' | 'full' | 'custom';
 

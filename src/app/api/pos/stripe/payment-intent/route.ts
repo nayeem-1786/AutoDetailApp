@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { BUSINESS_DEFAULTS } from '@/lib/data/business';
+import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { amount, description } = body;
 
-    if (!amount || amount < 50) {
+    if (!amount || amount < STRIPE_MIN_AMOUNT_CENTS) {
       return NextResponse.json(
         { error: 'Amount must be at least $0.50 (50 cents)' },
         { status: 400 }

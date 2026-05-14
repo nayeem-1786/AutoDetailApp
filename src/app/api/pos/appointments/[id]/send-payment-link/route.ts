@@ -6,15 +6,12 @@ import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { getBusinessInfo } from '@/lib/data/business';
 import { toCents, fromCents } from '@/lib/utils/refund-math';
+import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
 
 const TOKEN_LENGTH = 16;
 const TOKEN_ALPHABET =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 const TOKEN_RETRIES = 3;
-
-// Mirrors STRIPE_MIN_AMOUNT_CENTS in /api/pay/[token]/intent/route.ts. Reject
-// at send time so staff don't end up with a Stripe-rejected pay page later.
-const STRIPE_MIN_AMOUNT_CENTS = 50;
 
 type Method = 'email' | 'sms' | 'both';
 type ChannelStatus = 'sent' | 'skipped' | 'failed';

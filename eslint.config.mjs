@@ -2,6 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import phoneNoRawDisplay from "./eslint-rules/phone-no-raw-display.js";
+import moneyNoUnsuffixedMoneyProp from "./eslint-rules/money-no-unsuffixed-money-prop.js";
 
 const eslintConfig = defineConfig([
   // Ignore-only config (must be first; flat config respects ignores additively).
@@ -15,11 +16,16 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     plugins: {
-      // Local plugin housing project-specific lint rules.
-      // See docs/dev/PHONE_LINT.md for the phone-format rule rationale.
+      // Local plugins housing project-specific lint rules.
+      // See docs/dev/PHONE_LINT.md and docs/dev/MONEY.md for rationale.
       phone: {
         rules: {
           "no-raw-display": phoneNoRawDisplay,
+        },
+      },
+      money: {
+        rules: {
+          "no-unsuffixed-money-prop": moneyNoUnsuffixedMoneyProp,
         },
       },
     },
@@ -47,6 +53,11 @@ const eslintConfig = defineConfig([
       // TODO: Upgrade phone/no-raw-display from 'warn' to 'error'
       // after Phase Phone-UX-1 ships and all leaks are resolved.
       "phone/no-raw-display": "warn",
+      // Phase Money-Unify-1: flag cents-typed values bound to identifiers
+      // that lack the Cents/_cents suffix. Severity upgrades to 'error'
+      // at Unify-Final after all family-phase migrations land.
+      // See docs/dev/MONEY.md.
+      "money/no-unsuffixed-money-prop": "warn",
     },
   },
   // Override default ignores of eslint-config-next.

@@ -6,6 +6,79 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Money-Unify-1 — Foundation (helpers + lint rule + constant consolidation)
+
+First phase of the Money-Unify epic. Establishes the canonical money-helper API surface, formatter for integer cents, naming convention, lint rule, and documentation that the 8 family-migration phases (Unify-2 through Unify-9) build on. Also consolidates two cross-cutting constant-duplication hazards surfaced in Audit-1/Audit-2: the Stripe minimum charge value and the loyalty redeem rate. Dev only — no production deploy until Unify-Final.
+
+**Scope expansion from playbook-v2:** verification surfaced **3 additional Stripe-min sites** (client booking wizard + step-confirm + payment-link modal) and **2 additional hardcoded loyalty `0.05` sites** (booking step-confirm local const + AI messaging service) with identical drift-hazard profile to the originally enumerated 6+2. All 9 + 4 sites consolidated in this phase per user-approved decisions **A2** and **B3**. Rationale: fixing all 13 now establishes the canonical source of truth that this phase exists to create; leaving silent-drift hazards in place defeats consolidation.
+
+**Renamed + canonical helpers:**
+- `src/lib/utils/refund-math.ts` → `src/lib/utils/money.ts` (preserves git history via `git mv`)
+- `src/lib/utils/refund-math.ts` survives as a `@deprecated` re-export shim (`export * from './money';`) so the 21 existing importers don't have to migrate in a single commit. The shim is deleted at Unify-Final.
+- All existing refund-math exports retained verbatim under `money.ts`: `toCents`, `fromCents`, `computePerUnitRefundableCents`, `computeRefundLineAmountCents`, `computeTotalRefundCents`, `distributeResidualCents`, `TotalRefundResult`.
+
+**New canonical exports** in `src/lib/utils/money.ts`:
+- `STRIPE_MIN_AMOUNT_CENTS = 50` — single source of truth for Stripe's minimum charge in cents
+- `STRIPE_MIN_DOLLARS` — derived (`STRIPE_MIN_AMOUNT_CENTS / 100`) for dollars-context callers
+
+**New canonical export** in `src/lib/utils/constants.ts`:
+- `LOYALTY.REDEEM_RATE_CENTS = 5` — cents-context counterpart to legacy `LOYALTY.REDEEM_RATE = 0.05`. Both coexist through the epic; one is removed at Unify-Final.
+
+**New format helpers** in `src/lib/utils/format.ts`:
+- `formatMoney(cents)` — canonical formatter. Produces byte-identical output to `formatCurrency(cents / 100)` for any integer-cent value across 0–1,000,000 cents (proven by stress test). Throws `TypeError` on non-integer/non-finite input.
+- `formatMoneyForInput(cents)` — returns `"17.64"` form (no `$`, no commas) for controlled dollar-edit inputs.
+- Legacy `formatCurrency(dollars)` survives the epic; removed at Unify-Final via rename.
+
+**9 Stripe-minimum sites consolidated** (file:line, before → after):
+1. `src/app/api/book/payment-intent/route.ts:17` — `const STRIPE_MINIMUM = 0.50` → `import STRIPE_MIN_DOLLARS`
+2. `src/app/api/pay/[token]/intent/route.ts:9` — local `const STRIPE_MIN_AMOUNT_CENTS = 50` → import
+3. `src/app/api/pos/appointments/[id]/send-payment-link/route.ts:17` — local const → import
+4. `src/app/pos/components/refund/refund-dialog.tsx:43` — local const → import
+5. `src/app/api/checkout/create-payment-intent/route.ts:259` — inline `< 50` literal → `< STRIPE_MIN_AMOUNT_CENTS` + import
+6. `src/app/api/pos/stripe/payment-intent/route.ts:29` — inline `< 50` literal → import
+7. `src/components/booking/step-confirm-book.tsx:213` — `const STRIPE_MINIMUM = 0.50` → `import STRIPE_MIN_DOLLARS` (new)
+8. `src/components/booking/booking-wizard.tsx:915` — `const STRIPE_MINIMUM = 0.50` → `import STRIPE_MIN_DOLLARS` (new)
+9. `src/components/jobs/payment-link-amount-modal.tsx:18` — local `const STRIPE_MIN_AMOUNT_CENTS = 50` → import (new)
+
+DB-layer enforcement (`appointments.payment_link_amount_cents_check`) carries the same `>= 50` and is documented as a cross-system sync point in `docs/dev/MONEY.md`.
+
+**4 hardcoded loyalty `0.05` sites consolidated** (file:line):
+1. `src/app/admin/customers/[id]/page.tsx:1541` — `* 0.05` → `* LOYALTY.REDEEM_RATE`
+2. `src/app/api/admin/messaging/[conversationId]/summary/route.ts:107` — `* 0.05` → `* LOYALTY.REDEEM_RATE` (path corrected from audit-2's `agent-conversation-summary` reference)
+3. `src/components/booking/step-confirm-book.tsx:184-207` — local `const REDEEM_RATE = 0.05` shadowing the canonical constant, used at 5 sites (lines 190, 203, 206, 804, 824). Deleted the local const; rewrote all 5 references to `LOYALTY.REDEEM_RATE`. (new)
+4. `src/lib/services/messaging-ai.ts:415` — `* 0.05` → `* LOYALTY.REDEEM_RATE` (new)
+
+**New lint rule** `money/no-unsuffixed-money-prop`:
+- Implementation: `eslint-rules/money-no-unsuffixed-money-prop.js`
+- Tests: `eslint-rules/__tests__/money-no-unsuffixed-money-prop.test.js` (21 RuleTester cases — 14 valid + 7 invalid)
+- Registered at `'warn'` severity in `eslint.config.mjs` under the `money` plugin namespace. TODO comment marks the line for the upgrade to `'error'` at Unify-Final.
+- Triggers: cents-typed source (identifier with `Cents`/`_cents` suffix, member expression like `row.foo_cents`, or `toCents(...)` call) bound to an identifier whose LHS name lacks the suffix.
+- Skip patterns: test files (`__tests__/` + `*.test.*`/`*.spec.*`), `*Dollars`/`_dollars` LHS, `fromCents(...)` / `formatMoney(...)` / `formatMoneyForInput(...)` / `formatCurrency(...)` RHS (return strings or dollars), shorthand destructure, JSX attribute pass-through.
+
+**Initial lint warning count from the new rule: 29 warnings** across the codebase. These are real drift hazards (e.g. `appointmentBalanceDue` holding cents, `need` in source-plan, `amount` in shippo). They will be reduced as families A–H migrate; Unify-Final upgrades severity to `'error'` once the count reaches zero.
+
+**Documentation:**
+- New: `docs/dev/MONEY.md` — canonical money model, helper API, naming convention, lint rule, cross-system sync points (Stripe min DB CHECK + REDEEM_RATE float/int duality), migration status table, opt-out instructions. Mirrors `docs/dev/PHONE_LINT.md` structure.
+- `CLAUDE.md` — new Rule 20 documents the Money-Unify convention, helpers, and lint rule. Reference Docs table now includes MONEY.md.
+
+**Tests added (gates pass green):**
+- `src/lib/utils/__tests__/money.test.ts` — 11 tests covering `STRIPE_MIN_AMOUNT_CENTS`, `STRIPE_MIN_DOLLARS`, `LOYALTY.REDEEM_RATE_CENTS`/`REDEEM_RATE` parity, and the refund-math re-export shim.
+- `src/lib/utils/__tests__/format-money.test.ts` — 25 tests: edge cases (0, 1, 50, 99, 100, 1764, 100000, 100000000, negatives), input validation (non-integer/NaN/Infinity → `TypeError`), and a 1,000,001-iteration byte-identical equivalence stress test (`formatMoney(c) === formatCurrency(c / 100)` for `c ∈ [0, 1_000_000]` in steps of 1, plus 1000 negative samples).
+- Existing `src/lib/utils/__tests__/refund-math.test.ts` — 26 tests continue to pass via the deprecated re-export shim (zero changes).
+- `eslint-rules/__tests__/money-no-unsuffixed-money-prop.test.js` — 21 RuleTester cases.
+
+**Verification gates:** typecheck clean; existing + new tests green; `next lint` produces 29 new `money/no-unsuffixed-money-prop` warnings (expected) and no new errors; no migration files added (this phase touches no DB schema).
+
+**Out of scope (deferred to family phases):**
+- The 65 NUMERIC(10,2) dollar columns and 437 Pattern-A callers stay as-is. Each family phase migrates its own columns + callers atomically.
+- The 4 duplicate formatter implementations (`template.ts:143-146`, `quickbooks/page.tsx:147-149`, `quote-helpers.ts:33-35`, `quick-edit-drawer.tsx:44-47`) survive until their respective family phases or Unify-Final.
+- The 48 inline `` `$${x.toFixed(2)}` `` files — Unify-Final.
+- ADR-0003 supersession — Unify-Final.
+
+**Out-of-scope drift hazard noted for follow-up:** `src/components/booking/step-confirm-book.tsx:186` declares `const REDEEM_MINIMUM = 100` shadowing `LOYALTY.REDEEM_MINIMUM`. Same risk profile as the `REDEEM_RATE` shadow this phase removed, but the user-approved scope was REDEEM_RATE-specific. Recommend cleaning up in a Family C-adjacent follow-up.
+
+---
+
 ## Session: Phase ADR-1 — Architecture Decision Records as ongoing practice
 
 Established `docs/adr/` as the canonical home for architectural decisions and wrote 5 initial ADRs. The corpus is **ongoing practice**, not a one-time consolidation — every future session that makes an architecturally significant decision writes or updates an ADR alongside the usual CHANGELOG entry.

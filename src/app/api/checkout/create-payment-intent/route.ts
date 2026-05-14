@@ -9,6 +9,7 @@ import {
   type CouponRow,
 } from '@/lib/utils/coupon-helpers';
 import { getShippingSettings } from '@/lib/services/shippo';
+import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
@@ -256,7 +257,7 @@ export async function POST(request: NextRequest) {
     // ---------------------------------------------------------------
     const totalCents = subtotalCents - discountCents + taxCents + shippingCents;
 
-    if (totalCents < 50) {
+    if (totalCents < STRIPE_MIN_AMOUNT_CENTS) {
       return NextResponse.json(
         { error: 'Order total is too low for payment processing' },
         { status: 400 }

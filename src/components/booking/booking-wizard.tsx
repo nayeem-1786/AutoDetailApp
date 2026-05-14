@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { LOYALTY } from '@/lib/utils/constants';
+import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
 import { StepIndicator } from './step-indicator';
 import { StepVehicle, type VehicleSelection } from './step-vehicle';
 import { StepServiceSelect, type ConfigureResult } from './step-service-select';
@@ -912,8 +913,7 @@ export function BookingWizard({
       (appliedCoupon?.discount ?? 0) -
       loyaltyDiscount;
 
-    const STRIPE_MINIMUM = 0.50;
-    const discountsCoverAmount = grandTotal < STRIPE_MINIMUM;
+    const discountsCoverAmount = grandTotal < STRIPE_MIN_DOLLARS;
 
     // Determine effective payment option and deposit amount
     const effectivePaymentOption = discountsCoverAmount

@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { toCents } from '@/lib/utils/refund-math';
+import { STRIPE_MIN_AMOUNT_CENTS } from '@/lib/utils/money';
 import { getBusinessInfo } from '@/lib/data/business';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
-const STRIPE_MIN_AMOUNT_CENTS = 50;
 
 export async function POST(
   _request: NextRequest,

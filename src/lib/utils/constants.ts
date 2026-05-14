@@ -15,7 +15,14 @@ export const TIP_PRESETS = [15, 20, 25] as const;
 
 export const LOYALTY = {
   EARN_RATE: 1, // 1 point per $1 spent
-  REDEEM_RATE: 0.05, // $0.05 per point ($5 per 100 points)
+  REDEEM_RATE: 0.05, // $0.05 per point ($5 per 100 points). Dollars-context (legacy float).
+  /**
+   * Cents-context counterpart to REDEEM_RATE. 1 point = 5 cents = $0.05.
+   * Use this for integer-cent math; use REDEEM_RATE for dollars-context.
+   * Both coexist through the Money-Unify epic; one is removed at
+   * Unify-Final. See docs/dev/MONEY.md.
+   */
+  REDEEM_RATE_CENTS: 5,
   REDEEM_MINIMUM: 100, // Minimum points to redeem
 } as const;
 

@@ -30,6 +30,58 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * Canonical formatter for integer-cent values. Produces byte-identical
+ * output to formatCurrency(cents / 100) for any integer input. Examples:
+ *   formatMoney(0)        → "$0.00"
+ *   formatMoney(50)       → "$0.50"
+ *   formatMoney(1764)     → "$17.64"
+ *   formatMoney(100000)   → "$1,000.00"
+ *   formatMoney(-1764)    → "-$17.64" (negative refund display)
+ *
+ * Use this for ALL money rendering in JSX, SMS templates, emails,
+ * receipts, and PDFs going forward. The legacy dollars-input
+ * formatCurrency survives the Money-Unify epic; it is removed in
+ * Unify-Final. See docs/dev/MONEY.md.
+ *
+ * @throws TypeError if cents is non-finite or non-integer.
+ */
+export function formatMoney(cents: number): string {
+  if (!Number.isFinite(cents) || !Number.isInteger(cents)) {
+    throw new TypeError(
+      `formatMoney expects integer cents, received ${cents}. ` +
+        `Pass an integer (e.g. 1764 for $17.64), not a dollar float. ` +
+        `If you have a dollar value, use formatCurrency(dollars) instead.`,
+    );
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cents / 100);
+}
+
+/**
+ * Render integer cents as a plain dollar-decimal string for controlled
+ * inputs. No currency symbol, no thousands separator, always two
+ * decimals. Examples:
+ *   formatMoneyForInput(0)         → "0.00"
+ *   formatMoneyForInput(1764)      → "17.64"
+ *   formatMoneyForInput(100000000) → "1000000.00"
+ *
+ * Use as the display value in dollar-edit text inputs. The submit
+ * handler parses the user's edited string back to cents via toCents().
+ *
+ * @throws TypeError if cents is non-finite or non-integer.
+ */
+export function formatMoneyForInput(cents: number): string {
+  if (!Number.isFinite(cents) || !Number.isInteger(cents)) {
+    throw new TypeError(
+      `formatMoneyForInput expects integer cents, received ${cents}.`,
+    );
+  }
+  return (cents / 100).toFixed(2);
+}
+
+/**
  * Format a phone number for human-facing display.
  *
  * Returns "(XXX) XXX-XXXX" for any parseable US/Canada phone (E.164 or
