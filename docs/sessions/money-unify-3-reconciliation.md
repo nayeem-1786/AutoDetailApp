@@ -499,10 +499,65 @@ Unify-9 (Family G).
 **All reconciliation gates pass with zero divergence.** Migration is
 correct. Caller-code migration may proceed in Task 4.
 
-## Checkpoint #3 — Post-deploy (deferred)
+## Checkpoint #3 — Post-deploy
 
-To be populated after Task 13.
+> Generated 2026-05-14 after VPS deployed `ff2d51a1` (Money-Unify-3
+> commit). Run identical to Checkpoint #2 to confirm no drift
+> introduced during the misalignment window (schema-applied →
+> code-deployed). Expected outcome: zero divergence, matching
+> Checkpoint #2 byte-for-byte across every check.
 
-## Checkpoint #3 — Post-deploy (deferred)
+### Deploy fingerprint
 
-To be populated after Task 13.
+| Field | Value |
+|---|---|
+| Commit deployed | `ff2d51a1` |
+| Pre-deploy VPS state | `600a3655` (last code commit; lagged origin by 2 docs commits — see CHANGELOG note) |
+| Build time | 282s (4m 42s) |
+| Total deploy time | 374s (6m 14s) |
+| PM2 restart | 16 → 17 (PID 1645795 → 1957865) |
+| Memory after warm-up | 28.0mb → 55.7mb (normal startup growth) |
+| Port 5003 bound | ✅ HTTP 200 from `127.0.0.1:5003/` |
+
+### Production curl verification
+
+| Endpoint | Expected | Actual |
+|---|---|---|
+| `https://smartdetailsautospa.com/` | 200 | ✅ 200 |
+| `https://smartdetailsautospa.com/services` | 200 + dollar-formatted prices | ✅ 200; no raw-cents leakage |
+| `https://smartdetailsautospa.com/products` | 200 + dollar-formatted prices | ✅ 200; no raw-cents leakage |
+| `https://app.smartdetailsautospa.com/admin/catalog/services` | 307 (auth redirect) | ✅ 307 |
+| `https://app.smartdetailsautospa.com/admin/catalog/products` | 307 | ✅ 307 |
+| `https://app.smartdetailsautospa.com/admin/catalog/packages` | 307 | ✅ 307 |
+
+### Reconciliation — 12 invariants
+
+**8 leak checks** (legacy column populated AND `_cents` column NULL):
+
+| Check | Result |
+|---|---|
+| `services.flat_price` / `flat_price_cents` | 0 rows |
+| `services.sale_price` / `sale_price_cents` | 0 rows |
+| `service_pricing.price` / `price_cents` | 0 rows |
+| `service_pricing.sale_price` / `sale_price_cents` | 0 rows |
+| `products.cost_price` / `cost_price_cents` | 0 rows |
+| `products.retail_price` / `retail_price_cents` | 0 rows |
+| `products.sale_price` / `sale_price_cents` | 0 rows |
+| `packages.price` / `price_cents` | 0 rows |
+
+**4 SUM × 100 identity checks** (`SUM(dollar) * 100 − SUM(cents)`):
+
+| Table.column | Divergence |
+|---|---|
+| `services.flat_price` | 0.00 |
+| `service_pricing.price` | 0.00 |
+| `products.cost_price` | 0.00 |
+| `products.retail_price` | 0.00 |
+
+### Verdict
+
+**Zero divergence across all 12 invariants. Matches Checkpoint #2 byte-for-byte.**
+
+The two-phase commit pattern (cents columns added alongside legacy NUMERIC, legacy retained until Unify-Final) held its invariants. Both column sets carry identical values; no writes during the schema-apply-to-code-deploy window introduced drift. Production VPS is now reading + writing `_cents` columns; legacy NUMERIC columns remain intact for rollback safety.
+
+Family D — Catalog — production-ready. Cleanup at Unify-Final will drop the legacy NUMERIC columns.

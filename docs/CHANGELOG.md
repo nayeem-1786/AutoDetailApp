@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase Money-Unify-3 — Family D (Catalog) — DEPLOY
+
+Deployed to VPS on 2026-05-14 at commit `ff2d51a1`. Build time: 282s (4m 42s); total deploy time 374s. PM2 process `smart-details` restarted from PID 1645795 → 1957865, restart count incremented 16 → 17, status online, port 5003 bound, HTTP 200 from `127.0.0.1:5003/`.
+
+**Pre-deploy note**: VPS lagged origin/main by 2 docs-only commits (`ec14ca8f`, `14cb28f4`) because docs commits don't trigger deploys. Deploy pull fast-forwarded across all 3 commits but only `ff2d51a1` contributed code changes. Pre-deploy VPS state was `600a3655` (last code commit = Unify-2). Future deploy hand-offs should expect the VPS to match the most-recent **code** commit, not necessarily the most-recent commit on origin.
+
+**Production verification (curl-only, no SSH):**
+- `https://smartdetailsautospa.com/` → HTTP 200
+- `https://smartdetailsautospa.com/services` → HTTP 200 (no raw-cents leakage in rendered HTML)
+- `https://smartdetailsautospa.com/products` → HTTP 200 (no raw-cents leakage in rendered HTML)
+- `https://app.smartdetailsautospa.com/admin/catalog/services` → HTTP 307 (auth redirect; migrated code compiles)
+- `https://app.smartdetailsautospa.com/admin/catalog/products` → HTTP 307
+- `https://app.smartdetailsautospa.com/admin/catalog/packages` → HTTP 307
+
+**Post-deploy reconciliation — Checkpoint #3:**
+
+| Check | Result |
+|---|---|
+| `services.flat_price` populated + `flat_price_cents` NULL | 0 rows |
+| `services.sale_price` populated + `sale_price_cents` NULL | 0 rows |
+| `service_pricing.price` populated + `price_cents` NULL | 0 rows |
+| `service_pricing.sale_price` populated + `sale_price_cents` NULL | 0 rows |
+| `products.cost_price` populated + `cost_price_cents` NULL | 0 rows |
+| `products.retail_price` populated + `retail_price_cents` NULL | 0 rows |
+| `products.sale_price` populated + `sale_price_cents` NULL | 0 rows |
+| `packages.price` populated + `price_cents` NULL | 0 rows |
+| SUM(`services.flat_price`)×100 − SUM(`flat_price_cents`) | 0.00 |
+| SUM(`service_pricing.price`)×100 − SUM(`price_cents`) | 0.00 |
+| SUM(`products.cost_price`)×100 − SUM(`cost_price_cents`) | 0.00 |
+| SUM(`products.retail_price`)×100 − SUM(`retail_price_cents`) | 0.00 |
+
+**Matches Checkpoint #2 exactly.** No drift across the misalignment window (schema applied 2026-05-14 ~07:15 UTC → code deployed 2026-05-14 ~10:XX PST). The two-phase commit pattern (cents columns added alongside legacy NUMERIC; legacy retained for rollback safety) held its invariants — both column sets carry identical values, no writes during the window introduced divergence.
+
+**Warnings observed (same pre-existing item as Unify-1+2 deploy):**
+- One cron 'Failed' log line: "Failed to load active credentials" appearing before cron-job registration. Same pre-existing warning as the Unify-1+2 alignment deploy (`ec14ca8f` deploy entry). **Not a Money-Unify-3 regression.** All 14 cron jobs registered successfully after. Tracking as post-epic followup #12.
+
+**No build errors, no PM2 errors, no rollback needed.**
+
+---
+
 ## Phase Money-Unify-3 — Family D: Catalog (cents migration)
 
 Migrated the **Catalog** family (services, service_pricing, products, packages — 15 NUMERIC dollar columns) to integer cents. Schema applied to the shared Supabase project on 2026-05-14 (`20260514071552_unify_3_catalog_family_to_cents.sql`); reconciliation Checkpoint #2 zero divergence. Caller migration spans 54 files / ~700 lines.
