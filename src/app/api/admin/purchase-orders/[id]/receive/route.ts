@@ -5,6 +5,7 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
+import { fromCents } from '@/lib/utils/money';
 
 interface ReceiveItem {
   item_id: string;
@@ -44,7 +45,7 @@ export async function POST(
     // Fetch PO with items
     const { data: po } = await admin
       .from('purchase_orders')
-      .select('id, status, po_number, purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost)')
+      .select('id, status, po_number, purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost_cents)')
       .eq('id', id)
       .single();
 
@@ -72,7 +73,7 @@ export async function POST(
       product_id: string;
       quantity_ordered: number;
       quantity_received: number;
-      unit_cost: number;
+      unit_cost_cents: number | null;
     }>;
 
     for (const receiveItem of items) {
@@ -112,11 +113,18 @@ export async function POST(
       const quantityAfter = quantityBefore + receiveItem.quantity_received;
 
       // Update product stock AND cost price
+      // TODO Unify-D: when Family D migrates products.cost_price to
+      // cents, replace fromCents() with direct cents assignment and
+      // rename cost_price → cost_price_cents. See docs/sessions/money-
+      // unify-0-migration-playbook-v2.md §Family D.
       await admin
         .from('products')
         .update({
           quantity_on_hand: quantityAfter,
-          cost_price: poItem.unit_cost,
+          cost_price:
+            poItem.unit_cost_cents != null
+              ? fromCents(poItem.unit_cost_cents)
+              : null,
         })
         .eq('id', poItem.product_id);
 
@@ -139,7 +147,7 @@ export async function POST(
           reference_id: po.id,
           reference_type: 'purchase_order',
           created_by: employee.id,
-          unit_cost: poItem.unit_cost,
+          unit_cost_cents: poItem.unit_cost_cents,
         });
       }
     }

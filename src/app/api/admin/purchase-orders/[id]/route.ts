@@ -38,7 +38,7 @@ export async function GET(
         *,
         vendors(id, name, contact_name, email, phone, lead_time_days),
         employees!purchase_orders_created_by_fkey(id, first_name, last_name),
-        purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost, products(id, name, sku, quantity_on_hand))
+        purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost_cents, products(id, name, sku, quantity_on_hand))
       `)
       .eq('id', id)
       .single();
@@ -144,12 +144,14 @@ export async function PATCH(
       // Delete existing items and reinsert
       await admin.from('purchase_order_items').delete().eq('purchase_order_id', id);
 
-      const itemRows = body.items.map((item: { product_id: string; quantity_ordered: number; unit_cost: number }) => ({
-        purchase_order_id: id,
-        product_id: item.product_id,
-        quantity_ordered: item.quantity_ordered,
-        unit_cost: item.unit_cost,
-      }));
+      const itemRows = body.items.map(
+        (item: { product_id: string; quantity_ordered: number; unit_cost_cents: number }) => ({
+          purchase_order_id: id,
+          product_id: item.product_id,
+          quantity_ordered: item.quantity_ordered,
+          unit_cost_cents: item.unit_cost_cents,
+        }),
+      );
 
       const { error: itemsError } = await admin
         .from('purchase_order_items')

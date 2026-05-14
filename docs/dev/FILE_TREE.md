@@ -1603,6 +1603,7 @@ Phase Mobile-1.1 additions:
 20260512152847_quote_communications_delivery_tracking.sql    # Phase Messaging-1+2: twilio_sid column + 3-status enum (sent/failed/blocked) on quote_communications
 20260513022648_phone_normalization_phase_1.sql               # Phase Normalization-1: backfill 3 employees + 1 business_settings + 38 sms_delivery_log + ALTER employees ADD CONSTRAINT valid_phone
 20260513050241_phone_schema_hardening.sql                    # Phase Schema-Hardening-1: 4 new E.164 CHECK constraints (conversations.phone_number, sms_delivery_log.to_phone, sms_conversations.phone_number, sms_consent_log.phone) + retroactive idempotent capture of quote_communications.valid_sent_to (channel-aware Option B)
+20260514051953_unify_2_inventory_family_to_cents.sql         # Phase Money-Unify-2: ADD COLUMN unit_cost_cents on purchase_order_items + stock_adjustments; ADD COLUMN min_order_amount_cents on vendors; DROP NOT NULL on purchase_order_items.unit_cost; backfill ROUND × 100; CHECK >= 0; CREATE OR REPLACE FUNCTION void_transaction() writes unit_cost_cents (with TODO Unify-D)
 ```
 
 ## Scripts

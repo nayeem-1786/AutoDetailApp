@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { sendRefundEmail } from '@/lib/utils/order-emails';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
+import { toCents } from '@/lib/utils/money';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
@@ -116,7 +117,12 @@ export async function POST(
               reference_id: id,
               reference_type: 'order',
               created_by: employee.id,
-              unit_cost: product.cost_price ?? null,
+              // TODO Unify-D: when Family D migrates products.cost_price to
+              // cents, remove toCents() and use product.cost_price_cents
+              // directly. See docs/sessions/money-unify-0-migration-
+              // playbook-v2.md §Family D.
+              unit_cost_cents:
+                product.cost_price != null ? toCents(product.cost_price) : null,
             });
           }
         }

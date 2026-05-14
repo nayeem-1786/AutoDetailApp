@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { vendorSchema, type VendorInput } from '@/lib/utils/validation';
 import type { Vendor } from '@/lib/supabase/types';
 import { formatPhone, formatPhoneInput } from '@/lib/utils/format';
+import { fromCents, toCents } from '@/lib/utils/money';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -164,7 +165,12 @@ export default function VendorsPage() {
       website: vendor.website || '',
       address: vendor.address || '',
       lead_time_days: vendor.lead_time_days,
-      min_order_amount: vendor.min_order_amount,
+      // Phase Money-Unify-2: DB stores cents; form input is dollars.
+      // Convert at the form/DB boundary.
+      min_order_amount:
+        vendor.min_order_amount_cents != null
+          ? fromCents(vendor.min_order_amount_cents)
+          : null,
       notes: vendor.notes || '',
     });
     setDialogOpen(true);
@@ -181,7 +187,10 @@ export default function VendorsPage() {
         website: data.website || null,
         address: data.address || null,
         lead_time_days: data.lead_time_days ?? null,
-        min_order_amount: data.min_order_amount ?? null,
+        // Phase Money-Unify-2: form input is dollars; DB stores cents.
+        // Conversion at this boundary.
+        min_order_amount_cents:
+          data.min_order_amount != null ? toCents(data.min_order_amount) : null,
         notes: data.notes || null,
       };
 

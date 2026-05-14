@@ -167,7 +167,7 @@ describe('POST /api/webhooks/stripe — payment_intent.succeeded', () => {
       reference_id: 'order-1',
       reference_type: 'order',
       created_by: '00000000-0000-0000-0000-000000000001',
-      unit_cost: 4.5,
+      unit_cost_cents: 450,
     });
     expect(adj[1].payload).toMatchObject({
       product_id: 'prod-B',
@@ -176,7 +176,7 @@ describe('POST /api/webhooks/stripe — payment_intent.succeeded', () => {
       quantity_before: 5,
       quantity_after: 4,
       created_by: '00000000-0000-0000-0000-000000000001',
-      unit_cost: null,
+      unit_cost_cents: null,
     });
   });
 

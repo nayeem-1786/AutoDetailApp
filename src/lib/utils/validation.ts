@@ -142,6 +142,14 @@ export const vendorSchema = z.object({
   website: optionalString,
   address: optionalString,
   lead_time_days: positiveInt.optional().nullable(),
+  // Phase Money-Unify-2: this Zod schema validates the FORM input shape
+  // (dollars), not the DB write shape. The form's onSubmit converts via
+  // toCents() and writes `min_order_amount_cents` to the DB. We keep
+  // dollars at the form layer because react-hook-form's `register()`
+  // integration with `<Input step="0.01">` produces dollar strings
+  // naturally; introducing a Controller + setValueAs for one field
+  // would be more disruption than the value provides. The boundary is
+  // explicit at the onSubmit conversion site.
   min_order_amount: z.coerce.number().min(0).optional().nullable(),
   notes: optionalString,
 });
@@ -292,7 +300,9 @@ export const couponSchema = z.object({
 export const purchaseOrderItemSchema = z.object({
   product_id: z.string().uuid(),
   quantity_ordered: z.coerce.number().int().min(1, 'Must order at least 1'),
-  unit_cost: z.coerce.number().min(0, 'Must be 0 or greater'),
+  // Phase Money-Unify-2: cents-canonical wire shape. Form layer holds
+  // cents in state and submits cents directly.
+  unit_cost_cents: z.coerce.number().int().min(0, 'Must be 0 or greater'),
 });
 
 export const purchaseOrderCreateSchema = z.object({

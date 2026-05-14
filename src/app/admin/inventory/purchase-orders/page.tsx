@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { usePermission } from '@/lib/hooks/use-permission';
 import type { PurchaseOrder } from '@/lib/supabase/types';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatDate, formatMoney } from '@/lib/utils/format';
 import { PO_STATUS_LABELS, PO_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -46,9 +46,12 @@ export default function PurchaseOrdersPage() {
     loadOrders();
   }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function getTotal(po: PurchaseOrder): number {
+  function getTotalCents(po: PurchaseOrder): number {
     if (!po.items) return 0;
-    return po.items.reduce((sum, item) => sum + item.quantity_ordered * item.unit_cost, 0);
+    return po.items.reduce(
+      (sum, item) => sum + item.quantity_ordered * (item.unit_cost_cents ?? 0),
+      0,
+    );
   }
 
   function getItemCount(po: PurchaseOrder): number {
@@ -86,7 +89,7 @@ export default function PurchaseOrdersPage() {
       id: 'total',
       header: 'Total',
       size: 100,
-      cell: ({ row }) => formatCurrency(getTotal(row.original)),
+      cell: ({ row }) => formatMoney(getTotalCents(row.original)),
       enableSorting: false,
     },
     {

@@ -8,7 +8,8 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { Vendor, Product } from '@/lib/supabase/types';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney, formatMoneyForInput } from '@/lib/utils/format';
+import { toCents } from '@/lib/utils/money';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +26,7 @@ interface POLineItem {
   product_name: string;
   sku: string | null;
   quantity_ordered: number;
-  unit_cost: number;
+  unit_cost_cents: number;
 }
 
 export default function NewPurchaseOrderPage() {
@@ -110,13 +111,21 @@ export default function NewPurchaseOrderPage() {
         product_name: product.name,
         sku: product.sku,
         quantity_ordered: product.min_order_qty || 1,
-        unit_cost: product.cost_price,
+        // TODO Unify-D: when Family D migrates products.cost_price to
+        // cents, remove toCents() and use product.cost_price_cents
+        // directly. See docs/sessions/money-unify-0-migration-
+        // playbook-v2.md §Family D.
+        unit_cost_cents: toCents(product.cost_price),
       },
     ]);
     setProductSearch('');
   }
 
-  function updateItem(index: number, field: 'quantity_ordered' | 'unit_cost', value: number) {
+  function updateItem(
+    index: number,
+    field: 'quantity_ordered' | 'unit_cost_cents',
+    value: number,
+  ) {
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
@@ -126,7 +135,10 @@ export default function NewPurchaseOrderPage() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
-  const total = items.reduce((sum, i) => sum + i.quantity_ordered * i.unit_cost, 0);
+  const totalCents = items.reduce(
+    (sum, i) => sum + i.quantity_ordered * i.unit_cost_cents,
+    0,
+  );
 
   async function submitForm(status: 'draft' | 'ordered') {
     if (!vendorId) {
@@ -150,7 +162,7 @@ export default function NewPurchaseOrderPage() {
           items: items.map((i) => ({
             product_id: i.product_id,
             quantity_ordered: i.quantity_ordered,
-            unit_cost: i.unit_cost,
+            unit_cost_cents: i.unit_cost_cents,
           })),
         }),
       });
@@ -299,14 +311,20 @@ export default function NewPurchaseOrderPage() {
                           type="number"
                           min={0}
                           step={0.01}
-                          value={item.unit_cost}
-                          onChange={(e) => updateItem(idx, 'unit_cost', parseFloat(e.target.value) || 0)}
+                          value={formatMoneyForInput(item.unit_cost_cents)}
+                          onChange={(e) =>
+                            updateItem(
+                              idx,
+                              'unit_cost_cents',
+                              toCents(parseFloat(e.target.value) || 0),
+                            )
+                          }
                           className="w-24"
                           {...enterSubmit}
                         />
                       </td>
                       <td className="py-2 text-right font-medium">
-                        {formatCurrency(item.quantity_ordered * item.unit_cost)}
+                        {formatMoney(item.quantity_ordered * item.unit_cost_cents)}
                       </td>
                       <td className="py-2 text-right">
                         <Button
@@ -327,7 +345,7 @@ export default function NewPurchaseOrderPage() {
                       Total:
                     </td>
                     <td className="pt-3 text-right font-semibold text-gray-900">
-                      {formatCurrency(total)}
+                      {formatMoney(totalCents)}
                     </td>
                     <td></td>
                   </tr>

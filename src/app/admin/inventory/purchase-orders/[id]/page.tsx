@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { PurchaseOrder, PurchaseOrderItem } from '@/lib/supabase/types';
-import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils/format';
+import { formatDate, formatDateTime, formatMoney } from '@/lib/utils/format';
 import { PO_STATUS_LABELS, PO_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -152,13 +152,13 @@ export default function PurchaseOrderDetailPage() {
 
   if (!po) return null;
 
-  const total = (po.items ?? []).reduce(
-    (sum, item) => sum + item.quantity_ordered * item.unit_cost,
+  const totalCents = (po.items ?? []).reduce(
+    (sum, item) => sum + item.quantity_ordered * (item.unit_cost_cents ?? 0),
     0
   );
 
-  const totalReceived = (po.items ?? []).reduce(
-    (sum, item) => sum + item.quantity_received * item.unit_cost,
+  const totalReceivedCents = (po.items ?? []).reduce(
+    (sum, item) => sum + item.quantity_received * (item.unit_cost_cents ?? 0),
     0
   );
 
@@ -256,11 +256,11 @@ export default function PurchaseOrderDetailPage() {
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-sm text-gray-500">Total Cost</div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(total)}</div>
+          <div className="text-2xl font-bold text-gray-900">{formatMoney(totalCents)}</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-sm text-gray-500">Received Value</div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalReceived)}</div>
+          <div className="text-2xl font-bold text-gray-900">{formatMoney(totalReceivedCents)}</div>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-sm text-gray-500">Created</div>
@@ -338,9 +338,9 @@ export default function PurchaseOrderDetailPage() {
                         {item.quantity_received}
                       </span>
                     </td>
-                    <td className="py-2 text-right">{formatCurrency(item.unit_cost)}</td>
+                    <td className="py-2 text-right">{formatMoney(item.unit_cost_cents ?? 0)}</td>
                     <td className="py-2 text-right font-medium">
-                      {formatCurrency(item.quantity_ordered * item.unit_cost)}
+                      {formatMoney(item.quantity_ordered * (item.unit_cost_cents ?? 0))}
                     </td>
                     {receiving && (
                       <td className="py-2 text-right">

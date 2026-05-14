@@ -134,7 +134,10 @@ export interface Vendor {
   website: string | null;
   address: string | null;
   lead_time_days: number | null;
-  min_order_amount: number | null;
+  // Phase Money-Unify-2: cents-canonical. Legacy `min_order_amount` (NUMERIC
+  // dollars) still exists in DB but is no longer written by app code;
+  // dropped at Unify-Final.
+  min_order_amount_cents: number | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -486,7 +489,10 @@ export interface PurchaseOrderItem {
   product_id: string;
   quantity_ordered: number;
   quantity_received: number;
-  unit_cost: number;
+  // Phase Money-Unify-2: cents-canonical. Legacy `unit_cost` (NUMERIC dollars)
+  // still exists in DB but is no longer written by app code; dropped at
+  // Unify-Final.
+  unit_cost_cents: number | null;
   created_at: string;
   // Joined relations
   product?: Pick<Product, 'id' | 'name' | 'sku' | 'quantity_on_hand'>;
@@ -504,6 +510,9 @@ export interface StockAdjustment {
   reference_type: 'purchase_order' | 'transaction' | 'refund' | 'shop_use' | 'stock_count' | null;
   created_by: string | null;
   created_at: string;
+  // Phase Money-Unify-2: cents-canonical. Sourced from product.cost_price
+  // at INSERT time (D-coupling shim until Unify-3 migrates cost_price).
+  unit_cost_cents: number | null;
   // Joined relations
   product?: Pick<Product, 'id' | 'name' | 'sku'>;
   created_by_employee?: Pick<Employee, 'id' | 'first_name' | 'last_name'>;
@@ -781,8 +790,9 @@ export interface POItem {
   product_id: string;
   quantity_ordered: number;
   quantity_received: number;
-  unit_cost: number;
-  total_cost: number;
+  // Phase Money-Unify-2: cents-canonical (see PurchaseOrderItem above).
+  unit_cost_cents: number | null;
+  total_cost_cents: number;
   created_at: string;
   // Joined
   product?: Product;

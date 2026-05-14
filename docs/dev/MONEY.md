@@ -191,7 +191,7 @@ family phases that follow.
 
 | Family | Tables | Status |
 | --- | --- | --- |
-| H — Inventory | products | Pending (Unify-2) |
+| H — Inventory | purchase_order_items, stock_adjustments, vendors | **Migrated (Unify-2)** — 3 cents columns added, backfilled, CHECK-constrained; legacy NUMERIC columns retained until Unify-Final; `void_transaction()` Postgres function writes cents; ~10 `// TODO Unify-D` shim sites tagged for Family D to clean up |
 | D — Catalog | services, service_pricing, products, packages | Pending (Unify-3) |
 | E — Orders | orders, order_items, shipping_settings | Pending (Unify-4) |
 | A — POS Transactions | transactions, transaction_items, payments, refunds, cash_drawers | Pending (Unify-5) |

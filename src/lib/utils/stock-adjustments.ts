@@ -32,8 +32,14 @@ export interface StockAdjustmentInput {
   reference_id?: string | null;
   reference_type?: ReferenceType;
   created_by: string;
-  /** Snapshot from products.cost_price at call time. Used by shop_use + sold rows. */
-  unit_cost?: number | null;
+  /**
+   * Snapshot of unit cost in cents at call time (Phase Money-Unify-2).
+   * Used by shop_use + sold rows.
+   * Source is `products.cost_price` (Family D, still dollars) converted
+   * via `toCents()` at the call site — that's the Unify-D shim. After
+   * Family D migrates, callers pass `product.cost_price_cents` directly.
+   */
+  unit_cost_cents?: number | null;
 }
 
 /**
@@ -62,7 +68,7 @@ export async function logStockAdjustment(
       reference_id: row.reference_id ?? null,
       reference_type: row.reference_type ?? null,
       created_by: row.created_by,
-      unit_cost: row.unit_cost ?? null,
+      unit_cost_cents: row.unit_cost_cents ?? null,
     })
     .select('id')
     .single();

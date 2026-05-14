@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         *,
         vendors(id, name),
         employees!purchase_orders_created_by_fkey(id, first_name, last_name),
-        purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost, products(id, name, sku))
+        purchase_order_items(id, product_id, quantity_ordered, quantity_received, unit_cost_cents, products(id, name, sku))
       `)
       .order('created_at', { ascending: false });
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
       purchase_order_id: po.id,
       product_id: item.product_id,
       quantity_ordered: item.quantity_ordered,
-      unit_cost: item.unit_cost,
+      unit_cost_cents: item.unit_cost_cents,
     }));
 
     const { error: itemsError } = await admin

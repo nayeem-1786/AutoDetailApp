@@ -6,6 +6,118 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session: Phase Money-Unify-2 — Family H (Inventory) migration
+
+First family migration of the Money-Unify epic. Migrates 3 NUMERIC(10,2) dollar columns to INTEGER cents across the inventory/procurement subsystem. Validates the migration pattern that 7 subsequent family phases will replicate. Dev DB only; production deferred to Unify-Final.
+
+**Columns migrated (two-phase commit pattern):**
+- `purchase_order_items.unit_cost` → `unit_cost_cents` (with `NOT NULL` dropped on the legacy column per Decision A1)
+- `stock_adjustments.unit_cost` → `unit_cost_cents`
+- `vendors.min_order_amount` → `min_order_amount_cents`
+
+Each new column carries a `CHECK (col IS NULL OR col >= 0)`. Legacy NUMERIC columns retained through the epic for read-only reconciliation; dropped entirely at Unify-Final.
+
+**Postgres function update (Decision B1):** `void_transaction(p_transaction_id, p_user_id, p_reason)` now writes `stock_adjustments.unit_cost_cents` using `ROUND(v_product.cost_price * 100)::INTEGER` (with inline `TODO Unify-D` comment marking the simplification site for when Family D migrates `products.cost_price`).
+
+**Migration file:** `supabase/migrations/20260514051953_unify_2_inventory_family_to_cents.sql` — single atomic transaction (BEGIN/COMMIT) containing all 5 schema changes + the function `CREATE OR REPLACE`.
+
+**Reconciliation (all gates zero divergence):**
+- SUM equivalence per table: PO items $18.69 = 1869¢; stock_adjustments $856.47 = 85647¢; vendors NULL (no rows with values).
+- NULL parity (old NULL iff new NULL): 0 mismatches across all 3 tables.
+- Per-row both-columns match (Requirement 2): 0 mismatches.
+- All 3 new CHECK constraints in place.
+- `void_transaction()` function references `unit_cost_cents` + carries `TODO Unify-D` marker.
+
+Full reconciliation output saved at `docs/sessions/money-unify-2-reconciliation.md`.
+
+**Scope expansion vs. playbook v2:**
+- Playbook v2 estimated ~8 caller files for Family H.
+- Pre-flight verification (Task 0) found **17 app files + 3 support files + 1 Postgres function** (`void_transaction`).
+- **6 of the 17 files are transaction-lifecycle writers** (`orders/refund`, `pos/shop-use`, `pos/refunds`, `pos/transactions`, `pos/sync-offline-transaction`, `webhooks/stripe`) that write `stock_adjustments.unit_cost = product.cost_price` — the playbook didn't trace this D-coupling.
+- All 17 + 3 files migrated per Decision C1; D-coupling shim sites tagged `// TODO Unify-D` for Family D to clean up.
+- **Calendar estimate for remainder of epic may need adjustment**; actual caller counts are likely 2–3× playbook estimates per family. Trust pre-flight verification over playbook predictions going forward.
+
+**`// TODO Unify-D` shim count: 9 sites total** (8 source-code + 1 in `void_transaction()` migration body):
+1. `src/app/admin/inventory/purchase-orders/new/page.tsx:114` — PO form default reads `product.cost_price` (D→H read)
+2. `src/app/api/admin/purchase-orders/[id]/receive/route.ts:116` — writes `products.cost_price = fromCents(poItem.unit_cost_cents)` (H→D write)
+3. `src/app/api/admin/orders/[id]/refund/route.ts:120` — writes stock_adjustments cents from `product.cost_price`
+4. `src/app/api/pos/shop-use/route.ts:78` — same
+5. `src/app/api/pos/transactions/route.ts:439` — same
+6. `src/app/api/pos/sync-offline-transaction/route.ts:218` — same
+7. `src/app/api/pos/refunds/route.ts:558` — same
+8. `src/app/api/webhooks/stripe/route.ts:303` — same
+9. `supabase/migrations/20260514051953_unify_2_inventory_family_to_cents.sql:173` (inside `void_transaction()` body)
+
+Family D's phase (Unify-3) removes all 9 sites and the conversion drops to direct cents flow.
+
+**Forms migrated:**
+- `purchase-orders/new/page.tsx` — useState pattern: state holds `unit_cost_cents` (integer); input displays via `formatMoneyForInput(cents)`; onChange parses to dollars + `toCents()`.
+- `vendors/page.tsx` — react-hook-form pattern: Zod schema validates form-input shape (dollars); onSubmit converts via `toCents()` at the supabase write boundary to `min_order_amount_cents`. Documented in `validation.ts` comment why this form keeps dollars in form state (Controller + setValueAs refactor wasn't worth the disruption).
+
+**Hardcoded audit note — `vendors.min_order_amount_cents` is display-only post-migration** (Decision D1 + Verification 6 in Task 0). The field exists but is not compared to any PO subtotal or order total in app code today. If a "block/warn when PO total < vendor minimum" feature is desired, that's a separate phase — Unify-2 does NOT add this validation, and the playbook-suggested test "vendor min_order_amount validation against order subtotal_cents" was skipped accordingly.
+
+**Files changed (20 + 1 new migration + 1 new session doc):**
+
+Modified app (17):
+- `src/app/admin/catalog/products/[id]/page.tsx` — PO cost history card reads cents
+- `src/app/admin/inventory/shop-expenses/page.tsx` — display cents via `formatMoney`
+- `src/app/admin/inventory/purchase-orders/page.tsx` — list total uses cents
+- `src/app/admin/inventory/purchase-orders/[id]/page.tsx` — detail/totals/line display all cents
+- `src/app/admin/inventory/purchase-orders/new/page.tsx` — useState cents internal, dollar-display input
+- `src/app/admin/inventory/vendors/page.tsx` — RHF dollars at form layer, cents at submit/DB
+- `src/app/admin/inventory/vendors/[id]/page.tsx` — display cents
+- `src/app/api/admin/purchase-orders/route.ts` — SELECT/INSERT cents
+- `src/app/api/admin/purchase-orders/[id]/route.ts` — SELECT/UPDATE cents
+- `src/app/api/admin/purchase-orders/[id]/receive/route.ts` — full cents flow + H→D shim
+- `src/app/api/admin/shop-expenses/export/route.ts` — CSV export converts cents → dollars-decimal at the export boundary
+- `src/app/api/admin/orders/[id]/refund/route.ts` — D→H shim
+- `src/app/api/pos/shop-use/route.ts` — D→H shim
+- `src/app/api/pos/refunds/route.ts` — D→H shim + canonical money.ts import path
+- `src/app/api/pos/transactions/route.ts` — D→H shim + canonical import
+- `src/app/api/pos/sync-offline-transaction/route.ts` — D→H shim
+- `src/app/api/webhooks/stripe/route.ts` — D→H shim + canonical import
+
+Modified support (3):
+- `src/lib/utils/validation.ts` — `purchaseOrderItemSchema` field rename to `unit_cost_cents`; vendor schema field stays `min_order_amount` (form-input dollars; conversion at supabase boundary)
+- `src/lib/supabase/types.ts` — `Vendor`, `PurchaseOrderItem`, `POItem`, `StockAdjustment` interfaces switched to cents-canonical (legacy fields removed from interfaces; auto-generated `database.types.ts` retains both for the underlying DB shape)
+- `src/lib/utils/stock-adjustments.ts` — central helper takes `unit_cost_cents`
+
+Auto-generated:
+- `src/lib/supabase/database.types.ts` — regenerated via `npx supabase gen types typescript --linked`
+
+Test fixtures updated (3):
+- `src/lib/utils/__tests__/stock-adjustments.test.ts` — fixtures 5.99 → 599¢; null → null; added 2 new tests (PO-receive cents flow + integer-cent passthrough invariant)
+- `src/app/api/admin/orders/[id]/refund/__tests__/refund.test.ts` — fixtures 4.5 → 450¢
+- `src/app/api/webhooks/stripe/__tests__/payment-intent-succeeded.test.ts` — same
+
+New files:
+- `supabase/migrations/20260514051953_unify_2_inventory_family_to_cents.sql` — atomic migration
+- `docs/sessions/money-unify-2-reconciliation.md` — reconciliation audit trail
+
+Docs updated:
+- `docs/dev/MONEY.md` — Family H status flipped to **Migrated**
+- `docs/dev/FILE_TREE.md` — new migration + session doc paths
+
+**Lint warning count: 29 → 29** (unchanged). The 29 baseline warnings live in transaction-lifecycle / receipt code in non-Family-H files (orders, payments, receipts, source-plan, shippo). They're scheduled to clear as Families A, D, E migrate. Family H files added new cents-suffixed variables which the rule passed; no new warnings introduced.
+
+**Verification gates (all pass):**
+- Gate 1: Pre-flight verification complete; user-approved.
+- Gate 2: Migration applied to linked dev DB via `supabase db push`.
+- Gate 3: Reconciliation — all 5 queries zero divergence.
+- Gate 4: `next lint` — 29 money warnings (no delta); no new errors.
+- Gate 5: `tsc --noEmit` clean.
+- Gate 6: 390 utils tests pass + 59 ESLint-rule tests pass.
+- Gate 7: 2 new tests in stock-adjustments + 3 updated test fixtures all pass.
+- Gate 8: Dev smoke test below.
+- Gate 9: Legacy NUMERIC columns confirmed UNTOUCHED in value; only the NOT NULL constraint on `purchase_order_items.unit_cost` was dropped.
+- Gate 10: No production deploy; no `deploy-smartdetails`; no VPS push.
+- Gate 11 (Requirement 5): `grep -rn "TODO Unify-D" src/ supabase/migrations/ | wc -l` = 9. Matches expected.
+- Gate 12 (Requirement 5): `pg_get_functiondef(void_transaction)` references `unit_cost_cents` and contains `TODO Unify-D` marker; no remaining `unit_cost` writes.
+
+**Dev only — production deferred to Unify-Final.**
+
+---
+
 ## Session: Phase Money-Unify-1 — Foundation (helpers + lint rule + constant consolidation)
 
 First phase of the Money-Unify epic. Establishes the canonical money-helper API surface, formatter for integer cents, naming convention, lint rule, and documentation that the 8 family-migration phases (Unify-2 through Unify-9) build on. Also consolidates two cross-cutting constant-duplication hazards surfaced in Audit-1/Audit-2: the Stripe minimum charge value and the loyalty redeem rate. Dev only — no production deploy until Unify-Final.

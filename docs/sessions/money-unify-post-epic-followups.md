@@ -184,11 +184,33 @@ Audit-2 didn't fully trace whether the booking-completion path increments `coupo
 
 ---
 
+### 11. po_items typo in catalog/products/[id]/page.tsx:174
+
+- **Discovered:** Phase Money-Unify-2 verification (out-of-scope
+  finding)
+- **Location:** src/app/admin/catalog/products/[id]/page.tsx:174
+- **Bug:** Supabase query uses `.from('po_items')` but the
+  actual table is `purchase_order_items`. Query always returns
+  empty result; cost-history card on product detail page
+  silently shows no data.
+- **Risk profile:** Latent functional bug, not a money-unit
+  problem. User-facing impact: admin product page hides PO
+  history. No data corruption.
+- **Priority:** Medium — user-facing feature is broken
+- **Blast radius:** 1 file, ~5 lines
+- **Estimated effort:** ~10 min (verify table name, update
+  query, test)
+- **Recommended fix:** Separate chore phase after Money-Unify
+  epic, OR opportunistic fix during Unify-3 (Catalog) since
+  that phase touches products.
+
+---
+
 ## How these items relate to the Money-Unify epic
 
-All 10 items are **independent** of the cents migration. None block any Money-Unify phase. They were discovered during the audit because money-handling code paths are dense and dovetail with adjacent concerns (tax, accounting, e-commerce, scheduling).
+All 11 items are **independent** of the cents migration. None block any Money-Unify phase. They were discovered during the audit because money-handling code paths are dense and dovetail with adjacent concerns (tax, accounting, e-commerce, scheduling).
 
-After Money-Unify-Final completes, recommend reviewing this list and prioritizing items based on business impact. Items 5 (QBO tax), 9 (booking coupon increment), and 8 (e-commerce campaign attribution) are the most impactful financially. Items 1, 2, 3, 4 are cleanup. Item 6 is policy-driven. Item 7 is defense-in-depth. Item 10 (REDEEM_MINIMUM shadow) is a small-blast-radius cleanup discovered during Unify-1 verification.
+After Money-Unify-Final completes, recommend reviewing this list and prioritizing items based on business impact. Items 5 (QBO tax), 9 (booking coupon increment), and 8 (e-commerce campaign attribution) are the most impactful financially. Items 1, 2, 3, 4 are cleanup. Item 6 is policy-driven. Item 7 is defense-in-depth. Item 10 (REDEEM_MINIMUM shadow) is a small-blast-radius cleanup discovered during Unify-1 verification. Item 11 (po_items typo) is a user-facing bug discovered during Unify-2 verification — opportunistic fix recommended during Unify-3 (Catalog) since that phase already touches products.
 
 ---
 

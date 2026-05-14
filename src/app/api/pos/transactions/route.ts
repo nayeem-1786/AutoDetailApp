@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { transactionCreateSchema } from '@/lib/utils/validation';
-import { toCents } from '@/lib/utils/refund-math';
+import { toCents } from '@/lib/utils/money';
 import { CC_FEE_RATE, LOYALTY, WATER_SKU, FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
@@ -436,7 +436,11 @@ export async function POST(request: NextRequest) {
           reference_id: transaction.id,
           reference_type: 'transaction',
           created_by: posEmployee.employee_id,
-          unit_cost: prod.cost_price ?? null,
+          // TODO Unify-D: when Family D migrates products.cost_price to
+          // cents, remove toCents() and use prod.cost_price_cents
+          // directly. See docs/sessions/money-unify-0-migration-
+          // playbook-v2.md §Family D.
+          unit_cost_cents: prod.cost_price != null ? toCents(prod.cost_price) : null,
         });
       }
     }

@@ -5,12 +5,13 @@ import { Download, Package, DollarSign, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { adminFetch } from '@/lib/utils/admin-fetch';
+import { formatMoney } from '@/lib/utils/format';
 
 interface ShopExpenseRow {
   id: string;
   created_at: string;
   quantity_change: number;
-  unit_cost: number | null;
+  unit_cost_cents: number | null;
   reason: string | null;
   product: { id: string; name: string; sku: string | null } | null;
   created_by_employee: { first_name: string; last_name: string } | null;
@@ -118,32 +119,32 @@ export default function ShopExpensesPage() {
   }, [dateFrom, dateTo, granted]);
 
   // Summary calculations
-  const { totalSpend, rowCount, topProduct } = useMemo(() => {
-    let spend = 0;
-    const productSpend = new Map<string, { name: string; spend: number }>();
+  const { totalSpendCents, rowCount, topProduct } = useMemo(() => {
+    let spendCents = 0;
+    const productSpend = new Map<string, { name: string; spendCents: number }>();
 
     for (const row of rows) {
       const qty = Math.abs(row.quantity_change);
-      const cost = row.unit_cost ?? 0;
-      const lineCost = qty * cost;
-      spend += lineCost;
+      const costCents = row.unit_cost_cents ?? 0;
+      const lineCostCents = qty * costCents;
+      spendCents += lineCostCents;
 
       const pName = row.product?.name ?? 'Unknown';
-      const existing = productSpend.get(pName) ?? { name: pName, spend: 0 };
-      existing.spend += lineCost;
+      const existing = productSpend.get(pName) ?? { name: pName, spendCents: 0 };
+      existing.spendCents += lineCostCents;
       productSpend.set(pName, existing);
     }
 
     let top = '—';
-    let topSpend = 0;
+    let topSpendCents = 0;
     for (const [, val] of productSpend) {
-      if (val.spend > topSpend) {
-        topSpend = val.spend;
+      if (val.spendCents > topSpendCents) {
+        topSpendCents = val.spendCents;
         top = val.name;
       }
     }
 
-    return { totalSpend: spend, rowCount: rows.length, topProduct: top };
+    return { totalSpendCents: spendCents, rowCount: rows.length, topProduct: top };
   }, [rows]);
 
   async function handleExport() {
@@ -238,7 +239,7 @@ export default function ShopExpensesPage() {
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Spend</p>
           </div>
           <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-gray-100">
-            ${totalSpend.toFixed(2)}
+            {formatMoney(totalSpendCents)}
           </p>
         </div>
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -292,8 +293,8 @@ export default function ShopExpensesPage() {
             ) : (
               rows.map((row) => {
                 const qty = Math.abs(row.quantity_change);
-                const cost = row.unit_cost ?? 0;
-                const lineTotal = qty * cost;
+                const costCents = row.unit_cost_cents ?? 0;
+                const lineTotalCents = qty * costCents;
                 const note = row.reason?.replace(/^Shop use\s*—?\s*/, '') || '—';
 
                 return (
@@ -311,10 +312,10 @@ export default function ShopExpensesPage() {
                       {qty}
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300">
-                      {cost > 0 ? `$${cost.toFixed(2)}` : '—'}
+                      {costCents > 0 ? formatMoney(costCents) : '—'}
                     </td>
                     <td className="px-4 py-2.5 text-right text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                      {lineTotal > 0 ? `$${lineTotal.toFixed(2)}` : '—'}
+                      {lineTotalCents > 0 ? formatMoney(lineTotalCents) : '—'}
                     </td>
                     <td className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300">
                       {row.created_by_employee

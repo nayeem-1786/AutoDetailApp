@@ -187,7 +187,7 @@ describe('POST /api/admin/orders/[id]/refund', () => {
       reference_id: 'order-1',
       reference_type: 'order',
       created_by: 'emp-1',
-      unit_cost: 4.5,
+      unit_cost_cents: 450,
     });
     expect(adjustmentInserts[0].payload.reason).toContain('Stripe re_test_123');
     expect(adjustmentInserts[1].payload).toMatchObject({
@@ -197,7 +197,7 @@ describe('POST /api/admin/orders/[id]/refund', () => {
       quantity_before: 100,
       quantity_after: 105,
       reference_type: 'order',
-      unit_cost: null,
+      unit_cost_cents: null,
     });
 
     // payment_status flipped to 'refunded'

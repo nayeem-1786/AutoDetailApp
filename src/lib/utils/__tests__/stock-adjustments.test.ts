@@ -30,7 +30,7 @@ describe('logStockAdjustment', () => {
       reference_id: 'tx-1',
       reference_type: 'transaction',
       created_by: 'emp-1',
-      unit_cost: 5.99,
+      unit_cost_cents: 599,
     });
 
     expect(result).toEqual({ ok: true, id: 'adj-123' });
@@ -45,11 +45,11 @@ describe('logStockAdjustment', () => {
       reference_id: 'tx-1',
       reference_type: 'transaction',
       created_by: 'emp-1',
-      unit_cost: 5.99,
+      unit_cost_cents: 599,
     });
   });
 
-  it('handles optional fields (reference_id null, unit_cost null)', async () => {
+  it('handles optional fields (reference_id null, unit_cost_cents null)', async () => {
     const mock = createMockSupabase({ data: { id: 'adj-456' }, error: null });
 
     const result = await logStockAdjustment({
@@ -68,7 +68,7 @@ describe('logStockAdjustment', () => {
       expect.objectContaining({
         reference_id: null,
         reference_type: null,
-        unit_cost: null,
+        unit_cost_cents: null,
       })
     );
   });
@@ -90,6 +90,60 @@ describe('logStockAdjustment', () => {
     });
 
     expect(result).toEqual({ ok: false, error: 'constraint violation' });
+  });
+
+  it('PO receive flow: writes received adjustment with cents-typed unit_cost_cents (Phase Money-Unify-2)', async () => {
+    // Models the receive/route.ts call where poItem.unit_cost_cents flows
+    // directly into the stock_adjustments row (H-internal, no D shim).
+    const mock = createMockSupabase({ data: { id: 'adj-receive-1' }, error: null });
+
+    const result = await logStockAdjustment({
+      supabase: { from: mock.from } as unknown as StockAdjustmentInput['supabase'],
+      product_id: 'prod-receive',
+      adjustment_type: 'received',
+      quantity_change: 12,
+      quantity_before: 5,
+      quantity_after: 17,
+      reason: 'Received from PO-2026-001',
+      reference_id: 'po-uuid',
+      reference_type: 'purchase_order',
+      created_by: 'emp-receive',
+      unit_cost_cents: 1234, // $12.34 — exact integer, no fractional cents
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mock.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        adjustment_type: 'received',
+        reference_type: 'purchase_order',
+        unit_cost_cents: 1234,
+      }),
+    );
+  });
+
+  it('integer-cent invariant: helper passes any integer value through unchanged', async () => {
+    // No rounding, no conversion — caller is responsible for ensuring
+    // unit_cost_cents is already integer cents (via toCents() at the
+    // dollar boundary). Phase Money-Unify-2.
+    const mock = createMockSupabase({ data: { id: 'adj-1' }, error: null });
+
+    for (const cents of [0, 1, 99, 100, 9999, 1_000_000]) {
+      mock.insert.mockClear();
+      await logStockAdjustment({
+        supabase: { from: mock.from } as unknown as StockAdjustmentInput['supabase'],
+        product_id: 'prod-x',
+        adjustment_type: 'sold',
+        quantity_change: -1,
+        quantity_before: 5,
+        quantity_after: 4,
+        reason: 'integer-cent invariant',
+        created_by: 'emp-x',
+        unit_cost_cents: cents,
+      });
+      expect(mock.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ unit_cost_cents: cents }),
+      );
+    }
   });
 
   it.each([

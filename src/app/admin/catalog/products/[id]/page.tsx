@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { productEditSchema, type ProductEditInput } from '@/lib/utils/validation';
 import { WATER_SKU } from '@/lib/utils/constants';
 import type { Product, ProductCategory, ProductImage, Vendor } from '@/lib/supabase/types';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatMoney } from '@/lib/utils/format';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
@@ -48,7 +48,7 @@ interface CostHistoryEntry {
   date: string;
   po_number: string;
   po_id: string;
-  unit_cost: number;
+  unit_cost_cents: number;
   quantity_received: number;
 }
 
@@ -172,7 +172,7 @@ export default function ProductDetailPage() {
       // Load cost history from PO receiving
       const { data: poItems } = await supabase
         .from('po_items')
-        .select('unit_cost, quantity_received, purchase_order_id, purchase_orders(id, po_number, received_at)')
+        .select('unit_cost_cents, quantity_received, purchase_order_id, purchase_orders(id, po_number, received_at)')
         .eq('product_id', productId)
         .gt('quantity_received', 0)
         .order('created_at', { ascending: false })
@@ -187,7 +187,7 @@ export default function ProductDetailPage() {
               date: po.received_at || '',
               po_number: po.po_number,
               po_id: po.id,
-              unit_cost: item.unit_cost as number,
+              unit_cost_cents: (item.unit_cost_cents as number | null) ?? 0,
               quantity_received: item.quantity_received as number,
             };
           });
@@ -1934,7 +1934,7 @@ function CostMarginCard({
                           {entry.po_number}
                         </Link>
                       </td>
-                      <td className="px-3 py-2 text-right text-gray-900">{formatCurrency(entry.unit_cost)}</td>
+                      <td className="px-3 py-2 text-right text-gray-900">{formatMoney(entry.unit_cost_cents)}</td>
                       <td className="px-3 py-2 text-right text-gray-600">{entry.quantity_received}</td>
                     </tr>
                   ))}

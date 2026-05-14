@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Vendor, Product, ProductCategory } from '@/lib/supabase/types';
-import { formatCurrency, formatDate, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatMoney, formatPhone } from '@/lib/utils/format';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -306,10 +306,10 @@ export default function VendorDetailPage() {
               {vendor.lead_time_days} day{vendor.lead_time_days !== 1 ? 's' : ''} lead time
             </div>
           )}
-          {vendor.min_order_amount !== null && (
+          {vendor.min_order_amount_cents !== null && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <DollarSign className="h-4 w-4 text-gray-400" />
-              Min order: {formatCurrency(vendor.min_order_amount)}
+              Min order: {formatMoney(vendor.min_order_amount_cents)}
             </div>
           )}
         </div>

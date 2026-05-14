@@ -311,6 +311,11 @@ export type Database = {
           mobile_address: string | null
           mobile_surcharge: number | null
           mobile_zone_id: string | null
+          mobile_zone_name_snapshot: string | null
+          payment_link_amount_cents: number | null
+          payment_link_paid_at: string | null
+          payment_link_sent_at: string | null
+          payment_link_token: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           payment_type: string | null
           reminder_sent_at: string | null
@@ -345,6 +350,11 @@ export type Database = {
           mobile_address?: string | null
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
+          mobile_zone_name_snapshot?: string | null
+          payment_link_amount_cents?: number | null
+          payment_link_paid_at?: string | null
+          payment_link_sent_at?: string | null
+          payment_link_token?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           payment_type?: string | null
           reminder_sent_at?: string | null
@@ -379,6 +389,11 @@ export type Database = {
           mobile_address?: string | null
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
+          mobile_zone_name_snapshot?: string | null
+          payment_link_amount_cents?: number | null
+          payment_link_paid_at?: string | null
+          payment_link_sent_at?: string | null
+          payment_link_token?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           payment_type?: string | null
           reminder_sent_at?: string | null
@@ -3526,7 +3541,10 @@ export type Database = {
           card_brand: string | null
           card_fingerprint: string | null
           card_last_four: string | null
+          cash_tendered: number | null
+          change_given: number | null
           created_at: string
+          digital_platform: string | null
           id: string
           method: Database["public"]["Enums"]["payment_method"]
           stripe_charge_id: string | null
@@ -3540,7 +3558,10 @@ export type Database = {
           card_brand?: string | null
           card_fingerprint?: string | null
           card_last_four?: string | null
+          cash_tendered?: number | null
+          change_given?: number | null
           created_at?: string
+          digital_platform?: string | null
           id?: string
           method: Database["public"]["Enums"]["payment_method"]
           stripe_charge_id?: string | null
@@ -3554,7 +3575,10 @@ export type Database = {
           card_brand?: string | null
           card_fingerprint?: string | null
           card_last_four?: string | null
+          cash_tendered?: number | null
+          change_given?: number | null
           created_at?: string
+          digital_platform?: string | null
           id?: string
           method?: Database["public"]["Enums"]["payment_method"]
           stripe_charge_id?: string | null
@@ -3969,7 +3993,8 @@ export type Database = {
           purchase_order_id: string
           quantity_ordered: number
           quantity_received: number
-          unit_cost: number
+          unit_cost: number | null
+          unit_cost_cents: number | null
         }
         Insert: {
           created_at?: string
@@ -3978,7 +4003,8 @@ export type Database = {
           purchase_order_id: string
           quantity_ordered: number
           quantity_received?: number
-          unit_cost: number
+          unit_cost?: number | null
+          unit_cost_cents?: number | null
         }
         Update: {
           created_at?: string
@@ -3987,7 +4013,8 @@ export type Database = {
           purchase_order_id?: string
           quantity_ordered?: number
           quantity_received?: number
-          unit_cost?: number
+          unit_cost?: number | null
+          unit_cost_cents?: number | null
         }
         Relationships: [
           {
@@ -4286,7 +4313,12 @@ export type Database = {
           deleted_at: string | null
           follow_up_status: string | null
           id: string
+          is_mobile: boolean
           last_activity_at: string | null
+          mobile_address: string | null
+          mobile_surcharge: number | null
+          mobile_zone_id: string | null
+          mobile_zone_name_snapshot: string | null
           notes: string | null
           quote_number: string
           sent_at: string | null
@@ -4310,7 +4342,12 @@ export type Database = {
           deleted_at?: string | null
           follow_up_status?: string | null
           id?: string
+          is_mobile?: boolean
           last_activity_at?: string | null
+          mobile_address?: string | null
+          mobile_surcharge?: number | null
+          mobile_zone_id?: string | null
+          mobile_zone_name_snapshot?: string | null
           notes?: string | null
           quote_number: string
           sent_at?: string | null
@@ -4334,7 +4371,12 @@ export type Database = {
           deleted_at?: string | null
           follow_up_status?: string | null
           id?: string
+          is_mobile?: boolean
           last_activity_at?: string | null
+          mobile_address?: string | null
+          mobile_surcharge?: number | null
+          mobile_zone_id?: string | null
+          mobile_zone_name_snapshot?: string | null
           notes?: string | null
           quote_number?: string
           sent_at?: string | null
@@ -4367,6 +4409,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_mobile_zone_id_fkey"
+            columns: ["mobile_zone_id"]
+            isOneToOne: false
+            referencedRelation: "mobile_zones"
             referencedColumns: ["id"]
           },
           {
@@ -4431,6 +4480,7 @@ export type Database = {
           amount: number
           created_at: string
           id: string
+          notes: string | null
           points_clawed_back: number | null
           points_restored: number | null
           processed_by: string | null
@@ -4444,6 +4494,7 @@ export type Database = {
           amount: number
           created_at?: string
           id?: string
+          notes?: string | null
           points_clawed_back?: number | null
           points_restored?: number | null
           processed_by?: string | null
@@ -4457,6 +4508,7 @@ export type Database = {
           amount?: number
           created_at?: string
           id?: string
+          notes?: string | null
           points_clawed_back?: number | null
           points_restored?: number | null
           processed_by?: string | null
@@ -5558,6 +5610,7 @@ export type Database = {
           reference_id: string | null
           reference_type: string | null
           unit_cost: number | null
+          unit_cost_cents: number | null
         }
         Insert: {
           adjustment_type: string
@@ -5572,6 +5625,7 @@ export type Database = {
           reference_id?: string | null
           reference_type?: string | null
           unit_cost?: number | null
+          unit_cost_cents?: number | null
         }
         Update: {
           adjustment_type?: string
@@ -5586,6 +5640,7 @@ export type Database = {
           reference_id?: string | null
           reference_type?: string | null
           unit_cost?: number | null
+          unit_cost_cents?: number | null
         }
         Relationships: [
           {
@@ -6318,6 +6373,7 @@ export type Database = {
           is_active: boolean
           lead_time_days: number | null
           min_order_amount: number | null
+          min_order_amount_cents: number | null
           name: string
           notes: string | null
           phone: string | null
@@ -6333,6 +6389,7 @@ export type Database = {
           is_active?: boolean
           lead_time_days?: number | null
           min_order_amount?: number | null
+          min_order_amount_cents?: number | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -6348,6 +6405,7 @@ export type Database = {
           is_active?: boolean
           lead_time_days?: number | null
           min_order_amount?: number | null
+          min_order_amount_cents?: number | null
           name?: string
           notes?: string | null
           phone?: string | null
@@ -6662,7 +6720,7 @@ export type Database = {
         | "adjusted"
         | "expired"
         | "welcome_bonus"
-      payment_method: "cash" | "card" | "split" | "check"
+      payment_method: "cash" | "card" | "split" | "check" | "digital"
       payment_status:
         | "pending"
         | "partial"
@@ -6690,7 +6748,12 @@ export type Database = {
         | "converted"
       refund_status: "pending" | "processed" | "failed"
       service_classification: "primary" | "addon_only" | "both"
-      transaction_item_type: "product" | "service" | "package" | "custom"
+      transaction_item_type:
+        | "product"
+        | "service"
+        | "package"
+        | "custom"
+        | "mobile_fee"
       transaction_status:
         | "open"
         | "completed"
@@ -6866,7 +6929,7 @@ export const Constants = {
         "expired",
         "welcome_bonus",
       ],
-      payment_method: ["cash", "card", "split", "check"],
+      payment_method: ["cash", "card", "split", "check", "digital"],
       payment_status: [
         "pending",
         "partial",
@@ -6898,7 +6961,13 @@ export const Constants = {
       ],
       refund_status: ["pending", "processed", "failed"],
       service_classification: ["primary", "addon_only", "both"],
-      transaction_item_type: ["product", "service", "package", "custom"],
+      transaction_item_type: [
+        "product",
+        "service",
+        "package",
+        "custom",
+        "mobile_fee",
+      ],
       transaction_status: [
         "open",
         "completed",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
+import { fromCents } from '@/lib/utils/money';
 
 const PST_TZ = 'America/Los_Angeles';
 
@@ -45,7 +46,7 @@ export async function GET(request: NextRequest) {
     let query = admin
       .from('stock_adjustments')
       .select(`
-        id, created_at, quantity_change, unit_cost, reason,
+        id, created_at, quantity_change, unit_cost_cents, reason,
         products(name, sku),
         employees!stock_adjustments_created_by_fkey(first_name, last_name)
       `)
@@ -69,8 +70,13 @@ export async function GET(request: NextRequest) {
       const product = row.products as { name: string; sku: string | null } | null;
       const emp = row.employees as { first_name: string; last_name: string } | null;
       const qty = Math.abs(row.quantity_change as number);
-      const cost = (row.unit_cost as number) ?? 0;
-      const lineTotal = qty * cost;
+      const costCents = (row.unit_cost_cents as number | null) ?? 0;
+      const lineTotalCents = qty * costCents;
+      // CSV output is dollars-decimal for human + accounting readability.
+      // Conversion at the export boundary via fromCents() (canonical
+      // dollars-at-boundary marker — see MONEY.md).
+      const costDollars = fromCents(costCents);
+      const lineTotalDollars = fromCents(lineTotalCents);
       const reason = (row.reason as string) ?? '';
       const note = reason.replace(/^Shop use\s*—?\s*/, '');
 
@@ -79,8 +85,8 @@ export async function GET(request: NextRequest) {
         escapeCsv(product?.name ?? ''),
         escapeCsv(product?.sku ?? ''),
         String(qty),
-        cost > 0 ? cost.toFixed(2) : '',
-        lineTotal > 0 ? lineTotal.toFixed(2) : '',
+        costCents > 0 ? costDollars.toFixed(2) : '',
+        lineTotalCents > 0 ? lineTotalDollars.toFixed(2) : '',
         escapeCsv(note),
         escapeCsv(emp ? `${emp.first_name} ${emp.last_name}` : ''),
       ].join(',');
