@@ -8,7 +8,7 @@ import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import type { Vendor, Product } from '@/lib/supabase/types';
-import { formatCurrency, formatMoney, formatMoneyForInput } from '@/lib/utils/format';
+import { formatMoney, formatMoneyForInput } from '@/lib/utils/format';
 import { toCents } from '@/lib/utils/money';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -265,7 +265,7 @@ export default function NewPurchaseOrderPage() {
                       )}
                     </span>
                     <span className="text-gray-500">
-                      Cost: {formatCurrency(p.cost_price_cents)} | Stock: {p.quantity_on_hand}
+                      Cost: {formatMoney(p.cost_price_cents)} | Stock: {p.quantity_on_hand}
                     </span>
                   </button>
                 ))}

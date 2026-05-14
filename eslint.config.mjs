@@ -3,6 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import phoneNoRawDisplay from "./eslint-rules/phone-no-raw-display.js";
 import moneyNoUnsuffixedMoneyProp from "./eslint-rules/money-no-unsuffixed-money-prop.js";
+import noFormatCurrencyWithCentsArgs from "./eslint-rules/no-format-currency-with-cents-args.js";
 
 const eslintConfig = defineConfig([
   // Ignore-only config (must be first; flat config respects ignores additively).
@@ -26,6 +27,7 @@ const eslintConfig = defineConfig([
       money: {
         rules: {
           "no-unsuffixed-money-prop": moneyNoUnsuffixedMoneyProp,
+          "no-format-currency-with-cents-args": noFormatCurrencyWithCentsArgs,
         },
       },
     },
@@ -58,6 +60,12 @@ const eslintConfig = defineConfig([
       // at Unify-Final after all family-phase migrations land.
       // See docs/dev/MONEY.md.
       "money/no-unsuffixed-money-prop": "warn",
+      // Phase Money-Unify-3.1a: structurally prevent the Family D
+      // rendering bug class (formatCurrency called with cents-valued
+      // arg → silent 100× over-display). `formatCurrency` survives the
+      // epic for legitimate dollar callers; this rule + the deletion of
+      // formatCurrency at Unify-Final close the bug window.
+      "money/no-format-currency-with-cents-args": "error",
     },
   },
   // Override default ignores of eslint-config-next.

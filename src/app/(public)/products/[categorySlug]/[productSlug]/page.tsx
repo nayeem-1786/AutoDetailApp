@@ -10,7 +10,7 @@ import { generateProductMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { generateProductSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { SITE_URL } from '@/lib/utils/constants';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo, getSaleEndDescription, isEndingSoon } from '@/lib/utils/sale-pricing';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
@@ -169,7 +169,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
                 return (
                   <p className="mt-4 font-display text-3xl font-bold text-accent-brand">
-                    {formatCurrency(product.retail_price_cents)}
+                    {formatMoney(product.retail_price_cents)}
                   </p>
                 );
               })()}
@@ -326,7 +326,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                     <span className="inline-flex items-center rounded-lg bg-accent-brand/20 border border-accent-brand px-4 py-2 text-sm font-medium text-accent-brand">
                       {product.variant_label || product.name}
                       <span className="ml-2 text-site-text-muted">
-                        {formatCurrency((() => {
+                        {formatMoney((() => {
                           const ss = getSaleStatus(product);
                           const si = getTierSaleInfo(product.retail_price_cents, product.sale_price_cents, ss.isOnSale);
                           return si?.isDiscounted ? si.currentPriceCents : product.retail_price_cents;
@@ -346,7 +346,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                         >
                           {v.variant_label || v.name}
                           <span className="ml-2 text-site-text-muted">
-                            {formatCurrency(displayPrice)}
+                            {formatMoney(displayPrice)}
                           </span>
                         </Link>
                       );

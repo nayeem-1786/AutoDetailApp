@@ -25,7 +25,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
-import { formatTime, formatCurrency } from '@/lib/utils/format';
+import { formatTime, formatMoney } from '@/lib/utils/format';
 import { formatChannelLabel } from '@/lib/utils/format-channel';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import { AppointmentDetailDialog } from './appointments/components/appointment-detail-dialog';
@@ -469,7 +469,7 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-500">Orders Today</p>
             </div>
             <div className="rounded-lg bg-gray-50 p-3 text-center">
-              <p className="text-2xl font-bold text-green-600">{loading ? '-' : formatCurrency(orderStats.revenueToday / 100)}</p>
+              <p className="text-2xl font-bold text-green-600">{loading ? '-' : formatMoney(orderStats.revenueToday)}</p>
               <p className="text-xs text-gray-500">Revenue Today</p>
             </div>
             <div className="rounded-lg bg-gray-50 p-3 text-center">
@@ -493,7 +493,7 @@ export default function AdminDashboard() {
                       <span className="truncate text-xs text-gray-500">{order.first_name} {order.last_name}</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-medium text-gray-700">{formatCurrency(order.total / 100)}</span>
+                      <span className="text-xs font-medium text-gray-700">{formatMoney(order.total)}</span>
                       <Badge
                         variant={
                           order.fulfillment_status === 'delivered' ? 'success' :

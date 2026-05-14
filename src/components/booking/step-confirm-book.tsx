@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { formatCurrency, formatDate, formatTime, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatMoney, formatDate, formatTime, formatPhone } from '@/lib/utils/format';
 import { FEATURE_FLAGS, LOYALTY } from '@/lib/utils/constants';
 import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
@@ -484,7 +484,7 @@ export function StepConfirmBook({
       {addons.map((addon) => (
         <div key={addon.service_id} className="flex justify-between">
           <span className="text-site-text-secondary">{addon.name}</span>
-          <span className="font-medium text-site-text">{formatCurrency(addon.price_cents)}</span>
+          <span className="font-medium text-site-text">{formatMoney(addon.price_cents)}</span>
         </div>
       ))}
       {mobileSurcharge > 0 && (

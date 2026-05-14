@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ShoppingBag, Trash2, ArrowRight, Package, Tag, X } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
 import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { toCents } from '@/lib/utils/money';
 import { QuantitySelector } from '@/components/public/cart/quantity-selector';
 import { toast } from 'sonner';
 
@@ -20,9 +21,12 @@ export default function CartPage() {
   } | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // Calculate totals (tax & shipping calculated at checkout)
+  // Calculate totals (tax & shipping calculated at checkout).
+  // subtotal arrives in cents from cart-context; coupon discount arrives in
+  // dollars from /api/public/coupons/validate (Family F is still dollars
+  // until Unify-7). Normalize to cents so totals render via formatMoney.
   const discountAmount = appliedCoupon?.discount ?? 0;
-  const total = subtotal - discountAmount;
+  const total = subtotal - toCents(discountAmount);
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -161,7 +165,7 @@ export default function CartPage() {
                   </div>
 
                   <span className="text-sm text-site-text-muted mt-0.5">
-                    {formatCurrency(item.price_cents)} each
+                    {formatMoney(item.price_cents)} each
                   </span>
 
                   <div className="flex items-center justify-between mt-3">
@@ -172,7 +176,7 @@ export default function CartPage() {
                       size="sm"
                     />
                     <span className="text-base font-semibold text-site-text tabular-nums">
-                      {formatCurrency(item.price_cents * item.quantity)}
+                      {formatMoney(item.price_cents * item.quantity)}
                     </span>
                   </div>
                 </div>
@@ -252,7 +256,7 @@ export default function CartPage() {
                 <div className="flex justify-between">
                   <span className="text-site-text-muted">Subtotal</span>
                   <span className="text-site-text tabular-nums">
-                    {formatCurrency(subtotal)}
+                    {formatMoney(subtotal)}
                   </span>
                 </div>
                 {appliedCoupon && (
@@ -278,7 +282,7 @@ export default function CartPage() {
                 <div className="border-t border-site-border pt-3 flex justify-between">
                   <span className="text-base font-bold text-site-text">Estimated Total</span>
                   <span className="text-base font-bold text-site-text tabular-nums">
-                    {formatCurrency(total)}
+                    {formatMoney(total)}
                   </span>
                 </div>
               </div>

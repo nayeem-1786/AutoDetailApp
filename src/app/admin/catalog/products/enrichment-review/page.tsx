@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -409,7 +409,7 @@ export default function EnrichmentReviewPage() {
                         <div className="min-w-0">
                           <CardTitle className="text-sm truncate">{draft.product.name}</CardTitle>
                           <p className="text-xs text-gray-500">
-                            {draft.product.vendor_name ?? 'No vendor'} · {draft.product.category_name ?? 'No category'} · {formatCurrency(draft.product.retail_price_cents)}
+                            {draft.product.vendor_name ?? 'No vendor'} · {draft.product.category_name ?? 'No category'} · {formatMoney(draft.product.retail_price_cents)}
                           </p>
                         </div>
                       </div>

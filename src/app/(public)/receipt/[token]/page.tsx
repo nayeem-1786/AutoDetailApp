@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { formatCurrency, formatDate, formatReceiptDateTime } from '@/lib/utils/format';
+import { formatCurrency, formatMoney, formatDate, formatReceiptDateTime } from '@/lib/utils/format';
 import { LOYALTY } from '@/lib/utils/constants';
 import { getBusinessInfo } from '@/lib/data/business';
 import { PrintButton } from './print-button';
@@ -460,7 +460,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 <div className="flex justify-between text-sm pt-2 border-t border-site-border mt-2">
                   <span className="font-medium text-site-text">{RECEIPT_VOCAB.TOTAL_PAID}</span>
                   <span className="font-medium text-site-text tabular-nums">
-                    {formatCurrency(totalPaidCents / 100)}
+                    {formatMoney(totalPaidCents)}
                   </span>
                 </div>
               )}
@@ -476,7 +476,7 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                   <div className="flex justify-between text-sm">
                     <span className="font-medium text-site-text">{RECEIPT_VOCAB.BALANCE_DUE}</span>
                     <span className="font-medium text-site-text tabular-nums">
-                      {formatCurrency(resolvedBalanceCents / 100)}
+                      {formatMoney(resolvedBalanceCents)}
                     </span>
                   </div>
                 )

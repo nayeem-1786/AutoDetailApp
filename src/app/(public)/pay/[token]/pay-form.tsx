@@ -11,7 +11,7 @@ import {
   useStripe,
 } from '@stripe/react-stripe-js';
 import { Loader2, Lock, ShieldCheck } from 'lucide-react';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -169,7 +169,7 @@ function InnerForm({ token, amountCents }: { token: string; amountCents: number 
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-site-text">Payment Details</h3>
           <span className="text-lg font-semibold text-site-text">
-            {formatCurrency(amountCents / 100)}
+            {formatMoney(amountCents)}
           </span>
         </div>
 
@@ -212,7 +212,7 @@ function InnerForm({ token, amountCents }: { token: string; amountCents: number 
             Processing…
           </span>
         ) : (
-          `Pay ${formatCurrency(amountCents / 100)}`
+          `Pay ${formatMoney(amountCents)}`
         )}
       </button>
     </form>

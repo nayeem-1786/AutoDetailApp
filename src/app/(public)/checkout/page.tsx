@@ -25,7 +25,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
-import { formatCurrency, formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
+import { formatMoney, formatPhone, formatPhoneInput, normalizePhone } from '@/lib/utils/format';
 import { TAX_RATE } from '@/lib/utils/constants';
 import { toast } from 'sonner';
 
@@ -296,7 +296,7 @@ function PaymentForm({
             Processing...
           </span>
         ) : (
-          `Place Order — ${formatCurrency(totalCents / 100)}`
+          `Place Order — ${formatMoney(totalCents)}`
         )}
       </button>
     </form>
@@ -408,9 +408,12 @@ function CheckoutContent() {
     (fulfillmentMethod === 'pickup') ||
     (fulfillmentMethod === 'shipping' && shippingAddressValid);
 
+  // subtotal arrives in cents from useCart; tax-cents = cents × rate.
+  // Pre-Family-D-fix this read `subtotal * 100 * TAX_RATE` which double-
+  // scaled because subtotal was already cents — produced 100× over-estimate.
   const estimatedTaxCents =
     showTax && displayTaxState === 'CA'
-      ? Math.max(0, Math.round(subtotal * 100 * TAX_RATE))
+      ? Math.max(0, Math.round(subtotal * TAX_RATE))
       : 0;
 
   // Shipping amount for display
@@ -1154,7 +1157,7 @@ function CheckoutContent() {
                               >
                                 {rate.totalAmount === 0
                                   ? 'FREE'
-                                  : formatCurrency(rate.totalAmount / 100)}
+                                  : formatMoney(rate.totalAmount)}
                               </span>
                             </label>
                           ))}
@@ -1295,7 +1298,7 @@ function CheckoutContent() {
                               {selectedRate.carrierName} —{' '}
                               {selectedRate.serviceName}
                               {selectedRate.totalAmount > 0
-                                ? ` (${formatCurrency(selectedRate.totalAmount / 100)})`
+                                ? ` (${formatMoney(selectedRate.totalAmount)})`
                                 : ' (FREE)'}
                               {selectedRate.estimatedDays
                                 ? ` · Est. ${selectedRate.estimatedDays} business days`
@@ -1420,7 +1423,7 @@ function CheckoutContent() {
                       </p>
                     </div>
                     <span className="text-sm font-medium text-site-text tabular-nums shrink-0">
-                      {formatCurrency(item.price_cents * item.quantity)}
+                      {formatMoney(item.price_cents * item.quantity)}
                     </span>
                   </div>
                 ))}
@@ -1431,9 +1434,7 @@ function CheckoutContent() {
                 <div className="flex justify-between">
                   <span className="text-site-text-muted">Subtotal</span>
                   <span className="text-site-text tabular-nums">
-                    {formatCurrency(
-                      totals ? totals.subtotal / 100 : subtotal
-                    )}
+                    {formatMoney(totals ? totals.subtotal : subtotal)}
                   </span>
                 </div>
 
@@ -1441,7 +1442,7 @@ function CheckoutContent() {
                   <div className="flex justify-between">
                     <span className="text-accent-brand">Discount</span>
                     <span className="text-accent-brand tabular-nums">
-                      -{formatCurrency(totals.discount / 100)}
+                      -{formatMoney(totals.discount)}
                     </span>
                   </div>
                 )}
@@ -1457,7 +1458,7 @@ function CheckoutContent() {
                       }`}
                     >
                       {totals.shipping > 0
-                        ? formatCurrency(totals.shipping / 100)
+                        ? formatMoney(totals.shipping)
                         : 'FREE'}
                     </span>
                   ) : fulfillmentMethod === 'pickup' ? (
@@ -1467,7 +1468,7 @@ function CheckoutContent() {
                   ) : selectedRate ? (
                     <span className="text-site-text tabular-nums">
                       {selectedRate.totalAmount > 0
-                        ? formatCurrency(selectedRate.totalAmount / 100)
+                        ? formatMoney(selectedRate.totalAmount)
                         : 'FREE'}
                     </span>
                   ) : (
@@ -1480,13 +1481,13 @@ function CheckoutContent() {
                   {totals ? (
                     <span className="text-site-text tabular-nums">
                       {totals.tax > 0
-                        ? formatCurrency(totals.tax / 100)
+                        ? formatMoney(totals.tax)
                         : '$0.00'}
                     </span>
                   ) : showTax ? (
                     <span className="text-site-text tabular-nums">
                       {displayTaxState === 'CA'
-                        ? formatCurrency(estimatedTaxCents / 100)
+                        ? formatMoney(estimatedTaxCents)
                         : '$0.00'}
                     </span>
                   ) : (
@@ -1500,11 +1501,9 @@ function CheckoutContent() {
                   </span>
                   <span className="text-base font-bold text-site-text tabular-nums">
                     {totals
-                      ? formatCurrency(totals.total / 100)
-                      : formatCurrency(
-                          subtotal +
-                            displayShippingCents / 100 +
-                            estimatedTaxCents / 100
+                      ? formatMoney(totals.total)
+                      : formatMoney(
+                          subtotal + displayShippingCents + estimatedTaxCents
                         )}
                   </span>
                 </div>

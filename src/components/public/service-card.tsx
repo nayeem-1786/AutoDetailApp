@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Clock, Car, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, hasAnySalePrice, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import type { Service } from '@/lib/supabase/types';
 
@@ -38,12 +38,12 @@ function getStartingPrice(service: Service): PriceDisplay {
           if (saleInfo?.isDiscounted) {
             return {
               text: `From ${formatMoney(saleInfo.currentPriceCents)}`,
-              wasText: `From ${formatCurrency(standardMin)}`,
+              wasText: `From ${formatMoney(standardMin)}`,
               isOnSale: true,
             };
           }
         }
-        return { text: `From ${formatCurrency(standardMin)}`, isOnSale: false };
+        return { text: `From ${formatMoney(standardMin)}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
@@ -61,7 +61,7 @@ function getStartingPrice(service: Service): PriceDisplay {
             };
           }
         }
-        return { text: `From ${formatCurrency(sorted[0].price_cents)}`, isOnSale: false };
+        return { text: `From ${formatMoney(sorted[0].price_cents)}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
@@ -70,12 +70,12 @@ function getStartingPrice(service: Service): PriceDisplay {
         const label = service.per_unit_label ?? 'unit';
         if (saleStatus.isOnSale && service.sale_price_cents != null && service.sale_price_cents < service.per_unit_price_cents) {
           return {
-            text: `${formatCurrency(service.sale_price_cents)}/${label}`,
-            wasText: `${formatCurrency(service.per_unit_price_cents)}/${label}`,
+            text: `${formatMoney(service.sale_price_cents)}/${label}`,
+            wasText: `${formatMoney(service.per_unit_price_cents)}/${label}`,
             isOnSale: true,
           };
         }
-        return { text: `${formatCurrency(service.per_unit_price_cents)}/${label}`, isOnSale: false };
+        return { text: `${formatMoney(service.per_unit_price_cents)}/${label}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
@@ -83,18 +83,18 @@ function getStartingPrice(service: Service): PriceDisplay {
       if (service.flat_price_cents !== null) {
         if (saleStatus.isOnSale && service.sale_price_cents != null && service.sale_price_cents < service.flat_price_cents) {
           return {
-            text: formatCurrency(service.sale_price_cents),
-            wasText: formatCurrency(service.flat_price_cents),
+            text: formatMoney(service.sale_price_cents),
+            wasText: formatMoney(service.flat_price_cents),
             isOnSale: true,
           };
         }
-        return { text: formatCurrency(service.flat_price_cents), isOnSale: false };
+        return { text: formatMoney(service.flat_price_cents), isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
     case 'custom': {
       if (service.custom_starting_price_cents !== null) {
-        return { text: `From ${formatCurrency(service.custom_starting_price_cents)}`, isOnSale: false };
+        return { text: `From ${formatMoney(service.custom_starting_price_cents)}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }

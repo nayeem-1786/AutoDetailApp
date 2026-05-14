@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Search, X, Package } from 'lucide-react';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 
 interface SearchResult {
   id: string;
@@ -226,15 +226,15 @@ export function ProductSearch({ categorySlug, categoryName }: ProductSearchProps
                       {result.is_on_sale ? (
                         <>
                           <span className="text-xs text-site-text-faint line-through">
-                            {formatCurrency(result.retail_price_cents)}
+                            {formatMoney(result.retail_price_cents)}
                           </span>
                           <span className="ml-1.5 text-sm font-bold text-accent-brand">
-                            {formatCurrency(result.effective_price)}
+                            {formatMoney(result.effective_price)}
                           </span>
                         </>
                       ) : (
                         <span className="text-sm font-bold text-accent-brand">
-                          {formatCurrency(result.retail_price_cents)}
+                          {formatMoney(result.retail_price_cents)}
                         </span>
                       )}
                     </div>

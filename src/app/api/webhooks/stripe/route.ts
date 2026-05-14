@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { generateOrderNumber } from '@/lib/utils/order-number';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
@@ -413,8 +413,8 @@ async function sendOrderConfirmationEmail(order: OrderWithItems) {
         `<tr>
           <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;">${item.product_name}</td>
           <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:center;">${item.quantity}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:right;">${formatCurrency(item.unit_price / 100)}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:right;">${formatCurrency(item.line_total / 100)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:right;">${formatMoney(item.unit_price)}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:right;">${formatMoney(item.line_total)}</td>
         </tr>`
     )
     .join('');
@@ -423,7 +423,7 @@ async function sendOrderConfirmationEmail(order: OrderWithItems) {
     order.discount_amount > 0
       ? `<tr>
           <td colspan="3" style="padding:4px 12px;color:#9CA3AF;text-align:right;">Discount${order.coupon_code ? ` (${order.coupon_code})` : ''}</td>
-          <td style="padding:4px 12px;color:#CCFF00;text-align:right;">-${formatCurrency(order.discount_amount / 100)}</td>
+          <td style="padding:4px 12px;color:#CCFF00;text-align:right;">-${formatMoney(order.discount_amount)}</td>
         </tr>`
       : '';
 
@@ -469,16 +469,16 @@ async function sendOrderConfirmationEmail(order: OrderWithItems) {
         <tfoot>
           <tr>
             <td colspan="3" style="padding:4px 12px;color:#9CA3AF;text-align:right;">Subtotal</td>
-            <td style="padding:4px 12px;color:#D1D5DB;text-align:right;">${formatCurrency(order.subtotal / 100)}</td>
+            <td style="padding:4px 12px;color:#D1D5DB;text-align:right;">${formatMoney(order.subtotal)}</td>
           </tr>
           ${discountRow}
           <tr>
             <td colspan="3" style="padding:4px 12px;color:#9CA3AF;text-align:right;">Tax</td>
-            <td style="padding:4px 12px;color:#D1D5DB;text-align:right;">${formatCurrency(order.tax_amount / 100)}</td>
+            <td style="padding:4px 12px;color:#D1D5DB;text-align:right;">${formatMoney(order.tax_amount)}</td>
           </tr>
           <tr>
             <td colspan="3" style="padding:8px 12px;border-top:1px solid #555;color:#FFFFFF;text-align:right;font-weight:bold;">Total</td>
-            <td style="padding:8px 12px;border-top:1px solid #555;color:#CCFF00;text-align:right;font-weight:bold;font-size:18px;">${formatCurrency(order.total / 100)}</td>
+            <td style="padding:8px 12px;border-top:1px solid #555;color:#CCFF00;text-align:right;font-weight:bold;font-size:18px;">${formatMoney(order.total)}</td>
           </tr>
         </tfoot>
       </table>
@@ -508,11 +508,11 @@ Hi ${order.first_name},
 
 Thank you for your order! Here's a summary:
 
-${order.order_items.map((i) => `- ${i.product_name} x${i.quantity} - ${formatCurrency(i.line_total / 100)}`).join('\n')}
+${order.order_items.map((i) => `- ${i.product_name} x${i.quantity} - ${formatMoney(i.line_total)}`).join('\n')}
 
-Subtotal: ${formatCurrency(order.subtotal / 100)}
-${order.discount_amount > 0 ? `Discount: -${formatCurrency(order.discount_amount / 100)}\n` : ''}Tax: ${formatCurrency(order.tax_amount / 100)}
-Total: ${formatCurrency(order.total / 100)}
+Subtotal: ${formatMoney(order.subtotal)}
+${order.discount_amount > 0 ? `Discount: -${formatMoney(order.discount_amount)}\n` : ''}Tax: ${formatMoney(order.tax_amount)}
+Total: ${formatMoney(order.total)}
 
 ${order.fulfillment_method === 'pickup' ? 'Your order will be available for local pickup. We\'ll notify you when it\'s ready.' : 'Your order will be shipped. You\'ll receive tracking information once it ships.'}
 

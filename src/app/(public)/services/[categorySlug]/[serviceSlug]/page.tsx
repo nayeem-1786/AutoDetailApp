@@ -248,9 +248,9 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   if (suggestion.combo_price != null) {
                     priceLabel = `Add for ${formatCurrency(suggestion.combo_price)}`;
                   } else if (addon.flat_price_cents != null) {
-                    priceLabel = formatCurrency(addon.flat_price_cents);
+                    priceLabel = formatMoney(addon.flat_price_cents);
                   } else if (addon.custom_starting_price_cents != null) {
-                    priceLabel = `From ${formatCurrency(addon.custom_starting_price_cents)}`;
+                    priceLabel = `From ${formatMoney(addon.custom_starting_price_cents)}`;
                   }
 
                   return (

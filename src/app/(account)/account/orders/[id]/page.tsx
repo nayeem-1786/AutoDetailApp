@@ -7,7 +7,7 @@ import { ArrowLeft, Package, Truck, MapPin } from 'lucide-react';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 import type { Order, OrderItem } from '@/lib/supabase/types';
 
 type OrderDetail = Order & { order_items: OrderItem[] };
@@ -135,7 +135,7 @@ export default function AccountOrderDetailPage() {
                 )}
                 <p className="text-xs text-site-text-faint">Qty: {item.quantity}</p>
               </div>
-              <p className="font-medium text-site-text">{formatCurrency(item.line_total / 100)}</p>
+              <p className="font-medium text-site-text">{formatMoney(item.line_total)}</p>
             </div>
           ))}
         </div>
@@ -146,27 +146,27 @@ export default function AccountOrderDetailPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-site-text-faint">Subtotal</span>
-            <span className="text-site-text">{formatCurrency(order.subtotal / 100)}</span>
+            <span className="text-site-text">{formatMoney(order.subtotal)}</span>
           </div>
           {order.discount_amount > 0 && (
             <div className="flex justify-between">
               <span className="text-site-text-faint">Discount{order.coupon_code ? ` (${order.coupon_code})` : ''}</span>
-              <span className="text-green-400">-{formatCurrency(order.discount_amount / 100)}</span>
+              <span className="text-green-400">-{formatMoney(order.discount_amount)}</span>
             </div>
           )}
           <div className="flex justify-between">
             <span className="text-site-text-faint">Tax</span>
-            <span className="text-site-text">{formatCurrency(order.tax_amount / 100)}</span>
+            <span className="text-site-text">{formatMoney(order.tax_amount)}</span>
           </div>
           {order.shipping_amount > 0 && (
             <div className="flex justify-between">
               <span className="text-site-text-faint">Shipping</span>
-              <span className="text-site-text">{formatCurrency(order.shipping_amount / 100)}</span>
+              <span className="text-site-text">{formatMoney(order.shipping_amount)}</span>
             </div>
           )}
           <div className="flex justify-between border-t border-site-border pt-2 font-semibold">
             <span className="text-site-text">Total</span>
-            <span className="text-accent-brand">{formatCurrency(order.total / 100)}</span>
+            <span className="text-accent-brand">{formatMoney(order.total)}</span>
           </div>
         </div>
       </div>

@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatMoney } from '@/lib/utils/format';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { X, Wrench, ShoppingBag, AlertTriangle, Info } from 'lucide-react';
@@ -159,12 +159,16 @@ export function QuickSaleDialog({
   }
 
   function calculateSalePrice(standard: number): number {
+    // `standard` is integer cents (callers pass *_price_cents). Result is
+    // integer cents. Pre-Phase-3.1a this rounded via `* 100 / 100`, which
+    // produced fractional cents on integer-cents inputs and tripped
+    // formatMoney's integer guard.
     if (discountType === 'direct') return standard; // Direct mode uses pre-filled prices
     if (typeof discountValue !== 'number' || discountValue <= 0) return standard;
     if (discountType === 'percentage') {
-      return Math.round((standard * (1 - discountValue / 100)) * 100) / 100;
+      return Math.round(standard * (1 - discountValue / 100));
     }
-    return Math.max(0, standard - discountValue);
+    return Math.max(0, Math.round(standard - discountValue));
   }
 
   async function handleApply() {
@@ -242,16 +246,16 @@ export function QuickSaleDialog({
     const statusLabel = item.sale_status === 'active' ? 'active sale' : 'scheduled sale';
     const currentPrices: string[] = [];
     if (item.type === 'product' && item.current_sale_price != null) {
-      currentPrices.push(formatCurrency(item.current_sale_price));
+      currentPrices.push(formatMoney(item.current_sale_price));
     } else if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
       if (item.current_sale_price != null) {
         const suffix = item.pricing_model === 'per_unit' ? `/${item.per_unit_label || 'unit'}` : '';
-        currentPrices.push(formatCurrency(item.current_sale_price) + suffix);
+        currentPrices.push(formatMoney(item.current_sale_price) + suffix);
       }
     } else if (item.current_tier_sale_prices) {
       for (const t of item.current_tier_sale_prices) {
         if (t.sale_price_cents != null) {
-          currentPrices.push(`${t.tier_label || t.tier_name}: ${formatCurrency(t.sale_price_cents)}`);
+          currentPrices.push(`${t.tier_label || t.tier_name}: ${formatMoney(t.sale_price_cents)}`);
         }
       }
     }
@@ -349,20 +353,20 @@ export function QuickSaleDialog({
                     <span className="flex-1 font-medium">{item.name}</span>
                     <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
                     {item.type === 'product' && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.retail_price_cents ?? 0)}</span>
+                      <span className="text-xs text-gray-500">{formatMoney(item.retail_price_cents ?? 0)}</span>
                     )}
                     {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price_cents != null && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.flat_price_cents)}</span>
+                      <span className="text-xs text-gray-500">{formatMoney(item.flat_price_cents)}</span>
                     )}
                     {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price_cents != null && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price_cents)}/{item.per_unit_label || 'unit'}</span>
+                      <span className="text-xs text-gray-500">{formatMoney(item.per_unit_price_cents)}/{item.per_unit_label || 'unit'}</span>
                     )}
                   </div>
                   {renderConflictWarning(item)}
                   {/* Show pre-filled prices in direct mode */}
                   {discountType === 'direct' && item.prefilled_sale_price != null && (
                     <p className="mt-1 text-[10px] text-green-600">
-                      Sale price: {formatCurrency(item.prefilled_sale_price)}
+                      Sale price: {formatMoney(item.prefilled_sale_price)}
                       {item.pricing_model === 'per_unit' && `/${item.per_unit_label || 'unit'}`}
                     </p>
                   )}
@@ -372,7 +376,7 @@ export function QuickSaleDialog({
                         const tier = item.tiers?.find((t) => t.tier_name === tierName);
                         return (
                           <p key={tierName} className="text-[10px] text-green-600">
-                            {tier?.tier_label || tierName}: {formatCurrency(price)}
+                            {tier?.tier_label || tierName}: {formatMoney(price)}
                           </p>
                         );
                       })}
@@ -480,7 +484,7 @@ export function QuickSaleDialog({
                   const valid = sp > 0 && sp < basePrice;
                   return (
                     <p className={`ml-4 ${valid ? 'text-gray-600' : 'text-red-500'}`}>
-                      {formatCurrency(basePrice)} &rarr; {formatCurrency(sp)}
+                      {formatMoney(basePrice)} &rarr; {formatMoney(sp)}
                       {item.pricing_model === 'per_unit' && ` /${item.per_unit_label || 'unit'}`}
                       {!valid && ' (invalid)'}
                     </p>
@@ -499,7 +503,7 @@ export function QuickSaleDialog({
                         const valid = sp > 0 && sp < tier.price_cents;
                         return (
                           <p key={tier.tier_name} className={valid ? 'text-gray-600' : 'text-red-500'}>
-                            {tier.tier_label || tier.tier_name}: {formatCurrency(tier.price_cents)} &rarr; {formatCurrency(sp)}
+                            {tier.tier_label || tier.tier_name}: {formatMoney(tier.price_cents)} &rarr; {formatMoney(sp)}
                             {!valid && ' (invalid)'}
                           </p>
                         );
@@ -507,7 +511,7 @@ export function QuickSaleDialog({
                   </div>
                 ) : (
                   <p className="ml-4 text-gray-600">
-                    {formatCurrency(item.retail_price_cents ?? 0)} &rarr; {formatCurrency(calculateSalePrice(item.retail_price_cents ?? 0))}
+                    {formatMoney(item.retail_price_cents ?? 0)} &rarr; {formatMoney(calculateSalePrice(item.retail_price_cents ?? 0))}
                   </p>
                 )}
               </div>

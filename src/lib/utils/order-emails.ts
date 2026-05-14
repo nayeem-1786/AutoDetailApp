@@ -1,7 +1,7 @@
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency, formatPhone } from '@/lib/utils/format';
+import { formatMoney, formatPhone } from '@/lib/utils/format';
 import type { Order, OrderItem } from '@/lib/supabase/types';
 
 type OrderWithItems = Order & { items?: OrderItem[] };
@@ -34,7 +34,7 @@ function itemsTable(items: OrderItem[]) {
       `<tr>
         <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;">${item.product_name}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:center;">${item.quantity}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:right;">${formatCurrency(item.line_total / 100)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #333;color:#D1D5DB;text-align:right;">${formatMoney(item.line_total)}</td>
       </tr>`
   ).join('');
 
@@ -168,7 +168,7 @@ export async function sendRefundEmail(order: OrderWithItems, amountCents: number
   // Template-first
   const templated = await sendTemplatedEmail(order.email, 'order_refund', {
     ...orderTemplateVars(order, biz),
-    refund_amount: formatCurrency(amountCents / 100),
+    refund_amount: formatMoney(amountCents),
     refund_type: isFullRefund ? 'full' : 'partial',
   });
   if (templated.usedTemplate) return;
@@ -178,7 +178,7 @@ export async function sendRefundEmail(order: OrderWithItems, amountCents: number
     isFullRefund ? 'Refund Processed' : 'Partial Refund Processed',
     card(`
       <p style="color:#FFFFFF;margin:0 0 12px;">Hi ${order.first_name},</p>
-      <p style="color:#D1D5DB;margin:0 0 16px;">A ${isFullRefund ? 'full' : 'partial'} refund of <strong style="color:#CCFF00;">${formatCurrency(amountCents / 100)}</strong> has been processed for your order <strong style="color:#FFFFFF;">${order.order_number}</strong>.</p>
+      <p style="color:#D1D5DB;margin:0 0 16px;">A ${isFullRefund ? 'full' : 'partial'} refund of <strong style="color:#CCFF00;">${formatMoney(amountCents)}</strong> has been processed for your order <strong style="color:#FFFFFF;">${order.order_number}</strong>.</p>
       <p style="color:#D1D5DB;margin:0;">The refund should appear in your account within 5-10 business days, depending on your bank.</p>
     `),
     `${biz.name}<br>${formatPhone(biz.phone)}<br>${biz.email}`
@@ -187,7 +187,7 @@ export async function sendRefundEmail(order: OrderWithItems, amountCents: number
   await sendEmail(
     order.email,
     `Refund Processed — ${order.order_number} | ${biz.name}`,
-    `Hi ${order.first_name}, a ${isFullRefund ? 'full' : 'partial'} refund of ${formatCurrency(amountCents / 100)} has been processed for order ${order.order_number}. — ${biz.name}`,
+    `Hi ${order.first_name}, a ${isFullRefund ? 'full' : 'partial'} refund of ${formatMoney(amountCents)} has been processed for order ${order.order_number}. — ${biz.name}`,
     html
   );
 }
