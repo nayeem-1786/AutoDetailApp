@@ -27,8 +27,8 @@ export async function GET(request: NextRequest) {
         name,
         slug,
         image_url,
-        retail_price,
-        sale_price,
+        retail_price_cents,
+        sale_price_cents,
         sale_starts_at,
         sale_ends_at,
         product_categories!inner(id, name, slug)
@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
           name,
           slug,
           image_url,
-          retail_price,
-          sale_price,
+          retail_price_cents,
+          sale_price_cents,
           sale_starts_at,
           sale_ends_at,
           product_categories!inner(id, name, slug)
@@ -83,13 +83,13 @@ export async function GET(request: NextRequest) {
     const shaped = results.map((p) => {
       const cat = p.product_categories as unknown as { id: string; name: string; slug: string };
       // Determine effective price (check if sale is active)
-      let effectivePrice = p.retail_price;
-      if (p.sale_price != null) {
+      let effectivePrice = p.retail_price_cents;
+      if (p.sale_price_cents != null) {
         const now = new Date();
         const saleStartOk = !p.sale_starts_at || new Date(p.sale_starts_at) <= now;
         const saleEndOk = !p.sale_ends_at || new Date(p.sale_ends_at) >= now;
         if (saleStartOk && saleEndOk) {
-          effectivePrice = p.sale_price;
+          effectivePrice = p.sale_price_cents;
         }
       }
 
@@ -98,9 +98,9 @@ export async function GET(request: NextRequest) {
         name: p.name,
         slug: p.slug,
         image_url: p.image_url,
-        retail_price: p.retail_price,
+        retail_price_cents: p.retail_price_cents,
         effective_price: effectivePrice,
-        is_on_sale: effectivePrice < p.retail_price,
+        is_on_sale: effectivePrice < p.retail_price_cents,
         category_name: cat.name,
         category_slug: cat.slug,
       };

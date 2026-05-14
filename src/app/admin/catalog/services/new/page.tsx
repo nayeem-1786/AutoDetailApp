@@ -6,6 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { createClient } from '@/lib/supabase/client';
 import { serviceCreateSchema, type ServiceCreateInput } from '@/lib/utils/validation';
+import { toCents } from '@/lib/utils/money';
 import type { ServiceCategory, PricingModel, VehicleType } from '@/lib/supabase/types';
 import { PRICING_MODEL_LABELS, CLASSIFICATION_LABELS, VEHICLE_TYPE_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
@@ -71,11 +72,10 @@ export default function NewServicePage() {
       pricing_model: 'vehicle_size',
       classification: 'primary',
       base_duration_minutes: 60,
-      flat_price: null,
-      custom_starting_price: null,
-      per_unit_price: null,
-      per_unit_max: null,
-      per_unit_label: '',
+      // Phase Money-Unify-3: pricing-model-specific money fields
+      // (flat_price, per_unit_*, custom_starting_price, scope/specialty tiers)
+      // live in `pricingValue` parent state, NOT in RHF. Conversion dollars→cents
+      // happens in onSubmit() at the DB write boundary.
       mobile_eligible: false,
       online_bookable: true,
       staff_assessed: false,
@@ -162,15 +162,16 @@ export default function NewServicePage() {
         display_order: formData.display_order,
       };
 
-      // Set model-specific fields on the service row
+      // Set model-specific fields on the service row. Form state is dollars;
+      // DB columns are integer cents — conversion at this boundary.
       if (formData.pricing_model === 'flat' && pricingValue.model === 'flat') {
-        servicePayload.flat_price = typeof pricingValue.data.flat_price === 'number' ? pricingValue.data.flat_price : null;
+        servicePayload.flat_price_cents = typeof pricingValue.data.flat_price === 'number' ? toCents(pricingValue.data.flat_price) : null;
       }
       if (formData.pricing_model === 'custom' && pricingValue.model === 'custom') {
-        servicePayload.custom_starting_price = typeof pricingValue.data.custom_starting_price === 'number' ? pricingValue.data.custom_starting_price : null;
+        servicePayload.custom_starting_price_cents = typeof pricingValue.data.custom_starting_price === 'number' ? toCents(pricingValue.data.custom_starting_price) : null;
       }
       if (formData.pricing_model === 'per_unit' && pricingValue.model === 'per_unit') {
-        servicePayload.per_unit_price = typeof pricingValue.data.per_unit_price === 'number' ? pricingValue.data.per_unit_price : null;
+        servicePayload.per_unit_price_cents = typeof pricingValue.data.per_unit_price === 'number' ? toCents(pricingValue.data.per_unit_price) : null;
         servicePayload.per_unit_max = typeof pricingValue.data.per_unit_max === 'number' ? pricingValue.data.per_unit_max : null;
         servicePayload.per_unit_label = pricingValue.data.per_unit_label || null;
       }
@@ -184,12 +185,16 @@ export default function NewServicePage() {
 
       if (serviceError) throw serviceError;
 
-      // Insert pricing rows if needed
+      // Insert pricing rows if needed — form state holds dollars; DB stores
+      // integer cents in `*_cents` columns. Conversion at every write.
+      const vsToCents = (aware: boolean, v: number | ''): number | null =>
+        aware && typeof v === 'number' ? toCents(v) : null;
+
       if (formData.pricing_model === 'vehicle_size' && pricingValue.model === 'vehicle_size') {
         const pricingRows = [
-          { service_id: service.id, tier_name: 'sedan', tier_label: 'Sedan', price: typeof pricingValue.data.sedan === 'number' ? pricingValue.data.sedan : 0, display_order: 0, is_vehicle_size_aware: false },
-          { service_id: service.id, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: typeof pricingValue.data.truck_suv_2row === 'number' ? pricingValue.data.truck_suv_2row : 0, display_order: 1, is_vehicle_size_aware: false },
-          { service_id: service.id, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: typeof pricingValue.data.suv_3row_van === 'number' ? pricingValue.data.suv_3row_van : 0, display_order: 2, is_vehicle_size_aware: false },
+          { service_id: service.id, tier_name: 'sedan', tier_label: 'Sedan', price_cents: typeof pricingValue.data.sedan === 'number' ? toCents(pricingValue.data.sedan) : 0, display_order: 0, is_vehicle_size_aware: false },
+          { service_id: service.id, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price_cents: typeof pricingValue.data.truck_suv_2row === 'number' ? toCents(pricingValue.data.truck_suv_2row) : 0, display_order: 1, is_vehicle_size_aware: false },
+          { service_id: service.id, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price_cents: typeof pricingValue.data.suv_3row_van === 'number' ? toCents(pricingValue.data.suv_3row_van) : 0, display_order: 2, is_vehicle_size_aware: false },
         ];
         const { error: pricingError } = await supabase.from('service_pricing').insert(pricingRows);
         if (pricingError) throw pricingError;
@@ -202,14 +207,14 @@ export default function NewServicePage() {
             service_id: service.id,
             tier_name: t.tier_name,
             tier_label: t.tier_label || null,
-            price: typeof t.price === 'number' ? t.price : 0,
+            price_cents: typeof t.price === 'number' ? toCents(t.price) : 0,
             display_order: i,
             is_vehicle_size_aware: t.is_vehicle_size_aware,
-            vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
-            vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
-            vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
-            vehicle_size_exotic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_exotic_price === 'number' ? t.vehicle_size_exotic_price : null,
-            vehicle_size_classic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_classic_price === 'number' ? t.vehicle_size_classic_price : null,
+            vehicle_size_sedan_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_sedan_price),
+            vehicle_size_truck_suv_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_truck_suv_price),
+            vehicle_size_suv_van_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_suv_van_price),
+            vehicle_size_exotic_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_exotic_price),
+            vehicle_size_classic_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_classic_price),
           }));
         if (pricingRows.length > 0) {
           const { error: pricingError } = await supabase.from('service_pricing').insert(pricingRows);
@@ -224,7 +229,7 @@ export default function NewServicePage() {
             service_id: service.id,
             tier_name: t.tier_name,
             tier_label: t.tier_label || null,
-            price: typeof t.price === 'number' ? t.price : 0,
+            price_cents: typeof t.price === 'number' ? toCents(t.price) : 0,
             display_order: i,
             is_vehicle_size_aware: false,
           }));

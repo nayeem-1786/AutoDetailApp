@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Package } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { AddToCartButton } from './cart/add-to-cart-button';
 import type { Product } from '@/lib/supabase/types';
@@ -14,8 +14,8 @@ interface ProductCardProps {
 export function ProductCard({ product, categorySlug }: ProductCardProps) {
   const href = `/products/${categorySlug}/${product.slug}`;
   const saleStatus = getSaleStatus(product);
-  const saleInfo = getTierSaleInfo(product.retail_price, product.sale_price, saleStatus.isOnSale);
-  const effectivePrice = saleInfo?.isDiscounted ? saleInfo.currentPrice : product.retail_price;
+  const saleInfo = getTierSaleInfo(product.retail_price_cents, product.sale_price_cents, saleStatus.isOnSale);
+  const effectivePrice = saleInfo?.isDiscounted ? saleInfo.currentPriceCents : product.retail_price_cents;
 
   return (
     <div className="group h-full overflow-hidden rounded-2xl bg-brand-surface border border-site-border transition-all duration-300 hover:border-accent-ui/30 hover:-translate-y-1 hover:shadow-accent-sm">
@@ -46,15 +46,15 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
             {saleInfo?.isDiscounted ? (
               <>
                 <span className="text-xs text-white/60 line-through mr-1.5">
-                  {formatCurrency(saleInfo.originalPrice)}
+                  {formatMoney(saleInfo.originalPriceCents)}
                 </span>
                 <span className="text-sm font-bold text-accent-brand">
-                  {formatCurrency(saleInfo.currentPrice)}
+                  {formatMoney(saleInfo.currentPriceCents)}
                 </span>
               </>
             ) : (
               <span className="text-sm font-bold text-accent-brand">
-                {formatCurrency(product.retail_price)}
+                {formatCurrency(product.retail_price_cents)}
               </span>
             )}
           </div>
@@ -79,7 +79,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
               name: product.name,
               slug: product.slug,
               categorySlug,
-              price: effectivePrice,
+              price_cents: effectivePrice,
               stockQuantity: product.quantity_on_hand,
               imageUrl: product.image_url,
             }}

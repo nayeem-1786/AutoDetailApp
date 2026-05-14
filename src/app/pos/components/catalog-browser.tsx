@@ -281,11 +281,11 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
         dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass, ...prereqExtra });
       }
       if (!onAddService) toast.success(`Added ${prereqService.name}`);
-    } else if (prereqService.flat_price != null) {
+    } else if (prereqService.flat_price_cents != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
-        price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
+        price_cents: prereqService.flat_price_cents, sale_price_cents: prereqService.sale_price_cents ?? null, display_order: 0, is_vehicle_size_aware: false,
+        vehicle_size_sedan_price_cents: null, vehicle_size_truck_suv_price_cents: null, vehicle_size_suv_van_price_cents: null, vehicle_size_exotic_price_cents: null, vehicle_size_classic_price_cents: null, max_qty: null, qty_label: null, created_at: '',
       };
       if (onAddService) {
         onAddService(prereqService, syntheticPricing, vehicleSizeClass);
@@ -352,7 +352,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       return;
     }
     // Per-unit services always need the quantity picker
-    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+    if (service.pricing_model === 'per_unit' && service.per_unit_price_cents != null) {
       setPickerService(service);
       return;
     }
@@ -372,21 +372,21 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     }
 
     // Quick-add: flat price (no pricing tiers)
-    if (pricing.length === 0 && service.flat_price != null) {
+    if (pricing.length === 0 && service.flat_price_cents != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat',
         service_id: service.id,
         tier_name: 'default',
         tier_label: null,
-        price: service.flat_price,
-        sale_price: service.sale_price ?? null,
+        price_cents: service.flat_price_cents,
+        sale_price_cents: service.sale_price_cents ?? null,
         display_order: 0,
         is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null,
-        vehicle_size_truck_suv_price: null,
-        vehicle_size_suv_van_price: null,
-        vehicle_size_exotic_price: null,
-        vehicle_size_classic_price: null,
+        vehicle_size_sedan_price_cents: null,
+        vehicle_size_truck_suv_price_cents: null,
+        vehicle_size_suv_van_price_cents: null,
+        vehicle_size_exotic_price_cents: null,
+        vehicle_size_classic_price_cents: null,
         max_qty: null,
         qty_label: null,
         created_at: '',
@@ -444,7 +444,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
 
   // Same as handleTapServiceDirect but without the vehicle compatibility check (used after user confirms compat warning)
   function handleTapServiceDirectUnchecked(service: CatalogService) {
-    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+    if (service.pricing_model === 'per_unit' && service.per_unit_price_cents != null) {
       setPickerService(service);
       return;
     }
@@ -459,11 +459,11 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       quickAdd(service, pricing[0], vehicleSizeClass);
       return;
     }
-    if (pricing.length === 0 && service.flat_price != null) {
+    if (pricing.length === 0 && service.flat_price_cents != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: service.id, tier_name: 'default', tier_label: null,
-        price: service.flat_price, sale_price: service.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
+        price_cents: service.flat_price_cents, sale_price_cents: service.sale_price_cents ?? null, display_order: 0, is_vehicle_size_aware: false,
+        vehicle_size_sedan_price_cents: null, vehicle_size_truck_suv_price_cents: null, vehicle_size_suv_van_price_cents: null, vehicle_size_exotic_price_cents: null, vehicle_size_classic_price_cents: null, max_qty: null, qty_label: null, created_at: '',
       };
       quickAdd(service, syntheticPricing, vehicleSizeClass);
       return;

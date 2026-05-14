@@ -19,7 +19,8 @@ import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { categoryToCompatibilityKey } from '@/lib/utils/vehicle-categories';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { fromCents } from '@/lib/utils/money';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { buildPaymentInfo, buildDepositInfo } from '@/lib/sms/composites';
 
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Validate the primary service price
     const expectedPrice = computeExpectedPrice(serviceRow, data.tier_name, data.vehicle?.size_class);
-    if (expectedPrice !== null && Math.abs(expectedPrice - data.price) > 0.01) {
+    if (expectedPrice !== null && Math.abs(expectedPrice - data.price_cents) > 0.01) {
       return NextResponse.json(
         { error: 'Price mismatch — please refresh and try again' },
         { status: 400 }
@@ -262,8 +263,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 6. Calculate totals
-    const addonTotal = data.addons.reduce((sum, a) => sum + a.price, 0);
+    // ════════════════════════════════════════════════════════════════
+    // Phase Money-Unify-3 — DIRECTIONALITY DECISION (cents → dollars at entry)
+    // ════════════════════════════════════════════════════════════════
+    //
+    // Catalog wire (Family D) is cents — bookingSubmitSchema.price_cents +
+    // addons[].price_cents arrive as integer cents. But every downstream
+    // DB write target — Family C (appointments.subtotal, total_amount,
+    // discount_amount, mobile_surcharge, deposit_amount, coupon_discount,
+    // appointment_services.price_at_booking) and Family A (transactions.*,
+    // transaction_items.*, payments.amount) — is still NUMERIC(10,2)
+    // dollars until Unify-5 / Unify-6.
+    //
+    // Two directionality choices were considered:
+    //
+    //   (a) "cents-canonical math + fromCents at each write site"
+    //       Pros: matches the long-term end-state model.
+    //       Cons: ~15 fromCents() conversion sites in this route alone;
+    //             every dollar column write becomes a shim.
+    //
+    //   (b) "fromCents at entry + dollar math + dollar writes"  ← CHOSEN
+    //       Pros: 2 conversion sites (here); body math stays in the unit
+    //             of the columns being written.
+    //       Cons: temporary dollar intermediate; reversed at Unify-5/6.
+    //
+    // Option (b) chosen because the dollar-target write surface (~15 sites)
+    // outnumbers the entry boundary (2 sites: primary service + addon
+    // reduce). Inverting the directionality at Unify-5/6 means removing
+    // these 2 fromCents() lines + the matching fromCents() at each
+    // `price_at_booking` / `unit_price` / `total_price` / `standard_price`
+    // write — a mechanical sweep. Search markers: `TODO Unify-6` for
+    // appointment_services + appointment column writes (8 markers in this
+    // file), `TODO Unify-5` for transaction_items writes (6 markers in
+    // this file).
+    const primaryServiceDollars = fromCents(data.price_cents);
+    const addonTotalDollars = data.addons.reduce((sum, a) => sum + fromCents(a.price_cents), 0);
 
     // Reject mobile bookings when mobile_service flag is off
     if (data.is_mobile && !await isFeatureEnabled(FEATURE_FLAGS.MOBILE_SERVICE)) {
@@ -308,7 +342,7 @@ export async function POST(request: NextRequest) {
       mobileZoneNameSnapshot = zone.name;
     }
 
-    const subtotal = data.price + addonTotal + mobileSurcharge;
+    const subtotal = primaryServiceDollars + addonTotalDollars + mobileSurcharge;
     const scheduledEndTime = addMinutesToTime(
       data.time,
       data.duration_minutes + APPOINTMENT.BUFFER_MINUTES
@@ -374,17 +408,22 @@ export async function POST(request: NextRequest) {
     }
 
     // 8. Create appointment_services rows (primary + addons)
+    // TODO Unify-6: appointment_services.price_at_booking is Family C
+    // (still dollars). When that family migrates to cents, switch to
+    // writing data.price_cents / addon.price_cents directly without
+    // fromCents(). See docs/sessions/money-unify-0-migration-playbook-v3.md
+    // §Family C.
     const serviceRows = [
       {
         appointment_id: appointment.id,
         service_id: data.service_id,
-        price_at_booking: data.price,
+        price_at_booking: fromCents(data.price_cents),
         tier_name: data.tier_name || null,
       },
       ...data.addons.map((addon) => ({
         appointment_id: appointment.id,
         service_id: addon.service_id,
-        price_at_booking: addon.price,
+        price_at_booking: fromCents(addon.price_cents),
         tier_name: addon.tier_name || null,
       })),
     ];
@@ -442,6 +481,10 @@ export async function POST(request: NextRequest) {
             ? data.vehicle.size_class
             : null;
 
+          // TODO Unify-5: transaction_items.unit_price / total_price /
+          // standard_price are Family A (still dollars). When that family
+          // migrates, switch to writing data.price_cents / addon.price_cents
+          // directly and rename columns to `*_cents`. See playbook §Family A.
           const lineItems = [
             {
               transaction_id: depositTx.id,
@@ -451,14 +494,14 @@ export async function POST(request: NextRequest) {
               package_id: null,
               item_name: serviceRow.name as string,
               quantity: 1,
-              unit_price: data.price,
-              total_price: data.price,
+              unit_price: fromCents(data.price_cents),
+              total_price: fromCents(data.price_cents),
               tax_amount: 0,
               is_taxable: false,
               tier_name: data.tier_name || null,
               vehicle_size_class: sizeClass,
               notes: null,
-              standard_price: data.price,
+              standard_price: fromCents(data.price_cents),
               pricing_type: 'standard',
               is_addon: false,
               prerequisite_note: null,
@@ -471,14 +514,14 @@ export async function POST(request: NextRequest) {
               package_id: null,
               item_name: addon.name,
               quantity: 1,
-              unit_price: addon.price,
-              total_price: addon.price,
+              unit_price: fromCents(addon.price_cents),
+              total_price: fromCents(addon.price_cents),
               tax_amount: 0,
               is_taxable: false,
               tier_name: addon.tier_name || null,
               vehicle_size_class: sizeClass,
               notes: null,
-              standard_price: addon.price,
+              standard_price: fromCents(addon.price_cents),
               pricing_type: 'standard',
               is_addon: true,
               prerequisite_note: null,
@@ -593,14 +636,16 @@ export async function POST(request: NextRequest) {
         {
           id: data.service_id,
           name: serviceRow.name as string,
-          price: data.price,
+          // n8n webhook wire stays dollars for backward compatibility with
+          // existing automations. Convert at this boundary.
+          price: fromCents(data.price_cents),
           tier_name: data.tier_name || null,
           is_primary: true,
         },
         ...data.addons.map((addon) => ({
           id: addon.service_id,
           name: addon.name,
-          price: addon.price,
+          price: fromCents(addon.price_cents),
           tier_name: addon.tier_name || null,
           is_primary: false,
         })),
@@ -721,8 +766,8 @@ export async function POST(request: NextRequest) {
       if (data.customer.email) {
         const serviceRowsHtml = allServices
           .map((name, i) => {
-            const price = i === 0 ? data.price : data.addons[i - 1]?.price ?? 0;
-            return `<tr><td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;">${name}</td><td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatCurrency(price)}</td></tr>`;
+            const priceCents = i === 0 ? data.price_cents : data.addons[i - 1]?.price_cents ?? 0;
+            return `<tr><td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;">${name}</td><td style="padding:8px 16px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatMoney(priceCents)}</td></tr>`;
           })
           .join('');
         const servicesTableHtml = `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:#f3f4f6;"><th style="padding:8px 16px;text-align:left;font-size:12px;text-transform:uppercase;">Service</th><th style="padding:8px 16px;text-align:right;font-size:12px;text-transform:uppercase;">Price</th></tr></thead><tbody>${serviceRowsHtml}</tbody></table>`;
@@ -875,12 +920,12 @@ ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
 function computeExpectedPrice(
   service: {
     pricing_model: string;
-    flat_price: number | null;
-    sale_price: number | null;
+    flat_price_cents: number | null;
+    sale_price_cents: number | null;
     sale_starts_at: string | null;
     sale_ends_at: string | null;
-    per_unit_price: number | null;
-    service_pricing: { tier_name: string; price: number; sale_price: number | null; is_vehicle_size_aware: boolean; vehicle_size_sedan_price: number | null; vehicle_size_truck_suv_price: number | null; vehicle_size_suv_van_price: number | null }[];
+    per_unit_price_cents: number | null;
+    service_pricing: { tier_name: string; price_cents: number; sale_price_cents: number | null; is_vehicle_size_aware: boolean; vehicle_size_sedan_price_cents: number | null; vehicle_size_truck_suv_price_cents: number | null; vehicle_size_suv_van_price_cents: number | null }[];
   },
   tierName: string | null | undefined,
   sizeClass: string | null | undefined
@@ -892,10 +937,10 @@ function computeExpectedPrice(
 
   switch (service.pricing_model) {
     case 'flat':
-      if (isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price) {
-        return service.sale_price;
+      if (isOnSale && service.sale_price_cents != null && service.flat_price_cents != null && service.sale_price_cents < service.flat_price_cents) {
+        return service.sale_price_cents;
       }
-      return service.flat_price;
+      return service.flat_price_cents;
 
     case 'vehicle_size':
     case 'scope':
@@ -904,14 +949,14 @@ function computeExpectedPrice(
       const tier = service.service_pricing.find((t) => t.tier_name === tierName);
       if (!tier) return null;
       if (tier.is_vehicle_size_aware && sizeClass) {
-        if (sizeClass === 'sedan') return tier.vehicle_size_sedan_price;
-        if (sizeClass === 'truck_suv_2row') return tier.vehicle_size_truck_suv_price;
-        if (sizeClass === 'suv_3row_van') return tier.vehicle_size_suv_van_price;
+        if (sizeClass === 'sedan') return tier.vehicle_size_sedan_price_cents;
+        if (sizeClass === 'truck_suv_2row') return tier.vehicle_size_truck_suv_price_cents;
+        if (sizeClass === 'suv_3row_van') return tier.vehicle_size_suv_van_price_cents;
       }
-      if (isOnSale && tier.sale_price != null && tier.sale_price < tier.price) {
-        return tier.sale_price;
+      if (isOnSale && tier.sale_price_cents != null && tier.sale_price_cents < tier.price_cents) {
+        return tier.sale_price_cents;
       }
-      return tier.price;
+      return tier.price_cents;
     }
 
     case 'per_unit':

@@ -7,30 +7,30 @@ import { getSaleStatus, type SaleWindow } from '@/lib/utils/sale-pricing';
  *
  * Session 29: size_class is 5-value ('sedan' | 'truck_suv_2row' | 'suv_3row_van' |
  * 'exotic' | 'classic'). Exotic and classic are first-class members — no special
- * dispatch needed. A missing per-size column (e.g., vehicle_size_exotic_price on a
- * service that only has sedan/truck/van fan-out configured) falls back to pricing.price.
+ * dispatch needed. A missing per-size column (e.g., vehicle_size_exotic_price_cents on a
+ * service that only has sedan/truck/van fan-out configured) falls back to pricing.price_cents.
  */
 export function resolveServicePrice(
   pricing: ServicePricing,
   vehicleSizeClass: VehicleSizeClass | null
 ): number {
   if (!pricing.is_vehicle_size_aware || !vehicleSizeClass) {
-    return pricing.price;
+    return pricing.price_cents;
   }
 
   switch (vehicleSizeClass) {
     case 'sedan':
-      return pricing.vehicle_size_sedan_price ?? pricing.price;
+      return pricing.vehicle_size_sedan_price_cents ?? pricing.price_cents;
     case 'truck_suv_2row':
-      return pricing.vehicle_size_truck_suv_price ?? pricing.price;
+      return pricing.vehicle_size_truck_suv_price_cents ?? pricing.price_cents;
     case 'suv_3row_van':
-      return pricing.vehicle_size_suv_van_price ?? pricing.price;
+      return pricing.vehicle_size_suv_van_price_cents ?? pricing.price_cents;
     case 'exotic':
-      return pricing.vehicle_size_exotic_price ?? pricing.price;
+      return pricing.vehicle_size_exotic_price_cents ?? pricing.price_cents;
     case 'classic':
-      return pricing.vehicle_size_classic_price ?? pricing.price;
+      return pricing.vehicle_size_classic_price_cents ?? pricing.price_cents;
     default:
-      return pricing.price;
+      return pricing.price_cents;
   }
 }
 
@@ -51,16 +51,16 @@ export function resolveServicePriceWithSale(
   saleWindow: SaleWindow | null
 ): ResolvedPrice {
   const standardPrice = resolveServicePrice(pricing, vehicleSizeClass);
-  if (!saleWindow || !pricing.sale_price) {
+  if (!saleWindow || !pricing.sale_price_cents) {
     return { standardPrice, effectivePrice: standardPrice, isOnSale: false, saleSavings: 0 };
   }
   const { isOnSale } = getSaleStatus(saleWindow);
-  if (isOnSale && pricing.sale_price < standardPrice) {
+  if (isOnSale && pricing.sale_price_cents < standardPrice) {
     return {
       standardPrice,
-      effectivePrice: pricing.sale_price,
+      effectivePrice: pricing.sale_price_cents,
       isOnSale: true,
-      saleSavings: standardPrice - pricing.sale_price,
+      saleSavings: standardPrice - pricing.sale_price_cents,
     };
   }
   return { standardPrice, effectivePrice: standardPrice, isOnSale: false, saleSavings: 0 };
@@ -72,15 +72,15 @@ export function resolveServicePriceWithSale(
  */
 export function getServicePriceRange(pricing: ServicePricing): [number, number] {
   if (!pricing.is_vehicle_size_aware) {
-    return [pricing.price, pricing.price];
+    return [pricing.price_cents, pricing.price_cents];
   }
 
   const prices = [
-    pricing.vehicle_size_sedan_price ?? pricing.price,
-    pricing.vehicle_size_truck_suv_price ?? pricing.price,
-    pricing.vehicle_size_suv_van_price ?? pricing.price,
-    pricing.vehicle_size_exotic_price ?? pricing.price,
-    pricing.vehicle_size_classic_price ?? pricing.price,
+    pricing.vehicle_size_sedan_price_cents ?? pricing.price_cents,
+    pricing.vehicle_size_truck_suv_price_cents ?? pricing.price_cents,
+    pricing.vehicle_size_suv_van_price_cents ?? pricing.price_cents,
+    pricing.vehicle_size_exotic_price_cents ?? pricing.price_cents,
+    pricing.vehicle_size_classic_price_cents ?? pricing.price_cents,
   ];
 
   return [Math.min(...prices), Math.max(...prices)];

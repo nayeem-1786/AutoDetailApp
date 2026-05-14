@@ -14,7 +14,7 @@ interface OrderItem {
 interface Product {
   id: string;
   quantity_on_hand: number;
-  cost_price: number | null;
+  cost_price_cents: number | null;
 }
 
 const state = {
@@ -162,8 +162,8 @@ describe('POST /api/admin/orders/[id]/refund', () => {
         { id: 'oi-2', product_id: 'prod-B', quantity: 5 } as OrderItem,
       ],
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 10, cost_price: 4.5 });
-    state.products.set('prod-B', { id: 'prod-B', quantity_on_hand: 100, cost_price: null });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 10, cost_price_cents: 450 });
+    state.products.set('prod-B', { id: 'prod-B', quantity_on_hand: 100, cost_price_cents: null });
 
     const res = await POST(req({}), params); // no body.amount → full refund
 
@@ -213,7 +213,7 @@ describe('POST /api/admin/orders/[id]/refund', () => {
       stripe_payment_intent_id: 'pi_123',
       order_items: [{ id: 'oi-1', product_id: 'prod-A', quantity: 2 } as OrderItem],
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 10, cost_price: 4.5 });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 10, cost_price_cents: 450 });
 
     const res = await POST(req({ amount: 1000 }), params); // $10 of $50
 
@@ -241,7 +241,7 @@ describe('POST /api/admin/orders/[id]/refund', () => {
         { id: 'oi-2', product_id: 'prod-A', quantity: 3 } as OrderItem,
       ],
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 5, cost_price: null });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 5, cost_price_cents: null });
 
     const res = await POST(req({}), params);
 
@@ -271,7 +271,7 @@ describe('POST /api/admin/orders/[id]/refund', () => {
       stripe_payment_intent_id: 'pi_123',
       order_items: [{ id: 'oi-1', product_id: 'prod-A', quantity: 1 } as OrderItem],
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 5, cost_price: null });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 5, cost_price_cents: null });
     state.stripeShouldThrow = true;
 
     const res = await POST(req({}), params);

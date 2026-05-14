@@ -184,7 +184,7 @@ export function StepConfirmBook({
   // --- Price calculations ---
   const REDEEM_MINIMUM = 100;
 
-  const addonTotal = addons.reduce((sum, a) => sum + a.price, 0);
+  const addonTotal = addons.reduce((sum, a) => sum + a.price_cents, 0);
   const subtotal = price + addonTotal + mobileSurcharge;
   const couponDiscount = appliedCoupon?.discount ?? 0;
   const loyaltyDiscount = loyaltyPointsToUse * LOYALTY.REDEEM_RATE;
@@ -231,7 +231,7 @@ export function StepConfirmBook({
       const customerEmail = customerData?.customer.email ?? '';
       const services = [
         { service_id: serviceId, name: serviceName, price },
-        ...addons.map((a) => ({ service_id: a.service_id, name: a.name, price: a.price })),
+        ...addons.map((a) => ({ service_id: a.service_id, name: a.name, price: a.price_cents })),
       ];
 
       const res = await fetch('/api/book/validate-coupon', {
@@ -484,7 +484,7 @@ export function StepConfirmBook({
       {addons.map((addon) => (
         <div key={addon.service_id} className="flex justify-between">
           <span className="text-site-text-secondary">{addon.name}</span>
-          <span className="font-medium text-site-text">{formatCurrency(addon.price)}</span>
+          <span className="font-medium text-site-text">{formatCurrency(addon.price_cents)}</span>
         </div>
       ))}
       {mobileSurcharge > 0 && (

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { LOYALTY } from '@/lib/utils/constants';
-import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
+import { STRIPE_MIN_DOLLARS, toCents, fromCents } from '@/lib/utils/money';
 import { StepIndicator } from './step-indicator';
 import { StepVehicle, type VehicleSelection } from './step-vehicle';
 import { StepServiceSelect, type ConfigureResult } from './step-service-select';
@@ -291,7 +291,9 @@ export function BookingWizard({
             tier_label: rebookData.tier_name
               ? (rebookService.service_pricing.find((t) => t.tier_name === rebookData.tier_name)?.tier_label ?? null)
               : null,
-            price: 0,
+            // Rebook stub — actual price_cents is recomputed when the user
+            // re-confirms the tier in Step 2 (StepServiceSelect).
+            price_cents: 0,
             is_mobile: rebookData.is_mobile,
             mobile_zone_id: rebookData.mobile_zone_id ?? null,
             mobile_address: rebookData.mobile_address ?? null,
@@ -388,7 +390,7 @@ export function BookingWizard({
 
     switch (service.pricing_model) {
       case 'flat':
-        price = service.flat_price ?? 0;
+        price = service.flat_price_cents ?? 0;
         break;
 
       case 'vehicle_size': {
@@ -396,12 +398,12 @@ export function BookingWizard({
           const tier = tiers.find((t) => t.tier_name === vehicleSize);
           if (tier) {
             tier_name = tier.tier_name;
-            price = tier.price;
+            price = tier.price_cents;
           }
         }
         if (!price && tiers.length > 0) {
           tier_name = tiers[0].tier_name;
-          price = tiers[0].price;
+          price = tiers[0].price_cents;
           size_class = tiers[0].tier_name as VehicleSizeClass;
         }
         break;
@@ -413,20 +415,20 @@ export function BookingWizard({
           const tier = tiers[0];
           tier_name = tier.tier_name;
           if (tier.is_vehicle_size_aware && vehicleSize) {
-            const vp = vehicleSize === 'sedan' ? tier.vehicle_size_sedan_price
-              : vehicleSize === 'truck_suv_2row' ? tier.vehicle_size_truck_suv_price
-              : vehicleSize === 'suv_3row_van' ? tier.vehicle_size_suv_van_price
+            const vp = vehicleSize === 'sedan' ? tier.vehicle_size_sedan_price_cents
+              : vehicleSize === 'truck_suv_2row' ? tier.vehicle_size_truck_suv_price_cents
+              : vehicleSize === 'suv_3row_van' ? tier.vehicle_size_suv_van_price_cents
               : null;
-            price = vp ?? tier.price;
+            price = vp ?? tier.price_cents;
           } else {
-            price = tier.price;
+            price = tier.price_cents;
           }
         }
         break;
       }
 
       case 'per_unit':
-        price = service.per_unit_price ?? 0;
+        price = service.per_unit_price_cents ?? 0;
         break;
 
       default:
@@ -445,7 +447,12 @@ export function BookingWizard({
             return {
               service_id: id,
               name: addonSvc.name,
-              price: suggestion.combo_price ?? addonSvc.flat_price ?? 0,
+              // combo_price is Family C dollars; flat_price_cents is Family D cents.
+              // TODO Unify-7: replace toCents() shim when service_addon_suggestions
+              // migrates combo_price to cents.
+              price_cents: suggestion.combo_price != null
+                ? toCents(Number(suggestion.combo_price))
+                : addonSvc.flat_price_cents ?? 0,
               tier_name: null,
             };
           }
@@ -460,7 +467,7 @@ export function BookingWizard({
     return {
       tier_name,
       tier_label,
-      price,
+      price_cents: price,
       size_class,
       is_mobile: false,
       mobile_zone_id: null,
@@ -859,8 +866,8 @@ export function BookingWizard({
   function handleCouponApply(coupon: AppliedCoupon | null) {
     setState((prev) => {
       const couponDiscount = coupon?.discount ?? 0;
-      const subtotal = (prev.config?.price ?? 0) +
-        (prev.config?.addons ?? []).reduce((sum, a) => sum + a.price, 0) +
+      const subtotal = (prev.config?.price_cents ?? 0) +
+        (prev.config?.addons ?? []).reduce((sum, a) => sum + a.price_cents, 0) +
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
@@ -880,8 +887,8 @@ export function BookingWizard({
   function handleLoyaltyPointsChange(points: number) {
     setState((prev) => {
       const couponDiscount = prev.appliedCoupon?.discount ?? 0;
-      const subtotal = (prev.config?.price ?? 0) +
-        (prev.config?.addons ?? []).reduce((sum, a) => sum + a.price, 0) +
+      const subtotal = (prev.config?.price_cents ?? 0) +
+        (prev.config?.addons ?? []).reduce((sum, a) => sum + a.price_cents, 0) +
         (prev.config?.mobile_surcharge ?? 0);
       const remainingAfterCoupon = subtotal - couponDiscount;
 
@@ -907,8 +914,8 @@ export function BookingWizard({
 
     const loyaltyDiscount = loyaltyPointsToUse * LOYALTY.REDEEM_RATE;
 
-    const grandTotal = config.price +
-      config.addons.reduce((sum, a) => sum + a.price, 0) +
+    const grandTotal = config.price_cents +
+      config.addons.reduce((sum, a) => sum + a.price_cents, 0) +
       (config.mobile_surcharge ?? 0) -
       (appliedCoupon?.discount ?? 0) -
       loyaltyDiscount;
@@ -932,7 +939,7 @@ export function BookingWizard({
     const body = {
       service_id: service.id,
       tier_name: config.tier_name,
-      price: config.price,
+      price: config.price_cents,
       date,
       time,
       duration_minutes: service.base_duration_minutes,
@@ -948,7 +955,7 @@ export function BookingWizard({
       addons: config.addons.map((a) => ({
         service_id: a.service_id,
         name: a.name,
-        price: a.price,
+        price: a.price_cents,
         tier_name: a.tier_name,
       })),
       channel: isPortal ? 'portal' as const : 'online' as const,
@@ -1024,16 +1031,19 @@ export function BookingWizard({
     return null;
   }
 
-  // Build order summary for step 3
+  // Build order summary for step 3. Catalog amounts are cents; mobile_surcharge
+  // is Family C dollars (until Unify-6). Total is in dollars to match the
+  // appointment-row write contract; convert catalog cents → dollars at this
+  // boundary.
   const orderSummary = state.service && state.config ? {
     serviceName: state.service.name,
     tierName: state.config.tier_label ?? state.config.tier_name ?? null,
-    price: state.config.price,
-    addons: (state.config.addons ?? []).map(a => ({ name: a.name, price: a.price })),
+    price_cents: state.config.price_cents,
+    addons: (state.config.addons ?? []).map(a => ({ name: a.name, price_cents: a.price_cents })),
     mobileSurcharge: state.config.mobile_surcharge ?? 0,
-    total: (state.config.price) +
-      (state.config.addons ?? []).reduce((s, a) => s + a.price, 0) +
-      (state.config.mobile_surcharge ?? 0),
+    total: fromCents(state.config.price_cents)
+      + (state.config.addons ?? []).reduce((s, a) => s + fromCents(a.price_cents), 0)
+      + (state.config.mobile_surcharge ?? 0),
     durationMinutes: totalDuration,
     vehicleDescription: state.vehicleData
       ? [state.vehicleData.year, state.vehicleData.color, state.vehicleData.make, state.vehicleData.model].filter(Boolean).join(' ') || null
@@ -1126,7 +1136,7 @@ export function BookingWizard({
             serviceName={state.service.name}
             serviceId={state.service.id}
             tierName={state.config.tier_label ?? state.config.tier_name}
-            price={state.config.price}
+            price={state.config.price_cents}
             durationMinutes={totalDuration}
             isMobile={state.config.is_mobile}
             mobileAddress={state.config.mobile_address}

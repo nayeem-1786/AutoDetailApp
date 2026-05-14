@@ -5,7 +5,6 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
-import { fromCents } from '@/lib/utils/money';
 
 interface ReceiveItem {
   item_id: string;
@@ -113,18 +112,11 @@ export async function POST(
       const quantityAfter = quantityBefore + receiveItem.quantity_received;
 
       // Update product stock AND cost price
-      // TODO Unify-D: when Family D migrates products.cost_price to
-      // cents, replace fromCents() with direct cents assignment and
-      // rename cost_price → cost_price_cents. See docs/sessions/money-
-      // unify-0-migration-playbook-v2.md §Family D.
       await admin
         .from('products')
         .update({
           quantity_on_hand: quantityAfter,
-          cost_price:
-            poItem.unit_cost_cents != null
-              ? fromCents(poItem.unit_cost_cents)
-              : null,
+          cost_price_cents: poItem.unit_cost_cents ?? null,
         })
         .eq('id', poItem.product_id);
 

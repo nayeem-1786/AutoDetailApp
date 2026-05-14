@@ -73,11 +73,11 @@ export default function ProductDetailPage() {
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
 
   // Variant group state
-  const [variants, setVariants] = useState<{ id: string; name: string; variant_label: string | null; retail_price: number; quantity_on_hand: number; image_url: string | null }[]>([]);
+  const [variants, setVariants] = useState<{ id: string; name: string; variant_label: string | null; retail_price_cents: number; quantity_on_hand: number; image_url: string | null }[]>([]);
   const [variantsLoading, setVariantsLoading] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupSearch, setGroupSearch] = useState('');
-  const [groupSearchResults, setGroupSearchResults] = useState<{ id: string; name: string; retail_price: number; vendor_name: string | null }[]>([]);
+  const [groupSearchResults, setGroupSearchResults] = useState<{ id: string; name: string; retail_price_cents: number; vendor_name: string | null }[]>([]);
   const [groupSelectedIds, setGroupSelectedIds] = useState<string[]>([]);
   const [groupCreating, setGroupCreating] = useState(false);
 
@@ -169,9 +169,11 @@ export default function ProductDetailPage() {
         .order('sort_order');
       if (imgData) setProductImages(imgData);
 
-      // Load cost history from PO receiving
+      // Load cost history from PO receiving (Unify-3 fixed table-name typo
+      // — see post-epic followups #11; previously queried 'po_items' which
+      // does not exist).
       const { data: poItems } = await supabase
-        .from('po_items')
+        .from('purchase_order_items')
         .select('unit_cost_cents, quantity_received, purchase_order_id, purchase_orders(id, po_number, received_at)')
         .eq('product_id', productId)
         .gt('quantity_received', 0)
@@ -208,8 +210,8 @@ export default function ProductDetailPage() {
         description: p.description || '',
         category_id: p.category_id || null,
         vendor_id: p.vendor_id || null,
-        cost_price: p.cost_price,
-        retail_price: p.retail_price,
+        cost_price_cents: p.cost_price_cents,
+        retail_price_cents: p.retail_price_cents,
         reorder_threshold: p.reorder_threshold ?? null,
         min_order_qty: p.min_order_qty ?? null,
         is_taxable: p.is_taxable,
@@ -248,7 +250,7 @@ export default function ProductDetailPage() {
         .then(({ data: draft }: { data: { id: string } | null }) => setPendingDraftId(draft?.id ?? null));
 
       // Populate sale pricing
-      setSalePrice(p.sale_price ?? '');
+      setSalePrice(p.sale_price_cents ?? '');
       setSaleStartsAt(p.sale_starts_at ? new Date(p.sale_starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
       setSaleEndsAt(p.sale_ends_at ? new Date(p.sale_ends_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
       setSaleDiscountType('direct');
@@ -265,7 +267,7 @@ export default function ProductDetailPage() {
     if (typeof saleDiscountValue !== 'number' || saleDiscountValue <= 0) return;
     if (!product) return;
 
-    const std = product.retail_price;
+    const std = product.retail_price_cents;
     if (std <= 0) return;
 
     const newPrice = saleDiscountType === 'percentage'
@@ -469,8 +471,8 @@ export default function ProductDetailPage() {
           description: data.description || null,
           category_id: data.category_id || null,
           vendor_id: data.vendor_id || null,
-          cost_price: data.cost_price,
-          retail_price: data.retail_price,
+          cost_price_cents: data.cost_price_cents,
+          retail_price_cents: data.retail_price_cents,
           reorder_threshold: data.reorder_threshold ?? null,
           min_order_qty: data.min_order_qty ?? null,
           is_taxable: data.is_taxable,
@@ -593,8 +595,8 @@ export default function ProductDetailPage() {
     setSavingSale(true);
     try {
       if (salePrice !== '' && typeof salePrice === 'number') {
-        if (salePrice >= product.retail_price) {
-          toast.error(`Sale price must be less than retail price (${formatCurrency(product.retail_price)})`);
+        if (salePrice >= product.retail_price_cents) {
+          toast.error(`Sale price must be less than retail price (${formatCurrency(product.retail_price_cents)})`);
           setSavingSale(false);
           return;
         }
@@ -612,7 +614,7 @@ export default function ProductDetailPage() {
       const { error } = await supabase
         .from('products')
         .update({
-          sale_price: sp,
+          sale_price_cents: sp,
           sale_starts_at: startTs,
           sale_ends_at: endTs,
         })
@@ -629,7 +631,7 @@ export default function ProductDetailPage() {
         .single();
       if (updated) {
         setProduct(updated as ProductWithRelations);
-        setSalePrice(updated.sale_price ?? '');
+        setSalePrice(updated.sale_price_cents ?? '');
         setSaleStartsAt(updated.sale_starts_at ? new Date(updated.sale_starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
         setSaleEndsAt(updated.sale_ends_at ? new Date(updated.sale_ends_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
       }
@@ -646,7 +648,7 @@ export default function ProductDetailPage() {
     try {
       const { error } = await supabase
         .from('products')
-        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
+        .update({ sale_price_cents: null, sale_starts_at: null, sale_ends_at: null })
         .eq('id', productId);
       if (error) throw error;
       toast.success('Sale pricing cleared');
@@ -655,7 +657,7 @@ export default function ProductDetailPage() {
       setSaleEndsAt('');
       setShowClearSaleDialog(false);
       if (product) {
-        setProduct({ ...product, sale_price: null, sale_starts_at: null, sale_ends_at: null });
+        setProduct({ ...product, sale_price_cents: null, sale_starts_at: null, sale_ends_at: null });
       }
     } catch (err) {
       console.error('Failed to clear sale pricing:', err);
@@ -843,23 +845,23 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              <FormField label="Cost Price" error={errors.cost_price?.message} required htmlFor="cost_price">
+              <FormField label="Cost Price" error={errors.cost_price_cents?.message} required htmlFor="cost_price_cents">
                 <Input
-                  id="cost_price"
+                  id="cost_price_cents"
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*\.?[0-9]*"
-                  {...register('cost_price')}
+                  {...register('cost_price_cents')}
                 />
               </FormField>
 
-              <FormField label="Retail Price" error={errors.retail_price?.message} required htmlFor="retail_price">
+              <FormField label="Retail Price" error={errors.retail_price_cents?.message} required htmlFor="retail_price_cents">
                 <Input
-                  id="retail_price"
+                  id="retail_price_cents"
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*\.?[0-9]*"
-                  {...register('retail_price')}
+                  {...register('retail_price_cents')}
                 />
               </FormField>
 
@@ -1033,7 +1035,7 @@ export default function ProductDetailPage() {
                             <p className="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{v.name}</p>
                             <div className="flex gap-2 text-xs text-gray-500">
                               {v.variant_label && <span className="font-medium">{v.variant_label}</span>}
-                              <span>{formatCurrency(v.retail_price)}</span>
+                              <span>{formatCurrency(v.retail_price_cents)}</span>
                               <span>{v.quantity_on_hand > 0 ? `${v.quantity_on_hand} in stock` : 'Out of stock'}</span>
                             </div>
                           </Link>
@@ -1081,7 +1083,7 @@ export default function ProductDetailPage() {
                           if (value.trim().length < 2) { setGroupSearchResults([]); return; }
                           const { data } = await supabase
                             .from('products')
-                            .select('id, name, retail_price, vendors(name)')
+                            .select('id, name, retail_price_cents, vendors(name)')
                             .eq('is_active', true)
                             .is('product_group_id', null)
                             .neq('id', productId)
@@ -1090,7 +1092,7 @@ export default function ProductDetailPage() {
                           setGroupSearchResults((data ?? []).map((p: Record<string, unknown>) => ({
                             id: p.id as string,
                             name: p.name as string,
-                            retail_price: p.retail_price as number,
+                            retail_price_cents: p.retail_price_cents as number,
                             vendor_name: (p.vendors as { name: string } | null)?.name ?? null,
                           })));
                         }}
@@ -1112,7 +1114,7 @@ export default function ProductDetailPage() {
                               >
                                 <div>
                                   <p className="font-medium text-gray-900">{r.name}</p>
-                                  <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatCurrency(r.retail_price)}</p>
+                                  <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatCurrency(r.retail_price_cents)}</p>
                                 </div>
                                 {selected && <Badge variant="secondary">Selected</Badge>}
                               </button>
@@ -1292,8 +1294,8 @@ export default function ProductDetailPage() {
                                 description: p.description || '',
                                 category_id: p.category_id || null,
                                 vendor_id: p.vendor_id || null,
-                                cost_price: p.cost_price,
-                                retail_price: p.retail_price,
+                                cost_price_cents: p.cost_price_cents,
+                                retail_price_cents: p.retail_price_cents,
                                 reorder_threshold: p.reorder_threshold ?? null,
                                 min_order_qty: p.min_order_qty ?? null,
                                 is_taxable: p.is_taxable,
@@ -1635,9 +1637,9 @@ function ProductSalePricingCard({
   discountValue: number | '';
   setDiscountValue: (v: number | '') => void;
 }) {
-  const hasDbSale = product.sale_price !== null;
+  const hasDbSale = product.sale_price_cents !== null;
   const hasSaleInput = salePrice !== '' && typeof salePrice === 'number';
-  const hasError = hasSaleInput && salePrice >= product.retail_price;
+  const hasError = hasSaleInput && salePrice >= product.retail_price_cents;
 
   const saleStatus = getSaleStatus({
     sale_starts_at: product.sale_starts_at,
@@ -1648,7 +1650,7 @@ function ProductSalePricingCard({
   const endingSoon = isEndingSoon(saleStatus.saleEndsAt);
 
   const info = hasSaleInput
-    ? getTierSaleInfo(product.retail_price, salePrice, true)
+    ? getTierSaleInfo(product.retail_price_cents, salePrice, true)
     : null;
 
   return (
@@ -1681,7 +1683,7 @@ function ProductSalePricingCard({
           <div>
             <p className="mb-1 text-xs font-medium text-gray-500">Standard Price</p>
             <p className="text-sm font-semibold text-gray-900">
-              {formatCurrency(product.retail_price)}
+              {formatCurrency(product.retail_price_cents)}
             </p>
           </div>
           <FormField label="Sale Price">
@@ -1703,7 +1705,7 @@ function ProductSalePricingCard({
                 />
                 {hasError && (
                   <p className="mt-1 text-xs text-red-500">
-                    Must be less than {formatCurrency(product.retail_price)}
+                    Must be less than {formatCurrency(product.retail_price_cents)}
                   </p>
                 )}
               </div>
@@ -1730,11 +1732,11 @@ function ProductSalePricingCard({
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <p className="text-sm text-gray-600">
               {endingSoon && <span className="mr-1 text-amber-600">⏰</span>}
-              <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+              <span className="text-gray-400 line-through">{formatMoney(info.originalPriceCents)}</span>
               {' → '}
-              <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+              <span className="font-semibold text-green-600">{formatMoney(info.currentPriceCents)}</span>
               <span className="ml-2 text-xs text-gray-400">
-                (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                (-{info.discountPercent}%, save {formatMoney(info.savingsCents)})
               </span>
             </p>
           </div>
@@ -1836,8 +1838,8 @@ function CostMarginCard({
   costHistory: CostHistoryEntry[];
 }) {
   const margin =
-    product.retail_price > 0
-      ? ((product.retail_price - product.cost_price) / product.retail_price) * 100
+    product.retail_price_cents > 0
+      ? ((product.retail_price_cents - product.cost_price_cents) / product.retail_price_cents) * 100
       : 0;
 
   function getMarginColor(m: number) {
@@ -1866,7 +1868,7 @@ function CostMarginCard({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cost Price</p>
             <p className="mt-1 text-lg font-semibold text-gray-900">
-              {formatCurrency(product.cost_price)}
+              {formatCurrency(product.cost_price_cents)}
             </p>
           </div>
 
@@ -1874,7 +1876,7 @@ function CostMarginCard({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Retail Price</p>
             <p className="mt-1 text-lg font-semibold text-gray-900">
-              {formatCurrency(product.retail_price)}
+              {formatCurrency(product.retail_price_cents)}
             </p>
           </div>
 
@@ -1882,7 +1884,7 @@ function CostMarginCard({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Margin</p>
             <div className="mt-1 flex items-center gap-2">
-              {product.cost_price > 0 ? (
+              {product.cost_price_cents > 0 ? (
                 <>
                   <span className={`text-lg font-semibold ${getMarginColor(margin)}`}>
                     {margin.toFixed(1)}%

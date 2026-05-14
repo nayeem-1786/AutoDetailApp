@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import { ChevronDown, ChevronRight, Copy, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,48 +19,48 @@ function SnapshotPriceDisplay({ record }: { record: SaleHistoryRecord }) {
 
   // Product (pricing_model is null)
   if (pricing_model === null || pricing_model === undefined) {
-    const snap = pricing_snapshot as { retail_price: number; sale_price: number };
+    const snap = pricing_snapshot as { retail_price_cents: number; sale_price_cents: number };
     return (
       <div className="text-xs">
-        <span className="text-gray-400 line-through">{formatCurrency(snap.retail_price)}</span>
-        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price)}</span>
+        <span className="text-gray-400 line-through">{formatCurrency(snap.retail_price_cents)}</span>
+        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price_cents)}</span>
       </div>
     );
   }
 
   // Flat
   if (pricing_model === 'flat') {
-    const snap = pricing_snapshot as { base_price: number; sale_price: number };
+    const snap = pricing_snapshot as { base_price: number; sale_price_cents: number };
     return (
       <div className="text-xs">
         <span className="text-gray-400 line-through">{formatCurrency(snap.base_price)}</span>
-        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price)}</span>
+        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price_cents)}</span>
       </div>
     );
   }
 
   // Per_unit
   if (pricing_model === 'per_unit') {
-    const snap = pricing_snapshot as { base_price: number; sale_price: number; per_unit_label?: string };
+    const snap = pricing_snapshot as { base_price: number; sale_price_cents: number; per_unit_label?: string };
     const suffix = `/${snap.per_unit_label || 'unit'}`;
     return (
       <div className="text-xs">
         <span className="text-gray-400 line-through">{formatCurrency(snap.base_price)}{suffix}</span>
-        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price)}{suffix}</span>
+        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price_cents)}{suffix}</span>
       </div>
     );
   }
 
   // Tiered: vehicle_size, scope, specialty — array of tiers
   if (Array.isArray(pricing_snapshot)) {
-    const tiers = pricing_snapshot as { tier_name: string; tier_label: string | null; base_price: number; sale_price: number }[];
+    const tiers = pricing_snapshot as { tier_name: string; tier_label: string | null; base_price: number; sale_price_cents: number }[];
     return (
       <div className="space-y-0.5">
         {tiers.map((t) => (
           <div key={t.tier_name} className="text-xs">
             <span className="text-gray-400">{t.tier_label || t.tier_name}: </span>
             <span className="text-gray-400 line-through">{formatCurrency(t.base_price)}</span>
-            <span className="ml-1 font-medium text-green-600">{formatCurrency(t.sale_price)}</span>
+            <span className="ml-1 font-medium text-green-600">{formatCurrency(t.sale_price_cents)}</span>
           </div>
         ))}
       </div>

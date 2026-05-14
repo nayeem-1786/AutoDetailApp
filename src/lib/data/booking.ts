@@ -2,6 +2,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+import { toCents } from '@/lib/utils/money';
 import type {
   Service,
   ServiceCategory,
@@ -34,9 +35,9 @@ export interface BookableService extends Service {
       | 'slug'
       | 'description'
       | 'pricing_model'
-      | 'flat_price'
-      | 'custom_starting_price'
-      | 'per_unit_price'
+      | 'flat_price_cents'
+      | 'custom_starting_price_cents'
+      | 'per_unit_price_cents'
       | 'per_unit_label'
       | 'per_unit_max'
       | 'base_duration_minutes'
@@ -81,8 +82,8 @@ export async function getBookableServices(): Promise<BookableCategory[]> {
       service_addon_suggestions!service_addon_suggestions_primary_service_id_fkey(
         *,
         addon_service:services!service_addon_suggestions_addon_service_id_fkey(
-          id, name, slug, description, pricing_model, flat_price,
-          custom_starting_price, per_unit_price, per_unit_label, per_unit_max,
+          id, name, slug, description, pricing_model, flat_price_cents,
+          custom_starting_price_cents, per_unit_price_cents, per_unit_label, per_unit_max,
           base_duration_minutes, classification, mobile_eligible,
           service_pricing(*)
         )
@@ -146,8 +147,8 @@ export async function getBookableServiceBySlug(
       service_addon_suggestions!service_addon_suggestions_primary_service_id_fkey(
         *,
         addon_service:services!service_addon_suggestions_addon_service_id_fkey(
-          id, name, slug, description, pricing_model, flat_price,
-          custom_starting_price, per_unit_price, per_unit_label, per_unit_max,
+          id, name, slug, description, pricing_model, flat_price_cents,
+          custom_starting_price_cents, per_unit_price_cents, per_unit_label, per_unit_max,
           base_duration_minutes, classification, mobile_eligible,
           service_pricing(*)
         )
@@ -316,10 +317,12 @@ export interface RebookData {
     phone: string | null;
     email: string | null;
   };
+  // Phase Money-Unify-3: addons[].price_cents is cents (matches AddonSelection
+  // contract). mobile_surcharge stays dollars (Family C) until Unify-6.
   addons: {
     service_id: string;
     name: string;
-    price: number;
+    price_cents: number;
     tier_name: string | null;
   }[];
 }
@@ -378,11 +381,14 @@ export async function getRebookData(
           email: customer.email,
         }
       : { first_name: '', last_name: '', phone: null, email: null },
+    // appointment_services.price_at_booking is Family C dollars (until Unify-6);
+    // convert to cents at this boundary so the rebook flow speaks the same
+    // contract as fresh bookings (AddonSelection.price_cents).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     addons: addonServices.map((a: any) => ({
       service_id: a.service_id,
       name: a.services?.name ?? 'Add-on',
-      price: a.price_at_booking,
+      price_cents: toCents(Number(a.price_at_booking)),
       tier_name: a.tier_name,
     })),
   };

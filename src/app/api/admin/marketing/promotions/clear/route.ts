@@ -41,21 +41,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (item.type === 'service') {
-      // Clear sale dates and flat/per_unit sale_price on service
+      // Clear sale dates and flat/per_unit sale_price_cents on service
       await admin
         .from('services')
-        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
+        .update({ sale_price_cents: null, sale_starts_at: null, sale_ends_at: null })
         .eq('id', item.id);
 
-      // Clear sale_price on all pricing rows
+      // Clear sale_price_cents on all pricing rows
       await admin
         .from('service_pricing')
-        .update({ sale_price: null })
+        .update({ sale_price_cents: null })
         .eq('service_id', item.id);
     } else {
       await admin
         .from('products')
-        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
+        .update({ sale_price_cents: null, sale_starts_at: null, sale_ends_at: null })
         .eq('id', item.id);
     }
     cleared++;

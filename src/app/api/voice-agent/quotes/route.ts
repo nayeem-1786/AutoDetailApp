@@ -6,6 +6,7 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { fromCents } from '@/lib/utils/money';
 
 interface QuoteServiceInput {
   service_id: string;
@@ -128,7 +129,7 @@ const body = await request.json();
     t = perf.now();
     const { data: servicesData, error: svcErr } = await supabase
       .from('services')
-      .select('id, name, flat_price, pricing_model, service_pricing ( tier_name, price )')
+      .select('id, name, flat_price_cents, pricing_model, service_pricing ( tier_name, price_cents )')
       .in('id', serviceIds)
       .eq('is_active', true);
     perf.mark('query:services', t);
@@ -167,21 +168,24 @@ const body = await request.json();
       let price = 0;
       let tierName: string | null = null;
 
+      // Catalog reads are cents (Family D); quoteItems is Family B dollars
+      // until Unify-8. Convert at every read.
+      // TODO Unify-8: switch quoteItems to cents and drop fromCents() shims.
       if (input.tier_name) {
         // Look up tier price
-        const tiers = (svc.service_pricing as { tier_name: string; price: number }[]) ?? [];
+        const tiers = (svc.service_pricing as { tier_name: string; price_cents: number }[]) ?? [];
         const tier = tiers.find((tp) => tp.tier_name === input.tier_name);
         if (tier) {
-          price = Number(tier.price);
+          price = fromCents(Number(tier.price_cents));
           tierName = tier.tier_name;
         }
-      } else if (svc.pricing_model === 'flat' && svc.flat_price !== null) {
-        price = Number(svc.flat_price);
+      } else if (svc.pricing_model === 'flat' && svc.flat_price_cents !== null) {
+        price = fromCents(Number(svc.flat_price_cents));
       } else {
         // For tiered pricing with no tier specified, use the first tier as default
-        const tiers = (svc.service_pricing as { tier_name: string; price: number }[]) ?? [];
+        const tiers = (svc.service_pricing as { tier_name: string; price_cents: number }[]) ?? [];
         if (tiers.length > 0) {
-          price = Number(tiers[0].price);
+          price = fromCents(Number(tiers[0].price_cents));
           tierName = tiers[0].tier_name;
         }
       }

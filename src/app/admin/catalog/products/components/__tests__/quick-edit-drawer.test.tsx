@@ -72,8 +72,9 @@ function mockProduct(overrides: Partial<Product> = {}): Product {
     description: null,
     category_id: null,
     vendor_id: null,
-    cost_price: 5,
-    retail_price: 10,
+    // Phase Money-Unify-3: products columns are integer cents.
+    cost_price_cents: 500,
+    retail_price_cents: 1000,
     quantity_on_hand: 20,
     reorder_threshold: 3,
     min_order_qty: null,
@@ -159,7 +160,7 @@ describe('QuickEditDrawer', () => {
     });
 
     expect(supabaseUpdateEq).toHaveBeenCalledTimes(1);
-    expect(supabaseUpdateEq).toHaveBeenCalledWith({ retail_price: 12.5 });
+    expect(supabaseUpdateEq).toHaveBeenCalledWith({ retail_price_cents: 1250 });
   });
 
   it('price save success fires a sonner toast with an action button', async () => {
@@ -194,7 +195,7 @@ describe('QuickEditDrawer', () => {
 
     // Two updates total: initial set to 12.5, then undo back to 10.
     expect(supabaseUpdateEq).toHaveBeenCalledTimes(2);
-    expect(supabaseUpdateEq.mock.calls[1][0]).toEqual({ retail_price: 10 });
+    expect(supabaseUpdateEq.mock.calls[1][0]).toEqual({ retail_price_cents: 1000 });
   });
 
   it('qty change reveals the adjustment reason block; qty does NOT autosave on blur', async () => {

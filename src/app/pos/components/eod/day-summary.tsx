@@ -1,7 +1,7 @@
 'use client';
 
 import { Loader2, DollarSign, Receipt, Banknote, CreditCard } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 
 interface DaySummaryProps {
   summary: {

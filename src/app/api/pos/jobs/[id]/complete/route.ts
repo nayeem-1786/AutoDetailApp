@@ -7,7 +7,7 @@ import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, type BusinessHours } from '@/lib/data/business-hours';
 import { createShortLink } from '@/lib/utils/short-link';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import crypto from 'crypto';
 import { logAudit, getRequestIp } from '@/lib/services/audit';

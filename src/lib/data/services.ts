@@ -38,8 +38,8 @@ export interface ServiceWithFullDetails extends Service {
       | 'slug'
       | 'description'
       | 'pricing_model'
-      | 'flat_price'
-      | 'custom_starting_price'
+      | 'flat_price_cents'
+      | 'custom_starting_price_cents'
     > & {
       service_categories: Pick<ServiceCategory, 'slug'> | null;
     };
@@ -161,7 +161,7 @@ export async function getServiceBySlug(
       service_addon_suggestions!service_addon_suggestions_primary_service_id_fkey(
         *,
         addon_service:services!service_addon_suggestions_addon_service_id_fkey(
-          id, name, slug, description, pricing_model, flat_price, custom_starting_price,
+          id, name, slug, description, pricing_model, flat_price_cents, custom_starting_price_cents,
           service_categories(slug)
         )
       )`

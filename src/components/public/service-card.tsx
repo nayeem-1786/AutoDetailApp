@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Clock, Car, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, hasAnySalePrice, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import type { Service } from '@/lib/supabase/types';
 
@@ -27,17 +27,17 @@ function getStartingPrice(service: Service): PriceDisplay {
       if (tiers.length > 0) {
         const tier = tiers[0];
         const prices = [
-          tier.vehicle_size_sedan_price,
-          tier.vehicle_size_truck_suv_price,
-          tier.vehicle_size_suv_van_price,
+          tier.vehicle_size_sedan_price_cents,
+          tier.vehicle_size_truck_suv_price_cents,
+          tier.vehicle_size_suv_van_price_cents,
         ].filter((p): p is number => p !== null);
-        const standardMin = prices.length > 0 ? Math.min(...prices) : tier.price;
+        const standardMin = prices.length > 0 ? Math.min(...prices) : tier.price_cents;
 
-        if (showSale && tier.sale_price !== null && tier.sale_price < tier.price) {
-          const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, true);
+        if (showSale && tier.sale_price_cents !== null && tier.sale_price_cents < tier.price_cents) {
+          const saleInfo = getTierSaleInfo(tier.price_cents, tier.sale_price_cents, true);
           if (saleInfo?.isDiscounted) {
             return {
-              text: `From ${formatCurrency(saleInfo.currentPrice)}`,
+              text: `From ${formatMoney(saleInfo.currentPriceCents)}`,
               wasText: `From ${formatCurrency(standardMin)}`,
               isOnSale: true,
             };
@@ -50,51 +50,51 @@ function getStartingPrice(service: Service): PriceDisplay {
     case 'scope':
     case 'specialty': {
       if (tiers.length > 0) {
-        const sorted = [...tiers].sort((a, b) => a.price - b.price);
+        const sorted = [...tiers].sort((a, b) => a.price_cents - b.price_cents);
         if (showSale) {
-          const saleInfo = getTierSaleInfo(sorted[0].price, sorted[0].sale_price, true);
+          const saleInfo = getTierSaleInfo(sorted[0].price_cents, sorted[0].sale_price_cents, true);
           if (saleInfo?.isDiscounted) {
             return {
-              text: `From ${formatCurrency(saleInfo.currentPrice)}`,
-              wasText: `From ${formatCurrency(saleInfo.originalPrice)}`,
+              text: `From ${formatMoney(saleInfo.currentPriceCents)}`,
+              wasText: `From ${formatMoney(saleInfo.originalPriceCents)}`,
               isOnSale: true,
             };
           }
         }
-        return { text: `From ${formatCurrency(sorted[0].price)}`, isOnSale: false };
+        return { text: `From ${formatCurrency(sorted[0].price_cents)}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
     case 'per_unit': {
-      if (service.per_unit_price !== null) {
+      if (service.per_unit_price_cents !== null) {
         const label = service.per_unit_label ?? 'unit';
-        if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.per_unit_price) {
+        if (saleStatus.isOnSale && service.sale_price_cents != null && service.sale_price_cents < service.per_unit_price_cents) {
           return {
-            text: `${formatCurrency(service.sale_price)}/${label}`,
-            wasText: `${formatCurrency(service.per_unit_price)}/${label}`,
+            text: `${formatCurrency(service.sale_price_cents)}/${label}`,
+            wasText: `${formatCurrency(service.per_unit_price_cents)}/${label}`,
             isOnSale: true,
           };
         }
-        return { text: `${formatCurrency(service.per_unit_price)}/${label}`, isOnSale: false };
+        return { text: `${formatCurrency(service.per_unit_price_cents)}/${label}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
     case 'flat': {
-      if (service.flat_price !== null) {
-        if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.flat_price) {
+      if (service.flat_price_cents !== null) {
+        if (saleStatus.isOnSale && service.sale_price_cents != null && service.sale_price_cents < service.flat_price_cents) {
           return {
-            text: formatCurrency(service.sale_price),
-            wasText: formatCurrency(service.flat_price),
+            text: formatCurrency(service.sale_price_cents),
+            wasText: formatCurrency(service.flat_price_cents),
             isOnSale: true,
           };
         }
-        return { text: formatCurrency(service.flat_price), isOnSale: false };
+        return { text: formatCurrency(service.flat_price_cents), isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }
     case 'custom': {
-      if (service.custom_starting_price !== null) {
-        return { text: `From ${formatCurrency(service.custom_starting_price)}`, isOnSale: false };
+      if (service.custom_starting_price_cents !== null) {
+        return { text: `From ${formatCurrency(service.custom_starting_price_cents)}`, isOnSale: false };
       }
       return { text: 'Contact for pricing', isOnSale: false };
     }

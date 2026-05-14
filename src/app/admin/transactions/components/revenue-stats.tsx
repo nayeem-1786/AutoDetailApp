@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { Info } from 'lucide-react';
 
 interface RevenueStatsProps {

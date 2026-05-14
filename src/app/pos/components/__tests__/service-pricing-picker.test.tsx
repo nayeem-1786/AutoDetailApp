@@ -6,21 +6,23 @@ import type { CatalogService } from '../../types';
 
 afterEach(cleanup);
 
+// Phase Money-Unify-3: all fixture money values are integer cents
+// (× 100 of the pre-migration dollar fixtures).
 function mockTier(overrides: Partial<ServicePricing> = {}): ServicePricing {
   return {
     id: `p-${Math.random()}`,
     service_id: 's1',
     tier_name: 'sedan',
     tier_label: 'Sedan',
-    price: 100,
-    sale_price: null,
+    price_cents: 10000,
+    sale_price_cents: null,
     display_order: 0,
     is_vehicle_size_aware: false,
-    vehicle_size_sedan_price: null,
-    vehicle_size_truck_suv_price: null,
-    vehicle_size_suv_van_price: null,
-    vehicle_size_exotic_price: null,
-    vehicle_size_classic_price: null,
+    vehicle_size_sedan_price_cents: null,
+    vehicle_size_truck_suv_price_cents: null,
+    vehicle_size_suv_van_price_cents: null,
+    vehicle_size_exotic_price_cents: null,
+    vehicle_size_classic_price_cents: null,
     max_qty: null,
     qty_label: null,
     created_at: '',
@@ -32,24 +34,24 @@ function mockService(pricing: ServicePricing[] = []): CatalogService {
   return {
     id: 's1', name: 'Interior Detail', slug: 'interior-detail', description: null,
     category_id: null, pricing_model: 'vehicle_size', classification: 'primary',
-    base_duration_minutes: 60, flat_price: null, custom_starting_price: null,
-    per_unit_price: null, per_unit_max: null, per_unit_label: null,
+    base_duration_minutes: 60, flat_price_cents: null, custom_starting_price_cents: null,
+    per_unit_price_cents: null, per_unit_max: null, per_unit_label: null,
     mobile_eligible: false, online_bookable: true, staff_assessed: false,
     is_taxable: false, vehicle_compatibility: ['standard'],
     special_requirements: null, image_url: null, image_alt: null,
     is_active: true, show_on_website: true, is_featured: false, display_order: 0,
-    sale_price: null, sale_starts_at: null, sale_ends_at: null,
+    sale_price_cents: null, sale_starts_at: null, sale_ends_at: null,
     created_at: '', updated_at: '',
     pricing,
   };
 }
 
 const ALL_5_TIERS = [
-  mockTier({ tier_name: 'sedan', tier_label: 'Sedan', price: 100, display_order: 0 }),
-  mockTier({ tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: 150, display_order: 1 }),
-  mockTier({ tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: 200, display_order: 2 }),
-  mockTier({ tier_name: 'exotic', tier_label: 'Exotic', price: 500, display_order: 3 }),
-  mockTier({ tier_name: 'classic', tier_label: 'Classic', price: 350, display_order: 4 }),
+  mockTier({ tier_name: 'sedan', tier_label: 'Sedan', price_cents: 10000, display_order: 0 }),
+  mockTier({ tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price_cents: 15000, display_order: 1 }),
+  mockTier({ tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price_cents: 20000, display_order: 2 }),
+  mockTier({ tier_name: 'exotic', tier_label: 'Exotic', price_cents: 50000, display_order: 3 }),
+  mockTier({ tier_name: 'classic', tier_label: 'Classic', price_cents: 35000, display_order: 4 }),
 ];
 
 function renderPicker(vehicleSizeClass: VehicleSizeClass | null, tiers: ServicePricing[] = ALL_5_TIERS) {
@@ -136,8 +138,8 @@ describe('ServicePricingPicker — tier disable logic', () => {
 
   it('scope-model tiers with custom names are never disabled', () => {
     const scopeTiers = [
-      mockTier({ tier_name: 'complete_interior', tier_label: 'Complete Interior', price: 200 }),
-      mockTier({ tier_name: 'floor_mats', tier_label: 'Floor Mats Only', price: 80 }),
+      mockTier({ tier_name: 'complete_interior', tier_label: 'Complete Interior', price_cents: 20000 }),
+      mockTier({ tier_name: 'floor_mats', tier_label: 'Floor Mats Only', price_cents: 8000 }),
     ];
     const service = mockService(scopeTiers);
     service.pricing_model = 'scope';

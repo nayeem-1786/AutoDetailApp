@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
         name,
         slug,
         description,
-        retail_price,
-        sale_price,
+        retail_price_cents,
+        sale_price_cents,
         sale_starts_at,
         sale_ends_at,
         quantity_on_hand,
@@ -73,13 +73,13 @@ export async function GET(request: NextRequest) {
         .filter((gid): gid is string => !!gid)
     )];
 
-    const variantMap = new Map<string, Array<{ name: string; variant_label: string | null; retail_price: number; sale_price: number | null; sale_starts_at: string | null; sale_ends_at: string | null; quantity_on_hand: number }>>();
+    const variantMap = new Map<string, Array<{ name: string; variant_label: string | null; retail_price_cents: number; sale_price_cents: number | null; sale_starts_at: string | null; sale_ends_at: string | null; quantity_on_hand: number }>>();
 
     if (groupIds.length > 0) {
       const t2 = perf.now();
       const { data: siblings } = await supabase
         .from('products')
-        .select('id, name, variant_label, retail_price, sale_price, sale_starts_at, sale_ends_at, quantity_on_hand, product_group_id')
+        .select('id, name, variant_label, retail_price_cents, sale_price_cents, sale_starts_at, sale_ends_at, quantity_on_hand, product_group_id')
         .eq('is_active', true)
         .in('product_group_id', groupIds);
       perf.mark('query:variants', t2);
@@ -100,8 +100,8 @@ export async function GET(request: NextRequest) {
         sale_ends_at: p.sale_ends_at as string | null,
       };
       const { isOnSale } = getSaleStatus(saleWindow);
-      const retailPrice = Number(p.retail_price);
-      const salePrice = p.sale_price != null ? Number(p.sale_price) : null;
+      const retailPrice = Number(p.retail_price_cents);
+      const salePrice = p.sale_price_cents != null ? Number(p.sale_price_cents) : null;
       const isActiveSale = isOnSale && salePrice != null && salePrice < retailPrice;
 
       const cat = p.product_categories as unknown as { name: string; slug: string } | null;
@@ -110,20 +110,20 @@ export async function GET(request: NextRequest) {
       // Build variant array from siblings
       const gid = p.product_group_id as string | null;
       const siblings = gid ? variantMap.get(gid) : undefined;
-      let variants: Array<{ label: string; price: number; sale_price: number | null; in_stock: boolean }> | null = null;
+      let variants: Array<{ label: string; price: number; sale_price_cents: number | null; in_stock: boolean }> | null = null;
 
       if (siblings && siblings.length > 1) {
         variants = siblings
-          .sort((a, b) => Number(a.retail_price) - Number(b.retail_price))
+          .sort((a, b) => Number(a.retail_price_cents) - Number(b.retail_price_cents))
           .map((s) => {
             const sSaleWindow = { sale_starts_at: s.sale_starts_at, sale_ends_at: s.sale_ends_at };
             const { isOnSale: sOnSale } = getSaleStatus(sSaleWindow);
-            const sp = s.sale_price != null ? Number(s.sale_price) : null;
-            const rp = Number(s.retail_price);
+            const sp = s.sale_price_cents != null ? Number(s.sale_price_cents) : null;
+            const rp = Number(s.retail_price_cents);
             return {
               label: s.variant_label || s.name,
               price: rp,
-              sale_price: sOnSale && sp != null && sp < rp ? sp : null,
+              sale_price_cents: sOnSale && sp != null && sp < rp ? sp : null,
               in_stock: s.quantity_on_hand > 0,
             };
           });
@@ -132,8 +132,8 @@ export async function GET(request: NextRequest) {
       return {
         name: p.name,
         category: cat?.name ?? null,
-        retail_price: retailPrice,
-        sale_price: isActiveSale ? salePrice : null,
+        retail_price_cents: retailPrice,
+        sale_price_cents: isActiveSale ? salePrice : null,
         in_stock: (p.quantity_on_hand as number) > 0,
         stock_qty: p.quantity_on_hand as number,
         description: p.description ?? null,

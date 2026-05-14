@@ -111,10 +111,10 @@ export default function VendorDetailPage() {
       ),
     },
     {
-      accessorKey: 'retail_price',
+      accessorKey: 'retail_price_cents',
       header: 'Retail Price',
       size: 90,
-      cell: ({ row }) => formatCurrency(row.original.retail_price),
+      cell: ({ row }) => formatCurrency(row.original.retail_price_cents),
     },
     {
       accessorKey: 'quantity_on_hand',
@@ -151,12 +151,12 @@ export default function VendorDetailPage() {
   const costColumns: ColumnDef<VendorProduct, unknown>[] = canViewCost
     ? [
         {
-          id: 'cost_price',
+          id: 'cost_price_cents',
           header: 'Vendor Cost',
           size: 90,
           cell: ({ row }) =>
-            row.original.cost_price > 0
-              ? formatCurrency(row.original.cost_price)
+            row.original.cost_price_cents > 0
+              ? formatCurrency(row.original.cost_price_cents)
               : '--',
         },
         {
@@ -165,8 +165,8 @@ export default function VendorDetailPage() {
           size: 70,
           cell: ({ row }) => {
             const p = row.original;
-            if (!p.cost_price || p.cost_price === 0 || p.retail_price === 0) return '--';
-            const margin = (p.retail_price - p.cost_price) / p.retail_price * 100;
+            if (!p.cost_price_cents || p.cost_price_cents === 0 || p.retail_price_cents === 0) return '--';
+            const margin = (p.retail_price_cents - p.cost_price_cents) / p.retail_price_cents * 100;
             return (
               <span className={`font-medium ${getMarginColor(margin)}`}>
                 {margin.toFixed(0)}%
@@ -238,7 +238,7 @@ export default function VendorDetailPage() {
   if (!vendor) return null;
 
   const activeProducts = products.filter((p) => p.is_active);
-  const totalRetailValue = activeProducts.reduce((sum, p) => sum + p.retail_price * p.quantity_on_hand, 0);
+  const totalRetailValue = activeProducts.reduce((sum, p) => sum + p.retail_price_cents * p.quantity_on_hand, 0);
 
   return (
     <div className="space-y-6">

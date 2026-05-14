@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getProductBySlug } from '@/lib/data/products';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 
 export const alt = 'Product Details';
 export const size = { width: 1200, height: 630 };
@@ -18,7 +18,7 @@ export default async function ProductOGImage({
 
   const productName = result?.product.name ?? 'Product';
   const categoryName = result?.category.name ?? '';
-  const price = result?.product.retail_price;
+  const price = result?.product.retail_price_cents;
   const inStock = result?.product ? result.product.quantity_on_hand > 0 : false;
 
   return new ImageResponse(

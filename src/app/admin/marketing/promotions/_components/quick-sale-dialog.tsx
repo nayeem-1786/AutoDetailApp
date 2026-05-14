@@ -16,7 +16,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { X, Wrench, ShoppingBag, AlertTriangle, Info } from 'lucide-react';
@@ -29,17 +29,17 @@ export interface QuickSaleItem {
   id: string;
   name: string;
   pricing_model?: string;
-  flat_price?: number | null;
-  per_unit_price?: number | null;
+  flat_price_cents?: number | null;
+  per_unit_price_cents?: number | null;
   per_unit_label?: string | null;
   tiers?: ServicePricingRow[];
-  retail_price?: number;
+  retail_price_cents?: number;
   // Conflict detection fields
   sale_status: 'active' | 'scheduled' | 'expired' | 'no_sale';
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   current_sale_price?: number | null;
-  current_tier_sale_prices?: { tier_label: string | null; tier_name: string; sale_price: number | null }[];
+  current_tier_sale_prices?: { tier_label: string | null; tier_name: string; sale_price_cents: number | null }[];
   // Pre-fill: direct sale prices to restore (set by duplicate action)
   prefilled_sale_price?: number | null;
   prefilled_tier_sale_prices?: Record<string, number>;
@@ -134,19 +134,19 @@ export function QuickSaleDialog({
         id: item.id,
         name: item.name,
         pricing_model: item.pricing_model,
-        flat_price: item.flat_price,
-        per_unit_price: item.per_unit_price,
+        flat_price_cents: item.flat_price_cents,
+        per_unit_price_cents: item.per_unit_price_cents,
         per_unit_label: item.per_unit_label,
         tiers,
-        retail_price: item.retail_price,
+        retail_price_cents: item.retail_price_cents,
         sale_status: item.sale_status,
         sale_starts_at: item.sale_starts_at,
         sale_ends_at: item.sale_ends_at,
-        current_sale_price: item.sale_price,
+        current_sale_price: item.sale_price_cents,
         current_tier_sale_prices: tiers?.map((t) => ({
           tier_label: t.tier_label,
           tier_name: t.tier_name,
-          sale_price: t.sale_price,
+          sale_price_cents: t.sale_price_cents,
         })),
       },
     ]);
@@ -180,11 +180,11 @@ export function QuickSaleDialog({
       if (item.type === 'service') {
         const isFlatPerUnit = item.pricing_model === 'flat' || item.pricing_model === 'per_unit';
         if (isFlatPerUnit) {
-          const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
+          const basePrice = item.pricing_model === 'flat' ? (item.flat_price_cents ?? 0) : (item.per_unit_price_cents ?? 0);
           const sp = discountType === 'direct' && item.prefilled_sale_price != null
             ? item.prefilled_sale_price
             : calculateSalePrice(basePrice);
-          return { type: 'service' as const, id: item.id, sale_price: sp };
+          return { type: 'service' as const, id: item.id, sale_price_cents: sp };
         }
         // Tiered
         const salePrices: Record<string, number> = {};
@@ -200,7 +200,7 @@ export function QuickSaleDialog({
               (tier.tier_name === 'truck_suv_2row' && applyTruck) ||
               (tier.tier_name === 'suv_3row_van' && applySuv);
             if (shouldApply) {
-              salePrices[tier.tier_name] = calculateSalePrice(tier.price);
+              salePrices[tier.tier_name] = calculateSalePrice(tier.price_cents);
             }
           }
         }
@@ -209,8 +209,8 @@ export function QuickSaleDialog({
       // Product
       const sp = discountType === 'direct' && item.prefilled_sale_price != null
         ? item.prefilled_sale_price
-        : calculateSalePrice(item.retail_price ?? 0);
-      return { type: 'product' as const, id: item.id, sale_price: sp };
+        : calculateSalePrice(item.retail_price_cents ?? 0);
+      return { type: 'product' as const, id: item.id, sale_price_cents: sp };
     });
 
     try {
@@ -250,8 +250,8 @@ export function QuickSaleDialog({
       }
     } else if (item.current_tier_sale_prices) {
       for (const t of item.current_tier_sale_prices) {
-        if (t.sale_price != null) {
-          currentPrices.push(`${t.tier_label || t.tier_name}: ${formatCurrency(t.sale_price)}`);
+        if (t.sale_price_cents != null) {
+          currentPrices.push(`${t.tier_label || t.tier_name}: ${formatCurrency(t.sale_price_cents)}`);
         }
       }
     }
@@ -349,13 +349,13 @@ export function QuickSaleDialog({
                     <span className="flex-1 font-medium">{item.name}</span>
                     <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
                     {item.type === 'product' && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.retail_price ?? 0)}</span>
+                      <span className="text-xs text-gray-500">{formatCurrency(item.retail_price_cents ?? 0)}</span>
                     )}
-                    {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price != null && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.flat_price)}</span>
+                    {item.type === 'service' && item.pricing_model === 'flat' && item.flat_price_cents != null && (
+                      <span className="text-xs text-gray-500">{formatCurrency(item.flat_price_cents)}</span>
                     )}
-                    {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price != null && (
-                      <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price)}/{item.per_unit_label || 'unit'}</span>
+                    {item.type === 'service' && item.pricing_model === 'per_unit' && item.per_unit_price_cents != null && (
+                      <span className="text-xs text-gray-500">{formatCurrency(item.per_unit_price_cents)}/{item.per_unit_label || 'unit'}</span>
                     )}
                   </div>
                   {renderConflictWarning(item)}
@@ -475,7 +475,7 @@ export function QuickSaleDialog({
               <div key={item.id} className="text-sm">
                 <p className="font-medium text-gray-700">{item.name}:</p>
                 {item.type === 'service' && (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') ? (() => {
-                  const basePrice = item.pricing_model === 'flat' ? (item.flat_price ?? 0) : (item.per_unit_price ?? 0);
+                  const basePrice = item.pricing_model === 'flat' ? (item.flat_price_cents ?? 0) : (item.per_unit_price_cents ?? 0);
                   const sp = calculateSalePrice(basePrice);
                   const valid = sp > 0 && sp < basePrice;
                   return (
@@ -495,11 +495,11 @@ export function QuickSaleDialog({
                           (tier.tier_name === 'truck_suv_2row' && applyTruck) ||
                           (tier.tier_name === 'suv_3row_van' && applySuv);
                         if (!shouldApply) return null;
-                        const sp = calculateSalePrice(tier.price);
-                        const valid = sp > 0 && sp < tier.price;
+                        const sp = calculateSalePrice(tier.price_cents);
+                        const valid = sp > 0 && sp < tier.price_cents;
                         return (
                           <p key={tier.tier_name} className={valid ? 'text-gray-600' : 'text-red-500'}>
-                            {tier.tier_label || tier.tier_name}: {formatCurrency(tier.price)} &rarr; {formatCurrency(sp)}
+                            {tier.tier_label || tier.tier_name}: {formatCurrency(tier.price_cents)} &rarr; {formatCurrency(sp)}
                             {!valid && ' (invalid)'}
                           </p>
                         );
@@ -507,7 +507,7 @@ export function QuickSaleDialog({
                   </div>
                 ) : (
                   <p className="ml-4 text-gray-600">
-                    {formatCurrency(item.retail_price ?? 0)} &rarr; {formatCurrency(calculateSalePrice(item.retail_price ?? 0))}
+                    {formatCurrency(item.retail_price_cents ?? 0)} &rarr; {formatCurrency(calculateSalePrice(item.retail_price_cents ?? 0))}
                   </p>
                 )}
               </div>

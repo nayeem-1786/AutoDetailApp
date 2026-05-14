@@ -1,5 +1,10 @@
 import { SITE_URL } from '@/lib/utils/constants';
-import { formatCurrency, phoneToE164 } from '@/lib/utils/format';
+// formatCurrency (dollars-input) survives the Money-Unify epic; used by
+// the FAQ pricingAnswer strings below which receive dollar offers from
+// the JSON-LD Offer object. formatMoney (cents-input) is used inside the
+// Offer-building path which holds cents internally.
+import { formatCurrency, formatMoney, phoneToE164 } from '@/lib/utils/format';
+import { fromCents } from '@/lib/utils/money';
 import type { BusinessInfo, SeoSettings } from '@/lib/data/business';
 import type { Service, ServiceCategory, Product, ProductCategory, ServicePricing } from '@/lib/supabase/types';
 import type { ProductSpecs } from '@/lib/utils/validation';
@@ -123,23 +128,25 @@ export function generateServiceSchema(
 function buildServiceOffers(
   service: Service & { service_pricing?: ServicePricing[] }
 ): Record<string, unknown> | null {
-  const { pricing_model, flat_price, custom_starting_price, per_unit_price } = service;
+  // Schema.org Offer.price_cents expects decimal dollars; convert from canonical
+  // cents at the JSON-LD boundary via fromCents().
+  const { pricing_model, flat_price_cents, custom_starting_price_cents, per_unit_price_cents } = service;
   const pricingRows = service.service_pricing ?? [];
 
   // Flat rate -- single known price
-  if (pricing_model === 'flat' && flat_price != null) {
+  if (pricing_model === 'flat' && flat_price_cents != null) {
     return {
       '@type': 'Offer',
-      price: flat_price,
+      price: fromCents(flat_price_cents),
       priceCurrency: 'USD',
     };
   }
 
   // Per-unit pricing
-  if (pricing_model === 'per_unit' && per_unit_price != null) {
+  if (pricing_model === 'per_unit' && per_unit_price_cents != null) {
     return {
       '@type': 'Offer',
-      price: per_unit_price,
+      price: fromCents(per_unit_price_cents),
       priceCurrency: 'USD',
       description: service.per_unit_label
         ? `Per ${service.per_unit_label}`
@@ -148,32 +155,34 @@ function buildServiceOffers(
   }
 
   // Custom / quote-based -- show starting price if available
-  if (pricing_model === 'custom' && custom_starting_price != null) {
+  if (pricing_model === 'custom' && custom_starting_price_cents != null) {
     return {
       '@type': 'Offer',
-      price: custom_starting_price,
+      price: fromCents(custom_starting_price_cents),
       priceCurrency: 'USD',
-      description: `Starting at ${formatCurrency(custom_starting_price)}`,
+      description: `Starting at ${formatMoney(custom_starting_price_cents)}`,
     };
   }
 
   // Tiered pricing (vehicle_size, scope, specialty) -- use pricing rows
   if (pricingRows.length > 0) {
-    const prices = pricingRows.map((p) => p.price).filter((p) => p > 0);
-    if (prices.length === 1) {
+    const priceCentsList = pricingRows
+      .map((p) => p.price_cents)
+      .filter((p): p is number => p != null && p > 0);
+    if (priceCentsList.length === 1) {
       return {
         '@type': 'Offer',
-        price: prices[0],
+        price: fromCents(priceCentsList[0]),
         priceCurrency: 'USD',
       };
     }
-    if (prices.length > 1) {
+    if (priceCentsList.length > 1) {
       return {
         '@type': 'AggregateOffer',
-        lowPrice: Math.min(...prices),
-        highPrice: Math.max(...prices),
+        lowPrice: fromCents(Math.min(...priceCentsList)),
+        highPrice: fromCents(Math.max(...priceCentsList)),
         priceCurrency: 'USD',
-        offerCount: prices.length,
+        offerCount: priceCentsList.length,
       };
     }
   }
@@ -211,7 +220,8 @@ export function generateProductSchema(
     },
     offers: {
       '@type': 'Offer',
-      price: product.retail_price,
+      // Schema.org Offer.price_cents expects decimal dollars; convert from cents.
+      price: product.retail_price_cents != null ? fromCents(product.retail_price_cents) : 0,
       priceCurrency: 'USD',
       availability: product.quantity_on_hand > 0
         ? 'https://schema.org/InStock'
@@ -276,8 +286,8 @@ export function generateServiceFaqSchema(
   if (offers) {
     if (offers['@type'] === 'AggregateOffer') {
       pricingAnswer = `${serviceName} ranges from ${formatCurrency(offers.lowPrice as number)} to ${formatCurrency(offers.highPrice as number)}, depending on vehicle size. Contact ${businessName} for exact pricing for your vehicle.`;
-    } else if (offers.price != null) {
-      const price = offers.price as number;
+    } else if (offers.price_cents != null) {
+      const price = offers.price_cents as number;
       if (offers.description && (offers.description as string).startsWith('Starting')) {
         pricingAnswer = `${serviceName} starts at ${formatCurrency(price)}. Final pricing depends on your vehicle's size and condition.`;
       } else {

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Truck, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
 import type { QuoteMobileState } from '../../types';
 

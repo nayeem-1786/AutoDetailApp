@@ -1,4 +1,8 @@
-// Sale pricing utilities — single source of truth for sale status + display logic
+// Sale pricing utilities — single source of truth for sale status + display logic.
+// Money-Unify-3: helpers operate on integer cents. Inputs typed as `number`
+// represent cents; callers pass `flat_price_cents`, `sale_price_cents`, etc.
+// Discount-percent math is unit-agnostic — the formula (a - b) / a works
+// equivalently in dollars or cents.
 
 export interface SaleWindow {
   sale_starts_at: string | null;
@@ -33,39 +37,42 @@ export function getSaleStatus(window: SaleWindow): SaleStatus {
 }
 
 export interface TierSaleInfo {
-  originalPrice: number;
-  currentPrice: number;
+  /** Cents */
+  originalPriceCents: number;
+  /** Cents */
+  currentPriceCents: number;
   isDiscounted: boolean;
   discountPercent: number;
-  savings: number;
+  /** Cents */
+  savingsCents: number;
 }
 
-/** Get display price and discount info for a single tier/product */
+/** Get display price and discount info for a single tier/product (cents). */
 export function getTierSaleInfo(
-  standardPrice: number | null,
-  salePrice: number | null,
+  standardPriceCents: number | null,
+  salePriceCents: number | null,
   isOnSale: boolean
 ): TierSaleInfo | null {
-  if (!standardPrice) return null;
+  if (!standardPriceCents) return null;
 
-  const hasSalePrice = salePrice !== null && salePrice < standardPrice;
+  const hasSalePrice = salePriceCents !== null && salePriceCents < standardPriceCents;
 
   return {
-    originalPrice: standardPrice,
-    currentPrice: isOnSale && hasSalePrice ? salePrice : standardPrice,
+    originalPriceCents: standardPriceCents,
+    currentPriceCents: isOnSale && hasSalePrice ? salePriceCents! : standardPriceCents,
     isDiscounted: isOnSale && hasSalePrice,
     discountPercent: hasSalePrice
-      ? Math.round(((standardPrice - salePrice!) / standardPrice) * 100)
+      ? Math.round(((standardPriceCents - salePriceCents!) / standardPriceCents) * 100)
       : 0,
-    savings: hasSalePrice ? standardPrice - salePrice! : 0,
+    savingsCents: hasSalePrice ? standardPriceCents - salePriceCents! : 0,
   };
 }
 
 /** Check if any tier in a service has a sale price set */
 export function hasAnySalePrice(
-  tiers: { sale_price: number | null }[]
+  tiers: { sale_price_cents: number | null }[]
 ): boolean {
-  return tiers.some((t) => t.sale_price !== null);
+  return tiers.some((t) => t.sale_price_cents !== null);
 }
 
 /** Get the sale status label + color for admin display */

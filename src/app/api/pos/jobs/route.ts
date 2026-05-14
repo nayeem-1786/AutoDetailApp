@@ -338,6 +338,7 @@ export async function POST(request: NextRequest) {
     }).format(now);
     const apptStartTime = pstTimeExact; // HH:MM:SS PST
     const apptEndTime = addMinutesToTime(apptStartTime.slice(0, 5), 60) + ':00';
+    // TODO Unify-6: services[].price is Family C dollars (JobServiceSnapshot).
     const servicesTotal = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const appointmentTotal = servicesTotal + mobileSurcharge;
 
@@ -385,6 +386,7 @@ export async function POST(request: NextRequest) {
     const apptServiceRows = services.map((s) => ({
       appointment_id: appointment.id,
       service_id: s.id,
+      // TODO Unify-6: appointment_services.price_at_booking is Family C dollars.
       price_at_booking: s.price,
       tier_name: null,
     }));

@@ -6,6 +6,7 @@ import type { CatalogProduct, CatalogService } from '../types';
 import type { VehicleSizeClass } from '@/lib/supabase/types';
 import { getServicePriceRange, resolveServicePrice } from '../utils/pricing';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
+import { formatMoney } from '@/lib/utils/format';
 
 interface ProductCardProps {
   product: CatalogProduct;
@@ -26,7 +27,7 @@ export function ProductCard({ product, onTap }: ProductCardProps) {
         {product.name}
       </span>
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        ${product.retail_price.toFixed(2)}
+        ${product.retail_price_cents.toFixed(2)}
       </span>
       {product.quantity_on_hand <= 0 && (
         <span className="text-xs text-red-500 dark:text-red-400">Out of stock</span>
@@ -81,35 +82,35 @@ function ServicePriceDisplay({
   vehicleSizeClass: string | null;
 }) {
   // Per-unit pricing: "$150/panel"
-  if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
+  if (service.pricing_model === 'per_unit' && service.per_unit_price_cents != null) {
     const label = service.per_unit_label || 'unit';
     const { isOnSale: perUnitOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-    if (perUnitOnSale && service.sale_price != null && service.sale_price < service.per_unit_price) {
-      return <SalePriceStack standardLabel={`$${service.per_unit_price.toFixed(2)}/${label}`} saleLabel={`$${service.sale_price.toFixed(2)}/${label}`} />;
+    if (perUnitOnSale && service.sale_price_cents != null && service.sale_price_cents < service.per_unit_price_cents) {
+      return <SalePriceStack standardLabel={`$${service.per_unit_price_cents.toFixed(2)}/${label}`} saleLabel={`$${service.sale_price_cents.toFixed(2)}/${label}`} />;
     }
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        ${service.per_unit_price.toFixed(2)}/{label}
+        ${service.per_unit_price_cents.toFixed(2)}/{label}
       </span>
     );
   }
 
-  if (service.flat_price != null) {
+  if (service.flat_price_cents != null) {
     const { isOnSale: flatOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-    if (flatOnSale && service.sale_price != null && service.sale_price < service.flat_price) {
-      return <SalePriceStack standardLabel={`$${service.flat_price.toFixed(2)}`} saleLabel={`$${service.sale_price.toFixed(2)}`} />;
+    if (flatOnSale && service.sale_price_cents != null && service.sale_price_cents < service.flat_price_cents) {
+      return <SalePriceStack standardLabel={`$${service.flat_price_cents.toFixed(2)}`} saleLabel={`$${service.sale_price_cents.toFixed(2)}`} />;
     }
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        ${service.flat_price.toFixed(2)}
+        ${service.flat_price_cents.toFixed(2)}
       </span>
     );
   }
 
-  if (service.custom_starting_price != null) {
+  if (service.custom_starting_price_cents != null) {
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        From ${service.custom_starting_price.toFixed(2)}
+        From ${service.custom_starting_price_cents.toFixed(2)}
       </span>
     );
   }
@@ -134,9 +135,9 @@ function ServicePriceDisplay({
     const tier = pricing[0];
     if (vehicleSizeClass && tier.is_vehicle_size_aware) {
       const resolved = resolveServicePrice(tier, vehicleSizeClass as VehicleSizeClass);
-      const saleInfo = getTierSaleInfo(resolved, tier.sale_price, isOnSale);
+      const saleInfo = getTierSaleInfo(resolved, tier.sale_price_cents, isOnSale);
       if (saleInfo?.isDiscounted) {
-        return <SalePriceStack standardLabel={`$${saleInfo.originalPrice.toFixed(2)}`} saleLabel={`$${saleInfo.currentPrice.toFixed(2)}`} />;
+        return <SalePriceStack standardLabel={`${formatMoney(saleInfo.originalPriceCents)}`} saleLabel={`${formatMoney(saleInfo.currentPriceCents)}`} />;
       }
       return (
         <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
@@ -154,13 +155,13 @@ function ServicePriceDisplay({
       );
     }
     // Not vehicle-size-aware single tier — check sale
-    const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, isOnSale);
+    const saleInfo = getTierSaleInfo(tier.price_cents, tier.sale_price_cents, isOnSale);
     if (saleInfo?.isDiscounted) {
-      return <SalePriceStack standardLabel={`$${saleInfo.originalPrice.toFixed(2)}`} saleLabel={`$${saleInfo.currentPrice.toFixed(2)}`} />;
+      return <SalePriceStack standardLabel={`${formatMoney(saleInfo.originalPriceCents)}`} saleLabel={`${formatMoney(saleInfo.currentPriceCents)}`} />;
     }
     return (
       <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-        ${tier.price.toFixed(2)}
+        ${tier.price_cents.toFixed(2)}
       </span>
     );
   }
@@ -169,11 +170,11 @@ function ServicePriceDisplay({
   const salePrices = pricing.map((p) => {
     const base = vehicleSizeClass && p.is_vehicle_size_aware
       ? resolveServicePrice(p, vehicleSizeClass as VehicleSizeClass)
-      : p.price;
-    const saleInfo = getTierSaleInfo(base, p.sale_price, isOnSale);
+      : p.price_cents;
+    const saleInfo = getTierSaleInfo(base, p.sale_price_cents, isOnSale);
     return {
       standard: base,
-      effective: saleInfo?.currentPrice ?? base,
+      effective: saleInfo?.currentPriceCents ?? base,
       isDiscounted: saleInfo?.isDiscounted ?? false,
     };
   });

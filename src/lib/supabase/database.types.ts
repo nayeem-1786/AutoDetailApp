@@ -3319,7 +3319,8 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
-          price: number
+          price: number | null
+          price_cents: number | null
           updated_at: string
         }
         Insert: {
@@ -3329,7 +3330,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
-          price: number
+          price?: number | null
+          price_cents?: number | null
           updated_at?: string
         }
         Update: {
@@ -3339,7 +3341,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
-          price?: number
+          price?: number | null
+          price_cents?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -3848,7 +3851,8 @@ export type Database = {
         Row: {
           barcode: string | null
           category_id: string | null
-          cost_price: number
+          cost_price: number | null
+          cost_price_cents: number | null
           created_at: string
           description: string | null
           dimension_unit: string | null
@@ -3867,9 +3871,11 @@ export type Database = {
           qbo_id: string | null
           quantity_on_hand: number
           reorder_threshold: number | null
-          retail_price: number
+          retail_price: number | null
+          retail_price_cents: number | null
           sale_ends_at: string | null
           sale_price: number | null
+          sale_price_cents: number | null
           sale_starts_at: string | null
           show_on_website: boolean
           sku: string | null
@@ -3889,7 +3895,8 @@ export type Database = {
         Insert: {
           barcode?: string | null
           category_id?: string | null
-          cost_price?: number
+          cost_price?: number | null
+          cost_price_cents?: number | null
           created_at?: string
           description?: string | null
           dimension_unit?: string | null
@@ -3908,9 +3915,11 @@ export type Database = {
           qbo_id?: string | null
           quantity_on_hand?: number
           reorder_threshold?: number | null
-          retail_price?: number
+          retail_price?: number | null
+          retail_price_cents?: number | null
           sale_ends_at?: string | null
           sale_price?: number | null
+          sale_price_cents?: number | null
           sale_starts_at?: string | null
           show_on_website?: boolean
           sku?: string | null
@@ -3930,7 +3939,8 @@ export type Database = {
         Update: {
           barcode?: string | null
           category_id?: string | null
-          cost_price?: number
+          cost_price?: number | null
+          cost_price_cents?: number | null
           created_at?: string
           description?: string | null
           dimension_unit?: string | null
@@ -3949,9 +3959,11 @@ export type Database = {
           qbo_id?: string | null
           quantity_on_hand?: number
           reorder_threshold?: number | null
-          retail_price?: number
+          retail_price?: number | null
+          retail_price_cents?: number | null
           sale_ends_at?: string | null
           sale_price?: number | null
+          sale_price_cents?: number | null
           sale_starts_at?: string | null
           show_on_website?: boolean
           sku?: string | null
@@ -4889,17 +4901,24 @@ export type Database = {
           id: string
           is_vehicle_size_aware: boolean
           max_qty: number | null
-          price: number
+          price: number | null
+          price_cents: number | null
           qty_label: string | null
           sale_price: number | null
+          sale_price_cents: number | null
           service_id: string
           tier_label: string | null
           tier_name: string
           vehicle_size_classic_price: number | null
+          vehicle_size_classic_price_cents: number | null
           vehicle_size_exotic_price: number | null
+          vehicle_size_exotic_price_cents: number | null
           vehicle_size_sedan_price: number | null
+          vehicle_size_sedan_price_cents: number | null
           vehicle_size_suv_van_price: number | null
+          vehicle_size_suv_van_price_cents: number | null
           vehicle_size_truck_suv_price: number | null
+          vehicle_size_truck_suv_price_cents: number | null
         }
         Insert: {
           created_at?: string
@@ -4907,17 +4926,24 @@ export type Database = {
           id?: string
           is_vehicle_size_aware?: boolean
           max_qty?: number | null
-          price: number
+          price?: number | null
+          price_cents?: number | null
           qty_label?: string | null
           sale_price?: number | null
+          sale_price_cents?: number | null
           service_id: string
           tier_label?: string | null
           tier_name: string
           vehicle_size_classic_price?: number | null
+          vehicle_size_classic_price_cents?: number | null
           vehicle_size_exotic_price?: number | null
+          vehicle_size_exotic_price_cents?: number | null
           vehicle_size_sedan_price?: number | null
+          vehicle_size_sedan_price_cents?: number | null
           vehicle_size_suv_van_price?: number | null
+          vehicle_size_suv_van_price_cents?: number | null
           vehicle_size_truck_suv_price?: number | null
+          vehicle_size_truck_suv_price_cents?: number | null
         }
         Update: {
           created_at?: string
@@ -4925,17 +4951,24 @@ export type Database = {
           id?: string
           is_vehicle_size_aware?: boolean
           max_qty?: number | null
-          price?: number
+          price?: number | null
+          price_cents?: number | null
           qty_label?: string | null
           sale_price?: number | null
+          sale_price_cents?: number | null
           service_id?: string
           tier_label?: string | null
           tier_name?: string
           vehicle_size_classic_price?: number | null
+          vehicle_size_classic_price_cents?: number | null
           vehicle_size_exotic_price?: number | null
+          vehicle_size_exotic_price_cents?: number | null
           vehicle_size_sedan_price?: number | null
+          vehicle_size_sedan_price_cents?: number | null
           vehicle_size_suv_van_price?: number | null
+          vehicle_size_suv_van_price_cents?: number | null
           vehicle_size_truck_suv_price?: number | null
+          vehicle_size_truck_suv_price_cents?: number | null
         }
         Relationships: [
           {
@@ -4954,9 +4987,11 @@ export type Database = {
           classification: Database["public"]["Enums"]["service_classification"]
           created_at: string
           custom_starting_price: number | null
+          custom_starting_price_cents: number | null
           description: string | null
           display_order: number
           flat_price: number | null
+          flat_price_cents: number | null
           id: string
           image_alt: string | null
           image_url: string | null
@@ -4969,10 +5004,12 @@ export type Database = {
           per_unit_label: string | null
           per_unit_max: number | null
           per_unit_price: number | null
+          per_unit_price_cents: number | null
           pricing_model: Database["public"]["Enums"]["pricing_model"]
           qbo_id: string | null
           sale_ends_at: string | null
           sale_price: number | null
+          sale_price_cents: number | null
           sale_starts_at: string | null
           show_on_website: boolean
           slug: string
@@ -4987,9 +5024,11 @@ export type Database = {
           classification?: Database["public"]["Enums"]["service_classification"]
           created_at?: string
           custom_starting_price?: number | null
+          custom_starting_price_cents?: number | null
           description?: string | null
           display_order?: number
           flat_price?: number | null
+          flat_price_cents?: number | null
           id?: string
           image_alt?: string | null
           image_url?: string | null
@@ -5002,10 +5041,12 @@ export type Database = {
           per_unit_label?: string | null
           per_unit_max?: number | null
           per_unit_price?: number | null
+          per_unit_price_cents?: number | null
           pricing_model: Database["public"]["Enums"]["pricing_model"]
           qbo_id?: string | null
           sale_ends_at?: string | null
           sale_price?: number | null
+          sale_price_cents?: number | null
           sale_starts_at?: string | null
           show_on_website?: boolean
           slug: string
@@ -5020,9 +5061,11 @@ export type Database = {
           classification?: Database["public"]["Enums"]["service_classification"]
           created_at?: string
           custom_starting_price?: number | null
+          custom_starting_price_cents?: number | null
           description?: string | null
           display_order?: number
           flat_price?: number | null
+          flat_price_cents?: number | null
           id?: string
           image_alt?: string | null
           image_url?: string | null
@@ -5035,10 +5078,12 @@ export type Database = {
           per_unit_label?: string | null
           per_unit_max?: number | null
           per_unit_price?: number | null
+          per_unit_price_cents?: number | null
           pricing_model?: Database["public"]["Enums"]["pricing_model"]
           qbo_id?: string | null
           sale_ends_at?: string | null
           sale_price?: number | null
+          sale_price_cents?: number | null
           sale_starts_at?: string | null
           show_on_website?: boolean
           slug?: string

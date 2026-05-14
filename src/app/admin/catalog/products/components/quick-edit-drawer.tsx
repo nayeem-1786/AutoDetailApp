@@ -12,7 +12,8 @@ import { FormField } from '@/components/ui/form-field';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { usePermission } from '@/lib/hooks/use-permission';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney, formatMoneyForInput } from '@/lib/utils/format';
+import { fromCents, toCents } from '@/lib/utils/money';
 import type { Product } from '@/lib/supabase/types';
 
 // Shared props for the in-input clear-X button. `onMouseDown` preventDefault
@@ -41,20 +42,25 @@ const QTY_REASON_OPTIONS: { value: QtyReason; label: string }[] = [
   { value: 'shop_use', label: 'Shop use' },
 ];
 
-function formatPrice(n: number | null | undefined): string {
-  if (n === null || n === undefined) return '';
-  return Number.isFinite(n) ? n.toFixed(2) : '';
+// Phase Money-Unify-3: input edit fields accept integer cents and render via
+// formatMoneyForInput (e.g. cents=1000 → "10.00"). parsePrice converts user
+// keystrokes back to integer cents via toCents().
+function formatPriceCents(cents: number | null | undefined): string {
+  if (cents === null || cents === undefined || !Number.isFinite(cents)) return '';
+  return formatMoneyForInput(cents);
 }
 function formatInt(n: number | null | undefined): string {
   if (n === null || n === undefined) return '';
   return String(n);
 }
 
-function parsePrice(s: string): number | null {
+// Parse dollar-string input → integer cents. Returns null on invalid/empty/negative.
+function parsePriceCents(s: string): number | null {
   const trimmed = s.trim();
   if (trimmed === '') return null;
   const n = parseFloat(trimmed);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  if (!Number.isFinite(n) || n < 0) return null;
+  return toCents(n);
 }
 function parseInteger(s: string): number | null {
   const trimmed = s.trim();
@@ -92,18 +98,18 @@ export function QuickEditDrawer({
   useEffect(() => {
     setCurrent(product);
     setBarcodeStr(product?.barcode ?? '');
-    setPriceStr(formatPrice(product?.retail_price));
-    setCostStr(formatPrice(product?.cost_price));
+    setPriceStr(formatPriceCents(product?.retail_price_cents));
+    setCostStr(formatPriceCents(product?.cost_price_cents));
     setThresholdStr(formatInt(product?.reorder_threshold));
     setQtyStr(formatInt(product?.quantity_on_hand));
     setQtyReason('');
     setQtyNotes('');
-  }, [product?.id, product?.barcode, product?.retail_price, product?.cost_price, product?.reorder_threshold, product?.quantity_on_hand]);
+  }, [product?.id, product?.barcode, product?.retail_price_cents, product?.cost_price_cents, product?.reorder_threshold, product?.quantity_on_hand]);
 
   // Shared autosave helper for price/cost/threshold.
   const saveField = useCallback(
     async (
-      field: 'retail_price' | 'cost_price' | 'reorder_threshold',
+      field: 'retail_price_cents' | 'cost_price_cents' | 'reorder_threshold',
       newValue: number | null,
       label: string,
       displayValue: string,
@@ -123,8 +129,8 @@ export function QuickEditDrawer({
       if (error) {
         setCurrent((prev) => (prev ? { ...prev, [field]: oldValue } as Product : prev));
         // Re-hydrate the draft string to the prior value so the user sees the revert.
-        if (field === 'retail_price') setPriceStr(formatPrice(oldValue));
-        else if (field === 'cost_price') setCostStr(formatPrice(oldValue));
+        if (field === 'retail_price_cents') setPriceStr(formatPriceCents(oldValue));
+        else if (field === 'cost_price_cents') setCostStr(formatPriceCents(oldValue));
         else setThresholdStr(formatInt(oldValue));
         toast.error(`Save failed: ${error.message}`);
         return;
@@ -138,8 +144,8 @@ export function QuickEditDrawer({
           label: 'Undo',
           onClick: async () => {
             setCurrent((prev) => (prev ? { ...prev, [field]: oldValue } as Product : prev));
-            if (field === 'retail_price') setPriceStr(formatPrice(oldValue));
-            else if (field === 'cost_price') setCostStr(formatPrice(oldValue));
+            if (field === 'retail_price_cents') setPriceStr(formatPriceCents(oldValue));
+            else if (field === 'cost_price_cents') setCostStr(formatPriceCents(oldValue));
             else setThresholdStr(formatInt(oldValue));
 
             const { error: undoErr } = await supabase
@@ -152,7 +158,7 @@ export function QuickEditDrawer({
               return;
             }
             onSaved?.({ ...current, [field]: oldValue } as Product);
-            const reverted = field === 'reorder_threshold' ? formatInt(oldValue) : `$${formatPrice(oldValue)}`;
+            const reverted = field === 'reorder_threshold' ? formatInt(oldValue) : (oldValue != null ? formatMoney(oldValue) : '—');
             toast(`Reverted to ${reverted}`);
           },
         },
@@ -232,22 +238,22 @@ export function QuickEditDrawer({
   }
 
   async function handlePriceBlur() {
-    const next = parsePrice(priceStr);
+    const next = parsePriceCents(priceStr);
     if (next === null) {
       // Invalid — restore display to current saved value.
-      setPriceStr(formatPrice(current?.retail_price));
+      setPriceStr(formatPriceCents(current?.retail_price_cents));
       return;
     }
-    await saveField('retail_price', next, 'Price', formatCurrency(next));
+    await saveField('retail_price_cents', next, 'Price', formatMoney(next));
   }
 
   async function handleCostBlur() {
-    const next = parsePrice(costStr);
+    const next = parsePriceCents(costStr);
     if (next === null) {
-      setCostStr(formatPrice(current?.cost_price));
+      setCostStr(formatPriceCents(current?.cost_price_cents));
       return;
     }
-    await saveField('cost_price', next, 'Cost', formatCurrency(next));
+    await saveField('cost_price_cents', next, 'Cost', formatMoney(next));
   }
 
   async function handleThresholdBlur() {

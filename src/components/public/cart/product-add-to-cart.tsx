@@ -11,7 +11,8 @@ interface ProductAddToCartProps {
     name: string;
     slug: string;
     categorySlug: string;
-    price: number;
+    // Money-Unify-3 (Family D): cents — mirrors CartItem.price_cents.
+    price_cents: number;
     stockQuantity: number;
     imageUrl: string | null;
   };
@@ -36,7 +37,7 @@ export function ProductAddToCart({ product }: ProductAddToCartProps) {
         name: product.name,
         slug: product.slug,
         categorySlug: product.categorySlug,
-        price: product.price,
+        price_cents: product.price_cents,
         maxQuantity: product.stockQuantity,
         imageUrl: product.imageUrl,
       },

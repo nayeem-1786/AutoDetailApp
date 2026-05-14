@@ -111,11 +111,7 @@ export default function NewPurchaseOrderPage() {
         product_name: product.name,
         sku: product.sku,
         quantity_ordered: product.min_order_qty || 1,
-        // TODO Unify-D: when Family D migrates products.cost_price to
-        // cents, remove toCents() and use product.cost_price_cents
-        // directly. See docs/sessions/money-unify-0-migration-
-        // playbook-v2.md §Family D.
-        unit_cost_cents: toCents(product.cost_price),
+        unit_cost_cents: product.cost_price_cents ?? 0,
       },
     ]);
     setProductSearch('');
@@ -269,7 +265,7 @@ export default function NewPurchaseOrderPage() {
                       )}
                     </span>
                     <span className="text-gray-500">
-                      Cost: {formatCurrency(p.cost_price)} | Stock: {p.quantity_on_hand}
+                      Cost: {formatCurrency(p.cost_price_cents)} | Stock: {p.quantity_on_hand}
                     </span>
                   </button>
                 ))}

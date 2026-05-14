@@ -6,7 +6,7 @@ import { ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 
 interface OrderSummary {
   id: string;

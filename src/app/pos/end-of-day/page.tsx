@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, CheckCircle2, LockOpen, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { posFetch } from '../lib/pos-fetch';
 import { usePosAuth } from '../context/pos-auth-context';
 import { usePosPermission } from '../context/pos-permission-context';

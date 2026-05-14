@@ -25,7 +25,8 @@ import {
   VEHICLE_SIZE_CLASS_KEYS,
   VEHICLE_SIZE_LABELS,
 } from '@/lib/utils/constants';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { fromCents, toCents } from '@/lib/utils/money';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -234,7 +235,9 @@ export default function ServiceDetailPage() {
     if (addonsRes.data) setAddons(addonsRes.data as AddonSuggestionWithService[]);
     if (prereqsRes.data) setPrerequisites(prereqsRes.data as PrerequisiteWithService[]);
 
-    // Populate form
+    // Populate form — money + pricing-model-specific fields are handled by
+    // pricingValue / sale state below (not RHF). Conversion cents → dollars
+    // happens in buildPricingValue() and the sale-price hydration block.
     reset({
       name: svc.name,
       description: svc.description || '',
@@ -242,11 +245,6 @@ export default function ServiceDetailPage() {
       pricing_model: svc.pricing_model,
       classification: svc.classification,
       base_duration_minutes: svc.base_duration_minutes,
-      flat_price: svc.flat_price,
-      custom_starting_price: svc.custom_starting_price,
-      per_unit_price: svc.per_unit_price,
-      per_unit_max: svc.per_unit_max,
-      per_unit_label: svc.per_unit_label || '',
       mobile_eligible: svc.mobile_eligible,
       online_bookable: svc.online_bookable,
       staff_assessed: svc.staff_assessed,
@@ -264,14 +262,15 @@ export default function ServiceDetailPage() {
     // Build pricing value from existing rows
     buildPricingValue(svc.pricing_model, pricingRes.data || [], svc);
 
-    // Populate sale pricing state
+    // Populate sale pricing state — DB holds cents; form state holds dollars.
+    // Convert at the boundary; conversion back to cents happens at save.
     const sp: Record<string, number | ''> = {};
     (pricingRes.data || []).forEach((r: ServicePricing) => {
-      sp[r.tier_name] = r.sale_price ?? '';
+      sp[r.tier_name] = r.sale_price_cents != null ? fromCents(r.sale_price_cents) : '';
     });
     setSalePrices(sp);
     // Populate flat/per_unit sale price from service-level column
-    setFlatSalePrice(svc.sale_price ?? '');
+    setFlatSalePrice(svc.sale_price_cents != null ? fromCents(svc.sale_price_cents) : '');
     // Convert timestamps to PST date strings for date inputs
     setSaleStartsAt(svc.sale_starts_at ? new Date(svc.sale_starts_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
     setSaleEndsAt(svc.sale_ends_at ? new Date(svc.sale_ends_at).toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }) : '');
@@ -285,15 +284,22 @@ export default function ServiceDetailPage() {
     // Track original row IDs so we can detect deletions on save
     setOriginalPricingIds(rows.map((r) => r.id));
 
+    // Phase Money-Unify-3: DB holds integer cents; form state holds dollars
+    // (matches the <Input step="0.01"> UX in ServicePricingForm). Conversion
+    // at this boundary; the inverse happens in onSavePricing().
+    const centsToDollarOrBlank = (cents: number | null | undefined): number | '' =>
+      cents != null ? fromCents(cents) : '';
+
     switch (model) {
       case 'vehicle_size': {
         const vsp: VehicleSizePricing = { sedan: '', truck_suv_2row: '', suv_3row_van: '', exotic: '', classic: '' };
         rows.forEach((r) => {
-          if (r.tier_name === 'sedan') vsp.sedan = r.price;
-          if (r.tier_name === 'truck_suv_2row') vsp.truck_suv_2row = r.price;
-          if (r.tier_name === 'suv_3row_van') vsp.suv_3row_van = r.price;
-          if (r.tier_name === 'exotic') vsp.exotic = r.price;
-          if (r.tier_name === 'classic') vsp.classic = r.price;
+          const dollars = centsToDollarOrBlank(r.price_cents);
+          if (r.tier_name === 'sedan') vsp.sedan = dollars;
+          if (r.tier_name === 'truck_suv_2row') vsp.truck_suv_2row = dollars;
+          if (r.tier_name === 'suv_3row_van') vsp.suv_3row_van = dollars;
+          if (r.tier_name === 'exotic') vsp.exotic = dollars;
+          if (r.tier_name === 'classic') vsp.classic = dollars;
         });
         setPricingValue({ model: 'vehicle_size', data: vsp });
         break;
@@ -303,13 +309,13 @@ export default function ServiceDetailPage() {
           id: r.id,
           tier_name: r.tier_name,
           tier_label: r.tier_label || '',
-          price: r.price,
+          price: centsToDollarOrBlank(r.price_cents),
           is_vehicle_size_aware: r.is_vehicle_size_aware,
-          vehicle_size_sedan_price: r.vehicle_size_sedan_price ?? '',
-          vehicle_size_truck_suv_price: r.vehicle_size_truck_suv_price ?? '',
-          vehicle_size_suv_van_price: r.vehicle_size_suv_van_price ?? '',
-          vehicle_size_exotic_price: r.vehicle_size_exotic_price ?? '',
-          vehicle_size_classic_price: r.vehicle_size_classic_price ?? '',
+          vehicle_size_sedan_price: centsToDollarOrBlank(r.vehicle_size_sedan_price_cents),
+          vehicle_size_truck_suv_price: centsToDollarOrBlank(r.vehicle_size_truck_suv_price_cents),
+          vehicle_size_suv_van_price: centsToDollarOrBlank(r.vehicle_size_suv_van_price_cents),
+          vehicle_size_exotic_price: centsToDollarOrBlank(r.vehicle_size_exotic_price_cents),
+          vehicle_size_classic_price: centsToDollarOrBlank(r.vehicle_size_classic_price_cents),
           max_qty: r.max_qty ?? '',
           qty_label: r.qty_label || '',
         }));
@@ -320,7 +326,7 @@ export default function ServiceDetailPage() {
         setPricingValue({
           model: 'per_unit',
           data: {
-            per_unit_price: svc.per_unit_price ?? '',
+            per_unit_price: centsToDollarOrBlank(svc.per_unit_price_cents),
             per_unit_max: svc.per_unit_max ?? '',
             per_unit_label: svc.per_unit_label || '',
           },
@@ -331,16 +337,16 @@ export default function ServiceDetailPage() {
           id: r.id,
           tier_name: r.tier_name,
           tier_label: r.tier_label || '',
-          price: r.price,
+          price: centsToDollarOrBlank(r.price_cents),
         }));
         setPricingValue({ model: 'specialty', data: specTiers.length > 0 ? specTiers : [{ tier_name: '', tier_label: '', price: '' }] });
         break;
       }
       case 'flat':
-        setPricingValue({ model: 'flat', data: { flat_price: svc.flat_price ?? '' } });
+        setPricingValue({ model: 'flat', data: { flat_price: centsToDollarOrBlank(svc.flat_price_cents) } });
         break;
       case 'custom':
-        setPricingValue({ model: 'custom', data: { custom_starting_price: svc.custom_starting_price ?? '' } });
+        setPricingValue({ model: 'custom', data: { custom_starting_price: centsToDollarOrBlank(svc.custom_starting_price_cents) } });
         break;
     }
   }
@@ -354,7 +360,7 @@ export default function ServiceDetailPage() {
     if (saleDiscountType === 'direct') return;
     if (typeof saleDiscountValue !== 'number' || saleDiscountValue <= 0) return;
 
-    // Flat/per_unit: single base price
+    // Flat/per_unit: single base price (form state holds dollars)
     if (service && (service.pricing_model === 'flat' || service.pricing_model === 'per_unit')) {
       const basePrice = service.pricing_model === 'flat'
         ? (typeof pricingValue.data === 'object' && 'flat_price' in pricingValue.data ? (pricingValue.data as { flat_price: number | '' }).flat_price : 0)
@@ -378,11 +384,14 @@ export default function ServiceDetailPage() {
           : Math.max(0.01, Math.round((std - saleDiscountValue) * 100) / 100);
       }
     } else {
+      // pricing rows hold cents in DB; recalc uses dollar math to match the
+      // sale-price form input layer
       for (const row of pricing) {
-        if (row.price <= 0) { newSP[row.tier_name] = ''; continue; }
+        const stdDollars = row.price_cents != null ? fromCents(row.price_cents) : 0;
+        if (stdDollars <= 0) { newSP[row.tier_name] = ''; continue; }
         newSP[row.tier_name] = saleDiscountType === 'percentage'
-          ? Math.round(row.price * (1 - saleDiscountValue / 100) * 100) / 100
-          : Math.max(0.01, Math.round((row.price - saleDiscountValue) * 100) / 100);
+          ? Math.round(stdDollars * (1 - saleDiscountValue / 100) * 100) / 100
+          : Math.max(0.01, Math.round((stdDollars - saleDiscountValue) * 100) / 100);
       }
     }
 
@@ -540,15 +549,17 @@ export default function ServiceDetailPage() {
     try {
       const model = service.pricing_model;
 
-      // Validate sale prices before saving
+      // Validate sale prices before saving (form state holds dollars;
+      // service / pricing rows hold cents). Compare in cents to avoid float drift.
       if ((model === 'flat' || model === 'per_unit') && typeof flatSalePrice === 'number') {
-        const basePrice = model === 'flat' ? service.flat_price : service.per_unit_price;
-        if (basePrice != null && flatSalePrice >= basePrice) {
-          toast.error(`Sale price must be less than standard price (${formatCurrency(basePrice)})`);
+        const baseCents = model === 'flat' ? service.flat_price_cents : service.per_unit_price_cents;
+        const saleCents = toCents(flatSalePrice);
+        if (baseCents != null && saleCents >= baseCents) {
+          toast.error(`Sale price must be less than standard price (${formatMoney(baseCents)})`);
           setSavingPricing(false);
           return;
         }
-        if (flatSalePrice <= 0) {
+        if (saleCents <= 0) {
           toast.error('Sale price must be greater than $0');
           setSavingPricing(false);
           return;
@@ -557,12 +568,13 @@ export default function ServiceDetailPage() {
       for (const row of pricing) {
         const sp = salePrices[row.tier_name];
         if (sp !== '' && sp !== undefined && typeof sp === 'number') {
-          if (sp >= row.price) {
-            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be less than standard price (${formatCurrency(row.price)})`);
+          const saleCents = toCents(sp);
+          if (row.price_cents != null && saleCents >= row.price_cents) {
+            toast.error(`Sale price for ${row.tier_label || row.tier_name} must be less than standard price (${formatMoney(row.price_cents)})`);
             setSavingPricing(false);
             return;
           }
-          if (sp <= 0) {
+          if (saleCents <= 0) {
             toast.error(`Sale price for ${row.tier_label || row.tier_name} must be greater than $0`);
             setSavingPricing(false);
             return;
@@ -570,23 +582,24 @@ export default function ServiceDetailPage() {
         }
       }
 
-      // Update service-level fields (including sale dates)
+      // Update service-level fields. Form state is dollars; DB columns are
+      // integer cents. Conversion happens here at the save boundary.
       const serviceUpdate: Record<string, unknown> = {};
       if (model === 'flat' && pricingValue.model === 'flat') {
-        serviceUpdate.flat_price = typeof pricingValue.data.flat_price === 'number' ? pricingValue.data.flat_price : null;
+        serviceUpdate.flat_price_cents = typeof pricingValue.data.flat_price === 'number' ? toCents(pricingValue.data.flat_price) : null;
       }
       if (model === 'custom' && pricingValue.model === 'custom') {
-        serviceUpdate.custom_starting_price = typeof pricingValue.data.custom_starting_price === 'number' ? pricingValue.data.custom_starting_price : null;
+        serviceUpdate.custom_starting_price_cents = typeof pricingValue.data.custom_starting_price === 'number' ? toCents(pricingValue.data.custom_starting_price) : null;
       }
       if (model === 'per_unit' && pricingValue.model === 'per_unit') {
-        serviceUpdate.per_unit_price = typeof pricingValue.data.per_unit_price === 'number' ? pricingValue.data.per_unit_price : null;
+        serviceUpdate.per_unit_price_cents = typeof pricingValue.data.per_unit_price === 'number' ? toCents(pricingValue.data.per_unit_price) : null;
         serviceUpdate.per_unit_max = typeof pricingValue.data.per_unit_max === 'number' ? pricingValue.data.per_unit_max : null;
         serviceUpdate.per_unit_label = pricingValue.data.per_unit_label || null;
       }
 
-      // Save flat/per_unit sale_price on service level
+      // Save flat/per_unit sale_price_cents on service level
       if (model === 'flat' || model === 'per_unit') {
-        serviceUpdate.sale_price = typeof flatSalePrice === 'number' ? flatSalePrice : null;
+        serviceUpdate.sale_price_cents = typeof flatSalePrice === 'number' ? toCents(flatSalePrice) : null;
       }
 
       // Always save sale dates (PST/PDT-aware)
@@ -603,11 +616,16 @@ export default function ServiceDetailPage() {
 
         // ---- Vehicle Size: use upsert on (service_id, tier_name) unique constraint ----
         if (model === 'vehicle_size' && pricingValue.model === 'vehicle_size') {
+          // Form state holds dollars; convert to cents at write boundary.
+          const tierSaleCents = (key: string): number | null => {
+            const v = salePrices[key];
+            return typeof v === 'number' ? toCents(v) : null;
+          };
           // Standard tiers: always upsert (empty → 0)
           const standardRows = [
-            { service_id: serviceId, tier_name: 'sedan', tier_label: 'Sedan', price: typeof pricingValue.data.sedan === 'number' ? pricingValue.data.sedan : 0, display_order: 0, is_vehicle_size_aware: false, sale_price: typeof salePrices['sedan'] === 'number' ? salePrices['sedan'] : null },
-            { service_id: serviceId, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price: typeof pricingValue.data.truck_suv_2row === 'number' ? pricingValue.data.truck_suv_2row : 0, display_order: 1, is_vehicle_size_aware: false, sale_price: typeof salePrices['truck_suv_2row'] === 'number' ? salePrices['truck_suv_2row'] : null },
-            { service_id: serviceId, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price: typeof pricingValue.data.suv_3row_van === 'number' ? pricingValue.data.suv_3row_van : 0, display_order: 2, is_vehicle_size_aware: false, sale_price: typeof salePrices['suv_3row_van'] === 'number' ? salePrices['suv_3row_van'] : null },
+            { service_id: serviceId, tier_name: 'sedan', tier_label: 'Sedan', price_cents: typeof pricingValue.data.sedan === 'number' ? toCents(pricingValue.data.sedan) : 0, display_order: 0, is_vehicle_size_aware: false, sale_price_cents: tierSaleCents('sedan') },
+            { service_id: serviceId, tier_name: 'truck_suv_2row', tier_label: 'Truck/SUV (2-Row)', price_cents: typeof pricingValue.data.truck_suv_2row === 'number' ? toCents(pricingValue.data.truck_suv_2row) : 0, display_order: 1, is_vehicle_size_aware: false, sale_price_cents: tierSaleCents('truck_suv_2row') },
+            { service_id: serviceId, tier_name: 'suv_3row_van', tier_label: 'SUV (3-Row) / Van', price_cents: typeof pricingValue.data.suv_3row_van === 'number' ? toCents(pricingValue.data.suv_3row_van) : 0, display_order: 2, is_vehicle_size_aware: false, sale_price_cents: tierSaleCents('suv_3row_van') },
           ];
 
           // Specialty tiers (exotic/classic): skip upsert if empty, delete if cleared
@@ -626,8 +644,8 @@ export default function ServiceDetailPage() {
                 service_id: serviceId,
                 tier_name: name,
                 tier_label: label,
-                price: priceValue,
-                sale_price: (typeof salePrices[name] === 'number' && (salePrices[name] as number) > 0) ? salePrices[name] as number : null,
+                price_cents: toCents(priceValue as number),
+                sale_price_cents: tierSaleCents(name),
                 is_vehicle_size_aware: false,
                 display_order,
               });
@@ -671,6 +689,13 @@ export default function ServiceDetailPage() {
             if (deleteError) throw deleteError;
           }
 
+          // Form state holds dollars; convert to cents at every DB write.
+          const vsToCents = (aware: boolean, v: number | ''): number | null =>
+            aware && typeof v === 'number' ? toCents(v) : null;
+          const scopeSaleCents = (key: string): number | null => {
+            const v = salePrices[key];
+            return typeof v === 'number' ? toCents(v) : null;
+          };
           // Update existing tiers
           for (let i = 0; i < existingTiers.length; i++) {
             const t = existingTiers[i];
@@ -681,15 +706,15 @@ export default function ServiceDetailPage() {
               .update({
                 tier_name: t.tier_name,
                 tier_label: t.tier_label || null,
-                price: typeof t.price === 'number' ? t.price : 0,
+                price_cents: typeof t.price === 'number' ? toCents(t.price) : 0,
                 display_order: displayOrder,
                 is_vehicle_size_aware: t.is_vehicle_size_aware,
-                vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
-                vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
-                vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
-                vehicle_size_exotic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_exotic_price === 'number' ? t.vehicle_size_exotic_price : null,
-                vehicle_size_classic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_classic_price === 'number' ? t.vehicle_size_classic_price : null,
-                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
+                vehicle_size_sedan_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_sedan_price),
+                vehicle_size_truck_suv_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_truck_suv_price),
+                vehicle_size_suv_van_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_suv_van_price),
+                vehicle_size_exotic_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_exotic_price),
+                vehicle_size_classic_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_classic_price),
+                sale_price_cents: scopeSaleCents(t.tier_name),
                 max_qty: typeof t.max_qty === 'number' && t.max_qty > 1 ? t.max_qty : null,
                 qty_label: t.qty_label?.trim() || null,
               })
@@ -705,15 +730,15 @@ export default function ServiceDetailPage() {
                 service_id: serviceId,
                 tier_name: t.tier_name,
                 tier_label: t.tier_label || null,
-                price: typeof t.price === 'number' ? t.price : 0,
+                price_cents: typeof t.price === 'number' ? toCents(t.price) : 0,
                 display_order: displayOrder,
                 is_vehicle_size_aware: t.is_vehicle_size_aware,
-                vehicle_size_sedan_price: t.is_vehicle_size_aware && typeof t.vehicle_size_sedan_price === 'number' ? t.vehicle_size_sedan_price : null,
-                vehicle_size_truck_suv_price: t.is_vehicle_size_aware && typeof t.vehicle_size_truck_suv_price === 'number' ? t.vehicle_size_truck_suv_price : null,
-                vehicle_size_suv_van_price: t.is_vehicle_size_aware && typeof t.vehicle_size_suv_van_price === 'number' ? t.vehicle_size_suv_van_price : null,
-                vehicle_size_exotic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_exotic_price === 'number' ? t.vehicle_size_exotic_price : null,
-                vehicle_size_classic_price: t.is_vehicle_size_aware && typeof t.vehicle_size_classic_price === 'number' ? t.vehicle_size_classic_price : null,
-                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
+                vehicle_size_sedan_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_sedan_price),
+                vehicle_size_truck_suv_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_truck_suv_price),
+                vehicle_size_suv_van_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_suv_van_price),
+                vehicle_size_exotic_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_exotic_price),
+                vehicle_size_classic_price_cents: vsToCents(t.is_vehicle_size_aware, t.vehicle_size_classic_price),
+                sale_price_cents: scopeSaleCents(t.tier_name),
                 max_qty: typeof t.max_qty === 'number' && t.max_qty > 1 ? t.max_qty : null,
                 qty_label: t.qty_label?.trim() || null,
               };
@@ -742,6 +767,11 @@ export default function ServiceDetailPage() {
             if (deleteError) throw deleteError;
           }
 
+          // Form state holds dollars; convert to cents at every DB write.
+          const specialtySaleCents = (key: string): number | null => {
+            const v = salePrices[key];
+            return typeof v === 'number' ? toCents(v) : null;
+          };
           // Update existing tiers
           for (let i = 0; i < existingTiers.length; i++) {
             const t = existingTiers[i];
@@ -751,10 +781,10 @@ export default function ServiceDetailPage() {
               .update({
                 tier_name: t.tier_name,
                 tier_label: t.tier_label || null,
-                price: typeof t.price === 'number' ? t.price : 0,
+                price_cents: typeof t.price === 'number' ? toCents(t.price) : 0,
                 display_order: displayOrder,
                 is_vehicle_size_aware: false,
-                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
+                sale_price_cents: specialtySaleCents(t.tier_name),
               })
               .eq('id', t.id as string);
             if (updateError) throw updateError;
@@ -768,10 +798,10 @@ export default function ServiceDetailPage() {
                 service_id: serviceId,
                 tier_name: t.tier_name,
                 tier_label: t.tier_label || null,
-                price: typeof t.price === 'number' ? t.price : 0,
+                price_cents: typeof t.price === 'number' ? toCents(t.price) : 0,
                 display_order: displayOrder,
                 is_vehicle_size_aware: false,
-                sale_price: typeof salePrices[t.tier_name] === 'number' ? salePrices[t.tier_name] : null,
+                sale_price_cents: specialtySaleCents(t.tier_name),
               };
             });
             const { error: insertError } = await supabase.from('service_pricing').insert(insertRows);
@@ -961,19 +991,19 @@ export default function ServiceDetailPage() {
   async function clearAllSalePrices() {
     setSavingSale(true);
     try {
-      // Clear sale_price on all pricing rows (tiered models)
+      // Clear sale_price_cents on all pricing rows (tiered models)
       for (const row of pricing) {
         const { error } = await supabase
           .from('service_pricing')
-          .update({ sale_price: null })
+          .update({ sale_price_cents: null })
           .eq('id', row.id);
         if (error) throw error;
       }
 
-      // Clear sale dates and flat/per_unit sale_price on service
+      // Clear sale dates and flat/per_unit sale_price_cents on service
       const { error: svcError } = await supabase
         .from('services')
-        .update({ sale_price: null, sale_starts_at: null, sale_ends_at: null })
+        .update({ sale_price_cents: null, sale_starts_at: null, sale_ends_at: null })
         .eq('id', serviceId);
       if (svcError) throw svcError;
 
@@ -1384,11 +1414,12 @@ export default function ServiceDetailPage() {
                           <tbody>
                             {[...pricing].sort((a, b) => a.display_order - b.display_order).map((tier) => {
                               const sp = salePrices[tier.tier_name] ?? '';
-                              const hasError = sp !== '' && typeof sp === 'number' && sp >= tier.price;
+                              const tierStandardDollars = tier.price_cents != null ? fromCents(tier.price_cents) : 0;
+                              const hasError = sp !== '' && typeof sp === 'number' && sp >= tierStandardDollars;
                               return (
                                 <tr key={tier.id} className="border-b border-gray-100">
                                   <td className="px-3 py-3 font-medium text-gray-700">{tier.tier_label || tier.tier_name}</td>
-                                  <td className="px-3 py-3 text-gray-600">{formatCurrency(tier.price)}</td>
+                                  <td className="px-3 py-3 text-gray-600">{tier.price_cents != null ? formatMoney(tier.price_cents) : '—'}</td>
                                   <td className="px-3 py-3">
                                     {saleDiscountType !== 'direct' ? (
                                       <p className="text-sm font-medium text-gray-700 pl-1">
@@ -1409,7 +1440,7 @@ export default function ServiceDetailPage() {
                                             [tier.tier_name]: e.target.value === '' ? '' : parseFloat(e.target.value),
                                           })}
                                         />
-                                        {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(tier.price)}</p>}
+                                        {hasError && tier.price_cents != null && <p className="mt-1 text-xs text-red-500">Must be less than {formatMoney(tier.price_cents)}</p>}
                                       </div>
                                     )}
                                   </td>
@@ -1423,8 +1454,9 @@ export default function ServiceDetailPage() {
                   )}
                   {/* Inline sale pricing for flat/per_unit (single price, no tiers) */}
                   {pricing.length === 0 && (service.pricing_model === 'flat' || service.pricing_model === 'per_unit') && service.classification !== 'addon_only' && (() => {
-                    const basePrice = service.pricing_model === 'flat' ? service.flat_price : service.per_unit_price;
-                    const hasError = typeof flatSalePrice === 'number' && basePrice != null && flatSalePrice >= basePrice;
+                    const basePriceCents = service.pricing_model === 'flat' ? service.flat_price_cents : service.per_unit_price_cents;
+                    const baseDollars = basePriceCents != null ? fromCents(basePriceCents) : null;
+                    const hasError = typeof flatSalePrice === 'number' && baseDollars != null && flatSalePrice >= baseDollars;
                     return (
                       <div className="border-t border-gray-200 pt-6 space-y-4">
                         <p className="mb-1 text-sm font-semibold text-gray-700">Sale Price</p>
@@ -1437,7 +1469,7 @@ export default function ServiceDetailPage() {
                         <div className="flex items-center gap-4">
                           <div>
                             <p className="text-xs font-semibold text-gray-500 mb-1">Standard</p>
-                            <p className="text-sm text-gray-600">{basePrice != null ? formatCurrency(basePrice) : '—'}{service.pricing_model === 'per_unit' ? ` / ${service.per_unit_label || 'unit'}` : ''}</p>
+                            <p className="text-sm text-gray-600">{basePriceCents != null ? formatMoney(basePriceCents) : '—'}{service.pricing_model === 'per_unit' ? ` / ${service.per_unit_label || 'unit'}` : ''}</p>
                           </div>
                           <div>
                             <p className="text-xs font-semibold text-gray-500 mb-1">Sale Price</p>
@@ -1457,7 +1489,7 @@ export default function ServiceDetailPage() {
                                   value={flatSalePrice}
                                   onChange={(e) => setFlatSalePrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
                                 />
-                                {hasError && <p className="mt-1 text-xs text-red-500">Must be less than {formatCurrency(basePrice!)}</p>}
+                                {hasError && basePriceCents != null && <p className="mt-1 text-xs text-red-500">Must be less than {formatMoney(basePriceCents)}</p>}
                               </div>
                             )}
                           </div>
@@ -1512,16 +1544,16 @@ export default function ServiceDetailPage() {
                         {sortedTiers.map((tier) => {
                           const sp = salePrices[tier.tier_name];
                           if (sp === '' || sp === undefined || typeof sp !== 'number') return null;
-                          const info = getTierSaleInfo(tier.price, sp, true);
+                          const info = getTierSaleInfo(tier.price_cents, toCents(sp), true);
                           if (!info || !info.isDiscounted) return null;
                           return (
                             <div key={tier.id} className="flex items-center gap-2 text-gray-600">
                               <span className="font-medium min-w-[140px]">{tier.tier_label || tier.tier_name}:</span>
-                              <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+                              <span className="text-gray-400 line-through">{formatMoney(info.originalPriceCents)}</span>
                               <span className="text-gray-400">&rarr;</span>
-                              <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+                              <span className="font-semibold text-green-600">{formatMoney(info.currentPriceCents)}</span>
                               <span className="text-xs text-gray-400">
-                                (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                                (-{info.discountPercent}%, save {formatMoney(info.savingsCents)})
                               </span>
                             </div>
                           );
@@ -1532,8 +1564,8 @@ export default function ServiceDetailPage() {
                 }
                 // Flat/per_unit preview
                 if ((service.pricing_model === 'flat' || service.pricing_model === 'per_unit') && service.classification !== 'addon_only' && typeof flatSalePrice === 'number') {
-                  const basePrice = service.pricing_model === 'flat' ? service.flat_price : service.per_unit_price;
-                  const info = getTierSaleInfo(basePrice, flatSalePrice, true);
+                  const basePriceCents = service.pricing_model === 'flat' ? service.flat_price_cents : service.per_unit_price_cents;
+                  const info = getTierSaleInfo(basePriceCents, toCents(flatSalePrice), true);
                   if (!info || !info.isDiscounted) return null;
                   const endingSoon = isEndingSoon(getSaleStatus(service).saleEndsAt);
                   const label = service.pricing_model === 'flat' ? 'Flat' : `Per ${service.per_unit_label || 'unit'}`;
@@ -1541,17 +1573,17 @@ export default function ServiceDetailPage() {
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                       <p className="mb-2 text-sm font-semibold text-gray-700">
                         Sale Preview
-                        {service.sale_price != null && getSaleStatus(service).isOnSale && endingSoon && (
+                        {service.sale_price_cents != null && getSaleStatus(service).isOnSale && endingSoon && (
                           <span className="ml-2 text-amber-600">&#9200; Ending soon!</span>
                         )}
                       </p>
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <span className="font-medium min-w-[140px]">{label}:</span>
-                        <span className="text-gray-400 line-through">{formatCurrency(info.originalPrice)}</span>
+                        <span className="text-gray-400 line-through">{formatMoney(info.originalPriceCents)}</span>
                         <span className="text-gray-400">&rarr;</span>
-                        <span className="font-semibold text-green-600">{formatCurrency(info.currentPrice)}</span>
+                        <span className="font-semibold text-green-600">{formatMoney(info.currentPriceCents)}</span>
                         <span className="text-xs text-gray-400">
-                          (-{info.discountPercent}%, save {formatCurrency(info.savings)})
+                          (-{info.discountPercent}%, save {formatMoney(info.savingsCents)})
                         </span>
                       </div>
                     </div>
@@ -1562,7 +1594,7 @@ export default function ServiceDetailPage() {
 
               {/* Action buttons */}
               <div className="flex items-center justify-between">
-                {canSetPricing && (hasAnySalePrice(pricing) || service.sale_price != null) && (
+                {canSetPricing && (hasAnySalePrice(pricing) || service.sale_price_cents != null) && (
                   <Button variant="outline" size="sm" onClick={() => setShowClearSaleDialog(true)} disabled={savingSale}>
                     <X className="h-4 w-4" />
                     Clear All Sale Prices

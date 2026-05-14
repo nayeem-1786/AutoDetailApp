@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

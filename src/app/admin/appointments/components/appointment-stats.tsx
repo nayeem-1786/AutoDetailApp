@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 
 interface AppointmentStatsProps {

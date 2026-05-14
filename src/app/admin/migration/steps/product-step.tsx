@@ -14,6 +14,7 @@ import {
   parseDollarAmount,
 } from '@/lib/migration/phone-utils';
 import { WATER_SKU } from '@/lib/utils/constants';
+import { toCents } from '@/lib/utils/money';
 import type { MigrationState, ProductImportRow } from '@/lib/migration/types';
 
 interface ProductStepProps {
@@ -125,8 +126,10 @@ export function ProductStep({ state, onStateChange, onContinue }: ProductStepPro
         description: p.row['Description']?.trim() || null,
         category_slug: p.categorySlug,
         vendor_name: p.vendor || null,
-        cost_price: p.cost,
-        retail_price: p.price,
+        // Phase Money-Unify-3: ProcessedProduct.price/cost are parsed dollars
+        // (parseDollarAmount). DB columns are integer cents — convert here.
+        cost_price_cents: toCents(p.cost),
+        retail_price_cents: toCents(p.price),
         quantity_on_hand: p.quantity,
         reorder_threshold: parseInt(p.row['Stock Alert Count SDASAS'] || '0', 10) || null,
         is_taxable: p.row['Tax - Tax (10.25%)'] === 'Y',

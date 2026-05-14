@@ -53,7 +53,7 @@ export function ProductDetail({ product, open, onClose }: ProductDetailProps) {
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{product.name}</h2>
             <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">
-              ${product.retail_price.toFixed(2)}
+              ${product.retail_price_cents.toFixed(2)}
             </p>
             {product.sku && (
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">SKU: {product.sku}</p>
@@ -104,7 +104,7 @@ export function ProductDetail({ product, open, onClose }: ProductDetailProps) {
             onClick={handleAdd}
             className="w-full rounded-xl bg-blue-600 dark:bg-blue-500 py-3 text-base font-semibold text-white transition-all hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.99]"
           >
-            + Add to Ticket — ${(product.retail_price * qty).toFixed(2)}
+            + Add to Ticket — ${(product.retail_price_cents * qty).toFixed(2)}
           </button>
         </div>
       </div>

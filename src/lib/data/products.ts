@@ -152,8 +152,8 @@ export interface ProductVariant {
   name: string;
   slug: string;
   variant_label: string | null;
-  retail_price: number;
-  sale_price: number | null;
+  retail_price_cents: number;
+  sale_price_cents: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   image_url: string | null;
@@ -170,12 +170,12 @@ export async function getProductVariants(
 
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, slug, variant_label, retail_price, sale_price, sale_starts_at, sale_ends_at, image_url, product_categories!inner(slug)')
+    .select('id, name, slug, variant_label, retail_price_cents, sale_price_cents, sale_starts_at, sale_ends_at, image_url, product_categories!inner(slug)')
     .eq('product_group_id', productGroupId)
     .eq('is_active', true)
     .eq('show_on_website', true)
     .neq('id', excludeProductId)
-    .order('retail_price', { ascending: true });
+    .order('retail_price_cents', { ascending: true });
 
   if (error || !data) return [];
 
@@ -184,8 +184,8 @@ export async function getProductVariants(
     name: row.name as string,
     slug: row.slug as string,
     variant_label: row.variant_label as string | null,
-    retail_price: Number(row.retail_price),
-    sale_price: row.sale_price != null ? Number(row.sale_price) : null,
+    retail_price_cents: Number(row.retail_price_cents),
+    sale_price_cents: row.sale_price_cents != null ? Number(row.sale_price_cents) : null,
     sale_starts_at: row.sale_starts_at as string | null,
     sale_ends_at: row.sale_ends_at as string | null,
     image_url: row.image_url as string | null,

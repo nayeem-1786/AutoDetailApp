@@ -95,7 +95,7 @@ export async function POST(
         if (item.product_id) {
           const { data: product } = await admin
             .from('products')
-            .select('quantity_on_hand, cost_price')
+            .select('quantity_on_hand, cost_price_cents')
             .eq('id', item.product_id)
             .single();
           if (product) {
@@ -117,12 +117,7 @@ export async function POST(
               reference_id: id,
               reference_type: 'order',
               created_by: employee.id,
-              // TODO Unify-D: when Family D migrates products.cost_price to
-              // cents, remove toCents() and use product.cost_price_cents
-              // directly. See docs/sessions/money-unify-0-migration-
-              // playbook-v2.md §Family D.
-              unit_cost_cents:
-                product.cost_price != null ? toCents(product.cost_price) : null,
+              unit_cost_cents: product.cost_price_cents,
             });
           }
         }

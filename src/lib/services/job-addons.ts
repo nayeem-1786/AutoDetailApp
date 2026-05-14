@@ -287,6 +287,7 @@ export async function getPendingAddonsForCustomer(customerId: string): Promise<A
       service_id: a.service_id,
       product_id: a.product_id,
       custom_description: a.custom_description,
+      // TODO Unify-6: job_addons.price is Family C dollars (still NUMERIC).
       price: Number(a.price),
       discount_amount: Number(a.discount_amount),
       status: a.status,

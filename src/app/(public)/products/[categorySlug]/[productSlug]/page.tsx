@@ -10,7 +10,7 @@ import { generateProductMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { generateProductSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { SITE_URL } from '@/lib/utils/constants';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo, getSaleEndDescription, isEndingSoon } from '@/lib/utils/sale-pricing';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
 import { CtaSection } from '@/components/public/cta-section';
@@ -133,7 +133,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
               {(() => {
                 const saleStatus = getSaleStatus(product);
-                const saleInfo = getTierSaleInfo(product.retail_price, product.sale_price, saleStatus.isOnSale);
+                const saleInfo = getTierSaleInfo(product.retail_price_cents, product.sale_price_cents, saleStatus.isOnSale);
 
                 if (saleInfo?.isDiscounted) {
                   const endDesc = getSaleEndDescription(saleStatus.saleEndsAt);
@@ -151,10 +151,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       </div>
                       <div className="flex items-baseline gap-3">
                         <span className="text-lg text-site-text-muted line-through">
-                          {formatCurrency(saleInfo.originalPrice)}
+                          {formatMoney(saleInfo.originalPriceCents)}
                         </span>
                         <span className="font-display text-3xl font-bold text-accent-brand">
-                          {formatCurrency(saleInfo.currentPrice)}
+                          {formatMoney(saleInfo.currentPriceCents)}
                         </span>
                       </div>
                       {endDesc && (
@@ -169,7 +169,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
                 return (
                   <p className="mt-4 font-display text-3xl font-bold text-accent-brand">
-                    {formatCurrency(product.retail_price)}
+                    {formatCurrency(product.retail_price_cents)}
                   </p>
                 );
               })()}
@@ -201,10 +201,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   name: product.name,
                   slug: product.slug,
                   categorySlug: category.slug,
-                  price: (() => {
+                  price_cents: (() => {
                     const ss = getSaleStatus(product);
-                    const si = getTierSaleInfo(product.retail_price, product.sale_price, ss.isOnSale);
-                    return si?.isDiscounted ? si.currentPrice : product.retail_price;
+                    const si = getTierSaleInfo(product.retail_price_cents, product.sale_price_cents, ss.isOnSale);
+                    return si?.isDiscounted ? si.currentPriceCents : product.retail_price_cents;
                   })(),
                   stockQuantity: product.quantity_on_hand,
                   imageUrl: product.image_url,
@@ -328,16 +328,16 @@ export default async function ProductDetailPage({ params }: PageProps) {
                       <span className="ml-2 text-site-text-muted">
                         {formatCurrency((() => {
                           const ss = getSaleStatus(product);
-                          const si = getTierSaleInfo(product.retail_price, product.sale_price, ss.isOnSale);
-                          return si?.isDiscounted ? si.currentPrice : product.retail_price;
+                          const si = getTierSaleInfo(product.retail_price_cents, product.sale_price_cents, ss.isOnSale);
+                          return si?.isDiscounted ? si.currentPriceCents : product.retail_price_cents;
                         })())}
                       </span>
                     </span>
                     {/* Sibling variants — outline links */}
                     {variants.map((v) => {
                       const vs = getSaleStatus({ sale_starts_at: v.sale_starts_at, sale_ends_at: v.sale_ends_at });
-                      const vi = getTierSaleInfo(v.retail_price, v.sale_price, vs.isOnSale);
-                      const displayPrice = vi?.isDiscounted ? vi.currentPrice : v.retail_price;
+                      const vi = getTierSaleInfo(v.retail_price_cents, v.sale_price_cents, vs.isOnSale);
+                      const displayPrice = vi?.isDiscounted ? vi.currentPriceCents : v.retail_price_cents;
                       return (
                         <Link
                           key={v.id}

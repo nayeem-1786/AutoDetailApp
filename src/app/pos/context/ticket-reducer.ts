@@ -1,6 +1,7 @@
 import type { TicketState, TicketAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
 import { resolveServicePriceWithSale } from '../utils/pricing';
+import { fromCents } from '@/lib/utils/money';
 
 export const initialTicketState: TicketState = {
   items: [],
@@ -85,7 +86,10 @@ export function ticketReducer(
             : item
         );
       } else {
-        const totalPrice = product.retail_price;
+        // Family D catalog reads cents; TicketItem (Family A — Unify-5) is
+        // dollars-canonical. Convert at this boundary.
+        // TODO Unify-5: drop fromCents() shims when POS Transactions family migrates.
+        const totalPrice = fromCents(product.retail_price_cents);
         const newItem: TicketItem = {
           id: generateId(),
           itemType: 'product',
@@ -94,7 +98,7 @@ export function ticketReducer(
           categoryId: product.category_id ?? null,
           itemName: product.name,
           quantity: 1,
-          unitPrice: product.retail_price,
+          unitPrice: fromCents(product.retail_price_cents),
           totalPrice,
           taxAmount: calculateItemTax(totalPrice, product.is_taxable),
           isTaxable: product.is_taxable,
@@ -106,7 +110,7 @@ export function ticketReducer(
           perUnitPrice: null,
           perUnitMax: null,
           parentItemId: null,
-          standardPrice: product.retail_price,
+          standardPrice: fromCents(product.retail_price_cents),
           pricingType: 'standard',
           comboSourcePrimaryId: null,
           saleEffectivePrice: null,
@@ -169,7 +173,7 @@ export function ticketReducer(
         return state;
       }
 
-      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
+      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price_cents != null;
       const isScopeTierWithQty = !isPerUnit && !!perUnitQty && !!pricing?.max_qty && pricing.max_qty > 1;
 
       // Custom price override from specialty gate modal — bypass normal pricing resolution
@@ -206,17 +210,22 @@ export function ticketReducer(
         return recalculateTotals({ ...state, items: [...state.items, newItem] });
       }
 
-      // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
+      // Family D catalog returns cents (resolveServicePriceWithSale); TicketItem
+      // (Family A — Unify-5) is dollars-canonical. Collapse cents → dollars at
+      // this boundary so downstream math + writes stay in dollars.
+      // TODO Unify-5: drop fromCents() conversion when POS Transactions migrates.
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
       const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
+      const resolvedEffectiveDollars = fromCents(resolved.effectivePrice);
+      const resolvedStandardDollars = fromCents(resolved.standardPrice);
 
-      // Determine effective price: lowest of sale vs combo wins
-      let effectivePrice = resolved.effectivePrice;
+      // Determine effective price: lowest of sale vs combo wins (all dollars)
+      let effectivePrice = resolvedEffectiveDollars;
       let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
       let comboSourceId: string | null = null;
-      const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
+      const saleEffective = resolved.isOnSale ? resolvedEffectiveDollars : null;
 
-      if (!isPerUnit && !isScopeTierWithQty && comboPrice != null && comboPrice < resolved.standardPrice) {
+      if (!isPerUnit && !isScopeTierWithQty && comboPrice != null && comboPrice < resolvedStandardDollars) {
         if (comboPrice <= effectivePrice) {
           // Combo price wins (or ties — prefer combo for display)
           effectivePrice = comboPrice;
@@ -251,14 +260,14 @@ export function ticketReducer(
         perUnitLabel: isPerUnit ? (service.per_unit_label ?? null)
           : isScopeTierWithQty ? (pricing.qty_label ?? pricing.tier_label ?? null)
           : null,
-        perUnitPrice: isPerUnit ? service.per_unit_price!
-          : isScopeTierWithQty ? resolved.standardPrice
+        perUnitPrice: isPerUnit ? fromCents(service.per_unit_price_cents!)
+          : isScopeTierWithQty ? resolvedStandardDollars
           : null,
         perUnitMax: isPerUnit ? (service.per_unit_max ?? null)
           : isScopeTierWithQty ? pricing.max_qty
           : null,
         parentItemId: parentItemId ?? null,
-        standardPrice: resolved.standardPrice * qtyMultiplier,
+        standardPrice: resolvedStandardDollars * qtyMultiplier,
         pricingType,
         comboSourcePrimaryId: comboSourceId,
         saleEffectivePrice: saleEffective != null ? saleEffective * qtyMultiplier : null,
@@ -500,15 +509,19 @@ export function ticketReducer(
           if (!pricingTier) return item;
         }
 
-        // Resolve with sale awareness (always pass window — null dates = no time limit)
+        // Resolve with sale awareness (always pass window — null dates = no time limit).
+        // Family D catalog returns cents; TicketItem stays in dollars (Family A) —
+        // collapse cents → dollars at this boundary. TODO Unify-5: drop fromCents().
         const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
         const resolved = resolveServicePriceWithSale(pricingTier, sizeClass, saleWindow);
+        const resolvedEffectiveDollars = fromCents(resolved.effectivePrice);
+        const resolvedStandardDollars = fromCents(resolved.standardPrice);
 
-        // Re-evaluate combo vs sale (lowest wins)
-        let effectivePrice = resolved.effectivePrice;
+        // Re-evaluate combo vs sale (lowest wins; all dollars)
+        let effectivePrice = resolvedEffectiveDollars;
         let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
         let comboSourceId = item.comboSourcePrimaryId;
-        const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
+        const saleEffective = resolved.isOnSale ? resolvedEffectiveDollars : null;
 
         // If this was a combo item and still has a parent, check combo price
         if (item.comboSourcePrimaryId && item.parentItemId) {
@@ -537,7 +550,7 @@ export function ticketReducer(
           taxAmount: calculateItemTax(totalPrice, item.isTaxable),
           vehicleSizeClass: sizeClass,
           tierName: updatedTierName,
-          standardPrice: resolved.standardPrice,
+          standardPrice: resolvedStandardDollars,
           pricingType,
           comboSourcePrimaryId: comboSourceId,
           saleEffectivePrice: saleEffective,

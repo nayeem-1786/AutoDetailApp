@@ -277,7 +277,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [editVehicles, setEditVehicles] = useState<{ id: string; year: number | null; make: string | null; model: string | null; color: string | null }[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [showEditServices, setShowEditServices] = useState(false);
-  const [allServices, setAllServices] = useState<{ id: string; name: string; flat_price: number | null; pricing_model: string; pricing?: { tier_name: string; price: number }[] }[]>([]);
+  const [allServices, setAllServices] = useState<{ id: string; name: string; flat_price_cents: number | null; pricing_model: string; pricing?: { tier_name: string; price_cents: number }[] }[]>([]);
   const [editSelectedServices, setEditSelectedServices] = useState<JobServiceSnapshot[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
   const [serviceSearch, setServiceSearch] = useState('');
@@ -579,9 +579,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     });
   }
 
-  function getServicePrice(svc: { flat_price: number | null; pricing?: { tier_name: string; price: number }[] }): number {
-    if (svc.flat_price != null) return Number(svc.flat_price);
-    if (svc.pricing && svc.pricing.length > 0) return Number(svc.pricing[0].price);
+  function getServicePrice(svc: { flat_price_cents: number | null; pricing?: { tier_name: string; price_cents: number }[] }): number {
+    if (svc.flat_price_cents != null) return Number(svc.flat_price_cents);
+    if (svc.pricing && svc.pricing.length > 0) return Number(svc.pricing[0].price_cents);
     return 0;
   }
 
@@ -1204,6 +1204,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               <div className="mt-2 space-y-2">
                 {allAddons.map((addon) => {
                   const addonConfig = ADDON_STATUS_CONFIG[addon.status];
+                  // TODO Unify-6: job_addons.price + discount_amount are Family C dollars.
                   const finalPrice = addon.price - addon.discount_amount;
                   const canResend = addon.status === 'expired' || addon.status === 'declined';
                   return (

@@ -19,7 +19,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Loader2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatCurrency, formatTime } from '@/lib/utils/format';
+import { formatCurrency, formatMoney, formatTime } from '@/lib/utils/format';
 import type { BusinessHours, BookingConfig } from '@/lib/data/booking';
 
 const DAY_NAMES = [
@@ -32,12 +32,16 @@ const DAY_NAMES = [
   'saturday',
 ] as const;
 
+// Phase Money-Unify-3: catalog totals are cents (Family D); mobileSurcharge
+// stays dollars (Family C) until Unify-6.
 export interface OrderSummaryData {
   serviceName: string;
   tierName: string | null;
-  price: number;
-  addons: { name: string; price: number }[];
+  price_cents: number;
+  addons: { name: string; price_cents: number }[];
+  /** Dollars — Family C until Unify-6. */
   mobileSurcharge: number;
+  /** Dollars — Family C total written to appointment row until Unify-6. */
   total: number;
   durationMinutes?: number;
   vehicleDescription?: string | null;
@@ -319,14 +323,14 @@ export function StepSchedule({
                   )}
                 </span>
                 <span className="font-medium text-site-text">
-                  {formatCurrency(orderSummary.price)}
+                  {formatMoney(orderSummary.price_cents)}
                 </span>
               </div>
               {orderSummary.addons.map((addon) => (
                 <div key={addon.name} className="flex justify-between">
                   <span className="text-site-text-secondary">{addon.name}</span>
                   <span className="font-medium text-site-text">
-                    {formatCurrency(addon.price)}
+                    {formatMoney(addon.price_cents)}
                   </span>
                 </div>
               ))}

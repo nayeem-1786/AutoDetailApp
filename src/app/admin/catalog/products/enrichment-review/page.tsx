@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,7 +32,7 @@ interface DraftWithProduct {
     name: string;
     description: string | null;
     specs: Record<string, unknown> | null;
-    retail_price: number;
+    retail_price_cents: number;
     image_url: string | null;
     vendor_name: string | null;
     category_name: string | null;
@@ -80,7 +80,7 @@ export default function EnrichmentReviewPage() {
       .from('product_enrichment_drafts')
       .select(`
         id, product_id, short_description, specs, source_url, error_message, status, created_at,
-        products!inner ( name, description, specs, retail_price, image_url,
+        products!inner ( name, description, specs, retail_price_cents, image_url,
           vendors ( name ),
           product_categories ( name )
         )
@@ -109,7 +109,7 @@ export default function EnrichmentReviewPage() {
           name: product.name as string,
           description: product.description as string | null,
           specs: product.specs as Record<string, unknown> | null,
-          retail_price: product.retail_price as number,
+          retail_price_cents: product.retail_price_cents as number,
           image_url: product.image_url as string | null,
           vendor_name: (product.vendors as { name: string } | null)?.name ?? null,
           category_name: (product.product_categories as { name: string } | null)?.name ?? null,
@@ -409,7 +409,7 @@ export default function EnrichmentReviewPage() {
                         <div className="min-w-0">
                           <CardTitle className="text-sm truncate">{draft.product.name}</CardTitle>
                           <p className="text-xs text-gray-500">
-                            {draft.product.vendor_name ?? 'No vendor'} · {draft.product.category_name ?? 'No category'} · {formatCurrency(draft.product.retail_price)}
+                            {draft.product.vendor_name ?? 'No vendor'} · {draft.product.category_name ?? 'No category'} · {formatCurrency(draft.product.retail_price_cents)}
                           </p>
                         </div>
                       </div>

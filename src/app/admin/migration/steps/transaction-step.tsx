@@ -8,7 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { Receipt, AlertTriangle, DollarSign, Calendar } from 'lucide-react';
 import { parseDollarAmount } from '@/lib/migration/phone-utils';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import type { MigrationState, TransactionItemRow, TransactionRow } from '@/lib/migration/types';
 
 interface TransactionStepProps {

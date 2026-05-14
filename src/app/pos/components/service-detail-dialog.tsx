@@ -8,6 +8,7 @@ import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { useTicket } from '../context/ticket-context';
 import { resolveServicePrice, resolveServicePriceWithSale } from '../utils/pricing';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
+import { formatMoney } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS, VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
@@ -40,26 +41,26 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     ? vehicleSizeOverride
     : (ticket.vehicle?.size_class ?? null);
 
-  const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
+  const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price_cents != null;
 
   // If flat price and no tiers, create synthetic tier
   const tiers: ServicePricing[] = pricing.length > 0
     ? [...pricing].sort((a, b) => a.display_order - b.display_order)
-    : service.flat_price != null
+    : service.flat_price_cents != null
     ? [{
         id: 'flat',
         service_id: service.id,
         tier_name: 'default',
         tier_label: null,
-        price: service.flat_price,
-        sale_price: service.sale_price ?? null,
+        price_cents: service.flat_price_cents,
+        sale_price_cents: service.sale_price_cents ?? null,
         display_order: 0,
         is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null,
-        vehicle_size_truck_suv_price: null,
-        vehicle_size_suv_van_price: null,
-        vehicle_size_exotic_price: null,
-        vehicle_size_classic_price: null,
+        vehicle_size_sedan_price_cents: null,
+        vehicle_size_truck_suv_price_cents: null,
+        vehicle_size_suv_van_price_cents: null,
+        vehicle_size_exotic_price_cents: null,
+        vehicle_size_classic_price_cents: null,
         max_qty: null,
         qty_label: null,
         created_at: '',
@@ -171,22 +172,22 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     }
 
     if (isPerUnit) {
-      const perUnitPrice = service.per_unit_price!;
+      const perUnitPrice = service.per_unit_price_cents!;
       const total = perUnitQty * perUnitPrice;
       const syntheticPricing: ServicePricing = {
         id: 'per_unit',
         service_id: service.id,
         tier_name: 'default',
         tier_label: null,
-        price: total,
-        sale_price: service.sale_price ? service.sale_price * perUnitQty : null,
+        price_cents: total,
+        sale_price_cents: service.sale_price_cents ? service.sale_price_cents * perUnitQty : null,
         display_order: 0,
         is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null,
-        vehicle_size_truck_suv_price: null,
-        vehicle_size_suv_van_price: null,
-        vehicle_size_exotic_price: null,
-        vehicle_size_classic_price: null,
+        vehicle_size_sedan_price_cents: null,
+        vehicle_size_truck_suv_price_cents: null,
+        vehicle_size_suv_van_price_cents: null,
+        vehicle_size_exotic_price_cents: null,
+        vehicle_size_classic_price_cents: null,
         max_qty: null,
         qty_label: null,
         created_at: '',
@@ -248,8 +249,8 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   }
 
   // Per-unit sale status
-  const perUnitOnSale = isPerUnit && isOnSale && service.sale_price != null && service.sale_price < service.per_unit_price!;
-  const perUnitEffectivePrice = perUnitOnSale ? service.sale_price! : service.per_unit_price!;
+  const perUnitOnSale = isPerUnit && isOnSale && service.sale_price_cents != null && service.sale_price_cents < service.per_unit_price_cents!;
+  const perUnitEffectivePrice = perUnitOnSale ? service.sale_price_cents! : service.per_unit_price_cents!;
 
   // Resolve display price for the Add button
   let resolvedPrice: number | null;
@@ -257,7 +258,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
   let isSalePrice = false;
   if (isPerUnit) {
     resolvedPrice = perUnitQty * perUnitEffectivePrice;
-    resolvedStandardPrice = perUnitQty * service.per_unit_price!;
+    resolvedStandardPrice = perUnitQty * service.per_unit_price_cents!;
     isSalePrice = perUnitOnSale;
   } else if (selectedTier) {
     const tierEffective = getDisplayPrice(selectedTier);
@@ -265,7 +266,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
     const qtyMul = isScopeTierMultiQty ? perUnitQty : 1;
     resolvedPrice = tierEffective * qtyMul;
     resolvedStandardPrice = tierStandard * qtyMul;
-    const saleInfo = getTierSaleInfo(tierStandard, selectedTier.sale_price, isOnSale);
+    const saleInfo = getTierSaleInfo(tierStandard, selectedTier.sale_price_cents, isOnSale);
     isSalePrice = saleInfo?.isDiscounted ?? false;
   } else {
     resolvedPrice = null;
@@ -310,10 +311,10 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                   {perUnitOnSale ? (
                     <>
                       <span className="text-gray-400 dark:text-gray-500 line-through mr-1">
-                        ${service.per_unit_price!.toFixed(2)}
+                        ${service.per_unit_price_cents!.toFixed(2)}
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
-                        ${service.sale_price!.toFixed(2)}
+                        ${service.sale_price_cents!.toFixed(2)}
                       </span>
                       {' '}per {perUnitLabel}
                       <span className="ml-1.5 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-semibold uppercase text-red-600 dark:text-red-400">
@@ -323,7 +324,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                   ) : (
                     <>
                       <span className="font-semibold text-gray-900 dark:text-gray-100">
-                        ${service.per_unit_price!.toFixed(2)}
+                        ${service.per_unit_price_cents!.toFixed(2)}
                       </span>
                       {' '}per {perUnitLabel}
                     </>
@@ -387,7 +388,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                 <div className="text-right">
                   {perUnitOnSale && (
                     <span className="block text-xs text-gray-400 dark:text-gray-500 line-through">
-                      ${(perUnitQty * service.per_unit_price!).toFixed(2)}
+                      ${(perUnitQty * service.per_unit_price_cents!).toFixed(2)}
                     </span>
                   )}
                   <span className={cn(
@@ -411,7 +412,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                 {tiers.map((tier, idx) => {
                   const effectivePrice = getDisplayPrice(tier);
                   const standardPrice = resolveServicePrice(tier, vehicleSizeClass);
-                  const saleInfo = getTierSaleInfo(standardPrice, tier.sale_price, isOnSale);
+                  const saleInfo = getTierSaleInfo(standardPrice, tier.sale_price_cents, isOnSale);
                   const isSelected = idx === selectedTierIdx;
                   const isVehicleAware = tier.is_vehicle_size_aware && vehicleSizeClass;
                   // Disable non-matching vehicle-size tiers when vehicle is known
@@ -466,10 +467,10 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                       {saleInfo?.isDiscounted && !isDisabled ? (
                         <span className="flex items-center gap-1.5">
                           <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
-                            ${saleInfo.originalPrice.toFixed(2)}
+                            {formatMoney(saleInfo.originalPriceCents)}
                           </span>
                           <span className="text-sm font-semibold text-red-600 dark:text-red-400">
-                            ${saleInfo.currentPrice.toFixed(2)}
+                            {formatMoney(saleInfo.currentPriceCents)}
                           </span>
                         </span>
                       ) : (
@@ -565,7 +566,7 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
               <div className="flex flex-wrap gap-2">
                 {VEHICLE_SIZE_CLASS_KEYS.map((size) => {
                   const standardPrice = resolveServicePrice(tiers[0], size);
-                  const saleInfo = getTierSaleInfo(standardPrice, tiers[0].sale_price, isOnSale);
+                  const saleInfo = getTierSaleInfo(standardPrice, tiers[0].sale_price_cents, isOnSale);
                   const isActive = vehicleSizeClass === size;
                   return (
                     <div
@@ -581,10 +582,10 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
                       {saleInfo?.isDiscounted ? (
                         <>
                           <span className="line-through text-gray-400 dark:text-gray-500 mr-1">
-                            ${saleInfo.originalPrice.toFixed(2)}
+                            {formatMoney(saleInfo.originalPriceCents)}
                           </span>
                           <span className="text-red-600 dark:text-red-400 font-semibold">
-                            ${saleInfo.currentPrice.toFixed(2)}
+                            {formatMoney(saleInfo.currentPriceCents)}
                           </span>
                         </>
                       ) : (

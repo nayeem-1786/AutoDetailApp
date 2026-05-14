@@ -6,9 +6,10 @@ import { bookingSubmitSchema } from '@/lib/utils/validation';
 
 // Minimal-but-valid booking submission body. Only mobile-related fields are
 // exercised across the cases below; everything else is held constant.
+// Phase Money-Unify-3: bookingSubmitSchema now expects price_cents (integer cents).
 const baseValid = {
   service_id: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
-  price: 100,
+  price_cents: 10000,
   date: '2026-06-01',
   time: '10:00',
   duration_minutes: 60,

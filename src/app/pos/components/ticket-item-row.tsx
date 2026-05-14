@@ -436,8 +436,8 @@ export function TicketItemRow({ item, childItems, addonSuggestions = [], ticketS
             <div className="mt-1 space-y-1">
               {availableAddons.map((addon) => {
                 const addonService = services.find((s) => s.id === addon.addonServiceId);
-                const standalonePrice = addonService?.flat_price
-                  ?? addonService?.pricing?.[0]?.price
+                const standalonePrice = addonService?.flat_price_cents
+                  ?? addonService?.pricing?.[0]?.price_cents
                   ?? null;
                 const comboPrice = addon.comboPrice;
                 const savings = standalonePrice != null && comboPrice != null && standalonePrice > comboPrice

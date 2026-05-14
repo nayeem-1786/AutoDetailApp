@@ -188,8 +188,8 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
       return;
     }
 
-    const resolved = perUnitQty != null && service.per_unit_price != null
-      ? perUnitQty * service.per_unit_price
+    const resolved = perUnitQty != null && service.per_unit_price_cents != null
+      ? perUnitQty * service.per_unit_price_cents
       : resolveServicePrice(pricing, vsc);
 
     setSelectedItem({
@@ -212,7 +212,7 @@ export function FlagIssueFlow({ jobId, job, onComplete, onBack }: FlagIssueFlowP
       type: 'product',
       id: product.id,
       name: product.name,
-      price: product.retail_price,
+      price: product.retail_price_cents,
     });
     setStep('discount');
   }

@@ -46,31 +46,31 @@ function buildPrefillFromPromotion(item: PromotionItem): QuickSaleItem {
     id: item.id,
     name: item.name,
     pricing_model: item.pricing_model,
-    flat_price: item.flat_price,
-    per_unit_price: item.per_unit_price,
+    flat_price_cents: item.flat_price_cents,
+    per_unit_price_cents: item.per_unit_price_cents,
     per_unit_label: item.per_unit_label,
     tiers,
-    retail_price: item.retail_price,
+    retail_price_cents: item.retail_price_cents,
     sale_status: item.sale_status,
     sale_starts_at: item.sale_starts_at,
     sale_ends_at: item.sale_ends_at,
-    current_sale_price: item.sale_price,
+    current_sale_price: item.sale_price_cents,
     current_tier_sale_prices: tiers?.map((t) => ({
       tier_label: t.tier_label,
       tier_name: t.tier_name,
-      sale_price: t.sale_price,
+      sale_price_cents: t.sale_price_cents,
     })),
   };
 
   // Pre-fill sale prices for direct mode
   if (item.item_type === 'product') {
-    base.prefilled_sale_price = item.sale_price ?? null;
+    base.prefilled_sale_price = item.sale_price_cents ?? null;
   } else if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
-    base.prefilled_sale_price = item.sale_price ?? null;
+    base.prefilled_sale_price = item.sale_price_cents ?? null;
   } else if (tiers) {
     const tierPrices: Record<string, number> = {};
     for (const t of tiers) {
-      if (t.sale_price != null) tierPrices[t.tier_name] = t.sale_price;
+      if (t.sale_price_cents != null) tierPrices[t.tier_name] = t.sale_price_cents;
     }
     if (Object.keys(tierPrices).length > 0) base.prefilled_tier_sale_prices = tierPrices;
   }
@@ -220,34 +220,34 @@ export default function PromotionsPage() {
       id: matchingItem.id,
       name: matchingItem.name,
       pricing_model: matchingItem.pricing_model,
-      flat_price: matchingItem.flat_price,
-      per_unit_price: matchingItem.per_unit_price,
+      flat_price_cents: matchingItem.flat_price_cents,
+      per_unit_price_cents: matchingItem.per_unit_price_cents,
       per_unit_label: matchingItem.per_unit_label,
       tiers,
-      retail_price: matchingItem.retail_price,
+      retail_price_cents: matchingItem.retail_price_cents,
       sale_status: matchingItem.sale_status,
       sale_starts_at: matchingItem.sale_starts_at,
       sale_ends_at: matchingItem.sale_ends_at,
-      current_sale_price: matchingItem.sale_price,
+      current_sale_price: matchingItem.sale_price_cents,
       current_tier_sale_prices: tiers?.map((t) => ({
         tier_label: t.tier_label,
         tier_name: t.tier_name,
-        sale_price: t.sale_price,
+        sale_price_cents: t.sale_price_cents,
       })),
     };
 
     // Apply sale prices from the history snapshot
     const snap = record.pricing_snapshot;
     if (record.pricing_model === 'flat' || record.pricing_model === 'per_unit') {
-      prefillItem.prefilled_sale_price = snap?.sale_price ?? null;
+      prefillItem.prefilled_sale_price = snap?.sale_price_cents ?? null;
     } else if (record.pricing_model === null) {
       // Product
-      prefillItem.prefilled_sale_price = snap?.sale_price ?? null;
+      prefillItem.prefilled_sale_price = snap?.sale_price_cents ?? null;
     } else if (Array.isArray(snap)) {
       // Tiered
       const tierPrices: Record<string, number> = {};
       for (const t of snap) {
-        if (t.sale_price != null) tierPrices[t.tier_name] = t.sale_price;
+        if (t.sale_price_cents != null) tierPrices[t.tier_name] = t.sale_price_cents;
       }
       if (Object.keys(tierPrices).length > 0) prefillItem.prefilled_tier_sale_prices = tierPrices;
     }

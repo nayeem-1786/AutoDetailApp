@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
 import { usePosPermission } from '../../context/pos-permission-context';
 import { posFetch } from '../../lib/pos-fetch';
-import { formatCurrency } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import type { JobStatus } from '@/lib/supabase/types';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { JobTimeline } from './job-timeline';
@@ -395,6 +395,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     const nonCancelled = jobs.filter((j) => j.status !== 'cancelled');
     const totalJobs = nonCancelled.length;
     const unassigned = nonCancelled.filter((j) => !j.assigned_staff).length;
+    // TODO Unify-6: jobs.services[].price is Family C dollars (JSONB).
     const totalRevenue = nonCancelled.reduce((sum, j) => sum + j.services.reduce((s, svc) => s + svc.price, 0), 0);
     const completedCount = nonCancelled.filter((j) => j.status === 'completed' || j.status === 'closed').length;
     return { totalJobs, unassigned, totalRevenue, completedCount };

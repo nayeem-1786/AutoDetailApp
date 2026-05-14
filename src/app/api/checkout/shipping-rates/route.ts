@@ -88,11 +88,11 @@ export async function POST(request: NextRequest) {
       for (const item of items) {
         const { data: product } = await supabase
           .from('products')
-          .select('retail_price')
+          .select('retail_price_cents')
           .eq('id', item.productId)
           .single();
         if (product) {
-          subtotalCents += Math.round(Number(product.retail_price) * 100) * item.quantity;
+          subtotalCents += Math.round(Number(product.retail_price_cents) * 100) * item.quantity;
         }
       }
 

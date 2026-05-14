@@ -15,6 +15,7 @@ import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { resolveServicePrice } from '../utils/pricing';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
+import { formatMoney } from '@/lib/utils/format';
 import { VEHICLE_SIZE_LABELS, VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 
 interface ServicePricingPickerProps {
@@ -38,13 +39,13 @@ export function ServicePricingPicker({
   // size-class tiers are disabled (grayed out). Scope/specialty tiers with custom names
   // are never disabled by this logic.
   const pricing = service.pricing ?? [];
-  const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price != null;
+  const isPerUnit = service.pricing_model === 'per_unit' && service.per_unit_price_cents != null;
   const [tierQtyPick, setTierQtyPick] = useState<{ tier: ServicePricing; vsc: VehicleSizeClass | null } | null>(null);
 
   // Session 30: size_class keys now imported from canonical constant. Scope tiers
   // with is_vehicle_size_aware render a price button per size. Columns for
   // exotic/classic may be null on existing tiers — the resolver falls back to
-  // pricing.price in that case.
+  // pricing.price_cents in that case.
   const VEHICLE_SIZES = VEHICLE_SIZE_CLASS_KEYS;
 
   // Check sale status for this service
@@ -145,7 +146,7 @@ export function ServicePricingPicker({
                       )}
                       {VEHICLE_SIZES.map((size) => {
                         const sizePrice = resolveServicePrice(tier, size);
-                        const saleInfo = getTierSaleInfo(sizePrice, tier.sale_price, isOnSale);
+                        const saleInfo = getTierSaleInfo(sizePrice, tier.sale_price_cents, isOnSale);
                         return (
                           <button
                             key={`${tier.id}-${size}`}
@@ -162,10 +163,10 @@ export function ServicePricingPicker({
                             {saleInfo?.isDiscounted ? (
                               <span className="flex items-center gap-1.5">
                                 <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
-                                  ${saleInfo.originalPrice.toFixed(2)}
+                                  {formatMoney(saleInfo.originalPriceCents)}
                                 </span>
                                 <span className="text-sm font-semibold text-red-600 dark:text-red-400">
-                                  ${saleInfo.currentPrice.toFixed(2)}
+                                  {formatMoney(saleInfo.currentPriceCents)}
                                 </span>
                               </span>
                             ) : (
@@ -182,7 +183,7 @@ export function ServicePricingPicker({
 
                 // Vehicle is set or tier is not vehicle-size-aware — single button
                 const price = resolveServicePrice(tier, vehicleSizeClass);
-                const saleInfo = getTierSaleInfo(price, tier.sale_price, isOnSale);
+                const saleInfo = getTierSaleInfo(price, tier.sale_price_cents, isOnSale);
                 const sizeLabel =
                   vehicleSizeClass && tier.is_vehicle_size_aware
                     ? VEHICLE_SIZE_LABELS[vehicleSizeClass]
@@ -244,10 +245,10 @@ export function ServicePricingPicker({
                     {saleInfo?.isDiscounted ? (
                       <span className="flex items-center gap-1.5">
                         <span className="text-sm text-gray-400 dark:text-gray-500 line-through">
-                          ${saleInfo.originalPrice.toFixed(2)}
+                          {formatMoney(saleInfo.originalPriceCents)}
                         </span>
                         <span className="text-sm font-semibold text-red-600 dark:text-red-400">
-                          ${saleInfo.currentPrice.toFixed(2)}
+                          {formatMoney(saleInfo.currentPriceCents)}
                         </span>
                       </span>
                     ) : (
@@ -288,18 +289,18 @@ interface PerUnitPickerProps {
 }
 
 function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: PerUnitPickerProps) {
-  const perUnitPrice = service.per_unit_price!;
+  const perUnitPrice = service.per_unit_price_cents!;
   const perUnitMax = service.per_unit_max ?? 10;
   const perUnitLabel = service.per_unit_label || 'unit';
   const [quantity, setQuantity] = useState(1);
 
   // Sale awareness
   const { isOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-  const perUnitOnSale = isOnSale && service.sale_price != null && service.sale_price < perUnitPrice;
-  const effectiveUnitPrice = perUnitOnSale ? service.sale_price! : perUnitPrice;
+  const perUnitOnSale = isOnSale && service.sale_price_cents != null && service.sale_price_cents < perUnitPrice;
+  const effectiveUnitPrice = perUnitOnSale ? service.sale_price_cents! : perUnitPrice;
 
   const total = quantity * perUnitPrice;
-  const saleTotal = perUnitOnSale ? quantity * service.sale_price! : null;
+  const saleTotal = perUnitOnSale ? quantity * service.sale_price_cents! : null;
 
   // Create a synthetic ServicePricing for the dispatch
   const syntheticPricing: ServicePricing = {
@@ -307,15 +308,15 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
     service_id: service.id,
     tier_name: 'default',
     tier_label: null,
-    price: total,
-    sale_price: service.sale_price ? service.sale_price * quantity : null,
+    price_cents: total,
+    sale_price_cents: service.sale_price_cents ? service.sale_price_cents * quantity : null,
     display_order: 0,
     is_vehicle_size_aware: false,
-    vehicle_size_sedan_price: null,
-    vehicle_size_truck_suv_price: null,
-    vehicle_size_suv_van_price: null,
-    vehicle_size_exotic_price: null,
-    vehicle_size_classic_price: null,
+    vehicle_size_sedan_price_cents: null,
+    vehicle_size_truck_suv_price_cents: null,
+    vehicle_size_suv_van_price_cents: null,
+    vehicle_size_exotic_price_cents: null,
+    vehicle_size_classic_price_cents: null,
     max_qty: null,
     qty_label: null,
     created_at: '',
@@ -346,7 +347,7 @@ function PerUnitPicker({ open, onClose, service, vehicleSizeClass, onSelect }: P
             {perUnitOnSale ? (
               <>
                 <span className="text-gray-400 dark:text-gray-500 line-through mr-1">${perUnitPrice.toFixed(2)}</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">${service.sale_price!.toFixed(2)}</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">${service.sale_price_cents!.toFixed(2)}</span>
               </>
             ) : (
               <span className="font-semibold text-gray-900 dark:text-gray-100">${perUnitPrice.toFixed(2)}</span>
@@ -469,11 +470,11 @@ function TierQtyPicker({ open, onClose, onBack, service, tier, vehicleSizeClass,
   const [quantity, setQuantity] = useState(1);
 
   const standardPrice = resolveServicePrice(tier, vehicleSizeClass);
-  const tierOnSale = isOnSale && tier.sale_price != null && tier.sale_price < standardPrice;
-  const effectiveUnitPrice = tierOnSale ? tier.sale_price! : standardPrice;
+  const tierOnSale = isOnSale && tier.sale_price_cents != null && tier.sale_price_cents < standardPrice;
+  const effectiveUnitPrice = tierOnSale ? tier.sale_price_cents! : standardPrice;
 
   const total = quantity * standardPrice;
-  const saleTotal = tierOnSale ? quantity * tier.sale_price! : null;
+  const saleTotal = tierOnSale ? quantity * tier.sale_price_cents! : null;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -498,7 +499,7 @@ function TierQtyPicker({ open, onClose, onBack, service, tier, vehicleSizeClass,
             {tierOnSale ? (
               <>
                 <span className="text-gray-400 dark:text-gray-500 line-through mr-1">${standardPrice.toFixed(2)}</span>
-                <span className="font-semibold text-red-600 dark:text-red-400">${tier.sale_price!.toFixed(2)}</span>
+                <span className="font-semibold text-red-600 dark:text-red-400">${tier.sale_price_cents!.toFixed(2)}</span>
               </>
             ) : (
               <span className="font-semibold text-gray-900 dark:text-gray-100">${standardPrice.toFixed(2)}</span>

@@ -80,6 +80,15 @@ function parseDollar(val) {
   return isNaN(num) ? 0 : num;
 }
 
+// Money-Unify-3: products.cost_price / retail_price migrated to
+// _cents columns. This importer parses dollar-decimal strings from
+// the Square CSV export and converts at the parse boundary.
+// Mirror of toCents() in src/lib/utils/money.ts (kept inline here so
+// this .mjs script has no TS-source-import dependency).
+function parseDollarToCents(val) {
+  return Math.round(parseDollar(val) * 100);
+}
+
 function slugify(name) {
   return name
     .toLowerCase()
@@ -342,8 +351,8 @@ async function importProducts() {
     const vendorId = vendorName ? (vendorMap.get(vendorName) || null) : null;
 
     // Parse prices
-    const retailPrice = parseDollar(row['Price']);
-    const costPrice = parseDollar(row['Default Unit Cost']);
+    const retailPriceCents = parseDollarToCents(row['Price']);
+    const costPriceCents = parseDollarToCents(row['Default Unit Cost']);
 
     // Parse quantity — column name includes location name
     let quantity = 0;
@@ -377,8 +386,8 @@ async function importProducts() {
       description: row['Description'] || null,
       category_id: categoryId,
       vendor_id: vendorId,
-      cost_price: costPrice,
-      retail_price: retailPrice,
+      cost_price_cents: costPriceCents,
+      retail_price_cents: retailPriceCents,
       quantity_on_hand: quantity,
       reorder_threshold: reorderThreshold,
       is_taxable: isTaxable,
@@ -391,7 +400,7 @@ async function importProducts() {
   log(`  Importing ${productRows.length} products...`);
 
   // Use upsert on square_item_id so re-imports are safe.
-  // cost_price is only set on insert — existing manual edits are preserved.
+  // cost_price_cents is only set on insert — existing manual edits are preserved.
   let inserted = 0;
   let updated = 0;
   let errors = 0;
@@ -402,17 +411,17 @@ async function importProducts() {
         // Check if product already exists
         const { data: existing } = await supabase
           .from('products')
-          .select('id, cost_price')
+          .select('id, cost_price_cents')
           .eq('square_item_id', row.square_item_id)
           .maybeSingle();
 
         if (existing) {
-          // Update but preserve cost_price if already set
+          // Update but preserve cost_price_cents if already set
           const updatePayload = { ...row };
           delete updatePayload.square_item_id;
           delete updatePayload.slug; // Don't overwrite slug
-          if (existing.cost_price && existing.cost_price > 0) {
-            delete updatePayload.cost_price; // Don't overwrite manual edits
+          if (existing.cost_price_cents && existing.cost_price_cents > 0) {
+            delete updatePayload.cost_price_cents; // Don't overwrite manual edits
           }
           const { error } = await supabase
             .from('products')
