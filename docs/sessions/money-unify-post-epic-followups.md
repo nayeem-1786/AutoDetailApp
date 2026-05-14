@@ -206,11 +206,30 @@ Audit-2 didn't fully trace whether the booking-completion path increments `coupo
 
 ---
 
+### 12. "Failed to load active credentials" cron startup log
+
+- **Discovered:** During VPS alignment deploy for Unify-1+2
+- **Location:** Startup log of smart-details PM2 process
+- **Symptom:** "Failed to load active credentials: {" appears
+  once at startup, before cron job registration completes.
+  All 14 cron jobs register successfully after.
+- **Risk profile:** Unknown — failure mode appears soft
+  (doesn't block startup or cron registration). Could be
+  misleading log line, could be a real auth issue that
+  silently degrades a cron job's capability.
+- **Priority:** Medium — uncertain risk, worth investigating
+- **Blast radius:** Unknown until root cause identified
+- **Estimated effort:** ~30 min investigation
+- **Pre-existing:** Yes, predates Money-Unify epic.
+- **Recommended fix:** Post-Money-Unify cleanup phase.
+
+---
+
 ## How these items relate to the Money-Unify epic
 
-All 11 items are **independent** of the cents migration. None block any Money-Unify phase. They were discovered during the audit because money-handling code paths are dense and dovetail with adjacent concerns (tax, accounting, e-commerce, scheduling).
+All 12 items are **independent** of the cents migration. None block any Money-Unify phase. They were discovered during the audit because money-handling code paths are dense and dovetail with adjacent concerns (tax, accounting, e-commerce, scheduling).
 
-After Money-Unify-Final completes, recommend reviewing this list and prioritizing items based on business impact. Items 5 (QBO tax), 9 (booking coupon increment), and 8 (e-commerce campaign attribution) are the most impactful financially. Items 1, 2, 3, 4 are cleanup. Item 6 is policy-driven. Item 7 is defense-in-depth. Item 10 (REDEEM_MINIMUM shadow) is a small-blast-radius cleanup discovered during Unify-1 verification. Item 11 (po_items typo) is a user-facing bug discovered during Unify-2 verification — opportunistic fix recommended during Unify-3 (Catalog) since that phase already touches products.
+After Money-Unify-Final completes, recommend reviewing this list and prioritizing items based on business impact. Items 5 (QBO tax), 9 (booking coupon increment), and 8 (e-commerce campaign attribution) are the most impactful financially. Items 1, 2, 3, 4 are cleanup. Item 6 is policy-driven. Item 7 is defense-in-depth. Item 10 (REDEEM_MINIMUM shadow) is a small-blast-radius cleanup discovered during Unify-1 verification. Item 11 (po_items typo) is a user-facing bug discovered during Unify-2 verification — opportunistic fix recommended during Unify-3 (Catalog) since that phase already touches products. Item 12 (credentials startup log) is a soft-failure pre-existing pattern surfaced by the VPS alignment deploy's log heuristic — investigation post-epic.
 
 ---
 

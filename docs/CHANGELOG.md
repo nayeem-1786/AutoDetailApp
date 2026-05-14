@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Deploy: VPS alignment for Money-Unify Phases 1+2
+
+Aligned the production VPS with two locally-committed Money-Unify phases. Until this deploy, the schema migration from Unify-2 was live in the shared Supabase project (the only DB in the stack — there is no separate "dev DB"), but the VPS app code was still at `b051c0af` (pre-epic). This created a brief window where the DB schema had `unit_cost_cents` columns that production code didn't read or write. This deploy closes that window.
+
+**Framing correction recorded for future phases:** Unify-1 and Unify-2 were authored under the false assumption that `supabase db query --linked` and `supabase db push --linked` targeted a dev-only DB. Reality: the linked Supabase project is production. The Unify-2 schema migration was applied directly to the production DB on 2026-05-14 when `supabase db push --linked` was run. Future Money-Unify phases will treat the linked DB as production from the outset. Any phase that adds schema is a production-DB write at apply time, regardless of when the app code reaches VPS.
+
+**Pushed to `origin/main`:**
+- `e93bed6d` — Phase Money-Unify-1 foundation (code-only; money.ts helpers, formatMoney, lint rule, Stripe-min + loyalty constant consolidation across 13 sites)
+- `600a3655` — Phase Money-Unify-2 Family H (Inventory) — schema (3 cents columns + CHECK + DROP NOT NULL + `void_transaction()` rewrite) + 20 caller-code migrations
+
+**Deployed to VPS:** `time deploy-smartdetails`, executed by user. Build time **5m 25s real** (326s deploy script clock); under playbook's 6-10m estimate. PM2 process `smart-details` restarted to PID `1645795`, restart count incremented to **16**, status **online**, port 5003 bound, `HTTP 200` from `127.0.0.1:5003/` confirmed by deploy script.
+
+**Production verification (curl-only, no SSH):**
+- `https://smartdetailsautospa.com/` → HTTP 200
+- `https://www.smartdetailsautospa.com/` → HTTP 200
+- `https://app.smartdetailsautospa.com/` → HTTP 200
+- `/admin/inventory/purchase-orders` → HTTP 307 (auth redirect; migrated code compiles)
+- `/admin/inventory/vendors` → HTTP 307
+- `/admin/inventory/shop-expenses` → HTTP 307
+- `POST /api/book/payment-intent` with `amount: 0.30` → HTTP 400, body `{"error":"Amount must be at least $0.50"}`. **Confirms `STRIPE_MIN_DOLLARS` consolidation from Unify-1 is live in production.**
+
+**Post-deploy reconciliation (Family H, against shared Supabase project):**
+
+| Gate | purchase_order_items | stock_adjustments | vendors |
+|---|---|---|---|
+| SUM(dollars) vs SUM(cents) divergence | 0 | 0 | 0 (no rows) |
+| NULL parity mismatches | 0 | 0 | 0 |
+| Both-cols-set row mismatches | 0 | 0 | 0 |
+
+Same results as the post-Unify-2 reconciliation captured in `docs/sessions/money-unify-2-reconciliation.md`. Zero drift in the window between schema apply (2026-05-14 ~05:19 UTC) and code deploy (2026-05-14 ~03:46 PST).
+
+**Operational note — deploy script "cron Failed" warning:** The deploy script's log-tail health check flagged `⚠ 1 cron 'Failed' lines in recent logs`. Investigation: the matched line is `Failed to load active credentials: { ... }` from `src/lib/data/credentials.ts:22`, a Server-Component data path that runs on first request after boot. The `credentials` table exists, columns are correct, the query returns 0 rows under normal use; the boot-time error is most likely a transient init-race condition between the admin Supabase client and the Postgres connection pool. **Pre-existing in main; unrelated to Money-Unify-1 or Money-Unify-2.** The deploy script's grep heuristic matched the word "Failed" but this is not a cron-job failure. Tracking as a separate follow-up.
+
+**Future Money-Unify deploys will use Path 2:** each phase that ships a `supabase db push` is treated as the schema deploy itself (production from apply time); the corresponding code push + `deploy-smartdetails` to VPS happens in the same phase to close the schema-vs-code window. This alignment session was needed only because Unify-1 + Unify-2 were authored before that policy was clear.
+
+**Files changed (1):** `docs/CHANGELOG.md` only.
+
+---
+
 ## Session: Phase Money-Unify-2 — Family H (Inventory) migration
 
 First family migration of the Money-Unify epic. Migrates 3 NUMERIC(10,2) dollar columns to INTEGER cents across the inventory/procurement subsystem. Validates the migration pattern that 7 subsequent family phases will replicate. Dev DB only; production deferred to Unify-Final.
