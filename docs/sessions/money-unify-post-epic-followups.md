@@ -206,30 +206,81 @@ Audit-2 didn't fully trace whether the booking-completion path increments `coupo
 
 ---
 
-### 12. "Failed to load active credentials" cron startup log
+### 12. Startup credential load failure (Supabase fetch)
 
-- **Discovered:** During VPS alignment deploy for Unify-1+2
-- **Location:** Startup log of smart-details PM2 process
-- **Symptom:** "Failed to load active credentials: {" appears
-  once at startup, before cron job registration completes.
-  All 14 cron jobs register successfully after.
-- **Risk profile:** Unknown — failure mode appears soft
-  (doesn't block startup or cron registration). Could be
-  misleading log line, could be a real auth issue that
-  silently degrades a cron job's capability.
-- **Priority:** Medium — uncertain risk, worth investigating
-- **Blast radius:** Unknown until root cause identified
-- **Estimated effort:** ~30 min investigation
-- **Pre-existing:** Yes, predates Money-Unify epic.
-- **Recommended fix:** Post-Money-Unify cleanup phase.
+- **Discovered:** During VPS alignment deploy for Unify-1+2;
+  persisted across Unify-3 deploy.
+- **Location:** `src/lib/data/credentials.ts:22`
+- **Diagnosis:** `TypeError: fetch failed` / `SocketError: other
+  side closed` (`UND_ERR_SOCKET`) on initial Supabase query at
+  startup. Connection drops mid-request before response received.
+  Subsequent on-demand calls succeed, so functionality unimpacted.
+- **Probable cause:** Supabase pooler stale connection on first
+  request after process start; DNS race; or transient network blip.
+- **Risk profile:** Low — failure is non-blocking, soft fallback
+  works. Logged warning is cosmetic.
+- **Priority:** Low — defer to post-Money-Unify cleanup
+- **Recommended fix:** Add retry-with-backoff to credential
+  loader, OR make credential load lazy-on-first-use rather than
+  at startup.
+- **Estimated effort:** ~30 min
+
+---
+
+### 13. (reserved)
+
+(Placeholder to keep #14 and #15 numerically aligned with their
+introduction-order discovery; no item assigned.)
+
+---
+
+### 14. Lint warnings sweep before Unify-Final
+
+- **Discovered:** Unify-3 introduced 35 new
+  `money/no-unsuffixed-money-prop` warnings (29 pre-existing
+  + 35 = 64 total in main).
+- **Cause:** Internal-local variables that bind cents values
+  without `_cents` suffix (e.g., `const min = ...; const sp = ...`).
+  No canonical-model violations — values are correct, names don't
+  advertise.
+- **Top sites:** `step-service-select.tsx` (8),
+  `booking-wizard.tsx` (5), `service-resolver.ts` (3),
+  `sale-history.ts` (3).
+- **Recommended fix:** Per-file rename pass before Unify-Final
+  upgrades lint rule from `'warn'` to `'error'`. Expected each
+  subsequent family phase will add similar internal-local
+  warnings — sweep all at once at the end.
+- **Priority:** Low — scheduled work, not optional but not
+  blocking.
+- **Estimated effort:** ~1–2 hours for full sweep at Unify-Final.
+
+---
+
+### 15. Audit other voice-agent routes for cents-as-dollars display bugs
+
+- **Discovered:** Unify-3 fixed
+  `src/app/api/voice-agent/products/route.ts` which was emitting
+  `"$1599.00"` for $15.99 products (cents value string-formatted
+  as dollars without conversion).
+- **Risk:** Similar bugs may exist in other voice-agent routes
+  (10 total) where post-Family-D cents values get rendered
+  without `fromCents()` conversion.
+- **Recommended check:** Audit all 10 routes under
+  `src/app/api/voice-agent/` for any place where a money value
+  is interpolated into a string without explicit `formatMoney(cents)`
+  or `fromCents()` conversion.
+- **Priority:** Medium — production bug class. Customer-facing
+  voice quotes that mis-quote prices = real impact.
+- **Estimated effort:** ~30 min audit, fixes minimal if no other
+  instances.
 
 ---
 
 ## How these items relate to the Money-Unify epic
 
-All 12 items are **independent** of the cents migration. None block any Money-Unify phase. They were discovered during the audit because money-handling code paths are dense and dovetail with adjacent concerns (tax, accounting, e-commerce, scheduling).
+Items 1–11 are **independent** of the cents migration. They were discovered during the audit because money-handling code paths are dense and dovetail with adjacent concerns (tax, accounting, e-commerce, scheduling). Items 12, 14, 15 surfaced during deploy / Unify-3 execution: #12 is a pre-existing soft-failure log line that persisted across both deploys, #14 is scheduled cleanup intrinsic to the lint-rule upgrade plan, and #15 is a production bug class discovered via the products-route fix.
 
-After Money-Unify-Final completes, recommend reviewing this list and prioritizing items based on business impact. Items 5 (QBO tax), 9 (booking coupon increment), and 8 (e-commerce campaign attribution) are the most impactful financially. Items 1, 2, 3, 4 are cleanup. Item 6 is policy-driven. Item 7 is defense-in-depth. Item 10 (REDEEM_MINIMUM shadow) is a small-blast-radius cleanup discovered during Unify-1 verification. Item 11 (po_items typo) is a user-facing bug discovered during Unify-2 verification — opportunistic fix recommended during Unify-3 (Catalog) since that phase already touches products. Item 12 (credentials startup log) is a soft-failure pre-existing pattern surfaced by the VPS alignment deploy's log heuristic — investigation post-epic.
+After Money-Unify-Final completes, recommend reviewing this list and prioritizing items based on business impact. Items 5 (QBO tax), 9 (booking coupon increment), and 8 (e-commerce campaign attribution) are the most impactful financially. Items 1, 2, 3, 4 are cleanup. Item 6 is policy-driven. Item 7 is defense-in-depth. Item 10 (REDEEM_MINIMUM shadow) is a small-blast-radius cleanup discovered during Unify-1 verification. Item 11 (po_items typo) was opportunistically fixed during Unify-3. Item 12 (credentials startup log) is a soft-failure pre-existing pattern — diagnosed from VPS logs as a stale-pooler-connection on initial fetch; functionality unimpacted; fix is retry-with-backoff or lazy-on-first-use. Item 14 (lint sweep) is a scheduled cleanup that grows incrementally per family phase and gets resolved before Unify-Final upgrades the rule from `'warn'` to `'error'`. Item 15 (voice-agent audit) is medium-priority — customer-facing voice quotes mis-quoting prices have real impact, and the bug class CC caught in Unify-3 may exist in sibling routes.
 
 ---
 
