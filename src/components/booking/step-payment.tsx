@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { toCents } from '@/lib/utils/money';
 import { Lock, ShieldCheck } from 'lucide-react';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -149,10 +150,17 @@ export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, o
       return;
     }
 
+    // Phase Money-Unify-3 Hotfix 2: the `amount` prop is mixed-unit at this
+    // boundary — Pay-in-Full passes grandTotal (cents from Family D catalog)
+    // while Deposit passes bookingConfig.default_deposit_amount (dollars,
+    // Family C). Normalize to cents here. Session 1.5b will uniform the
+    // prop to cents at the step-confirm-book caller and remove this branch.
+    const amountCents = isDeposit ? toCents(amount) : amount;
+
     fetch('/api/book/payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({ amountCents }),
     })
       .then((res) => res.json())
       .then((data) => {
@@ -164,7 +172,7 @@ export function StepPayment({ amount, totalAmount, remainingAmount, isDeposit, o
       })
       .catch(() => setError('Failed to initialize payment'))
       .finally(() => setLoading(false));
-  }, [amount]);
+  }, [amount, isDeposit]);
 
   if (loading) {
     return (

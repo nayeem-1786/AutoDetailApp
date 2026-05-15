@@ -275,9 +275,11 @@ src/app/api/authorize/[token]/route.ts
 
 ### Booking (Public)
 ```
+src/app/api/book/__tests__/wire-contract.test.ts  # Vitest regression for client↔schema↔endpoint wire shape (Hotfix 2)
 src/app/api/book/check-customer/route.ts
 src/app/api/book/check-phone/route.ts
 src/app/api/book/payment-intent/route.ts
+src/app/api/book/payment-intent/schema.ts         # paymentIntentRequestSchema — sibling because Next.js route.ts rejects non-method exports
 src/app/api/book/route.ts
 src/app/api/book/slots/route.ts
 src/app/api/book/validate-coupon/route.ts

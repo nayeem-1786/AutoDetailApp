@@ -220,6 +220,21 @@ strategies.
 > usages against the migrated columns BEFORE shipping. The audit at
 > `docs/dev/MONEY_UNIFY_3_COMPREHENSIVE_BUG_AUDIT.md` provides the methodology.
 
+> When a column or wire field is renamed (e.g., `price` → `price_cents`),
+> the rename MUST be enforced at every contract boundary:
+> - Wire-shape contracts (client body ↔ Zod schema) require a per-endpoint
+>   contract test that builds the actual client body, parses via the schema,
+>   and asserts success. See `src/app/api/book/__tests__/wire-contract.test.ts`
+>   for the pattern.
+> - Endpoint input validation: every Stripe-money-touching endpoint must
+>   have a Zod schema with `positiveInt` for cents fields, `positiveNumber`
+>   for dollars fields. Never destructure money fields from an unvalidated
+>   body.
+> - Component prop contracts: a prop named `price` (ambiguous) must be
+>   renamed to `priceCents` or `priceDollars` (explicit) during any unit
+>   migration. Branded types (`Cents`, `Dollars`) will enforce this at
+>   compile time in Session 6.
+
 ## Files
 
 - Canonical helpers: `src/lib/utils/money.ts`

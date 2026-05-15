@@ -939,7 +939,7 @@ export function BookingWizard({
     const body = {
       service_id: service.id,
       tier_name: config.tier_name,
-      price: config.price_cents,
+      price_cents: config.price_cents,
       date,
       time,
       duration_minutes: service.base_duration_minutes,
@@ -955,7 +955,7 @@ export function BookingWizard({
       addons: config.addons.map((a) => ({
         service_id: a.service_id,
         name: a.name,
-        price: a.price_cents,
+        price_cents: a.price_cents,
         tier_name: a.tier_name,
       })),
       channel: isPortal ? 'portal' as const : 'online' as const,
