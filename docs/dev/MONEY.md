@@ -205,6 +205,89 @@ See `docs/sessions/money-unify-0-migration-playbook-v2.md` for the
 full epic plan, decision recap, and per-family reconciliation
 strategies.
 
+## Lessons learned from the Money-Unify-3 rollback (2026-05-15)
+
+The Unify-3 (Family D / Catalog) and Unify-4 (Family E / Orders) migrations
+were rolled back on 2026-05-15 after a 22-hour window during which booking
+submissions were silently 400-ing, the e-commerce checkout was creating
+PaymentIntents at 100× the cart total, and the booking confirmation screen
+was rendering `$7,500` for a `$75` service. No real customer was charged
+incorrectly — the failures surfaced in pre-launch self-testing — but the
+bug surface was wide enough that fixing forward would have meant 5+ more
+sessions across dozens of files. The migration was reverted at both the
+code (six git reverts) and database (two DOWN migrations) layers. Six
+forward-facing rules emerged from the postmortem; they govern Money-Unify
+Attempt 2.
+
+**1. One surface per commit, never an entire family in one commit.**
+`ff2d51a1` touched 80+ files across POS, admin, e-commerce, booking,
+voice-agent, account, and migration UI. Reverting was all-or-nothing
+because surfaces were entangled — a forward fix on one surface couldn't be
+shipped without dragging the others along. A future migration must touch
+one surface (one route, one page, one component) per commit. Schema change
++ caller migration may share a commit only if the caller set is genuinely
+small (1–3 files). The discipline is for the rollback path: if any surface
+breaks, only that surface gets reverted, not the whole family.
+
+**2. Branded types must precede the migration, not follow it.** Both
+`formatMoney` and `formatCurrency` accept `number` — the compiler couldn't
+tell which unit was being passed. Every bug we found was a unit-mismatch
+at a function boundary that the type system silently allowed. Future cents
+migrations require `Cents` and `Dollars` branded types as a compile-time
+barrier introduced BEFORE any column rename. With branded types in place,
+the entire class of `* 100`-scaler bugs (forward AND inverse) becomes
+impossible to compile, not merely unlikely.
+
+**3. Wire-contract tests at every API boundary.** The booking wizard's
+POST body and `bookingSubmitSchema` diverged silently for 22 hours because
+no test asserted they matched. Session 1.5a added
+`src/app/api/book/__tests__/wire-contract.test.ts` as the pattern: build
+the exact body the client sends, run it through the Zod schema, assert
+success. Every money-touching endpoint must have one of these BEFORE the
+schema is renamed — the test is the lock that prevents the client/server
+drift from going undetected.
+
+**4. The audit happens BEFORE the migration ships, not after.** The
+`MONEY_UNIFY_3_COMPREHENSIVE_BUG_AUDIT.md` document was built in response
+to bugs already in production. Every finding was a regression, not a
+pre-flight catch. For future migrations: a read-only audit of every money
+render site, every Stripe SDK call, and every DB write path on the target
+family is a hard gate. The audit produces an inventory; only then does
+code change. The Phase 2 audit appendix (preserved in
+`docs/dev/MONEY_UNIFY_LESSONS_PHASE_2_AUDIT.md`) is the methodology
+template.
+
+**5. Dual-column transitional state requires drift enforcement.** Unify-3
+kept legacy NUMERIC columns alongside new `_cents` columns "for rollback
+safety" — which is exactly what saved the rollback today. But nothing
+prevented application code from writing to one column and not the other,
+and that drift was a latent integrity bomb. Future migrations using the
+two-phase commit pattern need either (a) a DB trigger that keeps both
+columns in sync until Unify-Final, or (b) a CI check that grep-asserts only
+one column is referenced in writes. Without enforcement, the rollback
+safety net becomes the drift surface.
+
+**6. Inverse-direction bugs exist and are undetected by the integer check.**
+`formatMoney(125)` interprets `125` as 125 cents and renders `"$1.25"`. When
+the source is `service_addon_suggestions.combo_price` (NUMERIC dollars,
+value `125` meaning $125.00), the result is 100× too small in the
+customer-facing UI. The `formatMoney` safety net (`if (!Number.isInteger(cents)) throw`)
+passes because `125` IS an integer — the throw only catches non-integer
+floats like `125.50`. The original audit enumerated the forward direction
+(cents fed to `formatCurrency`, 100× too high) but missed the inverse
+(dollars fed to `formatMoney`, 100× too low). Future audits must enumerate
+BOTH directions explicitly; branded types (rule 2) catch the inverse pattern
+at compile time.
+
+> The cents-canonical destination remains the right architectural target.
+> The Unify-3 attempt failed not because cents-canonical is wrong, but
+> because the migration shipped without compile-time enforcement, without
+> per-surface isolation, and with an audit that came after the migration
+> rather than before. These six rules are the methodology for Money-Unify
+> Attempt 2, planned via Option A: branded types first, then
+> one-surface-at-a-time migration with audit-and-validate between each
+> surface.
+
 ## Files
 
 - Canonical helpers: `src/lib/utils/money.ts`

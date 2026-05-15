@@ -6,6 +6,65 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-15 — Money-Unify-3 + Unify-4 Rollback (Postmortem)
+
+The Money-Unify-3 (Family D / Catalog) and Unify-4 (Family E / Orders) migrations were rolled back today. The Family D rename shipped to `main` on 2026-05-14 as commit `ff2d51a1`, deployed to the VPS, and broke a wider surface than expected. Family E never reached `main` — it lived only on `unify-4-session-1-wip` with a corresponding migration applied to the shared Supabase project. Both were reverted at code (`main`) and DB layers. The site is now at the pre-Unify-3 baseline (commit `555dd41b` was the deployed post-revert HEAD; today's two DB DOWN migrations completed the rollback). No real customer was charged incorrectly at any point — every failure surfaced in self-testing.
+
+### What we attempted
+
+- **Unify-3** (`ff2d51a1`, 2026-05-14): Family D — services, service_pricing, products, packages — migrated from NUMERIC(10,2) dollars to INTEGER `_cents`. 15 columns added, backfilled, CHECK-constrained; legacy NUMERIC retained for two-phase-commit rollback safety. 80+ files touched across POS, admin, e-commerce, booking, voice-agent, account, and migration UI.
+- **Unify-4** (`unify-4-session-1-wip` branch, never merged): Family E — orders, order_items, shipping_settings — migration applied to the shared Supabase DB but the code branch was never merged to `main`. Rolled back at the DB layer alongside Unify-3.
+
+### What broke, and what we caught before merging the rollback
+
+S0 — payment / data correctness:
+- **Bug 3** — `src/app/api/checkout/create-payment-intent/route.ts:143`: `Math.round(product.retail_price_cents * 100)` left a stale `* 100` after the column rename, double-scaling cents. Would have charged Stripe 100× the cart total on every e-commerce checkout. Caught in self-test; no real customer charged.
+- **Booking wizard wire-shape mismatch**: the wizard's POST body used the JSON key `price` while `bookingSubmitSchema` now required `price_cents`. Empirically verified with Zod 4.3.6: every booking submission since `ff2d51a1` 400'd silently for 22 hours.
+- **`/api/book/payment-intent` 100× scaler**: same shape as Bug 3 — the renamed cents value reached the endpoint but `Math.round(amount * 100)` re-scaled it. Would have created Stripe PaymentIntents at 100× the intent. No real customer charged because the upstream Zod 400 on `/api/book` prevented the Stripe call from completing into a confirmed booking.
+- **Bug 1** — `flag-issue-flow.tsx` writing cents into `job_addons.price` (NUMERIC dollars column). Never exercised on the live deploy; no corrupted rows in the DB.
+
+S1 — customer-trust / revenue leakage:
+- **Bug 2** — `src/lib/services/shippo.ts:124`: flat handling fee returned in dollars where the caller expected cents (missing `* 100` at a dollars-out boundary). Silent shipping-fee undercharge.
+- **Bug 4** — `/api/checkout/shipping-rates/route.ts:95`: free-shipping eligibility subtotal applied the same stale `* 100` as Bug 3. Threshold gating was broken in the same direction.
+- **Booking wizard Step 4 confirmation rendering $7,500 for a $75 service**: 9+ render sites in `step-confirm-book.tsx` passed cents to `formatCurrency`. Plus 4 sites in the inline Stripe form (`step-payment.tsx`) and 4 sites in `booking-confirmation.tsx` — all rendered the wrong magnitude. Display-only; the actual Stripe charge took the same wrong number from the same source.
+- **Add-on browse cards rendering $1.25 instead of $125**: inverse direction bug — `service_addon_suggestions.combo_price` (NUMERIC dollars) passed to `formatMoney` which interpreted dollars-value as cents. Undetected by the `formatMoney` integer-throw safety net because whole-dollar values pass `Number.isInteger`. New bug class the original audit didn't enumerate.
+- **`src/lib/services/messaging-ai.ts:275`**: `Number(p.retail_price_cents).toFixed(2)` emits `"$1599.00"` for a `$15.99` product. The string lands in the AI auto-responder system prompt — customer-trust risk via mis-quoted prices.
+
+### What we shipped before deciding to roll back
+
+- `5266f113` — Phase Money-Unify-3.1a hotfix (pre-conversation): renamed 131 caller-side `formatCurrency(cents)` sites to `formatMoney(cents)`.
+- `2264a22a` — Session 1 hotfix: Bugs 2, 3, 4. Dropped the 100× scaler at create-payment-intent:143 and shipping-rates:95; added the missing `* 100` at shippo.ts:124. MONEY.md correction (Family E confirmed `INTEGER` cents in the live schema; playbook entry was stale). Lessons-learned section added.
+- `4725d0ad` — Session 1.5a hotfix: renamed the wizard POST body keys `price → price_cents` (top-level and addon); refactored `/api/book/payment-intent` to take `amountCents` with a `.strict()` Zod schema and dropped the 100× scaler; updated `step-payment.tsx` caller with an asymmetric `isDeposit ? toCents : passthrough` shim. Added `src/app/api/book/__tests__/wire-contract.test.ts` (11 tests) as the regression detector.
+
+### Non-money regressions discovered post-deploy
+
+- POS customer/vehicle gating disappeared for service selection. Returned after the rollback, confirming `ff2d51a1` was the cause (entangled in the same code mass).
+- Booking wizard "Back" buttons disappeared on some steps. Returned after the rollback for the same reason.
+
+These were unrelated to the cents math but proved how wide `ff2d51a1`'s blast radius was beyond money handling.
+
+### Why roll back instead of fix forward
+
+Three reasons converged. First, the bug surface was wider than originally scoped — Sessions 1 and 1.5a fixed 4 S0/S1 sites, but ongoing audit kept finding more (the inverse 1/100× add-on bug, the messaging-ai leak, the non-money POS/booking regressions). Second, fixing forward would have meant 5+ more sessions touching dozens of files — every additional rename risked introducing the same class of caller-side mismatches that broke Bug 3 originally. Third, the drift between sequential hotfix commits was producing emergent bugs: each fix was correct in isolation but interacted unpredictably with the still-broken code around it. The `ff2d51a1` blast radius (80+ files) meant any forward path would be high-risk for weeks.
+
+### Execution
+
+Rolled back to `b051c0af`-equivalent state on `main` via six `git revert` commits (one per Unify-3-era commit, in reverse order) plus one `chore` commit to reconcile the migration history. The DB was rolled back via two DOWN migrations applied today against the shared Supabase project: one for Family D, one for Family E. All 8 customer-facing surfaces smoke-tested and verified working.
+
+### Final state
+
+- **Code:** `main` at the post-revert state; deployed yesterday at `555dd41b`.
+- **DB:** pre-Unify-3 baseline applied today. No `_cents` columns on services / service_pricing / products / packages / orders / order_items / shipping_settings. Original NOT NULL constraints and sale-price-discipline checks restored. `void_transaction()` function back to its Unify-2 form.
+- **What survived intact:** Unify-1 helpers (`money.ts`, `formatMoney`, `formatCurrency`, `toCents`, `fromCents`) and the `money/no-unsuffixed-money-prop` ESLint rule; Unify-2 Inventory family (`purchase_order_items.unit_cost_cents`, `stock_adjustments.unit_cost_cents`, `vendors.min_order_amount_cents`); `refund-math.ts` cents foundation from Session 36; all pre-money work.
+- **Tag for recovery:** `money-unify-3-attempt-1` at the pre-rollback HEAD (`4725d0ad`) — preserves Session-1 and Session-1.5a hotfix code for future reference.
+- **Smoke tests passed:** homepage, services index, products index, /book wizard mount, /admin redirect, /pay/[token] mount, /receipt/[token] mount, /account redirect — all returned the expected status codes.
+
+### Next
+
+Option A planning: introduce branded types `Cents` and `Dollars` as compile-time enforcement BEFORE any future cents migration. Then migrate one surface at a time with audit-and-validate between each surface. The methodology is documented in the new "Lessons learned from the Money-Unify-3 rollback" section of `docs/dev/MONEY.md` and in the preserved Phase 2 audit (`docs/dev/MONEY_UNIFY_LESSONS_PHASE_2_AUDIT.md`).
+
+---
+
 ## Deploy: VPS alignment for Money-Unify Phases 1+2
 
 Aligned the production VPS with two locally-committed Money-Unify phases. Until this deploy, the schema migration from Unify-2 was live in the shared Supabase project (the only DB in the stack — there is no separate "dev DB"), but the VPS app code was still at `b051c0af` (pre-epic). This created a brief window where the DB schema had `unit_cost_cents` columns that production code didn't read or write. This deploy closes that window.
