@@ -288,6 +288,54 @@ at compile time.
 > one-surface-at-a-time migration with audit-and-validate between each
 > surface.
 
+
+## Decision (2026-05-15) — Money-Unify epic closed
+
+After completing the Money-Unify-3 rollback and reviewing the cost-benefit of
+continuing the epic, the decision is to **close Money-Unify permanently**. Future
+references in this file to "Money-Unify Attempt 2" or "Option A (branded types
+first)" should be understood as the path that was considered and **not taken**.
+
+**Final state and forward rules:**
+
+- Storage layer stays as `NUMERIC(10,2)` dollars for catalog (services,
+  service_pricing, products, packages), orders + order_items, transactions,
+  appointments, quotes, coupons, customers, and all other money-bearing tables
+  not already migrated.
+- Inventory family (Unify-2) stays on `_cents` columns — it shipped cleanly,
+  works correctly, and reverting it would be unnecessary churn.
+- Money-Unify-1 helpers (`toCents`, `fromCents`, `formatMoney`, `formatCurrency`)
+  and the `money/no-unsuffixed-money-prop` ESLint rule remain available for use,
+  but are not the canonical storage pattern.
+- `refund-math.ts` integer-cents pattern is preserved for the one math path
+  where precision matters (partial refund calculations). Any future
+  computation module with similar precision requirements should follow this
+  same pattern: integer cents internally, dollars at the I/O boundaries.
+- Stripe-rail conversions use `Math.round(dollars * 100)` consistently at the
+  payment-amount boundary. This is the established pattern; new code should
+  follow it.
+
+**Rationale (summarized — full reasoning in CHANGELOG 2026-05-15 postmortem):**
+
+For this business's scale and operational profile — sub-$500 average transactions,
+whole/half-dollar pricing, simple tax math (single rate, single boundary), Stripe
+and Square enforcing integer cents at the payment rail — the dollar/cent drift
+problem the migration was intended to solve has zero observed incidence in 18+
+months of operation. The 40-60 hour cost of completing the migration via Option A
+is not justified by the expected value of bugs prevented. The hours are better
+spent on customer-facing features.
+
+This decision applies indefinitely. It can be revisited if the business changes
+shape — e.g., expansion into multi-currency, subscription billing with proration,
+complex multi-rate tax compliance, or material increase in transaction volume —
+but none of those are on the current roadmap.
+
+**Lessons-learned section above (six rules) is preserved as reference material
+in case any future limited-scope cents migration is considered (e.g., a single
+computation module rather than a full family). The rules remain valid; the
+question of whether to apply them at all is the decision recorded here.**
+
+
 ## Files
 
 - Canonical helpers: `src/lib/utils/money.ts`

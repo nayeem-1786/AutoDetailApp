@@ -45,3 +45,9 @@ supabase/.repair-backup-*.txt
 
 # Claude Code agent worktrees and config — never commit
 .claude/
+
+# Local-only — secrets, break-glass procedures
+docs/dev/EMERGENCY_ACCESS.md
+
+# Temp working area
+tmp/
