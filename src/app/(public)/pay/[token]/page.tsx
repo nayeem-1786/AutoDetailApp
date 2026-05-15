@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getBusinessInfo } from '@/lib/data/business';
 import { toCents, fromCents } from '@/lib/utils/refund-math';
-import { formatCurrency, formatMoney, formatTime, formatReceiptDateTime, formatPhone, phoneToE164 } from '@/lib/utils/format';
+import { formatCurrency, formatTime, formatReceiptDateTime, formatPhone, phoneToE164 } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { PayForm } from './pay-form';
 import { ProcessingRefresh } from './processing-refresh';
@@ -438,7 +438,7 @@ function LinkPaidCard({
       {paidAmountCents !== null && (
         <p className="mt-2 text-base text-site-text">
           <span className="font-semibold tabular-nums">
-            {formatMoney(paidAmountCents)}
+            {formatCurrency(fromCents(paidAmountCents))}
           </span>{' '}
           paid
         </p>

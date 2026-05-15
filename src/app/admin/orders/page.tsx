@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -224,7 +224,7 @@ export default function AdminOrdersPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600">
-              {loading ? '-' : formatMoney(stats.revenue)}
+              {loading ? '-' : formatCurrency(stats.revenue / 100)}
             </p>
           </CardContent>
         </Card>
@@ -366,7 +366,7 @@ export default function AdminOrdersPage() {
                         {order.item_count}
                       </td>
                       <td className="px-4 py-3 text-right font-medium">
-                        {formatMoney(order.total)}
+                        {formatCurrency(order.total / 100)}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <Badge variant={payment.variant}>{payment.label}</Badge>

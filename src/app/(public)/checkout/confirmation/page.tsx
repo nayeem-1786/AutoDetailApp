@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { CheckCircle, Package, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 
 const CHECKOUT_ORDER_KEY = 'smart-details-checkout-order';
 const CHECKOUT_SESSION_KEY = 'smart-details-checkout-session';
@@ -203,11 +203,11 @@ function ConfirmationContent() {
                       {item.product_name}
                     </p>
                     <p className="text-xs text-site-text-muted">
-                      {formatMoney(item.unit_price)} x {item.quantity}
+                      {formatCurrency(item.unit_price / 100)} x {item.quantity}
                     </p>
                   </div>
                   <span className="text-sm font-medium text-site-text tabular-nums">
-                    {formatMoney(item.line_total)}
+                    {formatCurrency(item.line_total / 100)}
                   </span>
                 </div>
               ))}
@@ -219,7 +219,7 @@ function ConfirmationContent() {
             <div className="flex justify-between">
               <span className="text-site-text-muted">Subtotal</span>
               <span className="text-site-text tabular-nums">
-                {formatMoney(order.subtotal)}
+                {formatCurrency(order.subtotal / 100)}
               </span>
             </div>
             {order.discount_amount > 0 && (
@@ -229,28 +229,28 @@ function ConfirmationContent() {
                   {order.coupon_code && ` (${order.coupon_code})`}
                 </span>
                 <span className="text-accent-brand tabular-nums">
-                  -{formatMoney(order.discount_amount)}
+                  -{formatCurrency(order.discount_amount / 100)}
                 </span>
               </div>
             )}
             <div className="flex justify-between">
               <span className="text-site-text-muted">Tax</span>
               <span className="text-site-text tabular-nums">
-                {formatMoney(order.tax_amount)}
+                {formatCurrency(order.tax_amount / 100)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-site-text-muted">Shipping</span>
               <span className={`tabular-nums ${order.shipping_amount > 0 ? 'text-site-text' : 'text-accent-brand font-medium'}`}>
                 {order.shipping_amount > 0
-                  ? formatMoney(order.shipping_amount)
+                  ? formatCurrency(order.shipping_amount / 100)
                   : 'FREE'}
               </span>
             </div>
             <div className="border-t border-site-border pt-3 flex justify-between">
               <span className="text-base font-bold text-site-text">Total</span>
               <span className="text-base font-bold text-accent-brand tabular-nums">
-                {formatMoney(order.total)}
+                {formatCurrency(order.total / 100)}
               </span>
             </div>
           </div>

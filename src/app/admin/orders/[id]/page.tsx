@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
-import { formatMoney, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -292,10 +292,10 @@ export default function AdminOrderDetailPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900">{item.product_name}</p>
                       <p className="text-xs text-gray-500">
-                        {formatMoney(item.unit_price)} x {item.quantity}
+                        {formatCurrency(item.unit_price / 100)} x {item.quantity}
                       </p>
                     </div>
-                    <p className="font-medium">{formatMoney(item.line_total)}</p>
+                    <p className="font-medium">{formatCurrency(item.line_total / 100)}</p>
                   </div>
                 ))}
               </div>
@@ -313,27 +313,27 @@ export default function AdminOrderDetailPage() {
             <CardContent className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Subtotal</span>
-                <span>{formatMoney(order.subtotal)}</span>
+                <span>{formatCurrency(order.subtotal / 100)}</span>
               </div>
               {order.discount_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Discount{order.coupon_code ? ` (${order.coupon_code})` : ''}</span>
-                  <span className="text-green-600">-{formatMoney(order.discount_amount)}</span>
+                  <span className="text-green-600">-{formatCurrency(order.discount_amount / 100)}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Tax</span>
-                <span>{formatMoney(order.tax_amount)}</span>
+                <span>{formatCurrency(order.tax_amount / 100)}</span>
               </div>
               {order.shipping_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Shipping</span>
-                  <span>{formatMoney(order.shipping_amount)}</span>
+                  <span>{formatCurrency(order.shipping_amount / 100)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t pt-2 font-medium">
                 <span>Total</span>
-                <span>{formatMoney(order.total)}</span>
+                <span>{formatCurrency(order.total / 100)}</span>
               </div>
               {order.stripe_payment_intent_id && (
                 <div className="mt-3 pt-2 border-t">
@@ -522,7 +522,7 @@ export default function AdminOrderDetailPage() {
               </div>
               <div className="flex justify-between font-medium">
                 <span>Total</span>
-                <span>{formatMoney(order.total)}</span>
+                <span>{formatCurrency(order.total / 100)}</span>
               </div>
             </CardContent>
           </Card>
@@ -570,7 +570,7 @@ export default function AdminOrderDetailPage() {
           <div className="mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold">Issue Refund</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Order {order.order_number} — Total: {formatMoney(order.total)}
+              Order {order.order_number} — Total: {formatCurrency(order.total / 100)}
             </p>
 
             <div className="mt-4 space-y-4">
@@ -583,7 +583,7 @@ export default function AdminOrderDetailPage() {
                 >
                   Full Refund
                   <p className="mt-1 text-xs font-normal text-gray-500">
-                    {formatMoney(order.total)}
+                    {formatCurrency(order.total / 100)}
                   </p>
                 </button>
                 <button

@@ -6,7 +6,7 @@ import { ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 
 interface OrderSummary {
   id: string;
@@ -121,7 +121,7 @@ export default function AccountOrdersPage() {
                 </p>
               </div>
               <span className="text-lg font-semibold text-site-text">
-                {formatMoney(order.total)}
+                {formatCurrency(order.total / 100)}
               </span>
               <ChevronRight className="h-4 w-4 text-site-text-faint" />
             </Link>

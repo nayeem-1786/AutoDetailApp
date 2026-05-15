@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { getProductBySlug } from '@/lib/data/products';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 
 export const alt = 'Product Details';
 export const size = { width: 1200, height: 630 };
@@ -91,7 +91,7 @@ export default async function ProductOGImage({
                 fontWeight: 700,
               }}
             >
-              {formatMoney(price)}
+              {formatCurrency(price)}
             </div>
           )}
           <div

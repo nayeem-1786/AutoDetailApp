@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Package } from 'lucide-react';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo } from '@/lib/utils/sale-pricing';
 import { AddToCartButton } from './cart/add-to-cart-button';
 import type { Product } from '@/lib/supabase/types';
@@ -54,7 +54,7 @@ export function ProductCard({ product, categorySlug }: ProductCardProps) {
               </>
             ) : (
               <span className="text-sm font-bold text-accent-brand">
-                {formatMoney(product.retail_price_cents)}
+                {formatCurrency(product.retail_price_cents)}
               </span>
             )}
           </div>

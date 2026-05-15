@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import { timestampToPstDate } from '@/lib/utils/pst-date';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
@@ -59,7 +59,7 @@ function renderPriceLine(
   hasSale: boolean,
   suffix?: string
 ) {
-  const formattedBase = formatMoney(basePrice) + (suffix || '');
+  const formattedBase = formatCurrency(basePrice) + (suffix || '');
   if (!hasSale || salePrice === null) {
     return (
       <div key={label} className="text-gray-500 text-xs">
@@ -73,7 +73,7 @@ function renderPriceLine(
       {label && <span className="text-gray-400">{label}: </span>}
       <span className="text-gray-400 line-through">{formattedBase}</span>
       <span className="ml-1 font-medium text-green-600">
-        {formatMoney(salePrice)}{suffix || ''}
+        {formatCurrency(salePrice)}{suffix || ''}
       </span>
     </div>
   );
@@ -128,20 +128,15 @@ function calcSalePrice(
   inputValue: number | '',
   discountType: DiscountType
 ): number | null {
-  // basePrice is integer cents (caller passes *_price_cents). Result is
-  // integer cents. The pre-Phase-3.1a form of this function called
-  // `Math.round(basePrice * ... * 100) / 100`, which produced fractional
-  // cents when fed integer-cents inputs — formatMoney now throws on
-  // those. Round-trip through integer math instead.
   if (inputValue === '' || inputValue < 0) return null;
-  if (discountType === 'direct') return Math.round(inputValue);
+  if (discountType === 'direct') return inputValue;
   if (discountType === 'percentage') {
     if (inputValue <= 0 || inputValue >= 100) return null;
-    return Math.round(basePrice * (1 - inputValue / 100));
+    return Math.round(basePrice * (1 - inputValue / 100) * 100) / 100;
   }
   // fixed amount off
   if (inputValue <= 0 || inputValue >= basePrice) return null;
-  return Math.round(basePrice - inputValue);
+  return Math.round((basePrice - inputValue) * 100) / 100;
 }
 
 function calcInputFromSalePrice(
@@ -257,7 +252,7 @@ function getValidationErrors(item: PromotionItem, state: EditState): string[] {
     if (input === '' || input === undefined) continue;
     const sp = calcSalePrice(tier.price_cents, input, state.discountType);
     if (sp !== null && sp >= tier.price_cents) {
-      errors.push(`${tier.tier_label || tier.tier_name}: sale price must be < ${formatMoney(tier.price_cents)}`);
+      errors.push(`${tier.tier_label || tier.tier_name}: sale price must be < ${formatCurrency(tier.price_cents)}`);
     }
     if (sp === null) {
       errors.push(`${tier.tier_label || tier.tier_name}: invalid discount value`);
@@ -326,7 +321,7 @@ function EditPriceInputs({
         <div className="flex items-center gap-2">
           <div className="flex-1">
             <label className="text-[10px] text-gray-400">
-              {discountLabel} (base: {formatMoney(basePrice)}{suffix})
+              {discountLabel} (base: {formatCurrency(basePrice)}{suffix})
             </label>
             <Input
               type="number"
@@ -350,7 +345,7 @@ function EditPriceInputs({
         </div>
         {state.discountType !== 'direct' && computed !== null && (
           <p className="text-[10px] text-gray-500">
-            Preview: {formatMoney(computed)}{suffix}
+            Preview: {formatCurrency(computed)}{suffix}
           </p>
         )}
       </div>
@@ -366,7 +361,7 @@ function EditPriceInputs({
         return (
           <div key={tier.tier_name}>
             <label className="text-[10px] text-gray-400">
-              {tier.tier_label || tier.tier_name} {discountLabel} (base: {formatMoney(tier.price_cents)})
+              {tier.tier_label || tier.tier_name} {discountLabel} (base: {formatCurrency(tier.price_cents)})
             </label>
             <Input
               type="number"
@@ -393,7 +388,7 @@ function EditPriceInputs({
             />
             {state.discountType !== 'direct' && computed !== null && (
               <p className="text-[10px] text-gray-500">
-                Preview: {formatMoney(computed)}
+                Preview: {formatCurrency(computed)}
               </p>
             )}
           </div>

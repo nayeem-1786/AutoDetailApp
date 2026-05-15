@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { Vendor, Product, ProductCategory } from '@/lib/supabase/types';
-import { formatDate, formatMoney, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatMoney, formatPhone } from '@/lib/utils/format';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -114,7 +114,7 @@ export default function VendorDetailPage() {
       accessorKey: 'retail_price_cents',
       header: 'Retail Price',
       size: 90,
-      cell: ({ row }) => formatMoney(row.original.retail_price_cents),
+      cell: ({ row }) => formatCurrency(row.original.retail_price_cents),
     },
     {
       accessorKey: 'quantity_on_hand',
@@ -156,7 +156,7 @@ export default function VendorDetailPage() {
           size: 90,
           cell: ({ row }) =>
             row.original.cost_price_cents > 0
-              ? formatMoney(row.original.cost_price_cents)
+              ? formatCurrency(row.original.cost_price_cents)
               : '--',
         },
         {
@@ -329,7 +329,7 @@ export default function VendorDetailPage() {
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <div className="text-sm text-gray-500">Stock Retail Value</div>
-          <div className="text-2xl font-bold text-gray-900">{formatMoney(totalRetailValue)}</div>
+          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totalRetailValue)}</div>
         </div>
       </div>
 

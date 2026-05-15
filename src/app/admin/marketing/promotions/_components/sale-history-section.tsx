@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import { ChevronDown, ChevronRight, Copy, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,8 +22,8 @@ function SnapshotPriceDisplay({ record }: { record: SaleHistoryRecord }) {
     const snap = pricing_snapshot as { retail_price_cents: number; sale_price_cents: number };
     return (
       <div className="text-xs">
-        <span className="text-gray-400 line-through">{formatMoney(snap.retail_price_cents)}</span>
-        <span className="ml-1 font-medium text-green-600">{formatMoney(snap.sale_price_cents)}</span>
+        <span className="text-gray-400 line-through">{formatCurrency(snap.retail_price_cents)}</span>
+        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price_cents)}</span>
       </div>
     );
   }
@@ -33,8 +33,8 @@ function SnapshotPriceDisplay({ record }: { record: SaleHistoryRecord }) {
     const snap = pricing_snapshot as { base_price: number; sale_price_cents: number };
     return (
       <div className="text-xs">
-        <span className="text-gray-400 line-through">{formatMoney(snap.base_price)}</span>
-        <span className="ml-1 font-medium text-green-600">{formatMoney(snap.sale_price_cents)}</span>
+        <span className="text-gray-400 line-through">{formatCurrency(snap.base_price)}</span>
+        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price_cents)}</span>
       </div>
     );
   }
@@ -45,8 +45,8 @@ function SnapshotPriceDisplay({ record }: { record: SaleHistoryRecord }) {
     const suffix = `/${snap.per_unit_label || 'unit'}`;
     return (
       <div className="text-xs">
-        <span className="text-gray-400 line-through">{formatMoney(snap.base_price)}{suffix}</span>
-        <span className="ml-1 font-medium text-green-600">{formatMoney(snap.sale_price_cents)}{suffix}</span>
+        <span className="text-gray-400 line-through">{formatCurrency(snap.base_price)}{suffix}</span>
+        <span className="ml-1 font-medium text-green-600">{formatCurrency(snap.sale_price_cents)}{suffix}</span>
       </div>
     );
   }
@@ -59,8 +59,8 @@ function SnapshotPriceDisplay({ record }: { record: SaleHistoryRecord }) {
         {tiers.map((t) => (
           <div key={t.tier_name} className="text-xs">
             <span className="text-gray-400">{t.tier_label || t.tier_name}: </span>
-            <span className="text-gray-400 line-through">{formatMoney(t.base_price)}</span>
-            <span className="ml-1 font-medium text-green-600">{formatMoney(t.sale_price_cents)}</span>
+            <span className="text-gray-400 line-through">{formatCurrency(t.base_price)}</span>
+            <span className="ml-1 font-medium text-green-600">{formatCurrency(t.sale_price_cents)}</span>
           </div>
         ))}
       </div>

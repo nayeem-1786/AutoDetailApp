@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -424,7 +424,7 @@ export default function ProductsPage() {
       accessorKey: 'retail_price_cents',
       header: 'Price',
       size: 80,
-      cell: ({ row }) => formatMoney(row.original.retail_price_cents),
+      cell: ({ row }) => formatCurrency(row.original.retail_price_cents),
     },
   ];
 
@@ -436,7 +436,7 @@ export default function ProductsPage() {
           size: 80,
           cell: ({ row }) =>
             row.original.cost_price_cents > 0
-              ? formatMoney(row.original.cost_price_cents)
+              ? formatCurrency(row.original.cost_price_cents)
               : '--',
           enableSorting: false,
         },

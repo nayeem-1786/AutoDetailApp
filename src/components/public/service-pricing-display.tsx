@@ -1,4 +1,4 @@
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatMoney } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo, hasAnySalePrice, getSaleEndDescription, isEndingSoon } from '@/lib/utils/sale-pricing';
 import { MessageSquare, Clock } from 'lucide-react';
 import type { Service, ServicePricing } from '@/lib/supabase/types';
@@ -100,7 +100,7 @@ function VehicleSizePricing({ service }: { service: Service }) {
                 }
                 return (
                   <td key={tier.id} className="px-4 py-4 font-bold text-accent-brand text-base">
-                    {formatMoney(tier.price_cents)}
+                    {formatCurrency(tier.price_cents)}
                   </td>
                 );
               })}
@@ -174,7 +174,7 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
           <td className="px-4 py-1 pl-8 text-site-text-muted">Sedan</td>
           <td className="px-4 py-1 text-right font-bold text-accent-brand">
             {tier.vehicle_size_sedan_price_cents !== null
-              ? formatMoney(tier.vehicle_size_sedan_price_cents)
+              ? formatCurrency(tier.vehicle_size_sedan_price_cents)
               : '--'}
           </td>
         </tr>
@@ -182,7 +182,7 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
           <td className="px-4 py-1 pl-8 text-site-text-muted">Truck / SUV</td>
           <td className="px-4 py-1 text-right font-bold text-accent-brand">
             {tier.vehicle_size_truck_suv_price_cents !== null
-              ? formatMoney(tier.vehicle_size_truck_suv_price_cents)
+              ? formatCurrency(tier.vehicle_size_truck_suv_price_cents)
               : '--'}
           </td>
         </tr>
@@ -190,7 +190,7 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
           <td className="px-4 pb-3 py-1 pl-8 text-site-text-muted">SUV / Van</td>
           <td className="px-4 pb-3 py-1 text-right font-bold text-accent-brand">
             {tier.vehicle_size_suv_van_price_cents !== null
-              ? formatMoney(tier.vehicle_size_suv_van_price_cents)
+              ? formatCurrency(tier.vehicle_size_suv_van_price_cents)
               : '--'}
           </td>
         </tr>
@@ -215,7 +215,7 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
           </>
         ) : (
           <span className="font-bold text-accent-brand">
-            {formatMoney(tier.price_cents)}
+            {formatCurrency(tier.price_cents)}
           </span>
         )}
       </td>
@@ -231,16 +231,16 @@ function PerUnitPricing({ service }: { service: Service }) {
     <div className="space-y-2">
       {onSale ? (
         <div className="flex items-center gap-2">
-          <p className="text-base text-site-text-muted line-through">{formatMoney(service.per_unit_price_cents!)}</p>
+          <p className="text-base text-site-text-muted line-through">{formatCurrency(service.per_unit_price_cents!)}</p>
           <p className="font-display text-2xl font-bold text-accent-brand">
-            {formatMoney(service.sale_price_cents!)}{' '}
+            {formatCurrency(service.sale_price_cents!)}{' '}
             <span className="text-base font-normal text-site-text-muted">per {service.per_unit_label ?? 'unit'}</span>
           </p>
           <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
         </div>
       ) : (
         <p className="font-display text-2xl font-bold text-accent-brand">
-          {service.per_unit_price_cents !== null ? formatMoney(service.per_unit_price_cents) : '--'}{' '}
+          {service.per_unit_price_cents !== null ? formatCurrency(service.per_unit_price_cents) : '--'}{' '}
           <span className="text-base font-normal text-site-text-muted">
             per {service.per_unit_label ?? 'unit'}
           </span>
@@ -307,7 +307,7 @@ function SpecialtyPricing({ service }: { service: Service }) {
                       </>
                     ) : (
                       <span className="font-bold text-accent-brand">
-                        {formatMoney(tier.price_cents)}
+                        {formatCurrency(tier.price_cents)}
                       </span>
                     )}
                   </td>
@@ -329,13 +329,13 @@ function FlatPricing({ service }: { service: Service }) {
     <div>
       {onSale ? (
         <div className="flex items-center gap-3">
-          <p className="text-lg text-site-text-muted line-through">{formatMoney(service.flat_price_cents!)}</p>
-          <p className="font-display text-3xl font-bold text-accent-brand">{formatMoney(service.sale_price_cents!)}</p>
+          <p className="text-lg text-site-text-muted line-through">{formatCurrency(service.flat_price_cents!)}</p>
+          <p className="font-display text-3xl font-bold text-accent-brand">{formatCurrency(service.sale_price_cents!)}</p>
           <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
         </div>
       ) : (
         <p className="font-display text-3xl font-bold text-accent-brand">
-          {service.flat_price_cents !== null ? formatMoney(service.flat_price_cents) : '--'}
+          {service.flat_price_cents !== null ? formatCurrency(service.flat_price_cents) : '--'}
         </p>
       )}
     </div>
@@ -347,7 +347,7 @@ function CustomPricing({ service }: { service: Service }) {
     <div className="space-y-2">
       <p className="font-display text-2xl font-bold text-accent-brand">
         {service.custom_starting_price_cents !== null
-          ? `Starting at ${formatMoney(service.custom_starting_price_cents)}`
+          ? `Starting at ${formatCurrency(service.custom_starting_price_cents)}`
           : 'Custom pricing'}
       </p>
       <p className="flex items-center gap-1.5 text-sm text-site-text-muted">

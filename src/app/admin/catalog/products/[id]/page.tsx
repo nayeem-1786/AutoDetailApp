@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { productEditSchema, type ProductEditInput } from '@/lib/utils/validation';
 import { WATER_SKU } from '@/lib/utils/constants';
 import type { Product, ProductCategory, ProductImage, Vendor } from '@/lib/supabase/types';
-import { formatDate, formatMoney } from '@/lib/utils/format';
+import { formatCurrency, formatDate, formatMoney } from '@/lib/utils/format';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { PageHeader } from '@/components/ui/page-header';
@@ -596,7 +596,7 @@ export default function ProductDetailPage() {
     try {
       if (salePrice !== '' && typeof salePrice === 'number') {
         if (salePrice >= product.retail_price_cents) {
-          toast.error(`Sale price must be less than retail price (${formatMoney(product.retail_price_cents)})`);
+          toast.error(`Sale price must be less than retail price (${formatCurrency(product.retail_price_cents)})`);
           setSavingSale(false);
           return;
         }
@@ -1035,7 +1035,7 @@ export default function ProductDetailPage() {
                             <p className="text-sm font-medium text-gray-900 truncate hover:text-blue-600">{v.name}</p>
                             <div className="flex gap-2 text-xs text-gray-500">
                               {v.variant_label && <span className="font-medium">{v.variant_label}</span>}
-                              <span>{formatMoney(v.retail_price_cents)}</span>
+                              <span>{formatCurrency(v.retail_price_cents)}</span>
                               <span>{v.quantity_on_hand > 0 ? `${v.quantity_on_hand} in stock` : 'Out of stock'}</span>
                             </div>
                           </Link>
@@ -1114,7 +1114,7 @@ export default function ProductDetailPage() {
                               >
                                 <div>
                                   <p className="font-medium text-gray-900">{r.name}</p>
-                                  <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatMoney(r.retail_price_cents)}</p>
+                                  <p className="text-xs text-gray-500">{r.vendor_name ?? 'No vendor'} &middot; {formatCurrency(r.retail_price_cents)}</p>
                                 </div>
                                 {selected && <Badge variant="secondary">Selected</Badge>}
                               </button>
@@ -1683,13 +1683,13 @@ function ProductSalePricingCard({
           <div>
             <p className="mb-1 text-xs font-medium text-gray-500">Standard Price</p>
             <p className="text-sm font-semibold text-gray-900">
-              {formatMoney(product.retail_price_cents)}
+              {formatCurrency(product.retail_price_cents)}
             </p>
           </div>
           <FormField label="Sale Price">
             {discountType !== 'direct' ? (
               <p className="text-sm font-semibold text-gray-900 pt-2">
-                {hasSaleInput ? formatMoney(salePrice as number) : <span className="text-gray-400">—</span>}
+                {hasSaleInput ? formatCurrency(salePrice as number) : <span className="text-gray-400">—</span>}
               </p>
             ) : (
               <div className="relative">
@@ -1705,7 +1705,7 @@ function ProductSalePricingCard({
                 />
                 {hasError && (
                   <p className="mt-1 text-xs text-red-500">
-                    Must be less than {formatMoney(product.retail_price_cents)}
+                    Must be less than {formatCurrency(product.retail_price_cents)}
                   </p>
                 )}
               </div>
@@ -1868,7 +1868,7 @@ function CostMarginCard({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Cost Price</p>
             <p className="mt-1 text-lg font-semibold text-gray-900">
-              {formatMoney(product.cost_price_cents)}
+              {formatCurrency(product.cost_price_cents)}
             </p>
           </div>
 
@@ -1876,7 +1876,7 @@ function CostMarginCard({
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Retail Price</p>
             <p className="mt-1 text-lg font-semibold text-gray-900">
-              {formatMoney(product.retail_price_cents)}
+              {formatCurrency(product.retail_price_cents)}
             </p>
           </div>
 
