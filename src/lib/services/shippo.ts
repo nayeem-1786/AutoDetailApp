@@ -121,7 +121,7 @@ function calculateHandlingFee(
   feeType: string,
   feeAmount: number
 ): number {
-  if (feeType === 'flat') return Math.round(feeAmount * 100);
+  if (feeType === 'flat') return Math.round(feeAmount);
   if (feeType === 'percent') return Math.round(rateCents * (feeAmount / 100));
   return 0;
 }

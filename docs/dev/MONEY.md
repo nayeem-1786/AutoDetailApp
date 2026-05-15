@@ -193,7 +193,7 @@ family phases that follow.
 | --- | --- | --- |
 | H — Inventory | purchase_order_items, stock_adjustments, vendors | **Migrated (Unify-2)** — 3 cents columns added, backfilled, CHECK-constrained; legacy NUMERIC columns retained until Unify-Final; `void_transaction()` Postgres function writes cents; 9 `// TODO Unify-D` shim sites tagged for Family D to clean up (cleared in Unify-3). |
 | D — Catalog | services, service_pricing, products, packages | **Migrated (Unify-3)** — 15 cents columns added, backfilled (D-1 lax rounding of 4 whole-dollar pre-violators), CHECK-constrained (28 new constraints: non-negative, whole-dollar on services/service_pricing/packages, sale-price-discipline against `_cents`); legacy NUMERIC columns retained nullable until Unify-Final. New `services.chk_services_sale_price` enforces `sale_price_cents < flat_price_cents`. `void_transaction()` rewritten to read/write `cost_price_cents` directly. All 9 Unify-D shims cleared from `src/`. New shim markers `// TODO Unify-5/6/7/8` (28 total) tag conversion boundaries at Family A/C/F/B reads — cleaned up at the corresponding family phases. Form-state pattern: `service-pricing-form.tsx` interfaces hold dollars; admin pages convert at load/save boundaries (mirrors Unify-2 vendor pattern). Booking wire (`bookingSubmitSchema.price_cents` + `bookingAddonSchema.price_cents`) is cents; `mobile_surcharge` + `coupon_discount` stay dollars until Family C/F. POS reducers convert cents → dollars at the `resolveServicePriceWithSale()` boundary to keep `TicketItem.unitPrice` in dollars until Family A migrates. |
-| E — Orders | orders, order_items, shipping_settings | **Migrated (shipped with Unify-3)** — `orders.{subtotal, discount_amount, tax_amount, shipping_amount, total}` and `order_items.{unit_price, line_total}` are `INTEGER` cents in the live schema. The playbook previously listed this family as Pending Unify-4; that was stale. No separate Unify-4 phase remains for Family E. `shipping_settings.handling_fee_amount` and `free_shipping_threshold` units retained as-is. |
+| E — Orders | orders, order_items, shipping_settings | Pending (Unify-4) |
 | A — POS Transactions | transactions, transaction_items, payments, refunds, cash_drawers | Pending (Unify-5) |
 | C — Appointments | appointments, appointment_services, mobile_zones, job_addons | Pending (Unify-6) |
 | F — Marketing | coupons, coupon_rewards, campaigns | Pending (Unify-7) |
@@ -204,21 +204,6 @@ family phases that follow.
 See `docs/sessions/money-unify-0-migration-playbook-v2.md` for the
 full epic plan, decision recap, and per-family reconciliation
 strategies.
-
-## Money-Unify-3 caller-side bug pattern
-
-> When a column migrates from dollars (NUMERIC) to cents (INTEGER), every
-> caller-side `* 100` and `/ 100` conversion against that column must be
-> deleted in the same commit. The renaming of `retail_price` → `retail_price_cents`
-> in commit ff2d51a1 (May 14 2026) missed three call sites:
->   - `/api/checkout/create-payment-intent/route.ts:143` (Stripe amount + 7 DB cols)
->   - `/api/checkout/shipping-rates/route.ts:95` (free-ship eligibility)
->   - `/lib/services/shippo.ts:124` (handling fee, opposite direction —
->     missing `* 100` at a dollars-out boundary)
->
-> Future family migrations must include a sweep of all `* 100` and `/ 100`
-> usages against the migrated columns BEFORE shipping. The audit at
-> `docs/dev/MONEY_UNIFY_3_COMPREHENSIVE_BUG_AUDIT.md` provides the methodology.
 
 ## Files
 

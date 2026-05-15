@@ -6,35 +6,6 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## 2026-05-14 — Session: Money-Unify-3 Hotfix (Bugs 2, 3, 4)
-
-### Fixed
-- Bug 3 (S0): create-payment-intent/route.ts line 143 — removed 100× scaler.
-  Stripe `amount` and orders/order_items writes now correctly cents.
-- Bug 4 (S1): shipping-rates/route.ts line 95 — removed 100× scaler from
-  free-shipping eligibility check.
-- Bug 2 (S1): shippo.ts line 124 — added missing × 100 to flat handling fee
-  return value at the dollars→cents boundary.
-
-### Docs
-- MONEY.md: corrected Family E ground-truth row to reflect that orders +
-  order_items are already INTEGER cents in production.
-- MONEY.md: added "Money-Unify-3 caller-side bug pattern" lessons-learned
-  section to prevent recurrence in future family migrations.
-
-### Cleanup (manual, pre-session)
-- Corrupted test order 61369820-... deleted via SQL Editor.
-- Stripe PI pi_3TX80J... left in Incomplete state (handshake only, no charge).
-
-### Out of scope (sessions 2–6)
-- Bug 1 flag-issue-flow wire schema redesign
-- Class C/A display fixes (32 sites across 6 files)
-- AI/SEO renders (5 sites)
-- Lint promotion to error
-- Audit gaps 3–6 follow-up investigations
-
----
-
 ## Phase Money-Unify-3 — Family D (Catalog) — DEPLOY
 
 Deployed to VPS on 2026-05-14 at commit `ff2d51a1`. Build time: 282s (4m 42s); total deploy time 374s. PM2 process `smart-details` restarted from PID 1645795 → 1957865, restart count incremented 16 → 17, status online, port 5003 bound, HTTP 200 from `127.0.0.1:5003/`.
