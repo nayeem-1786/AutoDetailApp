@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const unitPriceCents = Math.round(product.retail_price_cents * 100);
+      const unitPriceCents = product.retail_price_cents;
       const categorySlug =
         (product.product_categories as unknown as { slug: string })?.slug ?? '';
 

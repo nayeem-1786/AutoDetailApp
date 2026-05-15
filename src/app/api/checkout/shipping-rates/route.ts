@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
           .eq('id', item.productId)
           .single();
         if (product) {
-          subtotalCents += Math.round(Number(product.retail_price_cents) * 100) * item.quantity;
+          subtotalCents += Number(product.retail_price_cents) * item.quantity;
         }
       }
 
