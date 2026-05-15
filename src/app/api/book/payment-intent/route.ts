@@ -1,60 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { STRIPE_MIN_AMOUNT_CENTS, STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
-import { paymentIntentRequestSchema } from './schema';
+import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
 
-// Lazy Stripe client — instantiated on first POST. Module-level new Stripe(...)
-// would throw at import time when STRIPE_SECRET_KEY is absent (notably in the
-// Vitest environment that imports `paymentIntentRequestSchema` from this file).
-let stripeClient: Stripe | null = null;
-function getStripe(): Stripe {
-  if (!stripeClient) {
-    stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!);
-  }
-  return stripeClient;
-}
+// Initialize Stripe (server-side only)
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const parsed = paymentIntentRequestSchema.safeParse(body);
+    const { amount, currency = 'usd', metadata, isDeposit, totalAmount } = body;
 
-    if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-      return NextResponse.json(
-        { error: 'Invalid payment-intent request', fieldErrors },
-        { status: 400 }
-      );
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
     }
 
-    const {
-      amountCents,
-      currency = 'usd',
-      metadata,
-      isDeposit,
-      totalAmountCents,
-    } = parsed.data;
-
-    if (amountCents < STRIPE_MIN_AMOUNT_CENTS) {
+    if (amount < STRIPE_MIN_DOLLARS) {
       return NextResponse.json(
         { error: `Amount must be at least $${STRIPE_MIN_DOLLARS.toFixed(2)}` },
         { status: 400 }
       );
     }
 
-    // Stripe metadata values must be strings. Cents stored as integer-string
-    // (e.g. "5000") keeps the unit explicit on the PaymentIntent record.
+    // Convert dollars to cents for Stripe
+    const amountInCents = Math.round(amount * 100);
+
+    // Include deposit information in metadata for tracking
     const paymentMetadata = {
       ...metadata,
       ...(isDeposit && {
         is_deposit: 'true',
-        deposit_amount_cents: String(amountCents),
-        total_amount_cents: totalAmountCents != null ? String(totalAmountCents) : '',
+        deposit_amount: amount.toString(),
+        total_amount: totalAmount?.toString() || '',
       }),
     };
 
-    const paymentIntent = await getStripe().paymentIntents.create({
-      amount: amountCents,
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
       currency,
       automatic_payment_methods: { enabled: true },
       metadata: paymentMetadata,

@@ -6,36 +6,6 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## 2026-05-14 — Session: Money-Unify-3 Hotfix 2 (Booking Critical, S0)
-
-### Fixed
-- Booking wizard wire-shape mismatch: POST body keys renamed
-  `price`/`addons[i].price` → `price_cents`/`addons[i].price_cents`
-  to match bookingSubmitSchema. Every booking submission since
-  ff2d51a1 had been 400'ing silently.
-- /api/book/payment-intent: dropped 100x scaler on cents input,
-  renamed `amount` → `amountCents`, added Zod input validation.
-- step-payment.tsx caller: updated body key to `amountCents`.
-
-### Added
-- src/app/api/book/__tests__/wire-contract.test.ts — regression
-  prevention for wire-shape drift across client/schema/endpoint.
-- paymentIntentRequestSchema in /api/book/payment-intent route
-  (sibling schema.ts file — Next.js App Router rejects non-method
-  named exports from route.ts).
-
-### Docs
-- MONEY.md: appended wire-contract enforcement rule to the
-  lessons-learned section.
-
-### Out of scope (session 1.5b)
-- Step 4 Confirm display (9+ sites at 100x)
-- Step Payment display (4 sites)
-- Booking Confirmation display (4 sites)
-- Add-on browse render bug (suggestion.combo_price 1/100x)
-
----
-
 ## 2026-05-14 — Session: Money-Unify-3 Hotfix (Bugs 2, 3, 4)
 
 ### Fixed
