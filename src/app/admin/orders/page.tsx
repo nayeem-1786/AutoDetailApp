@@ -15,7 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

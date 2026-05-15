@@ -2,7 +2,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { QboClient } from './client';
 import { isQboSyncEnabled, getQboSetting } from './settings';
 import { logSync } from './sync-log';
-import { fromCents } from '@/lib/utils/money';
 
 /**
  * Sync a single service to QuickBooks Online as an Item of type 'Service'.
@@ -20,7 +19,7 @@ export async function syncServiceToQbo(
     const supabase = createAdminClient();
     const { data: service, error: fetchErr } = await supabase
       .from('services')
-      .select('id, name, flat_price_cents, qbo_id')
+      .select('id, name, flat_price, qbo_id')
       .eq('id', serviceId)
       .single();
 
@@ -40,8 +39,7 @@ export async function syncServiceToQbo(
       Name: (service.name || '').substring(0, 100), // QBO 100 char limit
       Type: 'Service',
       IncomeAccountRef: { value: incomeAccountId },
-      // QBO Items.UnitPrice expects decimal dollars. fromCents converts at the boundary.
-      UnitPrice: service.flat_price_cents != null ? fromCents(service.flat_price_cents) : 0,
+      UnitPrice: service.flat_price || 0,
     };
 
     let qboId: string;
@@ -61,8 +59,7 @@ export async function syncServiceToQbo(
         Name: (service.name || '').substring(0, 100),
         Type: 'Service',
         IncomeAccountRef: { value: incomeAccountId, name: '' },
-        // QBO Items.UnitPrice expects decimal dollars. fromCents converts at the boundary.
-      UnitPrice: service.flat_price_cents != null ? fromCents(service.flat_price_cents) : 0,
+        UnitPrice: service.flat_price || 0,
       });
       qboId = updated.Id;
     } else {
@@ -131,7 +128,7 @@ export async function syncProductToQbo(
     const supabase = createAdminClient();
     const { data: product, error: fetchErr } = await supabase
       .from('products')
-      .select('id, name, retail_price_cents, qbo_id')
+      .select('id, name, retail_price, qbo_id')
       .eq('id', productId)
       .single();
 
@@ -150,7 +147,7 @@ export async function syncProductToQbo(
       Name: (product.name || '').substring(0, 100),
       Type: 'NonInventory',
       IncomeAccountRef: { value: incomeAccountId },
-      UnitPrice: product.retail_price_cents != null ? fromCents(product.retail_price_cents) : 0,
+      UnitPrice: product.retail_price || 0,
     };
 
     let qboId: string;
@@ -169,7 +166,7 @@ export async function syncProductToQbo(
         Name: (product.name || '').substring(0, 100),
         Type: 'NonInventory',
         IncomeAccountRef: { value: incomeAccountId, name: '' },
-        UnitPrice: product.retail_price_cents != null ? fromCents(product.retail_price_cents) : 0,
+        UnitPrice: product.retail_price || 0,
       });
       qboId = updated.Id;
     } else {

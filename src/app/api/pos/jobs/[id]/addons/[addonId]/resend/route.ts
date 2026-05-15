@@ -83,7 +83,7 @@ export async function POST(
         service_id: original.service_id,
         product_id: original.product_id,
         custom_description: original.custom_description,
-        price: original.price_cents,
+        price: original.price,
         discount_amount: original.discount_amount,
         status: 'pending',
         authorization_token: authToken,
@@ -154,7 +154,7 @@ export async function POST(
     }
 
     if (customer?.email) {
-      const finalPrice = original.price_cents - original.discount_amount;
+      const finalPrice = original.price - original.discount_amount;
       const emailResult = await sendEmail(
         customer.email,
         `Authorization Request — ${biz.name}`,

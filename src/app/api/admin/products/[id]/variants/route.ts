@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   // Get all other products in the same group
   const { data: variants, error: variantsError } = await admin
     .from('products')
-    .select('id, name, variant_label, retail_price_cents, quantity_on_hand, image_url')
+    .select('id, name, variant_label, retail_price, quantity_on_hand, image_url')
     .eq('product_group_id', product.product_group_id)
     .neq('id', id)
     .order('name');

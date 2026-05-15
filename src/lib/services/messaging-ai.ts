@@ -3,7 +3,6 @@ import { type SupabaseClient } from '@supabase/supabase-js';
 import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, isWithinBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
 import { getDefaultSystemPrompt } from '@/lib/services/messaging-ai-prompt';
-import { formatMoney } from '@/lib/utils/format';
 import { getPendingAddonsForCustomer, buildAddonPromptSection } from '@/lib/services/job-addons';
 import type { Message } from '@/lib/supabase/types';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
@@ -27,11 +26,11 @@ export async function buildSystemPrompt(customerId?: string | null): Promise<str
   const { data: services } = await supabase
     .from('services')
     .select(`
-      name, description, pricing_model, flat_price_cents, custom_starting_price_cents,
-      per_unit_price_cents, per_unit_max, per_unit_label, mobile_eligible,
+      name, description, pricing_model, flat_price, custom_starting_price,
+      per_unit_price, per_unit_max, per_unit_label, mobile_eligible,
       base_duration_minutes,
-      pricing:service_pricing(tier_name, tier_label, price_cents, vehicle_size_sedan_price_cents,
-        vehicle_size_truck_suv_price_cents, vehicle_size_suv_van_price_cents, is_vehicle_size_aware, display_order)
+      pricing:service_pricing(tier_name, tier_label, price, vehicle_size_sedan_price,
+        vehicle_size_truck_suv_price, vehicle_size_suv_van_price, is_vehicle_size_aware, display_order)
     `)
     .eq('is_active', true)
     .order('name');
@@ -53,74 +52,70 @@ export async function buildSystemPrompt(customerId?: string | null): Promise<str
   const serviceCatalog = services?.map((s) => {
     let pricingText = '';
 
-    // Phase Money-Unify-3: DB stores integer cents; AI prompt text needs
-    // human-readable dollar amounts. Format via formatMoney() at every emit.
     switch (s.pricing_model) {
       case 'vehicle_size': {
         const tiers = (s.pricing as Array<{
-          tier_name: string; price_cents: number;
-          vehicle_size_sedan_price_cents: number | null;
-          vehicle_size_truck_suv_price_cents: number | null;
-          vehicle_size_suv_van_price_cents: number | null;
+          tier_name: string; price: number;
+          vehicle_size_sedan_price: number | null;
+          vehicle_size_truck_suv_price: number | null;
+          vehicle_size_suv_van_price: number | null;
           display_order: number;
         }>) || [];
         if (tiers.length > 0) {
           const tier = tiers[0];
-          if (tier.vehicle_size_sedan_price_cents != null) {
-            pricingText = `Sedan ${formatMoney(tier.vehicle_size_sedan_price_cents)}, Truck/SUV ${formatMoney(tier.vehicle_size_truck_suv_price_cents ?? 0)}, SUV 3-Row/Van ${formatMoney(tier.vehicle_size_suv_van_price_cents ?? 0)}`;
+          if (tier.vehicle_size_sedan_price != null) {
+            pricingText = `Sedan $${tier.vehicle_size_sedan_price}, Truck/SUV $${tier.vehicle_size_truck_suv_price}, SUV 3-Row/Van $${tier.vehicle_size_suv_van_price}`;
           } else {
             pricingText = tiers
               .sort((a, b) => a.display_order - b.display_order)
-              .map((t) => `${t.tier_name}: ${formatMoney(t.price_cents)}`)
+              .map((t) => `${t.tier_name}: $${t.price}`)
               .join(', ');
           }
         } else {
-          pricingText = s.flat_price_cents != null ? formatMoney(s.flat_price_cents) : 'Contact for pricing';
+          pricingText = s.flat_price != null ? `$${s.flat_price}` : 'Contact for pricing';
         }
         break;
       }
       case 'scope': {
         const tiers = (s.pricing as Array<{
-          tier_name: string; tier_label: string | null; price_cents: number;
+          tier_name: string; tier_label: string | null; price: number;
           is_vehicle_size_aware: boolean;
-          vehicle_size_sedan_price_cents: number | null;
-          vehicle_size_truck_suv_price_cents: number | null;
-          vehicle_size_suv_van_price_cents: number | null;
+          vehicle_size_sedan_price: number | null;
+          vehicle_size_truck_suv_price: number | null;
+          vehicle_size_suv_van_price: number | null;
           display_order: number;
         }>) || [];
         pricingText = tiers
           .sort((a, b) => a.display_order - b.display_order)
           .map((t) => {
             const label = t.tier_label || t.tier_name;
-            if (t.is_vehicle_size_aware && t.vehicle_size_sedan_price_cents != null) {
-              return `${label}: Sedan ${formatMoney(t.vehicle_size_sedan_price_cents)}, Truck/SUV ${formatMoney(t.vehicle_size_truck_suv_price_cents ?? 0)}, SUV 3-Row/Van ${formatMoney(t.vehicle_size_suv_van_price_cents ?? 0)}`;
+            if (t.is_vehicle_size_aware && t.vehicle_size_sedan_price != null) {
+              return `${label}: Sedan $${t.vehicle_size_sedan_price}, Truck/SUV $${t.vehicle_size_truck_suv_price}, SUV 3-Row/Van $${t.vehicle_size_suv_van_price}`;
             }
-            return `${label}: ${formatMoney(t.price_cents)}`;
+            return `${label}: $${t.price}`;
           })
           .join(' | ');
         break;
       }
       case 'specialty': {
         const tiers = (s.pricing as Array<{
-          tier_name: string; tier_label: string | null; price_cents: number; display_order: number;
+          tier_name: string; tier_label: string | null; price: number; display_order: number;
         }>) || [];
         pricingText = tiers
           .sort((a, b) => a.display_order - b.display_order)
-          .map((t) => `${t.tier_label || t.tier_name}: ${formatMoney(t.price_cents)}`)
+          .map((t) => `${t.tier_label || t.tier_name}: $${t.price}`)
           .join(', ');
         break;
       }
       case 'per_unit':
-        pricingText = s.per_unit_price_cents != null
-          ? `${formatMoney(s.per_unit_price_cents)} per ${s.per_unit_label || 'unit'}${s.per_unit_max ? ` (max ${s.per_unit_max})` : ''}`
-          : 'Contact for pricing';
+        pricingText = `$${s.per_unit_price} per ${s.per_unit_label || 'unit'}${s.per_unit_max ? ` (max ${s.per_unit_max})` : ''}`;
         break;
       case 'flat':
-        pricingText = s.flat_price_cents != null ? formatMoney(s.flat_price_cents) : 'Contact for pricing';
+        pricingText = s.flat_price != null ? `$${s.flat_price}` : 'Contact for pricing';
         break;
       case 'custom':
-        pricingText = s.custom_starting_price_cents != null
-          ? `Starting at ${formatMoney(s.custom_starting_price_cents)}+ (inspection required)`
+        pricingText = s.custom_starting_price != null
+          ? `Starting at $${s.custom_starting_price}+ (inspection required)`
           : 'Contact for quote';
         break;
       default:
@@ -264,7 +259,7 @@ async function searchRelevantProducts(
 
   const { data: products, error } = await admin
     .from('products')
-    .select('name, description, retail_price_cents, category:product_categories(name)')
+    .select('name, description, retail_price, category:product_categories(name)')
     .eq('is_active', true)
     .or(orFilters)
     .limit(10);
@@ -272,7 +267,7 @@ async function searchRelevantProducts(
   if (error || !products || products.length === 0) return '';
 
   const productLines = products.map((p) => {
-    const price = p.retail_price_cents ? `$${Number(p.retail_price_cents).toFixed(2)}` : 'Price varies';
+    const price = p.retail_price ? `$${Number(p.retail_price).toFixed(2)}` : 'Price varies';
     const catData = p.category as unknown as { name: string } | null;
     const cat = catData?.name;
     const desc = p.description

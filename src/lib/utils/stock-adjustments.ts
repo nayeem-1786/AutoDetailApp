@@ -35,7 +35,7 @@ export interface StockAdjustmentInput {
   /**
    * Snapshot of unit cost in cents at call time (Phase Money-Unify-2).
    * Used by shop_use + sold rows.
-   * Source is `products.cost_price_cents` (Family D, still dollars) converted
+   * Source is `products.cost_price` (Family D, still dollars) converted
    * via `toCents()` at the call site — that's the Unify-D shim. After
    * Family D migrates, callers pass `product.cost_price_cents` directly.
    */

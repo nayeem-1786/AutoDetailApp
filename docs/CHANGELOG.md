@@ -6,58 +6,6 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
-## Phase Money-Unify-3 — Family D: Catalog (cents migration)
-
-Migrated the **Catalog** family (services, service_pricing, products, packages — 15 NUMERIC dollar columns) to integer cents. Schema applied to the shared Supabase project on 2026-05-14 (`20260514071552_unify_3_catalog_family_to_cents.sql`); reconciliation Checkpoint #2 zero divergence. Caller migration spans 54 files / ~700 lines.
-
-**Schema delta** (already applied):
-- 15 new `*_cents INTEGER` columns alongside legacy NUMERIC (services × 4, service_pricing × 7, products × 3, packages × 1)
-- 4 NOT NULL constraints dropped on legacy columns (`service_pricing.price`, `products.cost_price`, `products.retail_price`, `packages.price`) per two-phase commit pattern
-- 28 new CHECK constraints: 15 non-negative, 10 whole-dollar (services + service_pricing + packages only; products keep cent precision), 3 sale-price-discipline against `_cents`
-- `void_transaction()` PostgreSQL function rewritten to read/write `cost_price_cents` directly — 8 of the 9 Unify-2 `// TODO Unify-D` shims cleaned up
-
-**Decisions resolved at HALT-AND-DECIDE** (`docs/sessions/money-unify-3-reconciliation.md` §D-1 / D-2 / D-4):
-- D-1 (lax): rounded the 4 whole-dollar pre-violators during backfill (Headlight Restoration sale_price 1.25 → 1.00; 3 Ceramic Shield half-off prices ×2 → whole-dollar). Operator can re-enter exact half-dollar prices via admin UI now that the CHECK is in place.
-- D-2 (yes): added new `services.chk_services_sale_price` enforcing `sale_price_cents < flat_price_cents` for parity with `service_pricing` and `products`.
-- D-4 (yes): updated `scripts/import-square-data.mjs` to write `_cents` columns via `toCents()` — forward-compat for Phase 16 Launch Prep reimport.
-
-**Caller migration boundary policy:**
-- **Form-state pattern locked** (mirrors Unify-2 vendor pattern): `service-pricing-form.tsx` interfaces hold DOLLARS under bare names (`ScopeTier.price`, `FlatPricing.flat_price`, etc.); parent admin pages convert via `fromCents()` at load and `toCents()` at submit. Documented inline at the type definitions.
-- **Booking-wizard wire (Family D out)**: `bookingSubmitSchema.price_cents` / `bookingAddonSchema.price_cents` carry integer cents on the JSON wire from booking-wizard.tsx → `/api/book`. Wizard internal math operates in cents; `mobile_surcharge`/`deposit_amount`/`coupon_discount` (Family C/F wire) stay dollars until their respective family phases.
-- **Family C boundary at `/api/book/route.ts`**: catalog cents → dollars at route entry (single `fromCents()` site), downstream math + Family C writes (appointments, appointment_services, transaction_items) stay dollars. 8 `// TODO Unify-5/6` markers tag the conversion sites for cleanup at those phases.
-- **POS reducer boundary** (`ticket-reducer.ts` + `quote-reducer.ts`): catalog cents → TicketItem dollars at the `resolveServicePriceWithSale()` boundary. Restores the long-standing dollar contract for `unitPrice` / `standardPrice` / `perUnitPrice`. Drops at Unify-5 (Family A — POS Transactions).
-- **Voice agent wire (`/api/voice-agent/services/route.ts`)**: emits dollars for LLM consumption via `fromCents()` / `formatMoney()`. Output key `sale_price_cents` retained as legacy contract name (value is dollars); will rename to `sale_price` at Unify-Final.
-- **Public OG image, AI content writer, messaging-ai, page-content-extractor**: all switched to `formatMoney(cents)` / cents-typed local types.
-
-**Test fixtures regenerated:** 5 catalog-touching test files (pricing.test.ts, service-pricing-picker, service-detail-dialog, quote-reducer-vehicle-change, ticket-reducer-vehicle-change, quick-edit-drawer, refund.test.ts, payment-intent-succeeded.test.ts, validation-mobile-address.test.ts). All 962 tests pass.
-
-**`quick-edit-drawer.tsx` shim removed per LOCKED-3**: the local `formatPrice()` helper was replaced with `formatMoneyForInput(cents)` and `parsePrice()` with `parsePriceCents()` that converts via `toCents()`. Inputs now bind to integer-cents state; saves write `*_cents` columns directly.
-
-**Gate review (16/16 met):**
-
-| Gate | Status |
-|---|---|
-| 1 Pre-flight verification | Done (Checkpoint #1 in reconciliation doc) |
-| 2 Migration applied | Done (`supabase db push --linked` 2026-05-14) |
-| 3 Reconciliation #2 | Done (zero divergence; SUM × 100 identity holds across all 15 columns) |
-| 4 Lint baseline | 70 `money/no-unsuffixed-money-prop` warnings (vs 29 Unify-1 baseline; expected — Family A/C reads still bare-named until Unify-5/6) |
-| 5 Typecheck clean | Done (0 errors) |
-| 6 Existing tests pass | Done (962/962) |
-| 7 New tests added | Reducer + fixture rewrites land in this commit; new dedicated tests for vehicle-size resolver / CHECK constraint / AI content writer deferred to follow-up |
-| 8 `TODO Unify-D` in `src/` | 0 (`grep -rn "TODO Unify-D" src/` returns 0) |
-| 9 `po_items` typo | Fixed at `catalog/products/[id]/page.tsx:174` (Session 1) |
-| 10 Legacy NUMERIC columns intact | Done (verified via `information_schema.columns`) |
-| 11 `void_transaction()` updated | Done (no `TODO Unify-D` in function body) |
-| 12 New CHECK constraints validate | Done (verified at Checkpoint #2) |
-| 13 `database.types.ts` regenerated | Done (Session 1) |
-| 14 No production deploy yet | Pending Task 11 (Decision E Path 2) |
-| 15 Smoke test | npm run dev not exercised in commit prep; covered by user post-deploy |
-| 16 `TODO Unify-C/5/6/7/8` count | **28 shim markers** across 18 files (3 Unify-C, 1 Unify-5, 13 Unify-6, 2 Unify-7, 4 Unify-8 + 5 Unify-Final notes). Each tagged with location-specific cleanup notes. Cleanup-by-family expected at the corresponding Unify-N phases. |
-
-**Files touched: 54** (~700 inserted, ~500 deleted).
-
----
-
 ## Deploy: VPS alignment for Money-Unify Phases 1+2
 
 Aligned the production VPS with two locally-committed Money-Unify phases. Until this deploy, the schema migration from Unify-2 was live in the shared Supabase project (the only DB in the stack — there is no separate "dev DB"), but the VPS app code was still at `b051c0af` (pre-epic). This created a brief window where the DB schema had `unit_cost_cents` columns that production code didn't read or write. This deploy closes that window.

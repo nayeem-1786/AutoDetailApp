@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (type === 'all' || type === 'service') {
     let query = admin
       .from('services')
-      .select('id, name, slug, pricing_model, flat_price_cents, per_unit_price_cents, per_unit_label, sale_price_cents, sale_starts_at, sale_ends_at, is_active, service_pricing(id, tier_name, tier_label, price, sale_price_cents, display_order)')
+      .select('id, name, slug, pricing_model, flat_price, per_unit_price, per_unit_label, sale_price, sale_starts_at, sale_ends_at, is_active, service_pricing(id, tier_name, tier_label, price, sale_price, display_order)')
       .eq('is_active', true)
       .order('name');
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   if (type === 'all' || type === 'product') {
     let query = admin
       .from('products')
-      .select('id, name, slug, retail_price_cents, sale_price_cents, sale_starts_at, sale_ends_at, is_active')
+      .select('id, name, slug, retail_price, sale_price, sale_starts_at, sale_ends_at, is_active')
       .eq('is_active', true)
       .order('name');
 
@@ -74,10 +74,10 @@ export async function GET(request: NextRequest) {
     // Check if any sale price is set
     let hasSalePrice = false;
     if (item.item_type === 'product') {
-      hasSalePrice = item.sale_price_cents !== null;
+      hasSalePrice = item.sale_price !== null;
     } else {
-      const tiers = (item.service_pricing || []) as { sale_price_cents: number | null }[];
-      hasSalePrice = tiers.some((t) => t.sale_price_cents !== null) || item.sale_price_cents !== null;
+      const tiers = (item.service_pricing || []) as { sale_price: number | null }[];
+      hasSalePrice = tiers.some((t) => t.sale_price !== null) || item.sale_price !== null;
     }
 
     let saleStatus: 'active' | 'scheduled' | 'expired' | 'no_sale' = 'no_sale';

@@ -6,7 +6,7 @@ import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { fireWebhook } from '@/lib/utils/webhook';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 
 export async function POST(

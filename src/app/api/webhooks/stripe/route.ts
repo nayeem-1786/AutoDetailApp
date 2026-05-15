@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { generateOrderNumber } from '@/lib/utils/order-number';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
         if (item.product_id) {
           const { data: prod } = await admin
             .from('products')
-            .select('quantity_on_hand, cost_price_cents')
+            .select('quantity_on_hand, cost_price')
             .eq('id', item.product_id)
             .single();
 
@@ -300,7 +300,12 @@ export async function POST(request: NextRequest) {
               reference_id: orderId,
               reference_type: 'order',
               created_by: SYSTEM_EMPLOYEE_ID,
-              unit_cost_cents: prod.cost_price_cents,
+              // TODO Unify-D: when Family D migrates products.cost_price to
+              // cents, remove toCents() and use prod.cost_price_cents
+              // directly. See docs/sessions/money-unify-0-migration-
+              // playbook-v2.md §Family D.
+              unit_cost_cents:
+                prod.cost_price != null ? toCents(prod.cost_price) : null,
             });
           }
         }

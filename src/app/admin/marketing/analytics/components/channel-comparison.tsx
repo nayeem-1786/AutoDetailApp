@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   BarChart,

@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 // Mock state
 // -----------------------------------------------------------------------------
 
-interface Product { id: string; quantity_on_hand: number; cost_price_cents: number | null; }
+interface Product { id: string; quantity_on_hand: number; cost_price: number | null; }
 interface OrderItem { product_id: string | null; quantity: number; }
 
 const state = {
@@ -142,8 +142,8 @@ describe('POST /api/webhooks/stripe — payment_intent.succeeded', () => {
       first_name: 'X', last_name: 'Y', email: 'x@y.z', subtotal: 5000, discount_amount: 0,
       tax_amount: 0, shipping_amount: 0, coupon_code: null, fulfillment_method: 'pickup', order_number: 'ORD-TEST-0001',
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 10, cost_price_cents: 450 });
-    state.products.set('prod-B', { id: 'prod-B', quantity_on_hand: 5, cost_price_cents: null });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 10, cost_price: 4.5 });
+    state.products.set('prod-B', { id: 'prod-B', quantity_on_hand: 5, cost_price: null });
 
     const res = await POST(req());
     expect(res.status).toBe(200);
@@ -191,7 +191,7 @@ describe('POST /api/webhooks/stripe — payment_intent.succeeded', () => {
       first_name: 'X', last_name: 'Y', email: 'x@y.z', subtotal: 1000, discount_amount: 0,
       tax_amount: 0, shipping_amount: 0, coupon_code: null, fulfillment_method: 'pickup', order_number: 'ORD-TEST-0001',
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 3, cost_price_cents: null });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 3, cost_price: null });
 
     const res = await POST(req());
     expect(res.status).toBe(200);
@@ -223,7 +223,7 @@ describe('POST /api/webhooks/stripe — payment_intent.succeeded', () => {
       first_name: 'X', last_name: 'Y', email: 'x@y.z', subtotal: 1000, discount_amount: 0,
       tax_amount: 0, shipping_amount: 0, coupon_code: null, fulfillment_method: 'pickup', order_number: 'ORD-TEST-0001',
     };
-    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 5, cost_price_cents: null });
+    state.products.set('prod-A', { id: 'prod-A', quantity_on_hand: 5, cost_price: null });
 
     const res = await POST(req());
     expect(res.status).toBe(200);

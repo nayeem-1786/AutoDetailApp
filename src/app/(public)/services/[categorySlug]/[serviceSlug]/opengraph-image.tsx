@@ -1,39 +1,37 @@
 import { ImageResponse } from 'next/og';
 import { getServiceBySlug } from '@/lib/data/services';
 import { getBusinessInfo } from '@/lib/data/business';
-import { formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 
 export const alt = 'Service Details';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-// Phase Money-Unify-3: DB stores integer cents; OG image text needs dollars.
-// Use formatMoney() (cents-input) for all renders.
 function getStartingPrice(service: {
   pricing_model: string;
-  flat_price_cents: number | null;
-  custom_starting_price_cents: number | null;
-  per_unit_price_cents: number | null;
+  flat_price: number | null;
+  custom_starting_price: number | null;
+  per_unit_price: number | null;
   per_unit_label: string | null;
-  service_pricing?: { price_cents: number }[];
+  service_pricing?: { price: number }[];
 }): string | null {
   switch (service.pricing_model) {
     case 'flat':
-      return service.flat_price_cents != null ? formatMoney(service.flat_price_cents) : null;
+      return service.flat_price != null ? formatCurrency(service.flat_price) : null;
     case 'custom':
-      return service.custom_starting_price_cents != null
-        ? `Starting from ${formatMoney(service.custom_starting_price_cents)}`
+      return service.custom_starting_price != null
+        ? `Starting from ${formatCurrency(service.custom_starting_price)}`
         : null;
     case 'per_unit':
-      return service.per_unit_price_cents != null
-        ? `${formatMoney(service.per_unit_price_cents)} per ${service.per_unit_label ?? 'unit'}`
+      return service.per_unit_price != null
+        ? `${formatCurrency(service.per_unit_price)} per ${service.per_unit_label ?? 'unit'}`
         : null;
     case 'vehicle_size':
     case 'scope':
     case 'specialty': {
-      const prices = (service.service_pricing ?? []).map((p) => p.price_cents).filter((p) => p > 0);
+      const prices = (service.service_pricing ?? []).map((p) => p.price).filter((p) => p > 0);
       if (prices.length > 0) {
-        return `Starting from ${formatMoney(Math.min(...prices))}`;
+        return `Starting from ${formatCurrency(Math.min(...prices))}`;
       }
       return null;
     }

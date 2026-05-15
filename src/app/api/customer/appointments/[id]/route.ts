@@ -56,7 +56,7 @@ export async function GET(
         total_amount, is_mobile, mobile_address, vehicle_id,
         appointment_services(
           id, service_id, price_at_booking,
-          services(id, name, flat_price_cents)
+          services(id, name, flat_price)
         ),
         vehicles(id, year, make, model, color)
       `)
@@ -80,10 +80,10 @@ export async function GET(
     const { data: services } = await admin
       .from('services')
       .select(`
-        id, name, flat_price_cents, category_id, is_active, pricing_model,
+        id, name, flat_price, category_id, is_active, pricing_model,
         service_pricing(
           tier_name, price, is_vehicle_size_aware,
-          vehicle_size_sedan_price_cents, vehicle_size_truck_suv_price_cents, vehicle_size_suv_van_price_cents
+          vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price
         )
       `)
       .eq('is_active', true)
@@ -93,7 +93,7 @@ export async function GET(
     console.log('[Edit Appointment] Services with pricing:', services?.map(s => ({
       name: s.name,
       pricing_model: s.pricing_model,
-      flat_price_cents: s.flat_price_cents,
+      flat_price: s.flat_price,
       tiers: s.service_pricing?.length || 0
     })));
 
@@ -202,14 +202,14 @@ export async function PATCH(
     // Get service prices
     const { data: services } = await admin
       .from('services')
-      .select('id, flat_price_cents')
+      .select('id, flat_price')
       .in('id', service_ids);
 
     if (!services || services.length !== service_ids.length) {
       return NextResponse.json({ error: 'Invalid services' }, { status: 400 });
     }
 
-    const totalAmount = services.reduce((sum, s) => sum + (s.flat_price_cents || 0), 0);
+    const totalAmount = services.reduce((sum, s) => sum + (s.flat_price || 0), 0);
 
     // Update appointment
     const { error: updateErr } = await admin
@@ -238,7 +238,7 @@ export async function PATCH(
     const appointmentServices = services.map((s) => ({
       appointment_id: id,
       service_id: s.id,
-      price_at_booking: s.flat_price_cents || 0,
+      price_at_booking: s.flat_price || 0,
     }));
 
     const { error: servicesErr } = await admin

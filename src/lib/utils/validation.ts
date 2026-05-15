@@ -104,10 +104,6 @@ export const slugSchema = z.string()
   .regex(/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/, 'Lowercase letters, numbers, and hyphens only. No leading/trailing hyphens.')
   .refine(s => !s.includes('--'), 'No double hyphens allowed');
 
-// Phase Money-Unify-3 (Family D): money fields validate INTEGER cents.
-// Forms convert via toCents() at the submit boundary; API clients pass
-// cents directly. The legacy NUMERIC dollar columns remain in the DB but
-// no longer receive writes from app code.
 export const productCreateSchema = z.object({
   name: requiredString,
   slug: slugSchema.optional(),
@@ -115,8 +111,8 @@ export const productCreateSchema = z.object({
   description: optionalString,
   category_id: z.string().uuid().optional().nullable(),
   vendor_id: z.string().uuid().optional().nullable(),
-  cost_price_cents: positiveInt,
-  retail_price_cents: positiveInt,
+  cost_price: positiveNumber,
+  retail_price: positiveNumber,
   quantity_on_hand: positiveInt.default(0),
   reorder_threshold: positiveInt.optional().nullable(),
   min_order_qty: positiveInt.optional().nullable(),
@@ -158,11 +154,7 @@ export const vendorSchema = z.object({
   notes: optionalString,
 });
 
-// Service schemas — money + pricing-model-specific fields (flat_price, per_unit_*,
-// custom_starting_price, scope/specialty tier prices) are NOT RHF-managed in either
-// service form. They live in `pricingValue` parent state and are written via
-// `toCents()` at the save boundary. Schema therefore only validates the
-// non-money fields RHF actually registers.
+// Service schemas
 export const serviceCreateSchema = z.object({
   name: requiredString,
   description: optionalString,
@@ -170,6 +162,11 @@ export const serviceCreateSchema = z.object({
   pricing_model: z.enum(['vehicle_size', 'scope', 'per_unit', 'specialty', 'flat', 'custom']),
   classification: z.enum(['primary', 'addon_only', 'both']).default('primary'),
   base_duration_minutes: positiveInt.default(60),
+  flat_price: positiveNumber.optional().nullable(),
+  custom_starting_price: positiveNumber.optional().nullable(),
+  per_unit_price: positiveNumber.optional().nullable(),
+  per_unit_max: positiveInt.optional().nullable(),
+  per_unit_label: optionalString,
   mobile_eligible: z.boolean().default(false),
   online_bookable: z.boolean().default(true),
   staff_assessed: z.boolean().default(false),
@@ -182,19 +179,17 @@ export const serviceCreateSchema = z.object({
 
 export const serviceUpdateSchema = serviceCreateSchema.partial();
 
-// Service pricing tier schema — money fields validate INTEGER cents.
+// Service pricing tier schema
 export const servicePricingSchema = z.object({
   service_id: z.string().uuid(),
   tier_name: requiredString,
   tier_label: optionalString,
-  price_cents: positiveInt,
+  price: positiveNumber,
   display_order: positiveInt.default(0),
   is_vehicle_size_aware: z.boolean().default(false),
-  vehicle_size_sedan_price_cents: positiveInt.optional().nullable(),
-  vehicle_size_truck_suv_price_cents: positiveInt.optional().nullable(),
-  vehicle_size_suv_van_price_cents: positiveInt.optional().nullable(),
-  vehicle_size_exotic_price_cents: positiveInt.optional().nullable(),
-  vehicle_size_classic_price_cents: positiveInt.optional().nullable(),
+  vehicle_size_sedan_price: positiveNumber.optional().nullable(),
+  vehicle_size_truck_suv_price: positiveNumber.optional().nullable(),
+  vehicle_size_suv_van_price: positiveNumber.optional().nullable(),
 });
 
 // Service addon suggestion schema
@@ -357,10 +352,7 @@ export const bookingVehicleSchema = z.object({
 export const bookingAddonSchema = z.object({
   service_id: z.string().uuid(),
   name: z.string(),
-  // Phase Money-Unify-3: catalog wire is cents. Validators on Family C/F
-  // wire fields below (mobile_surcharge, deposit_amount, coupon_discount,
-  // loyalty_discount) stay as dollars until their respective family phases.
-  price_cents: positiveInt,
+  price: positiveNumber,
   tier_name: z.string().optional().nullable(),
 });
 
@@ -368,7 +360,7 @@ export const bookingSubmitSchema = z
   .object({
     service_id: z.string().uuid(),
     tier_name: z.string().optional().nullable(),
-    price_cents: positiveInt,
+    price: positiveNumber,
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
     time: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
     duration_minutes: z.coerce.number().int().min(1),

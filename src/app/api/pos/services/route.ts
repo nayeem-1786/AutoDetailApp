@@ -19,15 +19,15 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         name,
-        flat_price_cents,
-        per_unit_price_cents,
+        flat_price,
+        per_unit_price,
         per_unit_label,
         per_unit_max,
         pricing_model,
         classification,
         base_duration_minutes,
         vehicle_compatibility,
-        sale_price_cents,
+        sale_price,
         sale_starts_at,
         sale_ends_at,
         pricing:service_pricing(*)

@@ -1,7 +1,6 @@
 import type { QuoteState, QuoteAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
 import { resolveServicePriceWithSale } from '../utils/pricing';
-import { fromCents } from '@/lib/utils/money';
 
 export const initialQuoteState: QuoteState = {
   items: [],
@@ -89,8 +88,7 @@ export function quoteReducer(
             : item
         );
       } else {
-        // Family D catalog cents → Family A TicketItem dollars (Unify-5 boundary).
-        const totalPrice = fromCents(product.retail_price_cents);
+        const totalPrice = product.retail_price;
         const newItem: TicketItem = {
           id: generateId(),
           itemType: 'product',
@@ -99,7 +97,7 @@ export function quoteReducer(
           categoryId: product.category_id ?? null,
           itemName: product.name,
           quantity: 1,
-          unitPrice: fromCents(product.retail_price_cents),
+          unitPrice: product.retail_price,
           totalPrice,
           taxAmount: calculateItemTax(totalPrice, product.is_taxable),
           isTaxable: product.is_taxable,
@@ -111,7 +109,7 @@ export function quoteReducer(
           perUnitPrice: null,
           perUnitMax: null,
           parentItemId: null,
-          standardPrice: fromCents(product.retail_price_cents),
+          standardPrice: product.retail_price,
           pricingType: 'standard',
           comboSourcePrimaryId: null,
           saleEffectivePrice: null,
@@ -125,7 +123,7 @@ export function quoteReducer(
 
     case 'ADD_SERVICE': {
       const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId, customPrice, customNote } = action;
-      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price_cents != null;
+      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
 
       // Custom price override from specialty gate modal
       if (typeof customPrice === 'number') {
@@ -171,20 +169,17 @@ export function quoteReducer(
         return recalculateTotals({ ...state, items: [...state.items, newItem] });
       }
 
-      // Resolve pricing with sale awareness (always pass window — null dates = no time limit).
-      // Family D cents → Family A dollars at this boundary. TODO Unify-5.
+      // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
       const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
-      const resolvedEffectiveDollars = fromCents(resolved.effectivePrice);
-      const resolvedStandardDollars = fromCents(resolved.standardPrice);
 
-      // Determine effective price: lowest of sale vs combo wins (all dollars)
-      let effectivePrice = resolvedEffectiveDollars;
+      // Determine effective price: lowest of sale vs combo wins
+      let effectivePrice = resolved.effectivePrice;
       let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
       let comboSourceId: string | null = null;
-      const saleEffective = resolved.isOnSale ? resolvedEffectiveDollars : null;
+      const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
 
-      if (!isPerUnit && comboPrice != null && comboPrice < resolvedStandardDollars) {
+      if (!isPerUnit && comboPrice != null && comboPrice < resolved.standardPrice) {
         if (comboPrice <= effectivePrice) {
           effectivePrice = comboPrice;
           pricingType = 'combo';
@@ -211,10 +206,10 @@ export function quoteReducer(
         notes: null,
         perUnitQty: isPerUnit ? perUnitQty : null,
         perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
-        perUnitPrice: isPerUnit ? fromCents(service.per_unit_price_cents!) : null,
+        perUnitPrice: isPerUnit ? service.per_unit_price! : null,
         perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
         parentItemId: parentItemId ?? null,
-        standardPrice: resolvedStandardDollars,
+        standardPrice: resolved.standardPrice,
         pricingType,
         comboSourcePrimaryId: comboSourceId,
         saleEffectivePrice: saleEffective,
@@ -434,17 +429,14 @@ export function quoteReducer(
           if (!pricingTier) return item;
         }
 
-        // Always pass window — null dates = no time limit. Catalog cents →
-        // TicketItem dollars at this boundary. TODO Unify-5.
+        // Always pass window — null dates = no time limit
         const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
         const resolved = resolveServicePriceWithSale(pricingTier, sizeClass, saleWindow);
-        const resolvedEffectiveDollars = fromCents(resolved.effectivePrice);
-        const resolvedStandardDollars = fromCents(resolved.standardPrice);
 
-        let effectivePrice = resolvedEffectiveDollars;
+        let effectivePrice = resolved.effectivePrice;
         let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
         let comboSourceId = item.comboSourcePrimaryId;
-        const saleEffective = resolved.isOnSale ? resolvedEffectiveDollars : null;
+        const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
 
         if (item.comboSourcePrimaryId && item.parentItemId) {
           const currentComboPrice = item.unitPrice;
@@ -469,7 +461,7 @@ export function quoteReducer(
           taxAmount: calculateItemTax(totalPrice, item.isTaxable),
           vehicleSizeClass: sizeClass,
           tierName: updatedTierName,
-          standardPrice: resolvedStandardDollars,
+          standardPrice: resolved.standardPrice,
           pricingType,
           comboSourcePrimaryId: comboSourceId,
           saleEffectivePrice: saleEffective,

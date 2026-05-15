@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, FlaskConical } from 'lucide-react';

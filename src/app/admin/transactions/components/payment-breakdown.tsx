@@ -1,6 +1,6 @@
 'use client';
 
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 
 interface PaymentBreakdownProps {
   methods: Array<{

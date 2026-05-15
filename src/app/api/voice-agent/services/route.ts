@@ -3,8 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
-import { fromCents } from '@/lib/utils/money';
-import { formatMoney } from '@/lib/utils/format';
 
 /**
  * GET /api/voice-agent/services
@@ -35,20 +33,20 @@ export async function GET(request: NextRequest) {
         description,
         classification,
         pricing_model,
-        flat_price_cents,
-        sale_price_cents,
+        flat_price,
+        sale_price,
         sale_starts_at,
         sale_ends_at,
-        per_unit_price_cents,
+        per_unit_price,
         per_unit_label,
         per_unit_max,
-        custom_starting_price_cents,
+        custom_starting_price,
         base_duration_minutes,
         mobile_eligible,
         vehicle_compatibility,
         special_requirements,
         service_categories ( name ),
-        service_pricing ( tier_name, price_cents, sale_price_cents )
+        service_pricing ( tier_name, price, sale_price )
       `)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
@@ -77,7 +75,7 @@ export async function GET(request: NextRequest) {
         seasonal_start,
         seasonal_end,
         addon_service:services!service_addon_suggestions_addon_service_id_fkey (
-          id, name, flat_price_cents, pricing_model, per_unit_price_cents, custom_starting_price_cents
+          id, name, flat_price, pricing_model, per_unit_price, custom_starting_price
         )
       `)
       .eq('auto_suggest', true)
@@ -115,23 +113,21 @@ export async function GET(request: NextRequest) {
       const addon = row.addon_service as unknown as {
         id: string;
         name: string;
-        flat_price_cents: number | null;
+        flat_price: number | null;
         pricing_model: string;
-        per_unit_price_cents: number | null;
-        custom_starting_price_cents: number | null;
+        per_unit_price: number | null;
+        custom_starting_price: number | null;
       } | null;
       if (!addon) continue;
 
-      // Derive standard price from addon's pricing model. Voice agent wire
-      // contract is dollars (LLM reads "$X" naturally); convert cents → dollars
-      // at this output boundary.
+      // Derive standard price from addon's pricing model
       let standardPrice: number | null = null;
-      if (addon.pricing_model === 'flat' && addon.flat_price_cents != null) {
-        standardPrice = fromCents(addon.flat_price_cents);
-      } else if (addon.pricing_model === 'per_unit' && addon.per_unit_price_cents != null) {
-        standardPrice = fromCents(addon.per_unit_price_cents);
-      } else if (addon.pricing_model === 'custom' && addon.custom_starting_price_cents != null) {
-        standardPrice = fromCents(addon.custom_starting_price_cents);
+      if (addon.pricing_model === 'flat' && addon.flat_price != null) {
+        standardPrice = Number(addon.flat_price);
+      } else if (addon.pricing_model === 'per_unit' && addon.per_unit_price != null) {
+        standardPrice = Number(addon.per_unit_price);
+      } else if (addon.pricing_model === 'custom' && addon.custom_starting_price != null) {
+        standardPrice = Number(addon.custom_starting_price);
       }
 
       const comboPrice = row.combo_price != null ? Number(row.combo_price) : null;
@@ -159,21 +155,12 @@ export async function GET(request: NextRequest) {
 
     // Format response
     const formatted = serviceList.map((s) => {
-      const tiers = (s.service_pricing as { tier_name: string; price_cents: number; sale_price_cents: number | null }[]) ?? [];
+      const tiers = (s.service_pricing as { tier_name: string; price: number; sale_price: number | null }[]) ?? [];
       const saleWindow = { sale_starts_at: s.sale_starts_at as string | null, sale_ends_at: s.sale_ends_at as string | null };
       const { isOnSale } = getSaleStatus(saleWindow);
 
-      // Build pricing array based on pricing_model.
-      // Phase Money-Unify-3 wire contract: voice agent output keys are
-      // `*_dollars`-suffixed (was: bare `price`, misleadingly-named
-      // `sale_price_cents` that held dollars). The ElevenLabs system
-      // prompt does NOT use template-variable substitution (the agent
-      // reads the JSON shape contextually — see docs/dev/VOICE_AGENT.md
-      // §2 "System Prompt"), so renaming output keys is non-coordinated
-      // and preserves agent behavior. The rename eliminates the "field
-      // named `_cents` but holds dollars" canonical-model violation that
-      // would otherwise be the lone exception in the codebase.
-      let pricing: Array<{ tier_name: string; price_dollars: number | null; sale_price_dollars?: number | null; note?: string }>;
+      // Build pricing array based on pricing_model
+      let pricing: Array<{ tier_name: string; price: number | null; sale_price?: number | null; note?: string }>;
 
       switch (s.pricing_model) {
         case 'vehicle_size':
@@ -181,44 +168,44 @@ export async function GET(request: NextRequest) {
         case 'specialty':
           pricing = tiers.map((p) => ({
             tier_name: p.tier_name,
-            price_dollars: fromCents(p.price_cents),
-            ...(isOnSale && p.sale_price_cents != null && p.sale_price_cents < p.price_cents
-              ? { sale_price_dollars: fromCents(p.sale_price_cents) }
+            price: Number(p.price),
+            ...(isOnSale && p.sale_price != null && p.sale_price < p.price
+              ? { sale_price: Number(p.sale_price) }
               : {}),
           }));
           break;
 
         case 'flat': {
-          const flatSalePrice = s.sale_price_cents as number | null;
-          const flatPrice = s.flat_price_cents as number | null;
+          const flatSalePrice = s.sale_price as number | null;
+          const flatPrice = s.flat_price as number | null;
           pricing = flatPrice != null
             ? [{
                 tier_name: 'flat',
-                price_dollars: fromCents(flatPrice),
+                price: Number(flatPrice),
                 ...(isOnSale && flatSalePrice != null && flatSalePrice < flatPrice
-                  ? { sale_price_dollars: fromCents(flatSalePrice) }
+                  ? { sale_price: Number(flatSalePrice) }
                   : {}),
               }]
-            : [{ tier_name: 'flat', price_dollars: null, note: 'Contact for pricing' }];
+            : [{ tier_name: 'flat', price: null, note: 'Contact for pricing' }];
           break;
         }
 
         case 'per_unit':
-          pricing = s.per_unit_price_cents != null
+          pricing = s.per_unit_price != null
             ? [{
                 tier_name: 'per_unit',
-                price_dollars: fromCents(s.per_unit_price_cents as number),
+                price: Number(s.per_unit_price),
                 note: `Per ${s.per_unit_label || 'unit'}${s.per_unit_max ? ` (max ${s.per_unit_max})` : ''}`,
               }]
-            : [{ tier_name: 'per_unit', price_dollars: null, note: 'Contact for pricing' }];
+            : [{ tier_name: 'per_unit', price: null, note: 'Contact for pricing' }];
           break;
 
         case 'custom':
           pricing = [{
             tier_name: 'custom',
-            price_dollars: s.custom_starting_price_cents != null ? fromCents(s.custom_starting_price_cents as number) : null,
-            note: s.custom_starting_price_cents != null
-              ? `Starting at ${formatMoney(s.custom_starting_price_cents as number)} — custom quote required`
+            price: s.custom_starting_price != null ? Number(s.custom_starting_price) : null,
+            note: s.custom_starting_price != null
+              ? `Starting at $${Number(s.custom_starting_price)} — custom quote required`
               : 'Custom quote required — contact for pricing',
           }];
           break;
@@ -226,9 +213,9 @@ export async function GET(request: NextRequest) {
         default:
           pricing = tiers.map((p) => ({
             tier_name: p.tier_name,
-            price_dollars: fromCents(p.price_cents),
-            ...(isOnSale && p.sale_price_cents != null && p.sale_price_cents < p.price_cents
-              ? { sale_price_dollars: fromCents(p.sale_price_cents) }
+            price: Number(p.price),
+            ...(isOnSale && p.sale_price != null && p.sale_price < p.price
+              ? { sale_price: Number(p.sale_price) }
               : {}),
           }));
       }

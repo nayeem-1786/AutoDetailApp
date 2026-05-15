@@ -175,14 +175,8 @@ export interface Product {
   description: string | null;
   category_id: string | null;
   vendor_id: string | null;
-  // Money — integer cents (Money-Unify-3). cost_price_cents +
-  // retail_price_cents are nullable in the DB (Unify-3 migration adds
-  // them as plain INTEGER) but app code always populates them on insert
-  // — mirroring the original NOT NULL DEFAULT 0 semantics of the legacy
-  // cost_price / retail_price NUMERIC columns. Narrow the application
-  // contract to `number` to keep call sites tidy.
-  cost_price_cents: number;
-  retail_price_cents: number;
+  cost_price: number;
+  retail_price: number;
   quantity_on_hand: number;
   reorder_threshold: number | null;
   min_order_qty: number | null;
@@ -201,7 +195,7 @@ export interface Product {
   height: number | null;
   weight_unit: string | null;
   dimension_unit: string | null;
-  sale_price_cents: number | null;
+  sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   specs: Record<string, unknown> | null;
@@ -237,10 +231,9 @@ export interface Service {
   pricing_model: PricingModel;
   classification: ServiceClassification;
   base_duration_minutes: number;
-  // Money — integer cents (Money-Unify-3).
-  flat_price_cents: number | null;
-  custom_starting_price_cents: number | null;
-  per_unit_price_cents: number | null;
+  flat_price: number | null;
+  custom_starting_price: number | null;
+  per_unit_price: number | null;
   per_unit_max: number | null;
   per_unit_label: string | null;
   mobile_eligible: boolean;
@@ -255,7 +248,7 @@ export interface Service {
   show_on_website: boolean;
   is_featured: boolean;
   display_order: number;
-  sale_price_cents: number | null;
+  sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   created_at: string;
@@ -272,20 +265,16 @@ export interface ServicePricing {
   service_id: string;
   tier_name: string;
   tier_label: string | null;
-  // Money — integer cents (Money-Unify-3). price_cents is nullable in
-  // the DB but app code always writes it (mirrors the original NOT NULL
-  // semantic of service_pricing.price_cents). sale_price_cents is genuinely
-  // optional (promotional pricing).
-  price_cents: number;
-  sale_price_cents: number | null;
+  price: number;
+  sale_price: number | null;
   display_order: number;
   is_vehicle_size_aware: boolean;
-  vehicle_size_sedan_price_cents: number | null;
-  vehicle_size_truck_suv_price_cents: number | null;
-  vehicle_size_suv_van_price_cents: number | null;
+  vehicle_size_sedan_price: number | null;
+  vehicle_size_truck_suv_price: number | null;
+  vehicle_size_suv_van_price: number | null;
   /** Session 29: exotic/classic scope-pricing fan-out columns (nullable). */
-  vehicle_size_exotic_price_cents: number | null;
-  vehicle_size_classic_price_cents: number | null;
+  vehicle_size_exotic_price: number | null;
+  vehicle_size_classic_price: number | null;
   max_qty: number | null;
   qty_label: string | null;
   created_at: string;

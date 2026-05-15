@@ -303,7 +303,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
   async function handleTapServiceSearch(service: CatalogService) {
     // Per-unit services always need the quantity picker
-    if (service.pricing_model === 'per_unit' && service.per_unit_price_cents != null) {
+    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
       setPickerService(service);
       return;
     }
@@ -317,21 +317,21 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
       }
       return;
     }
-    if (pricing.length === 0 && service.flat_price_cents != null) {
+    if (pricing.length === 0 && service.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat',
         service_id: service.id,
         tier_name: 'default',
         tier_label: null,
-        price_cents: service.flat_price_cents,
-        sale_price_cents: service.sale_price_cents ?? null,
+        price: service.flat_price,
+        sale_price: service.sale_price ?? null,
         display_order: 0,
         is_vehicle_size_aware: false,
-        vehicle_size_sedan_price_cents: null,
-        vehicle_size_truck_suv_price_cents: null,
-        vehicle_size_suv_van_price_cents: null,
-        vehicle_size_exotic_price_cents: null,
-        vehicle_size_classic_price_cents: null,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
         max_qty: null,
         qty_label: null,
         created_at: '',
@@ -382,11 +382,11 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     if (prereqPricing.length > 0) {
       dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: prereqPricing[0], vehicleSizeClass, ...prereqExtra });
       toast.success(`Added ${prereqService.name}`);
-    } else if (prereqService.flat_price_cents != null) {
+    } else if (prereqService.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
-        price_cents: prereqService.flat_price_cents, sale_price_cents: prereqService.sale_price_cents ?? null, display_order: 0, is_vehicle_size_aware: false,
-        vehicle_size_sedan_price_cents: null, vehicle_size_truck_suv_price_cents: null, vehicle_size_suv_van_price_cents: null, vehicle_size_exotic_price_cents: null, vehicle_size_classic_price_cents: null, max_qty: null, qty_label: null, created_at: '',
+        price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
       };
       dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });
       toast.success(`Added ${prereqService.name}`);

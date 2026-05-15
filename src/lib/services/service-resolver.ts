@@ -1,25 +1,21 @@
 import { type SupabaseClient } from '@supabase/supabase-js';
 import { getSaleStatus } from '@/lib/utils/sale-pricing';
 
-// Money-Unify-3 (Family D): all money fields are integer cents.
-// Internal computation, exported types, and the SELECT projection
-// against services/service_pricing all use the *_cents columns.
-
 export interface ResolvedService {
   id: string;
   name: string;
   pricing_model: string;
-  flat_price_cents: number | null;
-  sale_price_cents: number | null;
+  flat_price: number | null;
+  sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
   service_pricing: Array<{
     tier_name: string;
-    price_cents: number | null;
-    sale_price_cents: number | null;
-    vehicle_size_sedan_price_cents: number | null;
-    vehicle_size_truck_suv_price_cents: number | null;
-    vehicle_size_suv_van_price_cents: number | null;
+    price: number;
+    sale_price: number | null;
+    vehicle_size_sedan_price: number | null;
+    vehicle_size_truck_suv_price: number | null;
+    vehicle_size_suv_van_price: number | null;
     is_vehicle_size_aware: boolean;
   }>;
 }
@@ -32,9 +28,9 @@ export async function resolveServiceByName(
   const { data } = await admin
     .from('services')
     .select(`
-      id, name, pricing_model, flat_price_cents, sale_price_cents, sale_starts_at, sale_ends_at,
-      service_pricing(tier_name, price_cents, sale_price_cents, vehicle_size_sedan_price_cents,
-        vehicle_size_truck_suv_price_cents, vehicle_size_suv_van_price_cents, is_vehicle_size_aware)
+      id, name, pricing_model, flat_price, sale_price, sale_starts_at, sale_ends_at,
+      service_pricing(tier_name, price, sale_price, vehicle_size_sedan_price,
+        vehicle_size_truck_suv_price, vehicle_size_suv_van_price, is_vehicle_size_aware)
     `)
     .ilike('name', name)
     .eq('is_active', true)
@@ -45,15 +41,13 @@ export async function resolveServiceByName(
 }
 
 export interface ResolvedPrice {
-  /** Cents */
-  priceCents: number;
-  /** Cents */
-  salePriceCents: number | null;
+  price: number;
+  salePrice: number | null;
   tierName: string | null;
   isOnSale: boolean;
 }
 
-/** Resolve the correct price for a service given vehicle size class, with sale awareness (cents). */
+/** Resolve the correct price for a service given vehicle size class, with sale awareness */
 export function resolvePrice(
   service: ResolvedService,
   sizeClass: string
@@ -64,12 +58,12 @@ export function resolvePrice(
 
   switch (service.pricing_model) {
     case 'flat': {
-      const standardPriceCents = service.flat_price_cents ?? 0;
-      const sp = service.sale_price_cents;
-      const onSale = saleActive && sp != null && sp < standardPriceCents;
+      const standardPrice = service.flat_price ?? 0;
+      const sp = service.sale_price;
+      const onSale = saleActive && sp != null && sp < standardPrice;
       return {
-        priceCents: standardPriceCents,
-        salePriceCents: onSale ? sp : null,
+        price: standardPrice,
+        salePrice: onSale ? sp : null,
         tierName: null,
         isOnSale: onSale,
       };
@@ -78,40 +72,40 @@ export function resolvePrice(
     case 'vehicle_size':
     case 'scope': {
       if (tiers.length === 0) {
-        const standardPriceCents = service.flat_price_cents ?? 0;
-        return { priceCents: standardPriceCents, salePriceCents: null, tierName: null, isOnSale: false };
+        const standardPrice = service.flat_price ?? 0;
+        return { price: standardPrice, salePrice: null, tierName: null, isOnSale: false };
       }
 
       // Prefer the vehicle-size-aware tier when a vehicle is known —
       // for scope services like Hot Shampoo, this selects "Complete Interior"
       // instead of "Floor Mats Only" (the first tier by display_order).
-      const sizeAwareTier = tiers.find((t) => t.is_vehicle_size_aware && t.vehicle_size_sedan_price_cents != null);
+      const sizeAwareTier = tiers.find((t) => t.is_vehicle_size_aware && t.vehicle_size_sedan_price != null);
       const matchingTier = tiers.find((t) => t.tier_name === sizeClass);
       const tier = sizeAwareTier || matchingTier || tiers[0];
 
-      let standardPriceCents: number;
-      if (tier.is_vehicle_size_aware && tier.vehicle_size_sedan_price_cents != null) {
+      let standardPrice: number;
+      if (tier.is_vehicle_size_aware && tier.vehicle_size_sedan_price != null) {
         switch (sizeClass) {
           case 'truck_suv_2row':
-            standardPriceCents = tier.vehicle_size_truck_suv_price_cents ?? tier.price_cents ?? 0;
+            standardPrice = tier.vehicle_size_truck_suv_price ?? tier.price;
             break;
           case 'suv_3row_van':
-            standardPriceCents = tier.vehicle_size_suv_van_price_cents ?? tier.price_cents ?? 0;
+            standardPrice = tier.vehicle_size_suv_van_price ?? tier.price;
             break;
           default:
-            standardPriceCents = tier.vehicle_size_sedan_price_cents ?? tier.price_cents ?? 0;
+            standardPrice = tier.vehicle_size_sedan_price ?? tier.price;
             break;
         }
       } else {
-        standardPriceCents = tier.price_cents ?? 0;
+        standardPrice = tier.price;
       }
 
       // Check tier-level sale price
-      const sp = tier.sale_price_cents;
-      const onSale = saleActive && sp != null && sp < standardPriceCents;
+      const sp = tier.sale_price;
+      const onSale = saleActive && sp != null && sp < standardPrice;
       return {
-        priceCents: standardPriceCents,
-        salePriceCents: onSale ? sp : null,
+        price: standardPrice,
+        salePrice: onSale ? sp : null,
         tierName: tier.tier_name,
         isOnSale: onSale,
       };
@@ -121,17 +115,17 @@ export function resolvePrice(
       // per_unit, specialty, custom — first tier as fallback
       if (tiers.length > 0) {
         const tier = tiers[0];
-        const standardPriceCents = tier.price_cents ?? 0;
-        const sp = tier.sale_price_cents;
-        const onSale = saleActive && sp != null && sp < standardPriceCents;
+        const standardPrice = tier.price;
+        const sp = tier.sale_price;
+        const onSale = saleActive && sp != null && sp < standardPrice;
         return {
-          priceCents: standardPriceCents,
-          salePriceCents: onSale ? sp : null,
+          price: standardPrice,
+          salePrice: onSale ? sp : null,
           tierName: tier.tier_name,
           isOnSale: onSale,
         };
       }
-      return { priceCents: service.flat_price_cents ?? 0, salePriceCents: null, tierName: null, isOnSale: false };
+      return { price: service.flat_price ?? 0, salePrice: null, tierName: null, isOnSale: false };
     }
   }
 }

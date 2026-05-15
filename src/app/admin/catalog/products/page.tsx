@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import type { Product, ProductCategory, Vendor } from '@/lib/supabase/types';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -421,22 +421,22 @@ export default function ProductsPage() {
       cell: ({ row }) => row.original.vendors?.name || '--',
     },
     {
-      accessorKey: 'retail_price_cents',
+      accessorKey: 'retail_price',
       header: 'Price',
       size: 80,
-      cell: ({ row }) => formatCurrency(row.original.retail_price_cents),
+      cell: ({ row }) => formatCurrency(row.original.retail_price),
     },
   ];
 
   const costColumns: ColumnDef<ProductWithRelations, unknown>[] = canViewCost
     ? [
         {
-          id: 'cost_price_cents',
+          id: 'cost_price',
           header: 'Cost',
           size: 80,
           cell: ({ row }) =>
-            row.original.cost_price_cents > 0
-              ? formatCurrency(row.original.cost_price_cents)
+            row.original.cost_price > 0
+              ? formatCurrency(row.original.cost_price)
               : '--',
           enableSorting: false,
         },
@@ -446,8 +446,8 @@ export default function ProductsPage() {
           size: 64,
           cell: ({ row }) => {
             const p = row.original;
-            if (!p.cost_price_cents || p.cost_price_cents === 0 || p.retail_price_cents === 0) return '--';
-            const margin = (p.retail_price_cents - p.cost_price_cents) / p.retail_price_cents * 100;
+            if (!p.cost_price || p.cost_price === 0 || p.retail_price === 0) return '--';
+            const margin = (p.retail_price - p.cost_price) / p.retail_price * 100;
             return (
               <span className={`font-medium ${getMarginColor(margin)}`}>
                 {margin.toFixed(0)}%

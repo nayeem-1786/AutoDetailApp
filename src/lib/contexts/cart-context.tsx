@@ -20,8 +20,7 @@ export interface CartItem {
   name: string;
   slug: string;
   categorySlug: string;
-  // Money-Unify-3 (Family D): integer cents (mirrors products.retail_price_cents).
-  price_cents: number;
+  price: number; // retail_price in dollars
   quantity: number;
   maxQuantity: number; // stock limit
   imageUrl: string | null;
@@ -220,7 +219,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   );
 
   const subtotal = useMemo(
-    () => state.items.reduce((sum, i) => sum + i.price_cents * i.quantity, 0),
+    () => state.items.reduce((sum, i) => sum + i.price * i.quantity, 0),
     [state.items]
   );
 

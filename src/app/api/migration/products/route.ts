@@ -8,8 +8,8 @@ interface ProductPayload {
   description: string | null;
   category_slug: string | null;
   vendor_name: string | null;
-  cost_price_cents: number;
-  retail_price_cents: number;
+  cost_price: number;
+  retail_price: number;
   quantity_on_hand: number;
   reorder_threshold: number | null;
   is_taxable: boolean;
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
         description: p.description || null,
         category_id: p.category_slug ? (categoryMap.get(p.category_slug) || null) : null,
         vendor_id: p.vendor_name ? (vendorMap.get(p.vendor_name) || null) : null,
-        cost_price_cents: p.cost_price_cents || 0,
-        retail_price_cents: p.retail_price_cents || 0,
+        cost_price: p.cost_price || 0,
+        retail_price: p.retail_price || 0,
         quantity_on_hand: p.quantity_on_hand || 0,
         reorder_threshold: p.reorder_threshold || null,
         is_taxable: p.is_taxable ?? true,

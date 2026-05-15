@@ -1,4 +1,4 @@
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { getSaleStatus, getTierSaleInfo, hasAnySalePrice, getSaleEndDescription, isEndingSoon } from '@/lib/utils/sale-pricing';
 import { MessageSquare, Clock } from 'lucide-react';
 import type { Service, ServicePricing } from '@/lib/supabase/types';
@@ -85,22 +85,22 @@ function VehicleSizePricing({ service }: { service: Service }) {
           <tbody>
             <tr>
               {tiers.map((tier) => {
-                const saleInfo = getTierSaleInfo(tier.price_cents, tier.sale_price_cents, saleStatus.isOnSale);
+                const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
                 if (saleInfo?.isDiscounted) {
                   return (
                     <td key={tier.id} className="px-4 py-4">
                       <span className="text-sm text-site-text-muted line-through">
-                        {formatMoney(saleInfo.originalPriceCents)}
+                        {formatCurrency(saleInfo.originalPrice)}
                       </span>
                       <span className="ml-2 font-bold text-accent-brand text-base">
-                        {formatMoney(saleInfo.currentPriceCents)}
+                        {formatCurrency(saleInfo.currentPrice)}
                       </span>
                     </td>
                   );
                 }
                 return (
                   <td key={tier.id} className="px-4 py-4 font-bold text-accent-brand text-base">
-                    {formatCurrency(tier.price_cents)}
+                    {formatCurrency(tier.price)}
                   </td>
                 );
               })}
@@ -157,7 +157,7 @@ function ScopePricing({ service }: { service: Service }) {
 
 function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: number; isOnSale: boolean }) {
   const rowBg = index % 2 === 1 ? 'bg-white/[0.02]' : '';
-  const saleInfo = getTierSaleInfo(tier.price_cents, tier.sale_price_cents, isOnSale);
+  const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, isOnSale);
 
   if (tier.is_vehicle_size_aware) {
     return (
@@ -173,24 +173,24 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
         <tr className={rowBg}>
           <td className="px-4 py-1 pl-8 text-site-text-muted">Sedan</td>
           <td className="px-4 py-1 text-right font-bold text-accent-brand">
-            {tier.vehicle_size_sedan_price_cents !== null
-              ? formatCurrency(tier.vehicle_size_sedan_price_cents)
+            {tier.vehicle_size_sedan_price !== null
+              ? formatCurrency(tier.vehicle_size_sedan_price)
               : '--'}
           </td>
         </tr>
         <tr className={rowBg}>
           <td className="px-4 py-1 pl-8 text-site-text-muted">Truck / SUV</td>
           <td className="px-4 py-1 text-right font-bold text-accent-brand">
-            {tier.vehicle_size_truck_suv_price_cents !== null
-              ? formatCurrency(tier.vehicle_size_truck_suv_price_cents)
+            {tier.vehicle_size_truck_suv_price !== null
+              ? formatCurrency(tier.vehicle_size_truck_suv_price)
               : '--'}
           </td>
         </tr>
         <tr className={rowBg}>
           <td className="px-4 pb-3 py-1 pl-8 text-site-text-muted">SUV / Van</td>
           <td className="px-4 pb-3 py-1 text-right font-bold text-accent-brand">
-            {tier.vehicle_size_suv_van_price_cents !== null
-              ? formatCurrency(tier.vehicle_size_suv_van_price_cents)
+            {tier.vehicle_size_suv_van_price !== null
+              ? formatCurrency(tier.vehicle_size_suv_van_price)
               : '--'}
           </td>
         </tr>
@@ -207,15 +207,15 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
         {saleInfo?.isDiscounted ? (
           <>
             <span className="text-sm text-site-text-muted line-through mr-2">
-              {formatMoney(saleInfo.originalPriceCents)}
+              {formatCurrency(saleInfo.originalPrice)}
             </span>
             <span className="font-bold text-accent-brand">
-              {formatMoney(saleInfo.currentPriceCents)}
+              {formatCurrency(saleInfo.currentPrice)}
             </span>
           </>
         ) : (
           <span className="font-bold text-accent-brand">
-            {formatCurrency(tier.price_cents)}
+            {formatCurrency(tier.price)}
           </span>
         )}
       </td>
@@ -225,22 +225,22 @@ function ScopeTierRow({ tier, index, isOnSale }: { tier: ServicePricing; index: 
 
 function PerUnitPricing({ service }: { service: Service }) {
   const { isOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-  const onSale = isOnSale && service.sale_price_cents != null && service.per_unit_price_cents != null && service.sale_price_cents < service.per_unit_price_cents;
+  const onSale = isOnSale && service.sale_price != null && service.per_unit_price != null && service.sale_price < service.per_unit_price;
 
   return (
     <div className="space-y-2">
       {onSale ? (
         <div className="flex items-center gap-2">
-          <p className="text-base text-site-text-muted line-through">{formatCurrency(service.per_unit_price_cents!)}</p>
+          <p className="text-base text-site-text-muted line-through">{formatCurrency(service.per_unit_price!)}</p>
           <p className="font-display text-2xl font-bold text-accent-brand">
-            {formatCurrency(service.sale_price_cents!)}{' '}
+            {formatCurrency(service.sale_price!)}{' '}
             <span className="text-base font-normal text-site-text-muted">per {service.per_unit_label ?? 'unit'}</span>
           </p>
           <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
         </div>
       ) : (
         <p className="font-display text-2xl font-bold text-accent-brand">
-          {service.per_unit_price_cents !== null ? formatCurrency(service.per_unit_price_cents) : '--'}{' '}
+          {service.per_unit_price !== null ? formatCurrency(service.per_unit_price) : '--'}{' '}
           <span className="text-base font-normal text-site-text-muted">
             per {service.per_unit_label ?? 'unit'}
           </span>
@@ -289,7 +289,7 @@ function SpecialtyPricing({ service }: { service: Service }) {
           </thead>
           <tbody>
             {tiers.map((tier, index) => {
-              const saleInfo = getTierSaleInfo(tier.price_cents, tier.sale_price_cents, saleStatus.isOnSale);
+              const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
               return (
                 <tr key={tier.id} className={index % 2 === 1 ? 'bg-white/[0.02]' : ''}>
                   <td className="px-4 py-3 text-site-text-secondary">
@@ -299,15 +299,15 @@ function SpecialtyPricing({ service }: { service: Service }) {
                     {saleInfo?.isDiscounted ? (
                       <>
                         <span className="text-sm text-site-text-muted line-through mr-2">
-                          {formatMoney(saleInfo.originalPriceCents)}
+                          {formatCurrency(saleInfo.originalPrice)}
                         </span>
                         <span className="font-bold text-accent-brand">
-                          {formatMoney(saleInfo.currentPriceCents)}
+                          {formatCurrency(saleInfo.currentPrice)}
                         </span>
                       </>
                     ) : (
                       <span className="font-bold text-accent-brand">
-                        {formatCurrency(tier.price_cents)}
+                        {formatCurrency(tier.price)}
                       </span>
                     )}
                   </td>
@@ -323,19 +323,19 @@ function SpecialtyPricing({ service }: { service: Service }) {
 
 function FlatPricing({ service }: { service: Service }) {
   const { isOnSale } = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-  const onSale = isOnSale && service.sale_price_cents != null && service.flat_price_cents != null && service.sale_price_cents < service.flat_price_cents;
+  const onSale = isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price;
 
   return (
     <div>
       {onSale ? (
         <div className="flex items-center gap-3">
-          <p className="text-lg text-site-text-muted line-through">{formatCurrency(service.flat_price_cents!)}</p>
-          <p className="font-display text-3xl font-bold text-accent-brand">{formatCurrency(service.sale_price_cents!)}</p>
+          <p className="text-lg text-site-text-muted line-through">{formatCurrency(service.flat_price!)}</p>
+          <p className="font-display text-3xl font-bold text-accent-brand">{formatCurrency(service.sale_price!)}</p>
           <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
         </div>
       ) : (
         <p className="font-display text-3xl font-bold text-accent-brand">
-          {service.flat_price_cents !== null ? formatCurrency(service.flat_price_cents) : '--'}
+          {service.flat_price !== null ? formatCurrency(service.flat_price) : '--'}
         </p>
       )}
     </div>
@@ -346,8 +346,8 @@ function CustomPricing({ service }: { service: Service }) {
   return (
     <div className="space-y-2">
       <p className="font-display text-2xl font-bold text-accent-brand">
-        {service.custom_starting_price_cents !== null
-          ? `Starting at ${formatCurrency(service.custom_starting_price_cents)}`
+        {service.custom_starting_price !== null
+          ? `Starting at ${formatCurrency(service.custom_starting_price)}`
           : 'Custom pricing'}
       </p>
       <p className="flex items-center gap-1.5 text-sm text-site-text-muted">

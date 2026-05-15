@@ -1420,7 +1420,7 @@ function CheckoutContent() {
                       </p>
                     </div>
                     <span className="text-sm font-medium text-site-text tabular-nums shrink-0">
-                      {formatCurrency(item.price_cents * item.quantity)}
+                      {formatCurrency(item.price * item.quantity)}
                     </span>
                   </div>
                 ))}

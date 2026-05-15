@@ -51,8 +51,8 @@ export default function NewProductPage() {
       description: '',
       category_id: null,
       vendor_id: null,
-      cost_price_cents: 0,
-      retail_price_cents: 0,
+      cost_price: 0,
+      retail_price: 0,
       quantity_on_hand: 0,
       reorder_threshold: null,
       min_order_qty: null,
@@ -166,8 +166,8 @@ export default function NewProductPage() {
           description: data.description || null,
           category_id: data.category_id || null,
           vendor_id: data.vendor_id || null,
-          cost_price_cents: data.cost_price_cents,
-          retail_price_cents: data.retail_price_cents,
+          cost_price: data.cost_price,
+          retail_price: data.retail_price,
           quantity_on_hand: data.quantity_on_hand,
           reorder_threshold: data.reorder_threshold ?? null,
           min_order_qty: data.min_order_qty ?? null,
@@ -355,24 +355,24 @@ export default function NewProductPage() {
                 </div>
               </div>
 
-              <FormField label="Cost Price" error={errors.cost_price_cents?.message} required htmlFor="cost_price_cents">
+              <FormField label="Cost Price" error={errors.cost_price?.message} required htmlFor="cost_price">
                 <Input
-                  id="cost_price_cents"
+                  id="cost_price"
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*\.?[0-9]*"
-                  {...register('cost_price_cents')}
+                  {...register('cost_price')}
                   placeholder="0.00"
                 />
               </FormField>
 
-              <FormField label="Retail Price" error={errors.retail_price_cents?.message} required htmlFor="retail_price_cents">
+              <FormField label="Retail Price" error={errors.retail_price?.message} required htmlFor="retail_price">
                 <Input
-                  id="retail_price_cents"
+                  id="retail_price"
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9]*\.?[0-9]*"
-                  {...register('retail_price_cents')}
+                  {...register('retail_price')}
                   placeholder="0.00"
                 />
               </FormField>

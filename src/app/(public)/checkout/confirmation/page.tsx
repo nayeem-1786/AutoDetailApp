@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { CheckCircle, Package, ShoppingBag, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 
 const CHECKOUT_ORDER_KEY = 'smart-details-checkout-order';
 const CHECKOUT_SESSION_KEY = 'smart-details-checkout-session';

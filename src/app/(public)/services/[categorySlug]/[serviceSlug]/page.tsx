@@ -13,7 +13,7 @@ import { generateServiceMetadata } from '@/lib/seo/metadata';
 import { getPageSeo, mergeMetadata } from '@/lib/seo/page-seo';
 import { generateServiceSchema, generateServiceFaqSchema, generateBreadcrumbSchema } from '@/lib/seo/json-ld';
 import { SITE_URL, CLASSIFICATION_LABELS } from '@/lib/utils/constants';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { ServicePricingDisplay } from '@/components/public/service-pricing-display';
 import { ServiceCard } from '@/components/public/service-card';
 import { Breadcrumbs } from '@/components/public/breadcrumbs';
@@ -247,10 +247,10 @@ export default async function ServiceDetailPage({ params }: PageProps) {
                   let priceLabel: string | null = null;
                   if (suggestion.combo_price != null) {
                     priceLabel = `Add for ${formatCurrency(suggestion.combo_price)}`;
-                  } else if (addon.flat_price_cents != null) {
-                    priceLabel = formatCurrency(addon.flat_price_cents);
-                  } else if (addon.custom_starting_price_cents != null) {
-                    priceLabel = `From ${formatCurrency(addon.custom_starting_price_cents)}`;
+                  } else if (addon.flat_price != null) {
+                    priceLabel = formatCurrency(addon.flat_price);
+                  } else if (addon.custom_starting_price != null) {
+                    priceLabel = `From ${formatCurrency(addon.custom_starting_price)}`;
                   }
 
                   return (

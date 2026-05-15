@@ -1,6 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { BUSINESS_DEFAULTS } from '@/lib/data/business';
-import { formatMoney } from '@/lib/utils/format';
 
 // ---------------------------------------------------------------------------
 // Page Content Extraction — builds text summaries for AI SEO context
@@ -108,14 +107,14 @@ async function extractHomepageContent(): Promise<string> {
   // Fetch top services
   const { data: services } = await admin
     .from('services')
-    .select('name, description, pricing_model, flat_price_cents, custom_starting_price_cents')
+    .select('name, description, pricing_model, flat_price, custom_starting_price')
     .eq('is_active', true)
     .eq('show_on_website', true)
     .order('display_order', { ascending: true })
     .limit(10);
 
   const serviceLines = (services ?? []).map(s => {
-    const price = s.flat_price_cents ? `$${s.flat_price_cents}` : s.custom_starting_price_cents ? `From $${s.custom_starting_price_cents}` : '';
+    const price = s.flat_price ? `$${s.flat_price}` : s.custom_starting_price ? `From $${s.custom_starting_price}` : '';
     return `- ${s.name}${price ? ` (${price})` : ''}`;
   }).join('\n');
 
@@ -182,14 +181,14 @@ async function extractServiceCategoryContent(categorySlug: string): Promise<stri
 
   const { data: services } = await admin
     .from('services')
-    .select('name, description, pricing_model, flat_price_cents, custom_starting_price_cents, base_duration_minutes, mobile_eligible')
+    .select('name, description, pricing_model, flat_price, custom_starting_price, base_duration_minutes, mobile_eligible')
     .eq('is_active', true)
     .eq('show_on_website', true)
     .eq('category_id', (await admin.from('service_categories').select('id').eq('slug', categorySlug).single()).data?.id ?? '')
     .order('display_order', { ascending: true });
 
   const serviceLines = (services ?? []).map(s => {
-    const price = s.flat_price_cents ? `$${s.flat_price_cents}` : s.custom_starting_price_cents ? `From $${s.custom_starting_price_cents}` : 'Contact for pricing';
+    const price = s.flat_price ? `$${s.flat_price}` : s.custom_starting_price ? `From $${s.custom_starting_price}` : 'Contact for pricing';
     const duration = s.base_duration_minutes ? `${s.base_duration_minutes} min` : '';
     const mobile = s.mobile_eligible ? ' [Mobile Available]' : '';
     return `- ${s.name}: ${price}${duration ? ` (${duration})` : ''}${mobile}\n  ${s.description || ''}`;
@@ -215,41 +214,37 @@ async function extractServiceDetailContent(categorySlug: string, serviceSlug: st
   const { data: svc } = await admin
     .from('services')
     .select(`
-      name, description, pricing_model, flat_price_cents, custom_starting_price_cents,
-      per_unit_price_cents, per_unit_label, per_unit_max, mobile_eligible,
+      name, description, pricing_model, flat_price, custom_starting_price,
+      per_unit_price, per_unit_label, per_unit_max, mobile_eligible,
       base_duration_minutes,
       service_categories!inner(name, slug),
-      pricing:service_pricing(tier_name, tier_label, price_cents, vehicle_size_sedan_price_cents,
-        vehicle_size_truck_suv_price_cents, vehicle_size_suv_van_price_cents, is_vehicle_size_aware, display_order)
+      pricing:service_pricing(tier_name, tier_label, price, vehicle_size_sedan_price,
+        vehicle_size_truck_suv_price, vehicle_size_suv_van_price, is_vehicle_size_aware, display_order)
     `)
     .eq('slug', serviceSlug)
     .single();
 
   if (!svc) return `Page: Service not found (${serviceSlug})`;
 
-  // Phase Money-Unify-3: DB columns store cents; SEO/RAG context text
-  // needs human-readable dollar amounts. Format via formatMoney() at emit.
   let pricingText = '';
   switch (svc.pricing_model) {
     case 'flat':
-      pricingText = svc.flat_price_cents != null ? formatMoney(svc.flat_price_cents) : 'Contact for pricing';
+      pricingText = svc.flat_price != null ? `$${svc.flat_price}` : 'Contact for pricing';
       break;
     case 'custom':
-      pricingText = svc.custom_starting_price_cents != null ? `Starting at ${formatMoney(svc.custom_starting_price_cents)}+` : 'Contact for quote';
+      pricingText = svc.custom_starting_price != null ? `Starting at $${svc.custom_starting_price}+` : 'Contact for quote';
       break;
     case 'per_unit':
-      pricingText = svc.per_unit_price_cents != null
-        ? `${formatMoney(svc.per_unit_price_cents)} per ${svc.per_unit_label || 'unit'}${svc.per_unit_max ? ` (max ${svc.per_unit_max})` : ''}`
-        : 'Contact for pricing';
+      pricingText = `$${svc.per_unit_price} per ${svc.per_unit_label || 'unit'}${svc.per_unit_max ? ` (max ${svc.per_unit_max})` : ''}`;
       break;
     case 'vehicle_size':
     case 'scope':
     case 'specialty': {
       const tiers = (svc.pricing as Array<{
-        tier_name: string; tier_label: string | null; price_cents: number;
-        vehicle_size_sedan_price_cents: number | null;
-        vehicle_size_truck_suv_price_cents: number | null;
-        vehicle_size_suv_van_price_cents: number | null;
+        tier_name: string; tier_label: string | null; price: number;
+        vehicle_size_sedan_price: number | null;
+        vehicle_size_truck_suv_price: number | null;
+        vehicle_size_suv_van_price: number | null;
         is_vehicle_size_aware: boolean;
         display_order: number;
       }>) || [];
@@ -257,10 +252,10 @@ async function extractServiceDetailContent(categorySlug: string, serviceSlug: st
         .sort((a, b) => a.display_order - b.display_order)
         .map(t => {
           const label = t.tier_label || t.tier_name;
-          if (t.vehicle_size_sedan_price_cents != null) {
-            return `${label}: Sedan ${formatMoney(t.vehicle_size_sedan_price_cents)}, Truck/SUV ${formatMoney(t.vehicle_size_truck_suv_price_cents ?? 0)}, SUV 3-Row/Van ${formatMoney(t.vehicle_size_suv_van_price_cents ?? 0)}`;
+          if (t.vehicle_size_sedan_price != null) {
+            return `${label}: Sedan $${t.vehicle_size_sedan_price}, Truck/SUV $${t.vehicle_size_truck_suv_price}, SUV 3-Row/Van $${t.vehicle_size_suv_van_price}`;
           }
-          return `${label}: ${formatMoney(t.price_cents)}`;
+          return `${label}: $${t.price}`;
         })
         .join(' | ');
       break;
@@ -323,7 +318,7 @@ async function extractProductCategoryContent(categorySlug: string): Promise<stri
 
   const { data: products } = await admin
     .from('products')
-    .select('name, description, retail_price_cents')
+    .select('name, description, retail_price')
     .eq('is_active', true)
     .eq('show_on_website', true)
     .eq('category_id', cat?.id ?? '')
@@ -331,7 +326,7 @@ async function extractProductCategoryContent(categorySlug: string): Promise<stri
     .limit(20);
 
   const productLines = (products ?? []).map(p => {
-    const price = p.retail_price_cents ? `$${Number(p.retail_price_cents).toFixed(2)}` : '';
+    const price = p.retail_price ? `$${Number(p.retail_price).toFixed(2)}` : '';
     return `- ${p.name}${price ? ` (${price})` : ''}\n  ${p.description ? p.description.substring(0, 100) : ''}`;
   }).join('\n');
 
@@ -354,7 +349,7 @@ async function extractProductDetailContent(categorySlug: string, productSlug: st
 
   const { data: prod } = await admin
     .from('products')
-    .select('name, description, retail_price_cents, sku, product_categories!inner(name, slug)')
+    .select('name, description, retail_price, sku, product_categories!inner(name, slug)')
     .eq('slug', productSlug)
     .single();
 
@@ -367,7 +362,7 @@ async function extractProductDetailContent(categorySlug: string, productSlug: st
     `URL: /products/${categorySlug}/${productSlug}`,
     `Type: Product Detail`,
     `Category: ${catName}`,
-    `Price: ${prod.retail_price_cents ? `$${Number(prod.retail_price_cents).toFixed(2)}` : 'Contact for pricing'}`,
+    `Price: ${prod.retail_price ? `$${Number(prod.retail_price).toFixed(2)}` : 'Contact for pricing'}`,
     `SKU: ${prod.sku || 'N/A'}`,
     '',
     `DESCRIPTION:`,

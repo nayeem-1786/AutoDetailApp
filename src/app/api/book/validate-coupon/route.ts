@@ -7,13 +7,11 @@ import {
   type CartItem,
   type CouponRewardRow,
 } from '@/lib/utils/coupon-helpers';
-import { fromCents } from '@/lib/utils/money';
 
-// Phase Money-Unify-3: catalog wire is cents. Aligned with bookingSubmitSchema.
 interface ServiceItem {
   service_id: string;
   name: string;
-  price_cents: number;
+  price: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -194,9 +192,9 @@ export async function POST(request: NextRequest) {
     const { data: serviceDetails } = serviceIds.length > 0
       ? await supabase
           .from('services')
-          .select('id, category_id, pricing_model, flat_price_cents, per_unit_price_cents, sale_price_cents, sale_starts_at, sale_ends_at, service_pricing(tier_name, price_cents, sale_price_cents)')
+          .select('id, category_id, pricing_model, flat_price, per_unit_price, sale_price, sale_starts_at, sale_ends_at, service_pricing(tier_name, price, sale_price)')
           .in('id', serviceIds)
-      : { data: [] as { id: string; category_id: string | null; pricing_model: string; flat_price_cents: number | null; per_unit_price_cents: number | null; sale_price_cents: number | null; sale_starts_at: string | null; sale_ends_at: string | null; service_pricing: { tier_name: string; price_cents: number; sale_price_cents: number | null }[] }[] };
+      : { data: [] as { id: string; category_id: string | null; pricing_model: string; flat_price: number | null; per_unit_price: number | null; sale_price: number | null; sale_starts_at: string | null; sale_ends_at: string | null; service_pricing: { tier_name: string; price: number; sale_price: number | null }[] }[] };
 
     const conditions: boolean[] = [];
 
@@ -329,20 +327,20 @@ export async function POST(request: NextRequest) {
         if (isOnSale) {
           switch (svc.pricing_model) {
             case 'flat':
-              if (svc.sale_price_cents != null && svc.flat_price_cents != null && svc.sale_price_cents < svc.flat_price_cents) {
+              if (svc.sale_price != null && svc.flat_price != null && svc.sale_price < svc.flat_price) {
                 pricingType = 'sale';
               }
               break;
             case 'per_unit':
-              if (svc.sale_price_cents != null && svc.per_unit_price_cents != null && svc.sale_price_cents < svc.per_unit_price_cents) {
+              if (svc.sale_price != null && svc.per_unit_price != null && svc.sale_price < svc.per_unit_price) {
                 pricingType = 'sale';
               }
               break;
             default: {
-              // Tiered (vehicle_size, scope, specialty): check if submitted price matches a tier's sale_price_cents
-              const tiers: { tier_name: string; price_cents: number; sale_price_cents: number | null }[] = svc.service_pricing || [];
+              // Tiered (vehicle_size, scope, specialty): check if submitted price matches a tier's sale_price
+              const tiers: { tier_name: string; price: number; sale_price: number | null }[] = svc.service_pricing || [];
               const matchesTierSale = tiers.some(
-                (t) => t.sale_price_cents != null && t.sale_price_cents < t.price_cents && item.price_cents === t.sale_price_cents
+                (t) => t.sale_price != null && t.sale_price < t.price && item.price === t.sale_price
               );
               if (matchesTierSale) {
                 pricingType = 'sale';
@@ -357,10 +355,7 @@ export async function POST(request: NextRequest) {
         item_type: 'service' as const,
         service_id: item.service_id,
         category_id: svc?.category_id ?? undefined,
-        // TODO Unify-7: coupon-helpers' CartItem.unit_price is Family F dollars
-        // until Marketing family migrates. Convert cents wire → dollars here;
-        // remove fromCents() when Family F lands (rename to unit_price_cents).
-        unit_price: fromCents(item.price_cents),
+        unit_price: item.price,
         quantity: 1,
         item_name: item.name,
         pricing_type: pricingType,

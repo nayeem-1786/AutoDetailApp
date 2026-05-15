@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ShoppingBag, Trash2, ArrowRight, Package, Tag, X } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { QuantitySelector } from '@/components/public/cart/quantity-selector';
 import { toast } from 'sonner';
 
@@ -33,7 +33,7 @@ export default function CartPage() {
       const cartItems = items.map((item) => ({
         item_type: 'product' as const,
         product_id: item.id,
-        unit_price: item.price_cents,
+        unit_price: item.price,
         quantity: item.quantity,
         item_name: item.name,
       }));
@@ -161,7 +161,7 @@ export default function CartPage() {
                   </div>
 
                   <span className="text-sm text-site-text-muted mt-0.5">
-                    {formatCurrency(item.price_cents)} each
+                    {formatCurrency(item.price)} each
                   </span>
 
                   <div className="flex items-center justify-between mt-3">
@@ -172,7 +172,7 @@ export default function CartPage() {
                       size="sm"
                     />
                     <span className="text-base font-semibold text-site-text tabular-nums">
-                      {formatCurrency(item.price_cents * item.quantity)}
+                      {formatCurrency(item.price * item.quantity)}
                     </span>
                   </div>
                 </div>

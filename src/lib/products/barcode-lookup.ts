@@ -5,8 +5,8 @@ export interface BarcodeLookupResult {
   name: string;
   sku: string | null;
   barcode: string | null;
-  retail_price_cents: number;
-  cost_price_cents: number | null;
+  retail_price: number;
+  cost_price: number | null;
   is_taxable: boolean;
   is_active: boolean;
   quantity_on_hand: number;
@@ -14,15 +14,15 @@ export interface BarcodeLookupResult {
   image_url: string | null;
   category_id: string | null;
   is_loyalty_eligible: boolean;
-  sale_price_cents: number | null;
+  sale_price: number | null;
   sale_starts_at: string | null;
   sale_ends_at: string | null;
 }
 
 const SELECT_COLUMNS =
-  'id, name, sku, barcode, retail_price_cents, cost_price_cents, is_taxable, ' +
+  'id, name, sku, barcode, retail_price, cost_price, is_taxable, ' +
   'is_active, quantity_on_hand, reorder_threshold, image_url, category_id, ' +
-  'is_loyalty_eligible, sale_price_cents, sale_starts_at, sale_ends_at';
+  'is_loyalty_eligible, sale_price, sale_starts_at, sale_ends_at';
 
 /**
  * Resolve a scanned code to a product. Matches against `barcode` OR `sku`,

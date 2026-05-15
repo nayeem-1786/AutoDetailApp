@@ -14,7 +14,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { parseDollarAmount } from '@/lib/migration/phone-utils';
 import type { MigrationState } from '@/lib/migration/types';
 

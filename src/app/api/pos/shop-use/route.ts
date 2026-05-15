@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     // Fetch product
     const { data: product, error: prodError } = await supabase
       .from('products')
-      .select('id, name, quantity_on_hand, cost_price_cents')
+      .select('id, name, quantity_on_hand, cost_price')
       .eq('id', product_id)
       .single();
 
@@ -75,7 +75,12 @@ export async function POST(request: NextRequest) {
       reference_id: null,
       reference_type: 'shop_use',
       created_by: posEmployee.employee_id,
-      unit_cost_cents: product.cost_price_cents,
+      // TODO Unify-D: when Family D migrates products.cost_price to
+      // cents, remove toCents() and use product.cost_price_cents
+      // directly. See docs/sessions/money-unify-0-migration-
+      // playbook-v2.md §Family D.
+      unit_cost_cents:
+        product.cost_price != null ? toCents(product.cost_price) : null,
     });
 
     if (!result.ok) {

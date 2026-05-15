@@ -1,6 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
-import { fromCents } from '@/lib/utils/money';
 import { sendSms } from '@/lib/utils/sms';
 import { generateConversationSummary } from '@/lib/services/conversation-summary';
 import { createQuote } from '@/lib/quotes/quote-service';
@@ -516,17 +515,14 @@ async function autoGenerateQuote(
       console.warn(`[VoicePostCall] Service not found: "${serviceName}"`);
       continue;
     }
-    // resolvePrice returns cents (Family D); quotes table is Family B dollars
-    // until Unify-8. Convert at this boundary.
-    // TODO Unify-8: write _cents columns directly when Quotes family migrates.
-    const { priceCents, salePriceCents, tierName, isOnSale } = resolvePrice(service, sizeClass);
+    const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
     quoteItems.push({
       service_id: service.id,
       item_name: service.name,
       quantity: 1,
-      unit_price: fromCents(isOnSale ? (salePriceCents as number) : priceCents),
+      unit_price: isOnSale ? salePrice! : price,
       tier_name: tierName,
-      standard_price: isOnSale ? fromCents(priceCents) : null,
+      standard_price: isOnSale ? price : null,
       pricing_type: isOnSale ? 'sale' : 'standard',
     });
   }

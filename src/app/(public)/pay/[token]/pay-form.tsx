@@ -11,7 +11,7 @@ import {
   useStripe,
 } from '@stripe/react-stripe-js';
 import { Loader2, Lock, ShieldCheck } from 'lucide-react';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 

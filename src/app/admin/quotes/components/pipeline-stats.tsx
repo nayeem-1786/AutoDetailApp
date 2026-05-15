@@ -1,7 +1,7 @@
 'use client';
 
 import { QUOTE_STATUS_LABELS } from '@/lib/utils/constants';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 
 interface PipelineStatsProps {

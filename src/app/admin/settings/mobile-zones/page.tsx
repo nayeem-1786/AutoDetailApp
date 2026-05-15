@@ -34,7 +34,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { usePermission } from '@/lib/hooks/use-permission';

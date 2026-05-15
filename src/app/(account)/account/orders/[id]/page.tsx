@@ -7,7 +7,7 @@ import { ArrowLeft, Package, Truck, MapPin } from 'lucide-react';
 import { useCustomerAuth } from '@/lib/auth/customer-auth-provider';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import type { Order, OrderItem } from '@/lib/supabase/types';
 
 type OrderDetail = Order & { order_items: OrderItem[] };

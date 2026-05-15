@@ -19,17 +19,10 @@ export interface VehicleSizePricing {
   classic: number | '';
 }
 
-// Phase Money-Unify-3: this form's state holds DOLLAR strings/numbers
-// (mirrors what react-hook-form's number Input produces). Conversion to
-// integer cents happens at submit time in the parent admin page. The
-// boundary is explicit at the save() handler. Keeping dollars in form
-// state preserves <Input step="0.01"> UX without a Controller +
-// setValueAs refactor — same trade-off as Unify-2's vendor min_order_amount.
 export interface ScopeTier {
   id?: string;
   tier_name: string;
   tier_label: string;
-  /** Dollars in form state; converted to cents at submit. */
   price: number | '';
   is_vehicle_size_aware: boolean;
   vehicle_size_sedan_price: number | '';
@@ -52,7 +45,6 @@ export interface SpecialtyTier {
   id?: string;
   tier_name: string;
   tier_label: string;
-  /** Dollars in form state; converted to cents at submit. */
   price: number | '';
 }
 

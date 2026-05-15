@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { adminFetch } from '@/lib/utils/admin-fetch';
-import { formatCurrency, formatMoney, formatPhone } from '@/lib/utils/format';
+import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { getZoneLabel } from '@/lib/utils/job-zones';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -35,14 +35,10 @@ import { usePermission } from '@/lib/hooks/use-permission';
 // Types
 // ---------------------------------------------------------------------------
 
-// TODO Unify-C: when Family C migrates appointment_services.
-// price_at_booking and job_addons.price to cents, remove
-// toCents() and read _cents columns directly. See docs/
-// sessions/money-unify-0-migration-playbook-v3.md §Family C.
 interface JobService {
   id: string;
   name: string;
-  price_cents: number;
+  price: number;
 }
 
 interface JobAddonEnriched {
@@ -50,8 +46,8 @@ interface JobAddonEnriched {
   service_id: string | null;
   product_id: string | null;
   custom_description: string | null;
-  price_cents: number;
-  discount_amount_cents: number;
+  price: number;
+  discount_amount: number;
   status: string;
   message_to_customer: string | null;
   issue_type: string | null;
@@ -295,9 +291,9 @@ export default function AdminJobDetailPage({
     );
   }
 
-  const servicesTotal = job.services.reduce((sum, s) => sum + s.price_cents, 0);
+  const servicesTotal = job.services.reduce((sum, s) => sum + s.price, 0);
   const approvedAddons = job.addons.filter((a) => a.status === 'approved');
-  const addonsTotal = approvedAddons.reduce((sum, a) => sum + a.price_cents - a.discount_amount_cents, 0);
+  const addonsTotal = approvedAddons.reduce((sum, a) => sum + a.price - a.discount_amount, 0);
   const grandTotal = servicesTotal + addonsTotal;
 
   const intakePhotos = job.photos_by_phase.intake || [];
@@ -509,7 +505,7 @@ export default function AdminJobDetailPage({
                       <div key={i} className="flex items-center justify-between py-2">
                         <span className="text-sm text-gray-700">{svc.name}</span>
                         <span className="text-sm font-medium text-gray-900">
-                          {formatMoney(svc.price_cents)}
+                          {formatCurrency(svc.price)}
                         </span>
                       </div>
                     ))}
@@ -546,18 +542,18 @@ export default function AdminJobDetailPage({
                               </span>
                             </div>
                             <div className="text-right">
-                              {addon.discount_amount_cents > 0 ? (
+                              {addon.discount_amount > 0 ? (
                                 <div>
                                   <span className="mr-2 text-xs text-gray-400 line-through">
-                                    {formatMoney(addon.price_cents)}
+                                    {formatCurrency(addon.price)}
                                   </span>
                                   <span className="text-sm font-medium text-gray-900">
-                                    {formatMoney(addon.price_cents - addon.discount_amount_cents)}
+                                    {formatCurrency(addon.price - addon.discount_amount)}
                                   </span>
                                 </div>
                               ) : (
                                 <span className="text-sm font-medium text-gray-900">
-                                  {formatMoney(addon.price_cents)}
+                                  {formatCurrency(addon.price)}
                                 </span>
                               )}
                             </div>

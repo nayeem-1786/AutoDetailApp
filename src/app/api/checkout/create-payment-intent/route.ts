@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const productIds = items.map((i) => i.id);
     const { data: products, error: prodError } = await admin
       .from('products')
-      .select('id, name, slug, retail_price_cents, quantity_on_hand, is_active, is_taxable, category_id, image_url, product_categories(slug)')
+      .select('id, name, slug, retail_price, quantity_on_hand, is_active, is_taxable, category_id, image_url, product_categories(slug)')
       .in('id', productIds)
       .eq('is_active', true);
 
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const unitPriceCents = Math.round(product.retail_price_cents * 100);
+      const unitPriceCents = Math.round(product.retail_price * 100);
       const categorySlug =
         (product.product_categories as unknown as { slug: string })?.slug ?? '';
 

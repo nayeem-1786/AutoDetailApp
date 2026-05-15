@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { X, ShoppingBag, Trash2, Package } from 'lucide-react';
 import { useCart } from '@/lib/contexts/cart-context';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { QuantitySelector } from './quantity-selector';
 
 export function CartDrawer() {
@@ -181,7 +181,7 @@ export function CartDrawer() {
                     {item.name}
                   </Link>
                   <span className="text-xs text-site-text-muted mt-0.5">
-                    {formatCurrency(item.price_cents)} each
+                    {formatCurrency(item.price)} each
                   </span>
 
                   <div className="flex items-center justify-between mt-2">
@@ -193,7 +193,7 @@ export function CartDrawer() {
                     />
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-semibold text-site-text tabular-nums">
-                        {formatCurrency(item.price_cents * item.quantity)}
+                        {formatCurrency(item.price * item.quantity)}
                       </span>
                       <button
                         type="button"

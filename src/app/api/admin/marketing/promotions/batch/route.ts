@@ -7,8 +7,8 @@ import { archiveSaleData } from '@/lib/utils/sale-history';
 interface BatchItem {
   type: 'service' | 'product';
   id: string;
-  sale_prices?: Record<string, number>; // tier_name → sale_price_cents for services
-  sale_price_cents?: number; // for products
+  sale_prices?: Record<string, number>; // tier_name → sale_price for services
+  sale_price?: number; // for products
 }
 
 interface BatchRequest {
@@ -52,14 +52,14 @@ export async function POST(request: NextRequest) {
       }
 
       if (item.type === 'service') {
-        // Update sale dates (and flat/per_unit sale_price_cents if provided) on service
+        // Update sale dates (and flat/per_unit sale_price if provided) on service
         const svcUpdate: Record<string, unknown> = {
           sale_starts_at: body.sale_starts_at,
           sale_ends_at: body.sale_ends_at,
         };
-        // For flat/per_unit models: sale_price_cents lives on the services table
-        if (item.sale_price_cents !== undefined) {
-          svcUpdate.sale_price_cents = item.sale_price_cents;
+        // For flat/per_unit models: sale_price lives on the services table
+        if (item.sale_price !== undefined) {
+          svcUpdate.sale_price = item.sale_price;
         }
         const { error: svcError } = await admin
           .from('services')
@@ -67,12 +67,12 @@ export async function POST(request: NextRequest) {
           .eq('id', item.id);
         if (svcError) throw svcError;
 
-        // Update sale_price_cents on each pricing tier (for tiered models)
+        // Update sale_price on each pricing tier (for tiered models)
         if (item.sale_prices) {
           for (const [tierName, salePrice] of Object.entries(item.sale_prices)) {
             const { error: tierError } = await admin
               .from('service_pricing')
-              .update({ sale_price_cents: salePrice })
+              .update({ sale_price: salePrice })
               .eq('service_id', item.id)
               .eq('tier_name', tierName);
             if (tierError) throw tierError;
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         const { error: prodError } = await admin
           .from('products')
           .update({
-            sale_price_cents: item.sale_price_cents ?? null,
+            sale_price: item.sale_price ?? null,
             sale_starts_at: body.sale_starts_at,
             sale_ends_at: body.sale_ends_at,
           })

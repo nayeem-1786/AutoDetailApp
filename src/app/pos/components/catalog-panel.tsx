@@ -83,7 +83,7 @@ export function CatalogPanel() {
 
   function handleTapService(service: CatalogService) {
     // Per-unit services always need the quantity picker
-    if (service.pricing_model === 'per_unit' && service.per_unit_price_cents != null) {
+    if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
       setPickerService(service);
       return;
     }
@@ -103,21 +103,21 @@ export function CatalogPanel() {
     }
 
     // Flat price service with no tiers: add directly
-    if (pricing.length === 0 && service.flat_price_cents != null) {
+    if (pricing.length === 0 && service.flat_price != null) {
       const syntheticPricing: ServicePricing = {
         id: 'flat',
         service_id: service.id,
         tier_name: 'default',
         tier_label: null,
-        price_cents: service.flat_price_cents,
-        sale_price_cents: service.sale_price_cents ?? null,
+        price: service.flat_price,
+        sale_price: service.sale_price ?? null,
         display_order: 0,
         is_vehicle_size_aware: false,
-        vehicle_size_sedan_price_cents: null,
-        vehicle_size_truck_suv_price_cents: null,
-        vehicle_size_suv_van_price_cents: null,
-        vehicle_size_exotic_price_cents: null,
-        vehicle_size_classic_price_cents: null,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
         max_qty: null,
         qty_label: null,
         created_at: '',

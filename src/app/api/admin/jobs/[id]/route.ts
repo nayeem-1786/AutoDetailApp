@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
-import { toCents } from '@/lib/utils/money';
 
 export async function GET(
   request: NextRequest,
@@ -69,30 +68,13 @@ export async function GET(
         product_name = prod?.name || null;
       }
 
-      // TODO Unify-C: when Family C migrates appointment_services.
-      // price_at_booking and job_addons.price to cents, remove
-      // toCents() and read _cents columns directly. See docs/
-      // sessions/money-unify-0-migration-playbook-v3.md §Family C.
       return {
         ...addon,
-        price_cents: addon.price != null ? toCents(addon.price) : 0,
-        discount_amount_cents: addon.discount_amount != null ? toCents(addon.discount_amount) : 0,
         service_name,
         product_name,
       };
     })
   );
-
-  // Shape jobs.services JSONB to cents (Family C boundary).
-  // TODO Unify-C: when Family C migrates appointment_services.
-  // price_at_booking and job_addons.price to cents, remove
-  // toCents() and read _cents columns directly. See docs/
-  // sessions/money-unify-0-migration-playbook-v3.md §Family C.
-  const servicesArray = Array.isArray(job.services) ? job.services : [];
-  const shapedServices = servicesArray.map((s: { id: string; name: string; price?: number | null; price_cents?: number | null }) => ({
-    ...s,
-    price_cents: s.price_cents ?? (s.price != null ? toCents(s.price) : 0),
-  }));
 
   // Fetch photos grouped by phase
   const { data: photos } = await admin
@@ -145,7 +127,6 @@ export async function GET(
   return NextResponse.json({
     job: {
       ...job,
-      services: shapedServices,
       addons: enrichedAddons,
       photos_by_phase: photosByPhase,
       photo_creators: photoCreators,

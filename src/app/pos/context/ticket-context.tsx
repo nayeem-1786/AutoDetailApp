@@ -38,7 +38,7 @@ export function TicketProvider({ children }: { children: ReactNode }) {
   // Session 29: the specialty gate wrapper was removed. Exotic/classic vehicles now
   // resolve pricing through the normal size_class path in the picker — no modal,
   // no dispatch interception. If a service has no exotic/classic tier configured,
-  // the resolver falls back to pricing.price_cents (a pricing-config issue to fix in admin,
+  // the resolver falls back to pricing.price (a pricing-config issue to fix in admin,
   // not a POS-time prompt).
   const [ticket, dispatch] = useReducer(ticketReducer, initialTicketState);
   const restoredRef = useRef(false);

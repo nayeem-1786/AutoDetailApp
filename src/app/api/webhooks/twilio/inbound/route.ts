@@ -30,7 +30,6 @@ import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
-import { fromCents } from '@/lib/utils/money';
 import crypto from 'crypto';
 
 const TWIML_EMPTY = '<Response/>';
@@ -776,17 +775,14 @@ export async function POST(request: NextRequest) {
               console.warn(`[Auto-Quote] Service not found: "${serviceName}"`);
               continue;
             }
-            // resolvePrice returns cents (Family D); quotes table is Family B
-            // dollars until Unify-8. Convert at this boundary.
-            // TODO Unify-8: write _cents columns directly.
-            const { priceCents, salePriceCents, tierName, isOnSale } = resolvePrice(service, sizeClass);
+            const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
             quoteItems.push({
               service_id: service.id,
               item_name: service.name,
               quantity: 1,
-              unit_price: fromCents(isOnSale ? (salePriceCents as number) : priceCents),
+              unit_price: isOnSale ? salePrice! : price,
               tier_name: tierName,
-              standard_price: isOnSale ? fromCents(priceCents) : null,
+              standard_price: isOnSale ? price : null,
               pricing_type: isOnSale ? 'sale' : 'standard',
             });
           }

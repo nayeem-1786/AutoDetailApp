@@ -4,7 +4,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { fireWebhook } from '@/lib/utils/webhook';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 

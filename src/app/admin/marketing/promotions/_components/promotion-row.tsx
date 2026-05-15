@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatCurrency, formatMoney } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { formatPstShortDate } from '@/lib/utils/pst-date';
 import { timestampToPstDate } from '@/lib/utils/pst-date';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
@@ -16,8 +16,8 @@ export interface ServicePricingRow {
   id: string;
   tier_name: string;
   tier_label: string | null;
-  price_cents: number;
-  sale_price_cents: number | null;
+  price: number;
+  sale_price: number | null;
   display_order: number;
 }
 
@@ -31,13 +31,13 @@ export interface PromotionItem {
   sale_ends_at: string | null;
   // Service fields
   pricing_model?: string;
-  flat_price_cents?: number | null;
-  per_unit_price_cents?: number | null;
+  flat_price?: number | null;
+  per_unit_price?: number | null;
   per_unit_label?: string | null;
   service_pricing?: ServicePricingRow[];
   // Product fields
-  retail_price_cents?: number;
-  sale_price_cents?: number | null;
+  retail_price?: number;
+  sale_price?: number | null;
 }
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -88,16 +88,16 @@ function AdaptivePriceDisplay({ item }: { item: PromotionItem }) {
     : [];
 
   if (item.item_type === 'product') {
-    return renderPriceLine(null, item.retail_price_cents ?? 0, item.sale_price_cents ?? null, hasSale);
+    return renderPriceLine(null, item.retail_price ?? 0, item.sale_price ?? null, hasSale);
   }
 
   if (item.pricing_model === 'flat') {
-    return renderPriceLine(null, item.flat_price_cents ?? 0, item.sale_price_cents ?? null, hasSale);
+    return renderPriceLine(null, item.flat_price ?? 0, item.sale_price ?? null, hasSale);
   }
 
   if (item.pricing_model === 'per_unit') {
     const suffix = `/${item.per_unit_label || 'unit'}`;
-    return renderPriceLine(null, item.per_unit_price_cents ?? 0, item.sale_price_cents ?? null, hasSale, suffix);
+    return renderPriceLine(null, item.per_unit_price ?? 0, item.sale_price ?? null, hasSale, suffix);
   }
 
   // Tiered: vehicle_size, scope, specialty
@@ -107,8 +107,8 @@ function AdaptivePriceDisplay({ item }: { item: PromotionItem }) {
         {tiers.map((tier) =>
           renderPriceLine(
             tier.tier_label || tier.tier_name,
-            tier.price_cents,
-            tier.sale_price_cents,
+            tier.price,
+            tier.sale_price,
             hasSale
           )
         )}
@@ -173,7 +173,7 @@ function initEditState(item: PromotionItem): EditState {
   if (item.item_type === 'product') {
     return {
       discountType,
-      inputValue: item.sale_price_cents ?? ('' as number | ''),
+      inputValue: item.sale_price ?? ('' as number | ''),
       tierInputs: {},
       saleStartsAt: item.sale_starts_at ? timestampToPstDate(item.sale_starts_at) : '',
       saleEndsAt: item.sale_ends_at ? timestampToPstDate(item.sale_ends_at) : '',
@@ -183,7 +183,7 @@ function initEditState(item: PromotionItem): EditState {
   if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
     return {
       discountType,
-      inputValue: item.sale_price_cents ?? ('' as number | ''),
+      inputValue: item.sale_price ?? ('' as number | ''),
       tierInputs: {},
       saleStartsAt: item.sale_starts_at ? timestampToPstDate(item.sale_starts_at) : '',
       saleEndsAt: item.sale_ends_at ? timestampToPstDate(item.sale_ends_at) : '',
@@ -193,7 +193,7 @@ function initEditState(item: PromotionItem): EditState {
   // Tiered
   const tierInputs: Record<string, number | ''> = {};
   for (const tier of tiers) {
-    tierInputs[tier.tier_name] = tier.sale_price_cents ?? '';
+    tierInputs[tier.tier_name] = tier.sale_price ?? '';
   }
 
   return {
@@ -212,8 +212,8 @@ function getValidationErrors(item: PromotionItem, state: EditState): string[] {
     : [];
 
   if (item.item_type === 'product') {
-    const sp = calcSalePrice(item.retail_price_cents ?? 0, state.inputValue, state.discountType);
-    if (sp !== null && sp >= (item.retail_price_cents ?? 0)) {
+    const sp = calcSalePrice(item.retail_price ?? 0, state.inputValue, state.discountType);
+    if (sp !== null && sp >= (item.retail_price ?? 0)) {
       errors.push('Sale price must be less than retail price');
     }
     if (state.inputValue !== '' && sp === null) {
@@ -223,7 +223,7 @@ function getValidationErrors(item: PromotionItem, state: EditState): string[] {
   }
 
   if (item.pricing_model === 'flat') {
-    const base = item.flat_price_cents ?? 0;
+    const base = item.flat_price ?? 0;
     const sp = calcSalePrice(base, state.inputValue, state.discountType);
     if (sp !== null && sp >= base) {
       errors.push('Sale price must be less than base price');
@@ -235,7 +235,7 @@ function getValidationErrors(item: PromotionItem, state: EditState): string[] {
   }
 
   if (item.pricing_model === 'per_unit') {
-    const base = item.per_unit_price_cents ?? 0;
+    const base = item.per_unit_price ?? 0;
     const sp = calcSalePrice(base, state.inputValue, state.discountType);
     if (sp !== null && sp >= base) {
       errors.push('Sale price must be less than base price');
@@ -250,9 +250,9 @@ function getValidationErrors(item: PromotionItem, state: EditState): string[] {
   for (const tier of tiers) {
     const input = state.tierInputs[tier.tier_name];
     if (input === '' || input === undefined) continue;
-    const sp = calcSalePrice(tier.price_cents, input, state.discountType);
-    if (sp !== null && sp >= tier.price_cents) {
-      errors.push(`${tier.tier_label || tier.tier_name}: sale price must be < ${formatCurrency(tier.price_cents)}`);
+    const sp = calcSalePrice(tier.price, input, state.discountType);
+    if (sp !== null && sp >= tier.price) {
+      errors.push(`${tier.tier_label || tier.tier_name}: sale price must be < ${formatCurrency(tier.price)}`);
     }
     if (sp === null) {
       errors.push(`${tier.tier_label || tier.tier_name}: invalid discount value`);
@@ -308,10 +308,10 @@ function EditPriceInputs({
   ) {
     const basePrice =
       item.item_type === 'product'
-        ? item.retail_price_cents ?? 0
+        ? item.retail_price ?? 0
         : item.pricing_model === 'flat'
-          ? item.flat_price_cents ?? 0
-          : item.per_unit_price_cents ?? 0;
+          ? item.flat_price ?? 0
+          : item.per_unit_price ?? 0;
     const suffix =
       item.pricing_model === 'per_unit' ? `/${item.per_unit_label || 'unit'}` : '';
     const computed = calcSalePrice(basePrice, state.inputValue, state.discountType);
@@ -357,11 +357,11 @@ function EditPriceInputs({
     <div className="space-y-1.5">
       {tiers.map((tier) => {
         const input = state.tierInputs[tier.tier_name] ?? '';
-        const computed = calcSalePrice(tier.price_cents, input, state.discountType);
+        const computed = calcSalePrice(tier.price, input, state.discountType);
         return (
           <div key={tier.tier_name}>
             <label className="text-[10px] text-gray-400">
-              {tier.tier_label || tier.tier_name} {discountLabel} (base: {formatCurrency(tier.price_cents)})
+              {tier.tier_label || tier.tier_name} {discountLabel} (base: {formatCurrency(tier.price)})
             </label>
             <Input
               type="number"
@@ -444,10 +444,10 @@ export function PromotionRow({
     ) {
       const basePrice =
         item.item_type === 'product'
-          ? item.retail_price_cents ?? 0
+          ? item.retail_price ?? 0
           : item.pricing_model === 'flat'
-            ? item.flat_price_cents ?? 0
-            : item.per_unit_price_cents ?? 0;
+            ? item.flat_price ?? 0
+            : item.per_unit_price ?? 0;
 
       // If current sale price exists, convert it to the new discount type
       const currentSalePrice =
@@ -469,11 +469,11 @@ export function PromotionRow({
         const currentSalePrice =
           editState.discountType === 'direct'
             ? currentInput
-            : calcSalePrice(tier.price_cents, currentInput ?? '', editState.discountType);
+            : calcSalePrice(tier.price, currentInput ?? '', editState.discountType);
 
         newTierInputs[tier.tier_name] =
           currentSalePrice !== null && currentSalePrice !== '' && typeof currentSalePrice === 'number'
-            ? calcInputFromSalePrice(tier.price_cents, currentSalePrice, newType)
+            ? calcInputFromSalePrice(tier.price, currentSalePrice, newType)
             : '';
       }
       setEditState((prev) => ({ ...prev, discountType: newType, tierInputs: newTierInputs }));
@@ -496,20 +496,20 @@ export function PromotionRow({
     let batchItem: Record<string, unknown>;
 
     if (item.item_type === 'product') {
-      const sp = calcSalePrice(item.retail_price_cents ?? 0, editState.inputValue, editState.discountType);
-      batchItem = { type: 'product', id: item.id, sale_price_cents: sp };
+      const sp = calcSalePrice(item.retail_price ?? 0, editState.inputValue, editState.discountType);
+      batchItem = { type: 'product', id: item.id, sale_price: sp };
     } else if (item.pricing_model === 'flat' || item.pricing_model === 'per_unit') {
       const base =
-        item.pricing_model === 'flat' ? item.flat_price_cents ?? 0 : item.per_unit_price_cents ?? 0;
+        item.pricing_model === 'flat' ? item.flat_price ?? 0 : item.per_unit_price ?? 0;
       const sp = calcSalePrice(base, editState.inputValue, editState.discountType);
-      batchItem = { type: 'service', id: item.id, sale_price_cents: sp };
+      batchItem = { type: 'service', id: item.id, sale_price: sp };
     } else {
       // Tiered: sale_prices keyed by tier_name
       const salePrices: Record<string, number> = {};
       for (const tier of tiers) {
         const input = editState.tierInputs[tier.tier_name];
         if (input !== '' && input !== undefined) {
-          const sp = calcSalePrice(tier.price_cents, input, editState.discountType);
+          const sp = calcSalePrice(tier.price, input, editState.discountType);
           if (sp !== null) salePrices[tier.tier_name] = sp;
         }
       }

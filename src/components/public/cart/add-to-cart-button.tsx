@@ -10,7 +10,7 @@ interface AddToCartButtonProps {
     name: string;
     slug: string;
     categorySlug: string;
-    price_cents: number;
+    price: number; // retail_price in dollars
     stockQuantity: number;
     imageUrl: string | null;
   };
@@ -42,7 +42,7 @@ export function AddToCartButton({
       name: product.name,
       slug: product.slug,
       categorySlug: product.categorySlug,
-      price_cents: product.price_cents,
+      price: product.price,
       maxQuantity: product.stockQuantity,
       imageUrl: product.imageUrl,
     });

@@ -6,23 +6,21 @@ import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 
 // ─── Fixtures ──────────────────────────────────────────────────────
 
-// Phase Money-Unify-3: all fixture money values are integer cents
-// (× 100 of the pre-migration dollar fixtures).
 function mockTier(overrides: Partial<ServicePricing> = {}): ServicePricing {
   return {
     id: 'tier-1',
     service_id: 'svc-1',
     tier_name: 'default',
     tier_label: 'Default',
-    price_cents: 10000,
-    sale_price_cents: null,
+    price: 100,
+    sale_price: null,
     display_order: 0,
     is_vehicle_size_aware: true,
-    vehicle_size_sedan_price_cents: 14000,
-    vehicle_size_truck_suv_price_cents: 15000,
-    vehicle_size_suv_van_price_cents: 16000,
-    vehicle_size_exotic_price_cents: 20000,
-    vehicle_size_classic_price_cents: 18000,
+    vehicle_size_sedan_price: 140,
+    vehicle_size_truck_suv_price: 150,
+    vehicle_size_suv_van_price: 160,
+    vehicle_size_exotic_price: 200,
+    vehicle_size_classic_price: 180,
     max_qty: null,
     qty_label: null,
     created_at: '',
@@ -42,14 +40,14 @@ function mockService(overrides: Partial<Service> & { pricing?: ServicePricing[] 
     display_order: 0,
     is_taxable: false,
     pricing_model: 'scope',
-    flat_price_cents: null,
-    per_unit_price_cents: null,
+    flat_price: null,
+    per_unit_price: null,
     per_unit_label: null,
     per_unit_max: null,
     base_duration_minutes: 30,
     sale_starts_at: null,
     sale_ends_at: null,
-    sale_price_cents: null,
+    sale_price: null,
     classification: 'primary',
     ...overrides,
     pricing,
@@ -168,12 +166,12 @@ describe('ticketReducer SET_VEHICLE (Session 31 silent reprice)', () => {
     const service = mockService({
       pricing: [
         mockTier({
-          price_cents: 9900,
-          vehicle_size_sedan_price_cents: 14000,
-          vehicle_size_truck_suv_price_cents: 15000,
-          vehicle_size_suv_van_price_cents: 16000,
-          vehicle_size_exotic_price_cents: null,
-          vehicle_size_classic_price_cents: null,
+          price: 99,
+          vehicle_size_sedan_price: 140,
+          vehicle_size_truck_suv_price: 150,
+          vehicle_size_suv_van_price: 160,
+          vehicle_size_exotic_price: null,
+          vehicle_size_classic_price: null,
         }),
       ],
     });
@@ -259,7 +257,7 @@ describe('ticketReducer SET_VEHICLE (Session 31 silent reprice)', () => {
   });
 
   it('7. swap skips per-unit items (size-invariant)', () => {
-    const service = mockService({ pricing_model: 'per_unit', per_unit_price_cents: 2500, per_unit_label: 'panel' });
+    const service = mockService({ pricing_model: 'per_unit', per_unit_price: 25, per_unit_label: 'panel' });
     const perUnitItem = mockServiceItem({
       unitPrice: 50,
       standardPrice: 50,
@@ -330,12 +328,10 @@ describe('ticketReducer SET_VEHICLE (Session 31 silent reprice)', () => {
   // Session 32: for vehicle_size pricing_model, each size is a separate row. Reprice
   // must match on the NEW size_class (not the stored tierName, which is the OLD size's label).
   // Helper to build a vehicle_size tier row with minimal boilerplate.
-  // Phase Money-Unify-3: vsTier accepts DOLLAR args for terse fixture syntax,
-  // converts to integer cents internally to match the post-migration column shape.
   function vsTier(
     size: 'sedan' | 'truck_suv_2row' | 'suv_3row_van' | 'exotic' | 'classic',
-    priceDollars: number,
-    salePriceDollars: number | null = null,
+    price: number,
+    salePrice: number | null = null,
     displayOrder = 0,
   ): ServicePricing {
     const labelMap: Record<string, string> = {
@@ -350,15 +346,15 @@ describe('ticketReducer SET_VEHICLE (Session 31 silent reprice)', () => {
       service_id: 'svc-1',
       tier_name: size,
       tier_label: labelMap[size],
-      price_cents: Math.round(priceDollars * 100),
-      sale_price_cents: salePriceDollars != null ? Math.round(salePriceDollars * 100) : null,
+      price,
+      sale_price: salePrice,
       display_order: displayOrder,
       is_vehicle_size_aware: false,
-      vehicle_size_sedan_price_cents: null,
-      vehicle_size_truck_suv_price_cents: null,
-      vehicle_size_suv_van_price_cents: null,
-      vehicle_size_exotic_price_cents: null,
-      vehicle_size_classic_price_cents: null,
+      vehicle_size_sedan_price: null,
+      vehicle_size_truck_suv_price: null,
+      vehicle_size_suv_van_price: null,
+      vehicle_size_exotic_price: null,
+      vehicle_size_classic_price: null,
       max_qty: null,
       qty_label: null,
       created_at: '',
@@ -525,15 +521,15 @@ describe('ticketReducer SET_VEHICLE (Session 31 silent reprice)', () => {
           service_id: 'svc-1',
           tier_name: 'complete_interior',
           tier_label: 'Complete Interior',
-          price_cents: 10000,
-          sale_price_cents: null,
+          price: 100,
+          sale_price: null,
           display_order: 0,
           is_vehicle_size_aware: true,
-          vehicle_size_sedan_price_cents: 14000,
-          vehicle_size_truck_suv_price_cents: 15000,
-          vehicle_size_suv_van_price_cents: 16000,
-          vehicle_size_exotic_price_cents: 22000,
-          vehicle_size_classic_price_cents: 18000,
+          vehicle_size_sedan_price: 140,
+          vehicle_size_truck_suv_price: 150,
+          vehicle_size_suv_van_price: 160,
+          vehicle_size_exotic_price: 220,
+          vehicle_size_classic_price: 180,
           max_qty: null,
           qty_label: null,
           created_at: '',

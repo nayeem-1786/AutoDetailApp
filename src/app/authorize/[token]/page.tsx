@@ -169,7 +169,6 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
     ? [vehicle.make, vehicle.model].filter(Boolean).join(' ')
     : null;
 
-  // TODO Unify-6: job_addons.price + jobs.services[].price are Family C dollars.
   const addonPrice = Number(addon.price) - Number(addon.discount_amount);
   const itemName = catalogItemName || addon.custom_description || 'Service Add-on';
 
@@ -260,7 +259,7 @@ export default async function AuthorizationPage({ params, searchParams }: PagePr
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Original price</span>
-                  <span className="text-gray-500 line-through">${Number(addon.price_cents).toFixed(2)}</span>
+                  <span className="text-gray-500 line-through">${Number(addon.price).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-green-600">Discount</span>

@@ -109,7 +109,6 @@ export default async function JobPhotosGalleryPage({ params }: Props) {
     if (svcData) for (const s of svcData) addonServiceNames.set(s.id, s.name);
   }
 
-  // TODO Unify-6: job_addons.price + discount_amount are Family C dollars.
   const addonItems = (approvedAddons || []).map((addon) => ({
     name: addon.service_id ? (addonServiceNames.get(addon.service_id) || addon.custom_description || 'Add-on Service') : (addon.custom_description || 'Add-on Service'),
     price: Number(addon.price) - Number(addon.discount_amount),

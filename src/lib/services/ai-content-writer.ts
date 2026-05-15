@@ -1,7 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { BUSINESS_DEFAULTS } from '@/lib/data/business';
 import type { ContentBlockType } from '@/lib/supabase/types';
-import { formatMoney } from '@/lib/utils/format';
 
 // ---------------------------------------------------------------------------
 // AI Content Writer — Claude API wrapper for page content generation
@@ -643,21 +642,16 @@ export async function buildServiceContext(
 
   const { data: svc } = await admin
     .from('services')
-    .select('name, description, flat_price_cents, custom_starting_price_cents, service_categories!inner(name)')
+    .select('name, description, flat_price, custom_starting_price, service_categories!inner(name)')
     .eq('slug', serviceSlug)
     .single();
 
   if (!svc) return {};
 
-  // Money-Unify-3: format integer cents → human-readable dollar string
-  // for the AI model. formatMoney emits "$125.00"; trim the trailing
-  // ".00" so the prompt reads more naturally ("$125" not "$125.00") —
-  // the model handles either, but the existing prompt corpus uses bare
-  // dollars.
-  const price = svc.flat_price_cents != null
-    ? formatMoney(svc.flat_price_cents).replace(/\.00$/, '')
-    : svc.custom_starting_price_cents != null
-      ? `Starting at ${formatMoney(svc.custom_starting_price_cents).replace(/\.00$/, '')}`
+  const price = svc.flat_price
+    ? `$${svc.flat_price}`
+    : svc.custom_starting_price
+      ? `Starting at $${svc.custom_starting_price}`
       : 'Contact for pricing';
 
   const catName = (svc.service_categories as unknown as { name: string }).name;

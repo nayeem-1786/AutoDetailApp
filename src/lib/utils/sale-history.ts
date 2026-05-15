@@ -44,13 +44,13 @@ async function archiveServiceSale(
 ): Promise<SaleHistoryRecord | null> {
   const { data: svc } = await supabase
     .from('services')
-    .select('sale_price_cents, sale_starts_at, sale_ends_at, pricing_model, flat_price_cents, per_unit_price_cents, per_unit_label, service_pricing(tier_name, tier_label, price_cents, sale_price_cents)')
+    .select('sale_price, sale_starts_at, sale_ends_at, pricing_model, flat_price, per_unit_price, per_unit_label, service_pricing(tier_name, tier_label, price, sale_price)')
     .eq('id', serviceId)
     .single();
 
   if (!svc) return null;
 
-  const tiers: { tier_name: string; tier_label: string | null; price_cents: number; sale_price_cents: number | null }[] =
+  const tiers: { tier_name: string; tier_label: string | null; price: number; sale_price: number | null }[] =
     svc.service_pricing ?? [];
   const pricingModel: string = svc.pricing_model;
 
@@ -59,32 +59,32 @@ async function archiveServiceSale(
   let pricingSnapshot: unknown = null;
 
   if (pricingModel === 'flat') {
-    if (svc.sale_price_cents != null) {
+    if (svc.sale_price != null) {
       hasSaleData = true;
       pricingSnapshot = {
-        base_price: svc.flat_price_cents,
-        sale_price_cents: svc.sale_price_cents,
+        base_price: svc.flat_price,
+        sale_price: svc.sale_price,
       };
     }
   } else if (pricingModel === 'per_unit') {
-    if (svc.sale_price_cents != null) {
+    if (svc.sale_price != null) {
       hasSaleData = true;
       pricingSnapshot = {
-        base_price: svc.per_unit_price_cents,
-        sale_price_cents: svc.sale_price_cents,
+        base_price: svc.per_unit_price,
+        sale_price: svc.sale_price,
         per_unit_label: svc.per_unit_label,
       };
     }
   } else {
     // Tiered models: vehicle_size, scope, specialty
-    const tiersWithSale = tiers.filter((t) => t.sale_price_cents != null);
+    const tiersWithSale = tiers.filter((t) => t.sale_price != null);
     if (tiersWithSale.length > 0) {
       hasSaleData = true;
       pricingSnapshot = tiersWithSale.map((t) => ({
         tier_name: t.tier_name,
         tier_label: t.tier_label,
-        base_price: t.price_cents,
-        sale_price_cents: t.sale_price_cents,
+        base_price: t.price,
+        sale_price: t.sale_price,
       }));
     }
   }
@@ -116,15 +116,15 @@ async function archiveProductSale(
 ): Promise<SaleHistoryRecord | null> {
   const { data: product } = await supabase
     .from('products')
-    .select('sale_price_cents, sale_starts_at, sale_ends_at, retail_price_cents')
+    .select('sale_price, sale_starts_at, sale_ends_at, retail_price')
     .eq('id', productId)
     .single();
 
-  if (!product || product.sale_price_cents == null) return null;
+  if (!product || product.sale_price == null) return null;
 
   const pricingSnapshot = {
-    retail_price_cents: product.retail_price_cents,
-    sale_price_cents: product.sale_price_cents,
+    retail_price: product.retail_price,
+    sale_price: product.sale_price,
   };
 
   const { data: record } = await supabase

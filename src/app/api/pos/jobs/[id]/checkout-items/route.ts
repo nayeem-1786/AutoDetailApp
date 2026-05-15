@@ -124,10 +124,6 @@ export async function GET(
       category_id?: string;
     }> = [];
 
-    // TODO Unify-6: jobs.services JSONB + job_addons.price are Family C
-    // (still dollars). The output shape items[].unit_price is Family A dollars
-    // (matches POS TicketState until Unify-5). When Family C migrates, switch
-    // svc.price → svc.price_cents and rewrite item math in cents.
     for (const svc of services) {
       if (svc.is_mobile_fee) continue;
       if (!svc.id) continue;
@@ -174,7 +170,6 @@ export async function GET(
     }
 
     for (const addon of approvedAddons) {
-      // TODO Unify-6: job_addons.price + discount_amount are Family C (dollars).
       const finalPrice = Number(addon.price) - Number(addon.discount_amount);
       const addonMeta = addon.service_id
         ? addonServiceMetaMap.get(addon.service_id)
