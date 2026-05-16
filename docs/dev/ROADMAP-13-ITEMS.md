@@ -10,9 +10,9 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.2 (2026-05-15) — Items 1, 6 completed
-**Last session updated:** 2026-05-15 — Item 6 (Deposit / Paid-in-Full Label Unification)
-**Total items:** 11 active + 2 done + 1 closed (Items 1, 6 done; Item 5 closed: NFC already enabled per Stripe support)
+**Document version:** v1.3 (2026-05-15) — Items 1, 6, 12 completed
+**Last session updated:** 2026-05-15 — Item 12 (POS Footer Appointments + Reschedule)
+**Total items:** 10 active + 3 done + 1 closed (Items 1, 6, 12 done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
 
@@ -240,29 +240,88 @@ If implemented, this resolves the need to edit appointments from the Jobs card.
 - Appointment creation — already exists elsewhere; this is edit-only.
 - Mobile zone changes for mobile appointments — defer to Item 13 work.
 
-**Files likely affected:**
-- POS footer component + navigation routing
-- New POS appointments view (likely reusing components from Admin appointments)
-- API endpoint: PATCH /api/appointments/[id] (may already exist)
-- Tests for the edit flow
-
-**Session plan:**
-- Single session.
-- First: search past chats for the prior plan ("add Appointments to POS footer")
-  — recover any earlier design decisions.
-- Build the footer entry + view.
-- Wire edit to existing appointment-update API.
-- UAT checklist:
-  - Reschedule an appointment from POS → date/time changes
-  - Reassign detailer → assignment changes
-  - Verify customer does NOT receive notification SMS
-  - Verify the Jobs card reflects the updated appointment
+**Files likely affected (actual after session):**
+- `src/app/pos/components/bottom-nav.tsx` — added Appointments tab as the
+  5th primary tab (`CalendarDays` icon, between Jobs and More).
+- `src/app/pos/appointments/page.tsx` — new POS route, renders the view in
+  a Suspense boundary.
+- `src/app/pos/components/appointments/appointments-view.tsx` — date-filtered
+  list with Today / Today+Tomorrow / Next 7 Days presets + custom range,
+  grouped by date with status pill, click-to-edit. Excludes cancelled
+  appointments server-side.
+- `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx` —
+  modal-from-row-click for date/time/detailer edit. Inline amber notice
+  reminding operator that the customer is NOT auto-notified.
+- `src/app/pos/components/appointments/types.ts` — local
+  `PosAppointment` and `PosStaff` shapes.
+- `src/app/api/pos/appointments/route.ts` — new `GET` returning
+  appointments in a date range, joined with customer/vehicle/employee/services.
+  Permission: `appointments.view_today`. Range capped at 31 days.
+- `src/app/api/pos/appointments/[id]/reschedule/route.ts` — new `PATCH`.
+  Updates ONLY `scheduled_date`, `scheduled_start_time`,
+  `scheduled_end_time`, `employee_id`. Permission: `appointments.reschedule`.
+  Mirrors admin's overlap check (BUFFER_MINUTES buffer, 409 on conflict).
+  Syncs `jobs.assigned_staff_id` when detailer changes — same direction as
+  `/api/pos/jobs/[id]/reschedule`.
+- `src/app/api/pos/appointments/__tests__/list.test.ts` — 7 cases.
+- `src/app/api/pos/appointments/[id]/reschedule/__tests__/reschedule.test.ts`
+  — 10 cases including notification-suppression invariants.
+- `docs/dev/FILE_TREE.md`, `docs/dev/ROADMAP-13-ITEMS.md`,
+  `docs/CHANGELOG.md` — doc updates.
 
 **Notes / decisions log:**
 - 2026-05-15: confirmed no need to edit from Jobs card if Appointments is in
   POS footer. Earlier "Jobs card edit" approach abandoned.
 - 2026-05-15: customer notification deliberately NOT triggered from this
   rescheduling path.
+- 2026-05-15 (session): `conversation_search` tool unavailable in this
+  environment, so no prior chat plan was recovered. Designed within-spec.
+- 2026-05-15 (session): **Inline edit vs modal** decision: chose
+  **modal-from-row-click**. Rationale — POS list rows are space-constrained
+  on iPad and inline editing 4 fields per row hurts scannability. Modal
+  also matches the existing admin `AppointmentDetailDialog` interaction
+  pattern, which staff already know.
+- 2026-05-15 (session): **Component-reuse decision (Rule 11)**: chose NOT to
+  reuse `AppointmentDetailDialog` from
+  `src/app/admin/appointments/components/`. That dialog has ~12 cross-cutting
+  concerns out of scope here (status changes, mobile-zone editor,
+  mobile-fee mismatch banner, status-transition matrix, cancellation flow,
+  notes editing). Building a focused 4-field reschedule dialog (~150 LOC)
+  is cleaner than gating off most of the admin dialog's surface. Reused:
+  `Dialog`/`DialogHeader`/`DialogContent`/etc. primitives, `FormField`,
+  `Input`, `Select`, `Button`, `Spinner`, `EmptyState`,
+  `cleanVehicleDescription`, `formatTime`, `getTodayPst`, `ROLE_LABELS`,
+  `APPOINTMENT_STATUS_LABELS`, `posFetch`, `addMinutesToTime`,
+  `APPOINTMENT.BUFFER_MINUTES`, and the existing `/api/pos/staff/available`
+  endpoint for the detailer dropdown.
+- 2026-05-15 (session): **Notification-suppression mechanism**: chose
+  option (b) — a dedicated POS endpoint that does NOT call `fireWebhook`.
+  The admin `PATCH /api/appointments/[id]` fires `appointment_rescheduled`
+  to n8n on date/time change, which downstream handlers may use to message
+  the customer. The new POS endpoint never fires it, so this surface is
+  notification-free by construction (not by feature flag). Audit log row
+  records `notification_suppressed: true` in `details` for traceability.
+  Tested via 3 spy mocks (`sendSms`, `sendEmail`, `fireWebhook`) — 0 calls
+  verified across both date/time and detailer-only updates.
+- 2026-05-15 (session): **Permission decision**: gated read view on
+  `appointments.view_today` (matches the admin minimum) and reschedule on
+  `appointments.reschedule` (granted to cashier+admin+super_admin by
+  default; detailer denied by default — matches existing role config). No
+  new permission keys introduced.
+- 2026-05-15 (session): **Cancelled appointments excluded** from the list
+  server-side. Completed appointments are returned for visibility but the
+  reschedule endpoint rejects them (400) — they appear but aren't editable.
+- 2026-05-15 (session): **Overlap check**: kept the same logic as the admin
+  endpoint (BUFFER_MINUTES added to end time, 409 on conflict). The roadmap
+  said "no schedule revalidation," but the admin endpoint does this
+  defense-in-depth check too — removing it would let the POS PATCH succeed
+  while the admin PATCH would have failed for the same input. That asymmetry
+  is a bug in waiting; keeping the check matches the admin's contract and
+  the operator can adjust the time if a conflict surfaces.
+- 2026-05-15 (session): all gates green — typecheck clean, lint 0 errors
+  (my files contributed 0 new warnings; one `Button` unused-import warning
+  was caught and removed during the session), vitest 1024/1024 (17 new),
+  build clean.
 
 ---
 
@@ -933,6 +992,7 @@ CC session.
 |---|---|---|---|---|---|
 | 2026-05-15 | 1 | Item 1 — POS Customer Search → Create Smart Prefill | done | `6b0413dd` | New helper `routeSearchInput` + 24 unit tests + 6 dialog prefill tests. Wired into ticket-panel + quote-ticket-panel. Reused `isPhoneQuery` from existing tokenize.ts. International phone shapes preserved verbatim. Pre-existing in-progress Item 6/12 work left untouched on working tree. |
 | 2026-05-15 | 2 | Item 6 — Deposit / Paid-in-Full Label Unification | done | _(this commit)_ | `formatDepositLabel({depositCents,totalCents})` helper added to receipt-composer.ts. `RECEIPT_VOCAB.DEPOSIT_ONLINE`/`DEPOSIT_IN_STORE` replaced with `DEPOSIT`/`PAID_IN_FULL`. Threaded `ticketTotalCents` (subtotal+tax+tip) into 3 render sites: thermal, HTML, public receipt. 10 fixture files regenerated. 7-case helper test suite + threshold tests on `buildSuggestedLabelForPayment` (122 composer tests, 1024 total — all pass). Typecheck/lint/build clean. |
+| 2026-05-15 | 3 | Item 12 — Appointments in POS Footer + Reschedule | done | _(this commit)_ | Added Appointments tab (5th primary) to `bottom-nav.tsx`. New `/pos/appointments` route + `appointments-view.tsx` (date-range presets, grouped list) + `reschedule-appointment-dialog.tsx` (modal-from-row-click). New `GET /api/pos/appointments` (date-filtered list, default today+tomorrow, 31-day cap). New `PATCH /api/pos/appointments/[id]/reschedule` — POS-dedicated endpoint, no `fireWebhook` call (notification-suppression by construction; audit row records `notification_suppressed: true`). 17 new tests including 3-spy invariant (`sendSms`, `sendEmail`, `fireWebhook` all 0 calls). Existing `/api/pos/staff/available` reused for detailer dropdown. Permissions: `appointments.view_today` for read, `appointments.reschedule` for write — no new keys. `conversation_search` tool unavailable in env so no prior plan recovered. Typecheck/lint/build/vitest 1024-clean. |
 
 ---
 

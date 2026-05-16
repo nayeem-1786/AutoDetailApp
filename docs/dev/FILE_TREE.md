@@ -379,9 +379,13 @@ src/app/api/migration/vehicles/route.ts
 
 ### POS
 ```
+src/app/api/pos/appointments/route.ts                         # GET list (date range, default today+tomorrow) — Roadmap Item 12
+src/app/api/pos/appointments/__tests__/list.test.ts
 src/app/api/pos/appointments/[id]/mobile-address/route.ts     # PATCH mobile_address only (Phase Mobile-1.6)
 src/app/api/pos/appointments/[id]/mobile-service/route.ts     # PATCH full mobile picker — toggle/zone/custom/address (Phase Mobile-1.9)
 src/app/api/pos/appointments/[id]/notify/route.ts
+src/app/api/pos/appointments/[id]/reschedule/route.ts          # PATCH date/time/detailer — notification suppression (Roadmap Item 12)
+src/app/api/pos/appointments/[id]/reschedule/__tests__/reschedule.test.ts
 src/app/api/pos/appointments/[id]/send-payment-link/route.ts   — Send pay-link via SMS/email/both (Pay-Link Session 3)
 src/app/api/pos/auth/logout/route.ts
 src/app/api/pos/auth/pin-login/route.ts
@@ -805,6 +809,7 @@ src/app/pos/page.tsx                     — POS main workspace
 src/app/pos/login/page.tsx               — POS PIN login
 src/app/pos/end-of-day/page.tsx          — End-of-day cash count & reconciliation
 src/app/pos/jobs/page.tsx                — Jobs management
+src/app/pos/appointments/page.tsx        — Appointments view (Roadmap Item 12 — POS footer reschedule surface)
 src/app/pos/offline/page.tsx             — Offline fallback page
 src/app/pos/quotes/page.tsx              — Quote builder & list
 src/app/pos/transactions/page.tsx        — Transaction list
@@ -1348,6 +1353,11 @@ Phase Mobile-1.1 additions:
 - `src/app/pos/components/checkout/save-address-dialog.tsx`
 - `src/app/pos/components/checkout/__tests__/save-address-dialog.test.tsx`
 - `src/app/pos/components/quotes/__tests__/mobile-fee-picker.test.tsx`
+
+Roadmap Item 12 (POS Appointments) additions:
+- `src/app/pos/components/appointments/appointments-view.tsx`
+- `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx`
+- `src/app/pos/components/appointments/types.ts`
 
 ---
 

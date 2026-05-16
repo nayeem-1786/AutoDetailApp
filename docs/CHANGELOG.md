@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-15 — Wave 1 / Item 12: Appointments in POS Footer + Reschedule
+
+Staff at the POS counter often field reschedule requests while the customer is right in front of them. Until today, appointment date/time/detailer edits were only possible from `Admin > Appointments` — a context switch staff routinely skipped, leaving stale appointments in the calendar. This session adds an **Appointments** tab to the POS footer and a focused reschedule flow.
+
+**What's new for staff:**
+- New **Appointments** tab in the POS bottom nav (5th primary tab, between Jobs and More).
+- Date-filtered list view with three presets: **Today**, **Today + Tomorrow** (default), **Next 7 Days**, plus a custom date range picker.
+- Appointments grouped by date with a relative label (Today / Tomorrow / Yesterday) and full long-form date.
+- Each row shows the time window, status pill, customer name, vehicle summary, services, and assigned detailer.
+- Tap any row → modal opens to edit **date**, **start time**, **end time**, and **assigned detailer**. Save closes the modal and refreshes the list.
+- Inline amber notice in the modal: *"Customer is not automatically notified when you reschedule from POS. Send the new time via SMS or call after saving."*
+
+**Out of scope by design (per roadmap Item 12):**
+- Customer change (separate concern — Item 8 handles walk-in customer assignment).
+- Service list edits.
+- Mobile zone changes (deferred to Item 13).
+- Customer SMS/email notification on reschedule — explicitly suppressed on this code path.
+
+**Notification suppression — how it works:**
+The admin `PATCH /api/appointments/[id]` route fires an `appointment_rescheduled` webhook to n8n on date/time change, which downstream handlers may use to message the customer. The new POS endpoint (`PATCH /api/pos/appointments/[id]/reschedule`) **never** fires that webhook — notification-free by construction, not by feature flag. The audit log row records `notification_suppressed: true` in `details` for traceability. Tested via three spy mocks (`sendSms`, `sendEmail`, `fireWebhook`) verifying 0 calls across both date/time and detailer-only updates.
+
+**Endpoints:**
+- `GET /api/pos/appointments?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` — date-range list, defaults to today + tomorrow when no params, range capped at 31 days. Excludes cancelled appointments. Permission: `appointments.view_today`.
+- `PATCH /api/pos/appointments/[id]/reschedule` — narrow scope: `scheduled_date`, `scheduled_start_time`, `scheduled_end_time`, `employee_id`. Permission: `appointments.reschedule` (granted to cashier/admin/super_admin by default; detailer denied). Mirrors admin's overlap check (BUFFER_MINUTES added to end time, 409 on conflict). Syncs `jobs.assigned_staff_id` when detailer changes.
+
+**Component-reuse decision (Rule 11):**
+Built a focused 4-field reschedule dialog (~150 LOC) instead of reusing the admin `AppointmentDetailDialog`. The admin dialog has ~12 cross-cutting concerns out of scope here (status changes, mobile-zone editor, mobile-fee mismatch banner, status-transition matrix, cancellation flow, notes editing). Reused: shared `Dialog`/`Input`/`Select`/`FormField`/`Button`/`Spinner`/`EmptyState` UI primitives, `cleanVehicleDescription`, `formatTime`, `getTodayPst`, `ROLE_LABELS`, `APPOINTMENT_STATUS_LABELS`, `posFetch`, `addMinutesToTime`, `APPOINTMENT.BUFFER_MINUTES`, and the existing `/api/pos/staff/available` endpoint for the detailer dropdown.
+
+**Files added:**
+- `src/app/pos/appointments/page.tsx`
+- `src/app/pos/components/appointments/appointments-view.tsx`
+- `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx`
+- `src/app/pos/components/appointments/types.ts`
+- `src/app/api/pos/appointments/route.ts`
+- `src/app/api/pos/appointments/[id]/reschedule/route.ts`
+- `src/app/api/pos/appointments/__tests__/list.test.ts` (7 cases)
+- `src/app/api/pos/appointments/[id]/reschedule/__tests__/reschedule.test.ts` (10 cases)
+
+**Files modified:**
+- `src/app/pos/components/bottom-nav.tsx` — added Appointments tab.
+- `docs/dev/FILE_TREE.md`, `docs/dev/ROADMAP-13-ITEMS.md` — doc updates.
+
+**Verification:** typecheck clean, lint 0 errors (my files contributed 0 new warnings), vitest **1024/1024** (17 new), build clean.
+
+---
+
 ## 2026-05-15 — Wave 1 / Item 6: Deposit / Paid-In-Full Label Unification
 
 Receipt payment rows previously rendered `"Deposit (Online) · …"` or `"Deposit (In-Store) · …"`. The online-vs-in-store distinction is operationally invisible to the customer and added receipt length, so the customer-facing label is now simply `"Deposit"`. When the deposit covers the ticket total, the label flips to `"Paid In Full"`.
