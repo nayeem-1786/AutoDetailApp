@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.6 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; Items 15d deferred; Items 15e, 15f scoped
-**Last session updated:** 2026-05-16 — Item 15f scoped + Items 15d, 15e roadmap entries added
+**Document version:** v1.7 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; Items 15d deferred; Items 15e, 15f scoped (Layer 1 done; Layer 3d added for service-resolver.ts migration)
+**Last session updated:** 2026-05-16 — Item 15f Layer 1 done; Layer 3d added to scope (service-resolver.ts discovered as 4th bespoke pricing impl)
 **Total items:** 7 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -784,7 +784,7 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 - **Status:** Layer 1 done (2026-05-16); Layers 2 + 3a + 3c + 4 not started
 - **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
-- **Effort:** 4-5 sessions (~8-12 hours total, layered)
+- **Effort:** 5-6 sessions (~10-14 hours total, layered)
 - **Wave:** 1.5
 - **Depends on:** none — must land before Item 15e
 
@@ -851,6 +851,32 @@ Booking Wizard (customer-facing), and enforce no-bespoke-pricing via ESLint.
 - Bespoke customer-facing UI of the wizard is preserved — only price
   calculations route through the shared resolver.
 
+**Layer 3d — Server-side helper migration (voice agent + SMS auto-responder):**
+- `src/lib/services/service-resolver.ts` is a 4th bespoke pricing implementation
+  discovered during Layer 1 verification. It exports `resolveServiceByName`
+  (legitimate name-lookup, KEEP) and `resolvePrice` (parallel implementation
+  of price math, REPLACE).
+- `resolvePrice` has multiple bugs:
+  - Missing `exotic` and `classic` size_class cases — both fall through to
+    sedan column, silently mis-pricing exotic/classic vehicles in customer-facing
+    voice and SMS flows.
+  - `per_unit` services return single-unit price ignoring quantity (voice
+    agent quotes $150 for Scratch Repair regardless of count).
+  - `specialty` services return first tier instead of matching the vehicle's
+    `specialty_tier` (wrong price for aircraft / boat / RV tiers).
+  - `custom` services return $0 silently (`pricing.length === 0` fallthrough).
+- Rewrite `resolvePrice` as a thin wrapper around `resolveServicePriceWithSale`
+  from the canonical engine, mapping its output to the existing `ResolvedPrice`
+  return shape so the 3 importers (`send-quote-sms/route.ts`,
+  `webhooks/twilio/inbound/route.ts`, `voice-post-call.ts`) need no code changes.
+- `resolveServiceByName` keeps its existing signature — it's a legitimate
+  name-resolution concern, separate from pricing.
+- Add tests covering: exotic Ferrari + 1-Year Ceramic Shield = $725 (not $425);
+  specialty service correctly resolves vehicle's `specialty_tier`; per_unit
+  service multiplied by quantity correctly; custom service uses
+  `custom_starting_price` as the surfaced price (until Layer 2's prompt UX
+  is exposed via this path).
+
 **Layer 3b — DEFERRED.** Migrating the 4 working POS surfaces (POS Register,
 Quote Builder, Flag-an-Issue, Catalog Panel) to the hook is consistency
 work, not bug-fix work. These surfaces are already on the canonical engine
@@ -887,6 +913,12 @@ ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
   (deleted) + Admin Appointment dialog integration point
 - Modified (Layer 3c): `src/components/booking/step-service-select.tsx`
   (math-only changes)
+- Modified (Layer 3d): `src/lib/services/service-resolver.ts`
+  (rewrite `resolvePrice` as thin wrapper around canonical
+  `resolveServicePriceWithSale`; keep `resolveServiceByName` unchanged)
+- New (Layer 3d): `src/lib/services/__tests__/service-resolver.test.ts`
+  (test the bug fixes: exotic/classic size_classes, per_unit quantity,
+  specialty tier matching, custom service starting price)
 - New (Layer 4): `eslint-rules/services-no-bespoke-pricing.js`
 - Modified (Layer 4): `eslint.config.mjs` to register the rule
 
