@@ -1070,6 +1070,30 @@ ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
   the surface operators get routed to). Layers 3c (Booking Wizard math) +
   3d (service-resolver.ts) + 4 (ESLint) remain in scope independent of the
   edit-flow architecture.
+- 2026-05-16 (Lifecycle persistence audit — scope-sizing for potential
+  Item 15g, parallel concern): user reported a separate bug — discount /
+  coupon / loyalty applied during the Quote phase silently vanish through
+  Quote → Appointment → Job → Checkout. Audit completed in
+  `docs/dev/LIFECYCLE_PERSISTENCE_AUDIT_2026-05-16.md`. Three independent
+  drop points identified: (1) `quotes` table lacks loyalty + manual-discount
+  columns (schema gap — those modifiers never reach DB), (2) `convertQuote`
+  hardcodes `discount_amount: 0` and drops `coupon_code` despite
+  `appointments.coupon_code` + `coupon_discount` columns existing (logic
+  gap — booking wizard at `/api/book` is the only writer of those columns
+  today), (3) `checkout-items` only reads `quotes.coupon_code` via
+  `job.quote_id` and never falls back to `appointments.coupon_code` — so
+  even online bookings (which DO persist coupon to appointment) lose the
+  coupon at register hydration. Loyalty redemption is stored only as
+  plaintext in `appointments.internal_notes` by the booking wizard.
+  Effort: ~5 sessions full fix (schema migrations + endpoint updates +
+  UI surfacing + tests); ~0.5 session MVP that closes the coupon-only
+  path through logic fixes alone. **Recommendation: schedule as a separate
+  Item 15g BEFORE Phase 1's edit-via-POS layers (8a-8f) land**, otherwise
+  Phase 1's `LOAD_FROM_SOURCE` action would silently re-zero modifiers
+  on every job/appointment edit round-trip. Phase 1 is decision-blocked
+  on whether Item 15g lands first (recommended ordering) vs. parallel-
+  tracked with full Item 15g following. **Item 15g NOT yet added to the
+  roadmap — awaiting user sign-off on scope.**
 
 ---
 
