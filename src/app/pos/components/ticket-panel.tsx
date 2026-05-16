@@ -61,6 +61,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
     [ticket.items]
   );
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
+  const [customerCreatePrefill, setCustomerCreatePrefill] = useState('');
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -652,7 +653,8 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           <CustomerLookup
             onSelect={handleSelectCustomer}
             onGuest={handleGuestCheckout}
-            onCreateNew={() => {
+            onCreateNew={(searchQuery) => {
+              setCustomerCreatePrefill(searchQuery);
               onCustomerLookupChange(false);
               setShowCustomerCreate(true);
             }}
@@ -669,6 +671,7 @@ export function TicketPanel({ customerLookupOpen, onCustomerLookupChange }: Tick
           setShowCustomerCreate(false);
           onCustomerLookupChange(true);
         }}
+        initialQuery={customerCreatePrefill}
       />
 
       {/* Vehicle Selector Dialog */}

@@ -6,6 +6,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-15 — Wave 1 / Item 1: POS Customer Search → Create Smart Prefill
+
+When the Find Customer modal returns "No customers found" and the operator clicks **New Customer**, the create dialog now opens with the search query routed into the matching field instead of forcing a retype.
+
+**Routing rules** (pure function `routeSearchInput` in `src/lib/search/customer-create-routing.ts`, reuses the existing `isPhoneQuery` from `src/lib/search/tokenize.ts`):
+
+- Empty / whitespace → no prefill (legacy blank-form behavior)
+- Phone-shaped (7-15 digits with `( ) - space + .` separators) → **Mobile** field; US 10/11-digit input is formatted `(XXX) XXX-XXXX`, international shapes preserved verbatim for operator review
+- Contains `@` → **Email** field (verbatim, trim only)
+- Single word → **First Name** verbatim
+- Multi-word → split on first whitespace run; first token → **First Name**, remainder → **Last Name**
+
+**Wiring:**
+- `CustomerLookup.onCreateNew` callback signature extended to `(searchQuery: string) => void`; the trimmed input is passed up at click time.
+- `CustomerCreateDialog` accepts a new optional `initialQuery` prop and applies the routing exactly once per open cycle via a `prefillAppliedRef`. Reopening with a fresh query re-applies; operator edits during the same open cycle are not overwritten.
+- Both call sites in the POS register tab (`ticket-panel.tsx`) and quote builder (`quote-ticket-panel.tsx`) store the search query in local state and pass it to the dialog.
+- `job-detail.tsx` "Change Customer" lookup ignores the query (still toasts an error there — that path doesn't expose creation), arity-relaxed callbacks satisfy the new signature.
+
+**Tests:**
+- 24 unit tests in `src/lib/search/__tests__/customer-create-routing.test.ts` cover all 5 routing branches plus edge cases (international `+44 20 1234 5678`, 7-digit minimum, 16-digit upper-bound rejection, partial emails, whitespace collapsing, etc.).
+- 6 dialog tests added to `src/app/pos/components/__tests__/customer-create-dialog.test.tsx` lock in the prefill wiring per field type.
+
+**Out of scope (deferred):**
+- Customer-type / SMS consent defaults stay as-is (operator still picks).
+- Search algorithm itself unchanged — only the no-results → New Customer transition is affected.
+- Phone normalization unchanged; existing `normalizePhone()`/`formatPhoneInput()` helpers reused.
+
+---
+
 ## 2026-05-15 — Money-Unify-3 + Unify-4 Rollback (Postmortem)
 
 The Money-Unify-3 (Family D / Catalog) and Unify-4 (Family E / Orders) migrations were rolled back today. The Family D rename shipped to `main` on 2026-05-14 as commit `ff2d51a1`, deployed to the VPS, and broke a wider surface than expected. Family E never reached `main` — it lived only on `unify-4-session-1-wip` with a corresponding migration applied to the shared Supabase project. Both were reverted at code (`main`) and DB layers. The site is now at the pre-Unify-3 baseline (commit `555dd41b` was the deployed post-revert HEAD; today's two DB DOWN migrations completed the rollback). No real customer was charged incorrectly at any point — every failure surfaced in self-testing.

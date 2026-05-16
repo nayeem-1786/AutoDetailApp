@@ -10,9 +10,9 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.0 (2026-05-15) — initial draft, awaiting your verification
-**Last session updated:** none yet
-**Total items:** 13 active + 1 closed (Item 5: NFC already enabled per Stripe support)
+**Document version:** v1.1 (2026-05-15) — Item 1 completed
+**Last session updated:** 2026-05-15 — Item 1 (POS Customer Search → Create Smart Prefill)
+**Total items:** 12 active + 1 done + 1 closed (Item 1 done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
 
@@ -42,9 +42,9 @@ Small, contained, low-risk sessions. Good momentum builders post-rollback.
 
 ### Item 1 — POS Customer Search → Create with Smart Prefill
 
-- **Status:** not started
+- **Status:** done (2026-05-15)
 - **Severity:** S2
-- **Effort:** 1 small session (~45-60 min)
+- **Effort:** 1 small session (~45-60 min) — actual: 1 session
 - **Wave:** 1
 - **Depends on:** none
 
@@ -75,9 +75,15 @@ in the appropriate field automatically.
 - Any change to the search algorithm itself (only how results-not-found case routes).
 
 **Files likely affected:**
-- POS customer modal component (Find Customer + New Customer)
-- Possibly a small utility for input-type detection
-- Tests added for the routing logic
+- `src/lib/search/customer-create-routing.ts` (new — pure `routeSearchInput` helper)
+- `src/lib/search/__tests__/customer-create-routing.test.ts` (new — 24 unit tests)
+- `src/app/pos/components/customer-lookup.tsx` (onCreateNew signature extended to pass trimmed query up)
+- `src/app/pos/components/customer-create-dialog.tsx` (new `initialQuery` prop + prefill-once effect)
+- `src/app/pos/components/ticket-panel.tsx` (POS register-tab wiring — local prefill state + initialQuery pass)
+- `src/app/pos/components/quotes/quote-ticket-panel.tsx` (POS quote-builder wiring — same pattern)
+- `src/app/pos/jobs/components/job-detail.tsx` (Change Customer lookup — comment-only; relies on arity-relaxed callback compatibility)
+- `src/app/pos/components/__tests__/customer-create-dialog.test.tsx` (6 dialog prefill tests added; helper extended to accept `initialQuery`)
+- `docs/dev/FILE_TREE.md` (new helper + test paths registered)
 
 **Session plan:**
 - Single session.
@@ -91,7 +97,15 @@ in the appropriate field automatically.
   - Enter empty → New Customer → verify nothing prefilled
 
 **Notes / decisions log:**
-- (empty — populate after Session 1)
+- 2026-05-15 — Session 1 (this session):
+  - **Helper location:** `src/lib/search/customer-create-routing.ts` (not `src/lib/utils/` as the prompt suggested). Reason: `src/lib/search/customer-search.ts` already exists as a server-side Supabase executor and reuses primitives from `src/lib/search/tokenize.ts` — the routing helper sits naturally alongside.
+  - **Phone-shape detection:** reused existing `isPhoneQuery(query, minDigits)` from `tokenize.ts` per Rule 11 (component reuse). Called with `minDigits=7` and an additional explicit upper bound of 15 digits to match the spec.
+  - **International phone shapes** (`+44 20 1234 5678`, 12 digits, doesn't match US 10/11): preserved verbatim in the Mobile field. The `formatPhoneInput` helper used by the input's onChange would mangle non-US input (caps at 10 digits, US-only `(XXX) XXX-XXXX` shape). Operator can correct or convert to E.164 manually. This is the deliberate interpretation of the spec line "pass through `normalizePhone()` for international shapes" — `normalizePhone()` itself returns `null` for non-US, which would discard the value entirely.
+  - **Re-apply guard:** the create dialog applies the prefill exactly once per `open=true` transition via a `prefillAppliedRef`. Reset on `open=false`. Prevents operator edits from being overwritten if the parent re-renders with the same `initialQuery`.
+  - **`job-detail.tsx`** "Change Customer" lookup ignores the new query argument and continues to error-toast on New Customer — that path doesn't expose creation locally. The `(searchQuery: string) => void` signature is satisfied by the existing `() => { ... }` callback (TS arity-relaxation).
+  - **Test surface:** 24 unit tests on the pure helper + 6 integration tests on the dialog. All routing branches, plus 7-digit minimum, 16-digit rejection, international preserve, multi-word join, whitespace handling.
+  - **Verification:** `npm run typecheck` shows 7 errors but all in pre-existing in-progress work (Item 6 `receipt-composer.test.ts`, Item 12 `appointments/page.tsx`) — none in files this session touched. `npm run lint` shows 90 warnings (0 errors) — all pre-existing baseline. `npm run build` fails at the Item 12 missing `reschedule-appointment-dialog` import — not from this session's changes. All 110 tests across `src/lib/search` + `src/app/pos/components/__tests__` pass.
+  - **Commit scope:** staged only files this session touched (helper, tests, modal components, docs). The in-progress receipt-composer + POS appointments files were left on the working tree for their respective sessions.
 
 ---
 
@@ -874,7 +888,7 @@ CC session.
 
 | Date | Session # | Item | Status | Commit hash | Notes |
 |---|---|---|---|---|---|
-| _none yet_ | | | | | |
+| 2026-05-15 | 1 | Item 1 — POS Customer Search → Create Smart Prefill | done | _(pending — set at commit time)_ | New helper `routeSearchInput` + 24 unit tests + 6 dialog prefill tests. Wired into ticket-panel + quote-ticket-panel. Reused `isPhoneQuery` from existing tokenize.ts. International phone shapes preserved verbatim. Pre-existing in-progress Item 6/12 work left untouched on working tree. |
 
 ---
 

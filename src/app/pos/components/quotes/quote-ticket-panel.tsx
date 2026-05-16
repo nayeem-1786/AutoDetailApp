@@ -125,6 +125,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
 
   const [customerLookupOpen, setCustomerLookupOpen] = useState(false);
   const [showCustomerCreate, setShowCustomerCreate] = useState(false);
+  const [customerCreatePrefill, setCustomerCreatePrefill] = useState('');
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showVehicleCreate, setShowVehicleCreate] = useState(false);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
@@ -1061,7 +1062,8 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           <CustomerLookup
             onSelect={handleSelectCustomer}
             onGuest={() => setCustomerLookupOpen(false)}
-            onCreateNew={() => {
+            onCreateNew={(searchQuery) => {
+              setCustomerCreatePrefill(searchQuery);
               setCustomerLookupOpen(false);
               setShowCustomerCreate(true);
             }}
@@ -1078,6 +1080,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           setShowCustomerCreate(false);
           setCustomerLookupOpen(true);
         }}
+        initialQuery={customerCreatePrefill}
       />
 
       {/* Vehicle Selector Dialog */}

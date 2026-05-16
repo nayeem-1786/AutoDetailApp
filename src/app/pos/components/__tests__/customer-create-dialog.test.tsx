@@ -41,6 +41,7 @@ afterEach(() => {
 function renderDialog(overrides: Partial<{
   onCreated: (c: unknown) => void;
   onClose: () => void;
+  initialQuery: string;
 }> = {}) {
   const onCreated = overrides.onCreated ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
@@ -49,6 +50,7 @@ function renderDialog(overrides: Partial<{
       open
       onCreated={onCreated}
       onClose={onClose}
+      initialQuery={overrides.initialQuery}
     />
   );
   return { onCreated, onClose };
@@ -173,6 +175,46 @@ describe('CustomerCreateDialog — Session 6b TCPA consent capture', () => {
     expect(body.sms_consent).toBe(false);
     expect(body.email_consent).toBe(true);
     expect(body.email).toBe('a@b.com');
+  });
+
+  it('prefills Mobile field from a phone-shaped initialQuery', () => {
+    renderDialog({ initialQuery: '3105551212' });
+    const phoneInput = screen.getByPlaceholderText('(310) 555-1234') as HTMLInputElement;
+    expect(phoneInput.value).toBe('(310) 555-1212');
+    expect((screen.getByPlaceholderText('First name') as HTMLInputElement).value).toBe('');
+  });
+
+  it('prefills Email field from an email initialQuery', () => {
+    renderDialog({ initialQuery: 'john@example.com' });
+    const emailInput = screen.getByPlaceholderText('jane@example.com') as HTMLInputElement;
+    expect(emailInput.value).toBe('john@example.com');
+    expect((screen.getByPlaceholderText('(310) 555-1234') as HTMLInputElement).value).toBe('');
+  });
+
+  it('prefills First Name only for a single-word initialQuery', () => {
+    renderDialog({ initialQuery: 'Tom' });
+    expect((screen.getByPlaceholderText('First name') as HTMLInputElement).value).toBe('Tom');
+    expect((screen.getByPlaceholderText('Last name') as HTMLInputElement).value).toBe('');
+  });
+
+  it('prefills First and Last Name for a multi-word initialQuery', () => {
+    renderDialog({ initialQuery: 'Tom Anderson Smith' });
+    expect((screen.getByPlaceholderText('First name') as HTMLInputElement).value).toBe('Tom');
+    expect((screen.getByPlaceholderText('Last name') as HTMLInputElement).value).toBe('Anderson Smith');
+  });
+
+  it('does not prefill any field when initialQuery is whitespace', () => {
+    renderDialog({ initialQuery: '   ' });
+    expect((screen.getByPlaceholderText('First name') as HTMLInputElement).value).toBe('');
+    expect((screen.getByPlaceholderText('Last name') as HTMLInputElement).value).toBe('');
+    expect((screen.getByPlaceholderText('(310) 555-1234') as HTMLInputElement).value).toBe('');
+    expect((screen.getByPlaceholderText('jane@example.com') as HTMLInputElement).value).toBe('');
+  });
+
+  it('does not prefill any field when initialQuery is omitted', () => {
+    renderDialog();
+    expect((screen.getByPlaceholderText('First name') as HTMLInputElement).value).toBe('');
+    expect((screen.getByPlaceholderText('(310) 555-1234') as HTMLInputElement).value).toBe('');
   });
 
   it('clears the email_consent selection when email is removed after being filled', async () => {

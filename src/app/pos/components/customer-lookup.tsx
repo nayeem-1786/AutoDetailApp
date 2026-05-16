@@ -13,7 +13,13 @@ import type { Customer } from '@/lib/supabase/types';
 interface CustomerLookupProps {
   onSelect: (customer: Customer) => void;
   onGuest?: () => void;
-  onCreateNew: () => void;
+  /**
+   * Invoked when the operator clicks "New Customer". Receives the current
+   * trimmed search input so the parent can hand it off to the create
+   * dialog for smart prefill (see `routeSearchInput` in
+   * `src/lib/search/customer-create-routing.ts`).
+   */
+  onCreateNew: (searchQuery: string) => void;
 }
 
 interface SearchResult {
@@ -190,7 +196,7 @@ export function CustomerLookup({
           variant="outline"
           size="sm"
           className="flex-1"
-          onClick={onCreateNew}
+          onClick={() => onCreateNew(searchInput.trim())}
         >
           <UserPlus className="mr-1.5 h-3.5 w-3.5" />
           New Customer

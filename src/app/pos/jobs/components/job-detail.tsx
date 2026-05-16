@@ -1750,6 +1750,8 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               <CustomerLookup
                 onSelect={handleEditCustomerSelect}
                 onCreateNew={() => {
+                  // Job-detail "Change Customer" doesn't expose creation here;
+                  // operator is directed back to the POS customer lookup flow.
                   toast.error('Create the customer first via POS customer lookup, then change customer here');
                 }}
               />

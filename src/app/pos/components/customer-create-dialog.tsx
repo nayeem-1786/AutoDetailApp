@@ -15,6 +15,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { posFetch } from '../lib/pos-fetch';
 import { formatPhone, formatPhoneInput, formatDate } from '@/lib/utils/format';
+import { routeSearchInput } from '@/lib/search/customer-create-routing';
 import type { Customer, CustomerType } from '@/lib/supabase/types';
 
 interface ArchivedMatch {
@@ -31,6 +32,13 @@ interface CustomerCreateDialogProps {
   onClose: () => void;
   onCreated: (customer: Customer) => void;
   onBack?: () => void;
+  /**
+   * Trimmed search query from the preceding Find Customer modal. When the
+   * dialog opens, this value is routed via `routeSearchInput` and dropped
+   * into the matching field (Mobile / Email / First Name / Last Name).
+   * Empty string or omitted = no prefill (legacy behavior).
+   */
+  initialQuery?: string;
 }
 
 const TYPE_OPTIONS: { value: CustomerType; label: string; activeClass: string }[] = [
@@ -52,6 +60,7 @@ export function CustomerCreateDialog({
   onClose,
   onCreated,
   onBack,
+  initialQuery,
 }: CustomerCreateDialogProps) {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -74,6 +83,39 @@ export function CustomerCreateDialog({
   const [restoringArchived, setRestoringArchived] = useState(false);
   const phoneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Prefill from Find Customer search query — applied once per open
+  // cycle. Reset on close so the next open re-applies for the new query.
+  // initialQuery comes from CustomerLookup via the parent's onCreateNew
+  // callback (see ticket-panel.tsx and quote-ticket-panel.tsx).
+  const prefillAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      prefillAppliedRef.current = false;
+      return;
+    }
+    if (prefillAppliedRef.current) return;
+    prefillAppliedRef.current = true;
+
+    const route = routeSearchInput(initialQuery ?? '');
+    switch (route.field) {
+      case 'phone':
+        if (route.mobile) setPhone(route.mobile);
+        break;
+      case 'email':
+        if (route.email) setEmail(route.email);
+        break;
+      case 'firstName':
+        if (route.firstName) setFirstName(route.firstName);
+        break;
+      case 'firstNameLastName':
+        if (route.firstName) setFirstName(route.firstName);
+        if (route.lastName) setLastName(route.lastName);
+        break;
+      case 'none':
+        break;
+    }
+  }, [open, initialQuery]);
 
   // Debounced phone duplicate check
   useEffect(() => {
