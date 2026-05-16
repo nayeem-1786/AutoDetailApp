@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.5 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed
-**Last session updated:** 2026-05-16 — Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
+**Document version:** v1.6 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; Items 15d deferred; Items 15e, 15f scoped
+**Last session updated:** 2026-05-16 — Item 15f scoped + Items 15d, 15e roadmap entries added
 **Total items:** 7 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -654,7 +654,7 @@ gap. Closes audit gap §10 #10 (and partially reduces §2/§3 friction).
 
 ### Item 15d — "Today's Tickets" Combined View
 
-- **Status:** not started
+- **Status:** deferred — re-evaluate after Item 15e ships
 - **Severity:** S2
 - **Effort:** 1-2 sessions (~3-4 hours)
 - **Wave:** 1.5
@@ -708,6 +708,205 @@ on whether it's worth it."
   Tickets merge — if this satisfies operator friction, the full merge is
   permanently deferred.
 - 2026-05-15: read-only navigation; rows link out to existing edit surfaces.
+
+---
+
+### Item 15e — POS Appointments Modal: Full Capability Parity with Admin
+
+- **Status:** not started
+- **Severity:** S1
+- **Effort:** 2-3 sessions
+- **Wave:** 1.5
+- **Depends on:** Item 15f (service picker engine + hook must exist first)
+
+**Problem statement:**
+The POS Appointments modal (shipped in Item 12) only supports reschedule
+(date/time/detailer). Operators must switch to Admin > Appointments to
+edit status, assigned detailer, start/end times, job notes, internal notes,
+or toggle mobile service. This creates surface-toggling friction for daily
+operator work that should happen in POS. The audit (§8.3) framed POS as
+"iPad-fast operator use" with a deliberately narrow modal — operator feedback
+revealed that framing was wrong; the full edit set is needed at POS.
+
+**Acceptance criteria:**
+- POS Appointments modal mirrors Admin Appointment dialog's field set:
+  - Status (edit, gated on `appointments.update_status`)
+  - Assigned detailer (edit, existing in Item 12)
+  - Date (edit, existing in Item 12)
+  - Start AND end times (edit; mirrors Admin behavior exactly — verify in-session)
+  - Job notes (edit, gated on `appointments.add_notes`)
+  - Internal notes (edit, gated on `appointments.add_notes`)
+  - Mobile service toggle (opens existing mobile-zone modal with mandatory
+    address + zone selection — use EXACT same flow/code as Admin)
+  - Service editing (uses Item 15f's `useServicePicker` hook — NOT a bespoke picker)
+- **Notification behavior** (per Q1 = a): all POS edits default notify-off
+  with a "Notify customer" checkbox per save (matches Item 12 pattern).
+- **Permission gating** (per Q2 = yes): mirror Admin's per-field permission
+  gating exactly. Cashier without `appointments.reschedule` sees date/time
+  read-only; cashier with `appointments.update_status` can edit status; etc.
+- **Mobile service toggle** (per Q3): when clicked, opens the EXACT same
+  modal Admin uses (expects mandatory mobile address + zone selection).
+  Use the same code path — no duplication.
+- **End time editing** (per Q4): follow exactly what Admin > Appointments
+  does. Verify in-session.
+- **Service editing** (per Q5 + Item 15f): uses the canonical `useServicePicker`
+  hook (Layer 3a migration). The 2-pane catalog browser + selected-services
+  list UX matches POS Register / Quote Builder muscle memory.
+
+**Out of scope:**
+- Tickets-view merger (deferred per audit §11.2; see Decisions Superseded).
+- Building a new service picker (use Item 15f's canonical engine).
+- Changing the mobile-zone modal (reuse existing).
+- Cancel from POS Appointments — Item 15b already shipped.
+
+**Files likely affected:**
+- POS Appointments modal component (the surface shipped in Item 12)
+- Mobile-zone modal (read-only reference; reused)
+- Item 15f's `src/lib/services/use-service-picker.ts` hook (consumed)
+- New permission-gated field components or extension of existing
+- Tests for per-field permission gating, notify-off invariant, end-time edit
+
+**Notes / decisions log:**
+- 2026-05-16: User feedback after Item 12 UAT — modal too narrow for daily
+  operator work. Required parity with Admin Appointment dialog.
+- 2026-05-16: User Q1 = a (notify-off default + per-save checkbox).
+- 2026-05-16: User Q2 = yes (mirror Admin permission gating per field).
+- 2026-05-16: User Q3 = use exact mobile-zone modal flow (no duplication).
+- 2026-05-16: User Q4 = match Admin end-time behavior exactly (verify in-session).
+- 2026-05-16: User Q5 = include service edit, BUT picker must be fixed first
+  (Item 15f Layer 3a migrates this surface to the canonical hook).
+- 2026-05-16: Depends on Item 15f Layers 1+2+3a to land first — POS Appointments
+  modal is one of the Layer 3a migration targets.
+
+---
+
+### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
+
+- **Status:** not started
+- **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces)
+- **Effort:** 4-5 sessions (~8-12 hours total, layered)
+- **Wave:** 1.5
+- **Depends on:** none — must land before Item 15e
+
+**Problem statement:**
+Service-pricing is computed inconsistently across the app. The shared
+`<CatalogBrowser>` + `<ServicePricingPicker>` stack handles 4 of 6
+`pricing_model` values correctly (`vehicle_size`, `specialty`, `scope`,
+`per_unit`) plus a `flat` workaround. The `custom` pricing_model is silently
+unsupported everywhere. Worse, two operator surfaces (Jobs card Edit Services
+modal at `job-detail.tsx:583-587` and Item 15a's `<EditServicesModal>` at
+`src/components/appointments/edit-services-modal.tsx:73`) ship their own
+bespoke `getServicePrice` / `resolveServicePrice` functions that mishandle
+multiple pricing patterns — including silent revenue leak on tiered services
+(e.g., 1-Year Ceramic Shield's per-size_class pricing is ignored on
+non-sedan vehicles when added via the Jobs card).
+
+The structural fix is to extract a canonical price-resolution engine into
+a shared library, expose it via a `useServicePicker` hook, migrate the
+broken operator surfaces to consume the hook, share the engine with the
+Booking Wizard (customer-facing), and enforce no-bespoke-pricing via ESLint.
+
+**Acceptance criteria — Layered Scope:**
+
+**Layer 1 — Extract canonical engine + create hook (refactor only, zero behavior change):**
+- New directory `src/lib/services/` with:
+  - `picker-engine.ts` — canonical functions: `resolveServicePrice`,
+    `resolveServicePriceWithSale`, `getServicePriceRange`, `routeServiceTap`
+    (routing logic from `<CatalogBrowser>` extracted here).
+  - `use-service-picker.ts` — `useServicePicker(options)` hook returning
+    `{ CatalogPane, ActiveDialog, selectedServiceIds, reset }`.
+  - `index.ts` — public surface.
+- `src/app/pos/utils/pricing.ts` becomes a thin re-export for backward compat.
+  Deprecation comment notes the new canonical location.
+- All existing surfaces remain unchanged. Zero regressions. All existing
+  tests pass unmodified.
+- New picker-engine tests exhaustively cover all 6 pricing_model values
+  (including `custom` as "not yet handled — Layer 2").
+
+**Layer 2 — Add `custom` UX (per Q1 = a):**
+- `useServicePicker` recognizes `pricing_model === 'custom'`.
+- Renders a prompt for operator to enter final price ("Staff assessment —
+  enter custom amount" based on `custom_starting_price` as starting reference).
+- Synthesizes a ServicePricing row with the entered amount.
+
+**Layer 3a — Migrate 3 broken operator surfaces:**
+- POS Jobs card "Edit Services" modal: replace bespoke checkbox-list +
+  `getServicePrice()` (job-detail.tsx:583-587, 1933-2015) with hook mount
+  + 2-pane catalog browser + selected-services-list UX (Option B from
+  Q2 + Q5 discussion).
+- Admin Appointment dialog: replace Item 15a's `<EditServicesModal>` and
+  its local `resolveServicePrice` (edit-services-modal.tsx:73) entirely
+  with hook mount + 2-pane UX. Item 15a's cascade endpoint
+  (`PUT /api/admin/appointments/[id]/services`) and pure helpers
+  (`buildJobServicesJsonb`, `computeTotalsForServiceEdit`) STAY — only
+  the UI layer changes.
+- POS Appointments modal: when Item 15e builds it, must consume the
+  canonical hook (NOT a bespoke picker).
+
+**Layer 3c — Booking Wizard price-math migration (NOT UI):**
+- `src/components/booking/step-service-select.tsx` replaces its inline
+  per-pricing_model price switch (lines 282, 951, 1307, 1394, 1404, 1440,
+  1482) with imports of `resolveServicePrice` /
+  `resolveServicePriceWithSale` from the canonical engine.
+- Bespoke customer-facing UI of the wizard is preserved — only price
+  calculations route through the shared resolver.
+
+**Layer 3b — DEFERRED.** Migrating the 4 working POS surfaces (POS Register,
+Quote Builder, Flag-an-Issue, Catalog Panel) to the hook is consistency
+work, not bug-fix work. These surfaces are already on the canonical engine
+via `<CatalogBrowser>` + `<ServicePricingPicker>`. Defer indefinitely;
+ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
+
+**Layer 4 — ESLint enforcement:**
+- New rule (e.g., `services/no-bespoke-pricing` in `eslint-rules/`):
+  - Flags direct reads of `service_pricing.price` outside the canonical
+    resolver.
+  - Flags direct reads of `vehicle_size_*_price` columns outside the resolver.
+  - Flags any function defined outside `src/lib/services/` matching
+    `getServicePrice|resolveServicePrice`.
+- Ships as `'warn'` initially; scheduled for `'error'` after a deprecation
+  window (mirrors the `money/no-unsuffixed-money-prop` pattern from Rule 20).
+
+**Out of scope:**
+- Layer 3b (4 working POS surfaces migration to the hook).
+- Schema rationalization of Pattern A vs Pattern B vehicle-size storage.
+  Both patterns work correctly through `resolveServicePrice`; consolidation
+  is a separate future item if needed.
+- Changing the Booking Wizard's bespoke UI (only its math routes through
+  the canonical resolver).
+- Service-category management UI (per CLAUDE.md Rule 14, that's an admin-UI
+  responsibility, not a picker concern).
+
+**Files likely affected:**
+- New: `src/lib/services/picker-engine.ts`, `use-service-picker.ts`, `index.ts`
+- New: `src/lib/services/__tests__/picker-engine.test.ts`,
+  `use-service-picker.test.tsx`
+- Modified: `src/app/pos/utils/pricing.ts` (becomes re-export shim)
+- Modified (Layer 3a): `src/app/pos/jobs/components/job-detail.tsx`
+- Modified (Layer 3a): `src/components/appointments/edit-services-modal.tsx`
+  (deleted) + Admin Appointment dialog integration point
+- Modified (Layer 3c): `src/components/booking/step-service-select.tsx`
+  (math-only changes)
+- New (Layer 4): `eslint-rules/services-no-bespoke-pricing.js`
+- Modified (Layer 4): `eslint.config.mjs` to register the rule
+
+**Notes / decisions log:**
+- 2026-05-16: User Q1 (custom UX) = a (operator prompt for final price).
+- 2026-05-16: User Q2 (sequencing) = a (incremental layer landings).
+- 2026-05-16: User Q3 (deploy) = II (hold Wave 1.5 until Item 15f Layers
+  1+2+3a+3c+4 land; single batch deploy).
+- 2026-05-16: User Q4 (unification pattern) = hook (not compound component,
+  not literal component merge).
+- 2026-05-16: User Q5 (migration scope) = i+ (fix broken surfaces + share
+  engine with Booking Wizard; defer 4 working POS surfaces).
+- 2026-05-16: Hook location = `src/lib/services/` as new shared-lib directory
+  (mirrors Money-Unify-1's `src/lib/money/` pattern).
+- 2026-05-16: Layer 1 stays pure refactor (does NOT fix the Item 15a bug
+  inline); Item 15a fix lands in Layer 3a.
+- 2026-05-16: ESLint scaffolding deferred to Layer 4 (no rule scaffolding
+  in Layer 1).
+- Reference: `<ServicePricingPicker>` audit conducted 2026-05-16 (in chat,
+  not committed as a doc — see CC session output of that date).
 
 ---
 
