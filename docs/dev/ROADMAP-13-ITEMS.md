@@ -1044,6 +1044,32 @@ ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
   production build compiled successfully. **Manual UAT NOT performed in
   this session** — requires running the app against a real database;
   user verifies post-session.
+- 2026-05-16 (Layer 3a-i UAT findings + edit-via-POS audit): real-world
+  UAT of the shipped `<EditServicesDialog>` surfaced 4 failures —
+  `<CatalogBrowser>` hard-depends on POS contexts (blocks Admin migration);
+  no vehicle-compatibility warning in the new dialog; broken custom-pricing
+  add path (Flood Damage button disabled); prices saved to `jobs.services`
+  still wrong despite the canonical engine being mounted. Root cause: the
+  shared dialog wraps `<CatalogBrowser>`'s UI without inheriting POS's
+  surrounding orchestration (ticket state, permission context, compatibility,
+  custom pricing routing, sale banners, cascade-write semantics). User
+  proposed an architectural pivot — instead of decoupling `<CatalogBrowser>`
+  from POS, take operators back to the POS Sale tab to add/remove items
+  (mirroring the existing quote → POS edit flow), keeping the rest of the
+  job/appointment edit experience pencil-icon-on-source-dialog. Discovery
+  audit completed in `docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md`
+  (sections 1-8: full trace of quote → POS edit, `<TicketContext>` data-model
+  gap analysis, feasibility per record type, ~5.5-session effort estimate,
+  breaking-change risk, no new permission keys needed). **Recommendation
+  (Section 8): proceed with edit-via-POS — revert Layer 3a-i when the
+  replacement lands; delete `<EditServicesDialog>` + Item 15a's
+  `<EditServicesModal>` files; keep `picker-engine.ts`, `use-service-picker.ts`,
+  `custom-price-dialog.tsx`, and Item 15a's cascade endpoint as canonical
+  writers.** Layer 3a-i revert is pending the user's architectural sign-off
+  on the audit. Layer 3b is rendered moot (the 4 working POS surfaces ARE
+  the surface operators get routed to). Layers 3c (Booking Wizard math) +
+  3d (service-resolver.ts) + 4 (ESLint) remain in scope independent of the
+  edit-flow architecture.
 
 ---
 

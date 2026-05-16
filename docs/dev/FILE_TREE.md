@@ -1712,6 +1712,8 @@ docs/dev/POS_SECURITY.md
 docs/dev/TROUBLESHOOTING.md
 docs/dev/QBO_INTEGRATION.md
 docs/dev/SERVICE_CATALOG.md
+docs/dev/LIFECYCLE_AUDIT_2026-05-15.md          # Lifecycle audit — Quote → Appointment → Job → Transaction surface map (data model, state transitions, POS×Admin matrix, permissions, gap inventory)
+docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md  # Audit: viability of generalizing quote → POS edit pattern to appointment/job service edits (Item 15f Layer 3a-i follow-up; recommendation to revert Layer 3a-i and route service edits through POS Sale tab)
 docs/sessions/receipt-unification-phase-0b-2.md   # Phase 0b.2: byte-diff harness operator runbook + 10-scenario SQL queries
 docs/sessions/receipt-unification-phase-1a.md     # Phase 1A: visual UX changes (Total Paid, Paid in Full ✓, deposit chrome retired, payment timestamps)
 docs/sessions/receipt-unification-phase-1a-5.md   # Phase 1A.5: digital payment types (Zelle/Venmo/AppleCash/Other) + Stripe webhook brand/last4 capture
