@@ -44,8 +44,14 @@ export const RECEIPT_VOCAB = {
   CUSTOMER: 'Customer:',
   VEHICLE: 'Vehicle:',
   DATE: 'Date:',
-  DEPOSIT_ONLINE: 'Deposit (Online)',
-  DEPOSIT_IN_STORE: 'Deposit (In-Store)',
+  // Wave-1 Item 6: deposit label unification. Prior split between
+  // "Deposit (Online)" / "Deposit (In-Store)" removed — customers don't
+  // benefit from the distinction. When the deposit equals or exceeds the
+  // ticket total (subtotal + tax + tip), label flips to PAID_IN_FULL.
+  // Distinct from PAID_IN_FULL_INDICATOR ('Paid in Full ✓'), which is the
+  // balance-zero banner below the payment block.
+  DEPOSIT: 'Deposit',
+  PAID_IN_FULL: 'Paid In Full',
   PAY_LINK_ONLINE: 'Pay Link (Online)',
   // Loyalty redemption stays in the discount section above TOTAL —
   // CDTFA Reg 1671.1 treats loyalty redemption as a discount that reduces
@@ -280,16 +286,59 @@ export function mapDigitalPlatformToFriendly(platform: string | null | undefined
 }
 
 /**
- * Construct a suggested primary label for a payment line per Phase 1 rules:
- *   - first-payment-with-remainder + online_booking_deposit → 'Deposit (Online)'
- *   - first-payment-with-remainder + in_store              → 'Deposit (In-Store)'
- *   - online_pay_link                                       → 'Pay Link (Online)'
- *   - online_booking_deposit (non-first-with-remainder)     → 'Deposit (Online)'
- *   - method=cash → 'Cash'; check → 'Check'; card → 'Card'
+ * Wave-1 Item 6: deposit label resolver.
  *
- * Phase 0b.1 surfaces ignore these. Phase 1 will adopt.
+ * Pure threshold function: when the deposit amount equals or exceeds the
+ * ticket total (subtotal + tax + tip), the row label flips from "Deposit"
+ * to "Paid In Full". Otherwise the row reads "Deposit".
+ *
+ * Edge cases handled defensively so we never render the wrong label on
+ * incomplete data:
+ *   - depositCents === 0           → "Deposit" (zero-dollar deposit row;
+ *                                     typically not rendered at all, but
+ *                                     never label as "Paid In Full")
+ *   - totalCents === 0 (unknown)   → "Deposit" (no comparison basis;
+ *                                     caller didn't pass the total or the
+ *                                     ticket has no subtotal/tax/tip yet)
+ *
+ * Total convention is fixed by spec: subtotal + tax + tip. Discount is NOT
+ * subtracted — callers pass the gross-of-discount total. See
+ * ROADMAP-13-ITEMS.md Item 6 for rationale.
  */
-export function buildSuggestedPaymentLabel(line: RenderedPaymentLine): string {
+export function formatDepositLabel(opts: {
+  depositCents: number;
+  totalCents: number;
+}): string {
+  if (
+    opts.depositCents > 0 &&
+    opts.totalCents > 0 &&
+    opts.depositCents >= opts.totalCents
+  ) {
+    return RECEIPT_VOCAB.PAID_IN_FULL;
+  }
+  return RECEIPT_VOCAB.DEPOSIT;
+}
+
+/**
+ * Construct a suggested primary label for a payment line.
+ *
+ * Deposit-source rows (online_booking_deposit any time, or in_store when
+ * first-with-remainder) resolve via formatDepositLabel — yielding either
+ * "Deposit" or "Paid In Full" depending on whether the row amount covers
+ * the ticket total. All other sources keep their prior labeling:
+ *   - online_pay_link → 'Pay Link (Online)'
+ *   - method=cash → 'Cash'; check → 'Check'; card → 'Card'
+ *   - method=digital → friendly platform name
+ *
+ * `ticketTotalCents` is the (subtotal + tax + tip) sum in cents. When omitted
+ * (default 0), the threshold check never fires and deposits render as
+ * "Deposit" — safe for the composer's informational `suggested_*` fields
+ * that don't have access to the ticket totals.
+ */
+export function buildSuggestedPaymentLabel(
+  line: RenderedPaymentLine,
+  ticketTotalCents: number = 0
+): string {
   // Phase 1A.5 Part A: digital payments use the platform name as the primary
   // label. Composer NEVER renders the word "Digital" on a customer-visible
   // receipt — the platform identifier carries all the information.
@@ -299,12 +348,22 @@ export function buildSuggestedPaymentLabel(line: RenderedPaymentLine): string {
   if (line.method === 'digital') {
     return mapDigitalPlatformToFriendly(line.digital_platform);
   }
-  if (line.is_first_with_remainder) {
-    if (line.source === 'online_booking_deposit') return RECEIPT_VOCAB.DEPOSIT_ONLINE;
-    if (line.source === 'in_store') return RECEIPT_VOCAB.DEPOSIT_IN_STORE;
+  // Wave-1 Item 6: unified deposit label + paid-in-full threshold.
+  // A row is treated as a "deposit" when:
+  //   - source is online_booking_deposit (always — booking deposits are
+  //     labeled as deposits regardless of whether a remainder exists), OR
+  //   - source is in_store AND it's the first payment with a remainder
+  //     after it applies (legacy "Deposit (In-Store)" case).
+  const isDepositRow =
+    line.source === 'online_booking_deposit' ||
+    (line.source === 'in_store' && line.is_first_with_remainder);
+  if (isDepositRow) {
+    return formatDepositLabel({
+      depositCents: line.amount_cents,
+      totalCents: ticketTotalCents,
+    });
   }
   if (line.source === 'online_pay_link') return RECEIPT_VOCAB.PAY_LINK_ONLINE;
-  if (line.source === 'online_booking_deposit') return RECEIPT_VOCAB.DEPOSIT_ONLINE;
   switch (line.method) {
     case 'cash': return 'Cash';
     case 'check': return 'Check';
@@ -337,8 +396,12 @@ function buildMethodDetail(line: Pick<RenderedPaymentLine, 'method' | 'card_bran
  * format hierarchy. Returns ONE string composed of 2 or 3 ` · `-joined
  * segments depending on the source:
  *
- *   - Online booking deposit  → `Deposit (Online) · Amex ****1074 · 5/4/26 9:15 AM`
- *   - In-store deposit (rare) → `Deposit (In-Store) · Cash · 5/4/26 9:15 AM`
+ *   - Booking deposit          → `Deposit · Amex ****1074 · 5/4/26 9:15 AM`
+ *                                (Wave-1 Item 6: was "Deposit (Online)";
+ *                                 flips to "Paid In Full · ..." when the
+ *                                 deposit covers subtotal+tax+tip)
+ *   - In-store deposit (rare)  → `Deposit · Cash · 5/4/26 9:15 AM`
+ *                                (Wave-1 Item 6: was "Deposit (In-Store)")
  *   - Pay-link payment         → `Pay Link (Online) · Amex ****1074 · 5/4/26 9:15 AM`
  *   - Regular cash             → `Cash · 5/6/26 10:32 AM`
  *   - Regular card             → `Amex ****1074 · 5/6/26 10:32 AM` (method_detail leads;
@@ -346,9 +409,9 @@ function buildMethodDetail(line: Pick<RenderedPaymentLine, 'method' | 'card_bran
  *   - Regular check            → `Check · 5/6/26 10:32 AM`
  *
  * 3-segment form is used when the primary label is a META label
- * (Deposit/Pay Link) distinct from the physical method; otherwise the
- * primary IS the method label and the method_detail segment is omitted
- * (or for cards, replaces the bare 'Card' primary).
+ * (Deposit/Paid In Full/Pay Link) distinct from the physical method;
+ * otherwise the primary IS the method label and the method_detail segment
+ * is omitted (or for cards, replaces the bare 'Card' primary).
  *
  * Timestamp is omitted entirely when `createdAt` is null/missing — produces
  * the leading segment(s) only.
@@ -360,9 +423,13 @@ export function buildCombinedPaymentLabel(opts: {
   method: string;
   createdAt: string | null | undefined;
 }): string {
+  // Wave-1 Item 6: DEPOSIT and PAID_IN_FULL (replacements for the old
+  // DEPOSIT_ONLINE / DEPOSIT_IN_STORE) are still meta-primaries — they're
+  // semantic labels distinct from the physical tender, so the renderer
+  // produces the 3-segment `primary · method_detail · timestamp` form.
   const isMetaPrimary =
-    opts.primary === RECEIPT_VOCAB.DEPOSIT_ONLINE ||
-    opts.primary === RECEIPT_VOCAB.DEPOSIT_IN_STORE ||
+    opts.primary === RECEIPT_VOCAB.DEPOSIT ||
+    opts.primary === RECEIPT_VOCAB.PAID_IN_FULL ||
     opts.primary === RECEIPT_VOCAB.PAY_LINK_ONLINE;
   const ts = formatReceiptDateTimeCompact(opts.createdAt);
 
@@ -396,10 +463,16 @@ export function buildCombinedPaymentLabel(opts: {
  *
  * Caller supplies `isFirstWithRemainder` because the renderer has access
  * to the chronological position + appointment_total to derive it cheaply.
+ *
+ * Wave-1 Item 6: `ticketTotalCents` (subtotal + tax + tip, in cents) drives
+ * the Deposit / Paid-In-Full threshold inside formatDepositLabel. Defaults
+ * to 0 for back-compat — when omitted, deposit rows always render as
+ * "Deposit". Renderers that surface the threshold pass the real total.
  */
 export function buildSuggestedLabelForPayment(
   p: {
     method: string;
+    amount?: number;
     card_brand?: string | null;
     card_last_four?: string | null;
     source_label?: string | null;
@@ -407,14 +480,16 @@ export function buildSuggestedLabelForPayment(
     created_at?: string | null;
     digital_platform?: string | null;
   },
-  isFirstWithRemainder: boolean
+  isFirstWithRemainder: boolean,
+  ticketTotalCents: number = 0
 ): string {
   const source: PaymentSource = p.source_notes
     ? detectPaymentSource(p.source_notes)
     : sourceFromLabel(p.source_label);
 
   // Reuse the same primary/method-detail logic by constructing a partial
-  // RenderedPaymentLine shape.
+  // RenderedPaymentLine shape. amount_cents is populated when the caller
+  // passes p.amount so formatDepositLabel can compare against the total.
   const dummy: RenderedPaymentLine = {
     payment_id: '',
     date_short: '',
@@ -425,7 +500,7 @@ export function buildSuggestedLabelForPayment(
     method: p.method,
     card_brand: p.card_brand ?? null,
     card_last_four: p.card_last_four ?? null,
-    amount_cents: 0,
+    amount_cents: toCents(Number(p.amount ?? 0)),
     cash_tendered_cents: null,
     change_given_cents: null,
     tip_amount_cents: 0,
@@ -434,7 +509,7 @@ export function buildSuggestedLabelForPayment(
     suggested_method_detail: '',
     suggested_label_combined: '',
   };
-  const primary = buildSuggestedPaymentLabel(dummy);
+  const primary = buildSuggestedPaymentLabel(dummy, ticketTotalCents);
   const methodDetail = buildMethodDetail(dummy);
   return buildCombinedPaymentLabel({
     primary,

@@ -722,9 +722,15 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   lines.push({ type: 'divider' });
 
   // Phase 1A LOCKED-9 + LOCKED-6 + LOCKED-10: payment rows use the unified
-  // composer label format ("Deposit (Online) · Amex ****1074 · 5/4/26 9:15 AM")
-  // with thermal-width wrap to a second indented line when overflow occurs.
+  // composer label format ("Deposit · Amex ****1074 · 5/4/26 9:15 AM") with
+  // thermal-width wrap to a second indented line when overflow occurs.
+  // Wave-1 Item 6: ticketTotalCents (subtotal + tax + tip) drives the
+  // Deposit / Paid-In-Full threshold inside buildSuggestedLabelForPayment.
   const firstWithRemainderFlags = buildFirstWithRemainderFlags(tx.payments, tx.appointment_total);
+  const ticketTotalCents =
+    toCents(Number(tx.subtotal ?? 0)) +
+    toCents(Number(tx.tax_amount ?? 0)) +
+    toCents(Number(tx.tip_amount ?? 0));
   let totalPaidCents = 0;
   for (let i = 0; i < tx.payments.length; i++) {
     const p = tx.payments[i];
@@ -732,13 +738,15 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
     const combined = buildSuggestedLabelForPayment(
       {
         method: p.method,
+        amount: p.amount,
         card_brand: p.card_brand,
         card_last_four: p.card_last_four,
         source_label: p.source_label,
         created_at: p.created_at,
         digital_platform: p.digital_platform,
       },
-      firstWithRemainderFlags[i]
+      firstWithRemainderFlags[i],
+      ticketTotalCents
     );
     const amountStr = `$${p.amount.toFixed(2)}`;
     const wrapped = wrapPaymentLabelForThermal(combined, amountStr);
@@ -1130,6 +1138,13 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   // deleted. Deposits now appear as payment rows in the unified Payments block.
 
   const htmlFirstWithRemainderFlags = buildFirstWithRemainderFlags(tx.payments, tx.appointment_total);
+  // Wave-1 Item 6: ticketTotalCents (subtotal + tax + tip) drives Deposit /
+  // Paid-In-Full threshold. Computed once per receipt and passed to every
+  // payment row's label builder.
+  const htmlTicketTotalCents =
+    toCents(Number(tx.subtotal ?? 0)) +
+    toCents(Number(tx.tax_amount ?? 0)) +
+    toCents(Number(tx.tip_amount ?? 0));
   let htmlTotalPaidCents = 0;
   const paymentRows = (() => {
     let html = tx.payments
@@ -1140,13 +1155,15 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
         const combined = buildSuggestedLabelForPayment(
           {
             method: p.method,
+            amount: p.amount,
             card_brand: p.card_brand,
             card_last_four: p.card_last_four,
             source_label: p.source_label,
             created_at: p.created_at,
             digital_platform: p.digital_platform,
           },
-          htmlFirstWithRemainderFlags[i]
+          htmlFirstWithRemainderFlags[i],
+          htmlTicketTotalCents
         );
         let row_html = row(esc(combined), `$${p.amount.toFixed(2)}`);
         // Cash-only: render Tendered + Change as indented sub-rows.

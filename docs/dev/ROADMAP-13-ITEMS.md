@@ -10,9 +10,9 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.1 (2026-05-15) — Item 1 completed
-**Last session updated:** 2026-05-15 — Item 1 (POS Customer Search → Create Smart Prefill)
-**Total items:** 12 active + 1 done + 1 closed (Item 1 done; Item 5 closed: NFC already enabled per Stripe support)
+**Document version:** v1.2 (2026-05-15) — Items 1, 6 completed
+**Last session updated:** 2026-05-15 — Item 6 (Deposit / Paid-in-Full Label Unification)
+**Total items:** 11 active + 2 done + 1 closed (Items 1, 6 done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
 
@@ -111,7 +111,7 @@ in the appropriate field automatically.
 
 ### Item 6 — Deposit / Paid-in-Full Label Unification
 
-- **Status:** not started
+- **Status:** done
 - **Severity:** S2
 - **Effort:** 1 small session (~45-60 min)
 - **Wave:** 1
@@ -143,10 +143,25 @@ total (including tip), in which case the label flips to "Paid In Full."
 - Adding the "Paid In Full" status to anywhere outside receipts (POS UI,
   jobs view, etc.) — receipts only.
 
-**Files likely affected:**
-- Receipt template files (4-5 surfaces)
-- A shared deposit-display utility function (if one exists) or new helper
-- Tests for the threshold logic
+**Files likely affected (actual, post-session):**
+- `src/lib/data/receipt-composer.ts` — added `formatDepositLabel` helper +
+  `RECEIPT_VOCAB.DEPOSIT` / `PAID_IN_FULL` constants (replaced
+  `DEPOSIT_ONLINE` / `DEPOSIT_IN_STORE`); rewired `buildSuggestedPaymentLabel`
+  and `buildSuggestedLabelForPayment` to accept `ticketTotalCents` and resolve
+  via the helper; extended `buildCombinedPaymentLabel`'s `isMetaPrimary` to
+  recognize the new labels.
+- `src/app/pos/lib/receipt-template.ts` — computed `ticketTotalCents`
+  (subtotal+tax+tip) once per receipt for both thermal (line 728) and HTML
+  (line 1133) renderers; threaded into payment-row label builder calls.
+- `src/app/(public)/receipt/[token]/page.tsx` — same threading on the public
+  receipt page (line 397).
+- `src/lib/data/__tests__/receipt-composer.test.ts` — 7-case
+  `formatDepositLabel` suite + updates to existing label-assertion tests; 4
+  new threshold cases on `buildSuggestedLabelForPayment` (UAT scenarios
+  B/C/D, plus default-zero back-compat).
+- `src/lib/data/__tests__/__fixtures__/receipt-baselines/` — regenerated
+  10 fixtures (HTML + thermal for scenarios 03, 04, 05, 08, 12) via
+  `npx tsx scripts/capture-receipt-baselines.ts`.
 
 **Session plan:**
 - Single session.
@@ -162,14 +177,42 @@ total (including tip), in which case the label flips to "Paid In Full."
 **Notes / decisions log:**
 - Confirmed 2026-05-15: no need to distinguish online vs in-store deposits
   on the customer-facing receipt.
+- 2026-05-15 (session): helper landed in `src/lib/data/receipt-composer.ts`
+  (existing receipt-shaping module — Component-Reuse Rule 11). Signature is
+  `formatDepositLabel({ depositCents, totalCents })`, defensive on edge
+  cases: zero deposit → "Deposit" (never flips to Paid In Full on a
+  zero-dollar row); zero total → "Deposit" (no comparison basis).
+- 2026-05-15 (session): `total` for the threshold is `subtotal + tax + tip`
+  per spec — discount is intentionally NOT subtracted. Confirmed across all
+  3 render sites (thermal, HTML, public page).
+- 2026-05-15 (session): the composer's internal `suggested_*` fields on
+  `RenderedPaymentLine` keep using the default-zero threshold (always
+  "Deposit") because `composeReceiptPaymentLines` doesn't have the totals.
+  Renderers all use `buildSuggestedLabelForPayment` (the separate helper)
+  which DOES receive `ticketTotalCents` — and they're the only consumers
+  that face the customer.
+- 2026-05-15 (session): all 4 surfaces share `buildSuggestedLabelForPayment`,
+  so the threshold flip is consistent across thermal print, email HTML
+  receipt, SMS receipt link, browser-print, and the public token URL. No
+  separate PDF code path exists — email receipts are HTML.
+- 2026-05-15 (session): legacy meta-primary label list in
+  `buildCombinedPaymentLabel` updated to `DEPOSIT | PAID_IN_FULL |
+  PAY_LINK_ONLINE`. `PAID_IN_FULL` (payment-row primary) is intentionally
+  distinct from `PAID_IN_FULL_INDICATOR` ("Paid in Full ✓", the balance-zero
+  banner below the payment block) — different surfaces, different
+  capitalization.
+- 2026-05-15 (session): 1024/1024 vitest tests pass post-change. 10 receipt
+  fixtures regenerated and byte-equality tests re-pass. Typecheck + lint +
+  build clean (0 errors; lint warnings are pre-existing Money-Unify
+  baseline, not in code I touched).
 
 ---
 
 ### Item 12 — Appointments in POS Footer + Edit Appointment from POS
 
-- **Status:** not started
+- **Status:** done
 - **Severity:** S1
-- **Effort:** 1 medium session (~2 hours)
+- **Effort:** 1 medium session (~2 hours) — actual: 1 session
 - **Wave:** 1
 - **Depends on:** none
 
@@ -889,6 +932,7 @@ CC session.
 | Date | Session # | Item | Status | Commit hash | Notes |
 |---|---|---|---|---|---|
 | 2026-05-15 | 1 | Item 1 — POS Customer Search → Create Smart Prefill | done | `6b0413dd` | New helper `routeSearchInput` + 24 unit tests + 6 dialog prefill tests. Wired into ticket-panel + quote-ticket-panel. Reused `isPhoneQuery` from existing tokenize.ts. International phone shapes preserved verbatim. Pre-existing in-progress Item 6/12 work left untouched on working tree. |
+| 2026-05-15 | 2 | Item 6 — Deposit / Paid-in-Full Label Unification | done | _(this commit)_ | `formatDepositLabel({depositCents,totalCents})` helper added to receipt-composer.ts. `RECEIPT_VOCAB.DEPOSIT_ONLINE`/`DEPOSIT_IN_STORE` replaced with `DEPOSIT`/`PAID_IN_FULL`. Threaded `ticketTotalCents` (subtotal+tax+tip) into 3 render sites: thermal, HTML, public receipt. 10 fixture files regenerated. 7-case helper test suite + threshold tests on `buildSuggestedLabelForPayment` (122 composer tests, 1024 total — all pass). Typecheck/lint/build clean. |
 
 ---
 

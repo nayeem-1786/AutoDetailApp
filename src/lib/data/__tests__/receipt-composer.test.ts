@@ -29,6 +29,7 @@ import {
   composeLoyaltyFooter,
   mapDigitalPlatformToFriendly,
   sourceToLabel,
+  formatDepositLabel,
   RECEIPT_VOCAB,
   type ComposerPaymentInput,
   type ComposerRefundInput,
@@ -184,7 +185,11 @@ describe('composer: composeReceiptPaymentLines', () => {
   });
 
   it('attaches suggested_primary_label per Phase 1 vocabulary', () => {
-    // First-payment-with-remainder + booking deposit → DEPOSIT_ONLINE
+    // Wave-1 Item 6: first-payment-with-remainder + booking deposit → DEPOSIT.
+    // composeReceiptPaymentLines doesn't receive ticketTotalCents (the threshold
+    // input), so deposit rows always render as "Deposit" here. Renderers that
+    // need the Paid-In-Full threshold pass ticketTotalCents to
+    // buildSuggestedLabelForPayment directly.
     const block1 = composeReceiptPaymentLines(
       [
         { method: 'card', amount: 50, source_notes: 'Online booking deposit. x', created_at: '2026-05-04T13:00:00.000-07:00' },
@@ -192,7 +197,7 @@ describe('composer: composeReceiptPaymentLines', () => {
       ],
       { total_amount: 175 }
     );
-    expect(block1.lines[0].suggested_primary_label).toBe(RECEIPT_VOCAB.DEPOSIT_ONLINE);
+    expect(block1.lines[0].suggested_primary_label).toBe(RECEIPT_VOCAB.DEPOSIT);
     // Second cash payment → 'Cash'
     expect(block1.lines[1].suggested_primary_label).toBe('Cash');
 
@@ -329,6 +334,33 @@ describe('composer: composeReceiptTotals', () => {
   });
 });
 
+describe('composer: formatDepositLabel (Wave-1 Item 6 threshold rule)', () => {
+  it('returns "Deposit" when deposit < total (UAT scenario A: $230 / $552)', () => {
+    expect(formatDepositLabel({ depositCents: 23000, totalCents: 55200 })).toBe(RECEIPT_VOCAB.DEPOSIT);
+  });
+  it('returns "Paid In Full" when deposit == total (UAT scenario B: $552 / $552)', () => {
+    expect(formatDepositLabel({ depositCents: 55200, totalCents: 55200 })).toBe(RECEIPT_VOCAB.PAID_IN_FULL);
+  });
+  it('returns "Paid In Full" when deposit > total (UAT scenario E: $560 / $552)', () => {
+    expect(formatDepositLabel({ depositCents: 56000, totalCents: 55200 })).toBe(RECEIPT_VOCAB.PAID_IN_FULL);
+  });
+  it('returns "Deposit" when deposit < total including tip (UAT scenario D: $460 / $552)', () => {
+    // $460 deposit on $460 subtotal + $0 tax + $92 tip = $552 total.
+    expect(formatDepositLabel({ depositCents: 46000, totalCents: 55200 })).toBe(RECEIPT_VOCAB.DEPOSIT);
+  });
+  it('returns "Paid In Full" when deposit == total including tip (UAT scenario C)', () => {
+    // $552 deposit on $460 subtotal + $0 tax + $92 tip = $552 total.
+    expect(formatDepositLabel({ depositCents: 55200, totalCents: 55200 })).toBe(RECEIPT_VOCAB.PAID_IN_FULL);
+  });
+  it('returns "Deposit" on zero-dollar deposit (edge case — never flip to Paid In Full)', () => {
+    expect(formatDepositLabel({ depositCents: 0, totalCents: 55200 })).toBe(RECEIPT_VOCAB.DEPOSIT);
+    expect(formatDepositLabel({ depositCents: 0, totalCents: 0 })).toBe(RECEIPT_VOCAB.DEPOSIT);
+  });
+  it('returns "Deposit" when totalCents unknown (0) — no threshold basis', () => {
+    expect(formatDepositLabel({ depositCents: 5000, totalCents: 0 })).toBe(RECEIPT_VOCAB.DEPOSIT);
+  });
+});
+
 describe('composer: buildSuggestedPaymentLabel', () => {
   function line(overrides: Partial<RenderedPaymentLine>): RenderedPaymentLine {
     return {
@@ -341,23 +373,48 @@ describe('composer: buildSuggestedPaymentLabel', () => {
       ...overrides,
     };
   }
-  it('first-with-remainder + online_booking_deposit → DEPOSIT_ONLINE', () => {
+  it('first-with-remainder + online_booking_deposit → DEPOSIT (below threshold)', () => {
     expect(buildSuggestedPaymentLabel(line({
       is_first_with_remainder: true, source: 'online_booking_deposit', method: 'card',
-    }))).toBe(RECEIPT_VOCAB.DEPOSIT_ONLINE);
+      amount_cents: 5000,
+    }), 17500)).toBe(RECEIPT_VOCAB.DEPOSIT);
   });
-  it('first-with-remainder + in_store → DEPOSIT_IN_STORE', () => {
+  it('first-with-remainder + in_store → DEPOSIT (below threshold)', () => {
     expect(buildSuggestedPaymentLabel(line({
       is_first_with_remainder: true, source: 'in_store', method: 'cash',
-    }))).toBe(RECEIPT_VOCAB.DEPOSIT_IN_STORE);
+      amount_cents: 3000,
+    }), 5000)).toBe(RECEIPT_VOCAB.DEPOSIT);
   });
-  it('online_pay_link → PAY_LINK_ONLINE', () => {
+  it('online_booking_deposit fully covering ticket → PAID_IN_FULL', () => {
+    // booking deposit $175 on $175 ticket (subtotal+tax+tip). is_first_with_remainder
+    // is false because no remainder, but online_booking_deposit always renders
+    // as a deposit row — formatDepositLabel flips it to "Paid In Full".
+    expect(buildSuggestedPaymentLabel(line({
+      is_first_with_remainder: false, source: 'online_booking_deposit', method: 'card',
+      amount_cents: 17500,
+    }), 17500)).toBe(RECEIPT_VOCAB.PAID_IN_FULL);
+  });
+  it('online_booking_deposit exceeding ticket → PAID_IN_FULL', () => {
+    expect(buildSuggestedPaymentLabel(line({
+      is_first_with_remainder: false, source: 'online_booking_deposit', method: 'card',
+      amount_cents: 20000,
+    }), 17500)).toBe(RECEIPT_VOCAB.PAID_IN_FULL);
+  });
+  it('online_pay_link → PAY_LINK_ONLINE (deposit threshold does not apply)', () => {
     expect(buildSuggestedPaymentLabel(line({
       source: 'online_pay_link', method: 'card',
     }))).toBe(RECEIPT_VOCAB.PAY_LINK_ONLINE);
   });
   it('cash + non-first → Cash', () => {
     expect(buildSuggestedPaymentLabel(line({ source: 'in_store', method: 'cash' }))).toBe('Cash');
+  });
+  it('omitting ticketTotalCents (default 0) → deposit rows always read "Deposit"', () => {
+    // Back-compat: composer-internal invocation without the threshold input
+    // never produces "Paid In Full" — safe default.
+    expect(buildSuggestedPaymentLabel(line({
+      is_first_with_remainder: false, source: 'online_booking_deposit', method: 'card',
+      amount_cents: 17500,
+    }))).toBe(RECEIPT_VOCAB.DEPOSIT);
   });
 });
 
@@ -482,24 +539,36 @@ describe('format: formatReceiptDateTimeCompact (LOCKED-6)', () => {
 describe('composer: buildCombinedPaymentLabel (LOCKED-9 format hierarchy)', () => {
   const ts = '2026-05-04T13:00:00.000-07:00'; // "5/4/26 1:00 PM"
 
-  it('online booking deposit → 3 segments: primary · method_detail · date', () => {
+  it('booking deposit (below threshold) → 3 segments: Deposit · method_detail · date', () => {
     expect(buildCombinedPaymentLabel({
-      primary: RECEIPT_VOCAB.DEPOSIT_ONLINE,
+      primary: RECEIPT_VOCAB.DEPOSIT,
       methodDetail: 'Amex ****1074',
       source: 'online_booking_deposit',
       method: 'card',
       createdAt: ts,
-    })).toBe('Deposit (Online) · Amex ****1074 · 5/4/26 1:00 PM');
+    })).toBe('Deposit · Amex ****1074 · 5/4/26 1:00 PM');
   });
 
-  it('in-store first-with-remainder deposit → 3 segments: primary · method_detail · date', () => {
+  it('booking deposit fully covering ticket → 3 segments: Paid In Full · method_detail · date', () => {
+    // Wave-1 Item 6: deposit >= total flips the primary to PAID_IN_FULL,
+    // which buildCombinedPaymentLabel still treats as a meta-primary.
     expect(buildCombinedPaymentLabel({
-      primary: RECEIPT_VOCAB.DEPOSIT_IN_STORE,
+      primary: RECEIPT_VOCAB.PAID_IN_FULL,
+      methodDetail: 'Amex ****1074',
+      source: 'online_booking_deposit',
+      method: 'card',
+      createdAt: ts,
+    })).toBe('Paid In Full · Amex ****1074 · 5/4/26 1:00 PM');
+  });
+
+  it('in-store first-with-remainder deposit → 3 segments: Deposit · method_detail · date', () => {
+    expect(buildCombinedPaymentLabel({
+      primary: RECEIPT_VOCAB.DEPOSIT,
       methodDetail: 'Cash',
       source: 'in_store',
       method: 'cash',
       createdAt: ts,
-    })).toBe('Deposit (In-Store) · Cash · 5/4/26 1:00 PM');
+    })).toBe('Deposit · Cash · 5/4/26 1:00 PM');
   });
 
   it('pay-link → 3 segments: Pay Link (Online) · method_detail · date', () => {
@@ -544,12 +613,12 @@ describe('composer: buildCombinedPaymentLabel (LOCKED-9 format hierarchy)', () =
 
   it('omits timestamp when createdAt is null/missing', () => {
     expect(buildCombinedPaymentLabel({
-      primary: RECEIPT_VOCAB.DEPOSIT_ONLINE,
+      primary: RECEIPT_VOCAB.DEPOSIT,
       methodDetail: 'Amex ****1074',
       source: 'online_booking_deposit',
       method: 'card',
       createdAt: null,
-    })).toBe('Deposit (Online) · Amex ****1074');
+    })).toBe('Deposit · Amex ****1074');
   });
 });
 
@@ -570,7 +639,23 @@ describe('composer: buildSuggestedLabelForPayment (renderer-side helper)', () =>
     expect(label).toBe('Pay Link (Online) · Visa ****0001 · 5/6/26 8:00 PM');
   });
 
-  it('first-with-remainder + in_store cash → Deposit (In-Store) · Cash · date', () => {
+  it('first-with-remainder + in_store cash → Deposit · Cash · date (below threshold)', () => {
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'cash',
+        amount: 30,
+        source_label: 'Cash',
+        created_at: ts,
+      },
+      true,
+      5000 // $50 ticket
+    );
+    expect(label).toBe('Deposit · Cash · 5/6/26 8:00 PM');
+  });
+
+  it('first-with-remainder + in_store cash without ticketTotalCents → Deposit · Cash · date (default 0)', () => {
+    // Back-compat: omitting ticketTotalCents falls back to "Deposit" — the
+    // threshold check needs a non-zero total to flip to "Paid In Full".
     const label = buildSuggestedLabelForPayment(
       {
         method: 'cash',
@@ -579,7 +664,59 @@ describe('composer: buildSuggestedLabelForPayment (renderer-side helper)', () =>
       },
       true
     );
-    expect(label).toBe('Deposit (In-Store) · Cash · 5/6/26 8:00 PM');
+    expect(label).toBe('Deposit · Cash · 5/6/26 8:00 PM');
+  });
+
+  it('online_booking_deposit fully covering ticket → Paid In Full · ... · date', () => {
+    // Wave-1 Item 6 UAT scenario B: $552 booking deposit on $552 ticket.
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'card',
+        amount: 552,
+        card_brand: 'amex',
+        card_last_four: '1074',
+        source_label: 'Booking deposit',
+        created_at: ts,
+      },
+      false,
+      55200
+    );
+    expect(label).toBe('Paid In Full · Amex ****1074 · 5/6/26 8:00 PM');
+  });
+
+  it('online_booking_deposit covering subtotal+tax+tip total → Paid In Full', () => {
+    // Wave-1 Item 6 UAT scenario C: $552 booking deposit on $460 subtotal +
+    // $0 tax + $92 tip = $552 total. Threshold met → Paid In Full.
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'card',
+        amount: 552,
+        card_brand: 'visa',
+        card_last_four: '0001',
+        source_label: 'Booking deposit',
+        created_at: ts,
+      },
+      false,
+      55200
+    );
+    expect(label).toBe('Paid In Full · Visa ****0001 · 5/6/26 8:00 PM');
+  });
+
+  it('online_booking_deposit below subtotal+tax+tip total → Deposit', () => {
+    // Wave-1 Item 6 UAT scenario D: $460 booking deposit on $552 total.
+    const label = buildSuggestedLabelForPayment(
+      {
+        method: 'card',
+        amount: 460,
+        card_brand: 'visa',
+        card_last_four: '0001',
+        source_label: 'Booking deposit',
+        created_at: ts,
+      },
+      true,
+      55200
+    );
+    expect(label).toBe('Deposit · Visa ****0001 · 5/6/26 8:00 PM');
   });
 
   it('non-first cash → Cash · date', () => {
@@ -665,8 +802,12 @@ describe('composer: combined-label assembly inside composeReceiptPaymentLines (L
       ],
       { total_amount: 175 }
     );
+    // Wave-1 Item 6: composer-internal label render uses default
+    // ticketTotalCents=0 → deposit rows always read "Deposit" (no threshold
+    // basis). Renderers pass the real total to flip to "Paid In Full" when
+    // appropriate.
     expect(block.lines[0].suggested_label_combined)
-      .toBe('Deposit (Online) · Amex ****1234 · 5/4/26 1:00 PM');
+      .toBe('Deposit · Amex ****1234 · 5/4/26 1:00 PM');
     expect(block.lines[1].suggested_label_combined)
       .toBe('Cash · 5/6/26 8:00 PM');
   });
@@ -775,7 +916,7 @@ describe('composer: digital payment combined-label assembly', () => {
   it('Venmo first-payment-with-remainder does NOT get "Deposit (...)" wrapper (digital primary always wins)', () => {
     // Digital payments are not deposits even if they're first-with-remainder —
     // a $50 Venmo against a $175 appointment is still labeled "Venmo · date",
-    // not "Deposit (In-Store) · Venmo · date". The composer's primary-label
+    // not "Deposit · Venmo · date". The composer's primary-label
     // short-circuit on method='digital' enforces this.
     const block = composeReceiptPaymentLines(
       [

@@ -395,6 +395,12 @@ export default async function PublicReceiptPage({ params }: PageProps) {
         // Total Paid row + Paid in Full ✓ conditional. REVISED LOCKED-7:
         // loyalty footer below balance row.
         const firstWithRemainder = buildFirstWithRemainderFlags(tx.payments, tx.appointment_total);
+        // Wave-1 Item 6: ticketTotalCents (subtotal + tax + tip) drives the
+        // Deposit / Paid-In-Full threshold inside buildSuggestedLabelForPayment.
+        const ticketTotalCents =
+          toCents(Number(tx.subtotal ?? 0)) +
+          toCents(Number(tx.tax_amount ?? 0)) +
+          toCents(Number(tx.tip_amount ?? 0));
         let totalPaidCents = 0;
         for (const p of tx.payments) totalPaidCents += toCents(Number(p.amount ?? 0));
         const loyaltyFooter = composeLoyaltyFooter(tx.loyalty_points_redeemed, tx.loyalty_balance_after_pts);
@@ -418,13 +424,15 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 const combined = buildSuggestedLabelForPayment(
                   {
                     method: p.method,
+                    amount: p.amount,
                     card_brand: p.card_brand,
                     card_last_four: p.card_last_four,
                     source_label: p.source_label,
                     created_at: p.created_at,
                     digital_platform: p.digital_platform,
                   },
-                  firstWithRemainder[i]
+                  firstWithRemainder[i],
+                  ticketTotalCents
                 );
                 const showTender = p.method === 'cash' && p.cash_tendered != null;
                 const change = showTender

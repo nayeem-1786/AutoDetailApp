@@ -15,8 +15,7 @@ Tax                                        $0.00
 TOTAL                                    $175.00
      See also: Deposit Receipt #R-0005-DEP
 ------------------------------------------------
-Deposit (Online) · Amex ****1234          $50.00
-                  5/4/26 1:00 PM
+Deposit · Amex ****1234 · 5/4/26 1:00 PM  $50.00
 Cash · 5/6/26 8:00 PM                    $125.00
   Tendered                               $125.00
   Change                                   $0.00

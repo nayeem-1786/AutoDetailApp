@@ -6,6 +6,51 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-15 — Wave 1 / Item 6: Deposit / Paid-In-Full Label Unification
+
+Receipt payment rows previously rendered `"Deposit (Online) · …"` or `"Deposit (In-Store) · …"`. The online-vs-in-store distinction is operationally invisible to the customer and added receipt length, so the customer-facing label is now simply `"Deposit"`. When the deposit covers the ticket total, the label flips to `"Paid In Full"`.
+
+**Threshold rule (locked):**
+- `depositCents < totalCents` → `"Deposit"`
+- `depositCents >= totalCents` → `"Paid In Full"`
+- `totalCents` = `subtotal + tax + tip` (discount NOT subtracted, per spec)
+- Zero-dollar deposit and zero-dollar total are guarded — neither flips to "Paid In Full" defensively.
+
+**Implementation:**
+- New pure helper `formatDepositLabel({ depositCents, totalCents })` in `src/lib/data/receipt-composer.ts`. Centralized so the rule lives in one place.
+- `RECEIPT_VOCAB.DEPOSIT_ONLINE` / `DEPOSIT_IN_STORE` replaced with `DEPOSIT` (`"Deposit"`) and `PAID_IN_FULL` (`"Paid In Full"`). `PAID_IN_FULL` is intentionally distinct from `PAID_IN_FULL_INDICATOR` (`"Paid in Full ✓"`, the balance-zero banner) — different capitalization, different surfaces, different code paths.
+- `buildSuggestedPaymentLabel(line, ticketTotalCents=0)` and `buildSuggestedLabelForPayment(p, isFirstWithRemainder, ticketTotalCents=0)` now accept the threshold input. Default 0 keeps composer-internal `suggested_*` fields safe (always "Deposit" without a basis to flip).
+- `buildCombinedPaymentLabel`'s `isMetaPrimary` check extended to recognize `DEPOSIT` and `PAID_IN_FULL` so the 3-segment `primary · method_detail · timestamp` form still applies.
+- Three render sites updated to compute `ticketTotalCents = subtotal+tax+tip` (in cents) once per receipt and pass it to the label builder for every payment row:
+  - `src/app/pos/lib/receipt-template.ts:728` (thermal)
+  - `src/app/pos/lib/receipt-template.ts:1137` (HTML — also serves email receipts, SMS receipt links, browser-printed copies, customer portal receipts, and the print-copier route)
+  - `src/app/(public)/receipt/[token]/page.tsx:397` (public token URL)
+
+**Receipt surfaces covered:**
+
+| Surface | Code path | Status |
+|---|---|---|
+| Thermal printer | `generateReceiptLines` | ✓ Unified label + threshold |
+| Email receipt (HTML) | `generateReceiptHtml` | ✓ Unified label + threshold |
+| SMS receipt link (HTML) | `generateReceiptHtml` | ✓ Unified label + threshold |
+| Browser-printed copy | `generateReceiptHtml` | ✓ Unified label + threshold |
+| Public receipt page | `(public)/receipt/[token]/page.tsx` | ✓ Unified label + threshold |
+
+No separate "email PDF" code path exists — email receipts are HTML inline.
+
+**Tests:**
+- 7-case `formatDepositLabel` suite locks the threshold rule (UAT scenarios A through E plus the zero-deposit and zero-total guards).
+- 4 new threshold cases on `buildSuggestedLabelForPayment` for the renderer-side helper (UAT B, C, D, plus default-zero back-compat).
+- Existing label-assertion tests updated to expect `"Deposit · …"` / `"Paid In Full · …"`.
+- 10 receipt baseline fixtures regenerated via `npx tsx scripts/capture-receipt-baselines.ts` (scenarios 03, 04, 05, 08, 12 — HTML + thermal). Byte-equality regression suite re-passes.
+- Full suite: 1024/1024 tests pass.
+
+**Out of scope:**
+- Internal data tracking the online vs in-store distinction is untouched — this change is display-only. Booking deposits keep being identifiable as such for accounting / reconciliation if ever needed downstream.
+- No new "Paid In Full" status added anywhere outside receipts (no POS UI, jobs list, or admin chrome change).
+
+---
+
 ## 2026-05-15 — Wave 1 / Item 1: POS Customer Search → Create Smart Prefill
 
 When the Find Customer modal returns "No customers found" and the operator clicks **New Customer**, the create dialog now opens with the search query routed into the matching field instead of forcing a retype.
