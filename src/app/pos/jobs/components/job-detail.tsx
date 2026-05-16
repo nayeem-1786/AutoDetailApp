@@ -25,7 +25,6 @@ import {
   Pencil,
   Car,
   FileText,
-  Search,
   ShoppingCart,
   MapPin,
 } from 'lucide-react';
@@ -50,7 +49,8 @@ import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
 import { ChangeTimeButton } from './change-time-button';
 import { CustomerLookup } from '../../components/customer-lookup';
-import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
+import { EditServicesDialog } from '@/lib/services/edit-services-dialog';
+import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot, VehicleSizeClass } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 type ZonePickerMode = 'intake' | 'completion' | 'progress' | null;
@@ -277,11 +277,11 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [showEditVehicle, setShowEditVehicle] = useState(false);
   const [editVehicles, setEditVehicles] = useState<{ id: string; year: number | null; make: string | null; model: string | null; color: string | null }[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
+  // Item 15f Layer 3a — Edit Services now mounted via the canonical
+  // `<EditServicesDialog>`. Local selection state holds the in-flight
+  // edit; `handleSaveEditServices` PATCHes the job and closes the dialog.
   const [showEditServices, setShowEditServices] = useState(false);
-  const [allServices, setAllServices] = useState<{ id: string; name: string; flat_price: number | null; pricing_model: string; pricing?: { tier_name: string; price: number }[] }[]>([]);
   const [editSelectedServices, setEditSelectedServices] = useState<JobServiceSnapshot[]>([]);
-  const [loadingServices, setLoadingServices] = useState(false);
-  const [serviceSearch, setServiceSearch] = useState('');
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -553,37 +553,47 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     if (ok) setShowEditVehicle(false);
   }
 
-  async function handleOpenEditServices() {
+  // Item 15f Layer 3a — Edit Services opens the canonical
+  // `<EditServicesDialog>`, which mounts `useServicePicker` and routes
+  // every tap through the canonical engine. Local selection state is
+  // seeded from the job's current services (filtering out the synthetic
+  // mobile-fee row — that's managed by the mobile picker, not here) and
+  // is mutated via add/remove callbacks from the dialog. Save calls
+  // `handlePatchJob({services})` which already accepts a
+  // `JobServiceSnapshot[]` payload.
+  function handleOpenEditServices() {
     if (!job) return;
+    const initial = job.services.filter((s) => !s.is_mobile_fee);
+    setEditSelectedServices(initial);
     setShowEditServices(true);
-    setEditSelectedServices([...job.services]);
-    setServiceSearch('');
-    setLoadingServices(true);
-    try {
-      const res = await posFetch('/api/pos/services');
-      if (res.ok) {
-        const { data } = await res.json();
-        setAllServices(data ?? []);
-      }
-    } catch {
-      toast.error('Failed to load services');
-    } finally {
-      setLoadingServices(false);
-    }
   }
 
-  function handleToggleEditService(svc: JobServiceSnapshot) {
+  function handleEditServiceAdded(
+    service: { id: string; name: string },
+    pricing: { id: string; price: number; tier_name: string },
+    _vsc: VehicleSizeClass | null,
+    perUnitQty?: number,
+  ) {
     setEditSelectedServices((prev) => {
-      const exists = prev.find((s) => s.id === svc.id);
-      if (exists) return prev.filter((s) => s.id !== svc.id);
-      return [...prev, svc];
+      // Duplicate-guard: if the catalog service is already selected, no-op.
+      // Custom assessments synthesize a unique id each time so they never
+      // collide. Catalog services use their UUID as the id.
+      if (prev.some((p) => p.id === service.id && !pricing.id.startsWith('custom-'))) {
+        return prev;
+      }
+      const snapshot: JobServiceSnapshot = {
+        id: service.id,
+        name: service.name,
+        price: Number(pricing.price),
+        tier_name: pricing.tier_name || null,
+      };
+      if (perUnitQty != null) snapshot.quantity = perUnitQty;
+      return [...prev, snapshot];
     });
   }
 
-  function getServicePrice(svc: { flat_price: number | null; pricing?: { tier_name: string; price: number }[] }): number {
-    if (svc.flat_price != null) return Number(svc.flat_price);
-    if (svc.pricing && svc.pricing.length > 0) return Number(svc.pricing[0].price);
-    return 0;
+  function handleEditServiceRemoved(serviceId: string) {
+    setEditSelectedServices((prev) => prev.filter((s) => s.id !== serviceId));
   }
 
   async function handleSaveEditServices() {
@@ -1930,92 +1940,31 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         </div>
       )}
 
-      {/* Edit Services Modal */}
-      {showEditServices && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center" onClick={() => setShowEditServices(false)}>
-          <div className="flex w-full max-w-md flex-col rounded-t-xl bg-white dark:bg-gray-900 shadow-xl dark:shadow-gray-950/50 sm:max-h-[80vh] sm:rounded-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 dark:border-gray-700 px-5 py-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Edit Services</h3>
-                <button
-                  onClick={() => setShowEditServices(false)}
-                  className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
-                >
-                  <X className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                </button>
-              </div>
-              <div className="relative mt-3">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
-                <input
-                  type="text"
-                  value={serviceSearch}
-                  onChange={(e) => setServiceSearch(e.target.value)}
-                  placeholder="Search services..."
-                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 py-2.5 pl-10 pr-4 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 dark:focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:focus:ring-blue-400"
-                />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2" style={{ maxHeight: '50vh' }}>
-              {loadingServices ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {allServices
-                    .filter((s) => !serviceSearch.trim() || s.name.toLowerCase().includes(serviceSearch.toLowerCase()))
-                    .map((svc) => {
-                      const isSelected = editSelectedServices.some((s) => s.id === svc.id);
-                      const price = getServicePrice(svc);
-                      return (
-                        <button
-                          key={svc.id}
-                          onClick={() => handleToggleEditService({ id: svc.id, name: svc.name, price })}
-                          className={cn(
-                            'flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors',
-                            isSelected
-                              ? 'bg-blue-50 dark:bg-blue-900/30 ring-1 ring-blue-200 dark:ring-blue-800'
-                              : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                          )}
-                        >
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{svc.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              ${price.toFixed(2)}
-                              {svc.pricing_model !== 'flat' && ' (starting)'}
-                            </p>
-                          </div>
-                          {isSelected && (
-                            <div className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 dark:bg-blue-500">
-                              <Check className="h-4 w-4 text-white" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
-                </div>
-              )}
-            </div>
-            <div className="border-t border-gray-200 dark:border-gray-700 px-5 py-3">
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">
-                  {editSelectedServices.length} service{editSelectedServices.length !== 1 ? 's' : ''}
-                </span>
-                <span className="font-medium text-gray-900 dark:text-gray-100">
-                  ${editSelectedServices.reduce((sum, s) => sum + s.price, 0).toFixed(2)}
-                </span>
-              </div>
-              <button
-                onClick={handleSaveEditServices}
-                disabled={editSelectedServices.length === 0 || savingEdit}
-                className="w-full rounded-lg bg-blue-600 dark:bg-blue-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50"
-              >
-                {savingEdit ? 'Saving...' : 'Update Services'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Edit Services Dialog — Item 15f Layer 3a. Canonical 2-pane
+          surface backed by `useServicePicker`. Tier-aware pricing for
+          all 6 pricing_model values (including custom assessments).
+          Per CLAUDE.md Rule 22, no bespoke pricing math lives here. */}
+      <EditServicesDialog
+        open={showEditServices}
+        onClose={() => setShowEditServices(false)}
+        title="Edit Services"
+        vehicleSizeClass={(job.vehicle?.size_class ?? null) as VehicleSizeClass | null}
+        vehicleSpecialtyTier={null}
+        selectedServices={editSelectedServices
+          .filter((s): s is JobServiceSnapshot & { id: string } => s.id != null)
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            price: s.price,
+            tier_name: s.tier_name ?? null,
+            quantity: s.quantity,
+          }))}
+        onServiceAdded={handleEditServiceAdded}
+        onServiceRemoved={handleEditServiceRemoved}
+        onSave={handleSaveEditServices}
+        isSaving={savingEdit}
+        saveLabel="Update Services"
+      />
     </div>
   );
 }

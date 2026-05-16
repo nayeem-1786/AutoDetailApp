@@ -30,3 +30,10 @@ export type {
 // Item 15f Layer 2 — `custom` pricing_model UX.
 export { CustomPriceDialog, buildCustomPricing } from './custom-price-dialog';
 export type { CustomPriceDialogProps } from './custom-price-dialog';
+
+// Item 15f Layer 3a — shared dialog wrapper for Edit Services surfaces.
+export { EditServicesDialog } from './edit-services-dialog';
+export type {
+  EditServicesDialogProps,
+  SelectedService,
+} from './edit-services-dialog';

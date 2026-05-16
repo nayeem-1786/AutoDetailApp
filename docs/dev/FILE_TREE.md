@@ -1036,10 +1036,12 @@ src/lib/services/shippo.ts
 src/lib/services/picker-engine.ts                    # Canonical service-pricing engine (Item 15f Layer 1; Layer 2 added `open-custom-price-dialog` ServiceTapRoute variant + branch) — resolveServicePrice, resolveServicePriceWithSale, getServicePriceRange, routeServiceTap. Per CLAUDE.md Rule 22.
 src/lib/services/use-service-picker.ts               # useServicePicker hook returning { CatalogPane, ActiveDialog, selectedServiceIds, tapService, reset } (Item 15f Layer 1; Layer 2 added tapService + custom-dialog wiring)
 src/lib/services/custom-price-dialog.tsx             # <CustomPriceDialog> + buildCustomPricing helper for pricing_model='custom' (Item 15f Layer 2) — staff-assessment prompt with Stripe-min validation
-src/lib/services/index.ts                            # Public barrel — re-exports engine + hook + custom-dialog + types (Item 15f Layer 1 + Layer 2)
+src/lib/services/edit-services-dialog.tsx            # <EditServicesDialog> — shared 2-pane Edit Services wrapper around useServicePicker. Used by POS Jobs card today; Admin Appointment will adopt once POS-context decoupling lands. (Item 15f Layer 3a)
+src/lib/services/index.ts                            # Public barrel — re-exports engine + hook + custom-dialog + edit-services-dialog + types (Item 15f Layer 1 + 2 + 3a)
 src/lib/services/__tests__/picker-engine.test.ts     # Engine tests — exhaustive size_class + sale + routing per pricing_model. Layer 2 flipped the 'custom' pin to assert open-custom-price-dialog.
 src/lib/services/__tests__/use-service-picker.test.tsx # Hook contract tests with vi-mocked CatalogBrowser/ServicePricingPicker/CustomPriceDialog (Item 15f Layer 1+2)
 src/lib/services/__tests__/custom-price-dialog.test.tsx # 11 tests — dialog rendering, validation, confirm/cancel emit, buildCustomPricing helper (Item 15f Layer 2)
+src/lib/services/__tests__/edit-services-dialog.test.tsx # 13 tests — wrapper rendering, prop forwarding, selected-services list, save/cancel, error/loading states (Item 15f Layer 3a)
 ```
 
 Backward-compat shim for the canonical engine (Item 15f Layer 1):

@@ -6,6 +6,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15f Layer 3a (partial): Migrate POS Jobs card Edit Services to canonical hook
+
+**Scope narrowed mid-session** per user direction (Option A from the in-session blocker). The original Layer 3a brief targeted BOTH the POS Jobs card and the Admin Appointment dialog. Discovery surfaced that `<CatalogBrowser>` (which `useServicePicker` wraps) has hard dependencies on POS-only contexts (`useTicket()` throws when no `<TicketProvider>` is mounted; `usePosPermission()` defaults to `granted: false`). The Jobs card sits inside `<PosShell>` and is unaffected; the Admin Appointment dialog sits outside it and would crash. Admin migration deferred to a follow-up that decouples `<CatalogBrowser>` from POS contexts.
+
+**This session migrates the Jobs card only.**
+
+**What's new:**
+- New shared component `src/lib/services/edit-services-dialog.tsx` — `<EditServicesDialog>`. 2-pane Dialog wrapping `useServicePicker`: left pane mounts `<CatalogPane>` (POS-style catalog browser with search), right pane is a caller-rendered selected-services list with per-row remove buttons + running total. Fully controlled — the caller owns selection state and the persistence call. UI-only. Per CLAUDE.md Rule 22, no pricing math here.
+- Barrel `src/lib/services/index.ts` re-exports `EditServicesDialog`, `EditServicesDialogProps`, `SelectedService`.
+
+**Jobs card migration (`src/app/pos/jobs/components/job-detail.tsx`):**
+- Deleted: bespoke local `getServicePrice()` (lines 583-587 in the prior version) that returned `pricing[0].price` regardless of vehicle — the silent revenue leak on tiered services for non-sedan vehicles called out in the lifecycle audit §10 #11.
+- Deleted: the bespoke modal (lines 1933-2015 in the prior version) — flat checkbox list with search.
+- Deleted: state for `allServices` / `loadingServices` / `serviceSearch` and the standalone catalog fetch.
+- Replaced with: `<EditServicesDialog>` mounted from the existing `showEditServices` state. Selection state seeded from `job.services` (filtering out the synthetic mobile-fee row — that's owned by the mobile picker), mutated via `onServiceAdded` / `onServiceRemoved` callbacks. Save calls the existing `handlePatchJob({services: editSelectedServices})` flow; payload shape (`JobServiceSnapshot[]`) is unchanged.
+- All 6 `pricing_model` values now resolve through the canonical engine: `flat`, `vehicle_size` Pattern A and Pattern B, `specialty`, `scope`, `per_unit`, `custom` (Layer 2's staff-assessment prompt).
+
+**What's NOT in this session (deferred):**
+- Admin Appointment dialog migration. Item 15a's `<EditServicesModal>` keeps shipping unchanged — including its local `resolveServicePrice` that mishandles Pattern A vehicle-size pricing. The cascade endpoint, helpers, and tests in `src/lib/appointments/edit-services.ts` are untouched.
+- `<CatalogBrowser>` POS-context decoupling — required before Admin can use the hook.
+- Booking Wizard math migration (Layer 3c).
+- `service-resolver.ts` migration (Layer 3d).
+- ESLint enforcement rule (Layer 4).
+
+**Tests:**
+- New `src/lib/services/__tests__/edit-services-dialog.test.tsx` — 13 cases: dialog rendering, open/closed visibility, hook-options forwarding (vehicle size, specialty tier, selected IDs set, search), selected-services list rendering (single + multi-quantity lines), empty state, remove button wiring, Save / Cancel button behavior, disabled-while-saving + disabled-when-empty, `saveError` surfacing, custom `saveLabel` override, search-input forwarding, hook callback identity check. `useServicePicker` is vi-mocked so the test stays focused on dialog wiring without booting POS contexts.
+- No existing Jobs-card tests covered the deleted modal directly, so no rewrites/deletions were needed.
+
+**Verification:**
+- Typecheck clean.
+- Lint 0 errors (98 warnings = unchanged baseline).
+- 1162/1162 tests pass (was 1149 at Layer 2; +13 new from `<EditServicesDialog>`).
+- Production build compiled successfully.
+- **Manual UAT was NOT performed in this session** — POS Jobs card requires running the app against a real database to exercise the picker flows. The user runs `npm run dev` and verifies the canonical fixtures (Ceramic Shield on exotic = $725, Engine Bay Detail flat = $175, Flood Damage / Mold Extraction = custom-price dialog, Scratch Repair = per-unit picker) post-session.
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15f Layer 2: Add `custom` pricing_model UX to `useServicePicker` hook
 
 Layer 2 closes the silent-unsupported gap for `pricing_model === 'custom'` services (canonical fixture today: "Flood Damage / Mold Extraction" with `custom_starting_price: 475` and no `service_pricing` rows). Operator surfaces that consume the `useServicePicker` hook can now route a custom-service tap through a staff-assessment prompt instead of dead-ending at "No pricing tiers available" inside `<ServicePricingPicker>`.
