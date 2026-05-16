@@ -27,8 +27,9 @@ import {
   type EditMobileModalSavedResult,
 } from '@/components/jobs/edit-mobile-modal';
 import { PaymentMismatchBanner } from '@/components/jobs/payment-mismatch-banner';
+import { EditServicesModal } from '@/components/appointments/edit-services-modal';
 import { STATUS_TRANSITIONS } from '../types';
-import type { AppointmentWithRelations } from '../types';
+import type { AppointmentWithRelations, AppointmentService } from '../types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
 
@@ -49,6 +50,8 @@ interface AppointmentDetailDialogProps {
   canReschedule: boolean;
   canCancel: boolean;
   canAddNotes?: boolean;
+  /** Item 15a — called after a services edit; lets the parent refetch. */
+  onServicesUpdated?: () => void;
 }
 
 export function AppointmentDetailDialog({
@@ -61,8 +64,19 @@ export function AppointmentDetailDialog({
   canReschedule,
   canCancel,
   canAddNotes = true,
+  onServicesUpdated,
 }: AppointmentDetailDialogProps) {
   const [saving, setSaving] = useState(false);
+  // Item 15a — Edit Services modal state. Same pattern as the mobile
+  // editor: modal owns its PATCH lifecycle, dialog surfaces an
+  // optimistic override so the totals re-render without waiting on a
+  // full list refetch.
+  const [editingServices, setEditingServices] = useState(false);
+  const [servicesOverride, setServicesOverride] = useState<{
+    services: AppointmentService[];
+    subtotal: number;
+    total_amount: number;
+  } | null>(null);
   // Phase Mobile-1.9: full mobile picker edit replaces the Phase 1.6
   // address-only inline editor. State drives the shared modal + the
   // post-save mismatch banner. Local overrides so the dialog reflects
@@ -109,6 +123,9 @@ export function AppointmentDetailDialog({
       setEditingMobile(null);
       setMobileOverride(null);
       setPaymentMismatch(null);
+      // Item 15a — clear optimistic services override on reopen.
+      setEditingServices(false);
+      setServicesOverride(null);
     }
   }, [appointment, open, reset]);
 
@@ -140,7 +157,17 @@ export function AppointmentDetailDialog({
   const overrideStatuses = availableStatuses.filter((s) => !recommendedStatuses.includes(s));
   const showCancelButton =
     canCancel && appointment.status !== 'cancelled';
-  const services = appointment.appointment_services;
+  const services = servicesOverride?.services ?? appointment.appointment_services;
+  const displayedTotal =
+    servicesOverride?.total_amount ?? Number(appointment.total_amount);
+  // Item 15a — service edit follows the reschedule role distribution
+  // (admin/cashier/super_admin yes; detailer no). Server enforces too.
+  // Hidden once the appointment hits a terminal state; the API would
+  // reject those with a 400.
+  const canEditServices =
+    canReschedule &&
+    appointment.status !== 'completed' &&
+    appointment.status !== 'cancelled';
 
   async function onSubmit(data: AppointmentUpdateInput) {
     if (!appointment) return;
@@ -208,7 +235,7 @@ export function AppointmentDetailDialog({
 
           <div>
             <dt className="text-xs font-medium text-gray-500">Total</dt>
-            <dd className="text-gray-900 font-medium">{formatCurrency(appointment.total_amount)}</dd>
+            <dd className="text-gray-900 font-medium">{formatCurrency(displayedTotal)}</dd>
           </div>
 
           {appointment.deposit_amount != null && appointment.deposit_amount > 0 && (
@@ -217,7 +244,7 @@ export function AppointmentDetailDialog({
               <dd className="text-green-700 font-medium">
                 {formatCurrency(appointment.deposit_amount)}
                 <span className="text-xs text-gray-500 font-normal ml-1">
-                  (Balance: {formatCurrency(appointment.total_amount - appointment.deposit_amount)})
+                  (Balance: {formatCurrency(displayedTotal - appointment.deposit_amount)})
                 </span>
               </dd>
             </div>
@@ -227,9 +254,22 @@ export function AppointmentDetailDialog({
         {/* Services list — Phase Mobile-1.7 refactor: render through the
             shared composeLineItems so the synthetic mobile-fee row stays
             consistent across surfaces. Visual output identical to the
-            prior ad-hoc append (Phase Mobile-1 Option D2). */}
+            prior ad-hoc append (Phase Mobile-1 Option D2).
+            Item 15a — Edit affordance opens the picker modal; hidden
+            for terminal-status appointments. */}
         <div className="mt-3">
-          <p className="text-xs font-medium text-gray-500">Services</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-gray-500">Services</p>
+            {canEditServices && (
+              <button
+                type="button"
+                onClick={() => setEditingServices(true)}
+                className="text-xs font-medium text-blue-600 hover:text-blue-800"
+              >
+                Edit
+              </button>
+            )}
+          </div>
           <div className="mt-1 space-y-0.5">
             {composeLineItems(
               appointment,
@@ -488,6 +528,39 @@ export function AppointmentDetailDialog({
           onSaved={handleMobileEditSaved}
         />
       )}
+      {/* Item 15a — Edit Services picker. Preloads from the latest
+          rendered service list (override-aware so the modal reopens to
+          the new selection without a refetch). */}
+      <EditServicesModal
+        open={editingServices}
+        appointmentId={appointment.id}
+        vehicleSizeClass={appointment.vehicle?.size_class ?? null}
+        initialServices={services.map((s) => ({
+          service_id: s.service_id,
+          service_name: s.service?.name || 'Service',
+          price_at_booking: Number(s.price_at_booking),
+          tier_name: s.tier_name,
+        }))}
+        onClose={() => setEditingServices(false)}
+        onSaved={(result) => {
+          // Optimistically reflect the server-side cascade in the
+          // dialog so totals + service list update immediately. The
+          // parent fetchAppointments() reconciles ids on the next pass.
+          setServicesOverride({
+            services: result.selected.map((s, idx) => ({
+              id: `optimistic-${idx}`,
+              service_id: s.service_id,
+              price_at_booking: s.price_at_booking,
+              tier_name: s.tier_name,
+              service: { id: s.service_id, name: s.service_name },
+            })),
+            subtotal: result.newSubtotal,
+            total_amount: result.newTotal,
+          });
+          setEditingServices(false);
+          onServicesUpdated?.();
+        }}
+      />
     </Dialog>
   );
 }

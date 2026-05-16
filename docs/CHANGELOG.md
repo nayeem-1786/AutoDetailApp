@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15a: Edit Services on Admin Appointment Dialog (with cascade to job)
+
+The Admin Appointment dialog rendered services read-only — operators couldn't add or remove services after an appointment was booked. Lifecycle audit gap §10 #1 captured this. The session also closes the §10 #11 cascade gap: when a `jobs` row is linked to the appointment via `jobs.appointment_id`, mutations now sync the `jobs.services` JSONB snapshot so the detailer sees the up-to-date service list at intake.
+
+**What's new for staff:**
+- The Services list in the Appointment dialog now has an inline **Edit** affordance (blue link, top-right of the Services header). It shows for any appointment in a non-terminal state (`pending`/`confirmed`/`in_progress`) when the user has `appointments.reschedule`.
+- Tap it → a service picker modal opens with the current selection preloaded and the catalog of active services below, searchable by name, with toggle-on-tap and a running total.
+- Save → both `appointment_services` rows AND (if a job is linked) `jobs.services` JSONB are updated in lock-step. The dialog re-renders with the new total and balance owed; no payment is collected automatically (per user spec — operator collects at completion).
+
+**Permission decision — reuse `appointments.reschedule`:**
+- Same role distribution that gates date/time/detailer changes (admin/cashier/super_admin yes; detailer no).
+- Service editing is a "scope mutation" semantically adjacent to reschedule.
+- No DB migration needed.
+
+**Cascade transactional model:**
+Supabase JS has no first-class transaction wrapper, so the endpoint follows the manual rollback pattern already in use at `/api/pos/jobs/route.ts:381-453` (walk-in creation): snapshot original `appointment_services` rows + appointment totals before mutation, then undo each step on the next step's failure. 17 cascade unit tests cover every failure-injection point and assert that snapshot restoration happens (preserving original row ids).
+
+**Notification suppression (inherits Item 12 pattern):**
+- No SMS sent (3 sentinel mocks for `sendSms` / `sendMarketingSms` assert 0 calls).
+- No email sent (`sendEmail` sentinel asserts 0).
+- No webhook fired (`fireWebhook` sentinel asserts 0).
+- Audit log records `notification_suppressed: true`.
+
+**Files added:**
+- `src/lib/appointments/edit-services.ts` — Zod body schema, `buildJobServicesJsonb()`, `computeTotalsForServiceEdit()` pure helpers.
+- `src/lib/appointments/__tests__/edit-services.test.ts` — 18 unit tests on the pure helpers.
+- `src/app/api/admin/appointments/[id]/services/route.ts` — PUT cascade endpoint.
+- `src/app/api/admin/appointments/[id]/services/__tests__/route.test.ts` — 17 cascade integration tests.
+- `src/app/api/admin/services/active/route.ts` — Session-authed GET for the picker UI (mirrors `/api/pos/services`).
+- `src/components/appointments/edit-services-modal.tsx` — Picker modal component.
+
+**Files modified:**
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — added Edit affordance + modal render with optimistic services-override merge.
+- `src/app/admin/appointments/page.tsx` — passes `onServicesUpdated` callback that refetches the appointment list + stats after a save.
+- `docs/dev/FILE_TREE.md`, `docs/dev/ROADMAP-13-ITEMS.md` — doc updates.
+
+**Verification:** typecheck clean, lint 0 errors (0 new warnings from this session's files), vitest **1088/1088** (35 new from this session), build clean. Ran concurrently with Items 15b and 15c — non-overlapping file footprint, only ROADMAP/CHANGELOG/FILE_TREE share state.
+
+**Tech-debt acknowledgement:**
+The POS Jobs card has its own inline "Edit Services" modal (`job-detail.tsx:1920-2005`) that writes only `jobs.services` JSONB. A future cleanup session can extract the picker into a single shared component and route both call sites through the new cascade endpoint so the JSONB-only path is retired. Out of scope here per acceptance criteria.
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15c: "Change Time" Affordance on Jobs Card
 
 Operators working from the POS Jobs card couldn't edit appointment date/time without switching to the POS Appointments tab or Admin Appointments — a friction point flagged in the lifecycle audit (`docs/dev/LIFECYCLE_AUDIT_2026-05-15.md` §10 #10). This session closes that gap by reusing the reschedule dialog built in Item 12 (commit `2eedaae4`) — no new flow, no new permission keys, no new notification behavior.

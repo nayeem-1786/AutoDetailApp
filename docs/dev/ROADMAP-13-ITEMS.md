@@ -10,9 +10,9 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.4 (2026-05-16) — Items 1, 6, 12, 15b completed
-**Last session updated:** 2026-05-16 — Item 15b (POS Appointments cancel + This Month filter)
-**Total items:** 9 active + 4 done + 1 closed (Items 1, 6, 12, 15b done; Item 5 closed: NFC already enabled per Stripe support)
+**Document version:** v1.5 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed
+**Last session updated:** 2026-05-16 — Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
+**Total items:** 7 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
 
@@ -350,9 +350,9 @@ section.
 
 ### Item 15a — Edit Services in Admin Appointment Dialog (with cascade to job)
 
-- **Status:** not started
+- **Status:** done (2026-05-16)
 - **Severity:** S1
-- **Effort:** 1 session (~2 hours)
+- **Effort:** 1 session (~2 hours) — actual: 1 session
 - **Wave:** 1.5
 - **Depends on:** none
 
@@ -386,16 +386,76 @@ list at intake. Closes audit gaps §10 #1 and #11.
   ticket creation flow per audit §3).
 
 **Files likely affected:**
-- Admin Appointment dialog component
-- Service picker component (reuse)
-- `appointment_services` insert/delete API
-- Job-services cascade logic (sync `jobs.services` JSONB when appointment changes)
-- Tests for cascade behavior
+- `src/lib/appointments/edit-services.ts` (new — pure helpers: Zod body schema,
+  `buildJobServicesJsonb()`, `computeTotalsForServiceEdit()`)
+- `src/lib/appointments/__tests__/edit-services.test.ts` (new — 18 unit tests)
+- `src/app/api/admin/appointments/[id]/services/route.ts` (new — PUT cascade
+  endpoint with manual rollback)
+- `src/app/api/admin/appointments/[id]/services/__tests__/route.test.ts` (new —
+  17 cascade integration tests)
+- `src/app/api/admin/services/active/route.ts` (new — session-authed GET that
+  mirrors `/api/pos/services` for admin pickers)
+- `src/components/appointments/edit-services-modal.tsx` (new — picker modal,
+  search + toggle + total + save)
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx`
+  (modified — Edit affordance + modal render + optimistic services-override
+  state)
+- `src/app/admin/appointments/page.tsx` (modified — `onServicesUpdated`
+  callback refetches list + stats)
+- `docs/dev/FILE_TREE.md` (registered new helper, modal, and endpoint files)
 
 **Notes / decisions log:**
 - 2026-05-15: source = lifecycle audit §11.2 intervention #1.
 - 2026-05-15: user answered Q1 = option (a): no immediate payment; balance
   updates and is collected at job completion.
+- 2026-05-16 — Session 1 (this session):
+  - **Permission decision:** reused existing `appointments.reschedule`
+    rather than introducing a new `appointments.edit_services` key.
+    Rationale: same role distribution (admin/cashier/super_admin yes;
+    detailer no), service editing is conceptually a "scope mutation"
+    adjacent to reschedule, no DB migration required, and consistent
+    with the precedent set by Item 12's POS reschedule endpoint.
+  - **Cascade transactional model:** Supabase JS exposes no first-class
+    multi-statement transaction. Followed the manual rollback pattern
+    from `/api/pos/jobs/route.ts:381-453` (walk-in creation). Three
+    failure-injection unit tests assert rollback restores the original
+    `appointment_services` rows (preserving ids) and the original
+    `appointments.subtotal`/`total_amount` values.
+  - **`jobs.services` JSONB rebuild on cascade** uses
+    `buildJobServicesJsonb()` which mirrors the shape produced by
+    `/api/pos/jobs/populate/route.ts:128-142` (synthetic
+    `{ id: null, name, price, is_mobile_fee: true }` mobile row when
+    the appointment is mobile + surcharge > 0). Tested.
+  - **Totals model:** `subtotal = sum(prices) + mobile_surcharge`,
+    `total = subtotal − discount + tax`. Tax + discount pass through
+    unchanged from the current appointment row (tax is 0 for
+    booking-flow appointments today; discount may be non-zero from
+    coupon redemption).
+  - **Service picker component decision:** the POS Jobs card has an
+    inline "Edit Services" modal (`job-detail.tsx:1920-2005`) that
+    writes only `jobs.services` JSONB. Extracting it into a shared
+    component would have refactored the Jobs flow mid-session and
+    risked regressions. Built a parallel admin-only picker
+    (`src/components/appointments/edit-services-modal.tsx`) that
+    targets the new cascade endpoint. Tech debt acknowledged: a
+    future cleanup session should consolidate both call sites under
+    the new endpoint so the JSONB-only path is retired. Out of scope
+    here per acceptance criteria.
+  - **Notification suppression invariant:** 3 spy mocks (sendSms /
+    sendEmail / fireWebhook) assert 0 calls on the success path. Audit
+    log records `notification_suppressed: true`. Mirrors Item 12 +
+    Item 15b precedent.
+  - **Out-of-scope guards:** the API rejects edits on `completed` or
+    `cancelled` appointments with 400; the UI hides the Edit
+    affordance for those statuses. Unknown / inactive service ids
+    rejected with 400 (no DB writes occur).
+  - **Verification:** typecheck clean, lint 0 errors, all 1088 tests
+    pass (35 new from this session), build clean.
+  - **Collision-prevention:** ran concurrently with Items 15b and 15c.
+    File overlap was zero by design except for ROADMAP /
+    CHANGELOG / FILE_TREE / `appointment-detail-dialog.tsx` (which
+    only 15a touched). Staged my files explicitly and pulled
+    --rebase before commit.
 
 ---
 
@@ -1321,6 +1381,7 @@ CC session.
 | 2026-05-15 | 3 | Item 12 — Appointments in POS Footer + Reschedule | done | _(this commit)_ | Added Appointments tab (5th primary) to `bottom-nav.tsx`. New `/pos/appointments` route + `appointments-view.tsx` (date-range presets, grouped list) + `reschedule-appointment-dialog.tsx` (modal-from-row-click). New `GET /api/pos/appointments` (date-filtered list, default today+tomorrow, 31-day cap). New `PATCH /api/pos/appointments/[id]/reschedule` — POS-dedicated endpoint, no `fireWebhook` call (notification-suppression by construction; audit row records `notification_suppressed: true`). 17 new tests including 3-spy invariant (`sendSms`, `sendEmail`, `fireWebhook` all 0 calls). Existing `/api/pos/staff/available` reused for detailer dropdown. Permissions: `appointments.view_today` for read, `appointments.reschedule` for write — no new keys. `conversation_search` tool unavailable in env so no prior plan recovered. Typecheck/lint/build/vitest 1024-clean. |
 | 2026-05-16 | 4 | Item 15b — Cancel from POS Appointments + This Month filter | done | _(this commit)_ | New `POST /api/pos/appointments/[id]/cancel` endpoint (HMAC POS auth + `checkPosPermission('appointments.cancel')`). `notify_customer` defaults to false — when false, BOTH `sendCancellationNotifications` and `fireWebhook('appointment_cancelled')` are skipped (mirrors Item 12 "no webhook by construction"). New `cancel-appointment-dialog.tsx` (reason textarea + Notify checkbox, amber notice swaps copy with checkbox state). Appointments-view gets "This Month" filter button (today → endOfMonth PST) + Trash icon per row gated by `usePosPermission('appointments.cancel')` (hidden, not disabled, for cashier role). 9-case endpoint suite (suppression invariant: 0 SMS / 0 email / 0 webhook / 0 cancellation-notification calls on the false path) + 4-case RTL suite on the view (filter date math, permission gate). 1071/1071 tests; typecheck/lint/build clean. Parallel Items 15a + 15c work stashed (ROADMAP / CHANGELOG / appointment-detail-dialog / FILE_TREE / job-detail) to keep this commit clean; will be popped post-commit for those sessions to resume. |
 | 2026-05-16 | 5 | Item 15c — "Change Time" Affordance on Jobs Card | done | _(this commit)_ | Closes audit gap §10 #10. New `<ChangeTimeButton>` (~120 LOC thin wrapper) placed in the Jobs-card Timing tile header. Hides on permission/appt-id/status guards (RESCHEDULABLE = scheduled/intake/in_progress; pending_approval/completed/closed/cancelled all hidden). Click fetches single appointment + bookable staff in parallel and renders the existing `<RescheduleAppointmentDialog>` from Item 12 **unmodified**. New `GET /api/pos/appointments/[id]` (single-appointment lookup, same select shape as the list endpoint, `appointments.view_today` gate). 15 new tests (11 component + 4 endpoint). Notification suppression inherited from Item 12's reschedule path — no new spy assertions needed. Ran concurrently with Items 15a/15b; only Item 15c files staged for this commit. Hit repeated doc-revert collisions with parallel sessions editing ROADMAP/FILE_TREE/CHANGELOG — re-applied minimum 15c doc edits immediately before commit. Typecheck/lint/build clean; vitest 1067-clean. |
+| 2026-05-16 | 6 | Item 15a — Edit Services on Admin Appointment Dialog (with cascade to job) | done | _(this commit)_ | Closes audit gaps §10 #1 and #11. New `PUT /api/admin/appointments/[id]/services` performs the cascade: replaces `appointment_services` rows, recomputes appointment `subtotal`/`total_amount`, and (if a `jobs` row is linked via `jobs.appointment_id`) rebuilds the `jobs.services` JSONB to match — mirroring the synthetic-mobile-fee shape from `/api/pos/jobs/populate/route.ts`. Permission decision: reused `appointments.reschedule` (same role distribution + no migration). Manual rollback pattern from `/api/pos/jobs/route.ts:381-453` adapted — snapshot/restore preserves original row ids at each failure-injection point. New `GET /api/admin/services/active` (session-authed) feeds the picker. New `<EditServicesModal>` and pure helpers in `src/lib/appointments/edit-services.ts` (Zod schema, `buildJobServicesJsonb`, `computeTotalsForServiceEdit`). 35 new tests (18 helpers + 17 cascade) including the 3-spy notification-suppression invariant (sendSms / sendEmail / fireWebhook all 0). Optimistic services-override state in the dialog re-renders totals immediately; parent refetches on `onServicesUpdated`. POS Jobs-card inline picker left untouched (tech debt acknowledged). Typecheck/lint/build clean; vitest 1088-clean. Concurrent with Items 15b/15c — only 15a files staged. |
 
 ---
 

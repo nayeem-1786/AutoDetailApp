@@ -1371,6 +1371,14 @@ Roadmap Item 15c ("Change Time" affordance on Jobs Card) additions:
 - `src/app/pos/jobs/components/change-time-button.tsx`
 - `src/app/pos/jobs/components/__tests__/change-time-button.test.tsx`
 
+Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job) additions:
+- `src/lib/appointments/edit-services.ts` — Pure helpers (Zod body schema, `buildJobServicesJsonb()`, `computeTotalsForServiceEdit()`).
+- `src/lib/appointments/__tests__/edit-services.test.ts`
+- `src/app/api/admin/appointments/[id]/services/route.ts` — PUT cascade endpoint (`appointment_services` + `jobs.services` JSONB sync with manual rollback).
+- `src/app/api/admin/appointments/[id]/services/__tests__/route.test.ts`
+- `src/app/api/admin/services/active/route.ts` — Session-authed GET active services for admin pickers.
+- `src/components/appointments/edit-services-modal.tsx` — Picker modal (search + toggle + total + save).
+
 ---
 
 ## Migrations (`supabase/migrations/`)
