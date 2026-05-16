@@ -381,6 +381,8 @@ src/app/api/migration/vehicles/route.ts
 ```
 src/app/api/pos/appointments/route.ts                         # GET list (date range, default today+tomorrow) — Roadmap Item 12
 src/app/api/pos/appointments/__tests__/list.test.ts
+src/app/api/pos/appointments/[id]/cancel/route.ts              # POST cancel — POS-specific, notify_customer flag default false (Roadmap Item 15b)
+src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts
 src/app/api/pos/appointments/[id]/mobile-address/route.ts     # PATCH mobile_address only (Phase Mobile-1.6)
 src/app/api/pos/appointments/[id]/mobile-service/route.ts     # PATCH full mobile picker — toggle/zone/custom/address (Phase Mobile-1.9)
 src/app/api/pos/appointments/[id]/notify/route.ts
@@ -1358,6 +1360,10 @@ Roadmap Item 12 (POS Appointments) additions:
 - `src/app/pos/components/appointments/appointments-view.tsx`
 - `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx`
 - `src/app/pos/components/appointments/types.ts`
+
+Roadmap Item 15b (Cancel from POS Appointments + This Month filter) additions:
+- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx`
+- `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx`
 
 ---
 

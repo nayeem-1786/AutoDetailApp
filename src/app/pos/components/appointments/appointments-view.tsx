@@ -1,16 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, RefreshCw, User } from 'lucide-react';
+import { Calendar, RefreshCw, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { posFetch } from '../../lib/pos-fetch';
+import { usePosPermission } from '../../context/pos-permission-context';
 import { formatTime } from '@/lib/utils/format';
 import { getTodayPst } from '@/lib/utils/pst-date';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { RescheduleAppointmentDialog } from './reschedule-appointment-dialog';
+import { CancelAppointmentDialog } from './cancel-appointment-dialog';
 import type { PosAppointment, PosStaff } from './types';
 
 function addDays(dateStr: string, days: number): string {
@@ -18,6 +20,18 @@ function addDays(dateStr: string, days: number): string {
   const dt = new Date(Date.UTC(y, m - 1, d));
   dt.setUTCDate(dt.getUTCDate() + days);
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Roadmap Item 15b: compute the last calendar day of the month that `dateStr`
+ * (YYYY-MM-DD) lies in, returning YYYY-MM-DD. `new Date(y, m, 0)` rolls back
+ * one day from the first of the following month, which is the standard
+ * end-of-month idiom and stays accurate across leap years.
+ */
+function endOfMonth(dateStr: string): string {
+  const [y, m] = dateStr.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 }
 
 function formatLongDate(dateStr: string): string {
@@ -47,6 +61,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function AppointmentsView() {
   const today = useMemo(() => getTodayPst(), []);
+  const monthEnd = useMemo(() => endOfMonth(today), [today]);
   const [startDate, setStartDate] = useState(today);
   const [endDate, setEndDate] = useState(addDays(today, 1));
   const [appointments, setAppointments] = useState<PosAppointment[]>([]);
@@ -54,6 +69,11 @@ export function AppointmentsView() {
   const [loading, setLoading] = useState(true);
   const [staffLoading, setStaffLoading] = useState(true);
   const [editing, setEditing] = useState<PosAppointment | null>(null);
+  const [cancelling, setCancelling] = useState<PosAppointment | null>(null);
+  // Roadmap Item 15b: gate Cancel control. Hide entirely (not just disable)
+  // for users without `appointments.cancel` — cashier role default is denied
+  // per audit §9.1.
+  const { granted: canCancel } = usePosPermission('appointments.cancel');
 
   const loadAppointments = useCallback(async () => {
     setLoading(true);
@@ -119,11 +139,26 @@ export function AppointmentsView() {
     setEndDate(addDays(today, 6));
   }
 
+  function handlePresetMonth() {
+    setStartDate(today);
+    setEndDate(monthEnd);
+  }
+
   function handleSaved(updated: PosAppointment) {
     setAppointments((prev) =>
       prev.map((appt) => (appt.id === updated.id ? updated : appt))
     );
     setEditing(null);
+  }
+
+  function handleCancelled(cancelled: PosAppointment) {
+    // The list endpoint (GET /api/pos/appointments) filters cancelled rows
+    // server-side, so we drop the row locally to keep the UI in sync without
+    // a full refetch round-trip.
+    setAppointments((prev) => prev.filter((appt) => appt.id !== cancelled.id));
+    setCancelling(null);
+    // If the same appointment was open in the reschedule dialog, close it.
+    setEditing((prev) => (prev?.id === cancelled.id ? null : prev));
   }
 
   // Group by date for the list rendering
@@ -192,6 +227,17 @@ export function AppointmentsView() {
           >
             Next 7 Days
           </button>
+          <button
+            type="button"
+            onClick={handlePresetMonth}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+              startDate === today && endDate === monthEnd
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+            }`}
+          >
+            This Month
+          </button>
 
           <div className="ml-auto flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
@@ -249,11 +295,15 @@ export function AppointmentsView() {
                   </h2>
                   <ul className="space-y-2">
                     {list.map((appt) => (
-                      <li key={appt.id}>
+                      <li
+                        key={appt.id}
+                        className="flex items-stretch gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm"
+                      >
                         <button
                           type="button"
                           onClick={() => setEditing(appt)}
-                          className="flex w-full items-start justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-sm"
+                          className="flex flex-1 items-start justify-between gap-3 p-3 text-left rounded-l-lg"
+                          aria-label={`Edit appointment for ${appt.customer.first_name} ${appt.customer.last_name}`}
                         >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
@@ -297,6 +347,17 @@ export function AppointmentsView() {
                             </span>
                           </div>
                         </button>
+                        {canCancel && (
+                          <button
+                            type="button"
+                            onClick={() => setCancelling(appt)}
+                            className="flex shrink-0 items-center justify-center rounded-r-lg border-l border-gray-200 dark:border-gray-700 px-3 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                            aria-label={`Cancel appointment for ${appt.customer.first_name} ${appt.customer.last_name}`}
+                            title="Cancel appointment"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -315,6 +376,15 @@ export function AppointmentsView() {
           staffLoading={staffLoading}
           onClose={() => setEditing(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {cancelling && (
+        <CancelAppointmentDialog
+          open
+          appointment={cancelling}
+          onClose={() => setCancelling(null)}
+          onCancelled={handleCancelled}
         />
       )}
     </div>

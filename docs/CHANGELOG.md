@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15b: Cancel from POS Appointments tab + "This Month" filter
+
+The POS Appointments tab (shipped in Item 12) supported reschedule but not cancel — cashiers had to switch to Admin Appointments to cancel a booking. This session adds the cancel control with explicit no-notification-by-default semantics, plus a "This Month" date-range filter that was surfaced as a user request during Item 12 UAT. Closes lifecycle audit gap §10 #4.
+
+**What's new for staff:**
+- Each row in the POS Appointments list now has a Trash icon on the right (sibling to the main row tap that opens reschedule). Tap it → confirmation modal with a required Reason textarea and a "Notify customer" checkbox.
+- Checkbox defaults OFF — operators cancel quietly unless they opt in. Amber notice copy swaps with the checkbox state so the operator sees exactly what will happen.
+- "This Month" filter button added between "Next 7 Days" and the Custom From/To inputs. Sets the date range to today → last calendar day of current month in `America/Los_Angeles`.
+- Cancel button is HIDDEN (not just disabled) for users without `appointments.cancel`. Cashier role default is `false` per the lifecycle audit §9.1 — this session does NOT grant it to cashier; that's a separate user decision.
+
+**Endpoint decision — new POS-specific endpoint, not an extension of admin:**
+- `POST /api/pos/appointments/[id]/cancel` (new) — HMAC POS auth + `checkPosPermission('appointments.cancel')`. Body: `{ cancellation_reason: string, notify_customer?: boolean }` (default `false`).
+- Modelled on the Item 12 `/api/pos/appointments/[id]/reschedule` pattern (POS-dedicated endpoint, narrower scope than admin, notification suppression by construction).
+- Admin `/api/appointments/[id]/cancel` endpoint is unchanged — admin notification default stays "on" as it always has.
+
+**Notification suppression — two channels gated by one flag:**
+- When `notify_customer=false` (default): skip BOTH `sendCancellationNotifications` (direct SMS+email to customer) AND `fireWebhook('appointment_cancelled')` (downstream n8n flows that may also notify the customer). The webhook is intentionally suppressed too — honoring "do not notify" means closing every customer-facing channel.
+- When `notify_customer=true`: fire both, matching admin parity for the customer-facing side effects.
+- Audit row always records `notification_suppressed: !notify_customer` + `source: 'pos'` for traceability.
+- Waitlist auto-notification is intentionally NOT mirrored from admin. Waitlist is its own fan-out customer-contact side-channel (notifies OTHER customers about an opening) — kept off the POS cancel surface to preserve the strict "no auto-notification from POS" invariant. Admin cancel continues to handle waitlist auto-notify.
+
+**Files:**
+- `src/app/api/pos/appointments/[id]/cancel/route.ts` (new) — the POST endpoint.
+- `src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts` (new) — 9 cases including the headline suppression invariant (notify=false → 0 SMS, 0 email, 0 webhook, 0 cancellation-notification calls).
+- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx` (new) — confirmation modal mirroring the reschedule dialog architecture.
+- `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx` (new) — 4 RTL cases (filter position, filter date math, cancel-button-visible-with-permission, cancel-button-HIDDEN-without-permission).
+- `src/app/pos/components/appointments/appointments-view.tsx` — added "This Month" preset + per-row Trash icon (permission-gated) + cancel-dialog mount. Row-tap reschedule unchanged.
+
+**Verification:** typecheck clean, 0 lint errors, 1071/1071 vitest, build clean.
+
+**Out of scope (per spec):**
+- Cancellation fee waiving — `appointments.waive_fee` is admin-only; not surfaced in POS.
+- Bulk cancellation.
+- Refund initiation logic — existing cancel flow handles refund processing if applicable; no change.
+- Granting `appointments.cancel` to cashier role — explicit user decision needed.
+
+---
+
 ## 2026-05-15 — Wave 1 / Item 12: Appointments in POS Footer + Reschedule
 
 Staff at the POS counter often field reschedule requests while the customer is right in front of them. Until today, appointment date/time/detailer edits were only possible from `Admin > Appointments` — a context switch staff routinely skipped, leaving stale appointments in the calendar. This session adds an **Appointments** tab to the POS footer and a focused reschedule flow.

@@ -10,9 +10,9 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.3 (2026-05-15) — Items 1, 6, 12 completed
-**Last session updated:** 2026-05-15 — Item 12 (POS Footer Appointments + Reschedule)
-**Total items:** 10 active + 3 done + 1 closed (Items 1, 6, 12 done; Item 5 closed: NFC already enabled per Stripe support)
+**Document version:** v1.4 (2026-05-16) — Items 1, 6, 12, 15b completed
+**Last session updated:** 2026-05-16 — Item 15b (POS Appointments cancel + This Month filter)
+**Total items:** 9 active + 4 done + 1 closed (Items 1, 6, 12, 15b done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
 
@@ -401,9 +401,9 @@ list at intake. Closes audit gaps §10 #1 and #11.
 
 ### Item 15b — Cancel Appointment from POS Appointments Tab + "This Month" Filter
 
-- **Status:** not started
+- **Status:** done (2026-05-16)
 - **Severity:** S2
-- **Effort:** 1 session (~1.5 hours)
+- **Effort:** 1 session (~1.5 hours) — actual: 1 session
 - **Wave:** 1.5
 - **Depends on:** none (extends Item 12 surface)
 
@@ -430,25 +430,80 @@ audit gap §10 #4.
 - Bulk cancellation.
 - Refund initiation on cancel (existing cancellation flow handles refund logic).
 
-**Files likely affected:**
-- POS Appointments tab component
-- POS Appointments API or direct call to existing cancel endpoint
-- Date-range filter dropdown
-- Tests for cancel flow + filter
+**Files likely affected (actual, post-session):**
+- `src/app/api/pos/appointments/[id]/cancel/route.ts` (new) — POS-specific
+  cancel endpoint mirroring the Item 12 reschedule pattern (HMAC POS auth +
+  `checkPosPermission('appointments.cancel')`). Body
+  `{ cancellation_reason, notify_customer? }`. When `notify_customer=false`
+  (the default): skip both `sendCancellationNotifications` AND
+  `fireWebhook('appointment_cancelled')` so no SMS/email/webhook fires.
+  When `true`: fire both, matching admin parity. Audit row records
+  `notification_suppressed: !notify_customer` + `source: 'pos'`.
+- `src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts` (new)
+  — 9 cases covering: 401 unauth, 403 permission denied (cashier role
+  default), 400 missing/empty reason, 404 missing appointment, 400 terminal
+  states (cancelled/completed), the headline suppression invariant
+  (notify=false → 0 SMS, 0 email, 0 webhook, 0 cancellation-notification
+  calls), notify=true firing path, and reason whitespace trim.
+- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx` (new)
+  — confirmation modal mirroring the reschedule dialog architecture. Required
+  reason textarea + "Notify customer" checkbox (default OFF). Amber-notice
+  swaps copy depending on the checkbox state so the operator sees the
+  notification semantics explicitly before confirming.
+- `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx`
+  (new) — 4 RTL cases: "This Month" button position, filter date math
+  (mid-May 2026 → end_date=2026-05-31), Cancel icon visible with permission,
+  Cancel icon HIDDEN (not just disabled) without permission.
+- `src/app/pos/components/appointments/appointments-view.tsx` — added the
+  "This Month" filter button between "Next 7 Days" and the Custom From/To
+  inputs (PST end-of-month math via local helper), the per-row Trash icon
+  permission-gated by `usePosPermission('appointments.cancel')`, and the
+  cancel-dialog mounting. The whole-row reschedule click is unchanged — the
+  Trash icon is a separate sibling button so it doesn't bubble.
 
 **Notes / decisions log:**
 - 2026-05-15: source = lifecycle audit §11.2 intervention #2 + user request
   for "This Month" filter from Item 12 testing.
 - 2026-05-15: cashier role lacks `appointments.cancel` per audit §9.1 — the
   button will be hidden for cashiers unless user explicitly grants the permission.
+- 2026-05-16 (session): **endpoint decision** — built a NEW
+  `/api/pos/appointments/[id]/cancel` endpoint instead of extending the
+  existing admin `/api/appointments/[id]/cancel`. Rationale: matches the
+  Item 12 reschedule pattern (HMAC POS auth, narrower scope, no waitlist
+  branch, no cancellation-fee branch). Admin endpoint stays unchanged so
+  the admin notification default ("notify on") is preserved verbatim.
+- 2026-05-16 (session): **notification suppression mechanism** — explicit
+  branch on `notify_customer` (default false). When false, BOTH the direct
+  `sendCancellationNotifications` call AND the `appointment_cancelled`
+  webhook are skipped. Skipping the webhook too is intentional: downstream
+  n8n flows on that event may also notify the customer, so honoring
+  "notify_customer=false" requires not firing the webhook either. Mirrors
+  the Item 12 "by construction, no webhook fired" pattern.
+- 2026-05-16 (session): **waitlist auto-notify** intentionally NOT mirrored
+  from admin. Waitlist notification (fan-out to OTHER customers waiting
+  for an opening) is its own customer-contact side-channel — kept off the
+  POS cancel surface to preserve the strict "no auto-notification from
+  POS" invariant. Admin cancel continues to handle waitlist auto-notify.
+- 2026-05-16 (session): **cancellation fee** intentionally NOT exposed.
+  `appointments.waive_fee` is admin-only per audit §9.1; this session
+  explicitly avoids surfacing fee math on the POS path.
+- 2026-05-16 (session): **cashier role default unchanged**. Cashier still
+  lacks `appointments.cancel`. UI hides the Trash icon for cashier
+  (RTL test asserts this). Endpoint returns 403 to cashier (test asserts
+  this). Granting cashier the permission is out of scope per spec.
+- 2026-05-16 (session): **collision-prevention**: ROADMAP/CHANGELOG/
+  appointment-detail-dialog/FILE_TREE were being modified by concurrent
+  Item 15a + 15c sessions. Stashed their working-tree edits before
+  applying mine, committed only my files explicitly, then will restore
+  the stashes for those sessions to resume.
 
 ---
 
 ### Item 15c — "Change Time" Affordance on Jobs Card
 
-- **Status:** not started
+- **Status:** done (2026-05-16)
 - **Severity:** S1
-- **Effort:** 1 session (~1.5 hours)
+- **Effort:** 1 session (~1.5 hours) — actual: 1 session
 - **Wave:** 1.5
 - **Depends on:** none
 
@@ -477,15 +532,63 @@ gap. Closes audit gap §10 #10 (and partially reduces §2/§3 friction).
 - Cancelling the appointment from the Jobs card (Jobs card has "Cancel Job"
   which is a different concern per audit §10 #12).
 
-**Files likely affected:**
-- Jobs card component (`job-detail.tsx`)
-- Reschedule dialog component (reuse from POS Appointments tab)
-- Tests for the new affordance + status guards
+**Files likely affected (actual after session):**
+- `src/app/pos/jobs/components/job-detail.tsx` — added `ChangeTimeButton`
+  import and placed it in the Timing tile header (top-right of the time
+  fields it edits). No other Jobs-card logic touched.
+- `src/app/pos/jobs/components/change-time-button.tsx` — new ~120 LOC thin
+  wrapper. Hides itself on permission/appt-id/status guards; on click
+  fetches the single appointment + bookable staff in parallel and renders
+  the reused `<RescheduleAppointmentDialog>` (unmodified).
+- `src/app/api/pos/appointments/[id]/route.ts` — new `GET` returning a
+  single joined `PosAppointment`. Same select shape as the list endpoint.
+  Permission: `appointments.view_today`.
+- `src/app/pos/jobs/components/__tests__/change-time-button.test.tsx` —
+  11 cases (3 status-visible, 4 status-hidden, 1 permission-hidden,
+  1 no-appointment-hidden, 1 happy-path open, 1 fetch-error toast).
+- `src/app/api/pos/appointments/[id]/__tests__/get.test.ts` — 4 cases
+  (401/403/404/200).
+- `docs/dev/FILE_TREE.md`, `docs/dev/ROADMAP-13-ITEMS.md`,
+  `docs/CHANGELOG.md` — doc updates.
 
 **Notes / decisions log:**
 - 2026-05-15: source = lifecycle audit §11.2 intervention #3.
 - 2026-05-15: explicit instruction to REUSE the POS Appointments tab's
   reschedule dialog — Rule 11.
+- 2026-05-16 (session): **Placement decision**: Timing tile header
+  (top-right). Edit control sits next to the time fields; mirrors the
+  pencil-icon affordance on the adjacent Notes tile. Rejected footer
+  action bar (status-flow actions live there) and inline-on-time-row
+  (no single "scheduled_time" row in the current Timing tile, which
+  shows 6 timestamps).
+- 2026-05-16 (session): **Reuse strategy**: the reschedule dialog file is
+  **unmodified**. `<ChangeTimeButton>` is a thin wrapper that does three
+  things: gate, fetch, render. Considered extending `GET /api/pos/jobs/[id]`
+  to inline the full appointment join — rejected as a higher-risk change
+  that would ripple through `JobDetailData` and Jobs-card rendering.
+- 2026-05-16 (session): **Status guards** — RESCHEDULABLE_STATUSES =
+  {`scheduled`, `intake`, `in_progress`}. `pending_approval`, `completed`,
+  `closed`, `cancelled` all hide the button. Mirrors `DRAGGABLE_STATUSES`
+  in the timeline reschedule route + the POS Appointments reschedule
+  endpoint's own 400 guard for completed/cancelled.
+- 2026-05-16 (session): **Permission guard** — `appointments.reschedule`
+  via `usePosPermission`. Same key the POS Appointments tab uses; granted
+  to cashier+admin+super_admin by default; detailer denied. **No new
+  permission keys.**
+- 2026-05-16 (session): **Notification suppression inherited** from
+  Item 12's `PATCH /api/pos/appointments/[id]/reschedule` endpoint (no
+  webhook fire; audit row records `notification_suppressed: true`). The
+  3-spy invariant from Item 12's `reschedule.test.ts` continues to
+  protect this path; no new spy test added since the entry point
+  introduces no new notification touchpoints.
+- 2026-05-16 (session): **Concurrency note** — ran alongside Items 15a/15b.
+  Only Item 15c files staged for this commit; parallel-session work left
+  on the working tree. Doc edits experienced repeated revert collisions
+  with parallel sessions editing the same file — re-applied minimum
+  Item 15c block edits + ledger row immediately before commit.
+- 2026-05-16 (session): all gates green — typecheck clean, lint 0 errors
+  (0 new warnings from this session's files), vitest 1067/1067 (15 new:
+  11 component + 4 endpoint), build clean.
 
 ---
 
@@ -1216,6 +1319,8 @@ CC session.
 | 2026-05-15 | 1 | Item 1 — POS Customer Search → Create Smart Prefill | done | `6b0413dd` | New helper `routeSearchInput` + 24 unit tests + 6 dialog prefill tests. Wired into ticket-panel + quote-ticket-panel. Reused `isPhoneQuery` from existing tokenize.ts. International phone shapes preserved verbatim. Pre-existing in-progress Item 6/12 work left untouched on working tree. |
 | 2026-05-15 | 2 | Item 6 — Deposit / Paid-in-Full Label Unification | done | _(this commit)_ | `formatDepositLabel({depositCents,totalCents})` helper added to receipt-composer.ts. `RECEIPT_VOCAB.DEPOSIT_ONLINE`/`DEPOSIT_IN_STORE` replaced with `DEPOSIT`/`PAID_IN_FULL`. Threaded `ticketTotalCents` (subtotal+tax+tip) into 3 render sites: thermal, HTML, public receipt. 10 fixture files regenerated. 7-case helper test suite + threshold tests on `buildSuggestedLabelForPayment` (122 composer tests, 1024 total — all pass). Typecheck/lint/build clean. |
 | 2026-05-15 | 3 | Item 12 — Appointments in POS Footer + Reschedule | done | _(this commit)_ | Added Appointments tab (5th primary) to `bottom-nav.tsx`. New `/pos/appointments` route + `appointments-view.tsx` (date-range presets, grouped list) + `reschedule-appointment-dialog.tsx` (modal-from-row-click). New `GET /api/pos/appointments` (date-filtered list, default today+tomorrow, 31-day cap). New `PATCH /api/pos/appointments/[id]/reschedule` — POS-dedicated endpoint, no `fireWebhook` call (notification-suppression by construction; audit row records `notification_suppressed: true`). 17 new tests including 3-spy invariant (`sendSms`, `sendEmail`, `fireWebhook` all 0 calls). Existing `/api/pos/staff/available` reused for detailer dropdown. Permissions: `appointments.view_today` for read, `appointments.reschedule` for write — no new keys. `conversation_search` tool unavailable in env so no prior plan recovered. Typecheck/lint/build/vitest 1024-clean. |
+| 2026-05-16 | 4 | Item 15b — Cancel from POS Appointments + This Month filter | done | _(this commit)_ | New `POST /api/pos/appointments/[id]/cancel` endpoint (HMAC POS auth + `checkPosPermission('appointments.cancel')`). `notify_customer` defaults to false — when false, BOTH `sendCancellationNotifications` and `fireWebhook('appointment_cancelled')` are skipped (mirrors Item 12 "no webhook by construction"). New `cancel-appointment-dialog.tsx` (reason textarea + Notify checkbox, amber notice swaps copy with checkbox state). Appointments-view gets "This Month" filter button (today → endOfMonth PST) + Trash icon per row gated by `usePosPermission('appointments.cancel')` (hidden, not disabled, for cashier role). 9-case endpoint suite (suppression invariant: 0 SMS / 0 email / 0 webhook / 0 cancellation-notification calls on the false path) + 4-case RTL suite on the view (filter date math, permission gate). 1071/1071 tests; typecheck/lint/build clean. Parallel Items 15a + 15c work stashed (ROADMAP / CHANGELOG / appointment-detail-dialog / FILE_TREE / job-detail) to keep this commit clean; will be popped post-commit for those sessions to resume. |
+| 2026-05-16 | 5 | Item 15c — "Change Time" Affordance on Jobs Card | done | _(this commit)_ | Closes audit gap §10 #10. New `<ChangeTimeButton>` (~120 LOC thin wrapper) placed in the Jobs-card Timing tile header. Hides on permission/appt-id/status guards (RESCHEDULABLE = scheduled/intake/in_progress; pending_approval/completed/closed/cancelled all hidden). Click fetches single appointment + bookable staff in parallel and renders the existing `<RescheduleAppointmentDialog>` from Item 12 **unmodified**. New `GET /api/pos/appointments/[id]` (single-appointment lookup, same select shape as the list endpoint, `appointments.view_today` gate). 15 new tests (11 component + 4 endpoint). Notification suppression inherited from Item 12's reschedule path — no new spy assertions needed. Ran concurrently with Items 15a/15b; only Item 15c files staged for this commit. Hit repeated doc-revert collisions with parallel sessions editing ROADMAP/FILE_TREE/CHANGELOG — re-applied minimum 15c doc edits immediately before commit. Typecheck/lint/build clean; vitest 1067-clean. |
 
 ---
 
