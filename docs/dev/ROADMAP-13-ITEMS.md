@@ -888,7 +888,7 @@ CC session.
 
 | Date | Session # | Item | Status | Commit hash | Notes |
 |---|---|---|---|---|---|
-| 2026-05-15 | 1 | Item 1 — POS Customer Search → Create Smart Prefill | done | _(pending — set at commit time)_ | New helper `routeSearchInput` + 24 unit tests + 6 dialog prefill tests. Wired into ticket-panel + quote-ticket-panel. Reused `isPhoneQuery` from existing tokenize.ts. International phone shapes preserved verbatim. Pre-existing in-progress Item 6/12 work left untouched on working tree. |
+| 2026-05-15 | 1 | Item 1 — POS Customer Search → Create Smart Prefill | done | `6b0413dd` | New helper `routeSearchInput` + 24 unit tests + 6 dialog prefill tests. Wired into ticket-panel + quote-ticket-panel. Reused `isPhoneQuery` from existing tokenize.ts. International phone shapes preserved verbatim. Pre-existing in-progress Item 6/12 work left untouched on working tree. |
 
 ---
 
