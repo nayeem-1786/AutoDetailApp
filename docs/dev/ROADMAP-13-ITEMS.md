@@ -330,6 +330,221 @@ If implemented, this resolves the need to edit appointments from the Jobs card.
   fill cross-surface gaps in the existing two-tab model. **No code or
   schema changes were made in this audit.** Next steps to be determined
   by review of the audit doc before any further planning.
+- 2026-05-15 (post-audit): full Jobs+Appointments merge (originally
+  drafted as Item 15) replaced by **Wave 1.5** (Items 15a-d) — four
+  minimal interventions that close most §10 friction gaps at substantially
+  lower cost. Item 15d is framed as a low-risk prototype that doubles as a
+  permanent solution if it satisfies operator friction. See Decisions
+  superseded table for the trace.
+
+---
+
+## Wave 1.5 — Item 12 Follow-ups (4 Minimal Interventions)
+
+Sourced from the lifecycle audit completed 2026-05-15
+(`docs/dev/LIFECYCLE_AUDIT_2026-05-15.md`). Audit findings revealed that a
+full Jobs+Appointments merge (originally drafted as Item 15) is not warranted
+— the 4 interventions below close most §10 friction gaps at substantially
+lower cost. Item 15 (full merge) is recorded in the Decisions Superseded
+section.
+
+### Item 15a — Edit Services in Admin Appointment Dialog (with cascade to job)
+
+- **Status:** not started
+- **Severity:** S1
+- **Effort:** 1 session (~2 hours)
+- **Wave:** 1.5
+- **Depends on:** none
+
+**Problem statement:**
+The Admin Appointment dialog currently shows services read-only. Operators can't
+add or remove services after an appointment is booked. If a job has been created
+from the appointment (1:1 link via `jobs.appointment_id`), changes must cascade
+to `jobs.services` (JSONB snapshot) so the detailer sees the up-to-date service
+list at intake. Closes audit gaps §10 #1 and #11.
+
+**Acceptance criteria:**
+- Admin Appointment dialog gets an "Edit Services" control that opens a service
+  picker (reuse existing service-picker component from the ticket creation flow).
+- Adding a service: creates an `appointment_services` row.
+- Removing a service: deletes the corresponding `appointment_services` row (or
+  soft-deletes if the schema supports it — verify in-session).
+- If a job exists linked to this appointment (`jobs.appointment_id` is set):
+  the `jobs.services` JSONB is synced to match the new `appointment_services` rows.
+- Price recalculation: appointment total updates; if a deposit was paid, the
+  balance owed updates (no payment collected immediately, per user spec — option a).
+- Permission gate: `appointments.edit_services` (new permission key, or reuse
+  existing `appointments.reschedule` — pick after audit in-session).
+- No customer SMS/email triggered from this path (consistent with Item 12 pattern).
+
+**Out of scope:**
+- Mid-job add-on flow (already handled by Flag-an-Issue — audit §4 confirms).
+- Sending the customer a new pay-link for the price delta (deliberately out
+  of scope per user answer Q1).
+- Editing services on completed/cancelled appointments.
+- Editing services on quotes (separate concern; already editable via quote
+  ticket creation flow per audit §3).
+
+**Files likely affected:**
+- Admin Appointment dialog component
+- Service picker component (reuse)
+- `appointment_services` insert/delete API
+- Job-services cascade logic (sync `jobs.services` JSONB when appointment changes)
+- Tests for cascade behavior
+
+**Notes / decisions log:**
+- 2026-05-15: source = lifecycle audit §11.2 intervention #1.
+- 2026-05-15: user answered Q1 = option (a): no immediate payment; balance
+  updates and is collected at job completion.
+
+---
+
+### Item 15b — Cancel Appointment from POS Appointments Tab + "This Month" Filter
+
+- **Status:** not started
+- **Severity:** S2
+- **Effort:** 1 session (~1.5 hours)
+- **Wave:** 1.5
+- **Depends on:** none (extends Item 12 surface)
+
+**Problem statement:**
+The POS Appointments tab (shipped in Item 12) supports reschedule but not cancel.
+Cashiers needing to cancel an appointment must switch to Admin Appointments.
+Additionally, the date-range filter is missing a "This Month" option. Closes
+audit gap §10 #4.
+
+**Acceptance criteria:**
+- POS Appointments row gets a "Cancel" action (icon button or modal-from-row-click).
+- Cancel opens a confirmation modal with reason field (required) and "Notify
+  customer" checkbox (default off, consistent with Item 12 no-notification pattern).
+- On confirm: calls existing `/api/appointments/[id]/cancel` endpoint.
+- Permission gate: `appointments.cancel` (existing — admin and super_admin only
+  per audit §9.1; do NOT grant to cashier without explicit user approval).
+- Date-range filter dropdown adds "This Month" option (between "Next 7 Days"
+  and "Custom").
+- "This Month" = appointments from today through end of current calendar month.
+
+**Out of scope:**
+- Cancellation fee waiving (existing `appointments.waive_fee` permission gates
+  that on the Admin side; not exposed in POS).
+- Bulk cancellation.
+- Refund initiation on cancel (existing cancellation flow handles refund logic).
+
+**Files likely affected:**
+- POS Appointments tab component
+- POS Appointments API or direct call to existing cancel endpoint
+- Date-range filter dropdown
+- Tests for cancel flow + filter
+
+**Notes / decisions log:**
+- 2026-05-15: source = lifecycle audit §11.2 intervention #2 + user request
+  for "This Month" filter from Item 12 testing.
+- 2026-05-15: cashier role lacks `appointments.cancel` per audit §9.1 — the
+  button will be hidden for cashiers unless user explicitly grants the permission.
+
+---
+
+### Item 15c — "Change Time" Affordance on Jobs Card
+
+- **Status:** not started
+- **Severity:** S1
+- **Effort:** 1 session (~1.5 hours)
+- **Wave:** 1.5
+- **Depends on:** none
+
+**Problem statement:**
+The Jobs card cannot edit appointment date/time. Operators must switch to POS
+Appointments tab or Admin Appointments to reschedule. Audit §7.3 confirms this
+gap. Closes audit gap §10 #10 (and partially reduces §2/§3 friction).
+
+**Acceptance criteria:**
+- Jobs card gets a "Change Time" or similar affordance (button or inline edit on
+  the scheduled-time field).
+- Click opens the SAME reschedule dialog used by the POS Appointments tab
+  (component reuse — Rule 11).
+- Reschedule edits the underlying appointment, syncs detailer back to job
+  (existing behavior).
+- Permission gate: `appointments.reschedule` (existing).
+- Available statuses: `scheduled`, `intake`, `in_progress` (same as POS
+  Appointments tab; explicitly rejects `completed` per audit §10 #3).
+- No customer notification (consistent with Item 12 pattern).
+
+**Out of scope:**
+- Changing detailer from the Jobs card (already supported per audit §7.2; this
+  session does not modify that flow).
+- Changing services from the Jobs card (already supported via Edit Services
+  modal per audit §7.2; this session does not modify that flow).
+- Cancelling the appointment from the Jobs card (Jobs card has "Cancel Job"
+  which is a different concern per audit §10 #12).
+
+**Files likely affected:**
+- Jobs card component (`job-detail.tsx`)
+- Reschedule dialog component (reuse from POS Appointments tab)
+- Tests for the new affordance + status guards
+
+**Notes / decisions log:**
+- 2026-05-15: source = lifecycle audit §11.2 intervention #3.
+- 2026-05-15: explicit instruction to REUSE the POS Appointments tab's
+  reschedule dialog — Rule 11.
+
+---
+
+### Item 15d — "Today's Tickets" Combined View
+
+- **Status:** not started
+- **Severity:** S2
+- **Effort:** 1-2 sessions (~3-4 hours)
+- **Wave:** 1.5
+- **Depends on:** 15a, 15b, 15c helpful but not strictly required
+
+**Problem statement:**
+Operators have no single view showing all of today's work regardless of stage.
+They check POS Quotes for outstanding quotes, POS Jobs for in-progress/scheduled,
+POS Appointments for upcoming-but-no-job-yet, POS Transactions for
+completed/refunded. Cross-surface mental model is the highest-friction
+observation in the audit (§10 #8). This intervention serves as a low-risk
+prototype for what a full Tickets merge would feel like — per the audit, "if
+after shipping it you still want a merger, you'll have real operational data
+on whether it's worth it."
+
+**Acceptance criteria:**
+- New view (location TBD in-session — could be a new POS tab, or absorbed into
+  existing Jobs surface as an "All" filter).
+- Lists for today's date:
+  - Quotes (pending / sent, not yet converted)
+  - Appointments (booked, no job yet)
+  - Jobs (any status — scheduled, intake, in-progress, completed)
+  - Transactions (completed today)
+- Each row shows a clear stage discriminator (badge, icon, or column).
+- Row click opens the appropriate edit surface for that entity (quote → quote
+  editor; appointment → appointment dialog; job → job card; transaction →
+  receipt).
+- Filters: stage (all/quote/appointment/job/transaction), detailer, date.
+- Default filter: today, all stages.
+- Read-only at this stage — clicking a row navigates to the existing edit
+  surface (this view doesn't replace edits, only consolidates discovery).
+
+**Out of scope:**
+- Inline editing in the combined view (clicking a row goes to existing edit
+  surfaces).
+- Merging the underlying entities or DB tables.
+- Renaming Jobs/Appointments/Quotes to "Tickets" globally.
+- Multi-day views (today only — date filter can override).
+- Permissions remapping for the merged view (use union of existing permissions
+  per stage; if a user can't view quotes, quotes don't appear for them).
+
+**Files likely affected:**
+- New combined view component (likely under POS or admin pos area)
+- Query layer to fetch quotes + appointments + jobs + transactions for a date range
+- Existing edit surfaces (no changes; just navigate to them)
+- Tests for the multi-entity query + stage filtering
+
+**Notes / decisions log:**
+- 2026-05-15: source = lifecycle audit §11.2 intervention #4.
+- 2026-05-15: explicitly framed as "low-risk prototype" for a future full
+  Tickets merge — if this satisfies operator friction, the full merge is
+  permanently deferred.
+- 2026-05-15: read-only navigation; rows link out to existing edit surfaces.
 
 ---
 
@@ -1011,7 +1226,9 @@ future-you can trace the history.
 
 | Date | Item | Original decision | Superseded by | Reason |
 |---|---|---|---|---|
-| _none yet_ | | | | |
+| 2026-05-15 | 15 | Full Jobs+Appointments merge (single "Tickets" view replacing both tabs) — original intent recorded in Item 12 audit prerequisite framing. | Wave 1.5 (Items 15a–d): 4 minimal interventions closing audit §10 friction gaps. | Lifecycle audit (`docs/dev/LIFECYCLE_AUDIT_2026-05-15.md` §11) found the DB already supports one-ticket = one-appointment + one-job; the split is in the UI, not the schema. Targeted gap-fills cost substantially less than a full merge and Item 15d serves as a low-risk prototype if a full merge is ever reconsidered. |
+
+| 2026-05-15 | 15 (originally drafted) | Full Jobs + Appointments merger into Tickets view (8-12 sessions) | Items 15a, 15b, 15c, 15d (4 minimal interventions, ~4 sessions total) | Lifecycle audit (LIFECYCLE_AUDIT_2026-05-15.md §11.2) showed the audit's 4 minimal interventions close most §10 friction gaps at ~$5-7K lower opportunity cost than the merge, with same operator-time savings. The merge solves a problem framing (Jobs and Appointments as two views of one thing) that the audit demonstrated is incorrect — they're conceptually separate concerns with operational meaning. Cost-benefit analysis per docs/decision-framework: merge ROI over interventions is approximately zero. Item 15d ("Today's Tickets" combined view) is explicitly framed as a prototype for the merger if operator data later justifies it. |
 
 ---
 
@@ -1028,11 +1245,12 @@ future-you can trace the history.
 | Wave | Items | Sessions | Calendar (full-time) | Calendar (evenings) |
 |---|---|---|---|---|
 | 1 | 3 (Items 1, 6, 12) | ~3 | 1-2 days | 3-5 days |
+| 1.5 | 4 (Items 15a, 15b, 15c, 15d) | ~4-5 | 1-2 days | 4-7 days |
 | 2 | 2 (Items 3, 4, 2) | ~5-6 | 2-3 days | 1-2 weeks |
 | 3 | 2 (Items 8, 7) | ~2-3 | 1-2 days | 3-5 days |
 | 4 | 3 (Items 9, 10, 11) | ~3 | 1-2 days | 3-5 days |
 | 5 | 2 (Items 14, 13) | ~13-20 | 3-4 weeks | 3-4 months |
-| **Total** | **12 active** | **~26-34** | **~5-6 weeks** | **~4-5 months** |
+| **Total** | **16 active** | **~30-39** | **~6-7 weeks** | **~5-6 months** |
 
 ---
 
