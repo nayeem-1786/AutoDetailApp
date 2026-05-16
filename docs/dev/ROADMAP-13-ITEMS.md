@@ -322,6 +322,14 @@ If implemented, this resolves the need to edit appointments from the Jobs card.
   (my files contributed 0 new warnings; one `Button` unused-import warning
   was caught and removed during the session), vitest 1024/1024 (17 new),
   build clean.
+- 2026-05-15 (audit): produced `docs/dev/LIFECYCLE_AUDIT_2026-05-15.md` —
+  read-only end-to-end documentation of the Quote → Appointment → Job
+  lifecycle, all POS + Admin surfaces that touch each stage, permissions,
+  and a gap inventory. Input for deciding whether to merge the Jobs and
+  Appointments POS surfaces (future Roadmap Item 15, not yet drafted) vs.
+  fill cross-surface gaps in the existing two-tab model. **No code or
+  schema changes were made in this audit.** Next steps to be determined
+  by review of the audit doc before any further planning.
 
 ---
 
