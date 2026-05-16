@@ -1228,8 +1228,6 @@ future-you can trace the history.
 |---|---|---|---|---|
 | 2026-05-15 | 15 | Full Jobs+Appointments merge (single "Tickets" view replacing both tabs) — original intent recorded in Item 12 audit prerequisite framing. | Wave 1.5 (Items 15a–d): 4 minimal interventions closing audit §10 friction gaps. | Lifecycle audit (`docs/dev/LIFECYCLE_AUDIT_2026-05-15.md` §11) found the DB already supports one-ticket = one-appointment + one-job; the split is in the UI, not the schema. Targeted gap-fills cost substantially less than a full merge and Item 15d serves as a low-risk prototype if a full merge is ever reconsidered. |
 
-| 2026-05-15 | 15 (originally drafted) | Full Jobs + Appointments merger into Tickets view (8-12 sessions) | Items 15a, 15b, 15c, 15d (4 minimal interventions, ~4 sessions total) | Lifecycle audit (LIFECYCLE_AUDIT_2026-05-15.md §11.2) showed the audit's 4 minimal interventions close most §10 friction gaps at ~$5-7K lower opportunity cost than the merge, with same operator-time savings. The merge solves a problem framing (Jobs and Appointments as two views of one thing) that the audit demonstrated is incorrect — they're conceptually separate concerns with operational meaning. Cost-benefit analysis per docs/decision-framework: merge ROI over interventions is approximately zero. Item 15d ("Today's Tickets" combined view) is explicitly framed as a prototype for the merger if operator data later justifies it. |
-
 ---
 
 ## Closed items (no longer active)
