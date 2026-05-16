@@ -1,0 +1,109 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+
+const state = {
+  posEmployee: {
+    employee_id: 'emp-uuid-1',
+    auth_user_id: 'auth-uuid-1',
+    role: 'cashier',
+    first_name: 'Pat',
+    last_name: 'Cashier',
+    email: 'pat@example.com',
+  } as null | {
+    employee_id: string;
+    auth_user_id: string;
+    role: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  },
+  viewGranted: true,
+  appointment: null as null | { id: string; scheduled_date: string },
+};
+
+vi.mock('@/lib/pos/api-auth', () => ({
+  authenticatePosRequest: async () => state.posEmployee,
+}));
+
+vi.mock('@/lib/pos/check-permission', () => ({
+  checkPosPermission: async (
+    _supabase: unknown,
+    _role: string,
+    _employeeId: string,
+    permissionKey: string
+  ) => {
+    if (permissionKey === 'appointments.view_today') return state.viewGranted;
+    return true;
+  },
+}));
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: (_table: string) => ({
+      select: (_cols: string) => ({
+        eq: (_col: string, _val: string) => ({
+          single: async () => {
+            if (!state.appointment) {
+              return { data: null, error: { message: 'not found' } };
+            }
+            return { data: state.appointment, error: null };
+          },
+        }),
+      }),
+    }),
+  }),
+}));
+
+import { GET } from '../route';
+
+function makeReq(): NextRequest {
+  return new NextRequest('http://localhost/api/pos/appointments/appt-1', {
+    method: 'GET',
+  });
+}
+
+const params = Promise.resolve({ id: 'appt-1' });
+
+beforeEach(() => {
+  state.posEmployee = {
+    employee_id: 'emp-uuid-1',
+    auth_user_id: 'auth-uuid-1',
+    role: 'cashier',
+    first_name: 'Pat',
+    last_name: 'Cashier',
+    email: 'pat@example.com',
+  };
+  state.viewGranted = true;
+  state.appointment = {
+    id: 'appt-1',
+    scheduled_date: '2026-05-16',
+  };
+});
+
+describe('GET /api/pos/appointments/[id]', () => {
+  it('returns 401 when not authenticated', async () => {
+    state.posEmployee = null;
+    const res = await GET(makeReq(), { params });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 when view permission denied', async () => {
+    state.viewGranted = false;
+    const res = await GET(makeReq(), { params });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 404 when appointment not found', async () => {
+    state.appointment = null;
+    const res = await GET(makeReq(), { params });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns the joined appointment on success', async () => {
+    const res = await GET(makeReq(), { params });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.id).toBe('appt-1');
+    expect(json.data.scheduled_date).toBe('2026-05-16');
+  });
+});

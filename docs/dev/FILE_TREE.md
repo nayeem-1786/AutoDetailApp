@@ -381,6 +381,8 @@ src/app/api/migration/vehicles/route.ts
 ```
 src/app/api/pos/appointments/route.ts                         # GET list (date range, default today+tomorrow) — Roadmap Item 12
 src/app/api/pos/appointments/__tests__/list.test.ts
+src/app/api/pos/appointments/[id]/route.ts                     # GET single appointment (Roadmap Item 15c — Jobs card Change Time)
+src/app/api/pos/appointments/[id]/__tests__/get.test.ts
 src/app/api/pos/appointments/[id]/cancel/route.ts              # POST cancel — POS-specific, notify_customer flag default false (Roadmap Item 15b)
 src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts
 src/app/api/pos/appointments/[id]/mobile-address/route.ts     # PATCH mobile_address only (Phase Mobile-1.6)
@@ -1364,6 +1366,10 @@ Roadmap Item 12 (POS Appointments) additions:
 Roadmap Item 15b (Cancel from POS Appointments + This Month filter) additions:
 - `src/app/pos/components/appointments/cancel-appointment-dialog.tsx`
 - `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx`
+
+Roadmap Item 15c ("Change Time" affordance on Jobs Card) additions:
+- `src/app/pos/jobs/components/change-time-button.tsx`
+- `src/app/pos/jobs/components/__tests__/change-time-button.test.tsx`
 
 ---
 

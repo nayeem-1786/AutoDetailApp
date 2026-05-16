@@ -48,6 +48,7 @@ import { fromCents } from '@/lib/utils/refund-math';
 import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
+import { ChangeTimeButton } from './change-time-button';
 import { CustomerLookup } from '../../components/customer-lookup';
 import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
@@ -1123,9 +1124,21 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
           {/* Timing */}
           <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
-            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-              <Clock className="h-4 w-4" />
-              <span>Timing</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <Clock className="h-4 w-4" />
+                <span>Timing</span>
+              </div>
+              {/* Roadmap Item 15c — Change Time affordance lives here so the
+                  edit control sits next to the time fields it edits. The
+                  button hides itself when the user lacks
+                  `appointments.reschedule`, the job has no appointment, or
+                  the status is past `in_progress`. */}
+              <ChangeTimeButton
+                appointmentId={job.appointment_id}
+                jobStatus={job.status}
+                onSaved={fetchJob}
+              />
             </div>
             <div className="mt-2 space-y-1 text-sm">
               <div className="flex justify-between">

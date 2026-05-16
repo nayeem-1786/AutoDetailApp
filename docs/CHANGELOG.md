@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15c: "Change Time" Affordance on Jobs Card
+
+Operators working from the POS Jobs card couldn't edit appointment date/time without switching to the POS Appointments tab or Admin Appointments — a friction point flagged in the lifecycle audit (`docs/dev/LIFECYCLE_AUDIT_2026-05-15.md` §10 #10). This session closes that gap by reusing the reschedule dialog built in Item 12 (commit `2eedaae4`) — no new flow, no new permission keys, no new notification behavior.
+
+**What's new for staff:**
+- A "Change Time" button now appears in the Timing tile header on the POS Jobs card.
+- Tap it → the same reschedule dialog used by the POS Appointments tab opens with the current date/time/detailer prefilled.
+- Save → Jobs card refreshes; the same time change reflects across POS Appointments, Admin Appointments, and the Jobs Timeline (single source of truth: the underlying appointment).
+- Same amber notice as the POS Appointments path: customer is **not** auto-notified when rescheduling from POS.
+
+**Where the button hides itself:**
+- Job status is `pending_approval`, `completed`, `closed`, or `cancelled` — matches the existing `DRAGGABLE_STATUSES` set and the POS Appointments reschedule endpoint's explicit guard.
+- User lacks `appointments.reschedule` permission — same gate the POS Appointments tab uses (granted to cashier/admin/super_admin by default; detailer denied).
+- Job has no linked appointment (defensive against pre-Phase-0a walk-ins).
+
+**Component-reuse decision (Rule 11):**
+The reschedule dialog file is **unmodified**. The new `<ChangeTimeButton>` (~120 LOC) is a thin wrapper that handles three things: gate, fetch, render. Click triggers parallel fetches of `GET /api/pos/appointments/[id]` (single-appointment lookup, new — same select shape as the list endpoint) and the existing `GET /api/pos/staff/available`. Both feed into the unchanged dialog. Considered extending `GET /api/pos/jobs/[id]` to inline the full appointment join — rejected as a higher-risk change that would ripple through `JobDetailData` and Jobs-card rendering.
+
+**Placement decision:**
+The button lives inside the Timing tile header (top-right). Rationale: the edit control sits next to the fields it edits (Created / Est. Pickup / Intake Started / etc.), and mirrors the pencil-icon affordance on the adjacent Notes tile so the pattern feels familiar. Rejected the footer action bar — those buttons are status-flow actions (Start Intake → Start Work → Complete Job → Checkout), and a reschedule control there would visually compete with the primary action.
+
+**Notification suppression inherited:**
+The dialog's save handler ultimately hits `PATCH /api/pos/appointments/[id]/reschedule` from Item 12, which by construction does NOT fire the n8n `appointment_rescheduled` webhook and records `notification_suppressed: true` in the audit log. The 3-spy invariant (sendSms / sendEmail / fireWebhook all = 0) from Item 12's `reschedule.test.ts` continues to protect this path.
+
+**Files added:**
+- `src/app/pos/jobs/components/change-time-button.tsx`
+- `src/app/api/pos/appointments/[id]/route.ts`
+- `src/app/pos/jobs/components/__tests__/change-time-button.test.tsx` (11 cases)
+- `src/app/api/pos/appointments/[id]/__tests__/get.test.ts` (4 cases)
+
+**Files modified:**
+- `src/app/pos/jobs/components/job-detail.tsx` — added `ChangeTimeButton` import and placed it in the Timing tile header.
+- `docs/dev/FILE_TREE.md`, `docs/dev/ROADMAP-13-ITEMS.md` — doc updates.
+
+**Verification:** typecheck clean, lint 0 errors (0 new warnings from this session's files), vitest **1067/1067** (15 new), build clean. Ran concurrently with Items 15a and 15b — repeated doc-revert collisions with parallel sessions led to re-applying ROADMAP/CHANGELOG/FILE_TREE edits immediately before commit.
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15b: Cancel from POS Appointments tab + "This Month" filter
 
 The POS Appointments tab (shipped in Item 12) supported reschedule but not cancel — cashiers had to switch to Admin Appointments to cancel a booking. This session adds the cancel control with explicit no-notification-by-default semantics, plus a "This Month" date-range filter that was surfaced as a user request during Item 12 UAT. Closes lifecycle audit gap §10 #4.
