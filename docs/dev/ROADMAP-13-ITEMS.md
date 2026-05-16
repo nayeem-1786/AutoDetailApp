@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.7 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; Items 15d deferred; Items 15e, 15f scoped (Layer 1 done; Layer 3d added for service-resolver.ts migration)
-**Last session updated:** 2026-05-16 — Item 15f Layer 1 done; Layer 3d added to scope (service-resolver.ts discovered as 4th bespoke pricing impl)
+**Document version:** v1.8 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; Items 15d deferred; Item 15e scoped; Item 15f Layers 1+2 done; Layers 3a, 3c, 3d, 4 not started
+**Last session updated:** 2026-05-16 — Item 15f Layer 2 done (custom pricing_model UX)
 **Total items:** 7 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -782,7 +782,7 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 ### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
 
-- **Status:** Layer 1 done (2026-05-16); Layers 2 + 3a + 3c + 4 not started
+- **Status:** Layers 1+2 done (2026-05-16); Layers 3a + 3c + 3d + 4 not started
 - **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
 - **Effort:** 5-6 sessions (~10-14 hours total, layered)
 - **Wave:** 1.5
@@ -965,6 +965,43 @@ ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
   but that type belongs to the hook — placed it under
   `./use-service-picker`. The barrel re-exports both, so external import
   sites are unaffected. Commit hash recorded in ledger row below.
+- 2026-05-16 (Layer 2 — `custom` pricing_model UX session): added the
+  staff-assessment prompt for `pricing_model === 'custom'` services
+  (canonical fixture: "Flood Damage / Mold Extraction" — `pricing_model:
+  'custom'`, `custom_starting_price: 475`, no `service_pricing` rows).
+  New file `src/lib/services/custom-price-dialog.tsx` —
+  `<CustomPriceDialog>` matches `<PerUnitPicker>`'s dialog conventions
+  (same primitives, same shell, same button layout). Validation enforces
+  positive amount ≥ `STRIPE_MIN_DOLLARS` (from `src/lib/utils/money.ts`
+  per Rule 20 — no hardcoded 50). Synthesizes a `ServicePricing` row at
+  confirm time via the exported `buildCustomPricing(service, amount)`
+  helper: `tier_name: 'custom'`, `tier_label: 'Custom Assessment'`,
+  `is_vehicle_size_aware: false`, all per-size columns null, synthetic
+  `id` of `custom-${service.id}-${Date.now()}`. `picker-engine.ts` got
+  one new variant on `ServiceTapRoute` (`open-custom-price-dialog`) and
+  one new branch in `routeServiceTap` — fires regardless of vehicle and
+  regardless of `flat_price` / `pricing` row state so the operator
+  always assesses a custom service rather than quick-adding a stale
+  value. The engine is now intentionally ahead of `<CatalogBrowser>` for
+  `custom` (the browser still dead-ends until Layer 3a/3d migrates
+  consumers). `useServicePicker` gained an imperative `tapService`
+  method (Layer 3a/3d consumers will call it from their own list/grid
+  entry points) and the `ActiveDialog` slot now picks between
+  `<ServicePricingPicker>` and `<CustomPriceDialog>` based on a
+  discriminated `ActiveDialogState` union. `index.ts` barrel re-exports
+  `CustomPriceDialog`, `buildCustomPricing`, `CustomPriceDialogProps`.
+  Tests: the Layer 1 "NOT YET HANDLED — Layer 2" pin in
+  `picker-engine.test.ts` was updated to assert the new behavior and a
+  second test pinned the "custom routing wins over flat_price/pricing
+  rows" invariant. New `custom-price-dialog.test.tsx` covers 10 dialog
+  cases (rendering, all validation paths including Stripe-minimum
+  boundary, confirm + cancel) plus a `buildCustomPricing` unit test.
+  Extended `use-service-picker.test.tsx` with 6 Layer 2 hook cases
+  including a `<CustomPriceDialog>` vi-mock (sibling pattern to the
+  Layer 1 mocks). Verification: typecheck clean, lint 0 errors (98
+  warnings = unchanged baseline), 1149/1149 vitest pass (1131 prior +
+  18 net new), build compiled successfully. **No surface migrated** —
+  Layer 3a / 3c / 3d still own that work.
 
 ---
 
@@ -1639,7 +1676,8 @@ CC session.
 | 2026-05-16 | 4 | Item 15b — Cancel from POS Appointments + This Month filter | done | _(this commit)_ | New `POST /api/pos/appointments/[id]/cancel` endpoint (HMAC POS auth + `checkPosPermission('appointments.cancel')`). `notify_customer` defaults to false — when false, BOTH `sendCancellationNotifications` and `fireWebhook('appointment_cancelled')` are skipped (mirrors Item 12 "no webhook by construction"). New `cancel-appointment-dialog.tsx` (reason textarea + Notify checkbox, amber notice swaps copy with checkbox state). Appointments-view gets "This Month" filter button (today → endOfMonth PST) + Trash icon per row gated by `usePosPermission('appointments.cancel')` (hidden, not disabled, for cashier role). 9-case endpoint suite (suppression invariant: 0 SMS / 0 email / 0 webhook / 0 cancellation-notification calls on the false path) + 4-case RTL suite on the view (filter date math, permission gate). 1071/1071 tests; typecheck/lint/build clean. Parallel Items 15a + 15c work stashed (ROADMAP / CHANGELOG / appointment-detail-dialog / FILE_TREE / job-detail) to keep this commit clean; will be popped post-commit for those sessions to resume. |
 | 2026-05-16 | 5 | Item 15c — "Change Time" Affordance on Jobs Card | done | _(this commit)_ | Closes audit gap §10 #10. New `<ChangeTimeButton>` (~120 LOC thin wrapper) placed in the Jobs-card Timing tile header. Hides on permission/appt-id/status guards (RESCHEDULABLE = scheduled/intake/in_progress; pending_approval/completed/closed/cancelled all hidden). Click fetches single appointment + bookable staff in parallel and renders the existing `<RescheduleAppointmentDialog>` from Item 12 **unmodified**. New `GET /api/pos/appointments/[id]` (single-appointment lookup, same select shape as the list endpoint, `appointments.view_today` gate). 15 new tests (11 component + 4 endpoint). Notification suppression inherited from Item 12's reschedule path — no new spy assertions needed. Ran concurrently with Items 15a/15b; only Item 15c files staged for this commit. Hit repeated doc-revert collisions with parallel sessions editing ROADMAP/FILE_TREE/CHANGELOG — re-applied minimum 15c doc edits immediately before commit. Typecheck/lint/build clean; vitest 1067-clean. |
 | 2026-05-16 | 6 | Item 15a — Edit Services on Admin Appointment Dialog (with cascade to job) | done | `8726053d` | Closes audit gaps §10 #1 and #11. New `PUT /api/admin/appointments/[id]/services` performs the cascade: replaces `appointment_services` rows, recomputes appointment `subtotal`/`total_amount`, and (if a `jobs` row is linked via `jobs.appointment_id`) rebuilds the `jobs.services` JSONB to match — mirroring the synthetic-mobile-fee shape from `/api/pos/jobs/populate/route.ts`. Permission decision: reused `appointments.reschedule` (same role distribution + no migration). Manual rollback pattern from `/api/pos/jobs/route.ts:381-453` adapted — snapshot/restore preserves original row ids at each failure-injection point. New `GET /api/admin/services/active` (session-authed) feeds the picker. New `<EditServicesModal>` and pure helpers in `src/lib/appointments/edit-services.ts` (Zod schema, `buildJobServicesJsonb`, `computeTotalsForServiceEdit`). 35 new tests (18 helpers + 17 cascade) including the 3-spy notification-suppression invariant (sendSms / sendEmail / fireWebhook all 0). Optimistic services-override state in the dialog re-renders totals immediately; parent refetches on `onServicesUpdated`. POS Jobs-card inline picker left untouched (tech debt acknowledged). Typecheck/lint/build clean; vitest 1088-clean. Concurrent with Items 15b/15c — only 15a files staged. |
-| 2026-05-16 | 7 | Item 15f Layer 1 — Extract canonical picker engine + `useServicePicker` hook | Layer 1 done | _(this commit)_ | **Pure refactor, zero behavior change** per session brief. New shared lib `src/lib/services/`: `picker-engine.ts` (canonical math `resolveServicePrice` / `resolveServicePriceWithSale` / `getServicePriceRange` MOVED byte-identical from `src/app/pos/utils/pricing.ts`, plus new `routeServiceTap` pure-function extraction of `<CatalogBrowser>`'s tap routing tree from lines 333-419 / 446-488), `use-service-picker.ts` (`.ts` extension honored via `React.createElement` — JSX-free), `index.ts` (public barrel). `src/app/pos/utils/pricing.ts` becomes a thin `@deprecated` re-export shim — all 9 existing importers (ticket-reducer, quote-reducer, register-tab, catalog-browser, service-detail-dialog, service-pricing-picker, catalog-card, flag-issue-flow, old pricing.test.ts) continue to work without modification. Tests: 32 engine tests covering all 5 size classes, sale interactions, `getServicePriceRange` boundary cases, and one `routeServiceTap` test per `pricing_model` value — `custom` pinned as `'NOT YET HANDLED — Layer 2'` so Layer 2 can update it deliberately. 7 hook-contract tests with vi-mocked `<CatalogBrowser>` + `<ServicePricingPicker>` (keeping the test focused on hook wiring, not the wrapped components' behavior). **Zero surface migrated** — Layer 3a / 3c handle migrations; Layer 3b (4 working POS surfaces) deferred indefinitely; ESLint `services/no-bespoke-pricing` deferred to Layer 4. Small deviation from brief: `ServicePickerOptions` re-exported from `./use-service-picker` (where it's defined) rather than `./picker-engine` (where the brief's index.ts example placed it) — the barrel re-exports both so external import sites are identical. Verification: typecheck clean, lint 0 errors (98 warnings = baseline, no new), 1131/1131 vitest pass (1088 prior + 32 engine + 7 hook + 4 unchanged via shim), production build compiled successfully. |
+| 2026-05-16 | 7 | Item 15f Layer 1 — Extract canonical picker engine + `useServicePicker` hook | Layer 1 done | `bec3e16e` | **Pure refactor, zero behavior change** per session brief. New shared lib `src/lib/services/`: `picker-engine.ts` (canonical math `resolveServicePrice` / `resolveServicePriceWithSale` / `getServicePriceRange` MOVED byte-identical from `src/app/pos/utils/pricing.ts`, plus new `routeServiceTap` pure-function extraction of `<CatalogBrowser>`'s tap routing tree from lines 333-419 / 446-488), `use-service-picker.ts` (`.ts` extension honored via `React.createElement` — JSX-free), `index.ts` (public barrel). `src/app/pos/utils/pricing.ts` becomes a thin `@deprecated` re-export shim — all 9 existing importers (ticket-reducer, quote-reducer, register-tab, catalog-browser, service-detail-dialog, service-pricing-picker, catalog-card, flag-issue-flow, old pricing.test.ts) continue to work without modification. Tests: 32 engine tests covering all 5 size classes, sale interactions, `getServicePriceRange` boundary cases, and one `routeServiceTap` test per `pricing_model` value — `custom` pinned as `'NOT YET HANDLED — Layer 2'` so Layer 2 can update it deliberately. 7 hook-contract tests with vi-mocked `<CatalogBrowser>` + `<ServicePricingPicker>` (keeping the test focused on hook wiring, not the wrapped components' behavior). **Zero surface migrated** — Layer 3a / 3c handle migrations; Layer 3b (4 working POS surfaces) deferred indefinitely; ESLint `services/no-bespoke-pricing` deferred to Layer 4. Small deviation from brief: `ServicePickerOptions` re-exported from `./use-service-picker` (where it's defined) rather than `./picker-engine` (where the brief's index.ts example placed it) — the barrel re-exports both so external import sites are identical. Verification: typecheck clean, lint 0 errors (98 warnings = baseline, no new), 1131/1131 vitest pass (1088 prior + 32 engine + 7 hook + 4 unchanged via shim), production build compiled successfully. |
+| 2026-05-16 | 8 | Item 15f Layer 2 — `custom` pricing_model UX | Layers 1+2 done | _(this commit)_ | Added the staff-assessment prompt for `pricing_model === 'custom'` services (canonical fixture: "Flood Damage / Mold Extraction" — `custom_starting_price: 475`, no `service_pricing` rows). New file `src/lib/services/custom-price-dialog.tsx` (`<CustomPriceDialog>` + `buildCustomPricing` helper); matches `<PerUnitPicker>`'s dialog conventions per Rule 11. Validation enforces positive amount ≥ `STRIPE_MIN_DOLLARS` from `src/lib/utils/money.ts` per Rule 20 — no hardcoded 50. Synthesizes a `ServicePricing` row with `tier_name: 'custom'`, `tier_label: 'Custom Assessment'`, `is_vehicle_size_aware: false`, all per-size columns null, synthetic `id` of `custom-${service.id}-${Date.now()}`. `picker-engine.ts`: one new variant on `ServiceTapRoute` (`open-custom-price-dialog`) and one new branch in `routeServiceTap` — fires regardless of vehicle and regardless of `flat_price`/`pricing` row state, so the operator always assesses (never quick-adds a stale value). The engine is intentionally ahead of `<CatalogBrowser>` for `custom` until Layer 3a/3d migrates consumers. `useServicePicker` gained imperative `tapService(service)` that runs `routeServiceTap` and either fires `onServiceSelected` (quick-add cases) or opens the appropriate dialog; `ActiveDialog` slot now discriminates between `<ServicePricingPicker>` and `<CustomPriceDialog>` via an `ActiveDialogState` union. `index.ts` barrel re-exports `CustomPriceDialog` / `buildCustomPricing` / `CustomPriceDialogProps`. Tests: Layer 1's "NOT YET HANDLED" pin flipped to assert the new behavior, plus a second engine test pinning "custom wins over flat_price/pricing rows." New `custom-price-dialog.test.tsx` with 10 dialog cases + 1 helper case (all validation paths including the Stripe-minimum boundary, confirm + cancel emit/no-emit). 6 new hook integration cases in `use-service-picker.test.tsx` (vi-mocking `<CustomPriceDialog>` as a sibling to the existing browser/picker mocks). Verification: typecheck clean, lint 0 errors (98 warnings = unchanged baseline), 1149/1149 vitest pass (was 1131; +18 net new), build compiled successfully. **Zero surface migrated** — Layer 3a / 3c / 3d still own that work; no ESLint scaffolding (Layer 4). |
 
 ---
 

@@ -3,6 +3,8 @@
 import { createElement, useCallback, useMemo, useState } from 'react';
 import { CatalogBrowser } from '@/app/pos/components/catalog-browser';
 import { ServicePricingPicker } from '@/app/pos/components/service-pricing-picker';
+import { CustomPriceDialog } from './custom-price-dialog';
+import { routeServiceTap } from './picker-engine';
 import type { CatalogService } from '@/app/pos/types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 
@@ -12,21 +14,33 @@ import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
  * Returns a small surface that operator UIs can mount instead of building
  * a bespoke service-picker. The hook wraps the existing `<CatalogBrowser>`
  * and `<ServicePricingPicker>` components rather than duplicating them
- * (Rule 11 — Component Reuse). Layer 1 is a pure refactor: no real surface
- * has been migrated to consume the hook yet. The hook exists so that
- * Layers 3a / 3c can replace bespoke pickers with `useServicePicker` mounts.
+ * (Rule 11 — Component Reuse). Layer 1 was a pure refactor: no real
+ * surface had been migrated to consume the hook yet. The hook exists so
+ * Layers 3a / 3c / 3d can replace bespoke pickers with `useServicePicker`
+ * mounts.
+ *
+ * Item 15f Layer 2 — `custom` pricing_model support.
+ *
+ * Layer 2 adds the operator staff-assessment prompt for services with
+ * `pricing_model === 'custom'` (e.g., "Flood Damage / Mold Extraction").
+ * `<CatalogBrowser>` itself does NOT route to the custom dialog yet —
+ * Layer 3a/3d will migrate the surfaces that need it. The hook now
+ * exposes an imperative `tapService(service)` method that consumers can
+ * call to route a tap through the canonical decision tree
+ * (`routeServiceTap`) and either fire `onServiceSelected` immediately
+ * (quick-add cases) or open the appropriate dialog.
  *
  * File extension is `.ts` per spec — uses `React.createElement` so this
- * module stays JSX-free and can live alongside the other `src/lib/services/`
- * pure modules (audit.ts, shippo.ts, etc.).
+ * module stays JSX-free and can live alongside the other
+ * `src/lib/services/` pure modules (audit.ts, shippo.ts, etc.).
  *
- * What this hook does NOT do in Layer 1:
- *  - Does NOT handle `pricing_model === 'custom'` (Layer 2 adds that UX).
- *  - Does NOT change the visual UX of either wrapped component.
- *  - Does NOT alter `<CatalogBrowser>`'s internal routing — taps still flow
- *    through `handleTapServiceDirect` / `handleTapService` inside the
- *    browser; the hook simply receives the `onAddService` callback the
- *    browser already emits and re-dispatches it.
+ * What this hook does NOT do in Layer 2:
+ *  - Does NOT migrate any existing surface to the hook (Layer 3a does that).
+ *  - Does NOT change `<CatalogBrowser>` or `<ServicePricingPicker>`.
+ *  - Does NOT alter `<CatalogBrowser>`'s internal routing — for taps that
+ *    flow through the wrapped browser, the browser's own
+ *    `handleTapServiceDirect` still owns routing and the hook's `tapService`
+ *    is the alternate path consumers can use directly.
  */
 
 export interface ServicePickerOptions {
@@ -80,8 +94,10 @@ export interface ServicePickerSurface {
 
   /**
    * The active picker dialog. Mount once at the same level as
-   * `<CatalogPane>`. Returns `null` when no service has been routed to
-   * `open-picker-dialog`. Self-managed open/close state.
+   * `<CatalogPane>`. Returns `null` when no service has been routed to a
+   * dialog. Self-managed open/close state. Renders one of:
+   *  - `<ServicePricingPicker>` (per-unit / scope / specialty / fallback)
+   *  - `<CustomPriceDialog>` (Layer 2 — `pricing_model === 'custom'`)
    */
   ActiveDialog: () => React.ReactElement | null;
 
@@ -92,11 +108,35 @@ export interface ServicePickerSurface {
   selectedServiceIds: Set<string>;
 
   /**
+   * Imperative tap entry point. Runs the canonical `routeServiceTap`
+   * decision tree and either:
+   *  - emits `onServiceSelected` directly (quick-add cases), or
+   *  - opens the corresponding dialog (per-unit / custom / fallback).
+   *
+   * Layer 3a/3d consumers (e.g., the migrated Jobs card and Admin
+   * Appointment dialog) call this in response to operator taps from
+   * their own selected-services list or any other entry point that
+   * isn't `<CatalogBrowser>`'s native grid.
+   */
+  tapService: (service: CatalogService) => void;
+
+  /**
    * Clear the hook's internal active-service state — closes the picker
    * dialog if open. Idempotent; safe to call when no dialog is open.
    */
   reset: () => void;
 }
+
+/**
+ * Discriminated state — which dialog (if any) is currently active.
+ *  - `picker`: `<ServicePricingPicker>` is open (per-unit, fallback, scope)
+ *  - `custom`: `<CustomPriceDialog>` is open (`pricing_model === 'custom'`)
+ *  - `null`: no dialog
+ */
+type ActiveDialogState =
+  | { kind: 'picker'; service: CatalogService }
+  | { kind: 'custom'; service: CatalogService }
+  | null;
 
 export function useServicePicker(
   options: ServicePickerOptions,
@@ -109,19 +149,14 @@ export function useServicePicker(
     onServiceSelected,
   } = options;
 
-  // `<CatalogBrowser>` already handles tap routing (per-unit / quick-add /
-  // open-picker) internally and only ever invokes its `onAddService`
-  // callback when the operator has committed to adding a specific pricing
-  // tier — including selection from a fallback picker dialog the browser
-  // opened. So the hook's catalog pane simply forwards that callback to
-  // `onServiceSelected`.
-  //
-  // The `ActiveDialog` surface is reserved for callers that want to drive
-  // the picker independently of the catalog pane (e.g., opening the
-  // picker for a service the operator clicked from a different list).
-  // It is wired through the `activeService` state below.
-  const [activeService, setActiveService] = useState<CatalogService | null>(null);
+  const [activeDialog, setActiveDialog] = useState<ActiveDialogState>(null);
 
+  // `<CatalogBrowser>` already handles tap routing internally and only
+  // ever invokes its `onAddService` callback once the operator has
+  // committed to adding a specific pricing tier (including selections
+  // made from a fallback picker dialog the browser opened). So the
+  // hook's catalog pane simply forwards that callback to
+  // `onServiceSelected`.
   const handleAddService = useCallback(
     (
       service: CatalogService,
@@ -134,22 +169,48 @@ export function useServicePicker(
     [onServiceSelected],
   );
 
+  // Imperative tap entry point — runs the canonical decision tree and
+  // routes to the right outcome. Used by Layer 3a/3d surfaces that want
+  // to drive the picker outside `<CatalogBrowser>`'s native grid.
+  const tapService = useCallback(
+    (service: CatalogService) => {
+      const route = routeServiceTap(service, vehicleSizeClass);
+      switch (route.action) {
+        case 'quick-add':
+        case 'quick-add-synthetic-flat':
+          onServiceSelected(service, route.pricing, vehicleSizeClass, undefined);
+          return;
+        case 'open-per-unit-picker':
+        case 'open-picker-dialog':
+          setActiveDialog({ kind: 'picker', service });
+          return;
+        case 'open-custom-price-dialog':
+          setActiveDialog({ kind: 'custom', service });
+          return;
+      }
+    },
+    [vehicleSizeClass, onServiceSelected],
+  );
+
+  // Selection handler shared by both dialogs. The dialog itself supplies
+  // the (possibly synthetic) ServicePricing row; the hook closes the
+  // dialog and forwards to the caller.
   const handleDialogSelect = useCallback(
     (
       pricing: ServicePricing,
       vsc: VehicleSizeClass | null,
       perUnitQty?: number,
     ) => {
-      if (!activeService) return;
-      const svc = activeService;
-      setActiveService(null);
+      if (!activeDialog) return;
+      const svc = activeDialog.service;
+      setActiveDialog(null);
       onServiceSelected(svc, pricing, vsc, perUnitQty);
     },
-    [activeService, onServiceSelected],
+    [activeDialog, onServiceSelected],
   );
 
   const reset = useCallback(() => {
-    setActiveService(null);
+    setActiveDialog(null);
   }, []);
 
   return useMemo<ServicePickerSurface>(() => {
@@ -165,11 +226,21 @@ export function useServicePicker(
     };
 
     const ActiveDialog = function ActiveDialog() {
-      if (!activeService) return null;
+      if (!activeDialog) return null;
+      if (activeDialog.kind === 'custom') {
+        return createElement(CustomPriceDialog, {
+          open: true,
+          service: activeDialog.service,
+          vehicleSizeClass,
+          onClose: () => setActiveDialog(null),
+          onSelect: handleDialogSelect,
+        });
+      }
+      // kind === 'picker'
       return createElement(ServicePricingPicker, {
         open: true,
-        onClose: () => setActiveService(null),
-        service: activeService,
+        onClose: () => setActiveDialog(null),
+        service: activeDialog.service,
         vehicleSizeClass,
         vehicleSpecialtyTier,
         onSelect: handleDialogSelect,
@@ -180,6 +251,7 @@ export function useServicePicker(
       CatalogPane,
       ActiveDialog,
       selectedServiceIds,
+      tapService,
       reset,
     };
   }, [
@@ -188,8 +260,9 @@ export function useServicePicker(
     vehicleSpecialtyTier,
     selectedServiceIds,
     handleAddService,
-    activeService,
+    activeDialog,
     handleDialogSelect,
+    tapService,
     reset,
   ]);
 }

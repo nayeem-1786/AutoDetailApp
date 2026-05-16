@@ -6,6 +6,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15f Layer 2: Add `custom` pricing_model UX to `useServicePicker` hook
+
+Layer 2 closes the silent-unsupported gap for `pricing_model === 'custom'` services (canonical fixture today: "Flood Damage / Mold Extraction" with `custom_starting_price: 475` and no `service_pricing` rows). Operator surfaces that consume the `useServicePicker` hook can now route a custom-service tap through a staff-assessment prompt instead of dead-ending at "No pricing tiers available" inside `<ServicePricingPicker>`.
+
+**What's new (engine + hook + dialog):**
+- New routing variant `{ action: 'open-custom-price-dialog' }` on `ServiceTapRoute` (`src/lib/services/picker-engine.ts`). The new branch in `routeServiceTap` fires whenever `service.pricing_model === 'custom'`, regardless of vehicle / `flat_price` / `pricing` row state — operators always assess custom services, never quick-add a stale value.
+- New component `<CustomPriceDialog>` at `src/lib/services/custom-price-dialog.tsx`. Matches `<PerUnitPicker>`'s dialog conventions (same primitives, same shell, same button layout) per Rule 11. Shows the service name, description (if present), `custom_starting_price` reference, a numeric input for the final amount, and a confirm/cancel pair. Validation enforces a positive amount ≥ `STRIPE_MIN_DOLLARS` from `src/lib/utils/money.ts` (per Rule 20 — no hardcoded 50). On confirm, it synthesizes a `ServicePricing` row via the exported `buildCustomPricing(service, amount)` helper: `tier_name: 'custom'`, `tier_label: 'Custom Assessment'`, `is_vehicle_size_aware: false`, all per-size columns null, synthetic `id` of `custom-${service.id}-${Date.now()}`.
+- `useServicePicker` gained an imperative `tapService(service)` method that runs the canonical decision tree (`routeServiceTap`) and either fires `onServiceSelected` immediately (quick-add cases) or opens the appropriate dialog. Layer 3a/3d consumers will call it from their own selected-services lists (entry points that aren't `<CatalogBrowser>`'s native grid).
+- `ActiveDialog` now discriminates between `<ServicePricingPicker>` and `<CustomPriceDialog>` via an internal `ActiveDialogState` union; `reset()` closes either dialog. The barrel `src/lib/services/index.ts` re-exports the new symbols (`CustomPriceDialog`, `buildCustomPricing`, `CustomPriceDialogProps`).
+
+**Tests:**
+- Layer 1's "NOT YET HANDLED — Layer 2" pin in `picker-engine.test.ts` was updated to assert the new `open-custom-price-dialog` outcome. A second engine test pins the "custom wins over flat_price / pricing rows" invariant so future contributors don't accidentally make the engine quick-add a custom service.
+- New `custom-price-dialog.test.tsx` (10 dialog cases + 1 helper unit test): rendering with/without description, with/without starting price; all validation paths (negative, zero, below Stripe minimum, non-numeric); Stripe-minimum boundary accepted; confirm emits synthetic pricing; cancel does not.
+- 6 new Layer 2 cases in `use-service-picker.test.tsx`: `tapService` exposure, custom-service tap opens `<CustomPriceDialog>`, flat tap quick-adds without dialog, per-unit tap opens `<ServicePricingPicker>`, dialog confirm emits to `onServiceSelected` and auto-closes, `reset()` closes the custom dialog. Hook integration mocks `<CustomPriceDialog>` as a sibling to the existing browser/picker mocks.
+
+**What this session does NOT do** (Layer 2 boundary):
+- Does not migrate any surface to consume the hook (Layer 3a does that for 3 broken operator surfaces; Layer 3c migrates Booking Wizard math; Layer 3d migrates `service-resolver.ts`).
+- Does not change `<CatalogBrowser>` or `<ServicePricingPicker>` (untouched). The catalog browser still dead-ends on `custom` until Layer 3a/3d migrates relevant surfaces — that's deliberate; the engine is intentionally ahead of the browser.
+- Does not ship the `services/no-bespoke-pricing` ESLint rule (Layer 4).
+
+**Verification:** typecheck clean, lint 0 errors (98 warnings = unchanged baseline), 1149/1149 tests pass (was 1131 at Layer 1, +18 net new), production build compiled successfully.
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15f Layer 1: Extract canonical service-picker engine + `useServicePicker` hook (pure refactor)
 
 Per CLAUDE.md Rule 22 (Service pricing — canonical engine only), the service-pricing math + tap-routing logic that lived inside POS components now lives in a shared library at `src/lib/services/`. This session is **pure refactor**: zero behavior change across any operator or customer surface.

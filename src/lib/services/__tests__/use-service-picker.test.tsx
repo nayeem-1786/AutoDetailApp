@@ -74,6 +74,40 @@ vi.mock('@/app/pos/components/service-pricing-picker', () => {
   };
 });
 
+// Layer 2 — mock the custom-price dialog. The hook's ActiveDialog mounts
+// this when `routeServiceTap` returns `open-custom-price-dialog`. The
+// mock exposes its props for assertion AND provides a stable handle for
+// simulating the operator's "Add Service" tap (via onSelect).
+const customDialogOnSelectCaptured = vi.fn();
+vi.mock('../custom-price-dialog', () => {
+  return {
+    CustomPriceDialog: (props: {
+      open: boolean;
+      service: CatalogService;
+      vehicleSizeClass: VehicleSizeClass | null;
+      onClose: () => void;
+      onSelect: (
+        p: ServicePricing,
+        vsc: VehicleSizeClass | null,
+        q?: number,
+      ) => void;
+    }) => {
+      customDialogOnSelectCaptured(props.onSelect);
+      return (
+        <div
+          data-testid="mock-custom-price-dialog"
+          data-open={String(props.open)}
+          data-service-id={props.service.id}
+          data-vehicle-size={props.vehicleSizeClass ?? 'null'}
+        />
+      );
+    },
+    // The hook does not import buildCustomPricing, but the barrel
+    // re-exports it. Keep a permissive stub so the module shape matches.
+    buildCustomPricing: vi.fn(),
+  };
+});
+
 // Imports must come after vi.mock declarations.
 import { useServicePicker } from '../use-service-picker';
 
@@ -168,6 +202,7 @@ function Harness({ surfaceRef, ...options }: HarnessProps) {
 
 beforeEach(() => {
   onAddServiceCaptured.mockClear();
+  customDialogOnSelectCaptured.mockClear();
   cleanup();
 });
 
@@ -225,6 +260,7 @@ describe('useServicePicker — Layer 1 contract', () => {
       />,
     );
     expect(screen.queryByTestId('mock-service-pricing-picker')).toBeNull();
+    expect(screen.queryByTestId('mock-custom-price-dialog')).toBeNull();
   });
 
   it('invokes onServiceSelected when <CatalogBrowser> emits onAddService (quick-add flow)', () => {
@@ -313,5 +349,194 @@ describe('useServicePicker — Layer 1 contract', () => {
       />,
     );
     expect(surfaceRef.current!.selectedServiceIds).toBe(ids);
+  });
+});
+
+// ─── Layer 2 — tapService imperative entry + custom dialog wiring ────
+
+function mockCustomService(): CatalogService {
+  return mockService({
+    id: 'svc-flood',
+    name: 'Flood Damage / Mold Extraction',
+    pricing_model: 'custom',
+    custom_starting_price: 475,
+    flat_price: null,
+    pricing: [],
+  });
+}
+
+describe('useServicePicker — Layer 2 (custom pricing_model)', () => {
+  it('exposes tapService on the surface', () => {
+    const surfaceRef: HarnessProps['surfaceRef'] = { current: null };
+    render(
+      <Harness
+        vehicleSizeClass={null}
+        vehicleSpecialtyTier={null}
+        selectedServiceIds={new Set()}
+        onServiceSelected={() => {}}
+        surfaceRef={surfaceRef}
+      />,
+    );
+    expect(typeof surfaceRef.current!.tapService).toBe('function');
+  });
+
+  it('tapService on a custom service opens <CustomPriceDialog>', () => {
+    const surfaceRef: HarnessProps['surfaceRef'] = { current: null };
+    render(
+      <Harness
+        vehicleSizeClass="exotic"
+        vehicleSpecialtyTier={null}
+        selectedServiceIds={new Set()}
+        onServiceSelected={() => {}}
+        surfaceRef={surfaceRef}
+      />,
+    );
+    expect(screen.queryByTestId('mock-custom-price-dialog')).toBeNull();
+    act(() => {
+      surfaceRef.current!.tapService(mockCustomService());
+    });
+    const dialog = screen.getByTestId('mock-custom-price-dialog');
+    expect(dialog.getAttribute('data-open')).toBe('true');
+    expect(dialog.getAttribute('data-service-id')).toBe('svc-flood');
+    expect(dialog.getAttribute('data-vehicle-size')).toBe('exotic');
+    // Picker should NOT be mounted.
+    expect(screen.queryByTestId('mock-service-pricing-picker')).toBeNull();
+  });
+
+  it('tapService on a flat-price service quick-adds without opening any dialog', () => {
+    const surfaceRef: HarnessProps['surfaceRef'] = { current: null };
+    const onSelect = vi.fn();
+    render(
+      <Harness
+        vehicleSizeClass={null}
+        vehicleSpecialtyTier={null}
+        selectedServiceIds={new Set()}
+        onServiceSelected={onSelect}
+        surfaceRef={surfaceRef}
+      />,
+    );
+    const flatSvc = mockService({
+      id: 'svc-flat',
+      pricing_model: 'flat',
+      flat_price: 45,
+      pricing: [],
+    });
+    act(() => {
+      surfaceRef.current!.tapService(flatSvc);
+    });
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    const [emittedSvc, emittedPricing, emittedVsc, emittedQty] = onSelect.mock.calls[0];
+    expect(emittedSvc.id).toBe('svc-flat');
+    expect(emittedPricing.price).toBe(45);
+    expect(emittedPricing.tier_name).toBe('default');
+    expect(emittedVsc).toBeNull();
+    expect(emittedQty).toBeUndefined();
+    expect(screen.queryByTestId('mock-custom-price-dialog')).toBeNull();
+    expect(screen.queryByTestId('mock-service-pricing-picker')).toBeNull();
+  });
+
+  it('tapService on a per_unit service opens <ServicePricingPicker> (not the custom dialog)', () => {
+    const surfaceRef: HarnessProps['surfaceRef'] = { current: null };
+    render(
+      <Harness
+        vehicleSizeClass={null}
+        vehicleSpecialtyTier={null}
+        selectedServiceIds={new Set()}
+        onServiceSelected={() => {}}
+        surfaceRef={surfaceRef}
+      />,
+    );
+    const perUnitSvc = mockService({
+      id: 'svc-per-unit',
+      pricing_model: 'per_unit',
+      per_unit_price: 12.5,
+      per_unit_max: 10,
+      per_unit_label: 'row',
+      pricing: [],
+    });
+    act(() => {
+      surfaceRef.current!.tapService(perUnitSvc);
+    });
+    expect(screen.getByTestId('mock-service-pricing-picker')).toBeDefined();
+    expect(screen.queryByTestId('mock-custom-price-dialog')).toBeNull();
+  });
+
+  it('confirming the custom dialog emits onServiceSelected with the synthesized pricing row and closes the dialog', () => {
+    const surfaceRef: HarnessProps['surfaceRef'] = { current: null };
+    const onSelect = vi.fn();
+    render(
+      <Harness
+        vehicleSizeClass="sedan"
+        vehicleSpecialtyTier={null}
+        selectedServiceIds={new Set()}
+        onServiceSelected={onSelect}
+        surfaceRef={surfaceRef}
+      />,
+    );
+    const svc = mockCustomService();
+    act(() => {
+      surfaceRef.current!.tapService(svc);
+    });
+    // Dialog is now mounted; capture its onSelect callback and simulate
+    // the operator confirming a price.
+    const dialogOnSelect = customDialogOnSelectCaptured.mock.calls.at(-1)?.[0] as (
+      p: ServicePricing,
+      vsc: VehicleSizeClass | null,
+      q?: number,
+    ) => void;
+    expect(typeof dialogOnSelect).toBe('function');
+
+    // Build a synthetic ServicePricing row representing the operator's
+    // entry (the real <CustomPriceDialog> does this internally via
+    // buildCustomPricing — the mock leaves the synthesis to the test).
+    const synthesized: ServicePricing = {
+      id: 'custom-svc-flood-123',
+      service_id: svc.id,
+      tier_name: 'custom',
+      tier_label: 'Custom Assessment',
+      price: 525.5,
+      sale_price: null,
+      display_order: 0,
+      is_vehicle_size_aware: false,
+      vehicle_size_sedan_price: null,
+      vehicle_size_truck_suv_price: null,
+      vehicle_size_suv_van_price: null,
+      vehicle_size_exotic_price: null,
+      vehicle_size_classic_price: null,
+      max_qty: null,
+      qty_label: null,
+      created_at: '',
+    };
+    act(() => {
+      dialogOnSelect(synthesized, 'sedan', undefined);
+    });
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(svc, synthesized, 'sedan', undefined);
+
+    // Dialog closes after confirm.
+    expect(screen.queryByTestId('mock-custom-price-dialog')).toBeNull();
+  });
+
+  it('reset() closes the custom dialog when open', () => {
+    const surfaceRef: HarnessProps['surfaceRef'] = { current: null };
+    render(
+      <Harness
+        vehicleSizeClass={null}
+        vehicleSpecialtyTier={null}
+        selectedServiceIds={new Set()}
+        onServiceSelected={() => {}}
+        surfaceRef={surfaceRef}
+      />,
+    );
+    act(() => {
+      surfaceRef.current!.tapService(mockCustomService());
+    });
+    expect(screen.getByTestId('mock-custom-price-dialog')).toBeDefined();
+
+    act(() => {
+      surfaceRef.current!.reset();
+    });
+    expect(screen.queryByTestId('mock-custom-price-dialog')).toBeNull();
   });
 });

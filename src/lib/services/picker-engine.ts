@@ -113,13 +113,22 @@ export function getServicePriceRange(pricing: ServicePricing): [number, number] 
 // ─── Tap routing ────────────────────────────────────────────────
 
 /**
- * Decision returned by `routeServiceTap`. The four actions mirror the
+ * Decision returned by `routeServiceTap`. The first four actions mirror the
  * conditional branches in `<CatalogBrowser>`'s `handleTapServiceDirect`
  * (lines 333-419) and `handleTapServiceDirectUnchecked` (lines 446-488).
+ * `open-custom-price-dialog` is new in Item 15f Layer 2 and has no
+ * corresponding branch in `<CatalogBrowser>` — that surface will continue
+ * to dead-end on `pricing_model === 'custom'` until it is migrated to the
+ * hook (Layer 3a / 3d).
  *
  * - `open-per-unit-picker` — service has `pricing_model === 'per_unit'` and
  *   a non-null `per_unit_price`. The caller should mount the
  *   `<ServicePricingPicker>` (which delegates to `<PerUnitPicker>`).
+ * - `open-custom-price-dialog` — service has `pricing_model === 'custom'`.
+ *   The caller (via `useServicePicker`) mounts `<CustomPriceDialog>` so the
+ *   operator can enter a staff-assessed final price. The hook synthesizes
+ *   the `ServicePricing` row at confirm time (Layer 2 owns that synthesis,
+ *   not this routing function, to keep the route a pure decision).
  * - `quick-add` — caller can add the supplied `pricing` row directly to the
  *   ticket / cart without opening a dialog.
  * - `quick-add-synthetic-flat` — service has no `service_pricing` rows but
@@ -130,6 +139,7 @@ export function getServicePriceRange(pricing: ServicePricing): [number, number] 
  */
 export type ServiceTapRoute =
   | { action: 'open-per-unit-picker' }
+  | { action: 'open-custom-price-dialog' }
   | { action: 'quick-add'; pricing: ServicePricing }
   | { action: 'quick-add-synthetic-flat'; pricing: ServicePricing }
   | { action: 'open-picker-dialog' };
@@ -138,14 +148,18 @@ const VEHICLE_SIZE_CLASSES_SET = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 /**
  * Pure routing function — given a service and the current vehicle size class,
- * decide what UI action the caller should take. Byte-identical to the routing
- * logic at `<CatalogBrowser>:333-419` (and the duplicate at 446-488) so the
- * shim and hook callers behave the same as the existing direct mounts.
+ * decide what UI action the caller should take. The non-custom branches are
+ * byte-identical to the routing logic at `<CatalogBrowser>:333-419` (and the
+ * duplicate at 446-488).
  *
- * NOTE on `pricing_model === 'custom'`: not yet handled. Falls through to
- * `open-picker-dialog`, which today dead-ends at "No pricing tiers available"
- * inside `<ServicePricingPicker>`. Layer 2 of Item 15f will add the operator
- * custom-price prompt.
+ * Item 15f Layer 2 adds the `open-custom-price-dialog` branch for
+ * `pricing_model === 'custom'` (e.g., "Flood Damage / Mold Extraction"
+ * with `custom_starting_price` set but no `service_pricing` rows). The
+ * branch fires regardless of `pricing` / `flat_price` state — `custom`
+ * means "operator assesses the final price," so we never quick-add a
+ * stale value. `<CatalogBrowser>` does NOT have this branch yet; the
+ * canonical engine is intentionally ahead of the catalog browser until
+ * Layer 3a/3d migrates the relevant surfaces.
  */
 export function routeServiceTap(
   service: CatalogService,
@@ -154,6 +168,15 @@ export function routeServiceTap(
   // Per-unit services always need the quantity picker.
   if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
     return { action: 'open-per-unit-picker' };
+  }
+
+  // Custom services always need the operator staff-assessment prompt.
+  // Layer 2: `custom_starting_price` is treated as reference-only — the
+  // operator-entered amount is the truth. The hook synthesizes the
+  // `ServicePricing` row at dialog-confirm time so this function stays a
+  // pure decision.
+  if (service.pricing_model === 'custom') {
+    return { action: 'open-custom-price-dialog' };
   }
 
   const pricing = service.pricing ?? [];

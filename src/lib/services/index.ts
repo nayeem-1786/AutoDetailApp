@@ -26,3 +26,7 @@ export type {
   ServicePickerOptions,
   ServicePickerSurface,
 } from './use-service-picker';
+
+// Item 15f Layer 2 — `custom` pricing_model UX.
+export { CustomPriceDialog, buildCustomPricing } from './custom-price-dialog';
+export type { CustomPriceDialogProps } from './custom-price-dialog';

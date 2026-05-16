@@ -394,21 +394,40 @@ describe('routeServiceTap', () => {
     expect(routeServiceTap(svc, null)).toEqual({ action: 'open-picker-dialog' });
   });
 
-  // NOT YET HANDLED — Layer 2 will add a custom-price prompt.
-  // Documents the current dead-end behavior: pricing_model:'custom' with
-  // no `pricing` rows and no `flat_price` falls through to
-  // `open-picker-dialog`, which in turn renders "No pricing tiers
-  // available" inside <ServicePricingPicker>. This test pins the current
-  // behavior so Layer 2 can update it deliberately.
-  it('pricing_model: custom (NOT YET HANDLED — Layer 2) → open-picker-dialog (dead-end)', () => {
+  // Layer 2 — `custom` is now routed to its dedicated dialog. Fires
+  // regardless of vehicle size (operator assesses the final price; vehicle
+  // info is reference only). Canonical fixture: "Flood Damage / Mold
+  // Extraction" — `pricing_model: 'custom'`, `custom_starting_price: 475`,
+  // no `service_pricing` rows.
+  it('pricing_model: custom (Layer 2) → open-custom-price-dialog', () => {
     const svc = mockService({
       pricing_model: 'custom',
-      custom_starting_price: 250,
+      custom_starting_price: 475,
       flat_price: null,
       pricing: [],
     });
-    expect(routeServiceTap(svc, 'sedan')).toEqual({ action: 'open-picker-dialog' });
-    expect(routeServiceTap(svc, null)).toEqual({ action: 'open-picker-dialog' });
+    expect(routeServiceTap(svc, 'sedan')).toEqual({ action: 'open-custom-price-dialog' });
+    expect(routeServiceTap(svc, null)).toEqual({ action: 'open-custom-price-dialog' });
+    expect(routeServiceTap(svc, 'exotic')).toEqual({ action: 'open-custom-price-dialog' });
+  });
+
+  // Layer 2 — custom-price routing wins over flat_price and pricing rows.
+  // The operator must always assess a custom service; we never silently
+  // use a stale value even if those fields were set on the row.
+  it('pricing_model: custom routes to dialog even if flat_price or pricing rows exist', () => {
+    const svcWithFlat = mockService({
+      pricing_model: 'custom',
+      flat_price: 100,
+      pricing: [],
+    });
+    expect(routeServiceTap(svcWithFlat, null).action).toBe('open-custom-price-dialog');
+
+    const svcWithPricing = mockService({
+      pricing_model: 'custom',
+      flat_price: null,
+      pricing: [mockTier({ tier_name: 'default', price: 200 })],
+    });
+    expect(routeServiceTap(svcWithPricing, null).action).toBe('open-custom-price-dialog');
   });
 
   // ─── Edge cases ───────────────────────────────────────────────
