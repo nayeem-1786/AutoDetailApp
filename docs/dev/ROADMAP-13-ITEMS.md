@@ -782,8 +782,8 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 ### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
 
-- **Status:** not started
-- **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces)
+- **Status:** Layer 1 done (2026-05-16); Layers 2 + 3a + 3c + 4 not started
+- **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
 - **Effort:** 4-5 sessions (~8-12 hours total, layered)
 - **Wave:** 1.5
 - **Depends on:** none — must land before Item 15e
@@ -907,6 +907,32 @@ ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
   in Layer 1).
 - Reference: `<ServicePricingPicker>` audit conducted 2026-05-16 (in chat,
   not committed as a doc — see CC session output of that date).
+- 2026-05-16 (Layer 1 — pure refactor session): shipped the foundation.
+  New files: `src/lib/services/picker-engine.ts` (engine math +
+  `routeServiceTap` pure-function extraction of `<CatalogBrowser>`'s tap
+  routing tree, byte-identical to lines 333-419 / 446-488 of
+  `catalog-browser.tsx`), `src/lib/services/use-service-picker.ts` (hook
+  wrapping `<CatalogBrowser>` + `<ServicePricingPicker>` — `.ts` extension
+  honored via `React.createElement` so the file lives alongside the other
+  `src/lib/services/` pure modules), `src/lib/services/index.ts` (public
+  barrel). Modified: `src/app/pos/utils/pricing.ts` becomes a thin
+  `@deprecated` re-export shim so all 9 existing callers continue working
+  unchanged. Tests: 32 engine tests in `picker-engine.test.ts` (exhaustive
+  size_class coverage + sale interactions + one `routeServiceTap` test per
+  `pricing_model` — `custom` pinned as "NOT YET HANDLED — Layer 2" so
+  Layer 2 can update it deliberately), 7 hook-contract tests in
+  `use-service-picker.test.tsx` with vi-mocked `<CatalogBrowser>` and
+  `<ServicePricingPicker>` (the hook's job is wiring, not the components'
+  behavior; mocking keeps the test focused). Verification: typecheck
+  clean, lint 0 errors (98 warnings = baseline — no new ones), 1131/1131
+  vitest pass (was 1088, +43 new), production build compiled
+  successfully. **No surface migrated to the hook this session** — Layer
+  3a / 3c handle migrations; Layer 3b (4 working POS surfaces) deferred
+  indefinitely. **Small deviation from session brief:** brief's example
+  `index.ts` re-exported `ServicePickerOptions` from `./picker-engine`,
+  but that type belongs to the hook — placed it under
+  `./use-service-picker`. The barrel re-exports both, so external import
+  sites are unaffected. Commit hash recorded in ledger row below.
 
 ---
 
@@ -1581,6 +1607,7 @@ CC session.
 | 2026-05-16 | 4 | Item 15b — Cancel from POS Appointments + This Month filter | done | _(this commit)_ | New `POST /api/pos/appointments/[id]/cancel` endpoint (HMAC POS auth + `checkPosPermission('appointments.cancel')`). `notify_customer` defaults to false — when false, BOTH `sendCancellationNotifications` and `fireWebhook('appointment_cancelled')` are skipped (mirrors Item 12 "no webhook by construction"). New `cancel-appointment-dialog.tsx` (reason textarea + Notify checkbox, amber notice swaps copy with checkbox state). Appointments-view gets "This Month" filter button (today → endOfMonth PST) + Trash icon per row gated by `usePosPermission('appointments.cancel')` (hidden, not disabled, for cashier role). 9-case endpoint suite (suppression invariant: 0 SMS / 0 email / 0 webhook / 0 cancellation-notification calls on the false path) + 4-case RTL suite on the view (filter date math, permission gate). 1071/1071 tests; typecheck/lint/build clean. Parallel Items 15a + 15c work stashed (ROADMAP / CHANGELOG / appointment-detail-dialog / FILE_TREE / job-detail) to keep this commit clean; will be popped post-commit for those sessions to resume. |
 | 2026-05-16 | 5 | Item 15c — "Change Time" Affordance on Jobs Card | done | _(this commit)_ | Closes audit gap §10 #10. New `<ChangeTimeButton>` (~120 LOC thin wrapper) placed in the Jobs-card Timing tile header. Hides on permission/appt-id/status guards (RESCHEDULABLE = scheduled/intake/in_progress; pending_approval/completed/closed/cancelled all hidden). Click fetches single appointment + bookable staff in parallel and renders the existing `<RescheduleAppointmentDialog>` from Item 12 **unmodified**. New `GET /api/pos/appointments/[id]` (single-appointment lookup, same select shape as the list endpoint, `appointments.view_today` gate). 15 new tests (11 component + 4 endpoint). Notification suppression inherited from Item 12's reschedule path — no new spy assertions needed. Ran concurrently with Items 15a/15b; only Item 15c files staged for this commit. Hit repeated doc-revert collisions with parallel sessions editing ROADMAP/FILE_TREE/CHANGELOG — re-applied minimum 15c doc edits immediately before commit. Typecheck/lint/build clean; vitest 1067-clean. |
 | 2026-05-16 | 6 | Item 15a — Edit Services on Admin Appointment Dialog (with cascade to job) | done | `8726053d` | Closes audit gaps §10 #1 and #11. New `PUT /api/admin/appointments/[id]/services` performs the cascade: replaces `appointment_services` rows, recomputes appointment `subtotal`/`total_amount`, and (if a `jobs` row is linked via `jobs.appointment_id`) rebuilds the `jobs.services` JSONB to match — mirroring the synthetic-mobile-fee shape from `/api/pos/jobs/populate/route.ts`. Permission decision: reused `appointments.reschedule` (same role distribution + no migration). Manual rollback pattern from `/api/pos/jobs/route.ts:381-453` adapted — snapshot/restore preserves original row ids at each failure-injection point. New `GET /api/admin/services/active` (session-authed) feeds the picker. New `<EditServicesModal>` and pure helpers in `src/lib/appointments/edit-services.ts` (Zod schema, `buildJobServicesJsonb`, `computeTotalsForServiceEdit`). 35 new tests (18 helpers + 17 cascade) including the 3-spy notification-suppression invariant (sendSms / sendEmail / fireWebhook all 0). Optimistic services-override state in the dialog re-renders totals immediately; parent refetches on `onServicesUpdated`. POS Jobs-card inline picker left untouched (tech debt acknowledged). Typecheck/lint/build clean; vitest 1088-clean. Concurrent with Items 15b/15c — only 15a files staged. |
+| 2026-05-16 | 7 | Item 15f Layer 1 — Extract canonical picker engine + `useServicePicker` hook | Layer 1 done | _(this commit)_ | **Pure refactor, zero behavior change** per session brief. New shared lib `src/lib/services/`: `picker-engine.ts` (canonical math `resolveServicePrice` / `resolveServicePriceWithSale` / `getServicePriceRange` MOVED byte-identical from `src/app/pos/utils/pricing.ts`, plus new `routeServiceTap` pure-function extraction of `<CatalogBrowser>`'s tap routing tree from lines 333-419 / 446-488), `use-service-picker.ts` (`.ts` extension honored via `React.createElement` — JSX-free), `index.ts` (public barrel). `src/app/pos/utils/pricing.ts` becomes a thin `@deprecated` re-export shim — all 9 existing importers (ticket-reducer, quote-reducer, register-tab, catalog-browser, service-detail-dialog, service-pricing-picker, catalog-card, flag-issue-flow, old pricing.test.ts) continue to work without modification. Tests: 32 engine tests covering all 5 size classes, sale interactions, `getServicePriceRange` boundary cases, and one `routeServiceTap` test per `pricing_model` value — `custom` pinned as `'NOT YET HANDLED — Layer 2'` so Layer 2 can update it deliberately. 7 hook-contract tests with vi-mocked `<CatalogBrowser>` + `<ServicePricingPicker>` (keeping the test focused on hook wiring, not the wrapped components' behavior). **Zero surface migrated** — Layer 3a / 3c handle migrations; Layer 3b (4 working POS surfaces) deferred indefinitely; ESLint `services/no-bespoke-pricing` deferred to Layer 4. Small deviation from brief: `ServicePickerOptions` re-exported from `./use-service-picker` (where it's defined) rather than `./picker-engine` (where the brief's index.ts example placed it) — the barrel re-exports both so external import sites are identical. Verification: typecheck clean, lint 0 errors (98 warnings = baseline, no new), 1131/1131 vitest pass (1088 prior + 32 engine + 7 hook + 4 unchanged via shim), production build compiled successfully. |
 
 ---
 

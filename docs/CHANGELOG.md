@@ -6,6 +6,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15f Layer 1: Extract canonical service-picker engine + `useServicePicker` hook (pure refactor)
+
+Per CLAUDE.md Rule 22 (Service pricing — canonical engine only), the service-pricing math + tap-routing logic that lived inside POS components now lives in a shared library at `src/lib/services/`. This session is **pure refactor**: zero behavior change across any operator or customer surface.
+
+**What moved:**
+- `resolveServicePrice`, `resolveServicePriceWithSale`, `getServicePriceRange` were lifted from `src/app/pos/utils/pricing.ts` into the new canonical engine at `src/lib/services/picker-engine.ts`. Logic is byte-identical.
+- The routing decision tree from `<CatalogBrowser>` (`catalog-browser.tsx:333-419` and its duplicate at 446-488) is now exposed as a pure function `routeServiceTap(service, vehicleSizeClass)` returning a typed `ServiceTapRoute` discriminator. The catalog browser still owns the runtime routing today (so behavior is unchanged); the pure function exists so Layer 3a's hook-mounted surfaces can route consistently without re-implementing.
+- `src/app/pos/utils/pricing.ts` is now a thin backward-compat re-export shim. All 9 existing importers continue to work without modification.
+
+**What's new:**
+- `src/lib/services/picker-engine.ts` — canonical math + routing.
+- `src/lib/services/use-service-picker.ts` — `useServicePicker(options)` hook returning `{ CatalogPane, ActiveDialog, selectedServiceIds, reset }`. The hook wraps the existing `<CatalogBrowser>` + `<ServicePricingPicker>` components (Rule 11 — Component Reuse) instead of duplicating them. JSX-free (`React.createElement`) so the file can keep its `.ts` extension alongside the other `src/lib/services/` modules.
+- `src/lib/services/index.ts` — public barrel exposing the engine functions, the hook, and the `ServiceTapRoute` / `ResolvedPrice` / `ServicePickerOptions` / `ServicePickerSurface` types.
+- 32 new engine tests (`picker-engine.test.ts`): exhaustive coverage of `resolveServicePrice` across all 5 size classes + null + sale interaction; `resolveServicePriceWithSale` window-active / window-future / window-past / sale-not-cheaper; `getServicePriceRange` size-aware / not / partial-null; `routeServiceTap` one test per `pricing_model` value including the `custom`-as-dead-end pin labeled "NOT YET HANDLED — Layer 2."
+- 7 new hook contract tests (`use-service-picker.test.tsx`): return shape, prop forwarding into `<CatalogBrowser>`, `<ActiveDialog>` null when no service active, `onServiceSelected` invocation on quick-add and per-unit-qty flows, `reset()` safety, set-identity preservation.
+
+**What this session does NOT do** (Layer 1 boundary):
+- Does not handle `pricing_model === 'custom'` (Layer 2 adds the operator custom-price prompt).
+- Does not change the visual UX of `<CatalogBrowser>` or `<ServicePricingPicker>`.
+- Does not migrate any existing surface to consume the hook (Layer 3a migrates the 3 broken operator surfaces; Layer 3c migrates Booking Wizard price-math; Layer 3b — 4 working POS surfaces — is deferred indefinitely).
+- Does not fix Item 15a's broken local `resolveServicePrice` in `<EditServicesModal>` (Layer 3a will replace that modal entirely).
+- Does not ship the `services/no-bespoke-pricing` ESLint rule (Layer 4 builds enforcement).
+
+**Verification:** typecheck clean, lint 0 errors (98 warnings = baseline, no new ones), 1131/1131 tests pass (1088 prior + 43 new — 32 engine + 7 hook + 4 from the shim-resolved legacy `pricing.test.ts`), production build compiled successfully.
+
+**One small deviation from the brief:** the session brief's example `index.ts` showed `ServicePickerOptions` re-exported from `./picker-engine`, but that type lives on the hook surface — placed it under `./use-service-picker` instead. Externally, the barrel `@/lib/services` re-exports both, so callers see the type at the same canonical import path. Direct sub-path imports (`@/lib/services/picker-engine`, `@/lib/services/use-service-picker`) also work.
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15a: Edit Services on Admin Appointment Dialog (with cascade to job)
 
 The Admin Appointment dialog rendered services read-only — operators couldn't add or remove services after an appointment was booked. Lifecycle audit gap §10 #1 captured this. The session also closes the §10 #11 cascade gap: when a `jobs` row is linked to the appointment via `jobs.appointment_id`, mutations now sync the `jobs.services` JSONB snapshot so the detailer sees the up-to-date service list at intake.

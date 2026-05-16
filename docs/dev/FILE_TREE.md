@@ -1033,6 +1033,16 @@ src/lib/services/page-content-extractor.ts
 src/lib/services/service-resolver.ts
 src/lib/services/voice-post-call.ts
 src/lib/services/shippo.ts
+src/lib/services/picker-engine.ts                    # Canonical service-pricing engine (Item 15f Layer 1) — resolveServicePrice, resolveServicePriceWithSale, getServicePriceRange, routeServiceTap. Per CLAUDE.md Rule 22.
+src/lib/services/use-service-picker.ts               # useServicePicker hook returning { CatalogPane, ActiveDialog, selectedServiceIds, reset } (Item 15f Layer 1)
+src/lib/services/index.ts                            # Public barrel — re-exports engine + hook + types (Item 15f Layer 1)
+src/lib/services/__tests__/picker-engine.test.ts     # 32 engine tests — exhaustive size_class + sale + routing per pricing_model (Item 15f Layer 1)
+src/lib/services/__tests__/use-service-picker.test.tsx # 7 hook contract tests with vi-mocked CatalogBrowser/ServicePricingPicker (Item 15f Layer 1)
+```
+
+Backward-compat shim for the canonical engine (Item 15f Layer 1):
+```
+src/app/pos/utils/pricing.ts                         # @deprecated re-exports from @/lib/services/picker-engine — kept for unmigrated call sites; Layer 3b will retire it
 ```
 
 ### Supabase
