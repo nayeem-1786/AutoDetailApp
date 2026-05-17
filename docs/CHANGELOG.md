@@ -6,6 +6,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Layer 3e: Wire <CustomPriceDialog> into shared <CatalogBrowser> ecosystem (S1 custom-pricing fix)
+
+S1 customer-money-correctness fix. Pre-fix, tapping a `pricing_model === 'custom'` service (canonical fixture: Flood Damage / Mold Extraction — `custom_starting_price: $475`, no `service_pricing` rows) was broken on 3 of 4 surfaces:
+
+- **POS New Sale + POS New Quote**: tapping the service opened `<ServiceDetailDialog>` with the "Add to Ticket" button greyed out — `disabled={!isPerUnit && !selectedTier}` evaluates to `true` because tiers = [] (no pricing rows, no flat_price). Operator couldn't add the service.
+- **Item 15a's `<EditServicesModal>` (Admin Appointment edit)**: bespoke checklist toggle. Pre-fix, the modal's local `resolveServicePrice` returned `{ price: 0, tier_name: null }` for custom services, so tapping silently added the row at $0 — worst bug pattern (no operator-visible signal, customer charged the deposit + walks away with no record of the $475+ work).
+- **Layer 3a-i's `<EditServicesDialog>` (Jobs card edit)**: already worked via `useServicePicker` hook (Layer 2 wired `<CustomPriceDialog>` into the hook). No change needed.
+
+Layer 2 (commit `3195c38c`) shipped `<CustomPriceDialog>` + the `open-custom-price-dialog` route action in the canonical engine, but only mounted it inside `useServicePicker`. The 4 native `<CatalogBrowser>` consumers + Item 15a's bespoke modal never went through the hook, so they never got Layer 2's UX.
+
+**Architectural discovery (in-session):** The 4 consumers did NOT share a single routing component. POS Sale + POS Quote share `<CatalogBrowser>` → `<ServiceDetailDialog>`. Layer 3a-i routes through the hook. Item 15a is a fully separate picker. User authorized expanding scope to patch all 3 broken surfaces in this session (Item 15a's bespoke modal gets a temporary patch — the modal is scheduled for deletion in Phase 1 Layer 8e).
+
+**Changes:**
+
+1. **`src/app/pos/components/catalog-browser.tsx`** — new state `customPriceService`. Custom-pricing branch added to all 3 tap handlers (`handleTapService`, `handleTapServiceDirect`, `handleTapServiceDirectUnchecked`) + `handleCompatConfirm`'s 'detail' mode. Branch fires before per-unit / picker fallback routes, so custom always goes to `<CustomPriceDialog>` regardless of vehicle / pricing-row state (matches `routeServiceTap`'s `open-custom-price-dialog` semantics from picker-engine.ts). `<CustomPriceDialog>` mounted as sibling to `<ServicePricingPicker>` in the dialogs block; new `handleCustomPriceSelect` calls `addServiceChecked` (same prerequisite-aware flow as the picker), so prerequisite/duplicate checks work for custom services too.
+
+2. **`src/components/appointments/edit-services-modal.tsx`** — same pattern, scoped to the bespoke checklist toggle. New state `customPriceService`; `handleToggle` routes `pricing_model === 'custom'` selections to `<CustomPriceDialog>` before adding; new `handleCustomPriceSelect` commits the row at the operator-entered amount with `tier_name: 'custom'`. `AdminCatalogService` interface widened with `description` + `custom_starting_price` (so the modal can pass them to the dialog). The modal builds a minimal CatalogService-shaped shim at the dialog boundary — cast at the call site rather than widening AdminCatalogService to a full 30-field clone, since the modal is scheduled for deletion in Phase 1 Layer 8e and the dialog only reads 4 fields.
+
+3. **`src/app/api/admin/services/active/route.ts`** — SELECT widened to include `description, custom_starting_price`. The endpoint feeds Item 15a's modal; pre-fix it returned neither, so the modal had no data to surface in `<CustomPriceDialog>`'s "Starting from $X" reference line.
+
+**Routing decision (engine vs local):** Did NOT refactor `<CatalogBrowser>`'s 3 tap handlers to delegate to `routeServiceTap` from the canonical engine. Rationale: each handler has surface-specific guard logic (customer/vehicle presence checks, compat checks, prerequisite warnings, post-add toast messages) that's not in `routeServiceTap`. A clean refactor would extract the surface guards as a higher-order wrapper around the engine route — bigger scope than Layer 3e's "wire the dialog" goal. The custom-branch addition is byte-aligned with `routeServiceTap`'s `open-custom-price-dialog` action; if `<CatalogBrowser>` ever migrates to engine routing (a Layer 3b-style refactor that's currently moot), the 3 branch sites are the obvious extraction points. Documented in the commit body.
+
+**Tests** (+7 new):
+
+- `src/app/pos/components/__tests__/catalog-browser-custom-routing.test.tsx` (3 cases): search-result tap on Flood Damage opens `<CustomPriceDialog>` (not `<ServiceDetailDialog>`); confirm with $500 emits a synthesized pricing row via `onAddService` (`tier_name: 'custom'`, `tier_label: 'Custom Assessment'`, `price: 500`, `vehicleSizeClass: 'sedan'`); cancel emits nothing.
+- `src/components/appointments/__tests__/edit-services-modal-custom.test.tsx` (4 cases): tap on Flood Damage opens dialog instead of silent $0 add; confirm with $500 commits 1 service totaling $500.00; cancel commits nothing; non-custom (flat) service still uses silent toggle (no dialog regression).
+
+**Manual UAT** (4 paths to verify post-deploy):
+1. POS New Sale → tap Flood Damage → confirm `<CustomPriceDialog>` opens, enter $500 → confirm service added to ticket
+2. POS New Quote → tap Flood Damage → same flow
+3. Admin Appointments → open appointment → "Edit Services" → tap Flood Damage → confirm dialog opens, enter $500 → save → verify `appointment_services` row has $500
+4. POS Jobs → already works via Layer 3a-i's hook path; sanity-check Flood Damage still flows correctly
+
+Verification: typecheck clean on touched files (14 pre-existing errors in `src/lib/quotes/__tests__/quote-service.modifiers.test.ts` unrelated to this layer); lint 0 errors (98 warnings = unchanged baseline); 1259/1259 vitest pass (was 1226 prior; +7 new from Layer 3e tests + 26 net from earlier sessions sweeping through); production build compiled successfully (clean `.next` rebuild).
+
+**Out of scope** (this is a wire-up layer): Did NOT change `<CustomPriceDialog>`, `<ServiceDetailDialog>`, the canonical engine, or `routeServiceTap`. Did NOT migrate `<CatalogBrowser>` consumers to `useServicePicker` (Layer 3b is permanently moot per roadmap). Did NOT touch Layer 3a-i's `<EditServicesDialog>` (works already via the hook).
+
+**Status of Item 15a's `<EditServicesModal>`:** patched in this layer for the custom-pricing bug (operator-visible dialog instead of silent $0 add). Still scheduled for full deletion in Phase 1 Layer 8e (edit-via-POS restructure) — the patch is a deliberate temporary fix that will be removed alongside the modal.
+
+---
+
 ## 2026-05-17 — Wave 1.5 / Item 15g Layer 15g-ii: Lifecycle persistence schema + endpoint propagation
 
 Layer 15g-ii closes the schema and endpoint gaps that caused loyalty + manual-discount + coupon-discount snapshot to silently vanish through Quote → Appointment → Job → Transaction. Layer 15g-i (commit `6acf1661`) shipped coupon-only logic fixes (~70% coverage); this layer extends to full chain fidelity for all three modifiers.

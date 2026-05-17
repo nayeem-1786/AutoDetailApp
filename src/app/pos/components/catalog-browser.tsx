@@ -15,6 +15,7 @@ import { ProductGrid, ServiceGrid } from './catalog-grid';
 import { ProductDetail } from './product-detail';
 import { ServiceDetailDialog } from './service-detail-dialog';
 import { ServicePricingPicker } from './service-pricing-picker';
+import { CustomPriceDialog } from '@/lib/services/custom-price-dialog';
 import { resolveServicePriceWithSale } from '../utils/pricing';
 import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCategory } from '@/lib/utils/vehicle-categories';
 import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
@@ -64,6 +65,7 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   const addDisabled = !canAddItems || (!canCreateTickets && ticketIsEmpty);
   const [browseState, setBrowseState] = useState<BrowseState>({ view: 'categories' });
   const [pickerService, setPickerService] = useState<CatalogService | null>(null);
+  const [customPriceService, setCustomPriceService] = useState<CatalogService | null>(null);
   const [detailProduct, setDetailProduct] = useState<CatalogProduct | null>(null);
   const [detailService, setDetailService] = useState<CatalogService | null>(null);
   const [compatWarning, setCompatWarning] = useState<{ service: CatalogService; mode: 'direct' | 'detail' } | null>(null);
@@ -327,6 +329,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       setCompatWarning({ service, mode: 'detail' });
       return;
     }
+    // Item 15f Layer 3e: pricing_model === 'custom' bypasses <ServiceDetailDialog>
+    // (whose "Add to Ticket" button would be disabled because no pricing row
+    // / flat_price exists). Open <CustomPriceDialog> directly so the operator
+    // can enter a staff-assessed final price. routeServiceTap returns the
+    // same `open-custom-price-dialog` action for this case — see picker-engine.ts.
+    if (service.pricing_model === 'custom') {
+      setCustomPriceService(service);
+      return;
+    }
     setDetailService(service);
   }
 
@@ -349,6 +360,17 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     }
     if (!isServiceCompatible(service)) {
       setCompatWarning({ service, mode: 'direct' });
+      return;
+    }
+    // Item 15f Layer 3e: pricing_model === 'custom' always opens the
+    // operator staff-assessment dialog (same branch as routeServiceTap's
+    // `open-custom-price-dialog`). Fires regardless of vehicle and
+    // regardless of any `flat_price` / `pricing` row state — `custom` means
+    // "operator assesses the final price," so we never quick-add a stale
+    // value. Layer 2's `<CustomPriceDialog>` synthesizes the
+    // `ServicePricing` row on confirm.
+    if (service.pricing_model === 'custom') {
+      setCustomPriceService(service);
       return;
     }
     // Per-unit services always need the quantity picker
@@ -435,15 +457,36 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
     const { service, mode } = compatWarning;
     setCompatWarning(null);
     if (mode === 'detail') {
-      setDetailService(service);
+      // Item 15f Layer 3e: mirror handleTapService's custom branch here.
+      if (service.pricing_model === 'custom') {
+        setCustomPriceService(service);
+      } else {
+        setDetailService(service);
+      }
     } else {
       // Re-run direct add logic without the compatibility check
       handleTapServiceDirectUnchecked(service);
     }
   }
 
+  async function handleCustomPriceSelect(
+    pricing: ServicePricing,
+    vsc: VehicleSizeClass | null,
+  ) {
+    if (!customPriceService) return;
+    const svc = customPriceService;
+    setCustomPriceService(null);
+    const added = await addServiceChecked(svc, pricing, vsc);
+    if (added && !onAddService) toast.success(`Added ${svc.name} — $${pricing.price.toFixed(2)}`);
+  }
+
   // Same as handleTapServiceDirect but without the vehicle compatibility check (used after user confirms compat warning)
   function handleTapServiceDirectUnchecked(service: CatalogService) {
+    // Item 15f Layer 3e: mirror the custom branch from `handleTapServiceDirect`.
+    if (service.pricing_model === 'custom') {
+      setCustomPriceService(service);
+      return;
+    }
     if (service.pricing_model === 'per_unit' && service.per_unit_price != null) {
       setPickerService(service);
       return;
@@ -527,6 +570,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
           onSelect={handlePricingSelect}
+        />
+      )}
+      {customPriceService && (
+        <CustomPriceDialog
+          open={!!customPriceService}
+          onClose={() => setCustomPriceService(null)}
+          service={customPriceService}
+          vehicleSizeClass={vehicleSizeClass as VehicleSizeClass | null}
+          onSelect={handleCustomPriceSelect}
         />
       )}
       {detailProduct && (

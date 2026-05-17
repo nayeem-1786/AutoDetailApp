@@ -6,7 +6,9 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { formatCurrency } from '@/lib/utils/format';
 import { Button } from '@/components/ui/button';
-import type { VehicleSizeClass } from '@/lib/supabase/types';
+import { CustomPriceDialog } from '@/lib/services/custom-price-dialog';
+import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import type { CatalogService } from '@/app/pos/types';
 
 /**
  * Item 15a — Edit Services modal for the Admin Appointment dialog.
@@ -35,7 +37,9 @@ interface ServicePricingRow {
 interface AdminCatalogService {
   id: string;
   name: string;
+  description: string | null;
   flat_price: number | null;
+  custom_starting_price: number | null;
   pricing_model: string | null;
   pricing?: ServicePricingRow[];
 }
@@ -102,6 +106,16 @@ export function EditServicesModal({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<SelectedAppointmentService[]>([]);
+  // Item 15f Layer 3e: when the operator taps a `pricing_model === 'custom'`
+  // service (e.g., Flood Damage / Mold Extraction), open the staff
+  // assessment dialog before adding. Pre-fix, `resolveServicePrice` silently
+  // returned $0 for custom services, so the operator could add the row with
+  // no operator-visible signal — and the customer was never charged the
+  // staff-assessed amount. Patch lives here temporarily; this whole modal
+  // is scheduled for deletion in Item 15f Phase 1 Layer 8e (edit-via-POS
+  // restructure), so the duplication of routing logic with `<CatalogBrowser>`
+  // is intentional and short-lived.
+  const [customPriceService, setCustomPriceService] = useState<AdminCatalogService | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -128,20 +142,50 @@ export function EditServicesModal({
   }, [allServices, search]);
 
   function handleToggle(svc: AdminCatalogService) {
-    setSelected((prev) => {
-      const exists = prev.find((s) => s.service_id === svc.id);
-      if (exists) return prev.filter((s) => s.service_id !== svc.id);
-      const { price, tier_name } = resolveServicePrice(svc, vehicleSizeClass);
-      return [
-        ...prev,
-        {
-          service_id: svc.id,
-          service_name: svc.name,
-          price_at_booking: price,
-          tier_name,
-        },
-      ];
-    });
+    const exists = selected.find((s) => s.service_id === svc.id);
+    // Deselect path: never routes through the custom dialog — the row is
+    // already on the appointment with its committed price.
+    if (exists) {
+      setSelected((prev) => prev.filter((s) => s.service_id !== svc.id));
+      return;
+    }
+    // Item 15f Layer 3e: custom-pricing services bypass the silent $0 add.
+    // Open `<CustomPriceDialog>` for operator staff-assessment first; the
+    // dialog's confirm handler completes the toggle with the entered price.
+    if (svc.pricing_model === 'custom') {
+      setCustomPriceService(svc);
+      return;
+    }
+    const { price, tier_name } = resolveServicePrice(svc, vehicleSizeClass);
+    setSelected((prev) => [
+      ...prev,
+      {
+        service_id: svc.id,
+        service_name: svc.name,
+        price_at_booking: price,
+        tier_name,
+      },
+    ]);
+  }
+
+  // Item 15f Layer 3e: completion handler for `<CustomPriceDialog>`. The
+  // dialog's `onSelect` emits a synthesized `ServicePricing` row carrying
+  // the operator-entered amount via `buildCustomPricing`; we commit that
+  // amount as `price_at_booking`. `tier_name` records 'custom' so the saved
+  // row is distinguishable from sized-tier rows when re-rendered.
+  function handleCustomPriceSelect(pricing: ServicePricing) {
+    if (!customPriceService) return;
+    const svc = customPriceService;
+    setCustomPriceService(null);
+    setSelected((prev) => [
+      ...prev,
+      {
+        service_id: svc.id,
+        service_name: svc.name,
+        price_at_booking: pricing.price,
+        tier_name: pricing.tier_name,
+      },
+    ]);
   }
 
   async function handleSave() {
@@ -190,7 +234,22 @@ export function EditServicesModal({
 
   const total = selected.reduce((sum, s) => sum + s.price_at_booking, 0);
 
+  // Item 15f Layer 3e: minimal CatalogService-shaped object for
+  // `<CustomPriceDialog>`. The dialog only reads `id`, `name`, `description`,
+  // and `custom_starting_price` — everything else is filler. Cast at the
+  // boundary; safer than widening `AdminCatalogService` to a 30-field clone
+  // for a modal that gets deleted in Phase 1 Layer 8e.
+  const customPriceServiceShim: CatalogService | null = customPriceService
+    ? ({
+        id: customPriceService.id,
+        name: customPriceService.name,
+        description: customPriceService.description ?? null,
+        custom_starting_price: customPriceService.custom_starting_price ?? null,
+      } as unknown as CatalogService)
+    : null;
+
   return (
+    <>
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center"
       onClick={onClose}
@@ -304,5 +363,15 @@ export function EditServicesModal({
         </div>
       </div>
     </div>
+    {customPriceServiceShim && (
+      <CustomPriceDialog
+        open={!!customPriceServiceShim}
+        service={customPriceServiceShim}
+        vehicleSizeClass={vehicleSizeClass}
+        onClose={() => setCustomPriceService(null)}
+        onSelect={handleCustomPriceSelect}
+      />
+    )}
+    </>
   );
 }

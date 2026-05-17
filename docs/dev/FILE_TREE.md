@@ -1371,9 +1371,13 @@ customer-lookup.tsx         pos-service-worker.tsx      ticket-item-row.tsx
                                                         __tests__/service-detail-dialog.test.tsx
                                                         __tests__/service-pricing-picker.test.tsx
                                                         __tests__/ticket-actions.test.tsx
+                                                        __tests__/catalog-browser-custom-routing.test.tsx  # Item 15f Layer 3e — pins `<CatalogBrowser>` opens `<CustomPriceDialog>` for pricing_model=custom
                                                         utils/__tests__/pricing.test.ts
                                                         quotes/
 ```
+
+Item 15f Layer 3e additions:
+- `src/app/pos/components/catalog-browser.tsx` — adds `customPriceService` state + custom branch in 3 tap handlers + `<CustomPriceDialog>` mount. Routes `pricing_model === 'custom'` directly to staff-assessment dialog, bypassing the disabled-button bug in `<ServiceDetailDialog>`.
 
 Phase Mobile-1.1 additions:
 - `src/app/pos/components/checkout/save-address-dialog.tsx`
@@ -1398,8 +1402,9 @@ Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
 - `src/lib/appointments/__tests__/edit-services.test.ts`
 - `src/app/api/admin/appointments/[id]/services/route.ts` — PUT cascade endpoint (`appointment_services` + `jobs.services` JSONB sync with manual rollback).
 - `src/app/api/admin/appointments/[id]/services/__tests__/route.test.ts`
-- `src/app/api/admin/services/active/route.ts` — Session-authed GET active services for admin pickers.
-- `src/components/appointments/edit-services-modal.tsx` — Picker modal (search + toggle + total + save).
+- `src/app/api/admin/services/active/route.ts` — Session-authed GET active services for admin pickers. Item 15f Layer 3e widened SELECT to include `description` + `custom_starting_price` so the modal can pass them to `<CustomPriceDialog>`.
+- `src/components/appointments/edit-services-modal.tsx` — Picker modal (search + toggle + total + save). Item 15f Layer 3e: routes `pricing_model === 'custom'` taps through `<CustomPriceDialog>` instead of the silent $0 add. Patch is temporary — modal is scheduled for deletion in Phase 1 Layer 8e.
+- `src/components/appointments/__tests__/edit-services-modal-custom.test.tsx` — Item 15f Layer 3e — pins the custom-pricing routing behavior of the modal.
 
 ---
 

@@ -31,10 +31,12 @@ export async function GET(request: NextRequest) {
         `
         id,
         name,
+        description,
         flat_price,
         per_unit_price,
         per_unit_label,
         per_unit_max,
+        custom_starting_price,
         pricing_model,
         classification,
         base_duration_minutes,
