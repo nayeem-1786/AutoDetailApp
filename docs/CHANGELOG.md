@@ -6,6 +6,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15g Layer 15g-i: MVP coupon-only lifecycle persistence (Quote → Appointment → Job → Checkout)
+
+S1 customer-money-correctness fix. Pre-fix, a coupon applied during the Quote phase silently disappeared by the time the operator hit Checkout on the linked Job: `convertQuote` dropped `coupon_code` from the appointment insert, and `checkout-items` only re-derived a coupon by joining `jobs.quote_id` → `quotes.coupon_code`. That join doesn't exist for online-booked jobs (which write `appointments.coupon_code` directly through the booking wizard) — so booking-wizard coupons leaked at checkout too.
+
+**Three logic changes, no schema migration (per LIFECYCLE_PERSISTENCE_AUDIT_2026-05-16.md §9.4 minimum viable scope):**
+
+1. **`src/lib/quotes/convert-service.ts:67-91`** — appointment insert now propagates `coupon_code` from the quote and replaces the hardcoded `discount_amount: 0` with `quote.coupon?.discount ?? 0`. `total_amount` becomes `quote.total_amount - couponDiscount` for forward-compatibility with Layer 15g-ii. Today `quote.coupon` is runtime-only state (no DB column for the discount snapshot), so `coupon_discount`/`discount_amount` resolve to 0 in this layer; Layer 15g-ii adds the column.
+2. **`src/app/api/pos/jobs/[id]/checkout-items/route.ts:243-266`** — appointment SELECT extended to include `coupon_code`; new fallback assigns `appt.coupon_code → coupon_code` when the quote-side lookup yielded nothing (online-booking-leaks-at-checkout gap, plus any future `job.quote_id`-NULL convert path).
+3. **`src/app/pos/jobs/page.tsx:155-214`** — verified no change needed. The existing `handleCheckout` already re-validates `data.coupon_code` through `/api/pos/coupons/validate` and dispatches `SET_COUPON` with the freshly computed discount. The reducer's `SET_COUPON` case is replace-based (not additive) and `RESTORE_TICKET` resets `coupon: null` first, so re-running checkout is naturally idempotent — no double-discount possible.
+
+**Tests (10 new):**
+- `src/lib/quotes/__tests__/convert-service.test.ts` — 3 cases: quote with coupon → appointment carries `coupon_code`; quote without coupon → null coupon_code + 0 discount; forward-compat case where `quote.coupon.discount` is hydrated → `discount_amount`/`total_amount`/`coupon_discount` reflect it.
+- `src/app/api/pos/jobs/[id]/checkout-items/__tests__/coupon-fallback.test.ts` — 4 cases: quote-side coupon takes precedence; appointment fallback fires when `quote_id` is null; appointment fallback fires when linked quote has no coupon; walk-in returns null.
+- `src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx` — 3 cases: validates request body shape + asserts dispatch order (`RESTORE_TICKET` with `coupon: null` THEN `SET_COUPON`); skips validation when no coupon_code; second checkout pass pins idempotency (RESTORE resets coupon each time).
+
+**Out of scope (Layer 15g-ii / 15g-iii / 15g-iv):**
+- Loyalty redemption persistence — requires `appointments.loyalty_*` columns.
+- Manual discount persistence — requires `appointments.manual_discount_*` columns.
+- Walk-in path `api/pos/jobs/route.ts` — synthetic appointment still hardcodes `discount_amount: 0`.
+- Booking wizard migration from `internal_notes` plaintext loyalty stop-gap to dedicated columns.
+- Admin Appointment dialog / Jobs card UI surfacing of modifiers.
+
+Coverage: ~70% of the operator-reported bug (coupon is the most-used modifier).
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15f Layer 3d: Rewrite `service-resolver.ts` as canonical-engine wrapper (voice agent + SMS auto-responder)
 
 Layer 3d removes the 4th and final bespoke service-pricing implementation discovered during Layer 1 verification — `resolvePrice` in `src/lib/services/service-resolver.ts`. This is the resolver used by the customer-facing voice-agent quote path and the SMS auto-responder, so its bugs surface directly in real-world quotes.

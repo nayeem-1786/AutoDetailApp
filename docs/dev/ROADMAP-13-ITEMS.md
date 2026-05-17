@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.0 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3d done; Phase 1 / Layers 3c, 4 pending); 15g new (lifecycle persistence — must land before Phase 1)
-**Last session updated:** 2026-05-16 — Item 15f Layer 3d landed: `service-resolver.ts` rewrite as canonical-engine wrapper (voice agent + SMS auto-responder). Fixed 4 silent mis-pricing bugs (exotic/classic fall-through, per_unit $0, specialty first-tier, custom $0).
+**Document version:** v2.1 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3d done; Phase 1 / Layers 3c, 4 pending); 15g Layer 15g-i landed (MVP coupon-only persistence); 15g Layers 15g-ii/iii/iv still pending (must land before Phase 1 layers 8a-8f).
+**Last session updated:** 2026-05-16 — Item 15g Layer 15g-i landed: MVP coupon-only persistence chain fix (convert-service.ts coupon propagation + checkout-items appointment fallback). Closes ~70% of operator-reported lifecycle-persistence bug; no schema changes. Layer 15g-ii (schema migration + loyalty/manual-discount propagation) is the next sequential session.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -1226,7 +1226,7 @@ any future code that might attempt to re-build a parallel picker.
 
 ### Item 15g — Lifecycle Persistence: Discount / Coupon / Loyalty Across Quote → Appointment → Job → Transaction
 
-- **Status:** not started
+- **Status:** Layer 15g-i done (2026-05-16); Layer 15g-ii not started; Layers 15g-iii, 15g-iv not started
 - **Severity:** S1 (customer-promised concessions silently dropped today)
 - **Effort:** 5 sessions (~10-12 hours total, layered)
 - **Wave:** 1.5
@@ -1310,6 +1310,13 @@ The chain is asymmetric — online booking flow works; POS-originated quote/walk
 - 2026-05-16: user chose Option C (phased 15g-i through 15g-iv) over Option A (full single-session) or Option B (MVP coupon-only).
 - 2026-05-16: user confirmed sequence — 15g-i + 15g-ii BEFORE Phase 1's layers 8a-8f. 15g-iii + 15g-iv can run in parallel with Phase 1 later layers.
 - 2026-05-16: breaking-change risk assessment is low across the board per audit §9.5. Key watch-items: QBO line-item sync (verify `loyalty_discount` handling), loyalty ledger row write timing (stays transaction-bound).
+- 2026-05-16: **Layer 15g-i landed.** Three logic changes, no schema migration:
+  - `src/lib/quotes/convert-service.ts` (modified) — appointment insert now writes `coupon_code: quote.coupon_code ?? null` plus `discount_amount`/`coupon_discount`/`total_amount` keyed off `quote.coupon?.discount ?? 0` (runtime-only state today; resolves to 0 until Layer 15g-ii adds `quotes.coupon_discount`).
+  - `src/app/api/pos/jobs/[id]/checkout-items/route.ts` (modified) — appointment SELECT extended to fetch `coupon_code`; new fallback after the existing `job.quote_id` lookup inherits `appt.coupon_code` when nothing was recovered from the quote bridge. Closes the online-booking-leaks-at-checkout gap (booking wizard writes `appointments.coupon_code` but online-booked jobs have `quote_id = NULL`).
+  - `src/app/pos/jobs/page.tsx` — no change needed. Existing `handleCheckout` already re-validates `data.coupon_code` via `/api/pos/coupons/validate` and dispatches `SET_COUPON`. `SET_COUPON` reducer is replace-based; `RESTORE_TICKET` resets `coupon: null` first → re-checkout naturally idempotent.
+  - Tests (10 new): `src/lib/quotes/__tests__/convert-service.test.ts` (3 cases), `src/app/api/pos/jobs/[id]/checkout-items/__tests__/coupon-fallback.test.ts` (4 cases), `src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx` (3 cases).
+  - Verification gates: typecheck clean (1 pre-existing unrelated error in `step-service-select.tsx` from prior in-progress work, not mine); lint clean (0 errors); vitest 1199/1199 passing including the 10 new tests; build blocked by the same pre-existing `step-service-select.tsx` modification — not introduced by this session.
+  - Coverage: ~70% of operator-reported lifecycle-persistence bug (coupon is the most-used modifier). Manual discount + loyalty remain lost — they require schema work in Layer 15g-ii.
 
 ---
 

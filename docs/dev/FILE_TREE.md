@@ -410,6 +410,7 @@ src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts
 src/app/api/pos/jobs/[id]/addons/route.ts
 src/app/api/pos/jobs/[id]/cancel/route.ts
 src/app/api/pos/jobs/[id]/checkout-items/route.ts
+src/app/api/pos/jobs/[id]/checkout-items/__tests__/coupon-fallback.test.ts  # 4 tests — pins Item 15g Layer 15g-i appointment-side coupon fallback when no job.quote_id bridge
 src/app/api/pos/jobs/[id]/complete/route.ts
 src/app/api/pos/jobs/[id]/link-transaction/route.ts
 src/app/api/pos/jobs/[id]/photos/[photoId]/route.ts
@@ -813,6 +814,7 @@ src/app/pos/page.tsx                     — POS main workspace
 src/app/pos/login/page.tsx               — POS PIN login
 src/app/pos/end-of-day/page.tsx          — End-of-day cash count & reconciliation
 src/app/pos/jobs/page.tsx                — Jobs management
+src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx  # 3 tests — pins Item 15g Layer 15g-i handleCheckout dispatch (RESTORE_TICKET coupon=null → SET_COUPON via /api/pos/coupons/validate) + idempotency
 src/app/pos/appointments/page.tsx        — Appointments view (Roadmap Item 12 — POS footer reschedule surface)
 src/app/pos/offline/page.tsx             — Offline fallback page
 src/app/pos/quotes/page.tsx              — Quote builder & list
@@ -998,6 +1000,9 @@ src/lib/products/barcode-lookup.ts          — Shared barcode/SKU lookup helper
 src/lib/quotes/convert-service.ts
 src/lib/quotes/quote-service.ts
 src/lib/quotes/send-service.ts
+src/lib/quotes/__tests__/convert-service.test.ts        # 3 tests — pins Item 15g Layer 15g-i coupon_code propagation through Quote → Appointment on convert
+src/lib/quotes/__tests__/derive-comm-pill.test.ts
+src/lib/quotes/__tests__/send-service.test.ts
 ```
 
 ### Search

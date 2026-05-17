@@ -240,14 +240,30 @@ export async function GET(
     // Also fetch mobile fields so we can synthesize the mobile_fee display
     // line (Write Point 3) — gives the cashier visibility and flows the line
     // through to checkout submit naturally.
+    //
+    // Item 15g Layer 15g-i: also fetch `coupon_code` so we can fall back to the
+    // appointment when no quote-side coupon was recovered. Closes the
+    // online-booking-leaks-at-checkout gap (booking wizard writes
+    // `appointments.coupon_code` but `job.quote_id` is NULL for online-booked
+    // jobs) AND the future case where a POS-converted appointment loses its
+    // `quote_id` bridge for any reason. Layer 15g-ii will additionally surface
+    // `coupon_discount` here for display.
     let deposit_amount = 0;
     let deposit_date: string | null = null;
     if (job.appointment_id) {
       const { data: appt } = await supabase
         .from('appointments')
-        .select('payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot')
+        .select('payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot, coupon_code')
         .eq('id', job.appointment_id)
         .single();
+
+      // Coupon fallback: if no quote-side coupon was found (no quote_id, or
+      // quote had no coupon_code), inherit from the appointment row. The
+      // client re-validates the code via /api/pos/coupons/validate, so the
+      // discount value is re-derived at hydration time.
+      if (!coupon_code && appt?.coupon_code) {
+        coupon_code = appt.coupon_code;
+      }
 
       // Synthesize mobile_fee line when appointment is mobile and the line
       // hasn't already been materialized through job.services (defense in

@@ -62,8 +62,20 @@ export async function convertQuote(
   // builder captures them once, conversion mirrors them onto the appointment
   // so the subsequent close-out (defensive injection in /api/pos/transactions)
   // materializes the mobile_fee transaction_items row automatically.
+  //
+  // Item 15g Layer 15g-i: propagate `coupon_code` from the quote so the
+  // checkout-items fallback (POS Jobs card → register) can re-validate the
+  // coupon when no `job.quote_id` bridge exists. `quote.coupon` is runtime-only
+  // state (see `src/app/pos/types.ts` QuoteState) — the DB row carries only
+  // `coupon_code`, so `coupon_discount`/`discount_amount` resolve to 0 here;
+  // checkout re-derives the discount through `/api/pos/coupons/validate`.
+  // Layer 15g-ii will add `quotes.coupon_discount` so we can persist a snapshot.
   const quoteIsMobile = !!quote.is_mobile;
   const quoteMobileSurcharge = Number(quote.mobile_surcharge ?? 0);
+  const couponDiscount =
+    Number(
+      (quote as { coupon?: { discount?: number | null } }).coupon?.discount ?? 0
+    ) || 0;
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
     .insert({
@@ -83,9 +95,11 @@ export async function convertQuote(
       payment_status: 'pending',
       subtotal: quote.subtotal,
       tax_amount: quote.tax_amount,
-      discount_amount: 0,
-      total_amount: quote.total_amount,
+      discount_amount: couponDiscount,
+      total_amount: Number(quote.total_amount ?? 0) - couponDiscount,
       job_notes: quote.notes,
+      coupon_code: quote.coupon_code ?? null,
+      coupon_discount: couponDiscount || null,
     })
     .select('*')
     .single();
