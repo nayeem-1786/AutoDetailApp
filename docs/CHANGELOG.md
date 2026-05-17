@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Wave 1.5 / Item 15f Layer 3d: Rewrite `service-resolver.ts` as canonical-engine wrapper (voice agent + SMS auto-responder)
+
+Layer 3d removes the 4th and final bespoke service-pricing implementation discovered during Layer 1 verification — `resolvePrice` in `src/lib/services/service-resolver.ts`. This is the resolver used by the customer-facing voice-agent quote path and the SMS auto-responder, so its bugs surface directly in real-world quotes.
+
+**Four bugs fixed (all silent mis-pricing, no errors thrown):**
+1. **Missing `exotic` + `classic` size_class cases** — both fell through to the sedan column. A Ferrari (exotic) quoted for a $725 1-Year Ceramic Shield was actually receiving the $425 sedan price; same for classic vehicles.
+2. **`per_unit` returned $0** — per-unit services like Scratch Repair ($150/unit) have no `service_pricing` rows, so the resolver's `default:` branch dropped to `flat_price ?? 0`. Customers got $0 quotes for per-unit services.
+3. **`specialty` returned `tiers[0]` regardless of `specialty_tier`** — aircraft / boat / RV services with multiple specialty tiers always returned the first tier by display_order, mis-pricing any non-default specialty class.
+4. **`custom` returned $0** — same `pricing.length === 0` fallthrough as per_unit; ignored `service.custom_starting_price`.
+
+**Approach:**
+- `resolvePrice` is now a thin wrapper around `resolveServicePriceWithSale` from the canonical engine (`src/lib/services/picker-engine.ts`) per CLAUDE.md Rule 22. The wrapper dispatches by `pricing_model` and synthesizes a `ServicePricing` row for the `flat` / `per_unit` / `custom` cases (which have no row in `service_pricing`). The `vehicle_size` / `scope` cases pick the size-aware tier (column-pattern A) or the size_class-named tier (row-pattern B) and pass to the canonical engine. The `specialty` case finds the row whose `tier_name` matches the new optional `specialtyTier` argument.
+- New 3rd argument: `options: { specialtyTier?: string | null }` — optional, so the 3 existing importers compile unchanged. End-to-end specialty fix at the call sites is a follow-up (they currently SELECT only `vehicles.size_class`; need to also SELECT `specialty_tier`).
+- The `ResolvedPrice` return shape (`price`, `salePrice`, `tierName`, `isOnSale`) is preserved byte-identically so the 3 importers (`send-quote-sms/route.ts`, `webhooks/twilio/inbound/route.ts`, `voice-post-call.ts`) need no code changes.
+- `resolveServiceByName` is unchanged in surface but the SELECT was widened to fetch the additional columns the canonical engine needs (`per_unit_price`, `custom_starting_price`, `vehicle_size_exotic_price`, `vehicle_size_classic_price`, plus the full `ServicePricing` row shape: `id`, `service_id`, `tier_label`, `display_order`, `max_qty`, `qty_label`, `created_at`).
+- `ResolvedService` interface gained `per_unit_price` and `custom_starting_price`; its `service_pricing[]` is now typed as the full `ServicePricing` shape rather than the previous partial subset.
+
+**Tests:**
+- New `src/lib/services/__tests__/service-resolver.test.ts` — 27 cases pinning all 4 bug fixes:
+  - **flat (3):** size-class-agnostic price, service-level sale window, null `flat_price` returns 0.
+  - **vehicle_size / scope (7):** Bug 1 fixes — Ferrari (exotic) = $725 not $425; Model A (classic) = $625 not $425; sedan / truck / van unchanged; per-size column null fallback to `pricing.price`; row-pattern B (one tier per size_class) resolves exotic + classic correctly; tier-level sale active; scope uses same dispatch.
+  - **per_unit (3):** Bug 2 fix — returns `service.per_unit_price` (not $0); null `per_unit_price` returns 0; size class does not silently apply.
+  - **specialty (7):** Bug 3 fixes — single_engine / twin / jet each return their own row; falls back to first tier when `specialtyTier` is omitted; falls back when specialty_tier doesn't match; size class is irrelevant for specialty; tier-level sale active.
+  - **custom (4):** Bug 4 fix — returns `service.custom_starting_price` (not $0); null returns 0; sale logic not applied; size class does not silently apply.
+  - **edge (2):** null sizeClass → engine's no-vehicle fallback; unknown sizeClass string falls back to `pricing.price`.
+
+**Verification:**
+- Typecheck clean on the touched files (`service-resolver.ts`, new test, 3 importers) — no new errors introduced anywhere.
+- Lint 0 errors, 0 new warnings on the touched files.
+- 1192/1192 tests pass (was 1162 at Layer 3a partial; +27 from this layer's new test file; the remaining delta is from in-progress unrelated work in the working tree).
+- Production build NOT attempted in this session — the working tree carries pre-existing uncommitted modifications in `step-service-select.tsx`, `checkout-items/route.ts`, and `convert-service.ts` that have their own typecheck errors unrelated to this layer.
+- **Manual UAT NOT performed** — voice-agent and SMS auto-responder paths require a real call / inbound message against the deployed environment. User verifies post-session: voice quote for a Ferrari + 1-Year Ceramic Shield should now SMS $725 (was $425); SMS quote for a per-unit Scratch Repair should now show $150/unit (was $0); a Mold Extraction quote should now show $475 (was $0); aircraft quotes should resolve the matching specialty tier (currently still requires call sites to also pass `vehicle.specialty_tier` — see follow-up below).
+
+**Follow-up needed (NOT in this session):**
+- The 3 importers currently SELECT only `vehicles.size_class` when fetching the vehicle. To complete the end-to-end specialty fix, they need to also SELECT `specialty_tier` and pass it as `resolvePrice(service, sizeClass, { specialtyTier: vehicle.specialty_tier })`. The resolver supports this today; the caller updates are a separate one-line-each change.
+- Layer 4 (ESLint enforcement of `services/no-bespoke-pricing`) — schedules `'warn'` → `'error'` once all bespoke-pricing surfaces are migrated.
+
+**Files:**
+- Modified: `src/lib/services/service-resolver.ts` (rewrite of `resolvePrice`, widened SELECT in `resolveServiceByName`, expanded `ResolvedService` type).
+- New: `src/lib/services/__tests__/service-resolver.test.ts` (27 cases).
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15f Layer 3a (partial): Migrate POS Jobs card Edit Services to canonical hook
 
 **Scope narrowed mid-session** per user direction (Option A from the in-session blocker). The original Layer 3a brief targeted BOTH the POS Jobs card and the Admin Appointment dialog. Discovery surfaced that `<CatalogBrowser>` (which `useServicePicker` wraps) has hard dependencies on POS-only contexts (`useTicket()` throws when no `<TicketProvider>` is mounted; `usePosPermission()` defaults to `granted: false`). The Jobs card sits inside `<PosShell>` and is unaffected; the Admin Appointment dialog sits outside it and would crash. Admin migration deferred to a follow-up that decouples `<CatalogBrowser>` from POS contexts.

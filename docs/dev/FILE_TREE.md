@@ -1030,7 +1030,7 @@ src/lib/services/messaging-ai-prompt.ts
 src/lib/services/messaging-ai.ts
 src/lib/services/conversation-summary.ts
 src/lib/services/page-content-extractor.ts
-src/lib/services/service-resolver.ts
+src/lib/services/service-resolver.ts                 # resolveServiceByName + resolvePrice for voice agent / SMS auto-responder. Layer 3d: resolvePrice rewritten as thin wrapper around canonical engine; 4 silent-mispricing bugs (exotic/classic, per_unit, specialty, custom) closed.
 src/lib/services/voice-post-call.ts
 src/lib/services/shippo.ts
 src/lib/services/picker-engine.ts                    # Canonical service-pricing engine (Item 15f Layer 1; Layer 2 added `open-custom-price-dialog` ServiceTapRoute variant + branch) — resolveServicePrice, resolveServicePriceWithSale, getServicePriceRange, routeServiceTap. Per CLAUDE.md Rule 22.
@@ -1042,6 +1042,7 @@ src/lib/services/__tests__/picker-engine.test.ts     # Engine tests — exhausti
 src/lib/services/__tests__/use-service-picker.test.tsx # Hook contract tests with vi-mocked CatalogBrowser/ServicePricingPicker/CustomPriceDialog (Item 15f Layer 1+2)
 src/lib/services/__tests__/custom-price-dialog.test.tsx # 11 tests — dialog rendering, validation, confirm/cancel emit, buildCustomPricing helper (Item 15f Layer 2)
 src/lib/services/__tests__/edit-services-dialog.test.tsx # 13 tests — wrapper rendering, prop forwarding, selected-services list, save/cancel, error/loading states (Item 15f Layer 3a)
+src/lib/services/__tests__/service-resolver.test.ts  # 27 tests — pin all 4 Layer-3d bug fixes (exotic/classic fall-through, per_unit $0, specialty first-tier, custom $0); covers flat / vehicle_size / scope / per_unit / specialty / custom dispatch + size-class edge cases.
 ```
 
 Backward-compat shim for the canonical engine (Item 15f Layer 1):
