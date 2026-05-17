@@ -74,6 +74,13 @@ interface EditServicesModalProps {
   }) => void;
 }
 
+// Item 15f Layer 4: this bespoke pricer is dead code. The Admin Appointment
+// dialog's "Edit" trigger is disabled (see appointment-detail-dialog.tsx);
+// the modal is mounted-but-unreachable. Deletion is scheduled in Phase 1
+// Layer 8e (edit-via-POS restructure). The eslint-disable below is the
+// only sanctioned disable comment in the codebase — it documents the
+// dead-code state rather than introducing a workaround.
+// eslint-disable-next-line services/no-bespoke-pricing
 function resolveServicePrice(
   svc: AdminCatalogService,
   sizeClass: VehicleSizeClass | null

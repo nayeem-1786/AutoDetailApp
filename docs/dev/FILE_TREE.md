@@ -1712,7 +1712,22 @@ eslint-rules/phone-no-raw-display.js                       # Phase Lint-Hardenin
 eslint-rules/__tests__/phone-no-raw-display.test.js        # 23 RuleTester cases (10 valid, 13 invalid) — vitest picks up via include
 eslint-rules/money-no-unsuffixed-money-prop.js             # Phase Money-Unify-1: flags cents-typed values bound to identifiers lacking Cents/_cents suffix
 eslint-rules/__tests__/money-no-unsuffixed-money-prop.test.js  # 21 RuleTester cases (14 valid, 7 invalid)
+eslint-rules/services-no-bespoke-pricing.js                # Item 15f Layer 4: enforces CLAUDE.md Rule 22 — 3 signals (function-name pattern, switch-over-pricing_model w/o engine call, direct vehicle_size_*_price reads). Ships at 'error'.
+eslint-rules/__tests__/services-no-bespoke-pricing.test.js # 19 RuleTester cases (10 valid, 9 invalid)
 ```
+
+Item 15f Layer 4 additions / changes (4 bespoke-pricer migrations + helper extraction):
+- New: `src/app/api/book/_pricing.ts` — `computeExpectedPrice` extracted from `route.ts` (Next.js route files only permit GET/POST/etc. exports; underscore prefix excludes from route resolution).
+- New: `src/app/api/book/__tests__/compute-expected-price.test.ts` — 12 cases pinning canonical-engine routing.
+- Modified: `src/app/api/book/route.ts` — imports `computeExpectedPrice` from `./_pricing`.
+- Modified: `src/components/booking/booking-wizard.tsx` — `reconstructConfig` migrated to canonical engine.
+- Modified: `src/components/public/service-card.tsx` — `getStartingPrice` migrated to canonical engine.
+- Modified: `src/app/api/voice-agent/services/route.ts` — pricing array builder migrated; SELECT widened to fetch full ServicePricing.
+- Modified: `src/components/appointments/edit-services-modal.tsx` — single sanctioned `// eslint-disable-next-line services/no-bespoke-pricing` comment above the dead-code `resolveServicePrice` (modal deletion-scheduled in Phase 1 Layer 8e).
+- Modified: `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — Admin "Edit Services" button disabled (deletion-window safety).
+- New: `src/app/admin/appointments/components/__tests__/edit-services-disabled.test.tsx` — 2 cases pinning the disabled button + no-modal-mount.
+- Modified: `CLAUDE.md` Rule 22 — updated to reflect rule is now `'error'`-enforced.
+- Modified: `eslint.config.mjs` — registered `services/no-bespoke-pricing` under the `services` plugin namespace.
 
 ---
 

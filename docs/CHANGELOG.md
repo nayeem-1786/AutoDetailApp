@@ -6,6 +6,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Layer 4: ESLint enforcement of Rule 22 + 4 missed bespoke-pricer migrations (Item 15f COMPLETE except Phase 1)
+
+Layer 4 ships the `services/no-bespoke-pricing` ESLint rule at `'error'` enforcing CLAUDE.md Rule 22, plus migrations of 4 bespoke pricers Layers 3c–3e missed:
+
+**New ESLint rule** (`eslint-rules/services-no-bespoke-pricing.js` + `eslint-rules/__tests__/services-no-bespoke-pricing.test.js`, 19 cases): three smoking-gun signals — (1) function-name pattern (`resolveServicePrice` / `resolvePrice` / `getServicePrice` / `computeServicePrice` defined outside `src/lib/services/`); (2) `switch (X.pricing_model)` doing money math without calling the canonical engine — refined to exclude string/JSX-returning display dispatches (e.g., `<ServicePricingDisplay>`), classifier switches setting non-price flags (coupon-eligibility's `pricingType`), and label generators wrapping prices in `formatCurrency` (OG image text); (3) direct `vehicle_size_*_price` reads in arithmetic / return contexts. Engine files + test files exempt. Registered in `eslint.config.mjs` under the `services` plugin namespace; severity `'error'`.
+
+**Bespoke-pricer migrations** (4 surfaces caught by the rule during initial enforcement, all wrapped around `resolveServicePriceWithSale` per the Layer 3d pattern):
+
+1. **`src/app/api/book/_pricing.ts` (extracted from `route.ts`) — `computeExpectedPrice`**: server-side booking-price validator. Same drift bugs as `service-resolver.ts` (missing exotic/classic per-size column dispatch). Per-customer impact: customer books a Ferrari 1-Year Ceramic Shield at $725 (Layer 3c wizard displays it correctly), server-side validator returned the base tier.price instead — booking either route-rejected or accepted at wrong price. Now routes through canonical engine; synthesizes `ServicePricing` for `flat`; preserves the `null`-skips-validation contract for `per_unit` / `custom`. Extracted to `_pricing.ts` because Next.js route files only permit GET/POST/etc. exports.
+
+2. **`src/components/booking/booking-wizard.tsx` — `reconstructConfig`**: deep-link / back-navigation config reconstruction from URL params. Missing exotic/classic branches; no sale-price handling; direct `vehicle_size_*_price` column reads. Customer impact: deep-linking to Step 2 with a classic vehicle silently reconstructed to sedan tier. Now uses engine + synthesized rows for `flat`/`per_unit`.
+
+3. **`src/components/public/service-card.tsx` — `getStartingPrice`**: public service catalog "From $X" display. Missing exotic/classic in the "From X" floor (only iterated sedan/truck/van columns); inline sale-price comparison ignored per-size columns for vehicle_size_aware tiers. Now routes through engine + iterates `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` for the customer-visible floor (preserving the existing 3-size customer-facing scope per the booking wizard's gating pattern).
+
+4. **`src/app/api/voice-agent/services/route.ts` — voice-agent catalog response builder**: SELECT widened to fetch full `ServicePricing` rows (was `tier_name, price, sale_price` only). Each case body now calls `resolveServicePriceWithSale` directly (inline, not via a helper — the ESLint rule's static-AST check requires the engine call lexically inside the case body's tree). Drift fixed: per-tier sale-price logic now routes through engine so vehicle_size_aware tier sale_price is compared against the resolved per-size price, not the base.
+
+**Item 15a's dead-code modal**: per the prior architectural decision (Layer 4 session brief), the Admin Appointment dialog's "Edit Services" button is disabled and the bespoke `resolveServicePrice` inside `<EditServicesModal>` carries the only sanctioned `// eslint-disable-next-line services/no-bespoke-pricing` comment in the codebase, documenting the dead-code state until Phase 1 Layer 8e deletes the modal.
+
+**Tests** (+33 new across 3 files):
+- `eslint-rules/__tests__/services-no-bespoke-pricing.test.js` (19 cases — valid: engine + test exemptions, engine-call exemption, display dispatch / classifier / label-generator non-flags, column-presence check, object-literal-key writes; invalid: function-name pattern, pricing_model switch without engine call, direct per-size column read in arithmetic / return).
+- `src/app/api/book/__tests__/compute-expected-price.test.ts` (12 cases — flat with/without sale, exotic Ferrari row-pattern $450 NOT sedan, classic Ceramic Shield $725, column-based exotic $500 / classic $600, per_unit / custom / unknown / no-tier-match preserved null contract).
+- `src/app/admin/appointments/components/__tests__/edit-services-disabled.test.tsx` (2 cases — Edit button disabled / modal does not mount on click).
+
+**ESLint rule refinement in-session**: original Signal 2 over-flagged 6 surfaces, including 3 display-only switches (validate-coupon classifier, opengraph-image label generator, `<ServicePricingDisplay>` JSX dispatch). Refined Signal 2 to require at least one case body to read a money property (`price` / `sale_price` / `flat_price` / `per_unit_price` / `custom_starting_price` / `vehicle_size_*_price`) in a numeric-output context — not a comparison, not inside `formatCurrency()`/`formatMoney()`/`formatMoneyForInput()`. Final state: 0 lint errors across the entire repo.
+
+Verification: typecheck clean on touched files (pre-existing errors in `quote-service.modifiers.test.ts` + `catalog-browser-custom-routing.test.tsx` unrelated to this layer); lint **0 errors** (98 warnings = unchanged baseline); 1366/1366 vitest pass (+33 net new); production build compiled successfully (787 static pages, clean `.next` rebuild).
+
+**Item 15f status after this layer**: Layers 1+2+3a-partial+3c+3d+3e+4 done. Only Phase 1 (Layers 8a-8f — edit-via-POS restructure) remains, which deletes Item 15a's `<EditServicesModal>` and the dead-code disable comment with it. Phase 1 was already unblocked by Item 15g completing earlier today.
+
+---
+
 ## 2026-05-17 — Item 15g Layer 15g-iv: booking-wizard cleanup + comprehensive end-to-end modifier-chain tests (Item 15g COMPLETE — Phase 1 unblocked)
 
 Final layer in Item 15g. Closes the booking-wizard read-side cleanup (the `internal_notes` plaintext loyalty stop-gap), pins the full modifier persistence chain with three E2E scenarios that previously had no test coverage, and verifies the QBO sync watch-item from audit §9.5.

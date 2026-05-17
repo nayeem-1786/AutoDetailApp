@@ -262,10 +262,23 @@ export function AppointmentDetailDialog({
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-500">Services</p>
             {canEditServices && (
+              // Item 15f Layer 4: the inline Admin "Edit Services" picker
+              // (`<EditServicesModal>`) carries a bespoke `resolveServicePrice`
+              // with the same drift-bug class Layer 3d fixed elsewhere
+              // (silent exotic/classic mispricing). Rather than patch a
+              // surface scheduled for deletion in Phase 1 Layer 8e, the
+              // Admin entry point is disabled — operators edit appointment
+              // services via the POS Jobs card, which already routes
+              // through the canonical engine via `useServicePicker`
+              // (Layer 3a-i). The modal mount below stays as dead code so
+              // the existing test pinning its internals (`<CustomPriceDialog>`
+              // routing from Layer 3e) keeps shipping until deletion.
               <button
                 type="button"
-                onClick={() => setEditingServices(true)}
-                className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                disabled
+                aria-disabled="true"
+                title="Service editing temporarily unavailable. Please use POS Jobs card to edit services."
+                className="text-xs font-medium text-gray-300 cursor-not-allowed"
               >
                 Edit
               </button>

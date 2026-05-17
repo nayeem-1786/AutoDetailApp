@@ -18,6 +18,8 @@ import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import type { MobileZone, VehicleSizeClass, VehicleType, VehicleCategoryRecord, VehicleCategory as VehicleCategoryType } from '@/lib/supabase/types';
 import type { BookingCustomerInput, BookingVehicleInput, BookingAddonInput } from '@/lib/utils/validation';
 import { categoryToCompatibilityKey, type VehicleCategory } from '@/lib/utils/vehicle-categories';
+import { resolveServicePriceWithSale } from '@/lib/services/picker-engine';
+import type { ServicePricing } from '@/lib/supabase/types';
 import { customerSignOut } from '@/lib/auth/customer-signout';
 import { SpecialtyVehicleBlock } from './specialty-vehicle-block';
 import { formatCustomerAddress } from '@/lib/utils/format-address';
@@ -374,34 +376,81 @@ export function BookingWizard({
     return { step: defaultStep, state: baseState };
   }
 
-  // Reconstruct config from URL params (vehicle size + addon IDs)
+  // Reconstruct config from URL params (vehicle size + addon IDs).
+  //
+  // Item 15f Layer 4: rewritten as a thin dispatcher around
+  // `resolveServicePriceWithSale` from the canonical engine per CLAUDE.md
+  // Rule 22. Pre-Layer-4 had the same drift bugs Layer 3d fixed in
+  // `service-resolver.ts`:
+  //   - Missing exotic/classic size_class branches — Ferrari deep-linking
+  //     to a step landed at sedan tier price.
+  //   - No sale-price handling — sale-active services reconstructed at
+  //     standard price.
+  //   - Direct `vehicle_size_*_price` column reads (Rule 22 violation).
+  //
+  // Behavior preserved: `vehicle_size` row-pattern reconstructs to the
+  // matching tier; fallback to first tier when vehicle size not provided.
+  // `scope` / `specialty` reconstructs to the first tier (the wizard
+  // step lets the customer choose; reconstruct picks a deterministic
+  // default that the step's auto-select then refines).
   function reconstructConfig(
     service: BookableService,
     vehicleSize: VehicleSizeClass | null,
     addonIdsStr: string | null
   ): ConfigureResult | null {
     const tiers = service.service_pricing;
+    const saleWindow = {
+      sale_starts_at: service.sale_starts_at,
+      sale_ends_at: service.sale_ends_at,
+    };
 
     let tier_name: string | null = null;
     let price = 0;
     let size_class: VehicleSizeClass | null = vehicleSize;
 
+    function synthesize(amount: number, salePrice: number | null): ServicePricing {
+      return {
+        id: `synthetic-${service.id}`,
+        service_id: service.id,
+        tier_name: 'synthetic',
+        tier_label: null,
+        price: amount,
+        sale_price: salePrice,
+        display_order: 0,
+        is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
+        max_qty: null,
+        qty_label: null,
+        created_at: '',
+      };
+    }
+
     switch (service.pricing_model) {
-      case 'flat':
-        price = service.flat_price ?? 0;
+      case 'flat': {
+        if (service.flat_price == null) break;
+        price = resolveServicePriceWithSale(
+          synthesize(service.flat_price, service.sale_price ?? null),
+          null,
+          saleWindow,
+        ).effectivePrice;
         break;
+      }
 
       case 'vehicle_size': {
         if (vehicleSize) {
           const tier = tiers.find((t) => t.tier_name === vehicleSize);
           if (tier) {
             tier_name = tier.tier_name;
-            price = tier.price;
+            price = resolveServicePriceWithSale(tier, vehicleSize, saleWindow).effectivePrice;
           }
         }
         if (!price && tiers.length > 0) {
           tier_name = tiers[0].tier_name;
-          price = tiers[0].price;
+          price = resolveServicePriceWithSale(tiers[0], null, saleWindow).effectivePrice;
           size_class = tiers[0].tier_name as VehicleSizeClass;
         }
         break;
@@ -412,22 +461,23 @@ export function BookingWizard({
         if (tiers.length > 0) {
           const tier = tiers[0];
           tier_name = tier.tier_name;
-          if (tier.is_vehicle_size_aware && vehicleSize) {
-            const vp = vehicleSize === 'sedan' ? tier.vehicle_size_sedan_price
-              : vehicleSize === 'truck_suv_2row' ? tier.vehicle_size_truck_suv_price
-              : vehicleSize === 'suv_3row_van' ? tier.vehicle_size_suv_van_price
-              : null;
-            price = vp ?? tier.price;
-          } else {
-            price = tier.price;
-          }
+          // Engine routes both row + column patterns: passing vehicleSize
+          // makes the per-size column dispatch fire for is_vehicle_size_aware
+          // tiers; non-size-aware tiers ignore it.
+          price = resolveServicePriceWithSale(tier, vehicleSize, saleWindow).effectivePrice;
         }
         break;
       }
 
-      case 'per_unit':
-        price = service.per_unit_price ?? 0;
+      case 'per_unit': {
+        if (service.per_unit_price == null) break;
+        price = resolveServicePriceWithSale(
+          synthesize(service.per_unit_price, service.sale_price ?? null),
+          null,
+          saleWindow,
+        ).effectivePrice;
         break;
+      }
 
       default:
         return null;

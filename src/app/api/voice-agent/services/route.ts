@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
-import { getSaleStatus } from '@/lib/utils/sale-pricing';
+import { resolveServicePriceWithSale } from '@/lib/services/picker-engine';
+import type { ServicePricing } from '@/lib/supabase/types';
 
 /**
  * GET /api/voice-agent/services
@@ -46,7 +47,13 @@ export async function GET(request: NextRequest) {
         vehicle_compatibility,
         special_requirements,
         service_categories ( name ),
-        service_pricing ( tier_name, price, sale_price )
+        service_pricing (
+          id, service_id, tier_name, tier_label, price, sale_price, display_order,
+          is_vehicle_size_aware,
+          vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price,
+          vehicle_size_exotic_price, vehicle_size_classic_price,
+          max_qty, qty_label, created_at
+        )
       `)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
@@ -153,54 +160,107 @@ export async function GET(request: NextRequest) {
       else prereqMap.set(serviceId, [entry]);
     }
 
+    // Item 15f Layer 4: pricing-array construction routes through
+    // `resolveServicePriceWithSale` from the canonical engine per
+    // CLAUDE.md Rule 22. Pre-Layer-4 the switch had inline sale-price
+    // comparisons against `tier.price` / `service.flat_price` / etc. —
+    // the same drift class Layer 3d fixed. Per-tier emission is
+    // preserved (the voice agent's catalog response is a list of
+    // configured tiers, not a per-vehicle resolved quote — the
+    // per-vehicle dispatch lives in `service-resolver.ts:resolvePrice`
+    // which already routes through the engine).
+    //
+    // Synthesize a `ServicePricing` row for `flat` / `per_unit` /
+    // `custom` (services with no `service_pricing` row) so they can be
+    // fed to the engine through the same path.
+    function synthesizeForVoice(
+      serviceId: string,
+      tierName: string,
+      amount: number,
+      salePrice: number | null,
+    ): ServicePricing {
+      return {
+        id: `synthetic-${tierName}-${serviceId}`,
+        service_id: serviceId,
+        tier_name: tierName,
+        tier_label: null,
+        price: amount,
+        sale_price: salePrice,
+        display_order: 0,
+        is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
+        max_qty: null,
+        qty_label: null,
+        created_at: '',
+      };
+    }
+
     // Format response
     const formatted = serviceList.map((s) => {
-      const tiers = (s.service_pricing as { tier_name: string; price: number; sale_price: number | null }[]) ?? [];
+      const tiers = (s.service_pricing as ServicePricing[]) ?? [];
       const saleWindow = { sale_starts_at: s.sale_starts_at as string | null, sale_ends_at: s.sale_ends_at as string | null };
-      const { isOnSale } = getSaleStatus(saleWindow);
 
-      // Build pricing array based on pricing_model
+      // Build pricing array based on pricing_model. Each case body calls
+      // `resolveServicePriceWithSale` directly so the canonical-engine
+      // delegation is statically visible (Item 15f Layer 4 ESLint rule
+      // looks for the engine call inside the switch body).
       let pricing: Array<{ tier_name: string; price: number | null; sale_price?: number | null; note?: string }>;
 
       switch (s.pricing_model) {
         case 'vehicle_size':
         case 'scope':
         case 'specialty':
-          pricing = tiers.map((p) => ({
-            tier_name: p.tier_name,
-            price: Number(p.price),
-            ...(isOnSale && p.sale_price != null && p.sale_price < p.price
-              ? { sale_price: Number(p.sale_price) }
-              : {}),
-          }));
+          pricing = tiers.map((p) => {
+            const r = resolveServicePriceWithSale(p, null, saleWindow);
+            return {
+              tier_name: p.tier_name,
+              price: r.standardPrice,
+              ...(r.isOnSale ? { sale_price: r.effectivePrice } : {}),
+            };
+          });
           break;
 
         case 'flat': {
-          const flatSalePrice = s.sale_price as number | null;
           const flatPrice = s.flat_price as number | null;
-          pricing = flatPrice != null
-            ? [{
-                tier_name: 'flat',
-                price: Number(flatPrice),
-                ...(isOnSale && flatSalePrice != null && flatSalePrice < flatPrice
-                  ? { sale_price: Number(flatSalePrice) }
-                  : {}),
-              }]
-            : [{ tier_name: 'flat', price: null, note: 'Contact for pricing' }];
+          if (flatPrice == null) {
+            pricing = [{ tier_name: 'flat', price: null, note: 'Contact for pricing' }];
+          } else {
+            const synthetic = synthesizeForVoice(s.id as string, 'flat', flatPrice, (s.sale_price as number | null) ?? null);
+            const r = resolveServicePriceWithSale(synthetic, null, saleWindow);
+            pricing = [{
+              tier_name: synthetic.tier_name,
+              price: r.standardPrice,
+              ...(r.isOnSale ? { sale_price: r.effectivePrice } : {}),
+            }];
+          }
           break;
         }
 
-        case 'per_unit':
-          pricing = s.per_unit_price != null
-            ? [{
-                tier_name: 'per_unit',
-                price: Number(s.per_unit_price),
-                note: `Per ${s.per_unit_label || 'unit'}${s.per_unit_max ? ` (max ${s.per_unit_max})` : ''}`,
-              }]
-            : [{ tier_name: 'per_unit', price: null, note: 'Contact for pricing' }];
+        case 'per_unit': {
+          const unitPrice = s.per_unit_price as number | null;
+          if (unitPrice == null) {
+            pricing = [{ tier_name: 'per_unit', price: null, note: 'Contact for pricing' }];
+          } else {
+            const synthetic = synthesizeForVoice(s.id as string, 'per_unit', unitPrice, (s.sale_price as number | null) ?? null);
+            const r = resolveServicePriceWithSale(synthetic, null, saleWindow);
+            pricing = [{
+              tier_name: synthetic.tier_name,
+              price: r.standardPrice,
+              ...(r.isOnSale ? { sale_price: r.effectivePrice } : {}),
+              note: `Per ${s.per_unit_label || 'unit'}${s.per_unit_max ? ` (max ${s.per_unit_max})` : ''}`,
+            }];
+          }
           break;
+        }
 
         case 'custom':
+          // Custom services are operator-assessed — `custom_starting_price`
+          // is a reference value; no sale logic applies. Engine not
+          // invoked here.
           pricing = [{
             tier_name: 'custom',
             price: s.custom_starting_price != null ? Number(s.custom_starting_price) : null,
@@ -211,13 +271,14 @@ export async function GET(request: NextRequest) {
           break;
 
         default:
-          pricing = tiers.map((p) => ({
-            tier_name: p.tier_name,
-            price: Number(p.price),
-            ...(isOnSale && p.sale_price != null && p.sale_price < p.price
-              ? { sale_price: Number(p.sale_price) }
-              : {}),
-          }));
+          pricing = tiers.map((p) => {
+            const r = resolveServicePriceWithSale(p, null, saleWindow);
+            return {
+              tier_name: p.tier_name,
+              price: r.standardPrice,
+              ...(r.isOnSale ? { sale_price: r.effectivePrice } : {}),
+            };
+          });
       }
 
       const addons = addonMap.get(s.id) ?? null;

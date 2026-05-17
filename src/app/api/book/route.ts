@@ -5,12 +5,12 @@ import { bookingSubmitSchema } from '@/lib/utils/validation';
 import { normalizePhone } from '@/lib/utils/format';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { APPOINTMENT, FEATURE_FLAGS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
+import { computeExpectedPrice } from './_pricing';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
-import { getSaleStatus } from '@/lib/utils/sale-pricing';
 import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 import { sendSms } from '@/lib/utils/sms';
 import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
@@ -871,52 +871,7 @@ ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
 // Helpers
 // ---------------------------------------------------------------------------
 
-function computeExpectedPrice(
-  service: {
-    pricing_model: string;
-    flat_price: number | null;
-    sale_price: number | null;
-    sale_starts_at: string | null;
-    sale_ends_at: string | null;
-    per_unit_price: number | null;
-    service_pricing: { tier_name: string; price: number; sale_price: number | null; is_vehicle_size_aware: boolean; vehicle_size_sedan_price: number | null; vehicle_size_truck_suv_price: number | null; vehicle_size_suv_van_price: number | null }[];
-  },
-  tierName: string | null | undefined,
-  sizeClass: string | null | undefined
-): number | null {
-  const { isOnSale } = getSaleStatus({
-    sale_starts_at: service.sale_starts_at,
-    sale_ends_at: service.sale_ends_at,
-  });
-
-  switch (service.pricing_model) {
-    case 'flat':
-      if (isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price) {
-        return service.sale_price;
-      }
-      return service.flat_price;
-
-    case 'vehicle_size':
-    case 'scope':
-    case 'specialty': {
-      if (!tierName) return null;
-      const tier = service.service_pricing.find((t) => t.tier_name === tierName);
-      if (!tier) return null;
-      if (tier.is_vehicle_size_aware && sizeClass) {
-        if (sizeClass === 'sedan') return tier.vehicle_size_sedan_price;
-        if (sizeClass === 'truck_suv_2row') return tier.vehicle_size_truck_suv_price;
-        if (sizeClass === 'suv_3row_van') return tier.vehicle_size_suv_van_price;
-      }
-      if (isOnSale && tier.sale_price != null && tier.sale_price < tier.price) {
-        return tier.sale_price;
-      }
-      return tier.price;
-    }
-
-    case 'per_unit':
-      return null;
-
-    default:
-      return null;
-  }
-}
+// computeExpectedPrice — booking-price validator — moved to `./_pricing.ts`
+// (Item 15f Layer 4 extraction). The underscore prefix excludes the file
+// from Next.js route resolution while keeping it co-located with the
+// route that calls it. Imported above.

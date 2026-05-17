@@ -3,6 +3,7 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import phoneNoRawDisplay from "./eslint-rules/phone-no-raw-display.js";
 import moneyNoUnsuffixedMoneyProp from "./eslint-rules/money-no-unsuffixed-money-prop.js";
+import servicesNoBespokePricing from "./eslint-rules/services-no-bespoke-pricing.js";
 
 const eslintConfig = defineConfig([
   // Ignore-only config (must be first; flat config respects ignores additively).
@@ -26,6 +27,18 @@ const eslintConfig = defineConfig([
       money: {
         rules: {
           "no-unsuffixed-money-prop": moneyNoUnsuffixedMoneyProp,
+        },
+      },
+      // Item 15f Layer 4: enforces CLAUDE.md Rule 22 — service-pricing
+      // math must flow through the canonical engine. Ships at 'error'
+      // because all bespoke pricers were migrated in Layers 3c/3d/3e/4
+      // (commit hash in the Layer 4 ledger row). The ONLY sanctioned
+      // disable comment in the codebase is on the dead-code
+      // `resolveServicePrice` inside `<EditServicesModal>` (scheduled
+      // for deletion in Phase 1 Layer 8e).
+      services: {
+        rules: {
+          "no-bespoke-pricing": servicesNoBespokePricing,
         },
       },
     },
@@ -58,6 +71,9 @@ const eslintConfig = defineConfig([
       // at Unify-Final after all family-phase migrations land.
       // See docs/dev/MONEY.md.
       "money/no-unsuffixed-money-prop": "warn",
+      // Item 15f Layer 4: enforce CLAUDE.md Rule 22 — service-pricing
+      // math must flow through the canonical engine.
+      "services/no-bespoke-pricing": "error",
     },
   },
   // Override default ignores of eslint-config-next.
