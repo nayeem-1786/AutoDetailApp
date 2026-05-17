@@ -28,6 +28,7 @@ import {
 } from '@/components/jobs/edit-mobile-modal';
 import { PaymentMismatchBanner } from '@/components/jobs/payment-mismatch-banner';
 import { EditServicesModal } from '@/components/appointments/edit-services-modal';
+import { ModifierSummary } from '@/components/appointments/modifier-summary';
 import { STATUS_TRANSITIONS } from '../types';
 import type { AppointmentWithRelations, AppointmentService } from '../types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
@@ -291,6 +292,20 @@ export function AppointmentDetailDialog({
               );
             })}
           </div>
+          {/* Item 15g Layer 15g-iii — modifier summary block. Read-only display
+              of coupon / loyalty / manual discount snapshotted on the
+              appointment row (booking wizard + convertQuote populate these).
+              Hidden when no modifier is applied. Edits go through POS
+              (Phase 1 — Item 15f layers 8a-8f). */}
+          <ModifierSummary
+            coupon_code={appointment.coupon_code}
+            coupon_discount={appointment.coupon_discount}
+            loyalty_points_redeemed={appointment.loyalty_points_redeemed}
+            loyalty_discount={appointment.loyalty_discount}
+            manual_discount_value={appointment.manual_discount_value}
+            manual_discount_label={appointment.manual_discount_label}
+            variant="admin"
+          />
         </div>
 
         {/* Mobile Service — Phase Mobile-1.9 expanded card. Shows zone

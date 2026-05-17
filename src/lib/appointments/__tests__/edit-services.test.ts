@@ -161,6 +161,7 @@ describe('computeTotalsForServiceEdit', () => {
     });
     expect(result.subtotal).toBe(250);
     expect(result.totalAmount).toBe(250);
+    expect(result.discountAmount).toBe(0);
   });
 
   it('includes mobile surcharge in subtotal and total', () => {
@@ -183,6 +184,7 @@ describe('computeTotalsForServiceEdit', () => {
     });
     expect(result.subtotal).toBe(200);
     expect(result.totalAmount).toBe(190);
+    expect(result.discountAmount).toBe(20);
   });
 
   it('handles empty services list (subtotal = mobile only)', () => {
@@ -209,5 +211,68 @@ describe('computeTotalsForServiceEdit', () => {
     });
     expect(result.subtotal).toBe(0.6);
     expect(result.totalAmount).toBe(0.6);
+  });
+
+  // Item 15g Layer 15g-iii — per-modifier preservation
+  describe('per-modifier path (Item 15g Layer 15g-iii)', () => {
+    it('uses coupon+loyalty+manual sum when any per-modifier value is supplied (ignores discountAmount)', () => {
+      const result = computeTotalsForServiceEdit({
+        services: [{ price_at_booking: 200 }],
+        mobileSurcharge: 0,
+        // Legacy combined value is stale (e.g., drift from another path).
+        discountAmount: 999,
+        taxAmount: 0,
+        couponDiscount: 25,
+        loyaltyDiscount: 10,
+        manualDiscountValue: 15,
+      });
+      expect(result.subtotal).toBe(200);
+      // Canonical discount = 25 + 10 + 15 = 50; total = 200 - 50 = 150.
+      expect(result.discountAmount).toBe(50);
+      expect(result.totalAmount).toBe(150);
+    });
+
+    it('treats null per-modifier values as zero when summing', () => {
+      const result = computeTotalsForServiceEdit({
+        services: [{ price_at_booking: 100 }],
+        mobileSurcharge: 0,
+        discountAmount: 0,
+        taxAmount: 0,
+        couponDiscount: 20,
+        loyaltyDiscount: null,
+        manualDiscountValue: null,
+      });
+      expect(result.discountAmount).toBe(20);
+      expect(result.totalAmount).toBe(80);
+    });
+
+    it('falls back to discountAmount when all per-modifier values are null', () => {
+      const result = computeTotalsForServiceEdit({
+        services: [{ price_at_booking: 100 }],
+        mobileSurcharge: 0,
+        discountAmount: 15,
+        taxAmount: 0,
+        couponDiscount: null,
+        loyaltyDiscount: null,
+        manualDiscountValue: null,
+      });
+      // No per-modifier provided → legacy `discountAmount` is canonical.
+      expect(result.discountAmount).toBe(15);
+      expect(result.totalAmount).toBe(85);
+    });
+
+    it('clamps totalAmount to 0 when discount exceeds subtotal (over-discount safety)', () => {
+      const result = computeTotalsForServiceEdit({
+        services: [{ price_at_booking: 50 }],
+        mobileSurcharge: 0,
+        discountAmount: 0,
+        taxAmount: 0,
+        couponDiscount: 100,
+        loyaltyDiscount: 0,
+        manualDiscountValue: 0,
+      });
+      expect(result.totalAmount).toBe(0);
+      expect(result.discountAmount).toBe(100);
+    });
   });
 });

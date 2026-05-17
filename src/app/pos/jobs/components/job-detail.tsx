@@ -50,6 +50,7 @@ import { FlagIssueFlow } from './flag-issue-flow';
 import { ChangeTimeButton } from './change-time-button';
 import { CustomerLookup } from '../../components/customer-lookup';
 import { EditServicesDialog } from '@/lib/services/edit-services-dialog';
+import { ModifierSummary } from '@/components/appointments/modifier-summary';
 import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot, VehicleSizeClass } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 
@@ -125,6 +126,18 @@ interface JobDetailData {
      * (zone re-select on existing job). The picker uses this to
      * pre-select the current zone in the dropdown. */
     mobile_zone_id?: string | null;
+    /**
+     * Item 15g Layer 15g-iii — modifier snapshot columns surfaced from the
+     * linked appointment. Renders the read-only "Applied Discounts" block in
+     * the Services tile so operators can see coupon / loyalty / manual
+     * discount before clicking Checkout. Edits go through POS (Phase 1).
+     */
+    coupon_code?: string | null;
+    coupon_discount?: number | null;
+    loyalty_points_redeemed?: number | null;
+    loyalty_discount?: number | null;
+    manual_discount_value?: number | null;
+    manual_discount_label?: string | null;
   } | null;
   addons: AddonData[] | null;
 }
@@ -980,6 +993,19 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   </div>
                 </div>
               </div>
+              {/* Item 15g Layer 15g-iii — modifier summary block (coupon /
+                  loyalty / manual discount). Hidden when no modifier is
+                  applied. Read-only here — edits go through POS via Phase 1
+                  edit-via-POS once it lands. */}
+              <ModifierSummary
+                coupon_code={job.appointment?.coupon_code}
+                coupon_discount={job.appointment?.coupon_discount}
+                loyalty_points_redeemed={job.appointment?.loyalty_points_redeemed}
+                loyalty_discount={job.appointment?.loyalty_discount}
+                manual_discount_value={job.appointment?.manual_discount_value}
+                manual_discount_label={job.appointment?.manual_discount_label}
+                variant="pos"
+              />
             </button>
           ) : (
             <div className="rounded-lg bg-white dark:bg-gray-900 p-3 shadow-sm dark:shadow-gray-950/30">
@@ -1006,6 +1032,15 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   </div>
                 </div>
               </div>
+              <ModifierSummary
+                coupon_code={job.appointment?.coupon_code}
+                coupon_discount={job.appointment?.coupon_discount}
+                loyalty_points_redeemed={job.appointment?.loyalty_points_redeemed}
+                loyalty_discount={job.appointment?.loyalty_discount}
+                manual_discount_value={job.appointment?.manual_discount_value}
+                manual_discount_label={job.appointment?.manual_discount_label}
+                variant="pos"
+              />
             </div>
           )}
 

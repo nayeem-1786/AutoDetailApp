@@ -90,10 +90,17 @@ export async function PUT(
     const supabase = createAdminClient();
 
     // ---- 1. Fetch the appointment so we know totals + state ----
+    //
+    // Item 15g Layer 15g-iii: SELECT now includes the per-modifier columns
+    // (`coupon_discount`, `loyalty_discount`, `manual_discount_value`) so the
+    // recompute can use the canonical sum instead of trusting the combined
+    // `discount_amount` (which a separate code path may have drifted). The
+    // per-modifier columns themselves stay unwritten by this endpoint — only
+    // `subtotal` / `total_amount` / `discount_amount` change.
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .select(
-        'id, status, subtotal, total_amount, tax_amount, discount_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot'
+        'id, status, subtotal, total_amount, tax_amount, discount_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot, coupon_discount, loyalty_discount, manual_discount_value'
       )
       .eq('id', id)
       .single();
@@ -187,6 +194,12 @@ export async function PUT(
     const linkedJobServicesSnapshot = linkedJob?.services ?? null;
 
     // ---- 5. Compute new totals ----
+    //
+    // Item 15g Layer 15g-iii: pass per-modifier values so the helper sums
+    // them canonically and `totals.discountAmount` becomes the authoritative
+    // combined value we write back. Falls through to the legacy combined
+    // `discount_amount` input only when all three are null (i.e., this
+    // appointment pre-dates the 15g-ii migration's snapshot writes).
     const totals = computeTotalsForServiceEdit({
       services: newServices.map((s) => ({
         price_at_booking: s.price_at_booking,
@@ -194,6 +207,18 @@ export async function PUT(
       mobileSurcharge: Number(appointment.mobile_surcharge ?? 0),
       discountAmount: Number(appointment.discount_amount ?? 0),
       taxAmount: Number(appointment.tax_amount ?? 0),
+      couponDiscount:
+        appointment.coupon_discount != null
+          ? Number(appointment.coupon_discount)
+          : null,
+      loyaltyDiscount:
+        appointment.loyalty_discount != null
+          ? Number(appointment.loyalty_discount)
+          : null,
+      manualDiscountValue:
+        appointment.manual_discount_value != null
+          ? Number(appointment.manual_discount_value)
+          : null,
     });
 
     // ---- 6. Delete old appointment_services rows ----
@@ -243,11 +268,19 @@ export async function PUT(
     }
 
     // ---- 8. Update appointment totals ----
+    //
+    // Item 15g Layer 15g-iii: also write back `discount_amount` so the
+    // combined column stays in sync with the per-modifier snapshot. The
+    // per-modifier columns (`coupon_discount` / `loyalty_discount` /
+    // `manual_discount_value`) are deliberately NOT touched here — they
+    // survive the cascade unchanged. Layer 15g-iii's UI surfacing renders
+    // off those per-modifier columns, so preserving them is the contract.
     const { error: apptUpdateErr } = await supabase
       .from('appointments')
       .update({
         subtotal: totals.subtotal,
         total_amount: totals.totalAmount,
+        discount_amount: totals.discountAmount,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);

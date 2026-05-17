@@ -1406,6 +1406,10 @@ Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
 - `src/components/appointments/edit-services-modal.tsx` — Picker modal (search + toggle + total + save). Item 15f Layer 3e: routes `pricing_model === 'custom'` taps through `<CustomPriceDialog>` instead of the silent $0 add. Patch is temporary — modal is scheduled for deletion in Phase 1 Layer 8e.
 - `src/components/appointments/__tests__/edit-services-modal-custom.test.tsx` — Item 15f Layer 3e — pins the custom-pricing routing behavior of the modal.
 
+Item 15g Layer 15g-iii (UI surfacing + checkout hydration for modifiers) additions:
+- `src/components/appointments/modifier-summary.tsx` — Shared `<ModifierSummary variant="admin|pos">` + `hasAppliedModifiers()` helper. Read-only summary of coupon / loyalty / manual discount on appointment-derived surfaces. Mounted on Admin Appointment dialog + Jobs card Services tile.
+- `src/components/appointments/__tests__/modifier-summary.test.tsx` — 12 cases covering both the helper truth table + the component's conditional rendering per modifier type + POS dark-mode variant.
+
 ---
 
 ## Migrations (`supabase/migrations/`)

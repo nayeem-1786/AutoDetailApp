@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15g Layer 15g-iii: UI surfacing + checkout hydration for loyalty + manual-discount modifiers
+
+Closes the **operator-visibility** gap in the lifecycle-persistence chain. After Layers 15g-i + 15g-ii landed the data path (modifiers persist through Quote → Appointment → Job → Transaction), operators STILL couldn't see what was applied: the Admin Appointment dialog and the Jobs card "Services" tile rendered services + total but nothing about coupon / loyalty / manual discount. And `handleCheckout` only re-applied the coupon — loyalty + manual discount silently zeroed at the register every time.
+
+**Three deliverables:**
+
+1. **`handleCheckout` dispatches all 3 modifiers** (`src/app/pos/jobs/page.tsx`). The checkout-items response shape (extended by Layer 15g-ii) already carries `loyalty_points_redeemed`, `loyalty_discount`, `manual_discount_value`, `manual_discount_label`. New dispatches: `SET_LOYALTY_REDEEM` fires when either points or dollar discount is non-zero; `APPLY_MANUAL_DISCOUNT` fires when value is non-zero, with `discountType: 'dollar'` (appointment snapshot stores already-resolved dollars; booking wizard never captures percent, convert-service resolves percent against subtotal before persisting). Label falls back to "Manual discount" when missing. Idempotency preserved by RESTORE_TICKET zeroing all 3 slots before each pass — re-running checkout for the same job can't accumulate.
+
+2. **Modifier summary blocks on source dialogs.** New shared component `src/components/appointments/modifier-summary.tsx` — `<ModifierSummary variant="admin|pos">` renders read-only rows for coupon (with code), loyalty (with points label), and manual discount (with operator label or "Manual discount" fallback). Each row gated independently on the underlying value being non-zero; whole block renders `null` when no modifier applied (via exported `hasAppliedModifiers()` helper). Admin variant is light-theme only; POS variant adds `dark:` Tailwind variants for the Jobs card. Mounted in both the Admin Appointment dialog (below Services list, above Mobile Service card) and the Jobs card Services tile (inside the tile, after the services Total — same position in both editable + read-only branches). `Appointment` type retroactively gained `coupon_code` + `coupon_discount` (DB columns existed pre-Layer-15g-ii, just weren't typed); `JobDetailData.appointment` shape extended with all 6 modifier fields; `JOB_SELECT` SQL in `/api/pos/jobs/[id]/route.ts` extended to fetch them.
+
+3. **Item 15a cascade endpoint preserves + canonicalizes modifiers** (`src/app/api/admin/appointments/[id]/services/route.ts` + `src/lib/appointments/edit-services.ts`). Pre-fix, the cascade preserved modifiers passively (UPDATE only wrote `subtotal`/`total_amount`, never touched per-modifier columns). New behavior: SELECT now includes `coupon_discount`, `loyalty_discount`, `manual_discount_value`; `computeTotalsForServiceEdit` accepts them as optional inputs; when any is supplied, the helper computes the canonical combined discount (coupon + loyalty + manual) and overrides the legacy `discountAmount` field; UPDATE writes the recomputed `discount_amount` back so the combined column stays in sync with the per-modifier snapshot. Per-modifier columns themselves are still NOT touched — they survive the cascade unchanged (the UI surfacing renders off them, so preservation is the contract). Legacy fallback: when all 3 per-modifier values are null (pre-15g-ii rows), the helper uses the legacy combined `discountAmount` input.
+
+**Helper return-shape change:** `ComputeTotalsResult` now includes `discountAmount` alongside `subtotal` + `totalAmount` so callers can write the canonical combined value back. Existing callers (cascade endpoint) updated; helper stays backwards-compatible for any future caller that doesn't read the new field.
+
+**Total clamp:** `totalAmount = max(0, subtotal - discount + tax)` (over-discount safety; mirrors `convert-service.ts`'s `resolveModifiers` path).
+
+**Tests** (+33 new, 1252 → 1285 total):
+
+- `edit-services.test.ts` (+4): per-modifier path overrides discountAmount; null per-modifier values treated as zero; legacy fallback when all null; total clamp on over-discount.
+- `route.test.ts` (Item 15a cascade, +4): coupon-only preservation; loyalty + manual preservation; all-3 modifiers; legacy fallback when per-modifier columns are null. Tests assert per-modifier columns are NEVER written by the cascade.
+- `handle-checkout-coupon.test.tsx` renamed-scope to cover Layer 15g-iii (+6): SET_LOYALTY_REDEEM dispatch; APPLY_MANUAL_DISCOUNT dispatch; default label fallback; all-3 dispatch together; skip dispatches when zero/null; idempotency across 2 checkout passes.
+- `modifier-summary.test.tsx` (new, +12): `hasAppliedModifiers` truth table; renders null when empty; each row renders independently; points label; manual label fallback; POS variant dark-mode classes present.
+
+**Out of scope** (per session brief):
+
+- Edit affordances on source dialogs (Phase 1 — Item 15f layers 8a-8f). Display only.
+- Booking wizard plaintext-loyalty cleanup (Layer 15g-iv).
+- Modifier integration into jobs.services JSONB cascade (Phase 1).
+- Refund flow changes (audit §9.5 — refunds read from `transactions.loyalty_*`, unchanged).
+- Loyalty ledger row timing (stays transaction-bound, audit §9.5 invariant).
+
+**Verification:** Typecheck clean (2 pre-existing errors in `quote-service.modifiers.test.ts` from Layer 15g-ii's session + `catalog-browser-custom-routing.test.tsx` from Layer 3e's session, untouched here). Lint: 0 errors, 11 warnings (all pre-existing, none introduced). Vitest: 1285/1285 passing (was 1252; +33 new). Production build compiled successfully.
+
+**Manual UAT** (user verifies post-session):
+1. Create a Quote with coupon + loyalty + manual discount → convert to appointment → SQL-check appointment row has all 3 modifiers.
+2. Open the appointment in Admin Appointments → verify modifier summary block appears with all 3.
+3. Generate Job from appointment → SQL spot-check.
+4. Open the Job in POS Jobs → verify Services tile shows summary block.
+5. Mark job complete → click Checkout → verify POS Sale tab loads with all 3 modifiers pre-applied (not just coupon).
+6. Edit services on the appointment via Admin → verify modifiers preserved post-edit.
+7. Job without modifiers → summary block does NOT appear (conditional rendering).
+
+**Phase 1 status:** Item 15g Layer 15g-iii closes a prerequisite for Phase 1's `LOAD_FROM_SOURCE` action. Combined with Layers 15g-i + 15g-ii (data path) and Layer 3e (custom-pricing UX), the edit-via-POS round-trip can now safely restore + preserve all modifiers. Phase 1 layers 8a-8f remain pending; Item 15g Layer 15g-iv (booking wizard cleanup + comprehensive tests) is the next sequential session within Item 15g.
+
+---
+
 ## 2026-05-17 — Item 15f Layer 3e: Wire <CustomPriceDialog> into shared <CatalogBrowser> ecosystem (S1 custom-pricing fix)
 
 S1 customer-money-correctness fix. Pre-fix, tapping a `pricing_model === 'custom'` service (canonical fixture: Flood Damage / Mold Extraction — `custom_starting_price: $475`, no `service_pricing` rows) was broken on 3 of 4 surfaces:

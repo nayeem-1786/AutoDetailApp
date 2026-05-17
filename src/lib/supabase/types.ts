@@ -373,6 +373,15 @@ export interface Appointment {
   loyalty_discount: number;
   manual_discount_value: number | null;
   manual_discount_label: string | null;
+  /**
+   * Item 15g Layer 15g-iii — coupon snapshot columns (pre-existing DB columns;
+   * type added retroactively so Layer 15g-iii surfaces can render the
+   * modifier summary block alongside loyalty + manual discount). Booking
+   * wizard (`/api/book`) is the original writer; `convertQuote` (Layer 15g-i)
+   * also writes via the snapshot.
+   */
+  coupon_code: string | null;
+  coupon_discount: number | null;
   created_at: string;
   updated_at: string;
 }

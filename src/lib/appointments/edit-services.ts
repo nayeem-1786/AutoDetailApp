@@ -90,10 +90,30 @@ export interface ComputeTotalsInput {
   services: { price_at_booking: number }[];
   /** Mobile surcharge as it stands on the appointment (unchanged by this edit). */
   mobileSurcharge: number;
-  /** Discount carried forward unchanged from the current row. */
+  /**
+   * Combined discount carried forward unchanged from the current row.
+   *
+   * Item 15g Layer 15g-iii: prefer the per-modifier fields below over
+   * this combined value when available — the cascade endpoint now reads
+   * `coupon_discount` + `loyalty_discount` + `manual_discount_value`
+   * directly so it stays authoritative even if a separate code path drifted
+   * the combined `discount_amount` column. This field stays in the input
+   * for backwards compatibility with the original Item 15a callers; when
+   * any per-modifier value is set, the sum overrides this field.
+   */
   discountAmount: number;
   /** Tax carried forward unchanged from the current row (booking flow uses 0). */
   taxAmount: number;
+  /**
+   * Item 15g Layer 15g-iii — per-modifier preservation. Optional so legacy
+   * callers (`computeTotalsForServiceEdit` is exported, may be re-used) keep
+   * working unchanged. When any of these is non-null, the canonical combined
+   * discount is `coupon + loyalty + manual` and `discountAmount` above is
+   * ignored. When all are nullish, fall back to `discountAmount`.
+   */
+  couponDiscount?: number | null;
+  loyaltyDiscount?: number | null;
+  manualDiscountValue?: number | null;
 }
 
 export interface ComputeTotalsResult {
@@ -101,12 +121,26 @@ export interface ComputeTotalsResult {
   subtotal: number;
   /** subtotal - discount + tax */
   totalAmount: number;
+  /**
+   * Item 15g Layer 15g-iii — canonical combined discount used to compute
+   * `totalAmount`. Equals `coupon + loyalty + manual` when any of those
+   * was supplied; otherwise equals `discountAmount` input. Callers should
+   * write this back to `appointments.discount_amount` so the combined
+   * column stays in sync with the per-modifier snapshot.
+   */
+  discountAmount: number;
 }
 
 /**
  * Recompute appointment subtotal + total_amount from the new service list.
  * Cents-internal arithmetic mirrors `mobile-service-edit.ts` so float drift
  * stays out. Mobile fee is non-taxable (LOCKED-2, Phase Mobile-1).
+ *
+ * Item 15g Layer 15g-iii: when per-modifier fields are supplied, recompute
+ * the combined discount as their sum so the cascade endpoint can write the
+ * authoritative combined value back to `appointments.discount_amount`.
+ * `total_amount` is clamped to ≥ 0 (over-discount safety, matches
+ * convert-service.ts's resolveModifiers path).
  */
 export function computeTotalsForServiceEdit(
   input: ComputeTotalsInput
@@ -116,10 +150,25 @@ export function computeTotalsForServiceEdit(
     0
   );
   const subtotalCents = serviceCents + toCents(input.mobileSurcharge);
-  const totalCents =
-    subtotalCents - toCents(input.discountAmount) + toCents(input.taxAmount);
+
+  // Prefer per-modifier sum when any of the three is supplied; otherwise
+  // fall back to the combined `discountAmount` input (legacy callers).
+  const hasPerModifier =
+    input.couponDiscount != null ||
+    input.loyaltyDiscount != null ||
+    input.manualDiscountValue != null;
+
+  const discountCents = hasPerModifier
+    ? toCents(Number(input.couponDiscount ?? 0)) +
+      toCents(Number(input.loyaltyDiscount ?? 0)) +
+      toCents(Number(input.manualDiscountValue ?? 0))
+    : toCents(input.discountAmount);
+
+  const totalCentsRaw = subtotalCents - discountCents + toCents(input.taxAmount);
+  const totalCents = Math.max(0, totalCentsRaw);
   return {
     subtotal: subtotalCents / 100,
     totalAmount: totalCents / 100,
+    discountAmount: discountCents / 100,
   };
 }

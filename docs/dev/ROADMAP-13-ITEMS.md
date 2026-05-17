@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.6 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3c+3d+3e done, Layer 3a-i partial; Phase 1 + Layer 4 pending); 15g Layers 15g-i + 15g-ii done; 15g-iii/iv pending
-**Last session updated:** 2026-05-16 — Roadmap note: documented known display-only bug in <EditServicesDialog> per_unit total (dies with modal at Phase 1 Layer 8e); no patch.
+**Document version:** v2.7 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3c+3d+3e done, Layer 3a-i partial; Phase 1 + Layer 4 pending); 15g Layers 15g-i + 15g-ii + 15g-iii done; 15g-iv pending
+**Last session updated:** 2026-05-17 — Item 15g Layer 15g-iii landed: handleCheckout now dispatches loyalty + manual-discount alongside coupon; new shared `<ModifierSummary>` block surfaces all 3 modifiers on Admin Appointment dialog + Jobs card; Item 15a cascade endpoint reads per-modifier columns + writes canonical combined `discount_amount`.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -1427,7 +1427,7 @@ any future code that might attempt to re-build a parallel picker.
 
 ### Item 15g — Lifecycle Persistence: Discount / Coupon / Loyalty Across Quote → Appointment → Job → Transaction
 
-- **Status:** Layers 15g-i + 15g-ii done (2026-05-16, 2026-05-17); Layers 15g-iii, 15g-iv not started
+- **Status:** Layers 15g-i + 15g-ii + 15g-iii done (2026-05-16, 2026-05-17, 2026-05-17); Layer 15g-iv not started
 - **Severity:** S1 (customer-promised concessions silently dropped today)
 - **Effort:** 5 sessions (~10-12 hours total, layered)
 - **Wave:** 1.5
@@ -1532,6 +1532,18 @@ The chain is asymmetric — online booking flow works; POS-originated quote/walk
   - DB_SCHEMA.md regenerated via `npx tsx scripts/regen-db-schema.ts` — verified new columns visible at lines 178, 185-188, 191 (appointments), 2104-2109, 2112-2113 (quotes), 2948-2949 (transactions unchanged).
   - **Production build NOT attempted** — pre-existing syntax error in `src/components/appointments/edit-services-modal.tsx` line 252 (`<>` fragment, parallel session's in-progress modifications) blocks the build. Independent of Layer 15g-ii; my files were committed selectively to avoid sweeping the parallel work.
   - Manual UAT deferred to user per session brief — voice/SMS/booking flows need real customer data.
+- 2026-05-17: **Layer 15g-iii landed.** UI surfacing + checkout hydration for loyalty + manual-discount; cascade endpoint reads per-modifier columns.
+  - `src/app/pos/jobs/page.tsx` `handleCheckout` — three new dispatches off the checkout-items response: `SET_LOYALTY_REDEEM` (when `loyalty_points_redeemed` or `loyalty_discount` non-zero), `APPLY_MANUAL_DISCOUNT` (when `manual_discount_value` non-zero, `discountType: 'dollar'`, label fallback "Manual discount"). RESTORE_TICKET zeroes the slots first so re-running checkout for the same job stays idempotent. Coupon path (Layer 15g-i) unchanged.
+  - `src/components/appointments/modifier-summary.tsx` — new shared `<ModifierSummary variant="admin|pos">` component + `hasAppliedModifiers()` helper. Renders read-only rows for coupon (with code), loyalty (with points label), manual discount (with operator label or fallback). Admin variant is light-theme only; POS variant adds dark-mode classes. Whole block renders `null` when no modifier applied.
+  - `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — mounts `<ModifierSummary variant="admin">` below the Services list, above the Mobile Service card.
+  - `src/app/pos/jobs/components/job-detail.tsx` — mounts `<ModifierSummary variant="pos">` inside the Services tile (both editable and read-only branches) after the services Total row. `JobDetailData.appointment` shape extended with 6 modifier fields.
+  - `src/app/api/pos/jobs/[id]/route.ts` `JOB_SELECT` — extended to fetch `coupon_code`, `coupon_discount`, `loyalty_points_redeemed`, `loyalty_discount`, `manual_discount_value`, `manual_discount_label` on the appointment join.
+  - `src/lib/supabase/types.ts` — `Appointment` retroactively gained `coupon_code` + `coupon_discount` (DB columns existed pre-15g-ii, just weren't typed). Required for the source-dialog block to compile.
+  - `src/lib/appointments/edit-services.ts` `computeTotalsForServiceEdit` — accepts optional `couponDiscount` / `loyaltyDiscount` / `manualDiscountValue` per-modifier inputs. When any is supplied, the helper recomputes the canonical combined discount as their sum (`coupon + loyalty + manual`) and exposes it via the new `discountAmount` field on `ComputeTotalsResult`. Legacy fallback to the combined `discountAmount` input when all per-modifier values are null. Total clamped to ≥ 0 (over-discount safety, matches `convert-service.ts`'s `resolveModifiers` path).
+  - `src/app/api/admin/appointments/[id]/services/route.ts` cascade endpoint — SELECT now includes the 3 per-modifier columns. New inputs threaded into `computeTotalsForServiceEdit`. UPDATE now also writes the canonical `discount_amount` back so it stays in sync with the per-modifier snapshot. Per-modifier columns themselves are NOT touched — they survive the cascade unchanged (the UI surfacing renders off them, so preservation is the contract).
+  - Tests: +33 new (1252 → 1285). `edit-services.test.ts` (+4, per-modifier path + null handling + clamp + legacy fallback). `route.test.ts` (+4, coupon-only / loyalty+manual / all-3 / legacy fallback, all asserting per-modifier columns are never written). `handle-checkout-coupon.test.tsx` (+6, SET_LOYALTY_REDEEM + APPLY_MANUAL_DISCOUNT dispatches, label fallback, all-3, skip-on-zero, idempotency). `modifier-summary.test.tsx` (new file, +12 cases).
+  - Verification: typecheck clean (no new errors; 2 pre-existing test-file errors from Layer 15g-ii + Layer 3e sessions untouched). Lint 0 errors / 0 new warnings on touched files. Vitest 1285/1285 passing. Production build compiled successfully (`✓ Compiled successfully in 10.0s`).
+  - **Manual UAT deferred to user per session brief** — 7-step round-trip path documented in CHANGELOG (Quote with all 3 modifiers → convert → appointment dialog shows summary → generate job → jobs card shows summary → checkout pre-applies all 3 → cascade edit preserves; appointment without modifiers omits the block).
 
 ---
 

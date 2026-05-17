@@ -77,6 +77,15 @@ function JobsPageInner() {
         category_id?: string;
       }>;
       coupon_code: string | null;
+      // Item 15g Layer 15g-ii — modifier snapshot returned by checkout-items.
+      // Layer 15g-iii (this layer) dispatches them to <TicketContext> after
+      // RESTORE_TICKET so the operator sees pre-applied loyalty + manual
+      // discount alongside the existing coupon flow.
+      coupon_discount?: number | null;
+      loyalty_points_redeemed?: number | null;
+      loyalty_discount?: number | null;
+      manual_discount_value?: number | null;
+      manual_discount_label?: string | null;
       deposit_amount: number;
       deposit_date: string | null;
       prior_payments?: PriorPayment[];
@@ -172,6 +181,40 @@ function JobsPageInner() {
       };
 
       dispatch({ type: 'RESTORE_TICKET', state: newTicket });
+
+      // Item 15g Layer 15g-iii — dispatch loyalty + manual-discount from the
+      // appointment snapshot. RESTORE_TICKET above resets these to 0/null so
+      // re-running checkout for the same job stays idempotent (the dispatches
+      // here replace state, they don't accumulate).
+      //
+      // Loyalty is dispatched whenever EITHER points or dollar discount is
+      // non-zero. Booking wizard records both as a pair; older rows that only
+      // recorded loyalty via plaintext-in-notes won't surface here (deferred
+      // back-fill is Layer 15g-iv).
+      const loyaltyPoints = Number(data.loyalty_points_redeemed ?? 0);
+      const loyaltyDiscount = Number(data.loyalty_discount ?? 0);
+      if (loyaltyPoints > 0 || loyaltyDiscount > 0) {
+        dispatch({
+          type: 'SET_LOYALTY_REDEEM',
+          points: loyaltyPoints,
+          discount: loyaltyDiscount,
+        });
+      }
+
+      // Manual discount is dispatched as `dollar` type — the appointment
+      // snapshot stores a resolved dollar amount (booking wizard never
+      // captures percent; convert-service resolves percent to dollar against
+      // subtotal before persisting). Label falls back to "Manual discount"
+      // when the source dialog didn't record one.
+      const manualValue = Number(data.manual_discount_value ?? 0);
+      if (manualValue > 0) {
+        dispatch({
+          type: 'APPLY_MANUAL_DISCOUNT',
+          discountType: 'dollar',
+          value: manualValue,
+          label: data.manual_discount_label?.trim() || 'Manual discount',
+        });
+      }
 
       // Auto-apply coupon from linked quote if present
       if (data.coupon_code) {

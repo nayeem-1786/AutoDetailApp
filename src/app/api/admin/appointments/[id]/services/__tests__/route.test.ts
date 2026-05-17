@@ -28,6 +28,12 @@ interface ApptRow {
   is_mobile: boolean;
   mobile_surcharge: number;
   mobile_zone_name_snapshot: string | null;
+  // Item 15g Layer 15g-iii — per-modifier columns surfaced by the cascade
+  // endpoint's SELECT. Tests use these to verify the cascade preserves the
+  // snapshot + recomputes the canonical combined `discount_amount`.
+  coupon_discount?: number | null;
+  loyalty_discount?: number | null;
+  manual_discount_value?: number | null;
 }
 
 interface ServiceLookupRow {
@@ -287,6 +293,9 @@ beforeEach(() => {
     is_mobile: false,
     mobile_surcharge: 0,
     mobile_zone_name_snapshot: null,
+    coupon_discount: null,
+    loyalty_discount: null,
+    manual_discount_value: null,
   };
   state.existingServices = [
     {
@@ -575,5 +584,118 @@ describe('PUT /api/admin/appointments/[id]/services', () => {
     const details = state.auditCalls[0].details as Record<string, unknown>;
     expect(details.notification_suppressed).toBe(true);
     expect(details.field).toBe('services');
+  });
+
+  // Item 15g Layer 15g-iii — modifier preservation across service edits
+  describe('modifier preservation (Item 15g Layer 15g-iii)', () => {
+    it('preserves coupon_discount when services are edited', async () => {
+      // Appointment carries an active coupon ($25 off).
+      state.appointment = {
+        ...state.appointment!,
+        subtotal: 200,
+        total_amount: 175,
+        discount_amount: 25,
+        coupon_discount: 25,
+      };
+      const res = await PUT(
+        req({
+          services: [
+            { service_id: SVC_A, price_at_booking: 200 },
+            { service_id: SVC_B, price_at_booking: 75 },
+          ],
+        }),
+        params
+      );
+      expect(res.status).toBe(200);
+      const apptUpd = state.updates.find((u) => u.table === 'appointments');
+      expect(apptUpd?.payload.subtotal).toBe(275);
+      // total = 275 - 25 = 250
+      expect(apptUpd?.payload.total_amount).toBe(250);
+      // discount_amount written back as canonical combined = 25 (coupon only).
+      expect(apptUpd?.payload.discount_amount).toBe(25);
+      // Per-modifier columns NOT touched — they survive untouched.
+      expect(apptUpd?.payload.coupon_discount).toBeUndefined();
+      expect(apptUpd?.payload.loyalty_discount).toBeUndefined();
+      expect(apptUpd?.payload.manual_discount_value).toBeUndefined();
+    });
+
+    it('preserves loyalty_discount + manual_discount_value when services are edited', async () => {
+      state.appointment = {
+        ...state.appointment!,
+        subtotal: 200,
+        total_amount: 155,
+        discount_amount: 45,
+        coupon_discount: null,
+        loyalty_discount: 30,
+        manual_discount_value: 15,
+      };
+      const res = await PUT(
+        req({
+          services: [{ service_id: SVC_A, price_at_booking: 250 }],
+        }),
+        params
+      );
+      expect(res.status).toBe(200);
+      const apptUpd = state.updates.find((u) => u.table === 'appointments');
+      expect(apptUpd?.payload.subtotal).toBe(250);
+      // total = 250 - (30 + 15) = 205
+      expect(apptUpd?.payload.total_amount).toBe(205);
+      // Canonical combined discount recomputed = 30 + 15 = 45.
+      expect(apptUpd?.payload.discount_amount).toBe(45);
+      // Per-modifier columns NOT touched.
+      expect(apptUpd?.payload.loyalty_discount).toBeUndefined();
+      expect(apptUpd?.payload.manual_discount_value).toBeUndefined();
+    });
+
+    it('handles appointments with all three modifiers (coupon + loyalty + manual)', async () => {
+      state.appointment = {
+        ...state.appointment!,
+        subtotal: 200,
+        total_amount: 150,
+        discount_amount: 50,
+        coupon_discount: 25,
+        loyalty_discount: 10,
+        manual_discount_value: 15,
+      };
+      const res = await PUT(
+        req({
+          services: [{ service_id: SVC_A, price_at_booking: 300 }],
+        }),
+        params
+      );
+      expect(res.status).toBe(200);
+      const apptUpd = state.updates.find((u) => u.table === 'appointments');
+      expect(apptUpd?.payload.subtotal).toBe(300);
+      // total = 300 - (25 + 10 + 15) = 250
+      expect(apptUpd?.payload.total_amount).toBe(250);
+      expect(apptUpd?.payload.discount_amount).toBe(50);
+    });
+
+    it('falls back to legacy combined discount_amount when all per-modifier columns are null', async () => {
+      // Appointment created before Layer 15g-ii migration — per-modifier
+      // columns are null but `discount_amount` still carries a value.
+      state.appointment = {
+        ...state.appointment!,
+        subtotal: 200,
+        total_amount: 180,
+        discount_amount: 20,
+        coupon_discount: null,
+        loyalty_discount: null,
+        manual_discount_value: null,
+      };
+      const res = await PUT(
+        req({
+          services: [{ service_id: SVC_A, price_at_booking: 300 }],
+        }),
+        params
+      );
+      expect(res.status).toBe(200);
+      const apptUpd = state.updates.find((u) => u.table === 'appointments');
+      expect(apptUpd?.payload.subtotal).toBe(300);
+      // total = 300 - 20 (legacy discount) = 280
+      expect(apptUpd?.payload.total_amount).toBe(280);
+      // discount_amount echoed back unchanged.
+      expect(apptUpd?.payload.discount_amount).toBe(20);
+    });
   });
 });

@@ -84,7 +84,16 @@ afterEach(() => {
   cleanup();
 });
 
-function buildCheckoutItemsResponse(couponCode: string | null) {
+function buildCheckoutItemsResponse(
+  couponCode: string | null,
+  modifiers?: {
+    coupon_discount?: number | null;
+    loyalty_points_redeemed?: number | null;
+    loyalty_discount?: number | null;
+    manual_discount_value?: number | null;
+    manual_discount_label?: string | null;
+  }
+) {
   return {
     ok: true,
     json: async () => ({
@@ -120,6 +129,11 @@ function buildCheckoutItemsResponse(couponCode: string | null) {
           },
         ],
         coupon_code: couponCode,
+        coupon_discount: modifiers?.coupon_discount ?? null,
+        loyalty_points_redeemed: modifiers?.loyalty_points_redeemed ?? null,
+        loyalty_discount: modifiers?.loyalty_discount ?? null,
+        manual_discount_value: modifiers?.manual_discount_value ?? null,
+        manual_discount_label: modifiers?.manual_discount_label ?? null,
         deposit_amount: 0,
         deposit_date: null,
         prior_payments: [],
@@ -216,6 +230,170 @@ describe('JobsPage handleCheckout — coupon re-validation (Item 15g Layer 15g-i
     expect(restoreCalls).toHaveLength(2);
     for (const call of restoreCalls) {
       expect(call[0].state.coupon).toBeNull();
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Item 15g Layer 15g-iii — handleCheckout now dispatches loyalty + manual-
+// discount alongside the existing coupon flow. The dispatches are
+// idempotent: RESTORE_TICKET zeroes all three slots first, so re-running
+// checkout for the same job cannot accumulate.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('JobsPage handleCheckout — modifier hydration (Item 15g Layer 15g-iii)', () => {
+  it('dispatches SET_LOYALTY_REDEEM when checkout-items returns loyalty fields', async () => {
+    fetchResponses['/api/pos/jobs/job-1/checkout-items'] = buildCheckoutItemsResponse(
+      null,
+      { loyalty_points_redeemed: 100, loyalty_discount: 10 }
+    );
+
+    const { getByTestId } = render(<JobsPage />);
+    fireEvent.click(getByTestId('trigger-checkout'));
+
+    await waitFor(() => {
+      expect(pushSpy).toHaveBeenCalledWith('/pos');
+    });
+
+    const loyaltyCall = dispatchSpy.mock.calls.find(
+      (c) => c[0].type === 'SET_LOYALTY_REDEEM'
+    );
+    expect(loyaltyCall).toBeDefined();
+    expect(loyaltyCall![0]).toEqual({
+      type: 'SET_LOYALTY_REDEEM',
+      points: 100,
+      discount: 10,
+    });
+  });
+
+  it('dispatches APPLY_MANUAL_DISCOUNT when checkout-items returns a manual discount', async () => {
+    fetchResponses['/api/pos/jobs/job-1/checkout-items'] = buildCheckoutItemsResponse(
+      null,
+      { manual_discount_value: 15, manual_discount_label: 'Manager goodwill' }
+    );
+
+    const { getByTestId } = render(<JobsPage />);
+    fireEvent.click(getByTestId('trigger-checkout'));
+
+    await waitFor(() => {
+      expect(pushSpy).toHaveBeenCalledWith('/pos');
+    });
+
+    const manualCall = dispatchSpy.mock.calls.find(
+      (c) => c[0].type === 'APPLY_MANUAL_DISCOUNT'
+    );
+    expect(manualCall).toBeDefined();
+    expect(manualCall![0]).toEqual({
+      type: 'APPLY_MANUAL_DISCOUNT',
+      discountType: 'dollar',
+      value: 15,
+      label: 'Manager goodwill',
+    });
+  });
+
+  it('falls back to "Manual discount" label when none is provided', async () => {
+    fetchResponses['/api/pos/jobs/job-1/checkout-items'] = buildCheckoutItemsResponse(
+      null,
+      { manual_discount_value: 20, manual_discount_label: null }
+    );
+
+    const { getByTestId } = render(<JobsPage />);
+    fireEvent.click(getByTestId('trigger-checkout'));
+
+    await waitFor(() => expect(pushSpy).toHaveBeenCalledWith('/pos'));
+
+    const manualCall = dispatchSpy.mock.calls.find(
+      (c) => c[0].type === 'APPLY_MANUAL_DISCOUNT'
+    );
+    expect(manualCall![0].label).toBe('Manual discount');
+  });
+
+  it('dispatches all three modifiers when present (coupon + loyalty + manual)', async () => {
+    fetchResponses['/api/pos/jobs/job-1/checkout-items'] = buildCheckoutItemsResponse(
+      'SAVE25',
+      {
+        coupon_discount: 25,
+        loyalty_points_redeemed: 100,
+        loyalty_discount: 10,
+        manual_discount_value: 15,
+        manual_discount_label: 'Goodwill',
+      }
+    );
+    fetchResponses['/api/pos/coupons/validate'] = {
+      ok: true,
+      json: async () => ({
+        data: { id: 'coup-1', code: 'SAVE25', total_discount: 25 },
+      }),
+    };
+
+    const { getByTestId } = render(<JobsPage />);
+    fireEvent.click(getByTestId('trigger-checkout'));
+
+    await waitFor(() => {
+      const types = dispatchSpy.mock.calls.map((c) => c[0].type);
+      expect(types).toContain('SET_LOYALTY_REDEEM');
+      expect(types).toContain('APPLY_MANUAL_DISCOUNT');
+      expect(types).toContain('SET_COUPON');
+    });
+  });
+
+  it('skips loyalty + manual dispatches when both modifiers are zero/null', async () => {
+    fetchResponses['/api/pos/jobs/job-1/checkout-items'] = buildCheckoutItemsResponse(
+      null,
+      {
+        loyalty_points_redeemed: 0,
+        loyalty_discount: 0,
+        manual_discount_value: 0,
+      }
+    );
+
+    const { getByTestId } = render(<JobsPage />);
+    fireEvent.click(getByTestId('trigger-checkout'));
+
+    await waitFor(() => expect(pushSpy).toHaveBeenCalledWith('/pos'));
+
+    const types = dispatchSpy.mock.calls.map((c) => c[0].type);
+    expect(types).not.toContain('SET_LOYALTY_REDEEM');
+    expect(types).not.toContain('APPLY_MANUAL_DISCOUNT');
+  });
+
+  it('is idempotent — re-running checkout dispatches each modifier exactly once per pass', async () => {
+    fetchResponses['/api/pos/jobs/job-1/checkout-items'] = buildCheckoutItemsResponse(
+      null,
+      {
+        loyalty_points_redeemed: 100,
+        loyalty_discount: 10,
+        manual_discount_value: 15,
+        manual_discount_label: 'Goodwill',
+      }
+    );
+
+    const { getByTestId } = render(<JobsPage />);
+
+    fireEvent.click(getByTestId('trigger-checkout'));
+    await waitFor(() =>
+      expect(
+        dispatchSpy.mock.calls.filter((c) => c[0].type === 'SET_LOYALTY_REDEEM')
+      ).toHaveLength(1)
+    );
+
+    fireEvent.click(getByTestId('trigger-checkout'));
+    await waitFor(() =>
+      expect(
+        dispatchSpy.mock.calls.filter((c) => c[0].type === 'SET_LOYALTY_REDEEM')
+      ).toHaveLength(2)
+    );
+
+    // RESTORE_TICKET fires before each modifier dispatch and zeroes the
+    // slots so the dispatches never stack.
+    const restoreCalls = dispatchSpy.mock.calls.filter(
+      (c) => c[0].type === 'RESTORE_TICKET'
+    );
+    expect(restoreCalls).toHaveLength(2);
+    for (const call of restoreCalls) {
+      expect(call[0].state.loyaltyPointsToRedeem).toBe(0);
+      expect(call[0].state.loyaltyDiscount).toBe(0);
+      expect(call[0].state.manualDiscount).toBeNull();
     }
   });
 });
