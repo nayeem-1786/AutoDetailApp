@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.5 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3c+3d+3e done, Layer 3a-i partial; Phase 1 + Layer 4 pending); 15g Layers 15g-i + 15g-ii done; 15g-iii/iv pending
-**Last session updated:** 2026-05-17 — Item 15f Layer 3e landed: `<CustomPriceDialog>` wired into `<CatalogBrowser>` (covers POS New Sale + POS New Quote) + Item 15a's `<EditServicesModal>` (temporary patch, modal deletes in Phase 1 Layer 8e). 3 of 4 consumers fixed; Layer 3a-i already worked via the hook.
+**Document version:** v2.6 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3c+3d+3e done, Layer 3a-i partial; Phase 1 + Layer 4 pending); 15g Layers 15g-i + 15g-ii done; 15g-iii/iv pending
+**Last session updated:** 2026-05-16 — Roadmap note: documented known display-only bug in <EditServicesDialog> per_unit total (dies with modal at Phase 1 Layer 8e); no patch.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -899,6 +899,8 @@ coupon / loyalty on the underlying record.
   (`src/components/appointments/edit-services-modal.tsx`). Remove their
   mounts from Jobs card and Admin Appointment dialog. Ship in same PR as
   the rest of Phase 1 (no half-state in production). ~0.5 sessions.
+  Layer 8e also closes the known display-bug in the deleted modal's
+  "Selected" panel total for per_unit services (see 2026-05-16 notes entry).
 
 - **Layer 8f — Tests.** Round-trip load + save tests for Jobs and Admin
   Appointment edit-via-POS flows. Edit-mode UX tests. In_progress edit
@@ -1419,6 +1421,7 @@ any future code that might attempt to re-build a parallel picker.
   → Flood Damage → dialog; Admin Appointments → Edit Services → Flood
   Damage → dialog → save → check `appointment_services` row; POS Jobs
   Layer 3a-i path already works).
+- 2026-05-16: UAT discovered `<EditServicesDialog>` (Layer 3a-i, commit `98dfdea6`) has a display-only bug in its "Selected" right-panel total calculation for per_unit services — Scratch Repair × 3 displays as $1,350 instead of correct $450. Underlying `jobs.services` JSONB persistence is unaffected; Job's own Services tile shows correct $450. Bug is in the modal's bespoke total summation, not the canonical engine. Decision: NO patch — accept the display-only defect for the remaining lifetime of the modal. Phase 1 Layer 8e deletes the component entirely; bug dies with it. Documented here so Layer 8e's session has context.
 
 ---
 
