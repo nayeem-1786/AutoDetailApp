@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.7 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3c+3d+3e done, Layer 3a-i partial; Phase 1 + Layer 4 pending); 15g Layers 15g-i + 15g-ii + 15g-iii done; 15g-iv pending
-**Last session updated:** 2026-05-17 — Item 15g Layer 15g-iii landed: handleCheckout now dispatches loyalty + manual-discount alongside coupon; new shared `<ModifierSummary>` block surfaces all 3 modifiers on Admin Appointment dialog + Jobs card; Item 15a cascade endpoint reads per-modifier columns + writes canonical combined `discount_amount`.
+**Document version:** v2.8 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d+3e done; Layer 4 + Phase 1 pending); 15g Layers 15g-i + 15g-ii + 15g-iii done; 15g-v added (audit-driven, customer-facing fix); 15g-iv pending; Phase 1 (8a-8f) blocked behind 15g-v + 15g-iv
+**Last session updated:** 2026-05-16 — Layer 15g-v added (quote total_amount writer fix + 4-surface receipt modifier rendering) per docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md; reorder sequence: 15g-v lands before 15g-iv
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -1427,12 +1427,12 @@ any future code that might attempt to re-build a parallel picker.
 
 ### Item 15g — Lifecycle Persistence: Discount / Coupon / Loyalty Across Quote → Appointment → Job → Transaction
 
-- **Status:** Layers 15g-i + 15g-ii + 15g-iii done (2026-05-16, 2026-05-17, 2026-05-17); Layer 15g-iv not started
+- **Status:** Layers 15g-i + 15g-ii + 15g-iii done; Layer 15g-v not started (next, BEFORE 15g-iv); Layer 15g-iv not started; Phase 1 (8a-8f) blocked behind 15g-v + 15g-iv
 - **Severity:** S1 (customer-promised concessions silently dropped today)
-- **Effort:** 5 sessions (~10-12 hours total, layered)
+- **Effort:** 6.5 sessions (~12-14 hours total, layered — 15g-i + 15g-ii + 15g-iii done; 15g-v + 15g-iv remaining)
 - **Wave:** 1.5
 - **Depends on:** none — must land before Phase 1 (Item 15f Layers 8a-8f)
-- **Sequencing:** 15g-i + 15g-ii MUST complete before Phase 1 starts; 15g-iii + 15g-iv can run in parallel with Phase 1 layers 8b-8f
+- **Sequencing:** 15g-i + 15g-ii + 15g-iii done; 15g-v NEXT (~1-1.5 sessions); then 15g-iv (~1 session); then Phase 1 (5.5 sessions). Total remaining: ~8 sessions.
 
 **Problem statement:**
 
@@ -1477,6 +1477,54 @@ The chain is asymmetric — online booking flow works; POS-originated quote/walk
 - Jobs card "Services" tile: modifier summary (e.g., "$25 off via SAVE25" + "50 pts redeemed").
 - Item 15a cascade endpoint update: read/preserve/re-validate modifiers during service edits.
 - Effort: ~1.5 sessions.
+
+**Layer 15g-v — Quote totals + receipt modifier rendering (audit follow-up):**
+- Source: docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md
+- Severity: S1 (customer-facing — every existing modifier-bearing quote currently displays wrong total to customer via SMS link / email / PDF)
+- Effort: ~1-1.5 sessions
+
+**Fix A — quotes.total_amount writer correction (~0.5 session):**
+- `src/lib/quotes/quote-service.ts`: extract a shared `computeQuoteTotals(input)` helper mirroring the reducer math at `quote-reducer.ts:45-62`. Call from both `createQuote` (`:134-170`) and `updateQuote` (`:344-361`). Lift the `data.items` guard in `updateQuote` so modifier-only PATCHes also recompute (per Layer 15g-ii's auto-save now hashing modifiers via `quote-ticket-panel.tsx:62-89`).
+- `src/lib/quotes/convert-service.ts:106-109`: remove the `Number(quote.total_amount) - totalDiscount` workaround. Once writers store net, convert path is `total_amount: Number(quote.total_amount ?? 0)`. Keep `Math.max(0, …)` clamp as defense-in-depth.
+- Tests: extend `quote-service.modifiers.test.ts` to assert `total_amount` = net for every modifier combination; extend `convert-service.test.ts` to verify post-fix convert produces identical `appointments.total_amount` for modifier-bearing quotes.
+- No schema migration. No DB_SCHEMA.md regen.
+- NO one-shot back-fill SQL (per user decision Q3). Auto-save naturally fixes existing modifier-bearing quotes on next edit.
+
+**Fix B — Receipt modifier rendering (~0.75-1 session):**
+- 4 customer-facing surfaces (per audit §2) + 1 operator surface need coupon/loyalty/manual rows mirroring `<QuoteTotals>` (`src/app/pos/components/quotes/quote-totals.tsx:42-76`):
+  - `src/app/(public)/quote/[token]/page.tsx:288-326` — public quote landing (SMS link target).
+  - `src/lib/quotes/send-service.ts` — both `buildEmailHtml` (`:496-622`) + `buildEmailText` (`:457-494`) + the templated path (widen `quote_sent` template variables: `quote_coupon_code`, `quote_coupon_discount`, `quote_loyalty_pts`, `quote_loyalty_discount`, `quote_manual_label`, `quote_manual_discount`).
+  - `src/app/api/quotes/[id]/pdf/route.ts:300-334` — PDF rendering.
+  - `src/app/pos/components/quotes/quote-detail.tsx:537-553` — operator saved-quote review.
+- SMS body STAYS unchanged (160-char limit; the SMS hooks to the public landing page which displays the breakdown).
+- Conditional rendering: each modifier row only renders when the modifier is applied (non-zero / non-null), matching `<QuoteTotals>` pattern.
+- Tests: snapshot-style assertions on email HTML + PDF output + public landing page. Modifier rows present when applicable, absent when not.
+
+**Out of scope:**
+- One-shot back-fill SQL for existing quotes with wrong persisted total_amount (user declined per Q3).
+- Schema changes (no migration needed).
+- ESLint enforcement (Item 15f Layer 4's scope).
+- Booking wizard plaintext loyalty cleanup (Layer 15g-iv's scope).
+- SMS body template change (deliberate scope decision — body stays short, link does the work).
+
+**Files likely affected:**
+- Modified: `src/lib/quotes/quote-service.ts` (Fix A)
+- Modified: `src/lib/quotes/convert-service.ts` (Fix A — workaround removal)
+- Modified: `src/app/(public)/quote/[token]/page.tsx` (Fix B)
+- Modified: `src/lib/quotes/send-service.ts` (Fix B)
+- Modified: `src/app/api/quotes/[id]/pdf/route.ts` (Fix B)
+- Modified: `src/app/pos/components/quotes/quote-detail.tsx` (Fix B)
+- Modified: seeded `quote_sent` email template body (Fix B — widen variables)
+- Extended: `src/lib/quotes/__tests__/quote-service.modifiers.test.ts` (Fix A)
+- Extended: `src/lib/quotes/__tests__/convert-service.test.ts` (Fix A)
+- New: snapshot tests for email/PDF/public-landing modifier rendering (Fix B)
+
+**Breaking-change watch items (per audit §5.5):**
+- Analytics (`getQuoteStats()`, customer-portal "Booked revenue") will show TRUTHFUL (lower) numbers post-fix; release notes should note "quote revenue figures more accurate after fix."
+- Existing customer-facing SMS history still shows old (wrong) numbers; the PDF/landing/email re-renders on view show correct numbers. Acceptable trade-off.
+
+**Notes / decisions log:**
+- 2026-05-16: UAT against Q-0067 (subtotal $1600, modifiers totaling $1598.70) surfaced both bugs. Per audit, BOTH fixes are required for correct UX. User selected sequential order (15g-v before 15g-iv before Phase 1) and no back-fill SQL.
 
 **Layer 15g-iv — Booking wizard cleanup + tests:**
 - Migrate `api/book/route.ts` from `internal_notes` plaintext loyalty stop-gap to dedicated columns (already added in 15g-ii).
