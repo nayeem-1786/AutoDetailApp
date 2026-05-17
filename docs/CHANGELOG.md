@@ -6,6 +6,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8a: backend cascade endpoint extraction + POS-authed variant
+
+First session of Phase 1 (edit-via-POS architecture). Lays the backend foundation so the next 5 layers (8b–8f) can hang frontend, UX, and Layer-3a-i revert off a single shared cascade helper. Source spec: `docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md` §4.1.
+
+**The pivot:** Item 15a's cascade endpoint (`PUT /api/admin/appointments/[id]/services`) held a 442-line inline cascade body — Zod parse, appointment SELECT, existing-services snapshot, services-table lookup, linked-job snapshot, totals recompute, atomic-ish DELETE+INSERT+UPDATE+JOBS-SYNC with manual rollback, audit log, refresh. Phase 1's edit-via-POS pivot needs the IDENTICAL cascade callable from a POS-authed sibling endpoint without duplicating the body. Layer 8a extracts and adds the sibling.
+
+**Three deliverables:**
+
+1. **New shared helper `src/lib/appointments/service-edit.ts`** — `editAppointmentServices(supabase, { appointmentId, body, actor, source, ipAddress })`. Owns all 11 cascade steps. Auth-agnostic: takes an `actor` (normalized `{ employeeId, authUserId, email, name }` shape) + `source: 'admin' | 'pos'` discriminator for the audit row. Validates input via the existing `editServicesBodySchema` (Item 15a). Preserves the Item 15g Layer 15g-iii modifier-preservation contract — reads per-modifier columns (`coupon_discount`, `loyalty_discount`, `manual_discount_value`), passes them to `computeTotalsForServiceEdit`, writes back the canonical combined `discount_amount` BUT never touches the per-modifier columns themselves. Throws structured `ServiceEditError` with `code` + `httpStatus` + optional `details` (Zod `flatten()` payload on `INVALID_INPUT`). Manual rollback pattern preserved (Supabase JS has no transaction wrapper); helper exposes a tiny `rollbackAppointmentServices` for the totals + jobs-sync rollback steps.
+
+2. **Refactored admin route** (`src/app/api/admin/appointments/[id]/services/route.ts`) — went from 442 lines to 84 lines. Auth via `getEmployeeFromSession` + `requirePermission('appointments.reschedule')` (unchanged from Item 15a). Builds actor from `employee`, calls helper with `source: 'admin'`, catches `ServiceEditError` to map → HTTP. **API contract preserved** — response shape, error shape, status codes all identical. All 21 existing route tests pass unmodified.
+
+3. **New POS-authed sibling** (`src/app/api/pos/appointments/[id]/services/route.ts`) — same shape, different auth: `authenticatePosRequest` + `checkPosPermission('pos.jobs.manage')` (per audit §6, the existing key that gates job-level edits in POS surfaces; granted to admin/detailer/super_admin, denied to cashier). Calls the same helper with `source: 'pos'`. Same response shape so frontend consumers can be path-agnostic when Layer 8b wires deep-link drain at `/pos?source=...&id=...`.
+
+**Auth pattern reference** (for future sessions): the POS endpoint mirrors `src/app/api/pos/appointments/[id]/mobile-address/route.ts` — `authenticatePosRequest(request)` returns `PosEmployee | null` (401 fallthrough), then `checkPosPermission(supabase, role, employeeId, key)` returns `boolean` (403 fallthrough). Different from admin's `requirePermission` which short-circuits to a `Response`. Both auth surfaces resolve to the same `employees.id` UUID (admin's `employee.id` == POS's `posEmployee.employee_id`) — the actor abstraction normalizes the field-name divergence.
+
+**Tests** (+33 new across 2 new test files, all 21 existing admin route tests still pass unmodified):
+
+- New `src/lib/appointments/__tests__/service-edit.test.ts` (+15): structured error contract (each code/status pair); source discriminator threads to audit row; ipAddress fallback to `""` when null; return shape with/without linked job; modifier preservation invariant (per-modifier columns never written; canonical combined `discount_amount` IS written; legacy fallback when all per-modifier cols are null).
+- New `src/app/api/pos/appointments/[id]/services/__tests__/route.test.ts` (+18): full POS endpoint cover — 401 on missing session, 403 on `pos.jobs.manage` denied, validation parity with admin (zero services, missing appointment, completed/cancelled status, unknown service, inactive service), cascade parity (no-linked-job vs linked-job with `jobs.services` write), audit row tagged `source: 'pos'` with POS actor identity, notification suppression invariant (no SMS/email/webhook), modifier preservation contract via the shared helper, idempotency (same payload twice produces the same persisted state).
+
+**Out of scope** (per session brief, deferred to subsequent Phase 1 layers):
+
+- No UI surface mounts the new POS endpoint yet. Layers 8b (`<TicketContext>` extensions + deep-link drain) and 8d (Jobs-card + Admin-dialog affordances) wire it up.
+- No `<TicketContext>` changes (Layer 8b).
+- No POS Sale-tab edit-mode branch (Layer 8c).
+- No `<EditServicesDialog>` / `<EditServicesModal>` deletions (Layer 8e — ships in same PR as 8d to avoid half-state in production).
+- No new permission keys (reuses `appointments.reschedule` + `pos.jobs.manage`).
+- No schema migration (cascade behavior is unchanged at the data layer).
+
+**Verification:** Typecheck — 0 new errors (2 pre-existing test-file cast errors untouched). ESLint — 0 errors on touched files; 8 pre-existing `col`/`val` unused-arg warnings in the admin route test file (predate this session). Vitest 1395/1395 passing. Production build compiled successfully (`✓ Compiled successfully in 24.0s`).
+
+**Manual UAT** (user verifies post-deploy):
+
+1. **Admin endpoint unchanged:** since the Admin "Edit Services" button is currently disabled (Item 15f Layer 4), this is a SQL/curl test. Hit `PUT /api/admin/appointments/[id]/services` with admin auth + a valid payload — verify cascade runs and response shape matches the pre-refactor output.
+2. **POS endpoint exists:** hit `PUT /api/pos/appointments/[id]/services` with POS auth (`pos.jobs.manage`-granted role) + valid payload. Verify 200 OK, response shape parity with admin endpoint, database state shows `appointment_services` updated + `jobs.services` JSONB cascade if linked job. Then call with a `pos.jobs.manage`-denied role (cashier) — verify 403.
+3. **Modifier preservation:** submit an edit on an appointment carrying `coupon_discount`/`loyalty_discount`/`manual_discount_value`. Verify post-edit row has the per-modifier columns UNCHANGED and `discount_amount` recomputed as `coupon + loyalty + manual`.
+
+**Next session:** Phase 1 Layer 8b — extend `<TicketContext>` with `source`, `sourceId`, `returnTo`, `editMode` fields + add deep-link drain at `/pos?source=...&id=...&returnTo=...` that calls the appropriate load endpoint (existing `checkout-items` for jobs; new GET endpoint for appointments). Re-fetch on every mount (audit §8.3 gotcha #5 — sessionStorage is UX nicety, not authoritative).
+
+---
+
 ## 2026-05-17 — Item 15f Layer 4: ESLint enforcement of Rule 22 + 4 missed bespoke-pricer migrations (Item 15f COMPLETE except Phase 1)
 
 Layer 4 ships the `services/no-bespoke-pricing` ESLint rule at `'error'` enforcing CLAUDE.md Rule 22, plus migrations of 4 bespoke pricers Layers 3c–3e missed:

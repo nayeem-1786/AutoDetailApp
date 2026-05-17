@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v3.1 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d+3e+4 done; only Phase 1 pending); **Item 15g COMPLETE (all 5 layers done)**; Phase 1 (8a-8f) UNBLOCKED.
-**Last session updated:** 2026-05-17 — **Item 15f Layer 4 landed**: `services/no-bespoke-pricing` ESLint rule ships at `'error'` enforcing CLAUDE.md Rule 22, plus 4 missed bespoke-pricer migrations caught by initial rule enforcement (`api/book/route.ts:computeExpectedPrice`, `booking-wizard.tsx:reconstructConfig`, `service-card.tsx:getStartingPrice`, voice-agent catalog endpoint). Admin Appointment dialog "Edit Services" button disabled; Item 15a's dead-code modal carries the single sanctioned eslint-disable comment. 1366/1366 vitest pass. 0 lint errors.
+**Document version:** v3.2 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layers 1+2+3a-partial+3c+3d+3e+4 done; **Phase 1 Layer 8a done**; Phase 1 Layers 8b-8f pending); **Item 15g COMPLETE (all 5 layers done)**.
+**Last session updated:** 2026-05-17 — **Item 15f Phase 1 Layer 8a landed**: extracted Item 15a's 442-line cascade body into auth-agnostic helper `src/lib/appointments/service-edit.ts`. Admin route refactored to thin wrapper (existing 21 tests pass unmodified). New POS-authed sibling `PUT /api/pos/appointments/[id]/services` gated by `pos.jobs.manage`. +33 tests across 2 new files. 1395/1395 vitest pass. Server-side foundation only — Layer 8b wires frontend.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -782,7 +782,7 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 ### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
 
-- **Status:** Layers 1+2+3c+3d+3e+4 done; Layer 3a-i partial (Jobs card migrated, pending revert in Phase 1 Layer 8e); only Phase 1 (8a-8f) remains. Phase 1 unblocked.
+- **Status:** Layers 1+2+3a-partial+3c+3d+3e+4 done; **Phase 1 Layer 8a done (2026-05-17)**; Phase 1 Layers 8b-8f pending.
 - **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
 - **Effort:** 5.5-7 sessions (~11-16 hours total, layered) — Layer 3e adds ~0.5-1 session
 - **Wave:** 1.5
@@ -865,11 +865,42 @@ coupon / loyalty on the underlying record.
 
 **Phase 1 Sub-Layers (sequential):**
 
-- **Layer 8a — Backend cascade endpoint extraction.** Extract Item 15a's
-  cascade logic into `src/lib/appointments/service-edit.ts` callable from
-  both admin and POS routes. Add POS-authed
-  `PUT /api/pos/appointments/[id]/services` variant. Same cascade behavior
-  (appointment_services + jobs.services), two auth surfaces. ~1.5 sessions.
+- **Layer 8a — Backend cascade endpoint extraction — DONE 2026-05-17:**
+  Item 15a's 442-line cascade body extracted into auth-agnostic helper
+  `src/lib/appointments/service-edit.ts` exposing
+  `editAppointmentServices(supabase, { appointmentId, body, actor, source, ipAddress })`.
+  - Admin route (`src/app/api/admin/appointments/[id]/services/route.ts`)
+    refactored to thin 84-line wrapper (auth via `getEmployeeFromSession`
+    + `requirePermission('appointments.reschedule')` unchanged from Item 15a;
+    builds actor, calls helper with `source: 'admin'`, catches
+    `ServiceEditError` to map → HTTP). **API contract preserved** — all 21
+    existing route tests pass unmodified.
+  - New POS-authed sibling
+    `src/app/api/pos/appointments/[id]/services/route.ts` with
+    `authenticatePosRequest` + `checkPosPermission('pos.jobs.manage')`
+    (per audit §6; the existing key granted to admin/detailer/super_admin
+    and denied to cashier). Same helper call with `source: 'pos'`.
+    Server-side only this layer — Layer 8b wires frontend deep-link drain.
+  - Modifier preservation contract (Item 15g Layer 15g-iii) preserved
+    inside the helper: per-modifier columns READ + canonical combined
+    `discount_amount` WRITTEN; per-modifier columns themselves NEVER
+    touched by the cascade.
+  - Manual rollback pattern preserved (Supabase JS has no first-class
+    transaction wrapper); helper exposes a small
+    `rollbackAppointmentServices` for the totals + jobs-sync rollback
+    steps.
+  - Structured `ServiceEditError` with `code` + `httpStatus` (`INVALID_INPUT`
+    / `NOT_FOUND` / `INVALID_STATUS` / `UNKNOWN_SERVICE` / `INACTIVE_SERVICE` /
+    `CASCADE_FAILED`) — both routes catch and map to NextResponse.
+  - Tests: +33 new across 2 new files. `service-edit.test.ts` (+15) pins
+    structured error contract / source threading / return shape / modifier
+    preservation invariant. `pos services route.test.ts` (+18) covers POS
+    auth (401/403), validation parity with admin, cascade parity, audit
+    source tagging, notification suppression, idempotency. Existing admin
+    tests (21) pass unmodified.
+  - Verification: typecheck 0 new errors; ESLint 0 errors on touched files;
+    vitest 1395/1395 passing; production build compiled successfully.
+  - Effort: ~1.5 sessions actual.
 
 - **Layer 8b — Frontend state extensions.** Extend `<TicketContext>` with
   `source: 'appointment' | 'job' | 'new'`, `sourceId: string | null`,
