@@ -10,9 +10,9 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v1.9 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; Item 15d deferred; Item 15e scoped; Item 15f Layers 1+2 done, Layer 3a partial (Jobs card migrated; Admin Appointment deferred pending POS-context decoupling); Layers 3c, 3d, 4 not started
-**Last session updated:** 2026-05-16 — Item 15f Layer 3a partial: POS Jobs card migrated; Admin Appointment migration deferred (POS-context decoupling required)
-**Total items:** 7 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
+**Document version:** v2.0 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2 done; Phase 1 / Layers 3c, 3d, 4 pending); 15g new (lifecycle persistence — must land before Phase 1)
+**Last session updated:** 2026-05-16 — Item 15f restructured per Quote→POS audit + Lifecycle Persistence audit; Item 15g (sub-layers 15g-i through 15g-iv) added for discount/coupon/loyalty chain fix
+**Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
 
@@ -829,19 +829,92 @@ Booking Wizard (customer-facing), and enforce no-bespoke-pricing via ESLint.
   enter custom amount" based on `custom_starting_price` as starting reference).
 - Synthesizes a ServicePricing row with the entered amount.
 
-**Layer 3a — Migrate 3 broken operator surfaces:**
-- POS Jobs card "Edit Services" modal: replace bespoke checkbox-list +
-  `getServicePrice()` (job-detail.tsx:583-587, 1933-2015) with hook mount
-  + 2-pane catalog browser + selected-services-list UX (Option B from
-  Q2 + Q5 discussion).
-- Admin Appointment dialog: replace Item 15a's `<EditServicesModal>` and
-  its local `resolveServicePrice` (edit-services-modal.tsx:73) entirely
-  with hook mount + 2-pane UX. Item 15a's cascade endpoint
-  (`PUT /api/admin/appointments/[id]/services`) and pure helpers
-  (`buildJobServicesJsonb`, `computeTotalsForServiceEdit`) STAY — only
-  the UI layer changes.
-- POS Appointments modal: when Item 15e builds it, must consume the
-  canonical hook (NOT a bespoke picker).
+**Layer 3a — RESTRUCTURED as Phase 1 (edit-via-POS pattern) per audit findings:**
+
+Layer 3a's original "extract <CatalogBrowser> + <ServicePricingPicker> into a
+shared <EditServicesDialog> component" approach was attempted at commit
+`98dfdea6` (Jobs card only — Admin migration deferred when POS-context
+blocker surfaced). Real-world UAT revealed four independent failures:
+(1) <CatalogBrowser> has hard POS-context dependencies (useTicket,
+usePosPermission) that crash outside POS; (2) the new dialog missing the
+service-vehicle compatibility warning that the POS Quote/Register flow has;
+(3) the new dialog's custom-pricing add path is broken (Flood Damage
+unaddable); (4) DESPITE the canonical engine, the migrated Jobs-card
+modal STILL writes wrong prices to `jobs.services` JSONB.
+
+Root cause: `<CatalogBrowser>` is not a standalone component — it's the
+visible surface of a larger orchestrated POS ecosystem (ticket state,
+permissions, compatibility checks, custom pricing routing, sale banners,
+canonical price resolution). Extracting its UI without its surrounding
+context produces broken behavior.
+
+Per `docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md`, the architectural
+pivot is **edit-via-POS** — instead of extracting catalog UI into other
+surfaces, ROUTE the ticket BACK to the POS Sale tab for editing. This is
+the existing quote-edit pattern applied to appointments and jobs. The
+operator clicks "Edit Services" on Jobs card / Admin Appointment dialog
+and is navigated to `/pos?source=...&id=...&returnTo=...`. POS loads
+the existing ticket, operator edits in the FULL POS UX (with all
+safeguards: compatibility warning, custom pricing, sale banners, canonical
+engine, etc.), clicks "Save Changes," ticket persists back to the original
+record, operator returns to source surface.
+
+This pivot DEPENDS on **Item 15g (lifecycle persistence)** landing FIRST.
+Without 15g, every edit-via-POS round-trip silently re-zeroes discount /
+coupon / loyalty on the underlying record.
+
+**Phase 1 Sub-Layers (sequential):**
+
+- **Layer 8a — Backend cascade endpoint extraction.** Extract Item 15a's
+  cascade logic into `src/lib/appointments/service-edit.ts` callable from
+  both admin and POS routes. Add POS-authed
+  `PUT /api/pos/appointments/[id]/services` variant. Same cascade behavior
+  (appointment_services + jobs.services), two auth surfaces. ~1.5 sessions.
+
+- **Layer 8b — Frontend state extensions.** Extend `<TicketContext>` with
+  `source: 'appointment' | 'job' | 'new'`, `sourceId: string | null`,
+  `returnTo: string | null`, `editMode: boolean`. Deep-link drain at
+  `/pos?source=...&id=...&returnTo=...` loads the ticket via the source's
+  load endpoint. Re-fetch on every mount (never trust sessionStorage as
+  authoritative in edit mode). ~1 session.
+
+- **Layer 8c — POS Sale-tab edit-mode UX.** Different action button labels
+  ("Save Changes" vs "Checkout"), suppress payment flow, suppress receipt
+  printing, suppress loyalty-redemption UI, "Unsaved changes" banner if
+  dirty. Customer-facing UX is unaffected. ~1 session.
+
+- **Layer 8d — Source-side affordances.** Jobs card "Services" tile gets
+  an "Edit Services" affordance (pencil icon or button) routing to
+  `/pos?source=job&id=<id>&returnTo=/pos/jobs/<id>`. Status-aware: all
+  statuses with `pos.jobs.manage` permission go through this path
+  (in_progress jobs use direct edit-via-POS, NOT Flag-an-Issue — per user
+  decision; Flag-an-Issue remains a SEPARATE affordance gated by
+  `pos.jobs.flag_issue` for detailer add-on discovery). Admin Appointment
+  dialog gets similar affordance routing to
+  `/pos?source=appointment&id=<id>&returnTo=/admin/appointments/<id>`.
+  ~0.75 sessions.
+
+- **Layer 8e — Revert Layer 3a-i.** Delete `<EditServicesDialog>`
+  (`src/lib/services/edit-services-dialog.tsx`) and `<EditServicesModal>`
+  (`src/components/appointments/edit-services-modal.tsx`). Remove their
+  mounts from Jobs card and Admin Appointment dialog. Ship in same PR as
+  the rest of Phase 1 (no half-state in production). ~0.5 sessions.
+
+- **Layer 8f — Tests.** Round-trip load + save tests for Jobs and Admin
+  Appointment edit-via-POS flows. Edit-mode UX tests. In_progress edit
+  tests. Cascade endpoint POS-auth variant tests. ~0.75 sessions.
+
+**Phase 1 total: ~5.5 sessions, ~12-14 hours.** Phase 1 is sequential
+within itself (each layer builds on previous). Phase 1 layers cannot start
+until Item 15g sub-layers 15g-i + 15g-ii land.
+
+**Permissions:** No new keys. Reuse `appointments.reschedule` for admin
+edits and `pos.jobs.manage` for POS edits.
+
+**Item 15a status under this restructure:** Item 15a's `<EditServicesModal>`
+gets deleted at Layer 8e. Item 15a's cascade endpoint and helpers STAY —
+they're the persistence layer that Phase 1 routes call.
+
 
 **Layer 3c — Booking Wizard price-math migration (NOT UI):**
 - `src/components/booking/step-service-select.tsx` replaces its inline
@@ -877,11 +950,15 @@ Booking Wizard (customer-facing), and enforce no-bespoke-pricing via ESLint.
   `custom_starting_price` as the surfaced price (until Layer 2's prompt UX
   is exposed via this path).
 
-**Layer 3b — DEFERRED.** Migrating the 4 working POS surfaces (POS Register,
-Quote Builder, Flag-an-Issue, Catalog Panel) to the hook is consistency
-work, not bug-fix work. These surfaces are already on the canonical engine
-via `<CatalogBrowser>` + `<ServicePricingPicker>`. Defer indefinitely;
-ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
+**Layer 3b — PERMANENTLY MOOT.** The original plan (migrate the 4 working
+POS surfaces — POS Register, Quote Builder, Flag-an-Issue, Catalog Panel —
+to the `useServicePicker` hook) becomes moot under the edit-via-POS pivot
+(Phase 1). These surfaces ARE the canonical surface that other records
+route INTO for service editing. No migration needed; they already work
+correctly via `<CatalogBrowser>` + `<ServicePricingPicker>` directly.
+ESLint enforcement (Layer 4) is the real drift-prevention mechanism for
+any future code that might attempt to re-build a parallel picker.
+
 
 **Layer 4 — ESLint enforcement:**
 - New rule (e.g., `services/no-bespoke-pricing` in `eslint-rules/`):
@@ -1094,6 +1171,95 @@ ESLint enforcement (Layer 4) is the real drift-prevention mechanism.
   on whether Item 15g lands first (recommended ordering) vs. parallel-
   tracked with full Item 15g following. **Item 15g NOT yet added to the
   roadmap — awaiting user sign-off on scope.**
+
+---
+
+### Item 15g — Lifecycle Persistence: Discount / Coupon / Loyalty Across Quote → Appointment → Job → Transaction
+
+- **Status:** not started
+- **Severity:** S1 (customer-promised concessions silently dropped today)
+- **Effort:** 5 sessions (~10-12 hours total, layered)
+- **Wave:** 1.5
+- **Depends on:** none — must land before Phase 1 (Item 15f Layers 8a-8f)
+- **Sequencing:** 15g-i + 15g-ii MUST complete before Phase 1 starts; 15g-iii + 15g-iv can run in parallel with Phase 1 layers 8b-8f
+
+**Problem statement:**
+
+The persistence chain has three independent drop points (per `docs/dev/LIFECYCLE_PERSISTENCE_AUDIT_2026-05-16.md`):
+
+1. **Schema gaps:** `quotes` has no loyalty/manual-discount columns; `jobs` has no money columns at all.
+2. **Convert logic gap:** `convertQuote` (`convert-service.ts:67-91`) hardcodes `discount_amount: 0` and omits `coupon_code`, despite `appointments` having those columns. `appointments.coupon_code` + `coupon_discount` are written only by the online booking wizard.
+3. **Checkout hydration gap:** `checkout-items` only reads `quotes.coupon_code` via `job.quote_id`, never falls back to `appointments.coupon_code`.
+
+The chain is asymmetric — online booking flow works; POS-originated quote/walk-in path silently zeroes everything. Loyalty is currently a plaintext stop-gap in `appointments.internal_notes` per a code comment.
+
+**Acceptance criteria — Sub-Layers (sequential within 15g):**
+
+**Layer 15g-i — MVP coupon-only logic fixes (no schema):**
+- `convert-service.ts:67-91`: read `quote.coupon_code` + `quote.coupon?.discount` into appointment row.
+- `checkout-items/route.ts:193-237`: fallback to `appointments.coupon_code` + `coupon_discount` when no quote-side coupon. Return in response.
+- `pos/jobs/page.tsx:155-214`: re-apply coupon from new response fields.
+- Effort: ~0.5 session.
+- Coverage: ~70% of operator-reported bug (coupon path).
+- No schema changes.
+
+**Layer 15g-ii — Schema migration + endpoint propagation:**
+- Add columns:
+  - `appointments.loyalty_points_redeemed INTEGER NOT NULL DEFAULT 0`
+  - `appointments.loyalty_discount NUMERIC(10,2) NOT NULL DEFAULT 0`
+  - `quotes.coupon_discount NUMERIC(10,2)` (optional; re-derivation works)
+  - `quotes.loyalty_points_to_redeem INTEGER`
+  - `quotes.manual_discount_type/value/label` (3 columns)
+  - `appointments.manual_discount_value/label` (2 columns)
+- Update endpoints to write new columns:
+  - `convert-service.ts` — propagate loyalty + manual discount
+  - `api/pos/jobs/route.ts` (walk-in) — accept + persist modifiers on synthetic appointment
+  - `api/book/route.ts` — migrate from `internal_notes` plaintext to dedicated loyalty columns
+  - `quote-service.ts` `createQuote`/`updateQuote` — accept + persist new quote columns
+  - `quote-ticket-panel.tsx` — send new fields in PATCH body
+- Update `checkout-items/route.ts` to read appointment modifiers, return in response.
+- `DB_SCHEMA.md` regen per Supabase migration ritual.
+- Effort: ~2 sessions.
+
+**Layer 15g-iii — UI surfacing on source dialogs:**
+- Admin Appointment dialog: surface discount + coupon + loyalty modifiers (read-only first; edit affordances later if needed).
+- Jobs card "Services" tile: modifier summary (e.g., "$25 off via SAVE25" + "50 pts redeemed").
+- Item 15a cascade endpoint update: read/preserve/re-validate modifiers during service edits.
+- Effort: ~1.5 sessions.
+
+**Layer 15g-iv — Booking wizard cleanup + tests:**
+- Migrate `api/book/route.ts` from `internal_notes` plaintext loyalty stop-gap to dedicated columns (already added in 15g-ii).
+- Remove the inline code comment noting the stop-gap.
+- Comprehensive tests: quote round-trip preserves modifiers, convert preserves, walk-in preserves, checkout hydrates correctly.
+- Verify QBO line-item sync handles `loyalty_discount` separately (mitigation per audit §9.5).
+- Effort: ~1 session.
+
+**Out of scope:**
+- `appointment_services.pricing_type` / `standard_price` provenance (deferred; audit §9.1 #3 — doesn't affect this bug).
+- Loyalty ledger row write timing — STAYS transaction-bound (audit §9.5 watch-item; do NOT write ledger rows pre-transaction).
+- Booking wizard customer-facing UI changes — only its backend writes change.
+- Refund flow changes — refunds read from `transactions.loyalty_*` which is unchanged (audit §9.5).
+
+**Files likely affected:**
+- New migration: `supabase/migrations/<timestamp>_lifecycle_persistence.sql`
+- Modified: `src/lib/quotes/convert-service.ts` (15g-i + 15g-ii)
+- Modified: `src/app/api/pos/jobs/[id]/checkout-items/route.ts` (15g-i)
+- Modified: `src/app/pos/jobs/page.tsx` (15g-i)
+- Modified: `src/app/api/pos/jobs/route.ts` (15g-ii — walk-in)
+- Modified: `src/app/api/book/route.ts` (15g-ii + 15g-iv)
+- Modified: `src/lib/quotes/quote-service.ts` (15g-ii)
+- Modified: `src/components/pos/quote-ticket-panel.tsx` (15g-ii)
+- Modified: `src/components/admin/appointments/appointment-detail-dialog.tsx` (15g-iii)
+- Modified: `src/app/pos/jobs/components/job-detail.tsx` (15g-iii)
+- Modified: `src/lib/appointments/edit-services.ts` (15g-iii — cascade preserves modifiers)
+- New tests: `src/lib/quotes/__tests__/convert-service.test.ts`, `src/app/api/pos/jobs/__tests__/checkout-items.test.ts`, `src/lib/quotes/__tests__/quote-service.modifiers.test.ts`
+- Modified: `docs/dev/DB_SCHEMA.md` (regen post-migration)
+
+**Notes / decisions log:**
+- 2026-05-16: source = `docs/dev/LIFECYCLE_PERSISTENCE_AUDIT_2026-05-16.md`.
+- 2026-05-16: user chose Option C (phased 15g-i through 15g-iv) over Option A (full single-session) or Option B (MVP coupon-only).
+- 2026-05-16: user confirmed sequence — 15g-i + 15g-ii BEFORE Phase 1's layers 8a-8f. 15g-iii + 15g-iv can run in parallel with Phase 1 later layers.
+- 2026-05-16: breaking-change risk assessment is low across the board per audit §9.5. Key watch-items: QBO line-item sync (verify `loyalty_discount` handling), loyalty ledger row write timing (stays transaction-bound).
 
 ---
 
