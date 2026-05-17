@@ -8,6 +8,7 @@ import {
   type MobileFieldsInput,
   type ResolvedMobileFields,
 } from '@/lib/utils/resolve-mobile-fields';
+import { resolveManualDiscountAmount } from './manual-discount';
 import type { CreateQuoteInput, UpdateQuoteInput } from '@/lib/utils/validation';
 
 // ---------------------------------------------------------------------------
@@ -131,22 +132,6 @@ export async function createQuote(
   // staff input within bounds.
   const mobileResolved = await resolveMobileForQuote(supabase, data);
 
-  const itemsSubtotal = data.items.reduce((sum, item) => {
-    return sum + item.quantity * item.unit_price;
-  }, 0);
-  const subtotal = Math.round((itemsSubtotal + mobileResolved.surcharge) * 100) / 100;
-
-  // Tax: apply TAX_RATE to items with product_id (products are taxable).
-  // Mobile fee is NOT taxable (CDTFA Pub 100 — separately-stated delivery).
-  const taxableAmount = data.items.reduce((sum, item) => {
-    if (item.product_id) {
-      return sum + item.quantity * item.unit_price;
-    }
-    return sum;
-  }, 0);
-  const taxAmount = Math.round(taxableAmount * TAX_RATE * 100) / 100;
-  const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
-
   // Generate short access token for public quote link (6 chars, 56.8B combos)
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const bytes = crypto.getRandomValues(new Uint8Array(6));
@@ -159,6 +144,18 @@ export async function createQuote(
   // payload that supplied only one half of a pair.
   const manualDiscount = normalizeManualDiscount(data);
   const loyalty = normalizeLoyaltyRedemption(data);
+
+  // Item 15g Layer 15g-v — total_amount is now net of all modifiers.
+  // Computed via the canonical `computeQuoteTotals` helper so writer +
+  // converter + in-memory reducer all produce the same number.
+  const { subtotal, taxAmount, totalAmount } = computeQuoteTotals({
+    items: data.items,
+    mobileSurcharge: mobileResolved.surcharge,
+    couponDiscount: data.coupon_discount ?? null,
+    loyaltyDiscount: loyalty.discount,
+    manualDiscountType: manualDiscount.type,
+    manualDiscountValue: manualDiscount.value,
+  });
 
   const insertPayload: Record<string, unknown> = {
     quote_number: quoteNumber,
@@ -292,26 +289,31 @@ export async function updateQuote(
   // when the corresponding payload field was supplied (undefined = "no
   // intent to change"); explicit null clears the column. Coherence is
   // enforced at the DB layer.
-  if (data.coupon_discount !== undefined) {
+  const couponDiscountChanged = data.coupon_discount !== undefined;
+  if (couponDiscountChanged) {
     update.coupon_discount = data.coupon_discount ?? null;
   }
-  if (
+
+  const manualDiscountChanged =
     data.manual_discount_type !== undefined ||
     data.manual_discount_value !== undefined ||
-    data.manual_discount_label !== undefined
-  ) {
-    const md = normalizeManualDiscount(data);
-    update.manual_discount_type = md.type;
-    update.manual_discount_value = md.value;
-    update.manual_discount_label = md.label;
+    data.manual_discount_label !== undefined;
+  let manualDiscountResolved: ReturnType<typeof normalizeManualDiscount> | null = null;
+  if (manualDiscountChanged) {
+    manualDiscountResolved = normalizeManualDiscount(data);
+    update.manual_discount_type = manualDiscountResolved.type;
+    update.manual_discount_value = manualDiscountResolved.value;
+    update.manual_discount_label = manualDiscountResolved.label;
   }
-  if (
+
+  const loyaltyChanged =
     data.loyalty_points_to_redeem !== undefined ||
-    data.loyalty_discount !== undefined
-  ) {
-    const ly = normalizeLoyaltyRedemption(data);
-    update.loyalty_points_to_redeem = ly.points;
-    update.loyalty_discount = ly.discount;
+    data.loyalty_discount !== undefined;
+  let loyaltyResolved: ReturnType<typeof normalizeLoyaltyRedemption> | null = null;
+  if (loyaltyChanged) {
+    loyaltyResolved = normalizeLoyaltyRedemption(data);
+    update.loyalty_points_to_redeem = loyaltyResolved.points;
+    update.loyalty_discount = loyaltyResolved.discount;
   }
 
   // Mobile fields: resolve via the same helper as createQuote so server-side
@@ -328,39 +330,103 @@ export async function updateQuote(
     update.mobile_zone_name_snapshot = mobileResolved.snapshotName;
   }
 
-  // If items provided, recalculate totals. Use the resolved mobile surcharge
-  // (or look up the existing one) so subtotal stays consistent with the
-  // stored mobile_surcharge.
-  if (data.items && data.items.length > 0) {
-    let effectiveSurcharge = mobileResolved?.surcharge ?? 0;
-    if (!mobileResolved) {
+  // Item 15g Layer 15g-v — recompute `total_amount` whenever ANY input that
+  // affects the canonical formula changes: items, coupon discount, loyalty
+  // discount, manual discount, or mobile surcharge. Previously the recompute
+  // only fired when items were supplied — leaving modifier-only PATCHes
+  // (the dominant edit path now that 15g-ii hashes modifiers in the
+  // auto-save) writing stale totals. When the PATCH doesn't supply items
+  // (or modifier values), we fetch the current persisted state and merge.
+  const hasItemsUpdate = !!(data.items && data.items.length > 0);
+  const needsTotalsRecompute =
+    hasItemsUpdate ||
+    hasMobileUpdate ||
+    couponDiscountChanged ||
+    manualDiscountChanged ||
+    loyaltyChanged;
+
+  if (needsTotalsRecompute) {
+    // Resolve the effective inputs to the totals formula. Anything not
+    // supplied in this PATCH falls back to the persisted state. We only
+    // skip the fetch when the PATCH carries every input the formula needs
+    // (items + mobile + all three modifiers) — the rare full-replacement
+    // case.
+    const needExistingFetch = !(
+      hasItemsUpdate &&
+      hasMobileUpdate &&
+      couponDiscountChanged &&
+      manualDiscountChanged &&
+      loyaltyChanged
+    );
+
+    interface ExistingRowShape {
+      mobile_surcharge?: number | string | null;
+      coupon_discount?: number | string | null;
+      loyalty_discount?: number | string | null;
+      manual_discount_type?: 'dollar' | 'percent' | null;
+      manual_discount_value?: number | string | null;
+      items?: Array<{
+        quantity: number;
+        unit_price: number;
+        product_id: string | null;
+      }>;
+    }
+    let existingRow: ExistingRowShape | null = null;
+    if (needExistingFetch) {
       const { data: existing } = await supabase
         .from('quotes')
-        .select('mobile_surcharge')
+        .select(
+          'mobile_surcharge, coupon_discount, loyalty_discount, manual_discount_type, manual_discount_value, items:quote_items(quantity, unit_price, product_id)'
+        )
         .eq('id', quoteId)
+        .is('deleted_at', null)
         .single();
-      effectiveSurcharge = Number(existing?.mobile_surcharge ?? 0);
+      existingRow = (existing as ExistingRowShape | null) ?? null;
     }
-    const itemsSubtotal = data.items.reduce((sum, item) => {
-      return sum + item.quantity * item.unit_price;
-    }, 0);
-    const subtotal = Math.round((itemsSubtotal + effectiveSurcharge) * 100) / 100;
 
-    const taxableAmount = data.items.reduce((sum, item) => {
-      if (item.product_id) {
-        return sum + item.quantity * item.unit_price;
-      }
-      return sum;
-    }, 0);
+    const effectiveItems = hasItemsUpdate
+      ? data.items!
+      : (existingRow?.items ?? []);
+    const effectiveSurcharge = hasMobileUpdate
+      ? (mobileResolved?.surcharge ?? 0)
+      : Number(existingRow?.mobile_surcharge ?? 0);
+    const effectiveCouponDiscount = couponDiscountChanged
+      ? (data.coupon_discount ?? null)
+      : (existingRow?.coupon_discount != null
+          ? Number(existingRow.coupon_discount)
+          : null);
+    const effectiveLoyaltyDiscount = loyaltyChanged
+      ? (loyaltyResolved?.discount ?? null)
+      : (existingRow?.loyalty_discount != null
+          ? Number(existingRow.loyalty_discount)
+          : null);
+    const effectiveManualType = manualDiscountChanged
+      ? (manualDiscountResolved?.type ?? null)
+      : (existingRow?.manual_discount_type ?? null);
+    const effectiveManualValue = manualDiscountChanged
+      ? (manualDiscountResolved?.value ?? null)
+      : (existingRow?.manual_discount_value != null
+          ? Number(existingRow.manual_discount_value)
+          : null);
 
-    const taxAmount = Math.round(taxableAmount * TAX_RATE * 100) / 100;
-    const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
+    const totals = computeQuoteTotals({
+      items: effectiveItems,
+      mobileSurcharge: effectiveSurcharge,
+      couponDiscount: effectiveCouponDiscount,
+      loyaltyDiscount: effectiveLoyaltyDiscount,
+      manualDiscountType: effectiveManualType,
+      manualDiscountValue: effectiveManualValue,
+    });
 
-    update.subtotal = subtotal;
-    update.tax_amount = taxAmount;
-    update.total_amount = totalAmount;
+    update.subtotal = totals.subtotal;
+    update.tax_amount = totals.taxAmount;
+    update.total_amount = totals.totalAmount;
+  }
 
-    // Delete existing items and re-insert
+  // Items: delete existing + re-insert when supplied. Separate from the
+  // totals recompute above so a modifier-only PATCH doesn't touch the
+  // quote_items table.
+  if (hasItemsUpdate) {
     const { error: deleteErr } = await supabase
       .from('quote_items')
       .delete()
@@ -371,7 +437,7 @@ export async function updateQuote(
       throw new Error('Failed to update quote items');
     }
 
-    const newItems = data.items.map((item) => ({
+    const newItems = data.items!.map((item) => ({
       quote_id: quoteId,
       service_id: item.service_id || null,
       product_id: item.product_id || null,
@@ -782,6 +848,74 @@ function normalizeManualDiscount(data: ManualDiscountInput): {
 interface LoyaltyRedemptionInput {
   loyalty_points_to_redeem?: number | null;
   loyalty_discount?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// computeQuoteTotals — single writer-side total formula (Item 15g Layer 15g-v)
+// ---------------------------------------------------------------------------
+
+/**
+ * Inputs for the canonical writer-side quote-total formula. Mirrors the
+ * in-memory reducer math at `src/app/pos/context/quote-reducer.ts:45-62`
+ * and the convert-side modifier resolution at `convert-service.ts:79-105`
+ * so the persisted `quotes.total_amount` matches both:
+ *   1. The live total the operator sees in the POS quote builder.
+ *   2. The `appointments.total_amount` that convert-service eventually writes.
+ *
+ * Pre-Layer-15g-v writers wrote `subtotal + tax` with no modifier subtraction,
+ * leaving 17 of 18 readers (SMS link, email, PDF, public landing, voice
+ * agent, AI responder, analytics) displaying inflated pre-discount totals.
+ * See `docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md` for the full
+ * audit chain.
+ */
+interface QuoteTotalsInput {
+  items: Array<{ quantity: number; unit_price: number; product_id?: string | null }>;
+  mobileSurcharge: number;
+  couponDiscount?: number | null;
+  loyaltyDiscount?: number | null;
+  manualDiscountType?: 'dollar' | 'percent' | null;
+  manualDiscountValue?: number | null;
+}
+
+interface QuoteTotalsResult {
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+}
+
+function computeQuoteTotals(input: QuoteTotalsInput): QuoteTotalsResult {
+  const itemsSubtotal = input.items.reduce(
+    (sum, item) => sum + item.quantity * item.unit_price,
+    0
+  );
+  const subtotal = Math.round((itemsSubtotal + input.mobileSurcharge) * 100) / 100;
+
+  // Tax: applied to items with product_id (products taxable, services not).
+  // Mobile fee is NOT taxable (CDTFA Pub 100 — separately-stated delivery).
+  const taxableAmount = input.items.reduce((sum, item) => {
+    if (item.product_id) {
+      return sum + item.quantity * item.unit_price;
+    }
+    return sum;
+  }, 0);
+  const taxAmount = Math.round(taxableAmount * TAX_RATE * 100) / 100;
+
+  const coupon = Number(input.couponDiscount ?? 0) || 0;
+  const loyalty = Number(input.loyaltyDiscount ?? 0) || 0;
+  const manual =
+    resolveManualDiscountAmount(
+      input.manualDiscountType ?? null,
+      input.manualDiscountValue ?? null,
+      subtotal
+    ) ?? 0;
+  const totalDiscount = coupon + loyalty + manual;
+
+  const totalAmount = Math.max(
+    0,
+    Math.round((subtotal + taxAmount - totalDiscount) * 100) / 100
+  );
+
+  return { subtotal, taxAmount, totalAmount };
 }
 
 /**

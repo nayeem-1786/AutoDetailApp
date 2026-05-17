@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getBusinessInfo, type BusinessInfo } from '@/lib/data/business';
 import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
+import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 
 // --- Types -----------------------------------------------------------
 
@@ -33,6 +34,17 @@ interface QuoteData {
   is_mobile: boolean;
   mobile_surcharge: number | string | null;
   mobile_zone_name_snapshot: string | null;
+  // Item 15g Layer 15g-v — modifier columns drive the coupon / loyalty /
+  // manual-discount rows above the TOTAL line. Without these, the customer
+  // sees a smaller number (post-Fix-A) with no explanation of how it was
+  // reached.
+  coupon_code: string | null;
+  coupon_discount: number | string | null;
+  loyalty_points_to_redeem: number | null;
+  loyalty_discount: number | string | null;
+  manual_discount_type: 'dollar' | 'percent' | null;
+  manual_discount_value: number | string | null;
+  manual_discount_label: string | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -320,6 +332,28 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
       align: 'right',
     });
 
+    // Item 15g Layer 15g-v: modifier rows between Tax and TOTAL. Conditional
+    // per modifier; mirrors the operator UI's <QuoteTotals> ordering. The
+    // label column uses a wider width to fit "Coupon (CODE)" / "Loyalty (N
+    // pts)" / operator manual-label text.
+    const modifierRows = resolveQuoteModifierRows(quote);
+    if (modifierRows.length > 0) {
+      doc.font('Helvetica').fontSize(10).fillColor(darkText);
+      const modifierLabelX = totalsLabelX - 120; // wider label column for verbose labels
+      const modifierLabelWidth = 220;
+      for (const row of modifierRows) {
+        y += 16;
+        doc.text(`${row.label}:`, modifierLabelX, y, {
+          width: modifierLabelWidth,
+          align: 'right',
+        });
+        doc.text(`-${formatCurrency(row.amount)}`, totalsValueX, y, {
+          width: 70,
+          align: 'right',
+        });
+      }
+    }
+
     y += 22;
     // Total with emphasis
     doc
@@ -428,6 +462,9 @@ export async function GET(
         id, quote_number, status, subtotal, tax_amount, total_amount,
         valid_until, created_at, access_token,
         is_mobile, mobile_surcharge, mobile_zone_name_snapshot,
+        coupon_code, coupon_discount,
+        loyalty_points_to_redeem, loyalty_discount,
+        manual_discount_type, manual_discount_value, manual_discount_label,
         customer:customers(first_name, last_name, phone, email),
         vehicle:vehicles(year, make, model, color),
         items:quote_items(item_name, tier_name, quantity, unit_price, total_price)

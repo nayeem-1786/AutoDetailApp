@@ -111,6 +111,17 @@ const CONVERT_INPUT = {
   employee_id: null,
 };
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Post-Layer-15g-v fixture convention: `quote.total_amount` is now ALREADY
+// net of all modifiers (the writer in `quote-service.ts:computeQuoteTotals`
+// guarantees this). The previous test fixtures wrote `total_amount: 218`
+// across the board (pre-discount), simulating the OLD writer behavior that
+// `convert-service.ts` then defensively subtracted from. Layer 15g-v removed
+// that subtraction; fixtures now reflect what a post-fix writer would have
+// produced for each modifier combination. The assertion target — what lands
+// on `appointments.total_amount` — is unchanged.
+// ──────────────────────────────────────────────────────────────────────────────
+
 describe('convertQuote — Item 15g Layer 15g-i coupon propagation', () => {
   let inserts: InsertRecord[];
 
@@ -119,6 +130,7 @@ describe('convertQuote — Item 15g Layer 15g-i coupon propagation', () => {
   });
 
   it('writes coupon_code to the appointment when the quote has one', async () => {
+    // No modifier → writer's total_amount stays at subtotal + tax = 218.
     const quote = { ...BASE_QUOTE, coupon_code: 'SAVE25' };
     const supabase = makeSupabase({ quote, inserts });
 
@@ -158,12 +170,14 @@ describe('convertQuote — Item 15g Layer 15g-i coupon propagation', () => {
     expect(apptInsert!.row.discount_amount).toBe(0);
   });
 
-  it('subtracts the runtime coupon discount from total when present on the input quote', async () => {
-    // Forward-compatibility: if a caller (or Layer 15g-ii materialized
-    // `quotes.coupon_discount`) hydrates `quote.coupon.discount`, convert
-    // should reflect it in both `discount_amount` and `total_amount`.
+  it('writes the persisted coupon discount to discount_amount + total_amount on convert', async () => {
+    // Post-Layer-15g-v: the writer stores `total_amount` already net of
+    // the runtime coupon, so the fixture reflects that. Convert pulls the
+    // runtime `coupon.discount` for discount_amount provenance and trusts
+    // `quote.total_amount` for the final appointment total.
     const quote = {
       ...BASE_QUOTE,
+      total_amount: 193, // 218 - 25 (post-fix writer output)
       coupon_code: 'SAVE25',
       coupon: { discount: 25 },
     };
@@ -180,7 +194,7 @@ describe('convertQuote — Item 15g Layer 15g-i coupon propagation', () => {
     expect(apptInsert!.row.coupon_code).toBe('SAVE25');
     expect(apptInsert!.row.coupon_discount).toBe(25);
     expect(apptInsert!.row.discount_amount).toBe(25);
-    expect(apptInsert!.row.total_amount).toBe(193); // 218 - 25
+    expect(apptInsert!.row.total_amount).toBe(193);
   });
 });
 
@@ -204,6 +218,7 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
   it('propagates loyalty_points_to_redeem + loyalty_discount to the appointment', async () => {
     const quote = {
       ...BASE_QUOTE,
+      total_amount: 213, // 218 - 5 (post-Layer-15g-v writer output)
       loyalty_points_to_redeem: 100,
       loyalty_discount: 5, // 100 pts * $0.05 = $5
     };
@@ -220,12 +235,13 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     expect(apptInsert.row.loyalty_points_redeemed).toBe(100);
     expect(apptInsert.row.loyalty_discount).toBe(5);
     expect(apptInsert.row.discount_amount).toBe(5);
-    expect(apptInsert.row.total_amount).toBe(213); // 218 - 5
+    expect(apptInsert.row.total_amount).toBe(213); // matches persisted net
   });
 
   it('propagates manual-discount type=dollar + value + label to the appointment', async () => {
     const quote = {
       ...BASE_QUOTE,
+      total_amount: 188, // 218 - 30 (post-Layer-15g-v writer output)
       manual_discount_type: 'dollar' as const,
       manual_discount_value: 30,
       manual_discount_label: 'First-time customer',
@@ -242,13 +258,14 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     expect(apptInsert.row.manual_discount_value).toBe(30);
     expect(apptInsert.row.manual_discount_label).toBe('First-time customer');
     expect(apptInsert.row.discount_amount).toBe(30);
-    expect(apptInsert.row.total_amount).toBe(188); // 218 - 30
+    expect(apptInsert.row.total_amount).toBe(188);
   });
 
   it('propagates manual-discount type=percent — converts to dollar against subtotal', async () => {
     // 10% of $200 subtotal = $20 manual discount.
     const quote = {
       ...BASE_QUOTE,
+      total_amount: 198, // 218 - 20 (post-Layer-15g-v writer output)
       manual_discount_type: 'percent' as const,
       manual_discount_value: 10,
       manual_discount_label: 'Loyalty member',
@@ -265,7 +282,7 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     expect(apptInsert.row.manual_discount_value).toBe(20);
     expect(apptInsert.row.manual_discount_label).toBe('Loyalty member');
     expect(apptInsert.row.discount_amount).toBe(20);
-    expect(apptInsert.row.total_amount).toBe(198); // 218 - 20
+    expect(apptInsert.row.total_amount).toBe(198);
   });
 
   it('propagates persisted quotes.coupon_discount snapshot (preferred over runtime)', async () => {
@@ -273,6 +290,7 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     // coupon.discount is only a fallback for the immediate POS save path.
     const quote = {
       ...BASE_QUOTE,
+      total_amount: 178, // 218 - 40 (post-Layer-15g-v writer output)
       coupon_code: 'SAVE40',
       coupon_discount: 40,
     };
@@ -288,12 +306,13 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     expect(apptInsert.row.coupon_code).toBe('SAVE40');
     expect(apptInsert.row.coupon_discount).toBe(40);
     expect(apptInsert.row.discount_amount).toBe(40);
-    expect(apptInsert.row.total_amount).toBe(178); // 218 - 40
+    expect(apptInsert.row.total_amount).toBe(178);
   });
 
   it('combines all three modifiers — coupon + loyalty + manual — into discount_amount', async () => {
     const quote = {
       ...BASE_QUOTE,
+      total_amount: 173, // 218 - 45 (post-Layer-15g-v writer output)
       coupon_code: 'SAVE25',
       coupon_discount: 25,
       loyalty_points_to_redeem: 100,
@@ -317,7 +336,7 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     expect(apptInsert.row.manual_discount_value).toBe(15);
     expect(apptInsert.row.manual_discount_label).toBe('Cashier override');
     expect(apptInsert.row.discount_amount).toBe(45); // 25 + 5 + 15
-    expect(apptInsert.row.total_amount).toBe(173); // 218 - 45
+    expect(apptInsert.row.total_amount).toBe(173);
   });
 
   it('writes default zeros / nulls when no modifiers are set', async () => {
@@ -339,13 +358,16 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     expect(apptInsert.row.total_amount).toBe(218); // unchanged
   });
 
-  it('clamps total_amount to >= 0 when modifiers exceed quote total', async () => {
+  it('clamps total_amount to >= 0 when persisted quote total is exhausted by modifiers', async () => {
     // Defensive: a misconfigured manual discount equal-to-or-greater-than
     // subtotal must not produce a negative total on the appointment row.
+    // Post-Layer-15g-v: the writer's clamp ensures persisted `total_amount`
+    // is already 0 in this scenario; convert preserves it via its own
+    // defense-in-depth `Math.max(0, …)`.
     const quote = {
       ...BASE_QUOTE,
       subtotal: 50,
-      total_amount: 50,
+      total_amount: 0, // post-fix writer clamps when discount exceeds subtotal+tax
       manual_discount_type: 'dollar' as const,
       manual_discount_value: 200, // > subtotal; resolver clamps to subtotal=50
       manual_discount_label: 'Over-discount',
@@ -384,5 +406,106 @@ describe('convertQuote — Item 15g Layer 15g-ii modifier propagation', () => {
     const apptInsert = inserts.find((i) => i.table === 'appointments')!;
     expect(apptInsert.row.manual_discount_value).toBeNull();
     expect(apptInsert.row.manual_discount_label).toBeNull();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Item 15g Layer 15g-v regression — post-fix convert trusts the persisted
+// `quotes.total_amount` as net-of-modifiers (the writer now guarantees this
+// via `computeQuoteTotals`). The previous workaround in convert-service.ts
+// — `Number(quote.total_amount) - totalDiscount` — was removed; convert now
+// reads the persisted total directly with a defense-in-depth `Math.max(0, …)`
+// clamp. These tests pin the contract: for a modifier-bearing quote whose
+// writer-produced `total_amount` IS net, convert produces an
+// `appointments.total_amount` equal to that persisted net (no double-
+// subtraction).
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('convertQuote — Item 15g Layer 15g-v writer-trust contract', () => {
+  let inserts: InsertRecord[];
+
+  beforeEach(() => {
+    inserts = [];
+  });
+
+  it('appointment.total_amount equals persisted quotes.total_amount for coupon-only', async () => {
+    const quote = {
+      ...BASE_QUOTE,
+      total_amount: 193,
+      coupon_code: 'SAVE25',
+      coupon_discount: 25,
+    };
+    const supabase = makeSupabase({ quote, inserts });
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+    const apptInsert = inserts.find((i) => i.table === 'appointments')!;
+    expect(apptInsert.row.total_amount).toBe(193);
+  });
+
+  it('appointment.total_amount equals persisted quotes.total_amount for loyalty-only', async () => {
+    const quote = {
+      ...BASE_QUOTE,
+      total_amount: 213,
+      loyalty_points_to_redeem: 100,
+      loyalty_discount: 5,
+    };
+    const supabase = makeSupabase({ quote, inserts });
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+    const apptInsert = inserts.find((i) => i.table === 'appointments')!;
+    expect(apptInsert.row.total_amount).toBe(213);
+  });
+
+  it('appointment.total_amount equals persisted quotes.total_amount for combined modifiers (Q-0067-style)', async () => {
+    // Mirrors the audit's Q-0067 case at smaller numbers: subtotal $200,
+    // coupon $25 + loyalty $5 + manual $15 = $45 discount → net $173.
+    const quote = {
+      ...BASE_QUOTE,
+      total_amount: 173,
+      coupon_code: 'SAVE25',
+      coupon_discount: 25,
+      loyalty_points_to_redeem: 100,
+      loyalty_discount: 5,
+      manual_discount_type: 'dollar' as const,
+      manual_discount_value: 15,
+      manual_discount_label: 'Cashier override',
+    };
+    const supabase = makeSupabase({ quote, inserts });
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+    const apptInsert = inserts.find((i) => i.table === 'appointments')!;
+    expect(apptInsert.row.total_amount).toBe(173);
+  });
+
+  it('defense-in-depth: legacy pre-fix quote with stale pre-discount total clamps to non-negative', async () => {
+    // Edge case: a quote written BEFORE Layer 15g-v hasn't been auto-saved
+    // yet — its persisted `total_amount` is still pre-discount. Convert
+    // should still clamp the result to ≥ 0 even though it no longer
+    // subtracts modifiers itself. The number will be "wrong-ish" until the
+    // quote's next edit triggers a writer recompute (audit §5.5 watch-item),
+    // but it won't be negative.
+    const quote = {
+      ...BASE_QUOTE,
+      total_amount: -5, // hypothetical corrupt persisted value
+      coupon_code: 'SAVE25',
+      coupon_discount: 25,
+    };
+    const supabase = makeSupabase({ quote, inserts });
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+    const apptInsert = inserts.find((i) => i.table === 'appointments')!;
+    expect(apptInsert.row.total_amount).toBe(0);
   });
 });

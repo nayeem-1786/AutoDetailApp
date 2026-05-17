@@ -7,6 +7,7 @@ import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { AcceptQuoteButton } from './accept-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
+import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -316,6 +317,19 @@ export default async function PublicQuotePage({ params }: PageProps) {
                 </div>
               ) : null;
             })()}
+            {/* Item 15g Layer 15g-v: render coupon / loyalty / manual modifier
+                rows above the Total line. Conditional per modifier; matches
+                <QuoteTotals> ordering (coupon → loyalty → manual). Empty
+                when no modifier applied — receipt looks identical to the
+                pre-15g-v shape for unmodified quotes. */}
+            {resolveQuoteModifierRows(quote).map((row) => (
+              <div key={row.kind} className="flex justify-between text-sm">
+                <span className="text-green-500">{row.label}</span>
+                <span className="font-medium text-green-500">
+                  -{formatCurrency(row.amount)}
+                </span>
+              </div>
+            ))}
             <div className="flex justify-between border-t border-site-border pt-2">
               <span className="text-base font-semibold text-site-text">Total</span>
               <span className="text-lg font-bold text-site-text">

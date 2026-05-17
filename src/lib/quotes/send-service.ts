@@ -12,6 +12,10 @@ import {
   composeLineItems,
   type DisplayLineItem,
 } from '@/lib/utils/compose-line-items';
+import {
+  resolveQuoteModifierRows,
+  type QuoteModifierSource,
+} from './modifier-display';
 
 interface QuoteCustomer {
   id: string;
@@ -234,6 +238,40 @@ export async function sendQuote(
         // Pre-render items table for template variable
         const itemsTableHtml = buildItemsTableHtml(displayItems);
 
+        // Item 15g Layer 15g-v: build the composite modifier-block variable
+        // for the templated path. The default seeded `quote_sent` body
+        // (migration 20260517052147_quote_sent_template_modifier_block.sql)
+        // references `{quote_modifier_block}` between Tax and Total. The
+        // composite is markdown — each row is `**Label:** -$X.XX` on its
+        // own line, trailing newline so Total stays on its own line. Empty
+        // string when no modifier applies (clean output).
+        //
+        // We also expose 6 individual variables so an operator who
+        // customizes the template body can reference them by name in the
+        // admin editor. All passed as empty strings when missing so the
+        // renderer doesn't leave literal `{var}` placeholders behind.
+        const modifierRows = resolveQuoteModifierRows(quote);
+        const modifierBlock = modifierRows.length > 0
+          ? modifierRows
+              .map((r) => `**${r.label}:** -${formatCurrency(r.amount)}`)
+              .join('\n') + '\n'
+          : '';
+        const couponCodeVar = quote.coupon_code ?? '';
+        const couponDiscountVar =
+          quote.coupon_discount != null && Number(quote.coupon_discount) > 0
+            ? formatCurrency(Number(quote.coupon_discount))
+            : '';
+        const loyaltyPts = Number(quote.loyalty_points_to_redeem ?? 0);
+        const loyaltyDiscountNum = Number(quote.loyalty_discount ?? 0);
+        const loyaltyPtsVar = loyaltyPts > 0 ? String(loyaltyPts) : '';
+        const loyaltyDiscountVar =
+          loyaltyDiscountNum > 0 ? formatCurrency(loyaltyDiscountNum) : '';
+        const manualRow = modifierRows.find((r) => r.kind === 'manual');
+        const manualLabelVar = manualRow ? manualRow.label : '';
+        const manualDiscountVar = manualRow
+          ? formatCurrency(manualRow.amount)
+          : '';
+
         // Template-first
         const templated = await sendTemplatedEmail(customer.email, 'quote_sent', {
           first_name: customer.first_name,
@@ -245,6 +283,13 @@ export async function sendQuote(
           quote_subtotal: formatCurrency(quote.subtotal),
           quote_tax: formatCurrency(quote.tax_amount),
           quote_total: formatCurrency(quote.total_amount),
+          quote_modifier_block: modifierBlock,
+          quote_coupon_code: couponCodeVar,
+          quote_coupon_discount: couponDiscountVar,
+          quote_loyalty_pts: loyaltyPtsVar,
+          quote_loyalty_discount: loyaltyDiscountVar,
+          quote_manual_label: manualLabelVar,
+          quote_manual_discount: manualDiscountVar,
           validity_days: String(validityDays),
           vehicle_info: vehicleStr,
           items_table: itemsTableHtml,
@@ -456,7 +501,7 @@ function buildItemsTableHtml(items: DisplayLineItem[]): string {
 
 function buildEmailText(
   business: { name: string; address: string; phone: string },
-  quote: { quote_number: string; created_at: string; subtotal: number; tax_amount: number; total_amount: number },
+  quote: { quote_number: string; created_at: string; subtotal: number; tax_amount: number; total_amount: number } & QuoteModifierSource,
   customerName: string,
   vehicleStr: string,
   items: DisplayLineItem[],
@@ -468,6 +513,13 @@ function buildEmailText(
       (i) =>
         `  ${i.name}${i.tier_name ? ` (${i.tier_name})` : ''} x${i.quantity} — ${formatCurrency(i.total_price)}`
     )
+    .join('\n');
+
+  // Item 15g Layer 15g-v: modifier rows between Tax and Total. Empty
+  // string when no modifier applied (clean output — receipt reads the
+  // same as pre-15g-v for unmodified quotes).
+  const modifierLines = resolveQuoteModifierRows(quote)
+    .map((row) => `${row.label}: -${formatCurrency(row.amount)}`)
     .join('\n');
 
   return `Estimate from ${business.name}
@@ -482,7 +534,7 @@ Items:
 ${itemLines}
 
 Subtotal: ${formatCurrency(quote.subtotal)}
-Tax: ${formatCurrency(quote.tax_amount)}
+Tax: ${formatCurrency(quote.tax_amount)}${modifierLines ? `\n${modifierLines}` : ''}
 Total: ${formatCurrency(quote.total_amount)}
 
 View your estimate online:
@@ -495,7 +547,7 @@ Thank you for choosing ${business.name}!`;
 
 function buildEmailHtml(
   business: { name: string; address: string; phone: string },
-  quote: { quote_number: string; created_at: string; subtotal: number; tax_amount: number; total_amount: number },
+  quote: { quote_number: string; created_at: string; subtotal: number; tax_amount: number; total_amount: number } & QuoteModifierSource,
   customerName: string,
   vehicleStr: string,
   items: DisplayLineItem[],
@@ -591,6 +643,14 @@ function buildEmailHtml(
             <span class="email-text-muted" style="color: #6b7280;">Tax</span>
             <span class="email-text" style="font-weight: 500;">${formatCurrency(quote.tax_amount)}</span>
           </div>
+          ${resolveQuoteModifierRows(quote)
+            .map(
+              (row) => `<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="color: #059669;">${row.label}</span>
+            <span style="font-weight: 500; color: #059669;">-${formatCurrency(row.amount)}</span>
+          </div>`
+            )
+            .join('\n          ')}
           <div class="email-border" style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
             <span class="email-text" style="font-size: 18px; font-weight: 600; color: #1e3a5f;">Total</span>
             <span class="email-text" style="font-size: 18px; font-weight: 700; color: #1e3a5f;">${formatCurrency(quote.total_amount)}</span>

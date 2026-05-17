@@ -77,8 +77,18 @@ const QUOTE_VARS: VariableDefinition[] = [
   { key: 'quote_link', description: 'Link to view quote online', sample: 'https://smartdetails.com/quote/abc123' },
   { key: 'quote_subtotal', description: 'Quote subtotal', sample: '$450.00' },
   { key: 'quote_tax', description: 'Quote tax amount', sample: '$42.19' },
-  { key: 'quote_total', description: 'Quote total amount', sample: '$492.19' },
+  { key: 'quote_total', description: 'Quote total amount (net of all modifiers)', sample: '$417.19' },
   { key: 'validity_days', description: 'Quote validity in days', sample: '10' },
+  // Item 15g Layer 15g-v — modifier rendering. Default `quote_sent`
+  // template uses the composite `{quote_modifier_block}`; the 6 individual
+  // variables are exposed for operator-customized template bodies.
+  { key: 'quote_modifier_block', description: 'Pre-rendered modifier rows (coupon/loyalty/manual) — empty when none applied', sample: '**Coupon (SAVE25):** -$25.00\n**Loyalty (100 pts):** -$5.00\n' },
+  { key: 'quote_coupon_code', description: 'Coupon code applied to the quote (empty when none)', sample: 'SAVE25' },
+  { key: 'quote_coupon_discount', description: 'Coupon discount dollar amount (empty when none)', sample: '$25.00' },
+  { key: 'quote_loyalty_pts', description: 'Loyalty points redeemed (empty when none)', sample: '100' },
+  { key: 'quote_loyalty_discount', description: 'Loyalty discount dollar amount (empty when none)', sample: '$5.00' },
+  { key: 'quote_manual_label', description: 'Manual-discount operator label (empty when none)', sample: 'Cashier override' },
+  { key: 'quote_manual_discount', description: 'Manual discount dollar amount (empty when none)', sample: '$15.00' },
 ];
 
 const NOTIFICATION_VARS: VariableDefinition[] = [
@@ -155,8 +165,15 @@ export const EMAIL_VARIABLE_GROUPS = {
     quote_link: 'Link to view quote online',
     quote_subtotal: 'Quote subtotal',
     quote_tax: 'Quote tax amount',
-    quote_total: 'Quote total amount',
+    quote_total: 'Quote total amount (net of all modifiers)',
     validity_days: 'Quote validity in days',
+    quote_modifier_block: 'Pre-rendered modifier rows (coupon/loyalty/manual) — empty when none',
+    quote_coupon_code: 'Coupon code (empty when none)',
+    quote_coupon_discount: 'Coupon discount $ (empty when none)',
+    quote_loyalty_pts: 'Loyalty points redeemed (empty when none)',
+    quote_loyalty_discount: 'Loyalty discount $ (empty when none)',
+    quote_manual_label: 'Manual-discount label (empty when none)',
+    quote_manual_discount: 'Manual discount $ (empty when none)',
   },
   'Appointment Details': {
     appointment_date: 'Appointment date',

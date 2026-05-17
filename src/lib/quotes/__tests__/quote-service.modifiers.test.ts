@@ -369,3 +369,242 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
     expect(apptUpdate.patch.manual_discount_label).toBeNull();
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Item 15g Layer 15g-v regression — pins the writer-side `total_amount`
+// formula. createQuote + updateQuote now both compute
+//   total_amount = subtotal + tax_amount
+//                  − (coupon_discount + loyalty_discount + resolved_manual_discount),
+// clamped to ≥ 0. Pre-Layer-15g-v writers wrote `subtotal + tax` with no
+// modifier subtraction, leaving 17 of 18 readers (SMS link, email, PDF,
+// public landing, voice agent, AI responder, analytics) displaying
+// inflated pre-discount totals. The audit motivating this fix is
+// `docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md`.
+//
+// Both writers route through the canonical `computeQuoteTotals` helper so
+// the writer + the converter (`convert-service.ts`) + the in-memory POS
+// reducer (`quote-reducer.ts`) all produce the same number for the same
+// inputs.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
+  let inserts: InsertRecord[];
+
+  beforeEach(() => {
+    inserts = [];
+  });
+
+  // subtotal: 1 × $200 = $200, tax: 0 (service items only)
+  const NO_MOD_TOTAL = 200;
+
+  it('writes subtotal + tax when no modifiers (regression baseline)', async () => {
+    const supabase = makeSupabase({ inserts });
+    await createQuote(
+      supabase as Parameters<typeof createQuote>[0],
+      BASE_INSERT_INPUT as Parameters<typeof createQuote>[1]
+    );
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.subtotal).toBe(NO_MOD_TOTAL);
+    expect(quoteInsert.row.total_amount).toBe(NO_MOD_TOTAL);
+  });
+
+  it('subtracts coupon_discount from total_amount', async () => {
+    const supabase = makeSupabase({ inserts });
+    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+      ...BASE_INSERT_INPUT,
+      coupon_code: 'SAVE25',
+      coupon_discount: 25,
+    } as Parameters<typeof createQuote>[1]);
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.total_amount).toBe(175); // 200 - 25
+  });
+
+  it('subtracts loyalty_discount from total_amount', async () => {
+    const supabase = makeSupabase({ inserts });
+    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+      ...BASE_INSERT_INPUT,
+      loyalty_points_to_redeem: 100,
+      loyalty_discount: 5,
+    } as Parameters<typeof createQuote>[1]);
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.total_amount).toBe(195); // 200 - 5
+  });
+
+  it('subtracts manual_discount type=dollar from total_amount', async () => {
+    const supabase = makeSupabase({ inserts });
+    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+      ...BASE_INSERT_INPUT,
+      manual_discount_type: 'dollar',
+      manual_discount_value: 30,
+      manual_discount_label: 'First-time customer',
+    } as Parameters<typeof createQuote>[1]);
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.total_amount).toBe(170); // 200 - 30
+  });
+
+  it('resolves manual_discount type=percent against subtotal before subtracting', async () => {
+    // 10% of $200 = $20 manual discount
+    const supabase = makeSupabase({ inserts });
+    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+      ...BASE_INSERT_INPUT,
+      manual_discount_type: 'percent',
+      manual_discount_value: 10,
+      manual_discount_label: 'Loyalty member',
+    } as Parameters<typeof createQuote>[1]);
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.total_amount).toBe(180); // 200 - 20
+  });
+
+  it('combines all three modifiers: coupon + loyalty + manual', async () => {
+    // Mirrors Q-0067-style scenario at smaller numbers (audit subject).
+    const supabase = makeSupabase({ inserts });
+    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+      ...BASE_INSERT_INPUT,
+      coupon_code: 'SAVE25',
+      coupon_discount: 25,
+      loyalty_points_to_redeem: 100,
+      loyalty_discount: 5,
+      manual_discount_type: 'dollar',
+      manual_discount_value: 15,
+      manual_discount_label: 'Cashier override',
+    } as Parameters<typeof createQuote>[1]);
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.total_amount).toBe(155); // 200 - 45
+  });
+
+  it('clamps total_amount to >= 0 when modifiers exceed subtotal + tax', async () => {
+    // Defensive: oversized manual dollar discount must not produce a
+    // negative persisted total.
+    const supabase = makeSupabase({ inserts });
+    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+      ...BASE_INSERT_INPUT,
+      manual_discount_type: 'dollar',
+      manual_discount_value: 500, // > subtotal; resolveManualDiscountAmount clamps to 200
+      manual_discount_label: 'Over-discount',
+    } as Parameters<typeof createQuote>[1]);
+    const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
+    expect(quoteInsert.row.total_amount).toBe(0); // 200 - 200, clamped
+  });
+});
+
+describe('updateQuote — Item 15g Layer 15g-v total_amount recompute', () => {
+  let updates: UpdateRecord[];
+
+  beforeEach(() => {
+    updates = [];
+  });
+
+  it('does NOT recompute total when ONLY non-financial fields change', async () => {
+    // PATCH with notes only — formula inputs unchanged → no subtotal/tax/total
+    // touched in patch.
+    const supabase = makeSupabase({
+      existingQuote: { id: 'q-1', status: 'draft' },
+      updates,
+    });
+    await updateQuote(
+      supabase as Parameters<typeof updateQuote>[0],
+      'q-1',
+      { notes: 'just a note change' } as unknown as Parameters<typeof updateQuote>[2]
+    );
+    const apptUpdate = updates.find((u) => u.table === 'quotes')!;
+    expect('subtotal' in apptUpdate.patch).toBe(false);
+    expect('tax_amount' in apptUpdate.patch).toBe(false);
+    expect('total_amount' in apptUpdate.patch).toBe(false);
+  });
+
+  it('recomputes total_amount when modifier-only PATCH lands (lifts pre-15g-v items-guard)', async () => {
+    // Pre-15g-v, the recompute branch was gated behind `data.items` being
+    // supplied — so a modifier-only PATCH wrote stale totals. Auto-save in
+    // 15g-ii now hashes modifiers and PATCHes them without items, so the
+    // gate had to be lifted.
+    //
+    // Existing-row fetch returns the mock's existingQuote (no items, no
+    // mobile, no other modifiers); effective subtotal is 0, so the new
+    // total_amount = max(0, 0 + 0 - 25) = 0. The point of this assertion is
+    // that the recompute *fired* (total_amount key present), not that the
+    // value matches a specific number — the mock doesn't reproduce real
+    // existing-row data.
+    const supabase = makeSupabase({
+      existingQuote: { id: 'q-1', status: 'draft' },
+      updates,
+    });
+    await updateQuote(
+      supabase as Parameters<typeof updateQuote>[0],
+      'q-1',
+      { coupon_discount: 25 } as unknown as Parameters<typeof updateQuote>[2]
+    );
+    const apptUpdate = updates.find((u) => u.table === 'quotes')!;
+    expect('total_amount' in apptUpdate.patch).toBe(true);
+    expect('subtotal' in apptUpdate.patch).toBe(true);
+    expect('tax_amount' in apptUpdate.patch).toBe(true);
+  });
+
+  it('recomputes total_amount when loyalty-only PATCH lands', async () => {
+    const supabase = makeSupabase({
+      existingQuote: { id: 'q-1', status: 'draft' },
+      updates,
+    });
+    await updateQuote(
+      supabase as Parameters<typeof updateQuote>[0],
+      'q-1',
+      {
+        loyalty_points_to_redeem: 50,
+        loyalty_discount: 2.5,
+      } as unknown as Parameters<typeof updateQuote>[2]
+    );
+    const apptUpdate = updates.find((u) => u.table === 'quotes')!;
+    expect('total_amount' in apptUpdate.patch).toBe(true);
+  });
+
+  it('recomputes total_amount when manual-discount-only PATCH lands', async () => {
+    const supabase = makeSupabase({
+      existingQuote: { id: 'q-1', status: 'draft' },
+      updates,
+    });
+    await updateQuote(
+      supabase as Parameters<typeof updateQuote>[0],
+      'q-1',
+      {
+        manual_discount_type: 'percent',
+        manual_discount_value: 10,
+        manual_discount_label: 'Loyalty member',
+      } as unknown as Parameters<typeof updateQuote>[2]
+    );
+    const apptUpdate = updates.find((u) => u.table === 'quotes')!;
+    expect('total_amount' in apptUpdate.patch).toBe(true);
+  });
+
+  it('recomputes total_amount when items + all modifiers supplied (no DB fetch needed)', async () => {
+    // Full-replacement PATCH: all formula inputs supplied. Computed math
+    // is deterministic.
+    const supabase = makeSupabase({
+      existingQuote: { id: 'q-1', status: 'draft' },
+      updates,
+    });
+    await updateQuote(
+      supabase as Parameters<typeof updateQuote>[0],
+      'q-1',
+      {
+        items: [
+          {
+            service_id: '00000000-0000-0000-0000-000000000003',
+            item_name: 'Test Service',
+            quantity: 1,
+            unit_price: 300,
+          },
+        ],
+        is_mobile: false,
+        coupon_discount: 50,
+        loyalty_points_to_redeem: 100,
+        loyalty_discount: 5,
+        manual_discount_type: 'dollar',
+        manual_discount_value: 10,
+        manual_discount_label: 'Manager comp',
+      } as unknown as Parameters<typeof updateQuote>[2]
+    );
+    const apptUpdate = updates.find((u) => u.table === 'quotes')!;
+    expect(apptUpdate.patch.subtotal).toBe(300);
+    expect(apptUpdate.patch.tax_amount).toBe(0); // service items not taxable
+    expect(apptUpdate.patch.total_amount).toBe(235); // 300 - 50 - 5 - 10
+  });
+});

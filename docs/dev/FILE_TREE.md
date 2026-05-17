@@ -998,12 +998,20 @@ src/lib/products/barcode-lookup.ts          — Shared barcode/SKU lookup helper
 ### Quotes
 ```
 src/lib/quotes/convert-service.ts
-src/lib/quotes/quote-service.ts
-src/lib/quotes/send-service.ts
-src/lib/quotes/__tests__/convert-service.test.ts        # 11 tests — pins Layer 15g-i coupon_code propagation (3) + Layer 15g-ii full modifier propagation (loyalty + manual + coupon snapshot + over-discount clamp; 8)
-src/lib/quotes/__tests__/quote-service.modifiers.test.ts  # 13 tests — Layer 15g-ii createQuote+updateQuote modifier persistence: each-modifier-persists, partial collapse, percent>100 rejection, omitted-payload no-op, explicit-null clears column
+src/lib/quotes/quote-service.ts                          # Layer 15g-v: extracted `computeQuoteTotals` writer-side helper (canonical net-of-modifiers formula); updateQuote recomputes on modifier-only PATCHes (items-guard lifted)
+src/lib/quotes/send-service.ts                           # Layer 15g-v: templated email path passes composite `quote_modifier_block` + 6 individual modifier vars; HTML+text fallback renders modifier rows above Total
+src/lib/quotes/manual-discount.ts                        # Layer 15g-v: extracted pure resolver (`resolveManualDiscountAmount`) so client-bundle consumers reach it without dragging convert-side deps
+src/lib/quotes/modifier-display.ts                       # Layer 15g-v: shared `resolveQuoteModifierRows(quote)` consumed by all 5 receipt surfaces (public landing, email HTML, email text, PDF, POS quote-detail)
+src/lib/quotes/__tests__/convert-service.test.ts        # 15 tests — pins Layer 15g-i coupon_code propagation (3) + Layer 15g-ii full modifier propagation (8) + Layer 15g-v writer-trust contract (4: coupon-only / loyalty-only / Q-0067-combined / defense-in-depth clamp)
+src/lib/quotes/__tests__/quote-service.modifiers.test.ts  # 25 tests — Layer 15g-ii modifier persistence (13) + Layer 15g-v writer-side total_amount = net formula (12: createQuote single-modifier × 4 / combined / over-discount clamp; updateQuote recompute triggers + non-financial PATCH skip + full-replacement deterministic math)
+src/lib/quotes/__tests__/modifier-display.test.ts        # 19 tests — Layer 15g-v shared helper: empty / coupon w+wo discount / loyalty w+wo points / manual label fallback / percent resolution / dollar clamp / partial collapse / ordering / Supabase NUMERIC-as-string coercion
 src/lib/quotes/__tests__/derive-comm-pill.test.ts
-src/lib/quotes/__tests__/send-service.test.ts
+src/lib/quotes/__tests__/send-service.test.ts            # Extended in Layer 15g-v with 4 cases: templated path passes composite+individual modifier vars (populated + empty); fallback HTML+text contain modifier rows (populated + omitted)
+```
+
+### Migrations
+```
+supabase/migrations/20260517052147_quote_sent_template_modifier_block.sql   # Layer 15g-v: update seeded `quote_sent` email template body to render {quote_modifier_block} between Tax and Total; widen variables list with 7 new modifier-related variables. Guarded by `is_customized = false` to preserve operator-customized templates.
 ```
 
 ### Search

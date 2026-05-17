@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.8 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d+3e done; Layer 4 + Phase 1 pending); 15g Layers 15g-i + 15g-ii + 15g-iii done; 15g-v added (audit-driven, customer-facing fix); 15g-iv pending; Phase 1 (8a-8f) blocked behind 15g-v + 15g-iv
-**Last session updated:** 2026-05-16 — Layer 15g-v added (quote total_amount writer fix + 4-surface receipt modifier rendering) per docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md; reorder sequence: 15g-v lands before 15g-iv
+**Document version:** v2.9 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d+3e done; Layer 4 + Phase 1 pending); 15g Layers 15g-i + 15g-ii + 15g-iii + 15g-v done; 15g-iv pending; Phase 1 (8a-8f) blocked behind 15g-iv
+**Last session updated:** 2026-05-16 — Layer 15g-v landed: writer-side quote.total_amount now net (computeQuoteTotals helper); 5 receipt surfaces (public landing + email HTML+text + templated email + PDF + POS quote-detail) render coupon/loyalty/manual modifier rows; +35 tests; 0 schema migration besides quote_sent template update.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -1427,12 +1427,12 @@ any future code that might attempt to re-build a parallel picker.
 
 ### Item 15g — Lifecycle Persistence: Discount / Coupon / Loyalty Across Quote → Appointment → Job → Transaction
 
-- **Status:** Layers 15g-i + 15g-ii + 15g-iii done; Layer 15g-v not started (next, BEFORE 15g-iv); Layer 15g-iv not started; Phase 1 (8a-8f) blocked behind 15g-v + 15g-iv
+- **Status:** Layers 15g-i + 15g-ii + 15g-iii + 15g-v done (2026-05-16, 2026-05-17, 2026-05-17, 2026-05-16); Layer 15g-iv not started; Phase 1 (8a-8f) blocked behind 15g-iv
 - **Severity:** S1 (customer-promised concessions silently dropped today)
-- **Effort:** 6.5 sessions (~12-14 hours total, layered — 15g-i + 15g-ii + 15g-iii done; 15g-v + 15g-iv remaining)
+- **Effort:** 6.5 sessions (~12-14 hours total, layered — 15g-i + 15g-ii + 15g-iii + 15g-v done; 15g-iv remaining)
 - **Wave:** 1.5
 - **Depends on:** none — must land before Phase 1 (Item 15f Layers 8a-8f)
-- **Sequencing:** 15g-i + 15g-ii + 15g-iii done; 15g-v NEXT (~1-1.5 sessions); then 15g-iv (~1 session); then Phase 1 (5.5 sessions). Total remaining: ~8 sessions.
+- **Sequencing:** 15g-i + 15g-ii + 15g-iii + 15g-v done; 15g-iv NEXT (~1 session); then Phase 1 (5.5 sessions). Total remaining: ~6.5 sessions.
 
 **Problem statement:**
 
@@ -1525,6 +1525,14 @@ The chain is asymmetric — online booking flow works; POS-originated quote/walk
 
 **Notes / decisions log:**
 - 2026-05-16: UAT against Q-0067 (subtotal $1600, modifiers totaling $1598.70) surfaced both bugs. Per audit, BOTH fixes are required for correct UX. User selected sequential order (15g-v before 15g-iv before Phase 1) and no back-fill SQL.
+- 2026-05-16: **Layer 15g-v landed.** Both Fix A (writer correction) and Fix B (5-surface receipt rendering) shipped in a single session.
+  - **Fix A:** New canonical `computeQuoteTotals(input)` helper in `quote-service.ts` extracted; mirrors `quote-reducer.ts:45-62` and uses shared `resolveManualDiscountAmount` (extracted to new pure-utility `src/lib/quotes/manual-discount.ts` so client-bundle consumers reach it without dragging convert-side deps; `convert-service.ts` re-exports for backward compat). Both `createQuote` (`:134-170`) and `updateQuote` (`:344-361`) call the helper. `updateQuote` items-guard lifted — modifier-only PATCHes now trigger recompute by fetching existing items + modifier state when not supplied in the PATCH. `convert-service.ts:106-109` workaround removed; convert now trusts `quote.total_amount` directly with `Math.max(0, …)` clamp as defense-in-depth.
+  - **Fix B:** New shared `src/lib/quotes/modifier-display.ts` (`resolveQuoteModifierRows(quote)`) consumed by all 5 surfaces. Public landing (`page.tsx:288-326`), email HTML+text fallback (`send-service.ts:457-622`), templated email (composite `quote_modifier_block` + 6 individual variables, new seed migration `20260517052147_quote_sent_template_modifier_block.sql`), PDF (`pdf/route.ts:300-334`), POS quote-detail (`quote-detail.tsx:537-553`). SMS body unchanged per scope. Admin variable picker registers 7 new variables in `src/lib/email/variables.ts`.
+  - **Tests:** +35 (1285 → 1320). 12 createQuote/updateQuote writer assertions in `quote-service.modifiers.test.ts`; 4 new "writer-trust contract" cases + 11 fixture updates in `convert-service.test.ts`; new `modifier-display.test.ts` (+19); 4 send-service email-path assertions.
+  - **NO back-fill SQL** per user decision Q3 — existing modifier-bearing quotes self-heal on next auto-save (15g-ii auto-save hashes modifier columns).
+  - **Verification:** typecheck clean (0 new errors; 2 pre-existing test-file cast errors untouched). ESLint clean on touched files. Vitest 1320/1320 passing. Production build compiled successfully (`✓ Compiled successfully in 12.0s`).
+  - **Manual UAT deferred to user per session brief.** Detailed UAT plan in CHANGELOG entry: (1) Fix A — modifier-bearing quote SQL-check `total_amount = subtotal − discounts`; (2) Fix B per-surface — SMS link → public landing / email preview / PDF / POS detail all show modifier rows; (3) Negative case — no-modifier quote shows Subtotal + Tax + Total only.
+  - **Analytics watch-item** (audit §5.5): `getQuoteStats()` + customer-portal "Booked revenue" now report truthful (lower) numbers. Operator may notice a stat drop after deploy — that's the correctness landing, not a regression.
 
 **Layer 15g-iv — Booking wizard cleanup + tests:**
 - Migrate `api/book/route.ts` from `internal_notes` plaintext loyalty stop-gap to dedicated columns (already added in 15g-ii).

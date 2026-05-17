@@ -6,6 +6,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Item 15g Layer 15g-v: quote `total_amount` writer correction + receipt modifier rendering (S1 customer-facing)
+
+Closes the **customer-facing display gap** uncovered by UAT against shipped 15g-i + 15g-ii + 15g-iii. Two layered bugs per `docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md`:
+
+1. **Writer-side semantic bug.** `createQuote` + `updateQuote` wrote `quotes.total_amount = subtotal + tax` with NO modifier subtraction. Field name implies "final amount owed"; math stored is pre-discount. Layer 15g-ii added per-modifier columns but didn't update the formula. Q-0067 example: subtotal $1600, modifiers totalling $1598.70, persisted `total_amount = 1600.00`, customer-facing SMS / email / PDF / public landing all displayed $1,600 (wrong — actual amount owed was $1.30).
+2. **Receipt rendering gap.** 4 customer-facing surfaces (public landing, email HTML, email text, PDF) and 1 operator surface (POS quote-detail) showed Subtotal + Tax + Total only — no coupon / loyalty / manual rows. Even after Fix A so the total displays correctly, the customer would see a smaller number with no explanation of how it was reached.
+
+**Fix A — Writer correction:**
+
+- New canonical helper `computeQuoteTotals` in `src/lib/quotes/quote-service.ts` — mirrors `quote-reducer.ts:45-62` and uses the shared `resolveManualDiscountAmount` from the new `src/lib/quotes/manual-discount.ts` (extracted from `convert-service.ts`). Produces `subtotal`, `taxAmount`, `totalAmount = max(0, subtotal + tax − coupon − loyalty − resolved-manual)`.
+- `createQuote` now calls the helper for the insert payload.
+- `updateQuote` recomputes when ANY formula input changes (items, mobile, coupon, loyalty, manual) — pre-fix, the recompute was gated behind `data.items` so modifier-only PATCHes (the dominant edit path now that 15g-ii hashes modifiers in the auto-save) wrote stale totals. When inputs aren't fully supplied in the PATCH, we fetch existing items + modifier state from `quotes` and merge.
+- `convert-service.ts:106-109`: workaround removed. The old `Math.max(0, Number(quote.total_amount) - totalDiscount)` double-subtracted now that writers store net. Replaced with `Math.max(0, Number(quote.total_amount ?? 0))` — defense-in-depth clamp only.
+- Three writers now agree on the formula: in-memory POS reducer, persisted DB row (createQuote/updateQuote), and the convert path. CLAUDE.md Rule 22 spirit honored — single resolver, no parallel math.
+
+**Fix B — Receipt modifier rendering:**
+
+- New shared helper `src/lib/quotes/modifier-display.ts` — `resolveQuoteModifierRows(quote)` returns ordered `[coupon, loyalty, manual]` rows for whichever modifiers should render. Centralizes the "should render" conditional logic + the percent-to-dollar manual-discount resolution. `hasQuoteModifierRows(quote)` provided for surfaces that gate on emptiness. All 5 surfaces flow through this helper.
+- **Public quote landing** (`src/app/(public)/quote/[token]/page.tsx:288-326`): JSX block inserts modifier rows between Subtotal/Tax and Total. Each row matches existing site-theme green styling. Whole block absent when no modifier applied.
+- **Email HTML + text fallback** (`src/lib/quotes/send-service.ts buildEmailHtml + buildEmailText`): rows inserted in both the styled HTML totals block and the plain-text body. Conditional — no extra lines when no modifier applied.
+- **Email templated path** (`src/lib/quotes/send-service.ts:238-256`): widened the variable set passed to `sendTemplatedEmail`. New composite `quote_modifier_block` variable contains pre-rendered markdown with all conditional modifier rows; the seeded `quote_sent` template body references this between Tax and Total. Six individual variables (`quote_coupon_code`, `quote_coupon_discount`, `quote_loyalty_pts`, `quote_loyalty_discount`, `quote_manual_label`, `quote_manual_discount`) also exposed for operator-customized template bodies — all passed as empty strings when missing so the renderer doesn't leave literal `{var}` placeholders. New migration `20260517052147_quote_sent_template_modifier_block.sql` updates the seeded body + variables list, guarded by `is_customized = false` so operator customizations are preserved. Admin variable picker registers all 7 new variables in `src/lib/email/variables.ts`.
+- **PDF** (`src/app/api/quotes/[id]/pdf/route.ts:300-334`): widened SELECT to fetch modifier columns; new PDFKit drawing block inserts modifier rows between Tax and TOTAL with a wider label column to fit "Coupon (CODE)" / "Loyalty (N pts)" / operator manual labels.
+- **POS quote-detail** (`src/app/pos/components/quotes/quote-detail.tsx:537-553`): operator saved-quote review now shows modifier rows in green between Tax and Total. `QuoteData` type extended with modifier fields (the POS quotes GET endpoint already returns them via `SELECT *`).
+- SMS body **stays unchanged** (160-char limit; SMS hooks to the public landing page which now shows the breakdown).
+
+**Refactor — manual-discount resolver:**
+
+`resolveManualDiscountAmount` extracted from `convert-service.ts` to a new pure-utility module `src/lib/quotes/manual-discount.ts` so client-bundle consumers (modifier-display → POS quote-detail) can reach it without dragging convert-side dependencies (assign-detailer, fireWebhook) through the bundler. `convert-service.ts` re-exports it for backward compatibility — no breaking changes for existing import sites.
+
+**Tests** (+35 new, 1285 → 1320 total):
+
+- `quote-service.modifiers.test.ts` (+12): createQuote subtotal-only baseline, +coupon, +loyalty, +manual-dollar, +manual-percent, all-three, over-discount clamp; updateQuote modifier-only PATCH triggers recompute, loyalty-only PATCH, manual-only PATCH, full-replacement deterministic math, non-financial PATCH does NOT recompute.
+- `convert-service.test.ts` (+4 new + 11 fixture updates): existing tests' `quote.total_amount` fixtures updated to reflect post-fix writer output (already-net). New "Layer 15g-v writer-trust contract" suite: coupon-only / loyalty-only / Q-0067-style combined / defense-in-depth clamp for legacy pre-fix quote.
+- `modifier-display.test.ts` (new, +19): no modifiers → empty; coupon-with-code-and-positive-discount; coupon code without discount → omitted; loyalty with points + dollar OR dollar-only; manual operator label vs "Manual discount" fallback vs whitespace fallback; percent resolves against subtotal; dollar clamps to subtotal; partial collapse to null; ordered output; Supabase NUMERIC-as-string coercion; `hasQuoteModifierRows` truth table.
+- `send-service.test.ts` (+4): templated path passes composite + 6 individual variables when modifiers applied; passes empty strings when none; fallback HTML+text contain modifier rows when applied; fallback omits them entirely when none.
+
+**Per-session brief: NO one-shot back-fill SQL.** Existing modifier-bearing quotes with wrong persisted `total_amount` self-heal on next auto-save (Layer 15g-ii's auto-save hashes the modifier columns, so any edit re-triggers the writer). User decision Q3 in session brief.
+
+**Breaking-change watch items** (per audit §5.5):
+
+- **Analytics** (`getQuoteStats()`, customer-portal "Booked revenue") will show truthful (lower) numbers post-fix. Operator may notice "Booked revenue" stat dropped after deploy — that's the post-fix correctness landing. Release-note customers if needed.
+- **Stale customer-facing SMS history** still shows old (wrong) numbers in the SMS log, but the PDF / public landing / email re-render on every view so customers clicking yesterday's SMS link today see the correct numbers + the new modifier breakdown. Net improvement; minor inconsistency with stale SMS log acceptable.
+
+**Verification:** Typecheck — 0 new errors; pre-existing `quote-service.modifiers.test.ts` cast errors + `catalog-browser-custom-routing.test.tsx` cast error untouched. ESLint — clean on all touched files. Vitest — 1320/1320 passing (+35 new). Production build compiled successfully.
+
+**Manual UAT** (user verifies post-deploy):
+
+1. **Fix A:** Create a quote with coupon + loyalty + manual discount, save → SQL-check `total_amount = subtotal − coupon − loyalty − resolved-manual`. Open in POS quote builder → live total still computes correctly (no regression).
+2. **Fix B per surface:** Send the same quote → click SMS link → public landing shows modifier rows + correct total. Email preview → HTML + text both show modifier rows. Download PDF → modifier rows between Tax and TOTAL. POS quote-detail (saved-quote view) → operator sees the rows too.
+3. **Negative case:** Quote with NO modifiers → all 4 surfaces display only Subtotal + Tax + Total (no empty rows).
+
+---
+
 ## 2026-05-17 — Item 15g Layer 15g-iii: UI surfacing + checkout hydration for loyalty + manual-discount modifiers
 
 Closes the **operator-visibility** gap in the lifecycle-persistence chain. After Layers 15g-i + 15g-ii landed the data path (modifiers persist through Quote → Appointment → Job → Transaction), operators STILL couldn't see what was applied: the Admin Appointment dialog and the Jobs card "Services" tile rendered services + total but nothing about coupon / loyalty / manual discount. And `handleCheckout` only re-applied the coupon — loyalty + manual discount silently zeroed at the register every time.

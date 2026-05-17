@@ -2,7 +2,15 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { resolveManualDiscountAmount } from './manual-discount';
 import type { ConvertQuoteInput } from '@/lib/utils/validation';
+
+// Item 15g Layer 15g-v — re-export for backward compatibility. The function
+// originated here in Layer 15g-ii; extraction to a dedicated module lets
+// client-bundle consumers (`modifier-display.ts` → POS quote-detail) reach
+// the resolver without dragging convert-side dependencies through the
+// bundler.
+export { resolveManualDiscountAmount } from './manual-discount';
 
 type ConvertQuoteResult =
   | { success: true; appointment: unknown; serviceNames: string }
@@ -103,10 +111,15 @@ export async function convertQuote(
   const manualDiscountLabel = quote.manual_discount_label ?? null;
 
   const totalDiscount = couponDiscount + loyaltyDiscount + (manualDiscountValue ?? 0);
-  const finalTotal = Math.max(
-    0,
-    Number(quote.total_amount ?? 0) - totalDiscount
-  );
+  // Item 15g Layer 15g-v: writers now persist `quotes.total_amount` net of
+  // all modifiers (createQuote/updateQuote call `computeQuoteTotals`). The
+  // previous workaround here — `Number(quote.total_amount) - totalDiscount`
+  // — double-subtracted modifiers and is now removed. `Math.max(0, …)` is
+  // kept as defense-in-depth in case a legacy modifier-bearing quote with a
+  // pre-fix `total_amount` is converted before its next auto-save corrects
+  // the column (such quotes self-heal on next edit per the Layer 15g-ii
+  // auto-save hashing modifier columns).
+  const finalTotal = Math.max(0, Number(quote.total_amount ?? 0));
 
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
@@ -196,23 +209,3 @@ export async function convertQuote(
   return { success: true, appointment, serviceNames };
 }
 
-/**
- * Item 15g Layer 15g-ii — resolve the manual-discount dollar amount from
- * the quote's persisted (type, value, subtotal). Returns null when no
- * coherent manual discount is set. Mirrors the client-side reducer math
- * at `quote-reducer.ts` so the appointment receives the same dollar
- * amount the cashier saw at quote time.
- */
-function resolveManualDiscountAmount(
-  type: 'dollar' | 'percent' | null | undefined,
-  value: number | null | undefined,
-  subtotal: number
-): number | null {
-  if (!type || value == null || !(value > 0)) return null;
-  if (type === 'dollar') {
-    return Math.min(value, subtotal);
-  }
-  // percent
-  const pct = Math.min(value, 100);
-  return Math.round(((subtotal * pct) / 100) * 100) / 100;
-}

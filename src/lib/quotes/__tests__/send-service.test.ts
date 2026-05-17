@@ -239,3 +239,116 @@ describe('sendQuote — fatal early-exits keep prior shape', () => {
     expect('status' in result && result.status).toBe(404);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Item 15g Layer 15g-v — pins modifier rendering on the customer-facing
+// email (both templated path + fallback HTML/text). Coupon / loyalty /
+// manual rows appear above the Total line when the persisted modifier
+// columns are populated; receipt looks identical to pre-15g-v for
+// unmodified quotes. Audit: §2 (4 customer-facing surfaces missed
+// modifier rows pre-fix).
+// ──────────────────────────────────────────────────────────────────────────────
+
+const MODIFIER_QUOTE = {
+  ...BASE_QUOTE,
+  subtotal: 200,
+  tax_amount: 0,
+  total_amount: 155, // 200 - 25 - 5 - 15
+  coupon_code: 'SAVE25',
+  coupon_discount: 25,
+  loyalty_points_to_redeem: 100,
+  loyalty_discount: 5,
+  manual_discount_type: 'dollar' as const,
+  manual_discount_value: 15,
+  manual_discount_label: 'Cashier override',
+};
+
+describe('sendQuote — Layer 15g-v modifier rendering (templated email path)', () => {
+  it('passes composite quote_modifier_block + 6 individual modifier variables to sendTemplatedEmail', async () => {
+    const { supabase } = makeSupabase({ quote: MODIFIER_QUOTE });
+    await sendQuote(supabase as never, 'quote-1', 'email');
+
+    expect(sendTemplatedEmail).toHaveBeenCalledOnce();
+    const vars = vi.mocked(sendTemplatedEmail).mock.calls[0][2] as Record<
+      string,
+      string
+    >;
+    // Composite block — each row on its own line + trailing newline so
+    // **Total** stays separate.
+    expect(vars.quote_modifier_block).toContain('**Coupon (SAVE25):** -$25.00');
+    expect(vars.quote_modifier_block).toContain('**Loyalty (100 pts):** -$5.00');
+    expect(vars.quote_modifier_block).toContain('**Cashier override:** -$15.00');
+    expect(vars.quote_modifier_block?.endsWith('\n')).toBe(true);
+
+    // Individual variables exposed for operator-customized template bodies.
+    expect(vars.quote_coupon_code).toBe('SAVE25');
+    expect(vars.quote_coupon_discount).toBe('$25.00');
+    expect(vars.quote_loyalty_pts).toBe('100');
+    expect(vars.quote_loyalty_discount).toBe('$5.00');
+    expect(vars.quote_manual_label).toBe('Cashier override');
+    expect(vars.quote_manual_discount).toBe('$15.00');
+  });
+
+  it('passes empty strings for modifier variables when no modifier applied', async () => {
+    const { supabase } = makeSupabase({ quote: BASE_QUOTE });
+    await sendQuote(supabase as never, 'quote-1', 'email');
+
+    const vars = vi.mocked(sendTemplatedEmail).mock.calls[0][2] as Record<
+      string,
+      string
+    >;
+    // Empty composite — template renders Subtotal/Tax/Total only.
+    expect(vars.quote_modifier_block).toBe('');
+    // Individual vars empty so renderer doesn't leave literal `{var}` in output.
+    expect(vars.quote_coupon_code).toBe('');
+    expect(vars.quote_coupon_discount).toBe('');
+    expect(vars.quote_loyalty_pts).toBe('');
+    expect(vars.quote_loyalty_discount).toBe('');
+    expect(vars.quote_manual_label).toBe('');
+    expect(vars.quote_manual_discount).toBe('');
+  });
+});
+
+describe('sendQuote — Layer 15g-v modifier rendering (fallback HTML + text)', () => {
+  // Force the fallback path by making sendTemplatedEmail return
+  // usedTemplate: false so sendEmail(htmlBody, textBody) is called instead.
+  it('fallback path includes modifier rows in BOTH html + text bodies when modifiers applied', async () => {
+    vi.mocked(sendTemplatedEmail).mockResolvedValueOnce({
+      usedTemplate: false,
+      success: false,
+    } as never);
+    const { supabase } = makeSupabase({ quote: MODIFIER_QUOTE });
+    await sendQuote(supabase as never, 'quote-1', 'email');
+
+    expect(sendEmail).toHaveBeenCalledOnce();
+    const [, , textBody, htmlBody] = vi.mocked(sendEmail).mock.calls[0];
+    // Text body — plain-text rows between Tax and Total.
+    expect(textBody).toContain('Coupon (SAVE25): -$25.00');
+    expect(textBody).toContain('Loyalty (100 pts): -$5.00');
+    expect(textBody).toContain('Cashier override: -$15.00');
+    // HTML body — display:flex rows with the modifier label + amount.
+    expect(htmlBody).toContain('Coupon (SAVE25)');
+    expect(htmlBody).toContain('-$25.00');
+    expect(htmlBody).toContain('Loyalty (100 pts)');
+    expect(htmlBody).toContain('-$5.00');
+    expect(htmlBody).toContain('Cashier override');
+    expect(htmlBody).toContain('-$15.00');
+  });
+
+  it('fallback path omits modifier rows entirely when no modifier applied', async () => {
+    vi.mocked(sendTemplatedEmail).mockResolvedValueOnce({
+      usedTemplate: false,
+      success: false,
+    } as never);
+    const { supabase } = makeSupabase({ quote: BASE_QUOTE });
+    await sendQuote(supabase as never, 'quote-1', 'email');
+
+    const [, , textBody, htmlBody] = vi.mocked(sendEmail).mock.calls[0];
+    // No "Coupon"/"Loyalty"/manual labels anywhere in the bodies.
+    expect(textBody).not.toContain('Coupon');
+    expect(textBody).not.toContain('Loyalty');
+    // HTML body still has Subtotal/Tax/Total; modifier rows absent.
+    expect(htmlBody).not.toContain('Coupon (');
+    expect(htmlBody).not.toContain('Loyalty (');
+  });
+});

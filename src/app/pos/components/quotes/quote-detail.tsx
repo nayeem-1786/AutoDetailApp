@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
+import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 import {
   deriveCommPillState,
   type CommPillTone,
@@ -66,6 +67,16 @@ interface QuoteData {
   is_mobile?: boolean;
   mobile_surcharge?: number | string | null;
   mobile_zone_name_snapshot?: string | null;
+  // Item 15g Layer 15g-v — modifier columns drive the coupon / loyalty /
+  // manual-discount rows in the saved-quote review surface. The POS
+  // quotes GET endpoint returns these via `SELECT *`.
+  coupon_code?: string | null;
+  coupon_discount?: number | string | null;
+  loyalty_points_to_redeem?: number | null;
+  loyalty_discount?: number | string | null;
+  manual_discount_type?: 'dollar' | 'percent' | null;
+  manual_discount_value?: number | string | null;
+  manual_discount_label?: string | null;
   customer: {
     id: string;
     first_name: string;
@@ -546,6 +557,19 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                   <span className="tabular-nums">{formatCurrency(quote.tax_amount)}</span>
                 </div>
               )}
+              {/* Item 15g Layer 15g-v: coupon / loyalty / manual modifier
+                  rows between Tax and Total. Conditional per modifier;
+                  green styling matches operator UI <QuoteTotals> intent
+                  (savings to customer). */}
+              {resolveQuoteModifierRows(quote).map((row) => (
+                <div
+                  key={row.kind}
+                  className="flex justify-between text-sm text-green-600 dark:text-green-400"
+                >
+                  <span>{row.label}</span>
+                  <span className="tabular-nums">-{formatCurrency(row.amount)}</span>
+                </div>
+              ))}
               <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-2 text-base font-semibold text-gray-900 dark:text-gray-100">
                 <span>Total</span>
                 <span className="tabular-nums">{formatCurrency(quote.total_amount)}</span>
