@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.2 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d done; Phase 1 / Layer 4 pending); 15g Layer 15g-i landed (MVP coupon-only persistence); 15g Layers 15g-ii/iii/iv still pending (must land before Phase 1 layers 8a-8f).
-**Last session updated:** 2026-05-16 — Item 15g Layer 15g-i landed: MVP coupon-only persistence chain fix (convert-service.ts coupon propagation + checkout-items appointment fallback). Closes ~70% of operator-reported lifecycle-persistence bug; no schema changes. Layer 15g-ii (schema migration + loyalty/manual-discount propagation) is the next sequential session.
+**Document version:** v2.3 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3c+3d done, Layer 3a-i partial; Layer 3e + Phase 1 + Layer 4 pending); 15g Layer 15g-i landed; 15g-ii/iii/iv pending (15g-ii must land before Phase 1)
+**Last session updated:** 2026-05-16 — Layer 3e added to Item 15f (system-wide custom-pricing fix discovered via UAT); parallel with Layer 15g-ii; both must land before Phase 1
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -782,9 +782,9 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 ### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
 
-- **Status:** Layers 1+2+3c+3d done; Layer 3a partial — POS Jobs card migrated (2026-05-16); Admin Appointment dialog migration deferred pending `<CatalogBrowser>` POS-context decoupling (see Notes/decisions log). Layer 4 not started.
+- **Status:** Layers 1+2+3c+3d done; Layer 3a-i partial (Jobs card migrated, pending revert in Phase 1 Layer 8e); Layers 3e + 4 + Phase 1 (8a-8f) not started. Layer 3e + Item 15g Layer 15g-ii are parallel prerequisites for Phase 1.
 - **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
-- **Effort:** 5-6 sessions (~10-14 hours total, layered)
+- **Effort:** 5.5-7 sessions (~11-16 hours total, layered) — Layer 3e adds ~0.5-1 session
 - **Wave:** 1.5
 - **Depends on:** none — must land before Item 15e
 
@@ -977,6 +977,50 @@ they're the persistence layer that Phase 1 routes call.
   `custom_starting_price` as the surfaced price (until Layer 2's prompt UX
   is exposed via this path).
 
+**Layer 3e — Wire `<CustomPriceDialog>` into shared `<CatalogBrowser>` ecosystem (system-wide custom-pricing fix):**
+
+UAT against shipped Layer 3c (customer-facing booking wizard) passed. UAT
+against `<CatalogBrowser>` in POS revealed that the "Add to Ticket" button
+is **disabled for `pricing_model === 'custom'` services across all 4 native
+consumers**: POS New Quote builder, POS New Sale (Register), Item 15a's
+`<EditServicesModal>` (Admin appointment edit), and Layer 3a-i's
+`<EditServicesDialog>` (Jobs card edit, currently shipped). Trying to add
+Flood Damage / Mold Extraction (`pricing_model: 'custom'`,
+`custom_starting_price: 475.00`) results in a greyed-out button — operator
+cannot add the service.
+
+Root cause: Layer 2 (commit `3195c38c`) shipped `<CustomPriceDialog>` and
+wired it into the `useServicePicker` hook. The hook is only mounted on
+surfaces migrated through Layer 3a-i (Jobs card). The 4 native
+`<CatalogBrowser>` consumers call `<CatalogBrowser>` (and its child
+`<ServiceDetailDialog>` / `<ServicePricingPicker>`) directly and never go
+through the hook, so they don't get Layer 2's `custom`-pricing UX.
+
+Layer 3e wires `<CustomPriceDialog>` into the shared catalog browser ecosystem
+so all 4 native consumers benefit without each having to mount the hook.
+Likely insertion point: the shared ancestor of the 4 consumers — either
+`<ServiceDetailDialog>` (the intermediate "Add to Ticket" dialog) or
+`<CatalogBrowser>` itself, whichever is the natural ancestor across all
+4 surfaces. Routing logic reuses `routeServiceTap` from `picker-engine.ts`
+(already returns `open-custom-price-dialog` for `pricing_model === 'custom'`).
+
+- Identify the right insertion point — likely `<ServiceDetailDialog>` or
+  `<CatalogBrowser>`, whichever is the shared ancestor of all 4 consumers.
+- Wire the existing `<CustomPriceDialog>` + `buildCustomPricing` helper from
+  `src/lib/services/custom-price-dialog.tsx` into that insertion point.
+- Route `pricing_model === 'custom'` taps through `<CustomPriceDialog>` and
+  emit the synthesized `ServicePricing` row via the existing callback path
+  (`onAddService` for the quote builder; `dispatch({ type: 'ADD_SERVICE', ... })`
+  for the Sale tab).
+- New tests pin the routing: `pricing_model === 'custom'` opens the dialog;
+  confirm emits the synthesized row; cancel emits nothing; "Add to Ticket"
+  is no longer disabled for Flood Damage / Mold Extraction.
+
+**Effort: ~0.5-1 session.** Sequencing: parallel with Item 15g Layer 15g-ii
+(no file overlap — 3e touches POS catalog UI; 15g-ii touches quotes /
+appointments persistence). BOTH Layer 3e AND Layer 15g-ii must land before
+Phase 1 (Layers 8a-8f) can start.
+
 **Layer 3b — PERMANENTLY MOOT.** The original plan (migrate the 4 working
 POS surfaces — POS Register, Quote Builder, Flag-an-Issue, Catalog Panel —
 to the `useServicePicker` hook) becomes moot under the edit-via-POS pivot
@@ -1023,6 +1067,16 @@ any future code that might attempt to re-build a parallel picker.
 - New (Layer 3d): `src/lib/services/__tests__/service-resolver.test.ts`
   (test the bug fixes: exotic/classic size_classes, per_unit quantity,
   specialty tier matching, custom service starting price)
+- Modified (Layer 3e): `src/app/pos/components/catalog-browser.tsx` (or
+  whichever shared ancestor owns the "Add to Ticket" routing for custom
+  services across the 4 native consumers)
+- Modified (Layer 3e): `src/app/pos/components/service-detail-dialog.tsx`
+  (if it's the intermediate dialog that gates "Add to Ticket" — confirm
+  insertion point during the session)
+- New (Layer 3e): `src/lib/services/__tests__/custom-pricing-routing.test.tsx`
+  (or extend existing `<CatalogBrowser>` / `<ServiceDetailDialog>` test
+  files — pin that `pricing_model === 'custom'` taps now open
+  `<CustomPriceDialog>` instead of leaving the Add button disabled)
 - New (Layer 4): `eslint-rules/services-no-bespoke-pricing.js`
 - Modified (Layer 4): `eslint.config.mjs` to register the rule
 
@@ -1301,6 +1355,14 @@ any future code that might attempt to re-build a parallel picker.
   (golden path: customer books a classic vehicle service through the
   wizard and sees $725 surface; per_unit qty stepper math; custom
   service displays starting price label).
+- 2026-05-16: UAT against shipped Layer 3c discovered Layer 2's
+  `<CustomPriceDialog>` isn't wired into native `<CatalogBrowser>`
+  consumers (POS New Quote, POS New Sale, Item 15a's modal, Layer 3a-i's
+  dialog). Custom-pricing services (e.g., Flood Damage / Mold Extraction)
+  cannot be added — "Add to Ticket" button disabled. Layer 3e scoped to
+  wire it into the shared catalog browser ecosystem so all 4 consumers
+  benefit. Effort: ~0.5-1 session. Sequence: parallel with Layer 15g-ii;
+  both must land before Phase 1.
 
 ---
 
