@@ -246,14 +246,28 @@ export async function GET(
     // online-booking-leaks-at-checkout gap (booking wizard writes
     // `appointments.coupon_code` but `job.quote_id` is NULL for online-booked
     // jobs) AND the future case where a POS-converted appointment loses its
-    // `quote_id` bridge for any reason. Layer 15g-ii will additionally surface
-    // `coupon_discount` here for display.
+    // `quote_id` bridge for any reason.
+    //
+    // Item 15g Layer 15g-ii: extends the appointment SELECT to include
+    // loyalty + manual-discount + coupon_discount snapshot. Returns them
+    // in the response so `handleCheckout` in `pos/jobs/page.tsx` can dispatch
+    // `SET_LOYALTY_REDEEM` + `APPLY_MANUAL_DISCOUNT` after `RESTORE_TICKET`
+    // (Layer 15g-iii wires the dispatches; this layer makes the data
+    // available). All four are nullable in the response so the client can
+    // distinguish "modifier not set" from "modifier is zero."
     let deposit_amount = 0;
     let deposit_date: string | null = null;
+    let coupon_discount: number | null = null;
+    let loyalty_points_redeemed: number | null = null;
+    let loyalty_discount: number | null = null;
+    let manual_discount_value: number | null = null;
+    let manual_discount_label: string | null = null;
     if (job.appointment_id) {
       const { data: appt } = await supabase
         .from('appointments')
-        .select('payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot, coupon_code')
+        .select(
+          'payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot, coupon_code, coupon_discount, loyalty_points_redeemed, loyalty_discount, manual_discount_value, manual_discount_label'
+        )
         .eq('id', job.appointment_id)
         .single();
 
@@ -263,6 +277,26 @@ export async function GET(
       // discount value is re-derived at hydration time.
       if (!coupon_code && appt?.coupon_code) {
         coupon_code = appt.coupon_code;
+      }
+
+      // Item 15g Layer 15g-ii — surface all modifier snapshots regardless of
+      // whether the coupon came from the quote-side or appointment-side. The
+      // appointment row is authoritative for the snapshot; the quote bridge
+      // is only used for code re-validation.
+      if (appt) {
+        coupon_discount =
+          appt.coupon_discount != null ? Number(appt.coupon_discount) : null;
+        loyalty_points_redeemed =
+          appt.loyalty_points_redeemed != null
+            ? Number(appt.loyalty_points_redeemed)
+            : null;
+        loyalty_discount =
+          appt.loyalty_discount != null ? Number(appt.loyalty_discount) : null;
+        manual_discount_value =
+          appt.manual_discount_value != null
+            ? Number(appt.manual_discount_value)
+            : null;
+        manual_discount_label = appt.manual_discount_label ?? null;
       }
 
       // Synthesize mobile_fee line when appointment is mobile and the line
@@ -378,6 +412,14 @@ export async function GET(
         vehicle: job.vehicle,
         items,
         coupon_code,
+        // Item 15g Layer 15g-ii — modifier snapshot from the linked
+        // appointment. Layer 15g-iii will wire the client to dispatch
+        // SET_LOYALTY_REDEEM + APPLY_MANUAL_DISCOUNT off these fields.
+        coupon_discount,
+        loyalty_points_redeemed,
+        loyalty_discount,
+        manual_discount_value,
+        manual_discount_label,
         deposit_amount,
         deposit_date,
         prior_payments,

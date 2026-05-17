@@ -182,6 +182,18 @@ export async function POST(request: NextRequest) {
       mobile_surcharge: rawMobileSurcharge,
       mobile_zone_name_snapshot: rawMobileLabel,
       is_custom: rawIsCustom,
+      // Item 15g Layer 15g-ii — modifier snapshot from the quote → POS
+      // walk-in path. quote-ticket-panel's handleCreateJob forwards these
+      // alongside services + mobile fields. All optional + nullable for
+      // backward compatibility with older clients / true walk-ins that
+      // never applied a modifier.
+      coupon_code: rawCouponCode,
+      coupon_discount: rawCouponDiscount,
+      loyalty_points_to_redeem: rawLoyaltyPoints,
+      loyalty_discount: rawLoyaltyDiscount,
+      manual_discount_type: rawManualType,
+      manual_discount_value: rawManualValue,
+      manual_discount_label: rawManualLabel,
     } = body as {
       customer_id: string;
       vehicle_id?: string;
@@ -200,6 +212,13 @@ export async function POST(request: NextRequest) {
       // (false) from "cashier chose Custom" (true). Optional + defaults to
       // false for backward compat with older clients.
       is_custom?: boolean;
+      coupon_code?: string | null;
+      coupon_discount?: number | null;
+      loyalty_points_to_redeem?: number | null;
+      loyalty_discount?: number | null;
+      manual_discount_type?: 'dollar' | 'percent' | null;
+      manual_discount_value?: number | null;
+      manual_discount_label?: string | null;
     };
 
     if (!customer_id) {
@@ -339,7 +358,25 @@ export async function POST(request: NextRequest) {
     const apptStartTime = pstTimeExact; // HH:MM:SS PST
     const apptEndTime = addMinutesToTime(apptStartTime.slice(0, 5), 60) + ':00';
     const servicesTotal = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
-    const appointmentTotal = servicesTotal + mobileSurcharge;
+    const appointmentSubtotal = servicesTotal + mobileSurcharge;
+
+    // Item 15g Layer 15g-ii — modifier snapshot for the synthetic walk-in
+    // appointment. quote-ticket-panel's handleCreateJob forwards these from
+    // the converted quote so the appointment carries the same loyalty +
+    // manual-discount + coupon snapshot the operator saw at quote time.
+    // A pure walk-in (no quote bridge) sends all null and the appointment
+    // gets safe defaults (0 / NULL).
+    const couponDiscount = Number(rawCouponDiscount ?? 0) || 0;
+    const loyaltyPoints = Number(rawLoyaltyPoints ?? 0) || 0;
+    const loyaltyDiscount = Number(rawLoyaltyDiscount ?? 0) || 0;
+    const manualDiscountValue = resolveManualDiscountAmount(
+      rawManualType ?? null,
+      Number(rawManualValue ?? 0) || null,
+      appointmentSubtotal
+    );
+    const manualDiscountLabel = (rawManualLabel ?? null)?.toString().trim() || null;
+    const totalDiscount = couponDiscount + loyaltyDiscount + (manualDiscountValue ?? 0);
+    const appointmentTotal = Math.max(0, appointmentSubtotal - totalDiscount);
 
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
@@ -358,14 +395,20 @@ export async function POST(request: NextRequest) {
         mobile_surcharge: mobileSurcharge,
         mobile_zone_name_snapshot: mobileZoneNameSnapshot,
         payment_status: 'pending',
-        subtotal: appointmentTotal,
+        subtotal: appointmentSubtotal,
         tax_amount: 0,
-        discount_amount: 0,
+        discount_amount: totalDiscount,
         total_amount: appointmentTotal,
         payment_type: 'pay_on_site',
         deposit_amount: null,
         job_notes: notes || null,
         internal_notes: null,
+        coupon_code: rawCouponCode ?? null,
+        coupon_discount: couponDiscount || null,
+        loyalty_points_redeemed: loyaltyPoints,
+        loyalty_discount: loyaltyDiscount,
+        manual_discount_value: manualDiscountValue,
+        manual_discount_label: manualDiscountValue !== null ? manualDiscountLabel : null,
       })
       .select('id')
       .single();
@@ -488,4 +531,23 @@ export async function POST(request: NextRequest) {
     console.error('Job create route error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+/**
+ * Item 15g Layer 15g-ii — resolve the manual-discount dollar amount from
+ * a (type, value, subtotal) triple. Mirrors `convert-service.ts` and the
+ * client-side reducer math so the synthetic walk-in appointment receives
+ * the same dollar value the cashier saw at quote / register time.
+ */
+function resolveManualDiscountAmount(
+  type: 'dollar' | 'percent' | null | undefined,
+  value: number | null | undefined,
+  subtotal: number
+): number | null {
+  if (!type || value == null || !(value > 0)) return null;
+  if (type === 'dollar') {
+    return Math.min(value, subtotal);
+  }
+  const pct = Math.min(value, 100);
+  return Math.round(((subtotal * pct) / 100) * 100) / 100;
 }

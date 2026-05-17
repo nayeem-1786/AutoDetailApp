@@ -661,6 +661,21 @@ const quoteMobileFields = {
   is_custom: z.boolean().optional(),
 };
 
+// Item 15g Layer 15g-ii — modifier snapshot fields persisted on quotes.
+// All optional + nullable so callers that don't care about modifiers
+// (legacy clients, voice-agent createQuote, etc.) keep working unchanged.
+// Coherence between (type, value, label) and (points, discount) is enforced
+// at the DB layer via quotes_manual_discount_coherent + quotes_loyalty_coherent
+// CHECK constraints.
+const quoteModifierFields = {
+  coupon_discount: z.coerce.number().min(0).optional().nullable(),
+  loyalty_points_to_redeem: z.coerce.number().int().min(0).optional().nullable(),
+  loyalty_discount: z.coerce.number().min(0).optional().nullable(),
+  manual_discount_type: z.enum(['dollar', 'percent']).optional().nullable(),
+  manual_discount_value: z.coerce.number().min(0).optional().nullable(),
+  manual_discount_label: optionalString,
+};
+
 export const createQuoteSchema = z.object({
   customer_id: z.string().uuid().nullable().optional(),
   vehicle_id: z.string().uuid().optional().nullable(),
@@ -670,6 +685,7 @@ export const createQuoteSchema = z.object({
   status: z.enum(['draft', 'converted']).optional(),
   coupon_code: optionalString,
   ...quoteMobileFields,
+  ...quoteModifierFields,
 });
 
 export const updateQuoteSchema = z.object({
@@ -681,6 +697,7 @@ export const updateQuoteSchema = z.object({
   status: z.enum(['draft', 'sent', 'viewed', 'accepted', 'expired', 'converted']).optional(),
   coupon_code: optionalString,
   ...quoteMobileFields,
+  ...quoteModifierFields,
 });
 
 export const convertSchema = z.object({

@@ -169,3 +169,110 @@ describe('GET /api/pos/jobs/[id]/checkout-items — coupon recovery (Item 15g La
     expect(json.data.coupon_code).toBeNull();
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Item 15g Layer 15g-ii regression — pins the appointment-side modifier
+// snapshot surfacing. The checkout-items endpoint now returns loyalty +
+// manual-discount + coupon_discount alongside coupon_code so the POS
+// register can hydrate the cart with everything that was promised at
+// quote / booking time. Layer 15g-iii wires the client dispatch; these
+// tests pin the endpoint contract that Layer 15g-iii consumes.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('GET /api/pos/jobs/[id]/checkout-items — modifier hydration (Item 15g Layer 15g-ii)', () => {
+  it('surfaces loyalty modifiers from the appointment', async () => {
+    state.job = { ...BASE_JOB, quote_id: null, appointment_id: 'a-1' };
+    state.appointment = {
+      coupon_code: null,
+      coupon_discount: null,
+      loyalty_points_redeemed: 100,
+      loyalty_discount: 5,
+      manual_discount_value: null,
+      manual_discount_label: null,
+    };
+
+    const res = await GET(makeReq(), ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.loyalty_points_redeemed).toBe(100);
+    expect(json.data.loyalty_discount).toBe(5);
+    expect(json.data.manual_discount_value).toBeNull();
+    expect(json.data.manual_discount_label).toBeNull();
+  });
+
+  it('surfaces manual-discount modifiers from the appointment', async () => {
+    state.job = { ...BASE_JOB, quote_id: null, appointment_id: 'a-1' };
+    state.appointment = {
+      coupon_code: null,
+      coupon_discount: null,
+      loyalty_points_redeemed: 0,
+      loyalty_discount: 0,
+      manual_discount_value: 30,
+      manual_discount_label: 'Friend discount',
+    };
+
+    const res = await GET(makeReq(), ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.manual_discount_value).toBe(30);
+    expect(json.data.manual_discount_label).toBe('Friend discount');
+  });
+
+  it('surfaces all three modifiers when present', async () => {
+    state.job = { ...BASE_JOB, quote_id: null, appointment_id: 'a-1' };
+    state.appointment = {
+      coupon_code: 'SAVE25',
+      coupon_discount: 25,
+      loyalty_points_redeemed: 100,
+      loyalty_discount: 5,
+      manual_discount_value: 15,
+      manual_discount_label: 'Cashier override',
+    };
+
+    const res = await GET(makeReq(), ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.coupon_code).toBe('SAVE25');
+    expect(json.data.coupon_discount).toBe(25);
+    expect(json.data.loyalty_points_redeemed).toBe(100);
+    expect(json.data.loyalty_discount).toBe(5);
+    expect(json.data.manual_discount_value).toBe(15);
+    expect(json.data.manual_discount_label).toBe('Cashier override');
+  });
+
+  it('returns nulls for modifiers when the appointment row is missing', async () => {
+    state.job = { ...BASE_JOB, quote_id: null, appointment_id: null };
+
+    const res = await GET(makeReq(), ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.coupon_discount).toBeNull();
+    expect(json.data.loyalty_points_redeemed).toBeNull();
+    expect(json.data.loyalty_discount).toBeNull();
+    expect(json.data.manual_discount_value).toBeNull();
+    expect(json.data.manual_discount_label).toBeNull();
+  });
+
+  it('coerces stringified numeric values from supabase to plain numbers', async () => {
+    // Supabase returns NUMERIC columns as strings via PostgREST in some
+    // configurations. Pin that the endpoint Number()-coerces them so
+    // client-side math works without type guards.
+    state.job = { ...BASE_JOB, quote_id: null, appointment_id: 'a-1' };
+    state.appointment = {
+      coupon_code: null,
+      coupon_discount: '25.00',
+      loyalty_points_redeemed: '100',
+      loyalty_discount: '5.00',
+      manual_discount_value: '15.00',
+      manual_discount_label: 'Cashier override',
+    };
+
+    const res = await GET(makeReq(), ctx);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.coupon_discount).toBe(25);
+    expect(json.data.loyalty_points_redeemed).toBe(100);
+    expect(json.data.loyalty_discount).toBe(5);
+    expect(json.data.manual_discount_value).toBe(15);
+  });
+});

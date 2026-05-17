@@ -58,8 +58,10 @@ function buildItemsPayload(items: TicketItem[]) {
 // Stable hash of the persistable slice of quote state. Used to skip auto-save
 // when current state matches the last successful save (or the load-snapshot
 // captured on resume), so resuming a draft does not trigger a redundant PATCH.
-// Excludes manualDiscount and loyalty fields — they are NOT persisted on the
-// quotes table today, so changes to them never need to round-trip to the server.
+//
+// Item 15g Layer 15g-ii — manualDiscount + loyalty + couponDiscount are now
+// persisted to the quotes table (added dedicated columns). Hash includes them
+// so auto-save fires when the cashier adjusts a discount or loyalty toggle.
 function computeQuoteHash(q: QuoteState): string {
   return JSON.stringify({
     items: q.items.map((i) => ({
@@ -77,6 +79,16 @@ function computeQuoteHash(q: QuoteState): string {
     notes: q.notes,
     validUntil: q.validUntil,
     couponCode: q.coupon?.code ?? null,
+    couponDiscount: q.coupon?.discount ?? null,
+    loyaltyPoints: q.loyaltyPointsToRedeem || 0,
+    loyaltyDiscount: q.loyaltyDiscount || 0,
+    manualDiscount: q.manualDiscount
+      ? {
+          t: q.manualDiscount.type,
+          v: q.manualDiscount.value,
+          l: q.manualDiscount.label ?? '',
+        }
+      : null,
     mobile: {
       on: q.mobile?.isMobile ?? false,
       zone: q.mobile?.zoneId ?? null,
@@ -85,6 +97,21 @@ function computeQuoteHash(q: QuoteState): string {
       label: q.mobile?.zoneNameSnapshot ?? '',
     },
   });
+}
+
+// Item 15g Layer 15g-ii — Build the modifier portion of the quote
+// POST/PATCH body. All fields nullable; "no intent to send" is omission,
+// "clear the column" is null. The shape matches the additions to
+// createQuoteSchema / updateQuoteSchema in src/lib/utils/validation.ts.
+function buildModifiersPayload(q: QuoteState) {
+  return {
+    coupon_discount: q.coupon?.discount ?? null,
+    loyalty_points_to_redeem: q.loyaltyPointsToRedeem || null,
+    loyalty_discount: q.loyaltyDiscount || null,
+    manual_discount_type: q.manualDiscount?.type ?? null,
+    manual_discount_value: q.manualDiscount?.value ?? null,
+    manual_discount_label: q.manualDiscount?.label || null,
+  };
 }
 
 // Build the mobile section of an API write payload. The {is_mobile=false}
@@ -229,6 +256,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               coupon_code: q.coupon?.code || null,
               items,
               ...buildMobilePayload(q),
+              ...buildModifiersPayload(q),
             }),
           });
           if (!res.ok) {
@@ -278,6 +306,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
               coupon_code: q.coupon?.code || null,
               items,
               ...buildMobilePayload(q),
+              ...buildModifiersPayload(q),
             }),
           });
           if (!res.ok) {
@@ -673,6 +702,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       let savedQuoteId = quote.quoteId;
 
       const mobilePayload = buildMobilePayload(quote);
+      const modifiersPayload = buildModifiersPayload(quote);
       if (savedQuoteId) {
         // Update existing quote and mark as converted
         const res = await posFetch(`/api/pos/quotes/${savedQuoteId}`, {
@@ -687,6 +717,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             coupon_code: couponCode,
             items,
             ...mobilePayload,
+            ...modifiersPayload,
           }),
         });
         if (!res.ok) {
@@ -707,6 +738,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             coupon_code: couponCode,
             items,
             ...mobilePayload,
+            ...modifiersPayload,
           }),
         });
         if (!res.ok) {
@@ -734,6 +766,10 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
       }
 
       // Step 4: Create the job
+      // Item 15g Layer 15g-ii — modifier payload propagates so the synthetic
+      // walk-in appointment carries loyalty/manual-discount/coupon snapshot.
+      // The walk-in path POST /api/pos/jobs persists them on the appointment
+      // row (see route.ts updates in this same layer).
       const jobRes = await posFetch('/api/pos/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -744,6 +780,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           quote_id: savedQuoteId,
           notes: jobNotes || undefined,
           ...mobilePayload,
+          ...modifiersPayload,
         }),
       });
 

@@ -331,6 +331,16 @@ export async function POST(request: NextRequest) {
     const loyaltyDiscount = data.loyalty_discount ?? 0;
     const totalAfterDiscount = subtotal - couponDiscount - loyaltyDiscount;
 
+    // Item 15g Layer 15g-ii — loyalty + manual-discount now persist to
+    // dedicated columns (`loyalty_points_redeemed`, `loyalty_discount`,
+    // `manual_discount_value`, `manual_discount_label`) added in this
+    // layer's migration. The pre-15g-ii `internal_notes` plaintext
+    // stop-gap (`Loyalty points used: N (D discount)`) is no longer
+    // written here. Historical appointment rows that still carry the
+    // plaintext line are left untouched — a separate Layer 15g-iv data
+    // migration handles the back-fill if needed for the operator UI.
+    const loyaltyPoints = Number(data.loyalty_points_used ?? 0) || 0;
+
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
@@ -357,10 +367,12 @@ export async function POST(request: NextRequest) {
         deposit_amount: data.deposit_amount || null,
         coupon_code: data.coupon_code || null,
         coupon_discount: couponDiscount || null,
-        // Note: loyalty_points_used and loyalty_discount could be stored in internal_notes or a new column
-        internal_notes: data.loyalty_points_used
-          ? `Loyalty points used: ${data.loyalty_points_used} (${loyaltyDiscount.toFixed(2)} discount)`
-          : null,
+        // Item 15g Layer 15g-ii — loyalty dedicated columns (replaces
+        // internal_notes plaintext). Booking wizard does not currently
+        // surface manual discount, so manual_discount_* stay NULL here.
+        loyalty_points_redeemed: loyaltyPoints,
+        loyalty_discount: loyaltyDiscount || 0,
+        internal_notes: null,
       })
       .select('id, scheduled_date, scheduled_start_time, scheduled_end_time, total_amount, is_mobile, mobile_address, mobile_surcharge, status, channel, subtotal')
       .single();

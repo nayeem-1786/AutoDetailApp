@@ -1000,7 +1000,8 @@ src/lib/products/barcode-lookup.ts          — Shared barcode/SKU lookup helper
 src/lib/quotes/convert-service.ts
 src/lib/quotes/quote-service.ts
 src/lib/quotes/send-service.ts
-src/lib/quotes/__tests__/convert-service.test.ts        # 3 tests — pins Item 15g Layer 15g-i coupon_code propagation through Quote → Appointment on convert
+src/lib/quotes/__tests__/convert-service.test.ts        # 11 tests — pins Layer 15g-i coupon_code propagation (3) + Layer 15g-ii full modifier propagation (loyalty + manual + coupon snapshot + over-discount clamp; 8)
+src/lib/quotes/__tests__/quote-service.modifiers.test.ts  # 13 tests — Layer 15g-ii createQuote+updateQuote modifier persistence: each-modifier-persists, partial collapse, percent>100 rejection, omitted-payload no-op, explicit-null clears column
 src/lib/quotes/__tests__/derive-comm-pill.test.ts
 src/lib/quotes/__tests__/send-service.test.ts
 ```
@@ -1657,6 +1658,7 @@ Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
 20260513022648_phone_normalization_phase_1.sql               # Phase Normalization-1: backfill 3 employees + 1 business_settings + 38 sms_delivery_log + ALTER employees ADD CONSTRAINT valid_phone
 20260513050241_phone_schema_hardening.sql                    # Phase Schema-Hardening-1: 4 new E.164 CHECK constraints (conversations.phone_number, sms_delivery_log.to_phone, sms_conversations.phone_number, sms_consent_log.phone) + retroactive idempotent capture of quote_communications.valid_sent_to (channel-aware Option B)
 20260514051953_unify_2_inventory_family_to_cents.sql         # Phase Money-Unify-2: ADD COLUMN unit_cost_cents on purchase_order_items + stock_adjustments; ADD COLUMN min_order_amount_cents on vendors; DROP NOT NULL on purchase_order_items.unit_cost; backfill ROUND × 100; CHECK >= 0; CREATE OR REPLACE FUNCTION void_transaction() writes unit_cost_cents (with TODO Unify-D)
+20260517021350_lifecycle_persistence.sql                     # Item 15g Layer 15g-ii: lifecycle persistence schema — ADD COLUMN appointments.{loyalty_points_redeemed,loyalty_discount,manual_discount_value,manual_discount_label} + quotes.{coupon_discount,loyalty_points_to_redeem,loyalty_discount,manual_discount_type,manual_discount_value,manual_discount_label} + 3 CHECK constraints (appointments_manual_discount_coherent, quotes_manual_discount_coherent, quotes_loyalty_coherent). All additive + non-breaking.
 ```
 
 ## Scripts

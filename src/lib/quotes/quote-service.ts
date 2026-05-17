@@ -152,6 +152,14 @@ export async function createQuote(
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   const accessToken = Array.from(bytes, (b) => chars[b % chars.length]).join('');
 
+  // Item 15g Layer 15g-ii — modifier snapshot. Coherence is enforced at
+  // the DB layer via the quotes_manual_discount_coherent +
+  // quotes_loyalty_coherent CHECK constraints; the helpers below collapse
+  // partial state to fully-null so we don't trip the constraints on a
+  // payload that supplied only one half of a pair.
+  const manualDiscount = normalizeManualDiscount(data);
+  const loyalty = normalizeLoyaltyRedemption(data);
+
   const insertPayload: Record<string, unknown> = {
     quote_number: quoteNumber,
     customer_id: data.customer_id,
@@ -164,6 +172,12 @@ export async function createQuote(
     valid_until: data.valid_until || null,
     access_token: accessToken,
     coupon_code: data.coupon_code || null,
+    coupon_discount: data.coupon_discount ?? null,
+    loyalty_points_to_redeem: loyalty.points,
+    loyalty_discount: loyalty.discount,
+    manual_discount_type: manualDiscount.type,
+    manual_discount_value: manualDiscount.value,
+    manual_discount_label: manualDiscount.label,
     is_mobile: mobileResolved.isMobile,
     mobile_zone_id: mobileResolved.zoneId,
     mobile_address: mobileResolved.address,
@@ -273,6 +287,32 @@ export async function updateQuote(
   if (data.valid_until !== undefined) update.valid_until = data.valid_until;
   if (data.status !== undefined) update.status = data.status;
   if (data.coupon_code !== undefined) update.coupon_code = data.coupon_code || null;
+
+  // Item 15g Layer 15g-ii — modifier snapshot. Update keys are written only
+  // when the corresponding payload field was supplied (undefined = "no
+  // intent to change"); explicit null clears the column. Coherence is
+  // enforced at the DB layer.
+  if (data.coupon_discount !== undefined) {
+    update.coupon_discount = data.coupon_discount ?? null;
+  }
+  if (
+    data.manual_discount_type !== undefined ||
+    data.manual_discount_value !== undefined ||
+    data.manual_discount_label !== undefined
+  ) {
+    const md = normalizeManualDiscount(data);
+    update.manual_discount_type = md.type;
+    update.manual_discount_value = md.value;
+    update.manual_discount_label = md.label;
+  }
+  if (
+    data.loyalty_points_to_redeem !== undefined ||
+    data.loyalty_discount !== undefined
+  ) {
+    const ly = normalizeLoyaltyRedemption(data);
+    update.loyalty_points_to_redeem = ly.points;
+    update.loyalty_discount = ly.discount;
+  }
 
   // Mobile fields: resolve via the same helper as createQuote so server-side
   // validation runs identically. Only patch the columns when the caller
@@ -696,4 +736,78 @@ async function resolveMobileForQuote(
     }
     throw err;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Modifier-snapshot helpers (Item 15g Layer 15g-ii)
+// ---------------------------------------------------------------------------
+
+interface ManualDiscountInput {
+  manual_discount_type?: 'dollar' | 'percent' | null;
+  manual_discount_value?: number | null;
+  manual_discount_label?: string | null;
+}
+
+/**
+ * Collapse a partial manual-discount payload to a fully-coherent triple.
+ * The DB CHECK constraint `quotes_manual_discount_coherent` requires either
+ * (type, value) both present (with type ∈ {dollar, percent} and value > 0,
+ * percent additionally ≤ 100) or both NULL. Label is independent on quotes
+ * (NULL allowed even when value is present). Helpers like this prevent the
+ * "user supplied only the label" footgun.
+ */
+function normalizeManualDiscount(data: ManualDiscountInput): {
+  type: 'dollar' | 'percent' | null;
+  value: number | null;
+  label: string | null;
+} {
+  const type = data.manual_discount_type ?? null;
+  const rawValue = data.manual_discount_value;
+  const value =
+    rawValue === undefined || rawValue === null
+      ? null
+      : Number(rawValue);
+  const label = data.manual_discount_label?.trim() || null;
+
+  // Collapse to fully-null when either half is missing or value is non-positive.
+  if (type === null || value === null || !(value > 0)) {
+    return { type: null, value: null, label: null };
+  }
+  if (type === 'percent' && value > 100) {
+    throw new QuoteValidationError('Percent manual discount cannot exceed 100');
+  }
+  return { type, value, label };
+}
+
+interface LoyaltyRedemptionInput {
+  loyalty_points_to_redeem?: number | null;
+  loyalty_discount?: number | null;
+}
+
+/**
+ * Collapse a partial loyalty-redemption payload to a coherent pair.
+ * DB CHECK constraint `quotes_loyalty_coherent` requires both NULL or both
+ * non-null+non-negative. Helper rounds points to int and validates non-negative.
+ */
+function normalizeLoyaltyRedemption(data: LoyaltyRedemptionInput): {
+  points: number | null;
+  discount: number | null;
+} {
+  const rawPoints = data.loyalty_points_to_redeem;
+  const rawDiscount = data.loyalty_discount;
+  if (
+    (rawPoints === undefined || rawPoints === null) &&
+    (rawDiscount === undefined || rawDiscount === null)
+  ) {
+    return { points: null, discount: null };
+  }
+  const points =
+    rawPoints === undefined || rawPoints === null
+      ? 0
+      : Math.max(0, Math.round(Number(rawPoints)));
+  const discount =
+    rawDiscount === undefined || rawDiscount === null
+      ? 0
+      : Math.max(0, Number(rawDiscount));
+  return { points, discount };
 }

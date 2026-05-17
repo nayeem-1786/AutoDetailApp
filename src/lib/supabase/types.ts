@@ -368,6 +368,11 @@ export interface Appointment {
   reminder_sent_at: string | null;
   job_notes: string | null;
   internal_notes: string | null;
+  /** Item 15g Layer 15g-ii — modifier snapshot columns. */
+  loyalty_points_redeemed: number;
+  loyalty_discount: number;
+  manual_discount_value: number | null;
+  manual_discount_label: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -677,6 +682,14 @@ export interface Quote {
   mobile_address: string | null;
   mobile_surcharge: number;
   mobile_zone_name_snapshot: string | null;
+  /** Item 15g Layer 15g-ii — modifier snapshot columns. All nullable so
+   *  "modifier not set" is distinguishable from "modifier was zero." */
+  coupon_discount: number | null;
+  loyalty_points_to_redeem: number | null;
+  loyalty_discount: number | null;
+  manual_discount_type: 'dollar' | 'percent' | null;
+  manual_discount_value: number | null;
+  manual_discount_label: string | null;
   // Joined relations
   customer?: Customer;
   vehicle?: Vehicle;

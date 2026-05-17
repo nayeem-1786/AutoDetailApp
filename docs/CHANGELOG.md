@@ -6,6 +6,85 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Wave 1.5 / Item 15g Layer 15g-ii: Lifecycle persistence schema + endpoint propagation
+
+Layer 15g-ii closes the schema and endpoint gaps that caused loyalty + manual-discount + coupon-discount snapshot to silently vanish through Quote → Appointment → Job → Transaction. Layer 15g-i (commit `6acf1661`) shipped coupon-only logic fixes (~70% coverage); this layer extends to full chain fidelity for all three modifiers.
+
+**Schema migration (`supabase/migrations/20260517021350_lifecycle_persistence.sql`):**
+
+New columns (all additive, non-breaking):
+- `appointments.loyalty_points_redeemed INTEGER NOT NULL DEFAULT 0`
+- `appointments.loyalty_discount NUMERIC(10,2) NOT NULL DEFAULT 0`
+- `appointments.manual_discount_value NUMERIC(10,2)` (nullable)
+- `appointments.manual_discount_label TEXT` (nullable)
+- `quotes.coupon_discount NUMERIC(10,2)` (nullable snapshot)
+- `quotes.loyalty_points_to_redeem INTEGER` (nullable)
+- `quotes.loyalty_discount NUMERIC(10,2)` (nullable)
+- `quotes.manual_discount_type TEXT` (nullable, `'dollar' | 'percent'`)
+- `quotes.manual_discount_value NUMERIC(10,2)` (nullable)
+- `quotes.manual_discount_label TEXT` (nullable)
+
+New CHECK constraints (enforce coherence at the DB layer so endpoint bugs can't write half-state):
+- `appointments_manual_discount_coherent`: `manual_discount_value` and `manual_discount_label` either both NULL or value > 0
+- `quotes_manual_discount_coherent`: `(type, value)` either both NULL or `type ∈ {dollar, percent}` + `value > 0` + (percent ⇒ `value ≤ 100`)
+- `quotes_loyalty_coherent`: `(loyalty_points_to_redeem, loyalty_discount)` either both NULL or both non-null + non-negative
+
+Per-column COMMENTs document audit-§9.5 invariants (e.g., loyalty pre-transaction columns are "planned redemption" snapshots only; ledger rows stay transaction-bound).
+
+**Endpoint propagation — 6 endpoints updated:**
+
+1. **`src/lib/quotes/quote-service.ts`** — `createQuote` and `updateQuote` accept the new modifier fields and persist them via dedicated `normalizeManualDiscount()` + `normalizeLoyaltyRedemption()` helpers that collapse partial state (e.g., type without value) to fully-null so the DB CHECK constraints are never tripped. Percent > 100 throws `QuoteValidationError`. Update path is surgical: modifier keys are only written when the corresponding payload field was supplied (omitted ⇒ no change; explicit null ⇒ clear column).
+
+2. **`src/app/pos/components/quotes/quote-ticket-panel.tsx`** — `computeQuoteHash` now includes manual-discount + loyalty + coupon-discount so auto-save fires when the cashier adjusts a modifier (pre-Layer-15g-ii, the hash explicitly excluded these — see the comment that this layer rewrites). New `buildModifiersPayload(q)` helper threaded into the auto-save PATCH, the manual-save PATCH/POST, and the `handleCreateJob` PATCH + POST + `/api/pos/jobs` POST so modifiers survive the entire quote→appointment→job path.
+
+3. **`src/lib/quotes/convert-service.ts`** — extends Layer 15g-i's coupon propagation to all three modifiers. New `resolveManualDiscountAmount(type, value, subtotal)` helper converts type=percent to a dollar amount against the quote subtotal. `discount_amount` on the appointment is the sum of all three modifiers (coupon + loyalty + manual) for analytics-reader compatibility; the per-modifier dedicated columns preserve provenance for the receipt and admin dialog. `total_amount` clamped to `>= 0` for over-discount safety.
+
+4. **`src/app/api/pos/jobs/route.ts`** (walk-in path) — accepts the same 7 modifier fields in the request body, applies `resolveManualDiscountAmount()` against the synthetic appointment's subtotal, persists all modifiers on the appointment row. Backward-compatible: pure walk-ins (no quote bridge) send null for all and get the schema defaults (0 / NULL).
+
+5. **`src/app/api/book/route.ts`** — replaces the `internal_notes` plaintext loyalty stop-gap (`Loyalty points used: N (D discount)`) with dedicated columns. The pre-Layer-15g-ii inline comment noting this as a stop-gap is removed. Historical rows that still carry the plaintext line are intentionally untouched; back-fill is deferred to Layer 15g-iv if operator-UI surfacing requires it.
+
+6. **`src/app/api/pos/jobs/[id]/checkout-items/route.ts`** — appointment SELECT extended to include the four new appointment columns (`coupon_discount`, `loyalty_points_redeemed`, `loyalty_discount`, `manual_discount_value`, `manual_discount_label`). Response shape extended with the same five fields so Layer 15g-iii's frontend dispatch (`SET_LOYALTY_REDEEM` + `APPLY_MANUAL_DISCOUNT` after `RESTORE_TICKET`) has the data it needs. All values are `Number()`-coerced to handle Supabase's NUMERIC-as-string behavior.
+
+**Type definitions updated (`src/lib/supabase/types.ts`):**
+- `Appointment` gains `loyalty_points_redeemed`, `loyalty_discount`, `manual_discount_value`, `manual_discount_label`.
+- `Quote` gains `coupon_discount`, `loyalty_points_to_redeem`, `loyalty_discount`, `manual_discount_type`, `manual_discount_value`, `manual_discount_label`.
+
+**Validation schemas updated (`src/lib/utils/validation.ts`):**
+- Shared `quoteModifierFields` block (6 optional+nullable fields) added to both `createQuoteSchema` and `updateQuoteSchema`. Coherence is enforced server-side (helpers) and DB-side (CHECK constraints); the Zod schema stays permissive so legacy clients can omit any subset.
+
+**Tests:**
+- Extended `src/lib/quotes/__tests__/convert-service.test.ts` — 8 new cases pinning Layer 15g-ii: loyalty propagation, manual-discount type=dollar, manual-discount type=percent (subtotal-resolved), persisted-snapshot priority over runtime, all-three-combined → aggregated `discount_amount`, default zero/null state, over-discount total clamp to 0, manual-discount label clears when value is null.
+- Extended `src/app/api/pos/jobs/[id]/checkout-items/__tests__/coupon-fallback.test.ts` — 5 new cases for modifier hydration: loyalty surfacing, manual-discount surfacing, all-three-combined, nulls when appointment is missing, NUMERIC-string coercion to plain numbers.
+- New `src/lib/quotes/__tests__/quote-service.modifiers.test.ts` — 13 cases covering createQuote + updateQuote: each modifier persists, partial manual-discount collapses to fully-null, zero/negative value collapses to null, percent > 100 throws, omitted payload leaves columns untouched on update, explicit null clears column.
+
+**Verification:**
+- Typecheck clean on all touched files.
+- Lint 0 errors, 0 new warnings (100 unchanged baseline).
+- 1252/1252 vitest pass (was 1192 at Layer 3d; +26 new from this layer's tests, remainder from parallel-session unrelated tests in the working tree).
+- DB_SCHEMA.md regenerated via `npx tsx scripts/regen-db-schema.ts` — new columns + CHECK constraints visible at lines 178, 185–188, 191, 2104–2109, 2112–2113, 2948–2949.
+- **Production build NOT attempted** — the working tree carries a pre-existing syntax error in `src/components/appointments/edit-services-modal.tsx` (line 252 `<>` fragment — "Expression expected") from a parallel session's in-progress modifications. The error blocks the build but is independent of this layer; my files were committed selectively to avoid sweeping the parallel-session work.
+- **Manual UAT NOT performed** — voice + SMS + booking flows + POS register hydration all require running against the deployed app with real customer data.
+
+**Manual UAT to run post-session:**
+1. Create a Quote with a coupon, loyalty redemption, and manual discount.
+2. Save the quote — check via SQL that all 3 modifiers persisted to the `quotes` row.
+3. Convert quote to appointment — check via SQL that all 3 modifiers persisted to the `appointments` row (verify `discount_amount` = coupon + loyalty + manual).
+4. Generate a Job from the appointment, complete it, click Checkout — the POS Sale tab should show the coupon code restored automatically (Layer 15g-i behavior); loyalty + manual-discount surfacing is wired in the response payload but client dispatch lands in Layer 15g-iii.
+5. Repeat for walk-in path (POS New Sale → apply modifiers → save) — verify synthetic appointment row has them.
+6. Repeat for online booking with loyalty — verify dedicated columns populated instead of `internal_notes` plaintext.
+
+**Follow-up needed (NOT in this session):**
+- Layer 15g-iii — UI surfacing on Admin Appointment dialog + Jobs card; wire `handleCheckout` in `pos/jobs/page.tsx` to dispatch `SET_LOYALTY_REDEEM` + `APPLY_MANUAL_DISCOUNT` off the new response fields; Item 15a cascade endpoint reads/preserves/re-validates modifiers.
+- Layer 15g-iv — Data-migration the historical `appointments.internal_notes` plaintext loyalty rows into the new dedicated columns; comprehensive round-trip tests; verify QBO line-item sync handles `loyalty_discount` as a separate discount source (audit §9.5 watch-item).
+
+**Files:**
+- New migration: `supabase/migrations/20260517021350_lifecycle_persistence.sql`
+- Modified: `src/lib/quotes/quote-service.ts`, `src/lib/quotes/convert-service.ts`, `src/app/api/pos/jobs/route.ts`, `src/app/api/book/route.ts`, `src/app/api/pos/jobs/[id]/checkout-items/route.ts`, `src/app/pos/components/quotes/quote-ticket-panel.tsx`, `src/lib/supabase/types.ts`, `src/lib/utils/validation.ts`, `docs/dev/DB_SCHEMA.md` (regen)
+- Extended: `src/lib/quotes/__tests__/convert-service.test.ts`, `src/app/api/pos/jobs/[id]/checkout-items/__tests__/coupon-fallback.test.ts`
+- New: `src/lib/quotes/__tests__/quote-service.modifiers.test.ts`
+
+---
+
 ## 2026-05-16 — Item 15f Layer 3c: Booking Wizard price-math migration to canonical engine
 
 Customer-facing booking wizard now routes ALL service-pricing math through `resolveServicePrice` / `resolveServicePriceWithSale` from `src/lib/services/picker-engine.ts` per CLAUDE.md Rule 22. Bespoke UI is preserved (Rule 22 carve-out for customer surfaces); only the math sites migrated. Net wizard pricing fixes:

@@ -65,17 +65,49 @@ export async function convertQuote(
   //
   // Item 15g Layer 15g-i: propagate `coupon_code` from the quote so the
   // checkout-items fallback (POS Jobs card → register) can re-validate the
-  // coupon when no `job.quote_id` bridge exists. `quote.coupon` is runtime-only
-  // state (see `src/app/pos/types.ts` QuoteState) — the DB row carries only
-  // `coupon_code`, so `coupon_discount`/`discount_amount` resolve to 0 here;
-  // checkout re-derives the discount through `/api/pos/coupons/validate`.
-  // Layer 15g-ii will add `quotes.coupon_discount` so we can persist a snapshot.
+  // coupon when no `job.quote_id` bridge exists.
+  //
+  // Item 15g Layer 15g-ii: extends Layer 15g-i with full modifier propagation.
+  // The quote row now persists `coupon_discount`, `loyalty_points_to_redeem`,
+  // `loyalty_discount`, and `manual_discount_*` (via the schema migration in
+  // this same layer). Conversion snapshots all three modifiers onto the
+  // appointment so the entire chain (Quote → Appointment → Job → Transaction)
+  // preserves them through to checkout. `appointment.discount_amount` is the
+  // sum of all three for compatibility with existing analytics readers; the
+  // dedicated per-modifier columns preserve provenance for the receipt and
+  // admin dialog.
   const quoteIsMobile = !!quote.is_mobile;
   const quoteMobileSurcharge = Number(quote.mobile_surcharge ?? 0);
-  const couponDiscount =
-    Number(
-      (quote as { coupon?: { discount?: number | null } }).coupon?.discount ?? 0
-    ) || 0;
+
+  // Coupon: prefer the persisted `quotes.coupon_discount` snapshot (Layer
+  // 15g-ii); fall back to runtime `quote.coupon.discount` for callers that
+  // hydrate the quote (still relevant for the immediate POS convert path).
+  const runtimeCoupon =
+    (quote as { coupon?: { discount?: number | null } }).coupon?.discount ?? null;
+  const couponDiscount = Number(
+    quote.coupon_discount ?? runtimeCoupon ?? 0
+  ) || 0;
+
+  // Loyalty: snapshot points + dollar value from the quote.
+  const loyaltyPoints = Number(quote.loyalty_points_to_redeem ?? 0) || 0;
+  const loyaltyDiscount = Number(quote.loyalty_discount ?? 0) || 0;
+
+  // Manual discount: compute the resolved dollar amount once. Appointment
+  // schema stores the dollar value (not the type/% pair) — applying %
+  // against the quote subtotal is the canonical interpretation.
+  const manualDiscountValue = resolveManualDiscountAmount(
+    quote.manual_discount_type ?? null,
+    Number(quote.manual_discount_value ?? 0) || null,
+    Number(quote.subtotal ?? 0) || 0
+  );
+  const manualDiscountLabel = quote.manual_discount_label ?? null;
+
+  const totalDiscount = couponDiscount + loyaltyDiscount + (manualDiscountValue ?? 0);
+  const finalTotal = Math.max(
+    0,
+    Number(quote.total_amount ?? 0) - totalDiscount
+  );
+
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
     .insert({
@@ -95,11 +127,15 @@ export async function convertQuote(
       payment_status: 'pending',
       subtotal: quote.subtotal,
       tax_amount: quote.tax_amount,
-      discount_amount: couponDiscount,
-      total_amount: Number(quote.total_amount ?? 0) - couponDiscount,
+      discount_amount: totalDiscount,
+      total_amount: finalTotal,
       job_notes: quote.notes,
       coupon_code: quote.coupon_code ?? null,
       coupon_discount: couponDiscount || null,
+      loyalty_points_redeemed: loyaltyPoints,
+      loyalty_discount: loyaltyDiscount,
+      manual_discount_value: manualDiscountValue,
+      manual_discount_label: manualDiscountValue !== null ? manualDiscountLabel : null,
     })
     .select('*')
     .single();
@@ -158,4 +194,25 @@ export async function convertQuote(
   fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
 
   return { success: true, appointment, serviceNames };
+}
+
+/**
+ * Item 15g Layer 15g-ii — resolve the manual-discount dollar amount from
+ * the quote's persisted (type, value, subtotal). Returns null when no
+ * coherent manual discount is set. Mirrors the client-side reducer math
+ * at `quote-reducer.ts` so the appointment receives the same dollar
+ * amount the cashier saw at quote time.
+ */
+function resolveManualDiscountAmount(
+  type: 'dollar' | 'percent' | null | undefined,
+  value: number | null | undefined,
+  subtotal: number
+): number | null {
+  if (!type || value == null || !(value > 0)) return null;
+  if (type === 'dollar') {
+    return Math.min(value, subtotal);
+  }
+  // percent
+  const pct = Math.min(value, 100);
+  return Math.round(((subtotal * pct) / 100) * 100) / 100;
 }
