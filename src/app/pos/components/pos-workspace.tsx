@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/cn';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
 import { usePosAuth } from '../context/pos-auth-context';
+import { useEditModeDrain } from '../hooks/use-edit-mode-drain';
 import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
 import { posFetch } from '../lib/pos-fetch';
 import type { CatalogProduct, CatalogService } from '../types';
@@ -36,6 +37,10 @@ export function PosWorkspace() {
   const { products, services, loading } = useCatalog();
   const { ticket, dispatch } = useTicket();
   const { locked } = usePosAuth();
+
+  // Item 15f Phase 1 Layer 8b — drain `/pos?source=...&id=...&returnTo=...`
+  // deep-links into edit mode. No-op on bare `/pos`; UI surfaces unchanged.
+  useEditModeDrain();
 
   const [tab, setTab] = useState<PosTab>('register');
   const [search, setSearch] = useState('');

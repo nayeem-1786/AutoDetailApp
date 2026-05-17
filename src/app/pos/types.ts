@@ -73,6 +73,14 @@ export interface PriorPayment {
 
 // ─── Ticket State ──────────────────────────────────────────────
 
+/**
+ * Source discriminator for ticket origin — Item 15f Phase 1 Layer 8b.
+ * 'new' is the default for fresh tickets the operator builds on the Sale tab.
+ * 'appointment' / 'job' indicate the ticket was hydrated from an existing
+ * record via the deep-link drain (`/pos?source=...&id=...&returnTo=...`).
+ */
+export type TicketSource = 'new' | 'appointment' | 'job';
+
 export interface TicketState {
   items: TicketItem[];
   customer: Customer | null;
@@ -91,6 +99,18 @@ export interface TicketState {
   taxAmount: number;
   discountAmount: number;
   total: number;
+  // ─── Edit-mode (Item 15f Phase 1 Layer 8b) ───────────────────────
+  // `source` defaults to 'new' for a fresh ticket. When the operator
+  // arrives via the deep-link drain (`/pos?source=appointment&id=...`),
+  // ENTER_EDIT_MODE sets source/sourceId/returnTo and editMode=true so the
+  // Sale-tab UX (Layer 8c) can swap "Checkout" for "Save Changes" and
+  // suppress receipt/payment flows. RESTORE_TICKET (sessionStorage path)
+  // and CLEAR_TICKET both reset these fields to defaults to prevent
+  // edit-mode state leaking across browser refreshes / "New Sale" taps.
+  source: TicketSource;
+  sourceId: string | null;
+  returnTo: string | null;
+  editMode: boolean;
 }
 
 // ─── Ticket Actions ────────────────────────────────────────────
@@ -112,7 +132,24 @@ export type TicketAction =
   | { type: 'APPLY_MANUAL_DISCOUNT'; discountType: 'dollar' | 'percent'; value: number; label: string }
   | { type: 'REMOVE_MANUAL_DISCOUNT' }
   | { type: 'RESTORE_TICKET'; state: TicketState }
-  | { type: 'CLEAR_TICKET' };
+  | { type: 'CLEAR_TICKET' }
+  // Item 15f Phase 1 Layer 8b — edit-mode transitions.
+  // ENTER_EDIT_MODE replaces state with `ticketData` AND sets the 4 edit-mode
+  // fields atomically. `ticketData` should carry the hydrated cart shape
+  // (items, customer, vehicle, modifiers — same as RESTORE_TICKET's payload);
+  // the reducer overwrites source/sourceId/returnTo/editMode from the action
+  // params so the caller doesn't have to mirror them on `ticketData`.
+  | {
+      type: 'ENTER_EDIT_MODE';
+      source: 'appointment' | 'job';
+      sourceId: string;
+      returnTo: string;
+      ticketData: TicketState;
+    }
+  // EXIT_EDIT_MODE clears the 4 fields without disturbing items/customer/etc.
+  // Used by Layer 8c's "Cancel Edit" affordance (still on the cart, still
+  // visible, but no longer scoped to a specific record).
+  | { type: 'EXIT_EDIT_MODE' };
 
 // ─── Catalog types ─────────────────────────────────────────────
 

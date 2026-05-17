@@ -19,6 +19,13 @@ export const initialTicketState: TicketState = {
   taxAmount: 0,
   discountAmount: 0,
   total: 0,
+  // Item 15f Phase 1 Layer 8b — edit-mode fields default to "fresh ticket".
+  // CLEAR_TICKET returns initialTicketState, so the 4 fields auto-reset on
+  // every "New Sale" / F1 invocation — no state-leak from a prior edit.
+  source: 'new',
+  sourceId: null,
+  returnTo: null,
+  editMode: false,
 };
 
 function generateId(): string {
@@ -596,15 +603,53 @@ export function ticketReducer(
       // Defensive normalization for sessionStorage payloads predating the
       // priorPayments fields — older tickets in the held-tickets queue or
       // an open browser tab on deploy would otherwise have these as undefined.
+      //
+      // Item 15f Phase 1 Layer 8b: edit-mode is NEVER restored from
+      // sessionStorage. The drain (`ENTER_EDIT_MODE`) is the only entry into
+      // edit mode, and it always re-fetches the underlying record. A page
+      // refresh that loses the deep-link URL (operator navigates to bare
+      // `/pos`) would otherwise surface stale `editMode: true` with a sourceId
+      // pointing at a record the operator can no longer save back to.
       return recalculateTotals({
         ...action.state,
         priorPayments: action.state.priorPayments ?? [],
         priorPaymentsTotal: action.state.priorPaymentsTotal ?? 0,
+        source: 'new',
+        sourceId: null,
+        returnTo: null,
+        editMode: false,
       });
     }
 
     case 'CLEAR_TICKET': {
       return { ...initialTicketState };
+    }
+
+    case 'ENTER_EDIT_MODE': {
+      // Item 15f Phase 1 Layer 8b — replace state with hydrated `ticketData`
+      // AND stamp the 4 edit-mode fields from the action params. The reducer
+      // overwrites source/sourceId/returnTo/editMode unconditionally so the
+      // caller can pass a `ticketData` shaped exactly like `RESTORE_TICKET`'s
+      // payload without having to mirror the edit-mode fields.
+      return recalculateTotals({
+        ...action.ticketData,
+        priorPayments: action.ticketData.priorPayments ?? [],
+        priorPaymentsTotal: action.ticketData.priorPaymentsTotal ?? 0,
+        source: action.source,
+        sourceId: action.sourceId,
+        returnTo: action.returnTo,
+        editMode: true,
+      });
+    }
+
+    case 'EXIT_EDIT_MODE': {
+      return {
+        ...state,
+        source: 'new',
+        sourceId: null,
+        returnTo: null,
+        editMode: false,
+      };
     }
 
     default:

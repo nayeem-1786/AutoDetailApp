@@ -386,6 +386,8 @@ src/app/api/pos/appointments/[id]/route.ts                     # GET single appo
 src/app/api/pos/appointments/[id]/__tests__/get.test.ts
 src/app/api/pos/appointments/[id]/cancel/route.ts              # POST cancel — POS-specific, notify_customer flag default false (Roadmap Item 15b)
 src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts
+src/app/api/pos/appointments/[id]/load/route.ts                # Item 15f Phase 1 Layer 8b — GET TicketState-shaped payload for POS deep-link drain (`/pos?source=appointment&id=...`). Sibling of jobs/checkout-items. Gates on pos.jobs.manage (matches PUT cascade); refuses completed/cancelled status (matches save guard).
+src/app/api/pos/appointments/[id]/load/__tests__/route.test.ts # 10 cases — auth (401/403), 404 missing, 400 completed/cancelled, modifier-column passthrough, mobile_fee synthesis, deposit + deposit_date lookup
 src/app/api/pos/appointments/[id]/mobile-address/route.ts     # PATCH mobile_address only (Phase Mobile-1.6)
 src/app/api/pos/appointments/[id]/mobile-service/route.ts     # PATCH full mobile picker — toggle/zone/custom/address (Phase Mobile-1.9)
 src/app/api/pos/appointments/[id]/notify/route.ts
@@ -1349,7 +1351,10 @@ stripe-terminal.ts    — Stripe Terminal SDK integration
 ```
 use-catalog.ts              — Shared catalog data hook (products, services)
 use-prerequisite-check.ts   — Service prerequisite check before adding to ticket/quote
+use-edit-mode-drain.ts      — Item 15f Phase 1 Layer 8b. POS deep-link drain (`/pos?source=...&id=...&returnTo=...`). Validates UUID + safe-internal-path, fetches load endpoint, dispatches ENTER_EDIT_MODE + modifier follow-ups. Mounted in pos-workspace.tsx. Exports pure helpers (`isUuid`, `isSafeInternalPath`, `buildTicketStateFromLoad`, `runEditModeDrain`) for unit-testing.
 ```
+
+- `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` — 22 cases: validators (UUID + 5 open-redirect attack classes), build-state pure helper, drain endpoint selection + dispatch sequence + coupon re-validation, error paths (403/404/network/malformed).
 
 ---
 

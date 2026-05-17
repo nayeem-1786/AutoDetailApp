@@ -25,6 +25,10 @@ const mockTicket: { value: TicketState } = {
     taxAmount: 0,
     discountAmount: 0,
     total: 0,
+    source: 'new',
+    sourceId: null,
+    returnTo: null,
+    editMode: false,
   },
 };
 
@@ -108,6 +112,10 @@ function setTicket(overrides: Partial<TicketState>) {
     taxAmount: 0,
     discountAmount: 0,
     total: 0,
+    source: 'new',
+    sourceId: null,
+    returnTo: null,
+    editMode: false,
     ...overrides,
   };
 }

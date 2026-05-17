@@ -178,6 +178,14 @@ function JobsPageInner() {
         taxAmount: Math.round(taxAmount * 100) / 100,
         discountAmount: 0,
         total: Math.round(total * 100) / 100,
+        // Edit-mode fields are placeholders here — RESTORE_TICKET strips them
+        // back to defaults inside the reducer (Layer 8b state-leak guard).
+        // The job checkout flow stays as "fresh ticket from job"; the deep-link
+        // drain is the only path into edit mode for job-source tickets.
+        source: 'new',
+        sourceId: null,
+        returnTo: null,
+        editMode: false,
       };
 
       dispatch({ type: 'RESTORE_TICKET', state: newTicket });

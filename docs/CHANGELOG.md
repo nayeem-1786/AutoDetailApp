@@ -6,6 +6,67 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8b: `<TicketContext>` edit-mode extensions + POS deep-link drain
+
+Second session of Phase 1 (edit-via-POS). Lays the frontend STATE plumbing so the POS Sale tab can represent "edit mode for an existing record" instead of only "build a new ticket." **No UI changes** — every visible surface looks the same. Layer 8c is where the Sale-tab UX swaps "Checkout" → "Save Changes" and suppresses payment/receipt flow off `editMode === true`. Source spec: `docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md` §2 + §4.2 + §7.
+
+**The pivot:** Layer 8a shipped a POS-authed cascade endpoint. Layer 8b extends `<TicketContext>` to carry the 4 fields the audit (§2.3) identified as the gap-set for round-tripping an appointment/job edit through ticket-shaped state — `source`, `sourceId`, `returnTo`, `editMode` — and wires a deep-link drain that hydrates the cart from a load endpoint when the operator arrives at `/pos?source=appointment&id=<uuid>&returnTo=<path>` (or `source=job`).
+
+**Four deliverables:**
+
+1. **`TicketState` extensions** (`src/app/pos/types.ts`) — added 4 fields and 2 reducer actions. `source: TicketSource` defaults to `'new'`; `sourceId`/`returnTo` default to `null`; `editMode` defaults to `false`. `ENTER_EDIT_MODE` accepts `{ source, sourceId, returnTo, ticketData }` and atomically replaces state + stamps the 4 fields (reducer overrides edit-mode fields on `ticketData` so the caller doesn't have to mirror them). `EXIT_EDIT_MODE` clears the 4 fields without disturbing items/customer/vehicle.
+
+2. **Reducer state-leak guards** (`src/app/pos/context/ticket-reducer.ts`) — `initialTicketState` defaults the 4 fields so `CLEAR_TICKET` (F1 / "New Sale") auto-resets them on every fresh ticket. `RESTORE_TICKET` (sessionStorage path) explicitly strips the 4 fields back to defaults even when the persisted payload carried `editMode: true` — re-entering edit mode requires a fresh deep-link drain. The audit's §8.3 gotcha #5 ("sessionStorage is a UX nicety, not authoritative") drove this — without the strip, a page refresh that loses the deep-link URL would surface stale `editMode: true` with a sourceId the operator can no longer save back to.
+
+3. **New `GET /api/pos/appointments/[id]/load`** — sibling of `GET /api/pos/jobs/[id]/checkout-items` for appointments without a linked job. Returns a TicketState-shaped payload (customer + vehicle + items from `appointment_services` + modifier snapshot + deposit). Auth: `authenticatePosRequest` + `checkPosPermission('pos.jobs.manage')` — same gate as the Layer 8a PUT cascade so a user without manage can't drain into an edit-mode UI they can't save from (defense in depth). Status guard refuses `completed`/`cancelled` — matches the PUT cascade so the operator can't drain into a state the save would reject anyway. Mobile-fee synthesis when `is_mobile + surcharge > 0` (parity with `checkout-items`). For `source=job`, the drain reuses existing `checkout-items` — Option B from the brief.
+
+4. **Deep-link drain hook + wiring** (`src/app/pos/hooks/use-edit-mode-drain.ts`, mounted at `src/app/pos/components/pos-workspace.tsx`). Reads `window.location.search` on mount, validates all three params, fetches the source-appropriate endpoint, builds `ticketData` via the same logic as `pos/jobs/page.tsx:handleCheckout`, dispatches `ENTER_EDIT_MODE`, then follows up with `SET_LOYALTY_REDEEM`/`APPLY_MANUAL_DISCOUNT`/coupon-revalidate-then-`SET_COUPON` (Item 15g Layer 15g-iii modifier contract). Strips the deep-link params from the URL after drain so a re-render doesn't re-drain over operator's in-progress changes. Re-fetches on every mount (audit gotcha #5). No-op when params are absent — bare `/pos` continues to behave identically.
+
+**Security: open-redirect defense.** `isSafeInternalPath` rejects:
+- absolute URLs (`https://evil.com`, `http://evil.com`)
+- protocol-relative (`//evil.com/...`)
+- dangerous schemes (`javascript:`, `data:`, `vbscript:`, `file:`, `about:`)
+- backslash legacy bypass (`\\evil.com`)
+- non-leading-slash or empty paths
+
+`isUuid` rejects non-v4-shaped values before the API call. Three params (`source ∈ {'appointment','job'}`, valid UUID `id`, safe internal `returnTo`) are validated up front; a single failure aborts the drain and surfaces a toast. The operator falls through to a fresh ticket without further damage.
+
+**Endpoint shape decision — Option B:** the load endpoint(s) reuse where possible. `source=job` → existing `GET /api/pos/jobs/[id]/checkout-items` (richer than needed but already in production with `pos.jobs.view` permission). `source=appointment` → new `GET /api/pos/appointments/[id]/load`. The two endpoints diverge on `prior_payments` (jobs has it; appointments doesn't) and permission key (jobs gates on `pos.jobs.view`; appointments gates on `pos.jobs.manage`) — the drain consumes the union, missing fields default safely. Option A (new endpoint for both) would have meant a redundant `jobs/[id]/load` duplicating `checkout-items`; rejected to avoid the duplication.
+
+**Modifier-hydration parity (Item 15g Layer 15g-iii):** the drain follows the exact pattern from `pos/jobs/page.tsx:handleCheckout` lines 185-217. `ticketData` ships with coupon/loyalty/manualDiscount zeroed; the drain dispatches `SET_LOYALTY_REDEEM` when points or discount > 0, `APPLY_MANUAL_DISCOUNT` when value > 0 (label falls back to "Manual discount"), and `SET_COUPON` after re-validating `coupon_code` against `/api/pos/coupons/validate` (so the discount value is re-derived against current cart). Coupon revalidate failure is non-fatal — cart still hydrates.
+
+**Tests** (+45 new across 3 new test files):
+
+- New `src/app/pos/context/__tests__/ticket-reducer-edit-mode.test.ts` (+13): default state values for the 4 fields; ENTER_EDIT_MODE hydrates cart + stamps all 4 fields + overrides stale edit-mode in `ticketData`; EXIT_EDIT_MODE clears 4 fields without disturbing items; CLEAR_TICKET clears edit-mode (state-leak prevention); RESTORE_TICKET strips edit-mode even when persisted payload had `editMode: true`; modifier-bearing `ticketData` propagates loyalty + manual discount (Layer 15g-iii parity).
+- New `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` (+22): pure validators (`isUuid` happy/sad; `isSafeInternalPath` rejects all 5 attack classes); `buildTicketStateFromLoad` (item mapping, is_addon name suffix, deposit + prior-payments total math, modifier columns zeroed); `runEditModeDrain` (endpoint selection by source, ENTER_EDIT_MODE dispatch, SET_LOYALTY_REDEEM when present, APPLY_MANUAL_DISCOUNT with label fallback, coupon re-validation + SET_COUPON dispatch, silent failure on revalidate); error paths (403/404/network throw/malformed payload all return ok:false without dispatching).
+- New `src/app/api/pos/appointments/[id]/load/__tests__/route.test.ts` (+10): 401 missing POS session; 403 `pos.jobs.manage` denied; 404 missing appointment; 400 on completed/cancelled status; happy-path shape (customer + vehicle + items + modifier snapshot); modifier columns surface NULL when unset; mobile_fee synthesis when is_mobile; deposit_amount + deposit_date when payment_type='deposit'; deposit_amount=0 when payment_type='pay_on_site'.
+
+Two collateral edits to satisfy typecheck under the widened `TicketState`:
+- `src/app/pos/components/__tests__/ticket-actions.test.tsx`: added the 4 new defaults to both `mockTicket.value` and `setTicket()` helper.
+- `src/app/pos/jobs/page.tsx`: added the 4 placeholder defaults to the `newTicket` literal in `handleCheckout`. RESTORE_TICKET strips them back to defaults inside the reducer regardless — the placeholder is purely a TS-shape requirement.
+
+**Out of scope** (per session brief, deferred to subsequent Phase 1 layers):
+- No UI changes. The Sale-tab still shows "Checkout" — Layer 8c branches off `ticket.editMode`.
+- No Jobs-card / Admin-dialog deep-link buttons — Layer 8d.
+- No `<EditServicesDialog>` / `<EditServicesModal>` deletions — Layer 8e.
+- No new permission keys. Reuses `pos.jobs.manage` (appointments load + cascade).
+
+**Verification:** Typecheck — 0 new errors on touched files (2 pre-existing test-file cast errors in `quote-service.modifiers.test.ts` + `catalog-browser-custom-routing.test.tsx` predate this session). ESLint — 0 errors, 98 warnings (unchanged baseline). Vitest 1440/1440 passing (was 1395 prior; +45 net new). Production build compiled successfully.
+
+**Manual UAT** (user verifies post-deploy):
+
+1. **Backwards compatibility** — `/pos` without query params behaves identically to today. Operator opens POS → fresh New Sale → builds ticket → checks out. No regression visible.
+2. **Direct URL drain (appointment)** — pick a scheduled appointment with services. Navigate to `/pos?source=appointment&id=<uuid>&returnTo=/admin/appointments/<uuid>`. POS Sale tab should load with the appointment's services pre-populated. The "Save Changes" button doesn't exist yet (8c) — but the cart should reflect the full appointment. URL bar will read just `/pos` (params stripped after drain).
+3. **Direct URL drain (job)** — pick an in-flight job. Navigate to `/pos?source=job&id=<uuid>&returnTo=/pos/jobs/<uuid>`. Cart hydrates from `checkout-items`. URL params strip.
+4. **Open-redirect defense** — `/pos?source=appointment&id=<uuid>&returnTo=https://evil.com` → toast "Invalid return path for ticket edit", cart stays fresh, URL params strip. Same for `returnTo=javascript:alert(1)`, `returnTo=//evil.com`, `returnTo=` (empty).
+5. **404 handling** — `/pos?source=appointment&id=<bogus-uuid>&returnTo=/admin/appointments/<uuid>` (well-formed UUID but no record) → toast "Record not found", cart stays fresh.
+6. **403 handling** — repeat (4) signed in as a cashier role without `pos.jobs.manage` → toast "You don't have permission to edit this record".
+7. **State-leak guard** — drain into edit mode, then click "New Sale" (F1 or the Clear/New button) — ticket clears AND `editMode` resets to false. Then drain into edit mode, force a browser refresh (no params in URL) — sessionStorage may restore the cart contents but `editMode` MUST be false (the audit's gotcha #5 contract).
+
+**Next session:** Phase 1 Layer 8c — POS Sale-tab edit-mode UX. Branches off `ticket.editMode === true` to swap "Checkout" → "Save Changes", suppress receipt/payment/loyalty-redemption UI, add an "Unsaved changes" banner when cart is dirty.
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8a: backend cascade endpoint extraction + POS-authed variant
 
 First session of Phase 1 (edit-via-POS architecture). Lays the backend foundation so the next 5 layers (8b–8f) can hang frontend, UX, and Layer-3a-i revert off a single shared cascade helper. Source spec: `docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md` §4.1.
