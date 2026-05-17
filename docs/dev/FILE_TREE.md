@@ -1291,9 +1291,10 @@ src/components/booking/step-confirm-book.tsx        (merged confirm & book page 
 src/components/booking/step-indicator.tsx
 src/components/booking/step-payment.tsx
 src/components/booking/step-schedule.tsx
-src/components/booking/step-service-select.tsx      (merged service select + configure — Step 2)
+src/components/booking/step-service-select.tsx      (merged service select + configure — Step 2; Item 15f Layer 3c migrated price math to canonical engine 2026-05-16, exports `computePrice` + `getServicePriceDisplay` for test consumption)
 src/components/booking/step-vehicle.tsx              (vehicle selection — Step 1)
 src/components/booking/specialty-vehicle-block.tsx   (exotic/classic booking block page — Session 27)
+src/components/booking/__tests__/step-service-select.test.tsx  # Item 15f Layer 3c — pins all 6 pricing_model values through canonical-engine path
 ```
 
 ### Quote Components

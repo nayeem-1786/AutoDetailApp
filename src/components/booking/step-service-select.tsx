@@ -7,7 +7,12 @@ import {
   Bike, Ship, Plane, Bus, Minus, Plus, X,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils/format';
-import { getSaleStatus, getTierSaleInfo, type TierSaleInfo } from '@/lib/utils/sale-pricing';
+import type { SaleWindow } from '@/lib/utils/sale-pricing';
+import {
+  resolveServicePrice,
+  resolveServicePriceWithSale,
+  type ResolvedPrice,
+} from '@/lib/services';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -235,15 +240,9 @@ export function StepServiceSelect({
   // --- Derived values ---
   const tiers = selectedService?.service_pricing ?? [];
   const tier = tiers.find((t) => t.tier_name === selectedTier);
-  const saleStatus = selectedService
-    ? getSaleStatus({
-        sale_starts_at: selectedService.sale_starts_at,
-        sale_ends_at: selectedService.sale_ends_at,
-      })
-    : { isOnSale: false };
   const isFlatPrice = selectedService?.pricing_model === 'flat';
   const price = selectedService
-    ? computePrice(selectedService, tier, sizeClass, perUnitQty, saleStatus.isOnSale)
+    ? computePrice(selectedService, tier, sizeClass, perUnitQty)
     : 0;
 
   const zone = mobileZones.find((z) => z.id === mobileZoneId);
@@ -370,7 +369,6 @@ export function StepServiceSelect({
           onSelectSize={setSizeClass}
           perUnitQty={perUnitQty}
           onSetQty={setPerUnitQty}
-          saleStatus={saleStatus}
           vehicleSizeClass={vehicleSizeClass}
           vehicleSpecialtyTier={vehicleSpecialtyTier}
         />
@@ -914,10 +912,6 @@ function ServiceFallbackIcon({ categoryName, serviceName }: { categoryName: stri
 // PricingSelector — renders the right control for the pricing model
 // ---------------------------------------------------------------------------
 
-interface SaleStatusInfo {
-  isOnSale: boolean;
-}
-
 function PricingSelector({
   service,
   tiers,
@@ -927,7 +921,6 @@ function PricingSelector({
   onSelectSize,
   perUnitQty,
   onSetQty,
-  saleStatus,
   vehicleSizeClass,
   vehicleSpecialtyTier,
 }: {
@@ -939,7 +932,6 @@ function PricingSelector({
   onSelectSize: (sc: VehicleSizeClass) => void;
   perUnitQty: number;
   onSetQty: (q: number) => void;
-  saleStatus: SaleStatusInfo;
   vehicleSizeClass?: VehicleSizeClass | null;
   vehicleSpecialtyTier?: string | null;
 }) {
@@ -947,24 +939,30 @@ function PricingSelector({
   const hideSizePicker = !!vehicleSizeClass;
   // When specialty tier is known from Step 1, hide the tier picker
   const hideSpecialtyPicker = !!vehicleSpecialtyTier;
+  const saleWindow = getServiceSaleWindow(service);
 
   switch (service.pricing_model) {
     case 'flat': {
-      const flatSaleStatus = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-      const flatOnSale = flatSaleStatus.isOnSale && service.sale_price != null && service.flat_price != null && service.sale_price < service.flat_price;
+      if (service.flat_price == null) {
+        return (
+          <div className="rounded-lg border border-site-border p-4">
+            <p className="text-sm text-site-text-secondary">Flat Rate</p>
+            <p className="text-2xl font-bold text-site-text">--</p>
+          </div>
+        );
+      }
+      const resolved = resolveServicePriceWithSale(synthesizeFlatTier(service), null, saleWindow);
       return (
         <div className="rounded-lg border border-site-border p-4">
           <p className="text-sm text-site-text-secondary">Flat Rate</p>
-          {flatOnSale ? (
+          {resolved.isOnSale ? (
             <div className="flex items-center gap-2">
-              <p className="text-sm text-site-text-muted line-through">{formatCurrency(service.flat_price!)}</p>
-              <p className="text-2xl font-bold text-accent-brand">{formatCurrency(service.sale_price!)}</p>
+              <p className="text-sm text-site-text-muted line-through">{formatCurrency(resolved.standardPrice)}</p>
+              <p className="text-2xl font-bold text-accent-brand">{formatCurrency(resolved.effectivePrice)}</p>
               <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>
             </div>
           ) : (
-            <p className="text-2xl font-bold text-site-text">
-              {service.flat_price != null ? formatCurrency(service.flat_price) : '--'}
-            </p>
+            <p className="text-2xl font-bold text-site-text">{formatCurrency(resolved.effectivePrice)}</p>
           )}
         </div>
       );
@@ -975,19 +973,19 @@ function PricingSelector({
       if (hideSizePicker) {
         const matchedTier = tiers.find((t) => t.tier_name === vehicleSizeClass);
         if (matchedTier) {
-          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
+          const resolved = resolveServicePriceWithSale(matchedTier, null, saleWindow);
           const label = matchedTier.tier_label ?? VEHICLE_SIZE_LABELS[matchedTier.tier_name] ?? matchedTier.tier_name;
           return (
             <div className="rounded-lg border border-site-border p-4">
               <p className="text-sm text-site-text-secondary">{label}</p>
-              {saleInfo?.isDiscounted ? (
+              {resolved.isOnSale ? (
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-site-text-muted line-through">{formatCurrency(saleInfo.originalPrice)}</p>
-                  <p className="text-2xl font-bold text-accent-brand">{formatCurrency(saleInfo.currentPrice)}</p>
+                  <p className="text-sm text-site-text-muted line-through">{formatCurrency(resolved.standardPrice)}</p>
+                  <p className="text-2xl font-bold text-accent-brand">{formatCurrency(resolved.effectivePrice)}</p>
                   <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-red-600 dark:bg-red-900/30 dark:text-red-400">Sale</span>
                 </div>
               ) : (
-                <p className="text-2xl font-bold text-site-text">{formatCurrency(saleInfo?.currentPrice ?? matchedTier.price)}</p>
+                <p className="text-2xl font-bold text-site-text">{formatCurrency(resolved.effectivePrice)}</p>
               )}
             </div>
           );
@@ -1001,7 +999,7 @@ function PricingSelector({
           </h3>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {tiers.map((tier) => {
-              const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
+              const resolved = resolveServicePriceWithSale(tier, null, saleWindow);
               const SizeIcon = VEHICLE_SIZE_ICONS[tier.tier_name] ?? Car;
               const isSelected = selectedTier === tier.tier_name;
 
@@ -1021,21 +1019,21 @@ function PricingSelector({
                   <p className="text-sm font-medium text-site-text">
                     {tier.tier_label ?? VEHICLE_SIZE_LABELS[tier.tier_name] ?? tier.tier_name}
                   </p>
-                  {saleInfo?.isDiscounted ? (
+                  {resolved.isOnSale ? (
                     <div className="mt-1 text-center">
                       <p className="text-sm text-site-text-muted line-through">
-                        {formatCurrency(saleInfo.originalPrice)}
+                        {formatCurrency(resolved.standardPrice)}
                       </p>
                       <p className="text-lg font-bold text-accent-brand">
-                        {formatCurrency(saleInfo.currentPrice)}
+                        {formatCurrency(resolved.effectivePrice)}
                       </p>
                       <p className="text-xs text-accent-brand">
-                        Save {formatCurrency(saleInfo.savings)}
+                        Save {formatCurrency(resolved.saleSavings)}
                       </p>
                     </div>
                   ) : (
                     <p className="mt-1 text-lg font-bold text-site-text">
-                      {formatCurrency(saleInfo?.currentPrice ?? tier.price)}
+                      {formatCurrency(resolved.effectivePrice)}
                     </p>
                   )}
                   {isSelected && (
@@ -1059,18 +1057,15 @@ function PricingSelector({
               Select Option
             </h3>
             <div className="mt-2 grid gap-2">
-              {tiers.map((tier) => {
-                const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
-                return (
-                  <ScopeTierCard
-                    key={tier.id}
-                    tier={tier}
-                    saleInfo={saleInfo}
-                    isSelected={selectedTier === tier.tier_name}
-                    onClick={() => onSelectTier(tier.tier_name)}
-                  />
-                );
-              })}
+              {tiers.map((tier) => (
+                <ScopeTierCard
+                  key={tier.id}
+                  tier={tier}
+                  resolved={resolveServicePriceWithSale(tier, null, saleWindow)}
+                  isSelected={selectedTier === tier.tier_name}
+                  onClick={() => onSelectTier(tier.tier_name)}
+                />
+              ))}
             </div>
           </div>
 
@@ -1085,8 +1080,8 @@ function PricingSelector({
                 </h3>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {CUSTOMER_SELF_SERVICE_SIZE_CLASSES.map((sc) => {
-                    const p = getVehicleSizePrice(current, sc);
-                    if (p == null) return null;
+                    if (!isVehicleSizeOffered(current, sc)) return null;
+                    const p = resolveServicePrice(current, sc);
                     const SizeIcon = VEHICLE_SIZE_ICONS[sc] ?? Car;
                     const isSelected = sizeClass === sc;
                     return (
@@ -1128,18 +1123,18 @@ function PricingSelector({
       if (hideSpecialtyPicker) {
         const matchedTier = tiers.find((t) => t.tier_name === vehicleSpecialtyTier);
         if (matchedTier) {
-          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
+          const resolved = resolveServicePriceWithSale(matchedTier, null, saleWindow);
           return (
             <div className="rounded-lg border border-site-border p-4">
               <p className="text-sm text-site-text-secondary">{matchedTier.tier_label ?? matchedTier.tier_name}</p>
-              {saleInfo?.isDiscounted ? (
+              {resolved.isOnSale ? (
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-site-text-muted line-through">{formatCurrency(saleInfo.originalPrice)}</p>
-                  <p className="text-2xl font-bold text-accent-brand">{formatCurrency(saleInfo.currentPrice)}</p>
+                  <p className="text-sm text-site-text-muted line-through">{formatCurrency(resolved.standardPrice)}</p>
+                  <p className="text-2xl font-bold text-accent-brand">{formatCurrency(resolved.effectivePrice)}</p>
                   <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-semibold uppercase text-red-600 dark:bg-red-900/30 dark:text-red-400">Sale</span>
                 </div>
               ) : (
-                <p className="text-2xl font-bold text-site-text">{formatCurrency(saleInfo?.currentPrice ?? matchedTier.price)}</p>
+                <p className="text-2xl font-bold text-site-text">{formatCurrency(resolved.effectivePrice)}</p>
               )}
             </div>
           );
@@ -1152,37 +1147,34 @@ function PricingSelector({
             Select Option
           </h3>
           <div className="mt-2 grid gap-2">
-            {tiers.map((tier) => {
-              const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
-              return (
-                <ScopeTierCard
-                  key={tier.id}
-                  tier={tier}
-                  saleInfo={saleInfo}
-                  isSelected={selectedTier === tier.tier_name}
-                  onClick={() => onSelectTier(tier.tier_name)}
-                />
-              );
-            })}
+            {tiers.map((tier) => (
+              <ScopeTierCard
+                key={tier.id}
+                tier={tier}
+                resolved={resolveServicePriceWithSale(tier, null, saleWindow)}
+                isSelected={selectedTier === tier.tier_name}
+                onClick={() => onSelectTier(tier.tier_name)}
+              />
+            ))}
           </div>
         </div>
       );
     }
 
     case 'per_unit': {
-      const puSaleStatus = getSaleStatus({ sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at });
-      const puOnSale = puSaleStatus.isOnSale && service.sale_price != null && service.per_unit_price != null && service.sale_price < service.per_unit_price;
+      if (service.per_unit_price == null) return null;
+      const unitResolved = resolveServicePriceWithSale(synthesizePerUnitTier(service), null, saleWindow);
       return (
         <div className="rounded-lg border border-site-border p-4">
           <p className="text-sm text-site-text-secondary">
-            {puOnSale ? (
+            {unitResolved.isOnSale ? (
               <>
-                <span className="line-through text-site-text-muted">{formatCurrency(service.per_unit_price!)}</span>{' '}
-                <span className="font-semibold text-accent-brand">{formatCurrency(service.sale_price!)}</span>{' '}
+                <span className="line-through text-site-text-muted">{formatCurrency(unitResolved.standardPrice)}</span>{' '}
+                <span className="font-semibold text-accent-brand">{formatCurrency(unitResolved.effectivePrice)}</span>{' '}
                 <span className="rounded bg-red-100 px-1 py-0.5 text-xs font-semibold uppercase text-red-600">Sale</span>{' '}
               </>
             ) : (
-              formatCurrency(service.per_unit_price ?? 0)
+              formatCurrency(unitResolved.effectivePrice)
             )}
             {' '}per {service.per_unit_label || 'unit'}
           </p>
@@ -1212,14 +1204,14 @@ function PricingSelector({
               <Plus className="h-4 w-4" />
             </button>
           </div>
-          {puOnSale ? (
+          {unitResolved.isOnSale ? (
             <div className="mt-2 flex items-center gap-2">
-              <p className="text-sm text-site-text-muted line-through">{formatCurrency((service.per_unit_price ?? 0) * perUnitQty)}</p>
-              <p className="text-xl font-bold text-accent-brand">{formatCurrency(service.sale_price! * perUnitQty)}</p>
+              <p className="text-sm text-site-text-muted line-through">{formatCurrency(unitResolved.standardPrice * perUnitQty)}</p>
+              <p className="text-xl font-bold text-accent-brand">{formatCurrency(unitResolved.effectivePrice * perUnitQty)}</p>
             </div>
           ) : (
             <p className="mt-2 text-xl font-bold text-site-text">
-              {formatCurrency((service.per_unit_price ?? 0) * perUnitQty)}
+              {formatCurrency(unitResolved.effectivePrice * perUnitQty)}
             </p>
           )}
         </div>
@@ -1237,15 +1229,31 @@ function PricingSelector({
 
 function ScopeTierCard({
   tier,
-  saleInfo,
+  resolved,
   isSelected,
   onClick,
 }: {
   tier: ServicePricing;
-  saleInfo: TierSaleInfo | null;
+  resolved: ResolvedPrice;
   isSelected: boolean;
   onClick: () => void;
 }) {
+  // For vehicle-size-aware tiers, derive "From $X" floor from customer-facing
+  // size columns only — exotic/classic are gated out of self-service per
+  // CUSTOMER_SELF_SERVICE_SIZE_CLASSES. Prices come from the canonical engine.
+  let displayLabel: string;
+  if (resolved.isOnSale) {
+    displayLabel = formatCurrency(resolved.effectivePrice);
+  } else if (tier.is_vehicle_size_aware) {
+    const customerPrices = CUSTOMER_SELF_SERVICE_SIZE_CLASSES
+      .filter((sc) => isVehicleSizeOffered(tier, sc))
+      .map((sc) => resolveServicePrice(tier, sc));
+    const floor = customerPrices.length > 0 ? Math.min(...customerPrices) : resolved.effectivePrice;
+    displayLabel = `From ${formatCurrency(floor)}`;
+  } else {
+    displayLabel = formatCurrency(resolved.effectivePrice);
+  }
+
   return (
     <button
       type="button"
@@ -1268,24 +1276,18 @@ function ScopeTierCard({
         </p>
       </div>
       <div className="text-right">
-        {saleInfo?.isDiscounted ? (
+        {resolved.isOnSale ? (
           <div className="flex items-center gap-2">
             <span className="text-sm text-site-text-muted line-through">
-              {formatCurrency(saleInfo.originalPrice)}
+              {formatCurrency(resolved.standardPrice)}
             </span>
             <span className="text-base font-bold text-accent-brand">
-              {formatCurrency(saleInfo.currentPrice)}
+              {formatCurrency(resolved.effectivePrice)}
             </span>
           </div>
         ) : (
           <span className="text-base font-bold text-site-text">
-            {tier.is_vehicle_size_aware
-              ? `From ${formatCurrency(Math.min(
-                  tier.vehicle_size_sedan_price ?? Infinity,
-                  tier.vehicle_size_truck_suv_price ?? Infinity,
-                  tier.vehicle_size_suv_van_price ?? Infinity
-                ))}`
-              : formatCurrency(saleInfo?.currentPrice ?? tier.price)}
+            {displayLabel}
           </span>
         )}
       </div>
@@ -1297,54 +1299,109 @@ function ScopeTierCard({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function computePrice(
+// Item 15f Layer 3c: all price math routes through the canonical engine
+// (`resolveServicePrice` / `resolveServicePriceWithSale`) per CLAUDE.md Rule 22.
+// Customer-facing UI stays bespoke; only the math sites migrated.
+//
+// `flat` and `per_unit` have no `service_pricing` row, so we synthesize one
+// to feed the engine — mirrors `routeServiceTap`'s `quick-add-synthetic-flat`
+// pattern. `custom` has no engine support for customer surfaces
+// (operator-only via `<CustomPriceDialog>`), so we surface
+// `custom_starting_price` until Item 15g-ii exposes the operator-entered
+// final price on this path.
+function synthesizeFlatTier(service: BookableService): ServicePricing {
+  return {
+    id: 'flat',
+    service_id: service.id,
+    tier_name: 'flat',
+    tier_label: null,
+    price: service.flat_price ?? 0,
+    sale_price: service.sale_price,
+    display_order: 0,
+    is_vehicle_size_aware: false,
+    vehicle_size_sedan_price: null,
+    vehicle_size_truck_suv_price: null,
+    vehicle_size_suv_van_price: null,
+    vehicle_size_exotic_price: null,
+    vehicle_size_classic_price: null,
+    max_qty: null,
+    qty_label: null,
+    created_at: '',
+  };
+}
+
+function synthesizePerUnitTier(service: BookableService): ServicePricing {
+  return {
+    id: 'per_unit',
+    service_id: service.id,
+    tier_name: 'per_unit',
+    tier_label: null,
+    price: service.per_unit_price ?? 0,
+    sale_price: service.sale_price,
+    display_order: 0,
+    is_vehicle_size_aware: false,
+    vehicle_size_sedan_price: null,
+    vehicle_size_truck_suv_price: null,
+    vehicle_size_suv_van_price: null,
+    vehicle_size_exotic_price: null,
+    vehicle_size_classic_price: null,
+    max_qty: null,
+    qty_label: null,
+    created_at: '',
+  };
+}
+
+function getServiceSaleWindow(service: BookableService): SaleWindow {
+  return { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
+}
+
+export function computePrice(
   service: BookableService,
   tier: ServicePricing | undefined,
   sizeClass: VehicleSizeClass | null,
   perUnitQty: number,
-  isOnSale: boolean
 ): number {
+  const saleWindow = getServiceSaleWindow(service);
+
   switch (service.pricing_model) {
     case 'flat':
-      if (isOnSale && service.sale_price != null && service.sale_price < (service.flat_price ?? 0)) {
-        return service.sale_price;
-      }
-      return service.flat_price ?? 0;
+      if (service.flat_price == null) return 0;
+      return resolveServicePriceWithSale(synthesizeFlatTier(service), null, saleWindow).effectivePrice;
 
     case 'vehicle_size':
     case 'scope':
     case 'specialty':
       if (!tier) return 0;
-      if (tier.is_vehicle_size_aware && sizeClass) {
-        return getVehicleSizePrice(tier, sizeClass) ?? 0;
-      }
-      // Apply sale price if active
-      if (isOnSale && tier.sale_price !== null && tier.sale_price < tier.price) {
-        return tier.sale_price;
-      }
-      return tier.price;
+      return resolveServicePriceWithSale(tier, sizeClass, saleWindow).effectivePrice;
 
     case 'per_unit': {
-      const baseUnit = service.per_unit_price ?? 0;
-      if (isOnSale && service.sale_price != null && service.sale_price < baseUnit) {
-        return service.sale_price * perUnitQty;
-      }
-      return baseUnit * perUnitQty;
+      if (service.per_unit_price == null) return 0;
+      const unitPrice = resolveServicePriceWithSale(synthesizePerUnitTier(service), null, saleWindow).effectivePrice;
+      return unitPrice * perUnitQty;
     }
+
+    case 'custom':
+      return service.custom_starting_price ?? 0;
 
     default:
       return 0;
   }
 }
 
-function getVehicleSizePrice(
-  tier: ServicePricing,
-  sc: VehicleSizeClass
-): number | null {
-  if (sc === 'sedan') return tier.vehicle_size_sedan_price;
-  if (sc === 'truck_suv_2row') return tier.vehicle_size_truck_suv_price;
-  if (sc === 'suv_3row_van') return tier.vehicle_size_suv_van_price;
-  return null;
+// Column-presence check for the customer-facing scope+size grid. Returns
+// whether a per-size column is explicitly populated for this tier (NOT the
+// price — that's the engine's job via `resolveServicePrice`). Used to hide
+// size buttons whose column is null rather than rendering them at the
+// engine's `tier.price` fallback.
+function isVehicleSizeOffered(tier: ServicePricing, sc: VehicleSizeClass): boolean {
+  if (!tier.is_vehicle_size_aware) return false;
+  switch (sc) {
+    case 'sedan': return tier.vehicle_size_sedan_price != null;
+    case 'truck_suv_2row': return tier.vehicle_size_truck_suv_price != null;
+    case 'suv_3row_van': return tier.vehicle_size_suv_van_price != null;
+    case 'exotic': return tier.vehicle_size_exotic_price != null;
+    case 'classic': return tier.vehicle_size_classic_price != null;
+  }
 }
 
 function needsSizeClass(
@@ -1377,7 +1434,7 @@ function getAddonMinPrice(
 // Price display helpers (for service cards)
 // ---------------------------------------------------------------------------
 
-function getServicePriceDisplay(
+export function getServicePriceDisplay(
   service: BookableService,
   vehicleSizeClass?: VehicleSizeClass | null,
   vehicleSpecialtyTier?: string | null
@@ -1386,18 +1443,16 @@ function getServicePriceDisplay(
   originalPrice: string | null;
   isOnSale: boolean;
 } {
-  const saleStatus = getSaleStatus({
-    sale_starts_at: service.sale_starts_at,
-    sale_ends_at: service.sale_ends_at,
-  });
+  const saleWindow = getServiceSaleWindow(service);
 
   switch (service.pricing_model) {
     case 'flat': {
       if (service.flat_price == null) return { priceLabel: null, originalPrice: null, isOnSale: false };
-      if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.flat_price) {
-        return { priceLabel: formatCurrency(service.sale_price), originalPrice: formatCurrency(service.flat_price), isOnSale: true };
+      const resolved = resolveServicePriceWithSale(synthesizeFlatTier(service), null, saleWindow);
+      if (resolved.isOnSale) {
+        return { priceLabel: formatCurrency(resolved.effectivePrice), originalPrice: formatCurrency(resolved.standardPrice), isOnSale: true };
       }
-      return { priceLabel: formatCurrency(service.flat_price), originalPrice: null, isOnSale: false };
+      return { priceLabel: formatCurrency(resolved.effectivePrice), originalPrice: null, isOnSale: false };
     }
 
     case 'vehicle_size': {
@@ -1408,25 +1463,23 @@ function getServicePriceDisplay(
       if (vehicleSizeClass) {
         const matchedTier = tiers.find((t) => t.tier_name === vehicleSizeClass);
         if (matchedTier) {
-          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
-          if (saleInfo?.isDiscounted) {
-            return { priceLabel: formatCurrency(saleInfo.currentPrice), originalPrice: formatCurrency(saleInfo.originalPrice), isOnSale: true };
+          const resolved = resolveServicePriceWithSale(matchedTier, null, saleWindow);
+          if (resolved.isOnSale) {
+            return { priceLabel: formatCurrency(resolved.effectivePrice), originalPrice: formatCurrency(resolved.standardPrice), isOnSale: true };
           }
-          return { priceLabel: formatCurrency(saleInfo?.currentPrice ?? matchedTier.price), originalPrice: null, isOnSale: false };
+          return { priceLabel: formatCurrency(resolved.effectivePrice), originalPrice: null, isOnSale: false };
         }
       }
 
-      // Fallback: "From $X" (no vehicle size known)
+      // Fallback: "From $X" (no vehicle size known) — min over tier effective prices
       let minCurrent = Infinity;
       let minOriginal = Infinity;
       let hasDiscount = false;
       for (const tier of tiers) {
-        const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
-        if (saleInfo) {
-          if (saleInfo.currentPrice < minCurrent) minCurrent = saleInfo.currentPrice;
-          if (saleInfo.originalPrice < minOriginal) minOriginal = saleInfo.originalPrice;
-          if (saleInfo.isDiscounted) hasDiscount = true;
-        }
+        const resolved = resolveServicePriceWithSale(tier, null, saleWindow);
+        if (resolved.effectivePrice < minCurrent) minCurrent = resolved.effectivePrice;
+        if (resolved.standardPrice < minOriginal) minOriginal = resolved.standardPrice;
+        if (resolved.isOnSale) hasDiscount = true;
       }
       if (minCurrent === Infinity) return { priceLabel: null, originalPrice: null, isOnSale: false };
       return {
@@ -1445,27 +1498,21 @@ function getServicePriceDisplay(
       let hasDiscount = false;
 
       for (const tier of tiers) {
-        // For vehicle-size-aware scope tiers, use the specific size price
-        if (tier.is_vehicle_size_aware && vehicleSizeClass) {
-          const sizePrice = getVehicleSizePrice(tier, vehicleSizeClass);
-          if (sizePrice != null && sizePrice < minCurrent) {
-            minCurrent = sizePrice;
-            minOriginal = sizePrice;
-          }
-        } else if (tier.is_vehicle_size_aware) {
-          // No size known — use sedan as minimum
-          const sedanPrice = tier.vehicle_size_sedan_price;
-          if (sedanPrice != null) {
-            if (sedanPrice < minCurrent) minCurrent = sedanPrice;
-            if (sedanPrice < minOriginal) minOriginal = sedanPrice;
+        if (tier.is_vehicle_size_aware) {
+          // Vehicle-size-aware scope tier: use vehicle's size or sedan as proxy
+          // for the "From $X" floor. Sale price applies tier-wide via engine.
+          const sc: VehicleSizeClass | null = vehicleSizeClass ?? 'sedan';
+          if (isVehicleSizeOffered(tier, sc) || vehicleSizeClass != null) {
+            const resolved = resolveServicePriceWithSale(tier, sc, saleWindow);
+            if (resolved.effectivePrice < minCurrent) minCurrent = resolved.effectivePrice;
+            if (resolved.standardPrice < minOriginal) minOriginal = resolved.standardPrice;
+            if (resolved.isOnSale) hasDiscount = true;
           }
         } else {
-          const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
-          if (saleInfo) {
-            if (saleInfo.currentPrice < minCurrent) minCurrent = saleInfo.currentPrice;
-            if (saleInfo.originalPrice < minOriginal) minOriginal = saleInfo.originalPrice;
-            if (saleInfo.isDiscounted) hasDiscount = true;
-          }
+          const resolved = resolveServicePriceWithSale(tier, null, saleWindow);
+          if (resolved.effectivePrice < minCurrent) minCurrent = resolved.effectivePrice;
+          if (resolved.standardPrice < minOriginal) minOriginal = resolved.standardPrice;
+          if (resolved.isOnSale) hasDiscount = true;
         }
       }
 
@@ -1486,11 +1533,11 @@ function getServicePriceDisplay(
       if (vehicleSpecialtyTier) {
         const matchedTier = tiers.find((t) => t.tier_name === vehicleSpecialtyTier);
         if (matchedTier) {
-          const saleInfo = getTierSaleInfo(matchedTier.price, matchedTier.sale_price, saleStatus.isOnSale);
-          if (saleInfo?.isDiscounted) {
-            return { priceLabel: formatCurrency(saleInfo.currentPrice), originalPrice: formatCurrency(saleInfo.originalPrice), isOnSale: true };
+          const resolved = resolveServicePriceWithSale(matchedTier, null, saleWindow);
+          if (resolved.isOnSale) {
+            return { priceLabel: formatCurrency(resolved.effectivePrice), originalPrice: formatCurrency(resolved.standardPrice), isOnSale: true };
           }
-          return { priceLabel: formatCurrency(saleInfo?.currentPrice ?? matchedTier.price), originalPrice: null, isOnSale: false };
+          return { priceLabel: formatCurrency(resolved.effectivePrice), originalPrice: null, isOnSale: false };
         }
       }
 
@@ -1499,12 +1546,10 @@ function getServicePriceDisplay(
       let minOriginal = Infinity;
       let hasDiscount = false;
       for (const tier of tiers) {
-        const saleInfo = getTierSaleInfo(tier.price, tier.sale_price, saleStatus.isOnSale);
-        if (saleInfo) {
-          if (saleInfo.currentPrice < minCurrent) minCurrent = saleInfo.currentPrice;
-          if (saleInfo.originalPrice < minOriginal) minOriginal = saleInfo.originalPrice;
-          if (saleInfo.isDiscounted) hasDiscount = true;
-        }
+        const resolved = resolveServicePriceWithSale(tier, null, saleWindow);
+        if (resolved.effectivePrice < minCurrent) minCurrent = resolved.effectivePrice;
+        if (resolved.standardPrice < minOriginal) minOriginal = resolved.standardPrice;
+        if (resolved.isOnSale) hasDiscount = true;
       }
       if (minCurrent === Infinity) return { priceLabel: null, originalPrice: null, isOnSale: false };
       return {
@@ -1514,12 +1559,19 @@ function getServicePriceDisplay(
       };
     }
 
-    case 'per_unit':
+    case 'per_unit': {
       if (service.per_unit_price == null) return { priceLabel: null, originalPrice: null, isOnSale: false };
-      if (saleStatus.isOnSale && service.sale_price != null && service.sale_price < service.per_unit_price) {
-        return { priceLabel: `${formatCurrency(service.sale_price)} / ${service.per_unit_label || 'unit'}`, originalPrice: `${formatCurrency(service.per_unit_price)} / ${service.per_unit_label || 'unit'}`, isOnSale: true };
+      const resolved = resolveServicePriceWithSale(synthesizePerUnitTier(service), null, saleWindow);
+      const unitLabel = service.per_unit_label || 'unit';
+      if (resolved.isOnSale) {
+        return {
+          priceLabel: `${formatCurrency(resolved.effectivePrice)} / ${unitLabel}`,
+          originalPrice: `${formatCurrency(resolved.standardPrice)} / ${unitLabel}`,
+          isOnSale: true,
+        };
       }
-      return { priceLabel: `${formatCurrency(service.per_unit_price)} / ${service.per_unit_label || 'unit'}`, originalPrice: null, isOnSale: false };
+      return { priceLabel: `${formatCurrency(resolved.effectivePrice)} / ${unitLabel}`, originalPrice: null, isOnSale: false };
+    }
 
     case 'custom':
       return service.custom_starting_price != null

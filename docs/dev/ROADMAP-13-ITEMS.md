@@ -10,7 +10,7 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.1 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3d done; Phase 1 / Layers 3c, 4 pending); 15g Layer 15g-i landed (MVP coupon-only persistence); 15g Layers 15g-ii/iii/iv still pending (must land before Phase 1 layers 8a-8f).
+**Document version:** v2.2 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d done; Phase 1 / Layer 4 pending); 15g Layer 15g-i landed (MVP coupon-only persistence); 15g Layers 15g-ii/iii/iv still pending (must land before Phase 1 layers 8a-8f).
 **Last session updated:** 2026-05-16 — Item 15g Layer 15g-i landed: MVP coupon-only persistence chain fix (convert-service.ts coupon propagation + checkout-items appointment fallback). Closes ~70% of operator-reported lifecycle-persistence bug; no schema changes. Layer 15g-ii (schema migration + loyalty/manual-discount propagation) is the next sequential session.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
@@ -782,7 +782,7 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 ### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
 
-- **Status:** Layers 1+2+3d done; Layer 3a partial — POS Jobs card migrated (2026-05-16); Admin Appointment dialog migration deferred pending `<CatalogBrowser>` POS-context decoupling (see Notes/decisions log). Layers 3c + 4 not started.
+- **Status:** Layers 1+2+3c+3d done; Layer 3a partial — POS Jobs card migrated (2026-05-16); Admin Appointment dialog migration deferred pending `<CatalogBrowser>` POS-context decoupling (see Notes/decisions log). Layer 4 not started.
 - **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
 - **Effort:** 5-6 sessions (~10-14 hours total, layered)
 - **Wave:** 1.5
@@ -916,13 +916,40 @@ gets deleted at Layer 8e. Item 15a's cascade endpoint and helpers STAY —
 they're the persistence layer that Phase 1 routes call.
 
 
-**Layer 3c — Booking Wizard price-math migration (NOT UI):**
+**Layer 3c — Booking Wizard price-math migration (NOT UI) — DONE 2026-05-16:**
 - `src/components/booking/step-service-select.tsx` replaces its inline
   per-pricing_model price switch (lines 282, 951, 1307, 1394, 1404, 1440,
   1482) with imports of `resolveServicePrice` /
   `resolveServicePriceWithSale` from the canonical engine.
 - Bespoke customer-facing UI of the wizard is preserved — only price
   calculations route through the shared resolver.
+- Synthesizes ephemeral `ServicePricing` rows for `flat` / `per_unit`
+  (which have no `service_pricing` row in the catalog) to feed the engine;
+  mirrors `routeServiceTap`'s `quick-add-synthetic-flat` pattern.
+- Adds missing `custom` branch in `computePrice` — pre-fix the wizard
+  returned 0 for `pricing_model === 'custom'`, blocking Flood Damage from
+  booking; now returns `service.custom_starting_price` (until Layer 15g-ii
+  exposes operator-prompted final price on this path).
+- Wizard-local `isVehicleSizeOffered(tier, sc)` provides column-presence
+  check (for hiding unconfigured customer sizes from the size grid) — a
+  metadata query, not a price computation, since the engine doesn't expose
+  null-vs-set semantics for per-size columns.
+- Deletes bespoke `getVehicleSizePrice(tier, sc)` (no longer needed),
+  unused `<PricingSelector>` `saleStatus` prop + `SaleStatusInfo`
+  interface, and all `getTierSaleInfo` call sites in PricingSelector /
+  getServicePriceDisplay / ScopeTierCard. `ScopeTierCard` now takes
+  `resolved: ResolvedPrice` instead of `saleInfo: TierSaleInfo | null`;
+  its "From $X" floor iterates `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` with
+  the engine + `isVehicleSizeOffered` filter.
+- New test file `src/components/booking/__tests__/step-service-select.test.tsx`
+  (27 cases) pins all 6 `pricing_model` values: flat $175 / vehicle_size
+  row-based pattern (exotic $450 NOT sedan, classic $725) / vehicle_size
+  column-based pattern (exotic/classic per-size columns) / scope
+  (non-vehicle_size_aware returns tier.price) / per_unit ($150 × 3 = $450,
+  sale path) / specialty (Aircraft $800, Boat $600, Motorcycle $200) /
+  custom (Flood Damage = $475). Exports added: `computePrice` +
+  `getServicePriceDisplay` from `step-service-select.tsx` to enable
+  testing.
 
 **Layer 3d — Server-side helper migration (voice agent + SMS auto-responder) — DONE 2026-05-16:**
 - `src/lib/services/service-resolver.ts` is a 4th bespoke pricing implementation
@@ -1221,6 +1248,59 @@ any future code that might attempt to re-build a parallel picker.
   (Ferrari Ceramic Shield = $725, Scratch Repair = $150/unit, Mold
   Extraction = $475 starting price; specialty pricing remains partially
   fixed until the call-site updates land).
+- 2026-05-16 (Layer 3c — Booking Wizard price-math migration): customer-
+  facing booking wizard now routes ALL service-pricing math through the
+  canonical engine (`resolveServicePrice` /
+  `resolveServicePriceWithSale`) per Rule 22. The 6 audit-cited inline
+  math sites in `src/components/booking/step-service-select.tsx`
+  (`computePrice`, `getServicePriceDisplay` + its case branches at the
+  cited lines, `PricingSelector` cases for flat/vehicle_size/scope/
+  specialty/per_unit, and `ScopeTierCard`'s "From $X" floor) are gone.
+  `flat` and `per_unit` services have no `service_pricing` row, so the
+  wizard synthesizes an ephemeral `ServicePricing` to feed the engine
+  (mirrors `routeServiceTap`'s `quick-add-synthetic-flat` pattern); the
+  `per_unit` qty multiplication stays wizard-side (the engine resolves
+  the unit price). Two engine-correct side effects: (1) `custom`
+  pricing_model now resolves to `service.custom_starting_price` — pre-
+  fix the wizard had no `custom` branch in `computePrice` and returned 0;
+  (2) `is_vehicle_size_aware: true` tiers now apply tier-level
+  `sale_price` when active, since `resolveServicePriceWithSale` compares
+  sale_price against the resolved per-size price. Wizard-local
+  `isVehicleSizeOffered(tier, sc)` is a pure column-presence query (NOT
+  a price computation — needed for the scope+size customer grid to hide
+  unconfigured sizes rather than falling back to base `tier.price`);
+  comment in-source documents this. Deleted: bespoke
+  `getVehicleSizePrice(tier, sc)` helper (the variant of the silent
+  exotic/classic mispricing root cause), all `getTierSaleInfo` call
+  sites in PricingSelector / getServicePriceDisplay / ScopeTierCard,
+  the unused `<PricingSelector>` `saleStatus` prop +
+  `SaleStatusInfo` interface, the redundant outer-component
+  `saleStatus` derivation. `ScopeTierCard`'s `saleInfo` prop renamed
+  to `resolved: ResolvedPrice` (engine's canonical output shape); the
+  "From $X" floor iterates `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` with
+  `isVehicleSizeOffered` filter + `resolveServicePrice` for values.
+  Customer-facing UI/layout/styling is untouched per Rule 22 carve-out.
+  New test file
+  `src/components/booking/__tests__/step-service-select.test.tsx` (27
+  cases) pins all 6 `pricing_model` values: flat $175 / vehicle_size
+  row-based (exotic $450 NOT sedan, classic Ceramic Shield $725) /
+  vehicle_size column-based (engine reads exotic/classic per-size
+  columns) / scope (non-vehicle_size_aware tier returns tier.price) /
+  per_unit (Scratch Repair $150 × 3 = $450, sale-applied variant) /
+  specialty (Aircraft $800, Boat $600, Motorcycle $200) / custom
+  (Flood Damage $475). `getServicePriceDisplay` label tests pinned for
+  sale strikethrough + "From $X" min. Required exporting `computePrice`
+  + `getServicePriceDisplay` from the wizard file for direct test
+  consumption (file is `'use client'`, but TypeScript-side exports work
+  for both the React tree and the jsdom test). Verification: typecheck
+  clean, lint 0 errors (98 warnings = unchanged baseline), 1226/1226
+  vitest pass (was 1199 prior; +27 new), production build compiled
+  successfully (787 static pages, clean `.next` rebuild).
+  **Manual UAT NOT performed** — booking wizard requires running the
+  app against a real DB; user verifies post-session per `npm run dev`
+  (golden path: customer books a classic vehicle service through the
+  wizard and sees $725 surface; per_unit qty stepper math; custom
+  service displays starting price label).
 
 ---
 
@@ -1993,6 +2073,7 @@ CC session.
 | 2026-05-16 | 6 | Item 15a — Edit Services on Admin Appointment Dialog (with cascade to job) | done | `8726053d` | Closes audit gaps §10 #1 and #11. New `PUT /api/admin/appointments/[id]/services` performs the cascade: replaces `appointment_services` rows, recomputes appointment `subtotal`/`total_amount`, and (if a `jobs` row is linked via `jobs.appointment_id`) rebuilds the `jobs.services` JSONB to match — mirroring the synthetic-mobile-fee shape from `/api/pos/jobs/populate/route.ts`. Permission decision: reused `appointments.reschedule` (same role distribution + no migration). Manual rollback pattern from `/api/pos/jobs/route.ts:381-453` adapted — snapshot/restore preserves original row ids at each failure-injection point. New `GET /api/admin/services/active` (session-authed) feeds the picker. New `<EditServicesModal>` and pure helpers in `src/lib/appointments/edit-services.ts` (Zod schema, `buildJobServicesJsonb`, `computeTotalsForServiceEdit`). 35 new tests (18 helpers + 17 cascade) including the 3-spy notification-suppression invariant (sendSms / sendEmail / fireWebhook all 0). Optimistic services-override state in the dialog re-renders totals immediately; parent refetches on `onServicesUpdated`. POS Jobs-card inline picker left untouched (tech debt acknowledged). Typecheck/lint/build clean; vitest 1088-clean. Concurrent with Items 15b/15c — only 15a files staged. |
 | 2026-05-16 | 7 | Item 15f Layer 1 — Extract canonical picker engine + `useServicePicker` hook | Layer 1 done | `bec3e16e` | **Pure refactor, zero behavior change** per session brief. New shared lib `src/lib/services/`: `picker-engine.ts` (canonical math `resolveServicePrice` / `resolveServicePriceWithSale` / `getServicePriceRange` MOVED byte-identical from `src/app/pos/utils/pricing.ts`, plus new `routeServiceTap` pure-function extraction of `<CatalogBrowser>`'s tap routing tree from lines 333-419 / 446-488), `use-service-picker.ts` (`.ts` extension honored via `React.createElement` — JSX-free), `index.ts` (public barrel). `src/app/pos/utils/pricing.ts` becomes a thin `@deprecated` re-export shim — all 9 existing importers (ticket-reducer, quote-reducer, register-tab, catalog-browser, service-detail-dialog, service-pricing-picker, catalog-card, flag-issue-flow, old pricing.test.ts) continue to work without modification. Tests: 32 engine tests covering all 5 size classes, sale interactions, `getServicePriceRange` boundary cases, and one `routeServiceTap` test per `pricing_model` value — `custom` pinned as `'NOT YET HANDLED — Layer 2'` so Layer 2 can update it deliberately. 7 hook-contract tests with vi-mocked `<CatalogBrowser>` + `<ServicePricingPicker>` (keeping the test focused on hook wiring, not the wrapped components' behavior). **Zero surface migrated** — Layer 3a / 3c handle migrations; Layer 3b (4 working POS surfaces) deferred indefinitely; ESLint `services/no-bespoke-pricing` deferred to Layer 4. Small deviation from brief: `ServicePickerOptions` re-exported from `./use-service-picker` (where it's defined) rather than `./picker-engine` (where the brief's index.ts example placed it) — the barrel re-exports both so external import sites are identical. Verification: typecheck clean, lint 0 errors (98 warnings = baseline, no new), 1131/1131 vitest pass (1088 prior + 32 engine + 7 hook + 4 unchanged via shim), production build compiled successfully. |
 | 2026-05-16 | 8 | Item 15f Layer 2 — `custom` pricing_model UX | Layers 1+2 done | `3195c38c` | Added the staff-assessment prompt for `pricing_model === 'custom'` services (canonical fixture: "Flood Damage / Mold Extraction" — `custom_starting_price: 475`, no `service_pricing` rows). New file `src/lib/services/custom-price-dialog.tsx` (`<CustomPriceDialog>` + `buildCustomPricing` helper); matches `<PerUnitPicker>`'s dialog conventions per Rule 11. Validation enforces positive amount ≥ `STRIPE_MIN_DOLLARS` from `src/lib/utils/money.ts` per Rule 20 — no hardcoded 50. Synthesizes a `ServicePricing` row with `tier_name: 'custom'`, `tier_label: 'Custom Assessment'`, `is_vehicle_size_aware: false`, all per-size columns null, synthetic `id` of `custom-${service.id}-${Date.now()}`. `picker-engine.ts`: one new variant on `ServiceTapRoute` (`open-custom-price-dialog`) and one new branch in `routeServiceTap` — fires regardless of vehicle and regardless of `flat_price`/`pricing` row state, so the operator always assesses (never quick-adds a stale value). The engine is intentionally ahead of `<CatalogBrowser>` for `custom` until Layer 3a/3d migrates consumers. `useServicePicker` gained imperative `tapService(service)` that runs `routeServiceTap` and either fires `onServiceSelected` (quick-add cases) or opens the appropriate dialog; `ActiveDialog` slot now discriminates between `<ServicePricingPicker>` and `<CustomPriceDialog>` via an `ActiveDialogState` union. `index.ts` barrel re-exports `CustomPriceDialog` / `buildCustomPricing` / `CustomPriceDialogProps`. Tests: Layer 1's "NOT YET HANDLED" pin flipped to assert the new behavior, plus a second engine test pinning "custom wins over flat_price/pricing rows." New `custom-price-dialog.test.tsx` with 10 dialog cases + 1 helper case (all validation paths including the Stripe-minimum boundary, confirm + cancel emit/no-emit). 6 new hook integration cases in `use-service-picker.test.tsx` (vi-mocking `<CustomPriceDialog>` as a sibling to the existing browser/picker mocks). Verification: typecheck clean, lint 0 errors (98 warnings = unchanged baseline), 1149/1149 vitest pass (was 1131; +18 net new), build compiled successfully. **Zero surface migrated** — Layer 3a / 3c / 3d still own that work; no ESLint scaffolding (Layer 4). |
+| 2026-05-16 | 11 | Item 15f Layer 3c — Booking Wizard price-math migration to canonical engine | Layer 3c done | _(this commit)_ | Customer-facing booking wizard (`src/components/booking/step-service-select.tsx`) now routes ALL service-pricing math through `resolveServicePrice` / `resolveServicePriceWithSale` per CLAUDE.md Rule 22; bespoke UI preserved per the carve-out for customer surfaces. The 6 audit-cited inline math sites are gone: `computePrice` switch (lines 1307), `getServicePriceDisplay` switch + flat/scope/specialty case branches (1394/1404/1440/1482), `PricingSelector` inner math for all 5 cases (951), and `ScopeTierCard`'s "From $X" floor (1280-1290). For `flat` and `per_unit` services (no `service_pricing` row in the catalog), the wizard synthesizes an ephemeral `ServicePricing` row to feed the engine (mirrors `routeServiceTap`'s `quick-add-synthetic-flat` pattern); `per_unit` qty multiplication stays wizard-side. Two engine-correct side effects: (1) `custom` pricing_model now resolves to `service.custom_starting_price` — pre-fix the wizard's `computePrice` had no `custom` branch and returned 0, silently blocking Flood Damage from booking; (2) `is_vehicle_size_aware: true` tiers now apply tier-level `sale_price` when active (engine compares sale_price against the resolved per-size price; pre-fix wizard ignored sale on per-size tiers). Wizard-local `isVehicleSizeOffered(tier, sc)` provides column-presence check for the scope+size customer grid (hides unconfigured sizes) — a metadata query, not a price computation, since the engine fallback-resolves null columns to `tier.price`. Deleted: bespoke `getVehicleSizePrice(tier, sc)`, all `getTierSaleInfo` call sites in PricingSelector/getServicePriceDisplay/ScopeTierCard, unused `SaleStatusInfo` interface + `saleStatus` prop on `<PricingSelector>`, the redundant outer `saleStatus` derivation. `ScopeTierCard` now takes `resolved: ResolvedPrice` (engine's canonical output shape) instead of `saleInfo: TierSaleInfo | null`; its "From $X" floor iterates `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` with `isVehicleSizeOffered` filter + `resolveServicePrice` for values. `computePrice` no longer takes `isOnSale` param (engine derives internally from `saleWindow`). New test file `src/components/booking/__tests__/step-service-select.test.tsx` (27 cases) pins all 6 `pricing_model` values: flat $175 / vehicle_size row-based (exotic $450 NOT sedan, classic Ceramic Shield $725) / vehicle_size column-based (engine reads exotic/classic per-size columns) / scope (non-vehicle_size_aware tier returns tier.price) / per_unit (Scratch Repair $150 × 3 = $450, sale-applied variant) / specialty (Aircraft $800, Boat $600, Motorcycle $200) / custom (Flood Damage $475). Plus `getServicePriceDisplay` label tests for sale strikethrough + "From $X" min. `computePrice` and `getServicePriceDisplay` exported from the wizard file for direct test consumption (the file is `'use client'`, but exports work both for the React tree and the jsdom test). Verification: typecheck clean, lint 0 errors (98 warnings = unchanged baseline), 1226/1226 vitest pass (was 1199 prior; +27 new), production build compiled successfully (787 static pages, clean `.next` rebuild). **Manual UAT NOT performed** — booking wizard requires running the app against a real DB; user verifies post-session per `npm run dev`. |
 | 2026-05-16 | 10 | Item 15f Layer 3d — `service-resolver.ts` rewrite (voice agent + SMS auto-responder) | Layer 3d done | _(this commit)_ | Removes the 4th and final bespoke service-pricing implementation discovered during Layer 1 verification. `resolvePrice` rewritten as a thin wrapper around `resolveServicePriceWithSale` from `picker-engine.ts` per CLAUDE.md Rule 22; dispatches by `pricing_model` and synthesizes a `ServicePricing` row for `flat` / `per_unit` / `custom` (which have no row in `service_pricing`). Fixes 4 silent mis-pricing bugs that surface directly in customer-facing voice quotes + SMS auto-responder: (1) `exotic` + `classic` size_class no longer fall through to sedan column — Ferrari 1-Year Ceramic Shield now correctly quotes $725 not $425; (2) `per_unit` services like Scratch Repair now return `per_unit_price` ($150) not $0; (3) `specialty` services now dispatch via the new optional `specialtyTier` argument and find the matching `tier_name` row instead of always returning `tiers[0]`; (4) `custom` services now return `custom_starting_price` ($475 for Flood Damage / Mold Extraction) not $0. `resolveServiceByName` SELECT widened to fetch `per_unit_price`, `custom_starting_price`, `vehicle_size_exotic_price`, `vehicle_size_classic_price`, plus full `ServicePricing` shape (id, service_id, tier_label, display_order, max_qty, qty_label, created_at). `ResolvedService` interface gained `per_unit_price` and `custom_starting_price`; `service_pricing[]` retyped from partial subset to full `ServicePricing[]`. `ResolvedPrice` return shape preserved byte-identically so the 3 importers (`send-quote-sms/route.ts`, `webhooks/twilio/inbound/route.ts`, `voice-post-call.ts`) need no code changes. New `src/lib/services/__tests__/service-resolver.test.ts` — 27 cases pinning all 4 bug fixes (flat 3, vehicle_size/scope 7, per_unit 3, specialty 7, custom 4, size-class edge cases 2). **End-to-end specialty fix at the call sites is a follow-up** (they currently SELECT only `vehicles.size_class`; need to also SELECT `specialty_tier` and pass via `{ specialtyTier }`). Verification: typecheck clean on the touched files; lint 0 errors / 0 new warnings on touched files; 1192/1192 vitest pass (was 1162 at Layer 3a partial; +27 new from this test file). **Production build NOT attempted** — working tree carries pre-existing uncommitted modifications in `step-service-select.tsx`, `checkout-items/route.ts`, `convert-service.ts` from a parallel session that have their own typecheck errors unrelated to Layer 3d. **Manual UAT NOT performed** — voice / SMS flows require real call / inbound message; user verifies post-session (Ferrari + Ceramic Shield SMS = $725; per-unit Scratch Repair = $150/unit; Mold Extraction = $475 starting price). |
 | 2026-05-16 | 9 | Item 15f Layer 3a (partial) — Migrate POS Jobs card to canonical hook | Layer 3a partial (Jobs card only) | _(this commit)_ | **Scope narrowed mid-session per user direction (Option A from in-session blocker discussion).** Original brief targeted POS Jobs card + Admin Appointment dialog. Discovery surfaced that `<CatalogBrowser>` (wrapped by `useServicePicker`) hard-depends on POS-only contexts: `useTicket()` THROWS without `<TicketProvider>` (`ticket-context.tsx:222`); `usePosPermission()` defaults to `granted: false` without `<PosPermissionProvider>`. POS Jobs card runs inside `<PosShell>` so the hook drops in cleanly; Admin Appointment dialog lives outside that tree and would crash. Stopped per session-brief risk-callout protocol ("STOP and ask") and surfaced 4 paths. User chose Option A: ship Jobs card today, defer Admin migration to a follow-up that decouples `<CatalogBrowser>` from POS contexts. New shared file `src/lib/services/edit-services-dialog.tsx` — `<EditServicesDialog>` 2-pane wrapper around the hook (left: `<CatalogPane>`, right: caller-rendered selected list with per-row remove + running total). UI-only, fully controlled — caller owns selection state + persistence call. POS Jobs card migration in `job-detail.tsx`: deleted bespoke `getServicePrice()` (the silent tier-pricing revenue leak on non-sedan vehicles called out in lifecycle audit §10 #11), the bespoke modal, and the bespoke catalog-fetch state (`allServices`, `loadingServices`, `serviceSearch`, `handleToggleEditService`). Dialog mounts on existing `showEditServices` state; selection seeds from `job.services` (filtering out `is_mobile_fee` rows owned by the mobile picker); `onServiceAdded` / `onServiceRemoved` mutate local state; Save calls existing `handlePatchJob({services})` — payload shape (`JobServiceSnapshot[]`) unchanged. All 6 `pricing_model` values now resolve through the canonical engine on the Jobs card. Removed unused `<Search>` icon import. New test file `src/lib/services/__tests__/edit-services-dialog.test.tsx` — 13 cases with `useServicePicker` vi-mocked (focus on wrapper wiring without booting POS contexts). No existing Jobs-card tests covered the deleted modal directly, so no rewrites/deletions needed. Item 15a's `<EditServicesModal>` keeps shipping unchanged — including its broken local `resolveServicePrice`. **Cascade endpoint, `src/lib/appointments/edit-services.ts` helpers, and Admin dialog integration untouched.** Verification: typecheck clean, lint 0 errors (98 warnings = unchanged baseline), 1162/1162 vitest pass (was 1149 at Layer 2; +13 new), production build compiled successfully. **Manual UAT NOT performed in this session** — POS Jobs card requires running the app against a real DB; user verifies post-session per `npm run dev`. |
 

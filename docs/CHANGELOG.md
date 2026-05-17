@@ -6,6 +6,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-16 — Item 15f Layer 3c: Booking Wizard price-math migration to canonical engine
+
+Customer-facing booking wizard now routes ALL service-pricing math through `resolveServicePrice` / `resolveServicePriceWithSale` from `src/lib/services/picker-engine.ts` per CLAUDE.md Rule 22. Bespoke UI is preserved (Rule 22 carve-out for customer surfaces); only the math sites migrated. Net wizard pricing fixes:
+
+- **6 inline `pricing_model` math sites migrated** in `src/components/booking/step-service-select.tsx`: `computePrice()`, `getServicePriceDisplay()`, `PricingSelector` switch (flat/vehicle_size/scope/specialty/per_unit cases), and `ScopeTierCard`'s "From $X" floor.
+- **`custom` pricing model now resolves** — pre-fix the wizard's `computePrice` had no `custom` branch and returned 0, blocking Flood Damage / Mold Extraction from booking. Now returns `service.custom_starting_price` (until Item 15g-ii surfaces the operator-prompted final price on this path).
+- **`vehicle_size_aware` tiers now apply tier-level sale_price** — pre-fix the wizard's inline math ignored sale_price entirely on tiers with `is_vehicle_size_aware: true`; the engine applies it when active (engine-correct behavior).
+- **Direct column reads eliminated** — `vehicle_size_*_price` columns are no longer inspected outside the engine for price math. Wizard-local `isVehicleSizeOffered(tier, sc)` provides column-presence check (for hiding unconfigured customer sizes) without computing prices; values come from `resolveServicePrice`.
+
+**Synthesis pattern for non-tier services**: `flat` and `per_unit` services have no `service_pricing` row in the catalog, so `synthesizeFlatTier()` / `synthesizePerUnitTier()` builds an ephemeral `ServicePricing` to feed the engine — mirrors `routeServiceTap`'s `quick-add-synthetic-flat` pattern. The `per_unit` qty multiplication happens wizard-side (the engine resolves the unit price, the wizard multiplies).
+
+**Deleted**: bespoke `getVehicleSizePrice(tier, sc)` helper (the source of exotic/classic mispricing in operator surfaces); bespoke `getTierSaleInfo` calls in PricingSelector / getServicePriceDisplay / ScopeTierCard; unused `SaleStatusInfo` interface and `saleStatus` prop on `<PricingSelector>` (no longer needed since sale info is derived inside the engine).
+
+**Tests**: new `src/components/booking/__tests__/step-service-select.test.tsx` (27 cases). Pins all 6 `pricing_model` values: flat ($175 no tier), vehicle_size row-based pattern (exotic Ferrari $450 NOT sedan, classic 1-Year Ceramic Shield $725), vehicle_size column-based pattern (engine reads exotic/classic per-size columns), scope (non-vehicle_size_aware tier returns tier.price), per_unit (Scratch Repair × 3 = $450), specialty (Aircraft Interior Clean $800 / Boat $600 / Motorcycle $200), custom (Flood Damage = $475), and sale-applied variants. Plus `getServicePriceDisplay` label tests for ServiceCard sale strikethrough + "From $X" min computation.
+
+**Out of scope** (this layer is math-only per session brief): customer-facing UI/layout/styling unchanged; operator surfaces untouched (POS Register, POS Quote Builder, Admin Appointment dialog — those are Phase 1 of the edit-via-POS restructure); `src/lib/services/service-resolver.ts` is Layer 3d; ESLint `services/no-bespoke-pricing` rule is Layer 4.
+
+Verification: typecheck clean, lint 0 errors (98 warnings = unchanged baseline), 1226/1226 vitest pass (was 1199 prior to this session; +27 new), production build compiled successfully (787 static pages generated).
+
+---
+
 ## 2026-05-16 — Wave 1.5 / Item 15g Layer 15g-i: MVP coupon-only lifecycle persistence (Quote → Appointment → Job → Checkout)
 
 S1 customer-money-correctness fix. Pre-fix, a coupon applied during the Quote phase silently disappeared by the time the operator hit Checkout on the linked Job: `convertQuote` dropped `coupon_code` from the appointment insert, and `checkout-items` only re-derived a coupon by joining `jobs.quote_id` → `quotes.coupon_code`. That join doesn't exist for online-booked jobs (which write `appointments.coupon_code` directly through the booking wizard) — so booking-wizard coupons leaked at checkout too.
