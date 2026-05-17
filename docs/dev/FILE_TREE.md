@@ -281,6 +281,7 @@ src/app/api/book/payment-intent/route.ts
 src/app/api/book/route.ts
 src/app/api/book/slots/route.ts
 src/app/api/book/validate-coupon/route.ts
+src/app/api/book/__tests__/modifier-persistence.test.ts  # 4 tests — pins Item 15g Layer 15g-iv Scenario A: POST /api/book persists coupon + loyalty to dedicated columns, never to internal_notes (post-cleanup contract)
 ```
 
 ### Checkout (Online Store)
@@ -421,6 +422,7 @@ src/app/api/pos/jobs/[id]/start-work/route.ts
 src/app/api/pos/jobs/[id]/timer/route.ts
 src/app/api/pos/jobs/populate/route.ts
 src/app/api/pos/jobs/route.ts
+src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts  # 5 tests — pins Item 15g Layer 15g-iv Scenario C: walk-in synthetic appointment persists 7-field modifier snapshot, percent → dollar resolution, over-discount clamp
 src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
 src/app/api/pos/loyalty/redeem/route.ts
@@ -1005,6 +1007,7 @@ src/lib/quotes/modifier-display.ts                       # Layer 15g-v: shared `
 src/lib/quotes/__tests__/convert-service.test.ts        # 15 tests — pins Layer 15g-i coupon_code propagation (3) + Layer 15g-ii full modifier propagation (8) + Layer 15g-v writer-trust contract (4: coupon-only / loyalty-only / Q-0067-combined / defense-in-depth clamp)
 src/lib/quotes/__tests__/quote-service.modifiers.test.ts  # 25 tests — Layer 15g-ii modifier persistence (13) + Layer 15g-v writer-side total_amount = net formula (12: createQuote single-modifier × 4 / combined / over-discount clamp; updateQuote recompute triggers + non-financial PATCH skip + full-replacement deterministic math)
 src/lib/quotes/__tests__/modifier-display.test.ts        # 19 tests — Layer 15g-v shared helper: empty / coupon w+wo discount / loyalty w+wo points / manual label fallback / percent resolution / dollar clamp / partial collapse / ordering / Supabase NUMERIC-as-string coercion
+src/lib/quotes/__tests__/modifier-chain.test.ts          # 4 tests — Layer 15g-iv Scenario B chain integration: Quote → convertQuote → checkout-items reads back identical modifier values; all-3 / coupon-only / modifier-free / manual percent → dollar resolution
 src/lib/quotes/__tests__/derive-comm-pill.test.ts
 src/lib/quotes/__tests__/send-service.test.ts            # Extended in Layer 15g-v with 4 cases: templated path passes composite+individual modifier vars (populated + empty); fallback HTML+text contain modifier rows (populated + omitted)
 ```

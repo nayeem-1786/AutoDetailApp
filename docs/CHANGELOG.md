@@ -6,6 +6,66 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15g Layer 15g-iv: booking-wizard cleanup + comprehensive end-to-end modifier-chain tests (Item 15g COMPLETE — Phase 1 unblocked)
+
+Final layer in Item 15g. Closes the booking-wizard read-side cleanup (the `internal_notes` plaintext loyalty stop-gap), pins the full modifier persistence chain with three E2E scenarios that previously had no test coverage, and verifies the QBO sync watch-item from audit §9.5.
+
+**Booking-wizard cleanup (`src/app/api/book/route.ts`):**
+
+- Removed the two stale stop-gap comments documenting Layer 15g-ii's migration from `internal_notes` plaintext loyalty (`"Loyalty points used: N (D discount)"`) to dedicated `loyalty_points_redeemed` + `loyalty_discount` columns. The migration is complete; the comments described historical context that's no longer load-bearing.
+- Removed the redundant explicit `internal_notes: null` write in the appointment INSERT. The column is `TEXT` with no DEFAULT — omitting it from the INSERT writes `NULL` natively. The explicit write was a defensive clear-out paired with the stop-gap comments; without those comments it created a "why are we writing null?" smell.
+- **No behavioral change to the appointment payload.** Layer 15g-ii's loyalty/coupon/manual-discount writes stay exactly as they were. Audit of all other `internal_notes` references confirmed: zero READ paths in src/ parse it as a loyalty source. It's a pure admin free-form notes field now.
+- Booking wizard UI (`src/components/booking/booking-wizard.tsx:960-961`) already passes `loyalty_points_used` + `loyalty_discount` as clean top-level body keys — no stop-gap shape, no UI changes needed.
+
+**QBO sync verification (`src/lib/qbo/sync-transaction.ts`, per audit §9.5 watch-item):**
+
+- Reads ONLY `transaction.discount_amount` (the combined canonical sum). Does NOT consult `coupon_discount`, `loyalty_discount`, or `manual_discount_value` individually.
+- Builds ONE generic `DiscountLineDetail` line item (`PercentBased: false`, total = combined discount). All 3 modifier types are aggregated into this single line on the QBO Sales Receipt.
+- Coupon code appears in `PrivateNote` as a string only — not as a separate line.
+- **Pre-existing behavior. Not a regression from Layer 15g.** Layer 15g makes more transactions have non-zero `discount_amount`; QBO will simply see correct (higher) totals where it previously saw `$0`.
+- **Not flagged as a bug.** Whether business needs loyalty/coupon/manual broken into separate QBO journal lines is an accounting policy decision. Documented for awareness; no roadmap item added without explicit user direction.
+
+**Comprehensive end-to-end modifier-chain tests (3 new files, 13 new tests):**
+
+Pre-Layer-15g-iv coverage map (pinned before this session):
+
+| Stage | Status pre-15g-iv |
+|---|---|
+| Quote writes (createQuote / updateQuote) | ✅ `quote-service.modifiers.test.ts` (15g-ii + 15g-v) |
+| Quote → Appointment convert | ✅ `convert-service.test.ts` (15g-i + 15g-ii + 15g-v) |
+| **Online booking writer (`/api/book`)** | ❌ **NO TESTS — gap closed by 15g-iv** |
+| **Walk-in writer (`/api/pos/jobs`)** | ❌ **NO TESTS — gap closed by 15g-iv** |
+| Checkout-items hydration | ✅ `coupon-fallback.test.ts` (15g-i + 15g-ii) |
+| Checkout dispatch (`handleCheckout`) | ✅ `handle-checkout-coupon.test.tsx` (15g-i + 15g-iii) |
+| Cascade endpoint preservation (Item 15a) | ✅ `route.test.ts` (15g-iii) |
+| Receipt rendering (5 surfaces) | ✅ `modifier-display.test.ts` + `send-service.test.ts` (15g-v) |
+| **Chain-level integration (cross-stage consistency)** | ❌ **NO TESTS — gap closed by 15g-iv** |
+
+The 3 new test files:
+
+- **`src/app/api/book/__tests__/modifier-persistence.test.ts`** (4 tests, Scenario A — online booking writer) — pins that `POST /api/book` persists coupon + loyalty to dedicated columns, NEVER to `internal_notes`. Covers: all 3 modifiers present; no modifiers; coupon-only; loyalty-only (the column that pre-15g-ii silently leaked into `internal_notes`). Asserts `internal_notes` is OMITTED from the insert payload (post-cleanup contract).
+- **`src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts`** (5 tests, Scenario C — walk-in synthetic appointment) — pins that `POST /api/pos/jobs` persists the 7-field modifier snapshot from a quote-bridged walk-in. Covers: pure walk-in (no modifiers, safe defaults); all 3 modifiers; manual_discount_type=percent resolves to dollar against subtotal; over-discount safety clamp (`total_amount ≥ 0`); manual_discount_label drops when value resolves to NULL.
+- **`src/lib/quotes/__tests__/modifier-chain.test.ts`** (4 tests, Scenario B — chained Quote → Convert → Checkout integration) — single shared in-memory fixture that `convertQuote` writes to and `/api/pos/jobs/[id]/checkout-items` reads back. Pins cross-stage consistency: modifier values on the quote must equal modifier values on the resulting appointment must equal modifier values returned to the POS register hydration. Covers: all 3 modifiers; coupon-only; modifier-free (negative case); manual_discount_type=percent → dollar resolution preserved across stages.
+
+Scenario D (negative cases — modifier-free record renders cleanly without empty modifier blocks) is folded into the modifier-free assertions across all 3 scenario files plus the existing `modifier-summary.test.tsx` (Layer 15g-iii) and `modifier-display.test.ts` (Layer 15g-v).
+
+**Verification gates:**
+
+- typecheck: clean for all 3 new files (27 pre-existing errors carry forward unchanged — Layer 15g-ii `quote-service.modifiers.test.ts` supabase mock cast errors + Layer 3e `catalog-browser-custom-routing.test.tsx` `CatalogService` cast error; both predate this session).
+- lint: 0 errors, 98 baseline warnings (no new warnings introduced).
+- vitest: 1333/1333 passing (was 1320 before this session; +13 tests).
+- production build: `✓ Compiled successfully in 12.0s`.
+
+**Item 15g is now COMPLETE.** Phase 1 (Item 15f Layers 8a-8f — edit-via-POS for Jobs) is unblocked. The lifecycle persistence chain (Quote → Appointment → Job → Transaction → Receipt) now preserves all 3 modifier types (coupon, loyalty, manual discount) end-to-end with full test coverage at every stage and at the chain level.
+
+**Manual UAT plan (user verification post-deploy):**
+
+1. **Booking wizard online flow:** Submit a booking through `/book` with loyalty redemption applied. SQL-check the appointment row — `loyalty_points_redeemed` + `loyalty_discount` populated in dedicated columns; `internal_notes` is `NULL` (no plaintext leakage).
+2. **End-to-end chain spot check:** Build a quote with coupon + loyalty + manual discount. Convert to appointment → populate as job → checkout. SQL-check each stage carries identical modifier values; final transaction row commits the full set.
+3. **QBO sync (if testable in dev):** Trigger a sync for a transaction with `loyalty_discount > 0`. QBO Sales Receipt will show ONE combined `DiscountLineDetail` (current behavior); confirm this matches accounting expectations or flag for a future separation enhancement.
+
+---
+
 ## 2026-05-16 — Item 15g Layer 15g-v: quote `total_amount` writer correction + receipt modifier rendering (S1 customer-facing)
 
 Closes the **customer-facing display gap** uncovered by UAT against shipped 15g-i + 15g-ii + 15g-iii. Two layered bugs per `docs/dev/QUOTE_TOTAL_AND_RECEIPT_AUDIT_2026-05-16.md`:

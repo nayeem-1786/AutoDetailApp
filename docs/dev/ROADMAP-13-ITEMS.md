@@ -10,8 +10,8 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v2.9 (2026-05-16) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d+3e done; Layer 4 + Phase 1 pending); 15g Layers 15g-i + 15g-ii + 15g-iii + 15g-v done; 15g-iv pending; Phase 1 (8a-8f) blocked behind 15g-iv
-**Last session updated:** 2026-05-16 — Layer 15g-v landed: writer-side quote.total_amount now net (computeQuoteTotals helper); 5 receipt surfaces (public landing + email HTML+text + templated email + PDF + POS quote-detail) render coupon/loyalty/manual modifier rows; +35 tests; 0 schema migration besides quote_sent template update.
+**Document version:** v3.0 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layer 1+2+3a-partial+3c+3d+3e done; Layer 4 + Phase 1 pending); **Item 15g COMPLETE (all 5 layers done)**; Phase 1 (8a-8f) UNBLOCKED.
+**Last session updated:** 2026-05-17 — **Item 15g COMPLETE.** Layer 15g-iv landed: booking-wizard `internal_notes` stop-gap cleanup + 3 new E2E test files (13 tests pinning Scenario A online booking, Scenario C walk-in, Scenario B chain integration) + QBO sync watch-item verified (aggregates all 3 modifier types into one Discount line — pre-existing, not a regression). 1333/1333 vitest passing. Production build clean.
 **Total items:** 8 active + 6 done + 1 closed (Items 1, 6, 12, 15a, 15b, 15c done; Item 5 closed: NFC already enabled per Stripe support)
 
 ---
@@ -1427,7 +1427,7 @@ any future code that might attempt to re-build a parallel picker.
 
 ### Item 15g — Lifecycle Persistence: Discount / Coupon / Loyalty Across Quote → Appointment → Job → Transaction
 
-- **Status:** Layers 15g-i + 15g-ii + 15g-iii + 15g-v done (2026-05-16, 2026-05-17, 2026-05-17, 2026-05-16); Layer 15g-iv not started; Phase 1 (8a-8f) blocked behind 15g-iv
+- **Status:** **COMPLETE** (2026-05-17) — all 5 layers done (15g-i + 15g-ii + 15g-iii + 15g-v + 15g-iv). Phase 1 (8a-8f) UNBLOCKED.
 - **Severity:** S1 (customer-promised concessions silently dropped today)
 - **Effort:** 6.5 sessions (~12-14 hours total, layered — 15g-i + 15g-ii + 15g-iii + 15g-v done; 15g-iv remaining)
 - **Wave:** 1.5
@@ -1606,6 +1606,17 @@ The chain is asymmetric — online booking flow works; POS-originated quote/walk
   - **Cross-table consistency check:** `appointments.total_amount` and `transactions.total_amount` are **net-of-discounts** by writer convention. Only `quotes.total_amount` is pre-discount. Drift created when `createQuote` was written before any modifier ever existed on quotes; never updated as modifiers landed.
   - **Receipt-rendering gap:** 4 quote-customer-facing surfaces (SMS body / public landing `/quote/[token]` / email HTML+text / PDF) and 1 operator surface (`pos/components/quotes/quote-detail.tsx`) render only `Subtotal / Tax / Total` — none iterate the modifier columns. The operator UI's `<QuoteTotals>` component already has the reference implementation (`pos/components/quotes/quote-totals.tsx:42-76`); it just needs to be lifted into a server-renderable form for the 4 templates. SMS body is short-by-design and references the public-landing link; no SMS template change needed.
   - **Recommended fix: new Layer 15g-v** (writer correction + receipt modifier rendering across the 4 customer surfaces + the operator review). Effort ~1-1.5 sessions, no schema migration, ESLint scope unchanged. **Lands BEFORE Phase 1 (8a-8f)** — Phase 1 operator-facing surfaces compound the consumer-side mis-rendering if the writer isn't fixed first. **Layer 15g-v NOT yet added to roadmap** — awaiting user sign-off on scope.
+- 2026-05-17: **Layer 15g-iv landed. Item 15g is now COMPLETE.** Phase 1 (Item 15f Layers 8a-8f) is unblocked.
+  - **Booking-wizard cleanup (`src/app/api/book/route.ts`):** Removed the 2 stale stop-gap comments documenting Layer 15g-ii's migration away from `internal_notes` plaintext loyalty. Removed the redundant explicit `internal_notes: null` write — the column is TEXT with no DEFAULT, so omitting writes NULL natively. No behavioral change to the appointment payload (15g-ii's loyalty/coupon/manual-discount writes are untouched). Cross-codebase audit confirmed: zero READ paths in src/ parse `internal_notes` as a loyalty source. The wizard UI at `src/components/booking/booking-wizard.tsx:960-961` already passes `loyalty_points_used` + `loyalty_discount` as clean top-level body keys — no UI changes needed.
+  - **QBO sync verification (audit §9.5 watch-item, `src/lib/qbo/sync-transaction.ts`):** Reads ONLY combined `transaction.discount_amount`; does NOT consult `coupon_discount`/`loyalty_discount`/`manual_discount_value` individually. Builds ONE generic `DiscountLineDetail` per Sales Receipt. Coupon code appears in `PrivateNote` as a string. Pre-existing behavior (NOT a Layer 15g regression). Whether business needs separation into per-modifier QBO journal lines is an accounting policy decision — documented for awareness, NOT flagged as a bug. No roadmap follow-up item created without explicit user direction.
+  - **3 new E2E test files (13 tests):**
+    - `src/app/api/book/__tests__/modifier-persistence.test.ts` (4 tests, Scenario A) — POST /api/book modifier persistence; pins `internal_notes` omitted from insert payload post-cleanup.
+    - `src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts` (5 tests, Scenario C) — walk-in synthetic appointment 7-field modifier snapshot; manual_discount_type=percent → dollar resolution against subtotal; over-discount safety clamp; label drop when value resolves to null.
+    - `src/lib/quotes/__tests__/modifier-chain.test.ts` (4 tests, Scenario B) — chained Quote → convertQuote → checkout-items reads back identical modifier values; all-3 / coupon-only / modifier-free (negative case) / percent → dollar resolution preserved.
+  - Scenario D (negative cases) folded into the modifier-free assertions across all 3 scenario files plus existing `modifier-summary.test.tsx` (15g-iii) and `modifier-display.test.ts` (15g-v).
+  - **Verification gates:** typecheck clean for new files (27 pre-existing errors unchanged — 15g-ii supabase mock cast + Layer 3e CatalogService cast, both predate this session). Lint 0 errors / 0 new warnings. Vitest 1333/1333 passing (was 1320 → +13). Production build `✓ Compiled successfully in 12.0s`.
+  - **Coverage map (post-15g-iv, all stages green):** Quote writes ✅ | Quote → Appointment convert ✅ | Online booking writer ✅ NEW | Walk-in writer ✅ NEW | Checkout-items hydration ✅ | Checkout dispatch ✅ | Cascade endpoint preservation ✅ | Receipt rendering (5 surfaces) ✅ | Chain-level integration ✅ NEW.
+  - **Manual UAT (deferred to user per session brief):** (1) Booking online flow → SQL-check appointment row has `loyalty_points_redeemed`/`loyalty_discount` populated, `internal_notes` NULL. (2) End-to-end chain — quote with 3 modifiers → convert → populate → checkout → transaction; SQL-check every stage carries identical values. (3) QBO sync — verify single combined Discount line matches accounting expectations.
 
 ---
 
