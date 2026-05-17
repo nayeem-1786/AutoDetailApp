@@ -219,6 +219,7 @@ export function buildTicketStateFromLoad(data: LoadResponseData): TicketState {
     sourceId: null,
     returnTo: null,
     editMode: false,
+    editInitialSnapshot: null,
   };
 }
 
@@ -345,6 +346,14 @@ export async function runEditModeDrain(
       // Coupon revalidate failed — swallow; ticket already hydrated.
     }
   }
+
+  // Item 15f Phase 1 Layer 8c — stamp the dirty-detection baseline AFTER
+  // all modifier dispatches have settled. The drain emits this last so
+  // `editInitialSnapshot` reflects the cart state the operator first sees
+  // (post-coupon-revalidate), not the zeroed-modifier intermediate state
+  // ENTER_EDIT_MODE momentarily holds. Without this, the Sale tab would
+  // show "Unsaved changes" immediately on hydration.
+  dispatch({ type: 'MARK_EDIT_INITIAL_STATE' });
 
   return { ok: true };
 }

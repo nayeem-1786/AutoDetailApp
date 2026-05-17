@@ -6,6 +6,79 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8c: edit-mode UX + modifier-editable cascade endpoint
+
+Third session of Phase 1 (edit-via-POS). Combines two deliverables: a backend extension to the Layer 8a cascade endpoint that accepts six optional modifier fields, and the POS Sale-tab UX that lets the operator save edits back through it. The reversibility audit (`docs/dev/LOYALTY_REVERSIBILITY_AUDIT_2026-05-17.md`) drove the scope — pre-transaction modifier edits don't touch `customers.loyalty_points_balance`, `loyalty_ledger`, or `coupons.use_count`, so the cascade endpoint extension is purely a wider write set on the appointment row.
+
+**Crucially, modifier UI stays VISIBLE and EDITABLE in edit mode** (the coupon chip, loyalty redemption panel, manual discount form). The original audit §7's "suppress loyalty redemption UI" recommendation was based on the incorrect premise that loyalty was already deducted from the customer balance at appointment creation; the reversibility audit corrected that. Layer 8c surfaces the corrected design: operators can change any modifier mid-edit, the cascade endpoint persists the new values to the appointment row, and the eventual transaction commit deducts (or doesn't) based on the saved snapshot.
+
+**Deliverable 1 — Backend cascade endpoint extension (`src/lib/appointments/edit-services.ts` + `src/lib/appointments/service-edit.ts`):**
+
+1. **Zod schema widening** — `editServicesBodySchema` adds six `.optional().nullable()` modifier fields: `coupon_code`, `coupon_discount`, `loyalty_points_to_redeem`, `loyalty_discount`, `manual_discount_value`, `manual_discount_label`. The three-state encoding (`omitted` → preserve, `null` → clear, value → write) was the cleanest mapping to the columns' existing nullability. A `superRefine` mirrors the `appointments_manual_discount_coherent` DB CHECK — `(manual_discount_value, manual_discount_label)` must travel together (both null or both set with value > 0).
+
+2. **Effective-value resolution** — for each modifier column, the cascade helper computes the "effective" value: payload-provided (including `null` to clear) takes precedence over the appointment's existing column. Effective values feed `computeTotalsForServiceEdit` so `subtotal` / `discount_amount` / `total_amount` reflect the edit. The previous Layer 15g-iii "fall back to legacy combined `discount_amount` when all per-modifier nulls" branch is short-circuited when ANY modifier edit was provided — otherwise removing the last modifier would leave the stale combined discount_amount in place. Layer 8c subtlety documented in the inline comment.
+
+3. **Write-path discipline** — `apptUpdatePayload` is built dynamically. Service-only edits (Layer 15g-iii preservation contract) never include modifier columns in the UPDATE. When the payload touches a modifier (via `*Provided` checks), the column is written — including `null` for clearing. Schema mapping: `loyalty_points_to_redeem` (payload) → `loyalty_points_redeemed` (column); `null` → `0` for the NOT NULL DEFAULT 0 loyalty columns.
+
+4. **Audit log diff** — when `anyModifierEdit` is true, `details.field` flips from `'services'` → `'services_and_modifiers'` and the payload adds `modifiers_before` / `modifiers_after` slices. Services-only edits keep the existing audit shape to avoid polluting existing audit consumers.
+
+**Deliverable 2 — POS Sale-tab edit-mode UX:**
+
+1. **`<TicketState.editInitialSnapshot>`** — new field for dirty detection. Serialized JSON of the editable cart slice (items + customer.id + vehicle.id + coupon + loyalty + manualDiscount), stamped by the drain via a new `MARK_EDIT_INITIAL_STATE` action AFTER all modifier follow-up dispatches (including the async coupon revalidate) settle. Cleared by `EXIT_EDIT_MODE` / `CLEAR_TICKET` / `RESTORE_TICKET`.
+
+2. **Dirty detection helper** — `serializeTicketEditSlice(state)` exported from `ticket-reducer.ts`. `<EditModeBanner>` and `<TicketActions>` both call it each render and compare against `ticket.editInitialSnapshot`. O(N) string compare; sub-millisecond on a typical cart.
+
+3. **`<EditModeBanner>`** (`src/app/pos/components/edit-mode-banner.tsx`) — subtle amber pill at the top of the Sale workspace when `editMode === true`. Surfaces "Editing Appointment #aaaaaaaa" (first 8 chars of UUID — Layer 8d can resolve to a friendly identifier later) plus an "Unsaved changes" badge when dirty. Returns null outside edit mode.
+
+4. **`<TicketActions>` edit-mode branch** — when `editMode === true`, the action bar renders only [Cancel | Save Changes]. Hold button is hidden; Clear is replaced by Cancel; Checkout (or the loyalty-only "Complete (Loyalty)" variant) is replaced by Save Changes. Bar layout stays compact for iPad. The non-edit-mode branch is unchanged byte-for-byte from Layer 8a's shipped behavior.
+
+5. **Save Changes handler** — POSTs to `/api/pos/appointments/${ticket.sourceId}/services` with `services[]` (filtered to `itemType === 'service'` rows; products + mobile_fee live on the appointment via other paths) plus the six modifier fields. Manual discount is client-resolved (percent → dollar via `resolveManualDiscountAmount` from `@/lib/quotes/manual-discount`) so the server contract stays single-dollar. On success: dispatches `EXIT_EDIT_MODE` + `CLEAR_TICKET`, calls `router.push(ticket.returnTo)`. On error: surfaces toast, stays in edit mode.
+
+6. **Cancel handler with dirty confirmation** — clean cancel (no diff vs snapshot) navigates directly; dirty cancel opens an inline "Discard unsaved changes?" modal. Keep Editing dismisses; Discard fires `EXIT_EDIT_MODE` + navigate. Cancellation always issues `CLEAR_TICKET` to flush the cart so the operator returns to a fresh `/pos`.
+
+7. **F2 keyboard shortcut guard** — `pos-shell.tsx` F2 (Checkout) is gated on `!ticket.editMode` so the operator can't accidentally open the payment overlay from inside an edit. No new Save shortcut (intentional — saving an edit should be an explicit tap).
+
+8. **Modifier UI preserved** — `<CouponInput>`, `<LoyaltyPanel>`, the manual-discount form, customer-vehicle selectors, mobile picker, catalog browser, and all other ticket-building surfaces all remain visible and interactive in edit mode. Audit-corrected design.
+
+**Wired to Layer 8b's drain:** `runEditModeDrain` now emits `MARK_EDIT_INITIAL_STATE` as its final dispatch (after ENTER_EDIT_MODE / SET_LOYALTY_REDEEM / APPLY_MANUAL_DISCOUNT / SET_COUPON have all settled). Without this the cart would flash "Unsaved changes" immediately on hydration because the snapshot would have been stamped before coupon revalidate completed.
+
+**Tests (+36 across 4 new/modified files; 1476/1476 passing — was 1440 prior):**
+
+- `src/lib/appointments/__tests__/service-edit.test.ts` (+11 from Layer 8c, total 26): coupon write + clear, loyalty write + null→0 mapping, manual discount + coherence rejection (both directions), negative coupon rejection, non-integer loyalty rejection, services-only preservation contract no-regression, audit `field` flip + modifiers_before/after diff.
+- `src/app/pos/context/__tests__/ticket-reducer-edit-mode.test.ts` (+5 from Layer 8c, total 18): `editInitialSnapshot` default null, `MARK_EDIT_INITIAL_STATE` stamping behavior, no-op outside edit mode, snapshot captures full slice, snapshot frozen at MARK time (REMOVE_ITEM after doesn't mutate snapshot).
+- `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` (+2 from Layer 8c, total 24): `MARK_EDIT_INITIAL_STATE` fires LAST always; fires AFTER `SET_COUPON` when coupon revalidate succeeds.
+- New `src/app/pos/components/__tests__/ticket-actions-edit-mode.test.tsx` (+12): button swap rendering, Save POST payload shape (with + without modifiers, percent→dollar resolution), success → navigate, error → no navigate, clean Cancel direct navigate, dirty Cancel opens confirmation, Keep Editing dismisses, Discard navigates.
+- New `src/app/pos/components/__tests__/edit-mode-banner.test.tsx` (+6): no render outside edit mode, appointment label, job label, no "Unsaved changes" when matching snapshot, surfaces when diverging, no surfacing when snapshot null (drain mid-MARK).
+
+Collateral typecheck-edits:
+- `src/app/pos/components/__tests__/ticket-actions.test.tsx`: added `editInitialSnapshot: null` to mock factory + `setTicket()` helper; new `next/navigation` mock (TicketActions now imports `useRouter`).
+- `src/app/pos/jobs/page.tsx:handleCheckout`: 4-field placeholder grew to 5 fields.
+- `src/app/pos/hooks/use-edit-mode-drain.ts:buildTicketStateFromLoad`: same.
+
+**Out of scope** (deferred to subsequent Phase 1 layers):
+- Jobs card "Edit Services" affordance routing to POS — Layer 8d.
+- Admin Appointment dialog same — Layer 8d.
+- Friendly identifier resolution (`appointment_number`, etc.) — Layer 8d nice-to-have.
+- `<EditServicesDialog>` / `<EditServicesModal>` deletion — Layer 8e.
+- Save Changes for source=job (no appointment cascade) — needs design decision in Layer 8d/8e. Layer 8c's Save handler currently POSTs to `/api/pos/appointments/${sourceId}/services` unconditionally; if source=job the appointment derived from `job.appointment_id` would need a resolution step. **Flagged for Layer 8d**.
+
+**Verification:** Typecheck 0 new errors on touched files (2 pre-existing test-file errors persist). ESLint 0 errors / 98 warnings unchanged baseline. Vitest 1476/1476 (was 1395 at Layer 8a → 1440 at Layer 8b → 1476 here; +36 net new). Production build compiled successfully.
+
+**Manual UAT** (user verifies post-deploy):
+
+1. **Fresh ticket regression** — `/pos` without query params → Checkout button visible, payment flow works, no banner, no behavior change.
+2. **Deep-link drain UX** — `/pos?source=appointment&id=<uuid>&returnTo=/admin/appointments/<uuid>` → banner shows "Editing Appointment #XXX"; action bar shows [Cancel | Save Changes]; payment/tip/receipt UI all suppressed; coupon chip + loyalty panel + manual discount form all visible AND editable.
+3. **Coupon removal scenario** — in edit mode, click X on coupon chip → coupon clears, total recalculates → Save Changes → SQL check: `appointments.coupon_code = NULL`, `coupon_discount = NULL`, `total_amount` recomputed without coupon discount. **Navigate back to returnTo.**
+4. **Loyalty change scenario** — edit appointment with `loyalty_points_redeemed: 152` → change to 50 → Save Changes → SQL: appointment updated; **CRITICAL: `customers.loyalty_points_balance` UNCHANGED, NO new `loyalty_ledger` row** (per reversibility audit invariant).
+5. **Dirty Cancel** — make changes, click Cancel → confirmation dialog → Keep Editing keeps state, Discard navigates without saving (SQL unchanged).
+6. **Clean Cancel** — open edit mode, immediately click Cancel → no confirmation, direct navigate.
+7. **F2 shortcut** — press F2 in edit mode → no payment overlay opens.
+8. **No regression** — walk-in sale works; quote-edit (pre-Phase-1 flow) works; Hold ticket works on fresh tickets.
+
+**Next session:** Phase 1 Layer 8d — source-side affordances. Add "Edit Services" buttons on the Jobs card (Services tile) and Admin Appointment dialog routing to `/pos?source=...&id=...&returnTo=...`. Resolve the `source=job` save asymmetry flagged above. Optional friendly-identifier resolution.
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8b: `<TicketContext>` edit-mode extensions + POS deep-link drain
 
 Second session of Phase 1 (edit-via-POS). Lays the frontend STATE plumbing so the POS Sale tab can represent "edit mode for an existing record" instead of only "build a new ticket." **No UI changes** — every visible surface looks the same. Layer 8c is where the Sale-tab UX swaps "Checkout" → "Save Changes" and suppresses payment/receipt flow off `editMode === true`. Source spec: `docs/dev/QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md` §2 + §4.2 + §7.

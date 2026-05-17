@@ -392,6 +392,51 @@ describe('runEditModeDrain — endpoint selection + dispatch sequence', () => {
     expect(dispatch.mock.calls.some((c) => c[0].type === 'ENTER_EDIT_MODE')).toBe(true);
     expect(dispatch.mock.calls.some((c) => c[0].type === 'SET_COUPON')).toBe(false);
   });
+
+  it('dispatches MARK_EDIT_INITIAL_STATE as the FINAL action (Layer 8c dirty baseline)', async () => {
+    // Even when no modifiers / coupon are present, the drain still emits
+    // MARK_EDIT_INITIAL_STATE so the dirty-detection baseline is captured
+    // for downstream Cancel-confirmation UX.
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: makeLoadData() }));
+    const dispatch = vi.fn();
+    await runEditModeDrain(
+      {
+        source: 'appointment',
+        id: APPT_UUID,
+        returnTo: '/admin/appointments/' + APPT_UUID,
+      },
+      dispatch
+    );
+    const types = dispatch.mock.calls.map((c) => c[0].type);
+    expect(types).toContain('MARK_EDIT_INITIAL_STATE');
+    expect(types[types.length - 1]).toBe('MARK_EDIT_INITIAL_STATE');
+  });
+
+  it('MARK_EDIT_INITIAL_STATE fires AFTER coupon revalidate completes', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ data: makeLoadData({ coupon_code: 'SUMMER10' }) })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: { id: 'coupon-1', code: 'SUMMER10', total_discount: 18 },
+        })
+      );
+    const dispatch = vi.fn();
+    await runEditModeDrain(
+      {
+        source: 'appointment',
+        id: APPT_UUID,
+        returnTo: '/admin/appointments/' + APPT_UUID,
+      },
+      dispatch
+    );
+    const types = dispatch.mock.calls.map((c) => c[0].type);
+    const couponIdx = types.indexOf('SET_COUPON');
+    const markIdx = types.indexOf('MARK_EDIT_INITIAL_STATE');
+    expect(couponIdx).toBeGreaterThanOrEqual(0);
+    expect(markIdx).toBeGreaterThan(couponIdx);
+  });
 });
 
 describe('runEditModeDrain — error paths', () => {

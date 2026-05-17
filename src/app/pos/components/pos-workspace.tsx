@@ -19,6 +19,7 @@ import { TicketPanel } from './ticket-panel';
 import { RegisterTab } from './register-tab';
 import { CatalogBrowser } from './catalog-browser';
 import { PromotionsTab } from './promotions-tab';
+import { EditModeBanner } from './edit-mode-banner';
 import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 
 type PosTab = 'register' | 'products' | 'services' | 'promotions';
@@ -288,7 +289,13 @@ export function PosWorkspace() {
   );
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[1fr_380px] grid-rows-[1fr]">
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Item 15f Phase 1 Layer 8c — edit-mode banner. Mounts above the
+          two-pane workspace, spanning the full width so the operator sees
+          "Editing Appointment #XXX" + "Unsaved changes" badge while editing.
+          Returns null outside edit mode. */}
+      <EditModeBanner />
+      <div className="grid min-h-0 flex-1 grid-cols-[1fr_380px] grid-rows-[1fr]">
       {/* Left panel */}
       <div className="flex min-w-0 flex-col overflow-hidden">
         {/* Search bar */}
@@ -387,6 +394,7 @@ export function PosWorkspace() {
           onSelect={handlePricingSelect}
         />
       )}
+      </div>
     </div>
   );
 }

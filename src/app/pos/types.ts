@@ -111,6 +111,19 @@ export interface TicketState {
   sourceId: string | null;
   returnTo: string | null;
   editMode: boolean;
+  /**
+   * Item 15f Phase 1 Layer 8c — serialized snapshot of the editable cart slice
+   * (items + customer.id + vehicle.id + coupon + loyalty + manualDiscount) at
+   * `ENTER_EDIT_MODE` time. Used for "Unsaved changes" detection without an
+   * effect-tracked ref. `null` outside edit mode.
+   *
+   * The serializer is `serializeTicketEditSlice` (see ticket-reducer.ts).
+   * Comparing the current rendered ticket's serialization against this field
+   * gives an O(N) dirty check that's stable across re-renders. Cleared by
+   * EXIT_EDIT_MODE / CLEAR_TICKET / RESTORE_TICKET alongside the other
+   * edit-mode fields (state-leak prevention).
+   */
+  editInitialSnapshot: string | null;
 }
 
 // ─── Ticket Actions ────────────────────────────────────────────
@@ -149,7 +162,13 @@ export type TicketAction =
   // EXIT_EDIT_MODE clears the 4 fields without disturbing items/customer/etc.
   // Used by Layer 8c's "Cancel Edit" affordance (still on the cart, still
   // visible, but no longer scoped to a specific record).
-  | { type: 'EXIT_EDIT_MODE' };
+  | { type: 'EXIT_EDIT_MODE' }
+  // Item 15f Phase 1 Layer 8c — stamp `editInitialSnapshot` from current
+  // state. Dispatched by the deep-link drain as the final step (after all
+  // ENTER_EDIT_MODE follow-ups including async coupon revalidate). No-op
+  // outside edit mode. See `editInitialSnapshot` in TicketState for the
+  // dirty-detection contract.
+  | { type: 'MARK_EDIT_INITIAL_STATE' };
 
 // ─── Catalog types ─────────────────────────────────────────────
 

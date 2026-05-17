@@ -29,6 +29,7 @@ const mockTicket: { value: TicketState } = {
     sourceId: null,
     returnTo: null,
     editMode: false,
+    editInitialSnapshot: null,
   },
 };
 
@@ -65,6 +66,13 @@ vi.mock('../customer-type-prompt', () => ({
 
 vi.mock('../../lib/pos-fetch', () => ({
   posFetch: vi.fn(),
+}));
+
+// Item 15f Phase 1 Layer 8c — `next/navigation`'s `useRouter` is mounted
+// from `<TicketActions>` for the Save Changes / Cancel handlers. The
+// jsdom test environment doesn't ship an app-router context, so mock it.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -116,6 +124,7 @@ function setTicket(overrides: Partial<TicketState>) {
     sourceId: null,
     returnTo: null,
     editMode: false,
+    editInitialSnapshot: null,
     ...overrides,
   };
 }

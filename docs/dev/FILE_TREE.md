@@ -1354,7 +1354,11 @@ use-prerequisite-check.ts   — Service prerequisite check before adding to tick
 use-edit-mode-drain.ts      — Item 15f Phase 1 Layer 8b. POS deep-link drain (`/pos?source=...&id=...&returnTo=...`). Validates UUID + safe-internal-path, fetches load endpoint, dispatches ENTER_EDIT_MODE + modifier follow-ups. Mounted in pos-workspace.tsx. Exports pure helpers (`isUuid`, `isSafeInternalPath`, `buildTicketStateFromLoad`, `runEditModeDrain`) for unit-testing.
 ```
 
-- `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` — 22 cases: validators (UUID + 5 open-redirect attack classes), build-state pure helper, drain endpoint selection + dispatch sequence + coupon re-validation, error paths (403/404/network/malformed).
+- `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` — 24 cases: validators (UUID + 5 open-redirect attack classes), build-state pure helper, drain endpoint selection + dispatch sequence + coupon re-validation, error paths (403/404/network/malformed), Layer 8c `MARK_EDIT_INITIAL_STATE` as final dispatch (ordering vs coupon revalidate).
+
+- `src/app/pos/components/edit-mode-banner.tsx` — Item 15f Phase 1 Layer 8c. Subtle amber banner at top of Sale workspace when `ticket.editMode` is true. Surfaces "Editing Appointment #XXX" / "Editing Job #XXX" + "Unsaved changes" badge (compares `serializeTicketEditSlice(ticket)` against `ticket.editInitialSnapshot`). Returns null outside edit mode.
+- `src/app/pos/components/__tests__/edit-mode-banner.test.tsx` — 6 cases: no render outside edit mode, appointment/job label, dirty/clean states, pre-MARK snapshot=null suppression.
+- `src/app/pos/components/__tests__/ticket-actions-edit-mode.test.tsx` — 12 cases for the editMode branch of `<TicketActions>`: button swap (Save Changes + Cancel), Save POST payload shape (services + 6 modifier fields, percent→dollar resolution), success/error paths, clean vs dirty Cancel UX.
 
 ---
 

@@ -29,9 +29,12 @@ interface ApptRow {
   is_mobile: boolean;
   mobile_surcharge: number;
   mobile_zone_name_snapshot: string | null;
+  coupon_code?: string | null;
   coupon_discount?: number | null;
+  loyalty_points_redeemed?: number | null;
   loyalty_discount?: number | null;
   manual_discount_value?: number | null;
+  manual_discount_label?: string | null;
 }
 
 const state = {
@@ -152,9 +155,12 @@ beforeEach(() => {
     is_mobile: false,
     mobile_surcharge: 0,
     mobile_zone_name_snapshot: null,
+    coupon_code: null,
     coupon_discount: null,
+    loyalty_points_redeemed: null,
     loyalty_discount: null,
     manual_discount_value: null,
+    manual_discount_label: null,
   };
   state.existingServices = [
     { id: 'aps-1', service_id: SVC_A, price_at_booking: 200, tier_name: null },
@@ -391,3 +397,259 @@ describe('editAppointmentServices — modifier preservation contract (Item 15g L
     expect(apptUpd?.payload.discount_amount).toBe(20);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Item 15f Phase 1 Layer 8c — modifier-edit extension
+// ---------------------------------------------------------------------------
+// The cascade endpoint now accepts six OPTIONAL modifier fields. When
+// provided (including with value `null`), they write to the appointment row;
+// when omitted, Layer 15g-iii's preservation contract holds (existing
+// columns untouched). Per `docs/dev/LOYALTY_REVERSIBILITY_AUDIT_2026-05-17.md`,
+// pre-transaction modifier edits do NOT mutate customers.loyalty_points_balance,
+// loyalty_ledger, or coupons.use_count — those are transaction-bound writers
+// the cascade endpoint never touches.
+
+describe('editAppointmentServices — Layer 8c modifier-edit extension', () => {
+  it('writes coupon_code + coupon_discount when both provided', async () => {
+    state.appointment = {
+      ...state.appointment!,
+      coupon_code: null,
+      coupon_discount: null,
+    };
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: {
+        services: [{ service_id: SVC_A, price_at_booking: 200 }],
+        coupon_code: 'SUMMER10',
+        coupon_discount: 20,
+      },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const apptUpd = state.updates.find((u) => u.table === 'appointments');
+    expect(apptUpd?.payload.coupon_code).toBe('SUMMER10');
+    expect(apptUpd?.payload.coupon_discount).toBe(20);
+    // totals reflect the new coupon: 200 - 20 = 180
+    expect(apptUpd?.payload.total_amount).toBe(180);
+    expect(apptUpd?.payload.discount_amount).toBe(20);
+  });
+
+  it('clears coupon when payload sends coupon_code=null + coupon_discount=null', async () => {
+    state.appointment = {
+      ...state.appointment!,
+      coupon_code: 'SUMMER10',
+      coupon_discount: 20,
+      discount_amount: 20,
+      total_amount: 180,
+    };
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: {
+        services: [{ service_id: SVC_A, price_at_booking: 200 }],
+        coupon_code: null,
+        coupon_discount: null,
+      },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const apptUpd = state.updates.find((u) => u.table === 'appointments');
+    // Null is explicitly written (operator removed the coupon)
+    expect(apptUpd?.payload.coupon_code).toBeNull();
+    expect(apptUpd?.payload.coupon_discount).toBeNull();
+    // totals revert to subtotal (no discount applied)
+    expect(apptUpd?.payload.total_amount).toBe(200);
+    expect(apptUpd?.payload.discount_amount).toBe(0);
+  });
+
+  it('writes loyalty_points_redeemed + loyalty_discount on edit', async () => {
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: {
+        services: [{ service_id: SVC_A, price_at_booking: 200 }],
+        loyalty_points_to_redeem: 50,
+        loyalty_discount: 2.5,
+      },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const apptUpd = state.updates.find((u) => u.table === 'appointments');
+    expect(apptUpd?.payload.loyalty_points_redeemed).toBe(50);
+    expect(apptUpd?.payload.loyalty_discount).toBe(2.5);
+    expect(apptUpd?.payload.total_amount).toBe(197.5);
+  });
+
+  it('maps loyalty null → 0 (column is NOT NULL DEFAULT 0)', async () => {
+    state.appointment = {
+      ...state.appointment!,
+      loyalty_points_redeemed: 152,
+      loyalty_discount: 7.6,
+    };
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: {
+        services: [{ service_id: SVC_A, price_at_booking: 200 }],
+        loyalty_points_to_redeem: null,
+        loyalty_discount: null,
+      },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const apptUpd = state.updates.find((u) => u.table === 'appointments');
+    expect(apptUpd?.payload.loyalty_points_redeemed).toBe(0);
+    expect(apptUpd?.payload.loyalty_discount).toBe(0);
+  });
+
+  it('writes manual_discount_value + manual_discount_label together', async () => {
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: {
+        services: [{ service_id: SVC_A, price_at_booking: 200 }],
+        manual_discount_value: 15,
+        manual_discount_label: 'VIP',
+      },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const apptUpd = state.updates.find((u) => u.table === 'appointments');
+    expect(apptUpd?.payload.manual_discount_value).toBe(15);
+    expect(apptUpd?.payload.manual_discount_label).toBe('VIP');
+    expect(apptUpd?.payload.total_amount).toBe(185);
+  });
+
+  it('rejects manual_discount_value without label (coherence)', async () => {
+    await expect(
+      editAppointmentServices(mockSupabase() as never, {
+        appointmentId: APPT_ID,
+        body: {
+          services: [{ service_id: SVC_A, price_at_booking: 200 }],
+          manual_discount_value: 15,
+          manual_discount_label: null,
+        },
+        actor: BASE_ACTOR,
+        source: 'pos',
+        ipAddress: null,
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', httpStatus: 400 });
+  });
+
+  it('rejects manual_discount_label without value (coherence)', async () => {
+    await expect(
+      editAppointmentServices(mockSupabase() as never, {
+        appointmentId: APPT_ID,
+        body: {
+          services: [{ service_id: SVC_A, price_at_booking: 200 }],
+          manual_discount_value: null,
+          manual_discount_label: 'VIP',
+        },
+        actor: BASE_ACTOR,
+        source: 'pos',
+        ipAddress: null,
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', httpStatus: 400 });
+  });
+
+  it('rejects negative coupon_discount', async () => {
+    await expect(
+      editAppointmentServices(mockSupabase() as never, {
+        appointmentId: APPT_ID,
+        body: {
+          services: [{ service_id: SVC_A, price_at_booking: 200 }],
+          coupon_discount: -10,
+        },
+        actor: BASE_ACTOR,
+        source: 'pos',
+        ipAddress: null,
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', httpStatus: 400 });
+  });
+
+  it('rejects non-integer loyalty_points_to_redeem', async () => {
+    await expect(
+      editAppointmentServices(mockSupabase() as never, {
+        appointmentId: APPT_ID,
+        body: {
+          services: [{ service_id: SVC_A, price_at_booking: 200 }],
+          loyalty_points_to_redeem: 50.5,
+        },
+        actor: BASE_ACTOR,
+        source: 'pos',
+        ipAddress: null,
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_INPUT', httpStatus: 400 });
+  });
+
+  it('services-only payload preserves existing modifier columns (15g-iii contract)', async () => {
+    state.appointment = {
+      ...state.appointment!,
+      coupon_code: 'KEEP10',
+      coupon_discount: 25,
+      loyalty_points_redeemed: 50,
+      loyalty_discount: 2.5,
+      manual_discount_value: 5,
+      manual_discount_label: 'VIP',
+    };
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: { services: [{ service_id: SVC_A, price_at_booking: 400 }] },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const apptUpd = state.updates.find((u) => u.table === 'appointments');
+    // Modifier columns NEVER appear in the update payload when services-only.
+    expect('coupon_code' in apptUpd!.payload).toBe(false);
+    expect('coupon_discount' in apptUpd!.payload).toBe(false);
+    expect('loyalty_points_redeemed' in apptUpd!.payload).toBe(false);
+    expect('loyalty_discount' in apptUpd!.payload).toBe(false);
+    expect('manual_discount_value' in apptUpd!.payload).toBe(false);
+    expect('manual_discount_label' in apptUpd!.payload).toBe(false);
+    // But the canonical combined discount_amount IS written (15g-iii).
+    expect(apptUpd?.payload.discount_amount).toBe(32.5); // 25+2.5+5
+  });
+
+  it('audit details captures modifier diff when modifier fields provided', async () => {
+    state.appointment = {
+      ...state.appointment!,
+      coupon_code: null,
+      coupon_discount: null,
+    };
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: {
+        services: [{ service_id: SVC_A, price_at_booking: 200 }],
+        coupon_code: 'SUMMER10',
+        coupon_discount: 20,
+      },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const audit = state.auditCalls[0];
+    expect(audit).toBeDefined();
+    const details = audit.details as Record<string, unknown>;
+    expect(details.field).toBe('services_and_modifiers');
+    expect(details.modifiers_before).toMatchObject({ coupon_code: null, coupon_discount: null });
+    expect(details.modifiers_after).toMatchObject({ coupon_code: 'SUMMER10', coupon_discount: 20 });
+  });
+
+  it('audit details has field="services" + NO modifier diff when payload is services-only', async () => {
+    await editAppointmentServices(mockSupabase() as never, {
+      appointmentId: APPT_ID,
+      body: { services: [{ service_id: SVC_A, price_at_booking: 200 }] },
+      actor: BASE_ACTOR,
+      source: 'pos',
+      ipAddress: null,
+    });
+    const audit = state.auditCalls[0];
+    const details = audit.details as Record<string, unknown>;
+    expect(details.field).toBe('services');
+    expect('modifiers_before' in details).toBe(false);
+    expect('modifiers_after' in details).toBe(false);
+  });
+});
+

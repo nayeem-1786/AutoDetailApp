@@ -186,6 +186,7 @@ function JobsPageInner() {
         sourceId: null,
         returnTo: null,
         editMode: false,
+        editInitialSnapshot: null,
       };
 
       dispatch({ type: 'RESTORE_TICKET', state: newTicket });

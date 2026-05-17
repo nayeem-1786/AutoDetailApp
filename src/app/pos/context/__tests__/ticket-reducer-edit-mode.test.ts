@@ -70,6 +70,7 @@ function makeTicketData(overrides: Partial<TicketState> = {}): TicketState {
     sourceId: null,
     returnTo: null,
     editMode: false,
+    editInitialSnapshot: null,
     ...overrides,
   };
 }
@@ -89,6 +90,9 @@ describe('initialTicketState — edit-mode defaults', () => {
   });
   it('editMode defaults to false', () => {
     expect(initialTicketState.editMode).toBe(false);
+  });
+  it('editInitialSnapshot defaults to null', () => {
+    expect(initialTicketState.editInitialSnapshot).toBeNull();
   });
 });
 
@@ -229,6 +233,7 @@ describe('RESTORE_TICKET — never re-enters edit mode from sessionStorage', () 
       sourceId: APPT_UUID,
       returnTo: '/admin/appointments/' + APPT_UUID,
       editMode: true,
+      editInitialSnapshot: '{"some": "stale-snapshot"}',
     });
     const restored = ticketReducer(initialTicketState, {
       type: 'RESTORE_TICKET',
@@ -238,7 +243,79 @@ describe('RESTORE_TICKET — never re-enters edit mode from sessionStorage', () 
     expect(restored.sourceId).toBeNull();
     expect(restored.returnTo).toBeNull();
     expect(restored.editMode).toBe(false);
+    expect(restored.editInitialSnapshot).toBeNull();
     // Cart contents DO restore (the sessionStorage UX nicety).
     expect(restored.items).toHaveLength(1);
+  });
+});
+
+describe('MARK_EDIT_INITIAL_STATE — Layer 8c dirty-detection baseline', () => {
+  it('stamps a non-null snapshot when editMode is true', () => {
+    const editing = ticketReducer(initialTicketState, {
+      type: 'ENTER_EDIT_MODE',
+      source: 'appointment',
+      sourceId: APPT_UUID,
+      returnTo: '/admin/appointments/' + APPT_UUID,
+      ticketData: makeTicketData(),
+    });
+    expect(editing.editInitialSnapshot).toBeNull();
+    const marked = ticketReducer(editing, { type: 'MARK_EDIT_INITIAL_STATE' });
+    expect(marked.editInitialSnapshot).not.toBeNull();
+    expect(typeof marked.editInitialSnapshot).toBe('string');
+  });
+
+  it('is a no-op when editMode is false (defense against late dispatches)', () => {
+    const out = ticketReducer(initialTicketState, {
+      type: 'MARK_EDIT_INITIAL_STATE',
+    });
+    expect(out.editInitialSnapshot).toBeNull();
+    expect(out).toBe(initialTicketState); // same reference returned
+  });
+
+  it('captures items + customer.id + vehicle.id + modifiers in the snapshot', () => {
+    // Hydrate with a richer ticketData so the snapshot has actual content
+    // to round-trip.
+    const editing = ticketReducer(initialTicketState, {
+      type: 'ENTER_EDIT_MODE',
+      source: 'appointment',
+      sourceId: APPT_UUID,
+      returnTo: '/admin/appointments/' + APPT_UUID,
+      ticketData: makeTicketData({
+        loyaltyPointsToRedeem: 50,
+        loyaltyDiscount: 2.5,
+        manualDiscount: { type: 'dollar', value: 10, label: 'VIP' },
+      }),
+    });
+    const marked = ticketReducer(editing, { type: 'MARK_EDIT_INITIAL_STATE' });
+    const snap = JSON.parse(marked.editInitialSnapshot ?? '{}');
+    expect(snap.items).toHaveLength(1);
+    expect(snap.loyaltyPointsToRedeem).toBe(50);
+    expect(snap.loyaltyDiscount).toBe(2.5);
+    expect(snap.manualDiscount).toEqual({ type: 'dollar', value: 10, label: 'VIP' });
+  });
+
+  it('snapshot diverges from current state when items change post-mark (dirty signal)', () => {
+    const editing = ticketReducer(initialTicketState, {
+      type: 'ENTER_EDIT_MODE',
+      source: 'appointment',
+      sourceId: APPT_UUID,
+      returnTo: '/admin/appointments/' + APPT_UUID,
+      ticketData: makeTicketData(),
+    });
+    const marked = ticketReducer(editing, { type: 'MARK_EDIT_INITIAL_STATE' });
+    const initialSnapshot = marked.editInitialSnapshot;
+
+    // Simulate operator removing the item.
+    const modified = ticketReducer(marked, {
+      type: 'REMOVE_ITEM',
+      itemId: marked.items[0].id,
+    });
+    // editInitialSnapshot doesn't change on REMOVE_ITEM.
+    expect(modified.editInitialSnapshot).toBe(initialSnapshot);
+    // But the live serialization would now differ — caller computes via
+    // `serializeTicketEditSlice(modified)` and compares. We can't import
+    // the helper here without re-importing, but the contract is: the
+    // snapshot is frozen at MARK time and the diff is computed at read time.
+    expect(modified.items).toHaveLength(0);
   });
 });

@@ -34,12 +34,90 @@ export const serviceEditItemSchema = z.object({
   tier_name: z.string().min(1).max(100).nullable().optional(),
 });
 
-export const editServicesBodySchema = z.object({
-  services: z
-    .array(serviceEditItemSchema)
-    .min(1, { message: 'At least one service is required' })
-    .max(50, { message: 'Too many services in a single edit' }),
-});
+/**
+ * Item 15f Phase 1 Layer 8c — optional modifier fields.
+ *
+ * All six fields are `.optional().nullable()`, encoding three states:
+ *   - **field omitted** (`undefined`) → preserve existing column value
+ *     (Layer 15g-iii's modifier-preservation contract — services-only edits
+ *     must not touch modifiers).
+ *   - **field = null** → clear the column. For coupon/manual this means
+ *     "remove the modifier"; for loyalty it means "zero the redemption."
+ *   - **field = value** → write the value.
+ *
+ * Per the loyalty reversibility audit (`docs/dev/LOYALTY_REVERSIBILITY_AUDIT_2026-05-17.md`):
+ * pre-transaction loyalty/coupon edits do NOT mutate `customers.loyalty_points_balance`,
+ * `loyalty_ledger`, or `coupons.use_count`. The appointment row is a planned-
+ * redemption snapshot; the actual customer-state writes happen at transaction
+ * commit (which the cascade endpoint does not touch). This is why the schema
+ * accepts arbitrary modifier values without consulting the customer record.
+ *
+ * Coherence (mirroring the `appointments_manual_discount_coherent` DB CHECK):
+ * `manual_discount_value` and `manual_discount_label` must travel together.
+ * `(value=null, label=null)` clears both; `(value>0, label=string)` writes both.
+ * Mixed states are rejected at the Zod layer before the DB ever sees them.
+ */
+const modifierFieldsShape = {
+  coupon_code: z.string().max(50).nullable().optional(),
+  coupon_discount: z
+    .number()
+    .nonnegative({ message: 'coupon_discount must be non-negative' })
+    .finite()
+    .nullable()
+    .optional(),
+  loyalty_points_to_redeem: z
+    .number()
+    .int({ message: 'loyalty_points_to_redeem must be an integer' })
+    .nonnegative({ message: 'loyalty_points_to_redeem must be non-negative' })
+    .finite()
+    .nullable()
+    .optional(),
+  loyalty_discount: z
+    .number()
+    .nonnegative({ message: 'loyalty_discount must be non-negative' })
+    .finite()
+    .nullable()
+    .optional(),
+  manual_discount_value: z
+    .number()
+    .positive({ message: 'manual_discount_value must be > 0' })
+    .finite()
+    .nullable()
+    .optional(),
+  manual_discount_label: z.string().min(1).max(100).nullable().optional(),
+} as const;
+
+export const editServicesBodySchema = z
+  .object({
+    services: z
+      .array(serviceEditItemSchema)
+      .min(1, { message: 'At least one service is required' })
+      .max(50, { message: 'Too many services in a single edit' }),
+    ...modifierFieldsShape,
+  })
+  .superRefine((data, ctx) => {
+    // Manual-discount coherence: value and label travel together. Mirrors
+    // the `appointments_manual_discount_coherent` DB CHECK constraint so
+    // the rejection surfaces a structured Zod error (400) instead of an
+    // opaque DB error (500). Only checked when at least one of the two
+    // fields is explicitly present (undefined-undefined = preserve, no
+    // coherence concern).
+    const valuePresent = 'manual_discount_value' in data;
+    const labelPresent = 'manual_discount_label' in data;
+    if (!valuePresent && !labelPresent) return;
+    const v = data.manual_discount_value;
+    const l = data.manual_discount_label;
+    const valueIsSet = v != null;
+    const labelIsSet = l != null && l.length > 0;
+    if (valueIsSet !== labelIsSet) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'manual_discount_value and manual_discount_label must be both set (with value > 0 + non-empty label) or both null',
+        path: ['manual_discount_value'],
+      });
+    }
+  });
 
 export type EditServicesInput = z.infer<typeof editServicesBodySchema>;
 export type EditServicesItem = z.infer<typeof serviceEditItemSchema>;

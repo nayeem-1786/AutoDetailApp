@@ -26,7 +26,55 @@ export const initialTicketState: TicketState = {
   sourceId: null,
   returnTo: null,
   editMode: false,
+  // Item 15f Phase 1 Layer 8c — dirty-detection snapshot for "Unsaved
+  // changes" indicator. `null` outside edit mode; set by ENTER_EDIT_MODE
+  // alongside the other fields; cleared by EXIT_EDIT_MODE / CLEAR_TICKET /
+  // RESTORE_TICKET.
+  editInitialSnapshot: null,
 };
+
+/**
+ * Item 15f Phase 1 Layer 8c — serialize the editable cart slice for dirty
+ * detection. Only the fields the operator can change in edit mode are
+ * included. Excludes runtime-assigned `item.id` / `parentItemId` (UUIDs
+ * re-assigned on every hydration); compares content equivalence instead.
+ *
+ * Stable JSON-string output: the same logical cart state produces the same
+ * string across renders. Comparing `serializeTicketEditSlice(ticket)`
+ * against `ticket.editInitialSnapshot` gives the "dirty" answer in O(N).
+ */
+export function serializeTicketEditSlice(state: TicketState): string {
+  return JSON.stringify({
+    items: state.items.map((i) => ({
+      itemName: i.itemName,
+      itemType: i.itemType,
+      productId: i.productId,
+      serviceId: i.serviceId,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      tierName: i.tierName,
+      perUnitQty: i.perUnitQty,
+      // parentItemId would normally identify which catalog row owns a child
+      // addon, but since `id` is re-assigned each hydration, structural
+      // ordering is the better signal — items[] order itself encodes parent
+      // grouping (children always sit adjacent to parent post-add).
+    })),
+    customerId: state.customer?.id ?? null,
+    vehicleId: state.vehicle?.id ?? null,
+    coupon: state.coupon
+      ? { code: state.coupon.code, discount: state.coupon.discount }
+      : null,
+    loyaltyPointsToRedeem: state.loyaltyPointsToRedeem,
+    loyaltyDiscount: state.loyaltyDiscount,
+    manualDiscount: state.manualDiscount
+      ? {
+          type: state.manualDiscount.type,
+          value: state.manualDiscount.value,
+          label: state.manualDiscount.label,
+        }
+      : null,
+  });
+}
 
 function generateId(): string {
   // Fallback for older Safari/iPad that lack crypto.randomUUID()
@@ -618,6 +666,7 @@ export function ticketReducer(
         sourceId: null,
         returnTo: null,
         editMode: false,
+        editInitialSnapshot: null,
       });
     }
 
@@ -631,6 +680,13 @@ export function ticketReducer(
       // overwrites source/sourceId/returnTo/editMode unconditionally so the
       // caller can pass a `ticketData` shaped exactly like `RESTORE_TICKET`'s
       // payload without having to mirror the edit-mode fields.
+      //
+      // Layer 8c: does NOT stamp `editInitialSnapshot` here — the drain
+      // dispatches SET_LOYALTY_REDEEM / APPLY_MANUAL_DISCOUNT / SET_COUPON
+      // AFTER this action (the last one is async — coupon revalidate). The
+      // initial-state snapshot must be taken AFTER those settle so the cart
+      // doesn't appear dirty on hydration. The drain emits
+      // `MARK_EDIT_INITIAL_STATE` as its final dispatch.
       return recalculateTotals({
         ...action.ticketData,
         priorPayments: action.ticketData.priorPayments ?? [],
@@ -639,6 +695,7 @@ export function ticketReducer(
         sourceId: action.sourceId,
         returnTo: action.returnTo,
         editMode: true,
+        editInitialSnapshot: null,
       });
     }
 
@@ -649,6 +706,22 @@ export function ticketReducer(
         sourceId: null,
         returnTo: null,
         editMode: false,
+        editInitialSnapshot: null,
+      };
+    }
+
+    case 'MARK_EDIT_INITIAL_STATE': {
+      // Item 15f Phase 1 Layer 8c — snapshot stamp issued by the deep-link
+      // drain as its final dispatch (after ENTER_EDIT_MODE + optional
+      // SET_LOYALTY_REDEEM / APPLY_MANUAL_DISCOUNT / SET_COUPON have all
+      // settled). Computed from the current rendered state so the dirty-
+      // check that follows compares against the operator's actual starting
+      // point. No-op when editMode is false — defends against late or
+      // duplicate dispatches outside the drain.
+      if (!state.editMode) return state;
+      return {
+        ...state,
+        editInitialSnapshot: serializeTicketEditSlice(state),
       };
     }
 

@@ -246,7 +246,16 @@ function PosShellContent({
           break;
         case 'F2':
           e.preventDefault();
-          if (ticket.items.length > 0 && !checkoutOpen) {
+          // Item 15f Phase 1 Layer 8c — F2 is the Checkout shortcut. In
+          // edit mode there is no checkout, so the shortcut becomes a
+          // no-op. The Sale tab's "Save Changes" button has no keyboard
+          // shortcut (intentional — saving an edit should be an explicit
+          // tap, not a keystroke that could be triggered while typing).
+          if (
+            !ticket.editMode &&
+            ticket.items.length > 0 &&
+            !checkoutOpen
+          ) {
             openCheckout();
           }
           break;
@@ -280,7 +289,7 @@ function PosShellContent({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [dispatch, ticket.items.length, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen, router]);
+  }, [dispatch, ticket.items.length, ticket.editMode, openCheckout, checkoutOpen, shortcutsOpen, heldPanelOpen, router]);
 
   return (
     <div className="pos-standalone-safe flex h-dvh flex-col overflow-hidden bg-gray-100 dark:bg-gray-950 touch-manipulation pb-[env(safe-area-inset-bottom)]">
