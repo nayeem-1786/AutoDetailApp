@@ -984,6 +984,14 @@ src/lib/sms/dedup.ts                        # isRecentDuplicateSms — messages-
 src/lib/sms/hardcoded-messages.ts           # Static read-only display list for admin UI; also exports derived INTENTIONALLY_HARDCODED_SMS slug list (Sessions 2E.1b, 2E.2)
 src/lib/sms/__tests__/render-sms-template.test.ts
 src/lib/sms/__tests__/render-sms-template-contract.test.ts
+
+# SMS AI v2 (Layer 1+2 foundation — declarative + routing only; runner is Layer 3, webhook integration is Layer 4)
+src/lib/sms-ai/feature-flag.ts                    # shouldUseSmsAiV2 pure router + loadSmsAiV2Flags DB reader. Three flags: sms_ai_v2_kill_switch, sms_ai_v2_enabled_phones, sms_ai_v2_globally_enabled. Safe default = legacy.
+src/lib/sms-ai/tools.ts                           # 10 Anthropic tool definitions (declarative; no runner). Side-effecting tools carry "Only call when explicitly confirmed" gates. TOOL_NAMES const for type-safe runtime dispatch.
+src/lib/sms-ai/system-prompt.ts                   # buildV2SystemPrompt — 8 sections: identity, channel rules, critical rules, tool guide, escalation guide, conversation flow, context placeholder, grounding. Structured for prompt caching (audit §4.5). {CUSTOMER_CONTEXT} token left un-substituted for runner injection.
+src/lib/sms-ai/__tests__/feature-flag.test.ts     # 22 tests — kill-switch precedence, global enable, allowlist (E.164 normalization symmetric), DB reader coercion + safe defaults on missing keys.
+src/lib/sms-ai/__tests__/tools.test.ts            # 18 tests — schema validity, name uniqueness, required fields, side-effect-tool confirmation gate, enum coverage (info types, reason codes).
+src/lib/sms-ai/__tests__/system-prompt.test.ts    # 16 tests — interpolation, 8 sections present, all 10 tools named, all 7 reasons listed, STOP/UNSUBSCRIBE rule, deterministic output.
 src/app/api/admin/sms-templates/route.ts
 src/app/api/admin/sms-templates/[slug]/route.ts
 src/app/api/admin/sms-templates/[slug]/__tests__/route.test.ts
@@ -1048,6 +1056,12 @@ src/lib/services/job-addons.ts
 src/lib/services/messaging-ai-prompt.ts
 src/lib/services/messaging-ai.ts
 src/lib/services/conversation-summary.ts
+src/lib/services/conversation-history.ts          # getConversationHistory — small helper (SMS AI v2 Layer 1+2). By conversationId or phone, configurable limit, optional system-message exclusion.
+src/lib/services/customer-context.ts              # getCustomerContext — unified single-call snapshot bundle (SMS AI v2 Layer 1+2). Returns customer + vehicles + upcoming_appointments + recent_quotes + recent_transactions (cents) + conversation_history. Used by SMS AI v2 runner (Layer 3) + webhook handler (Layer 4). Defaults: 20 history messages, 5 transactions for known customers only, 5 appointments, 3 quotes.
+src/lib/services/staff-notification.ts            # notifyStaff — canonical staff-alert dispatcher (SMS AI v2 Layer 1+2). Extracted from /api/voice-agent/notify-staff body. 7 reason codes including human_handoff. Renders staff_notification template via renderSmsTemplate; recipient chain: template.recipient_phones → business_phone → BUSINESS_DEFAULTS.phone. Returns per-recipient success/error summary.
+src/lib/services/__tests__/conversation-history.test.ts # 10 tests — by conversationId, phone fallback, chronological order, limit cap, system-message exclusion.
+src/lib/services/__tests__/customer-context.test.ts     # 15 tests — known customer happy path, unknown phone, includeTransactions toggle, maxHistoryMessages cap, is_ai_enabled propagation, dollars→cents conversion.
+src/lib/services/__tests__/staff-notification.test.ts   # 15 tests — all 7 reason codes + isStaffNotificationReason guard, recipient fallback chain, partial-failure reporting, template-inactive short-circuit, audit-log to customer thread.
 src/lib/services/page-content-extractor.ts
 src/lib/services/service-resolver.ts                 # resolveServiceByName + resolvePrice for voice agent / SMS auto-responder. Layer 3d: resolvePrice rewritten as thin wrapper around canonical engine; 4 silent-mispricing bugs (exotic/classic, per_unit, specialty, custom) closed.
 src/lib/services/voice-post-call.ts
@@ -1440,6 +1454,17 @@ Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
 - `supabase/migrations/20260518193527_normalize_google_place_id.sql` — Idempotent one-time UPDATE that unwraps the double-encoded `business_settings.google_place_id` JSONB value. Scope: only the `google_place_id` key; WHERE clause matches the exact `"\"...\""` drift pattern.
 - `src/lib/utils/__tests__/google-place-id.test.ts` — 26 unit tests for the Place ID normalizer (double-encoded unwrap, URL extraction, quote-strip, trim, validation).
 - `src/app/api/admin/cms/homepage-settings/__tests__/place-id-guard.test.ts` — 7 integration tests for the PUT route's google_place_id 400 guard + normalization.
+
+SMS AI v2 Layer 1+2 additions (foundation; no runner + no webhook integration yet):
+- `supabase/migrations/20260518215003_add_sms_ai_v2_settings.sql` — Idempotent seed for 3 business_settings keys (kill_switch, enabled_phones, globally_enabled). Safe default state: v2 disabled.
+- `src/lib/services/customer-context.ts` — getCustomerContext unified single-call snapshot. Reuses voice-agent/context shape so both call sites converge.
+- `src/lib/services/conversation-history.ts` — getConversationHistory small helper used by getCustomerContext + SMS AI v2 runner.
+- `src/lib/services/staff-notification.ts` — notifyStaff canonical dispatcher (extracted from voice-agent endpoint body). 7 reason codes including new `human_handoff`.
+- `src/app/api/voice-agent/notify-staff/route.ts` — REFACTORED to thin HTTP wrapper around notifyStaff helper. Behavior-preserving.
+- `src/app/api/voice-agent/notify-staff/__tests__/route.test.ts` — 8 tests pinning HTTP contract post-refactor (401 / { success: false } on bad input / { success: true } on success, all 6 original reasons + new human_handoff forward-compat).
+- `src/lib/sms-ai/feature-flag.ts` — shouldUseSmsAiV2 pure router + loadSmsAiV2Flags reader.
+- `src/lib/sms-ai/tools.ts` — 10 declarative Anthropic tool definitions.
+- `src/lib/sms-ai/system-prompt.ts` — buildV2SystemPrompt with {CUSTOMER_CONTEXT} placeholder.
 
 Item 15g Layer 15g-iii (UI surfacing + checkout hydration for modifiers) additions:
 - `src/components/appointments/modifier-summary.tsx` — Shared `<ModifierSummary variant="admin|pos">` + `hasAppliedModifiers()` helper. Read-only summary of coupon / loyalty / manual discount on appointment-derived surfaces. Mounted on Admin Appointment dialog + Jobs card Services tile.
