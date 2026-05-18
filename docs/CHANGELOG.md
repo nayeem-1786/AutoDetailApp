@@ -6,6 +6,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-18 — Next.js 15.5.18 upgrade audit + restore point (Phase 1 of 3)
+
+Audit-only session. Zero source/package changes. Single git mutation: annotated tag `pre-nextjs-15.5.18-upgrade` created at main HEAD (`82cbcffee587ddd56c51abd540b2f984269827d2`) and pushed to origin (`d3d3f6d630f507fdac426909a1f934737760730a refs/tags/pre-nextjs-15.5.18-upgrade`) as the rollback baseline.
+
+**Deliverable:** `docs/dev/NEXTJS_15.5.18_UPGRADE_AUDIT.md` — 8-section audit covering current state, restore point, release-notes diff (15.3 → 15.5), surface inventory across 7 risk areas (middleware, image optimization, Server Actions/RSC, cache + revalidation, configuration, transitive deps, POS-specific), Phase 2 test plan, Phase 3 deploy plan, known unknowns, and out-of-scope follow-ups.
+
+**Critical findings:**
+
+1. **`npm audit` is empirical truth.** 11 distinct vulns in the current dep tree on `15.3.3`; `next` itself bundles 23 individual GHSAs. Severity rollup: 1 critical + 5 high + 4 moderate + 1 low. The critical is `next` itself rooted in the December 2025 RCE (CVE-2025-66478 / GHSA-9qr9-h5gf-34mp). **15.5.18 closes every one of the 23 `next`-rooted advisories** — confirmed against the audit DB.
+
+2. **Image optimization remotePatterns wildcard.** `next.config.ts:327-329` has a bare `{ protocol: 'https', hostname: '**' }`. This is exactly the attack surface for GHSA-9g9p-9gw9-jx7f (self-hosted DoS via image optimizer), patched in 15.5.10. 15.5.18 fixes the underlying mechanism, but Next.js docs themselves call bare `**` "not recommended" — defense-in-depth recommends tightening to `**.supabase.co` in Phase 2 alongside the version bump. Audit's smoke test #13 proves the tightening (request to non-Supabase host returns 403 after the change).
+
+3. **Middleware surface is high pre-upgrade exposure.** Smart Details' middleware enforces the IP-whitelist + subdomain-routing security boundary for `app.smartdetailsautospa.com`. GHSA-26hh-7cqf-hhc6 (App Router segment-prefetch middleware bypass — incomplete-fix follow-up) is patched **only in 15.5.18** (not in earlier 15.5.x). Patching the runtime is the actual fix; no code change needed.
+
+4. **Server Actions surface is empty.** `grep -rln '"use server"' src/` returns zero results. The Dec 2025 Server Action source-exposure advisory (GHSA-w37m-7fhw-fmv9) has zero exploit surface in our codebase because mutations route through explicit `/api/*` handlers with cookie/Bearer/HMAC auth.
+
+5. **One dead config setting.** `next.config.ts:28` has `skipTrailingSlashRedirect: false` at top level. The option is `experimental.*` in 15.5; at top level it's likely a no-op. Since the value matches the default, the audit's Phase 2 recommendation is to delete the line. Not blocking.
+
+6. **15.4.x is no longer receiving security backports.** May 2026 coordinated advisory lists fixed-in versions as `15.5.18` and `16.2.6` only. Do not pin to 15.4.x at any intermediate point. Audit flags any 15.4.x usage anywhere as a follow-up to confirm.
+
+7. **No CVE has a patched range that excludes 15.5.18.** The brief's explicit red-flag check passes: every cited GHSA + the December 2025 CVE + the May 2026 13-advisory coordinated release is closed at or below 15.5.18.
+
+8. **`experimental` flags in `next.config.ts` are unchanged in 15.5.** `webpackBuildWorker`, `parallelServerCompiles`, `parallelServerBuildTraces`, `cpus` — all still experimental, same shape. Keep as-is. `serverExternalPackages` has been top-level stable since 15.0 — our usage matches.
+
+9. **React 19.2.3 → 19.2.6 also recommended.** Upstream React advisory CVE-2026-23870 (RSC DoS) was patched in React 19.0.6 / 19.1.7 / **19.2.6**. We're at 19.2.3 pinned exact. Bump React + react-dom in the same Phase 2 PR.
+
+**Transitive deps that DON'T auto-fix from the Next bump:**
+
+- `qs@6.14.1` (low — DoS via arrayLimit) lives under `@stripe/terminal-js → stripe@8.222.0`. Needs `@stripe/terminal-js` bump. **Out of scope for Phase 2.**
+- `ws@8.19.0` (moderate — uninitialized memory disclosure) lives under `@supabase/realtime-js`. Needs `@supabase/supabase-js` bump. **Out of scope for Phase 2.**
+- All other transitives (`ajv`, `brace-expansion`, `flatted`, `minimatch`, `picomatch`, `postcss`, `tar`) auto-resolve via `npm audit fix` after the Next bump.
+
+**Gap — production VPS SHA not verified.** Brief specified `ssh root@31.220.60.157 'cd /home/media/repositories/smart-details && git rev-parse HEAD'`. SSH succeeded; path does not exist on VPS. Filesystem enumeration was permission-denied (only `git rev-parse HEAD` authorized). **Owner action before Phase 2:** supply correct repo path or temporarily authorize discovery; confirm SHA matches `82cbcffee587ddd56c51abd540b2f984269827d2`.
+
+**Sourcing correction.** Audit brief cited `nextjs.org/blog/may-2026-security-release` — that URL returns 404. The canonical advisory lives at `vercel.com/changelog/next-js-may-2026-security-release`. Audit doc cites the working URL.
+
+**Risk rating: MEDIUM.** Brief: no Server Actions in codebase + no `<Image quality>` overrides + no AMP + no `next lint` invocation means none of the 15.5 deprecation warnings affect us; the upgrade payload reduces to a build/runtime version bump. Estimated Phase 2 effort: 2.5–3.5 h. Estimated Phase 3 effort: 1.5–2 h + 30 min monitoring window.
+
+**Next:** owner reviews `docs/dev/NEXTJS_15.5.18_UPGRADE_AUDIT.md`. Phase 2 prompt (branch + dev test) will quote audit §5 verbatim. Phase 3 prompt (deploy + UAT) will quote audit §6 verbatim. No code or package changes will be made until Phase 2 is explicitly authorized.
+
+---
+
 ## 2026-05-18 — Google Place ID double-encoding fix (B + C hardening)
 
 **Root cause:** `business_settings.google_place_id` stored a double-JSON-encoded value in production (`"\"ChIJ1bR4uWNK3YAReKepydOFb20\""` — length 33, real ID is 27 chars). The Supabase JSONB read returned a JS string with embedded literal double-quote characters. The `google-reviews` cron at `src/app/api/cron/google-reviews/route.ts:64` cast `(placeIdSetting?.value as string)` without unwrapping, so the constructed URL was `?place_id=%22ChIJ...%22` — which Google's Place Details API rejected with `INVALID_REQUEST: Invalid 'place_id' parameter.` causing the daily 6 AM PST tick to 502.
