@@ -228,6 +228,16 @@ describe('GET /api/pos/appointments/[id]/load — record state', () => {
     const res = await GET(req(), params);
     expect(res.status).toBe(400);
   });
+
+  it('returns 400 on no_show appointment (Layer 8d-bis audit finding #5)', async () => {
+    // Per the appointment + job status flow audit (2026-05-17) §6.4,
+    // no_show is a terminal state — customer didn't arrive, so editing
+    // services is semantically nonsensical. Lockstep with the cascade
+    // endpoint's guard in src/lib/appointments/service-edit.ts.
+    state.appointment = makeAppt({ status: 'no_show' });
+    const res = await GET(req(), params);
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('GET /api/pos/appointments/[id]/load — happy path shape', () => {

@@ -66,6 +66,18 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
       toast.error(!canAddItems ? 'You do not have permission to add items' : 'You do not have permission to create tickets');
       return;
     }
+    // Item 15f Phase 1 Layer 8d-bis — 4th product-add surface. Layer 8d
+    // gated the Products tab, global search, and the barcode scanner; the
+    // Register tab's favorite/quick-add buttons were missed. Product
+    // favorites are colored buttons in the same grid as service favorites,
+    // so the visual gating is per-button (service favorites continue to
+    // work). Same toast text as the Layer 8d Products-tab gate for parity.
+    if (ticket.editMode && fav.type === 'product') {
+      toast.info(
+        'Products can only be added at checkout. Save your service changes first, then add products during checkout.'
+      );
+      return;
+    }
     switch (fav.type) {
       case 'product': {
         const product = products.find((p) => p.id === fav.referenceId);
@@ -257,16 +269,30 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
                 const useShade = (resolvedTheme === 'dark' && fav.darkColor) ? (fav.darkColorShade ?? 80) : fav.colorShade;
                 const colors = getTileColors(useColor, useShade);
                 const Icon = TYPE_ICONS[fav.type] ?? Package;
+                // Item 15f Phase 1 Layer 8d-bis — product favorites are
+                // gated in edit mode (cascade endpoint accepts services
+                // only). Visual treatment mirrors the disabled Products
+                // tab — opacity-40 + cursor-not-allowed. The click handler
+                // still surfaces the toast for accessibility (operator
+                // can tap to see WHY it's disabled).
+                const isProductGated = ticket.editMode && fav.type === 'product';
                 return (
                   <button
                     key={fav.id}
                     onClick={() => handleTapFavorite(fav)}
+                    aria-disabled={isProductGated || undefined}
+                    title={
+                      isProductGated
+                        ? 'Products are added at checkout, not in edit mode'
+                        : undefined
+                    }
                     className={cn(
                       'flex h-full flex-col items-center justify-center gap-1.5 rounded-lg px-2 py-3 transition-all',
                       'active:scale-[0.97]',
                       colors.bg,
                       colors.text,
-                      colors.hover
+                      colors.hover,
+                      isProductGated && 'opacity-40 cursor-not-allowed'
                     )}
                   >
                     <Icon className="h-5 w-5" />

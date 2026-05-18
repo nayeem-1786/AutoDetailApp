@@ -251,8 +251,13 @@ describe('runEditModeDrain — endpoint selection + dispatch sequence', () => {
     expect(enterCall![0].returnTo).toBe('/admin/appointments/' + APPT_UUID);
   });
 
-  it('hits the jobs/checkout-items endpoint when source=job', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ data: makeLoadData() }));
+  it('hits the jobs/checkout-items endpoint when source=job (URL id = JOB UUID)', async () => {
+    // Layer 8d-bis (Option G4): URL `id` is the JOB UUID; the drain calls
+    // /api/pos/jobs/${jobId}/checkout-items and resolves the appointment
+    // UUID from the response for `sourceId` stamping.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ data: makeLoadData({ appointment_id: APPT_UUID }) })
+    );
     const dispatch = vi.fn();
     await runEditModeDrain(
       { source: 'job', id: JOB_UUID, returnTo: '/pos/jobs/' + JOB_UUID },
@@ -262,6 +267,29 @@ describe('runEditModeDrain — endpoint selection + dispatch sequence', () => {
     const enterCall = dispatch.mock.calls.find((c) => c[0].type === 'ENTER_EDIT_MODE');
     expect(enterCall).toBeTruthy();
     expect(enterCall![0].source).toBe('job');
+    // Layer 8d-bis core assertion: sourceId is the APPOINTMENT UUID from the
+    // response, NOT the JOB UUID from the URL. Layer 8c's Save handler hits
+    // /api/pos/appointments/${sourceId}/services which expects an appointment.
+    expect(enterCall![0].sourceId).toBe(APPT_UUID);
+    expect(enterCall![0].sourceId).not.toBe(JOB_UUID);
+  });
+
+  it('refuses the drain when source=job and response.appointment_id is null', async () => {
+    // Defense in depth — the click handler in job-detail.tsx refuses jobs
+    // with null appointment_id before building the deep-link, but if a
+    // legacy job somehow reaches the drain (or a future load endpoint
+    // returns null), the cascade endpoint would 404 on save. Refuse the
+    // drain so the operator falls back to a fresh ticket + toast.
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ data: makeLoadData({ appointment_id: null }) })
+    );
+    const dispatch = vi.fn();
+    const result = await runEditModeDrain(
+      { source: 'job', id: JOB_UUID, returnTo: '/pos/jobs/' + JOB_UUID },
+      dispatch
+    );
+    expect(result.ok).toBe(false);
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('dispatches SET_LOYALTY_REDEEM when loyalty points or discount present', async () => {

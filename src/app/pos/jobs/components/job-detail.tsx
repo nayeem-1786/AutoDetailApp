@@ -568,18 +568,21 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     if (ok) setShowEditVehicle(false);
   }
 
-  // Item 15f Phase 1 Layer 8d — Edit Services routes to POS edit mode via
-  // the deep-link drain (Layer 8b). The full POS Sale tab opens with the
-  // appointment's services + modifiers pre-loaded; Save Changes hits the
-  // cascade endpoint (Layer 8a/8c) which writes appointment_services AND
-  // cascades to jobs.services.
+  // Item 15f Phase 1 Layer 8d / 8d-bis — Edit Services routes to POS edit
+  // mode via the deep-link drain (Layer 8b). The full POS Sale tab opens
+  // with the appointment's services + modifiers pre-loaded; Save Changes
+  // hits the cascade endpoint (Layer 8a/8c) which writes
+  // appointment_services AND cascades to jobs.services.
   //
-  // CRITICAL: deep-link `id` is the APPOINTMENT UUID, not the JOB UUID.
-  // Layer 8c's Save handler POSTs to /api/pos/appointments/${sourceId}/services
-  // unconditionally — passing the job id here would 404 the cascade. The
-  // source=job discriminator just tells the drain to use the jobs/checkout-items
-  // load endpoint (richer payload incl. prior_payments); save still targets
-  // the appointment row.
+  // Layer 8d-bis (Option G4): deep-link `id` is the JOB UUID for source=job.
+  // The drain calls `/api/pos/jobs/${id}/checkout-items` (which expects a
+  // job UUID — Layer 8d shipped the appointment UUID and 404'd), then
+  // resolves the linked appointment_id from the response and uses that as
+  // `ticket.sourceId`. Invariant preserved: `sourceId` is ALWAYS an
+  // appointment UUID — Layer 8c's save POSTs to
+  // `/api/pos/appointments/${sourceId}/services`. The change is where
+  // sourceId gets populated (response.appointment_id for source=job; URL
+  // id for source=appointment).
   //
   // Walk-ins post-Phase-0a all carry a synthetic appointment_id. Legacy
   // pre-0a walk-ins (appointment_id IS NULL) can't be edited via this
@@ -597,7 +600,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     // mount and opens the detail view (Layer 8d adds this query-param hop
     // since the Jobs page doesn't have per-job URL segments).
     router.push(
-      `/pos?source=job&id=${job.appointment_id}&returnTo=${encodeURIComponent(
+      `/pos?source=job&id=${job.id}&returnTo=${encodeURIComponent(
         `/pos/jobs?jobId=${job.id}`
       )}`
     );

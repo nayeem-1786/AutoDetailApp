@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { MapPin, Pencil } from 'lucide-react';
+import { MapPin, MonitorSmartphone, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogHeader,
@@ -196,6 +196,33 @@ export function AppointmentDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogHeader>
+        {/* Item 15f Phase 1 Layer 8d-bis — "Edit in POS" promoted to a
+            top-right button styled to match the admin shell's "Open POS"
+            header pattern (MonitorSmartphone icon + same bordered button
+            shape). Layer 8d shipped this as a small text link inside the
+            Services block; the dialog-header position is more discoverable
+            and matches the user's UX request. The in-Services Edit link
+            stays for now as a secondary entry point until UAT confirms
+            the top-right placement covers operator muscle memory. The
+            DialogClose component is positioned `absolute right-4 top-4`,
+            so this button sits inside the header flow with right-padding
+            reserved for the close icon. */}
+        {canEditServices && appointment && (
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(
+                  '/admin/appointments'
+                )}`
+              )
+            }
+            className="absolute right-12 top-4 flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          >
+            <MonitorSmartphone className="h-4 w-4" />
+            <span>Edit in POS</span>
+          </button>
+        )}
         <DialogTitle>Appointment Details</DialogTitle>
         <DialogDescription>
           {appointment.customer.first_name} {appointment.customer.last_name}
@@ -258,43 +285,14 @@ export function AppointmentDetailDialog({
             shared composeLineItems so the synthetic mobile-fee row stays
             consistent across surfaces. Visual output identical to the
             prior ad-hoc append (Phase Mobile-1 Option D2).
-            Item 15a — Edit affordance opens the picker modal; hidden
-            for terminal-status appointments. */}
+            Item 15f Phase 1 Layer 8d-bis — Edit affordance moved to the
+            top-right of the dialog header ("Edit in POS" button), matching
+            the admin shell's "Open POS" pattern. The in-Services text link
+            is gone; both single- and modifier-edit entry points go through
+            that one promoted button. */}
         <div className="mt-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-500">Services</p>
-            {canEditServices && appointment && (
-              // Item 15f Phase 1 Layer 8d — re-enables the Admin "Edit
-              // Services" entry point. The Layer 4 disable was scoped to
-              // the deletion window for the bespoke `<EditServicesModal>`
-              // (silent exotic/classic mispricing). With Phase 1 Layers
-              // 8a-8c shipped, the canonical edit surface IS the POS Sale
-              // tab — services + modifier editing routes through the same
-              // cascade endpoint (`/api/pos/appointments/[id]/services`)
-              // regardless of operator entry point. The modal mount below
-              // stays inert as dead code; Layer 8e deletes it.
-              //
-              // returnTo lands the operator back at `/admin/appointments`
-              // (the list page that owns this dialog). The dialog itself
-              // doesn't auto-reopen on return — the operator clicks the
-              // appointment row again to see updated totals. Future
-              // ?dialogId=... query-param hop would auto-reopen, but the
-              // audit §7.2 marks that as a trivial follow-up, not Layer
-              // 8d scope.
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(
-                      '/admin/appointments'
-                    )}`
-                  )
-                }
-                className="text-xs font-medium text-blue-600 hover:text-blue-700"
-              >
-                Edit
-              </button>
-            )}
           </div>
           <div className="mt-1 space-y-0.5">
             {composeLineItems(

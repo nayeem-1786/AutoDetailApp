@@ -232,9 +232,17 @@ export async function editAppointmentServices(
   }
   const appointment = appointmentRaw as AppointmentRow;
 
+  // Item 15f Phase 1 Layer 8d-bis (Audit Finding #5): refuse terminal
+  // statuses — `completed` / `cancelled` / `no_show`. Lockstep with the
+  // load endpoint (`src/app/api/pos/appointments/[id]/load/route.ts`) so
+  // a successful drain implies the save can succeed on status. Per the
+  // appointment + job status flow audit (2026-05-17) §6.4, `no_show` is
+  // a terminal state — the customer didn't arrive, so editing services
+  // is semantically nonsensical.
   if (
     appointment.status === 'completed' ||
-    appointment.status === 'cancelled'
+    appointment.status === 'cancelled' ||
+    appointment.status === 'no_show'
   ) {
     throw new ServiceEditError(
       'INVALID_STATUS',

@@ -6,6 +6,49 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8d-bis: UAT fix-up (Jobs card load + register product gate + no_show refusal + Edit-in-POS button)
+
+Fifth session of Phase 1 (edit-via-POS). Ships four targeted fixes surfaced by Layer 8d UAT — two CRITICAL (the Jobs-card edit flow was broken end-to-end, and the Register tab favorite grid bypassed Layer 8d's product gate), one audit gap (`no_show` is terminal but was loadable + saveable), and one cosmetic (admin "Edit in POS" button styled to match the existing "Open POS" header pattern). Driven by `docs/dev/APPOINTMENT_JOB_STATUS_FLOW_AUDIT_2026-05-17.md` (Finding #5) plus the UAT punch list. Layer 8e (revert Layer 3a-i + delete dead modals) remains the next sequential session.
+
+**Four fixes:**
+
+1. **Fix 1 — Jobs card edit flow (Option G4)** — `src/app/pos/jobs/components/job-detail.tsx`, `src/app/api/pos/jobs/[id]/checkout-items/route.ts`, `src/app/pos/hooks/use-edit-mode-drain.ts`:
+   - **Bug**: Layer 8d's deep-link URL carried `id=<APPOINTMENT_UUID>` for source=job. The drain calls `/api/pos/jobs/${id}/checkout-items`, which expects a JOB UUID — 404'd on every Jobs-card edit attempt for non-trivial `in_progress` cases. UAT reported the entire source=job path as broken.
+   - **Fix (Option G4)**: URL `id` is now the JOB UUID. The checkout-items endpoint adds `appointment_id` to its response. The drain hook reads `data.appointment_id` and uses that as `ticket.sourceId` (since Layer 8c's Save POSTs to `/api/pos/appointments/${sourceId}/services` — sourceId must always be an appointment UUID). For source=appointment, `sourceId` continues to come from the URL `id` (the appointments/load endpoint expects an appointment UUID, so URL id IS the sourceId — no change).
+   - **Defensive**: drain refuses (no dispatch, generic "Failed to load record for edit" toast) when source=job and response.appointment_id is null (legacy pre-Phase-0a walk-ins). The Jobs-card click handler already guards on `!job.appointment_id`, so this is defense in depth.
+   - Test contract pinned: `edit-services-deep-link.test.ts` rewritten — `id=JOB_UUID`, no APPT_UUID in URL. `use-edit-mode-drain.test.ts` source=job test asserts `sourceId === APPT_UUID` (from response, NOT the URL).
+
+2. **Fix 2 — Register tab favorite product-add gate (4th surface)** — `src/app/pos/components/register-tab.tsx`:
+   - **Bug**: Layer 8d gated Products tab + global search + barcode scanner. The Register tab's favorite/quick-add grid (the colored buttons mixed with services — e.g. "Wool Pad" / "Carnauba Paste Wax") was missed. Operators could click a product favorite in edit mode; the row would be added to the cart and silently dropped on Save Changes (cascade endpoint's Zod accepts services only).
+   - **Fix**: `handleTapFavorite` rejects clicks where `ticket.editMode && fav.type === 'product'` and surfaces the same `toast.info("Products can only be added at checkout. Save your service changes first, then add products during checkout.")` as the other 3 gates. Visual treatment matches the disabled Products tab — product favorites get `opacity-40 cursor-not-allowed` + `aria-disabled` + a `title` tooltip when in edit mode. Service / surcharge / custom-amount / customer-lookup favorites continue to work — services ARE editable.
+   - New test: `register-tab-favorites-gating.test.tsx` (4 cases — non-edit-mode adds normally, edit-mode rejects + toasts, edit-mode renders disabled styling, service favorites unaffected).
+
+3. **Fix 3 — `no_show` refusal in load + cascade (Audit Finding #5)** — `src/app/api/pos/appointments/[id]/load/route.ts`, `src/lib/appointments/service-edit.ts`:
+   - **Bug**: Layer 8b/8c's status guard refused `completed` and `cancelled` but allowed `no_show`. Per the status flow audit §6.4, `no_show` is terminal — customer didn't arrive, no service is being delivered. Editing services makes no sense and would create auditor confusion.
+   - **Fix**: load endpoint and cascade module BOTH refuse `['completed', 'cancelled', 'no_show']` in lockstep — load-success implies save-success on status.
+   - Tests added in both surfaces (load route test, cascade module test, services route test) — all three test files pinned the existing 2-status guard; each gains a parallel `'no_show'` case.
+
+4. **Fix 4 — "Edit in POS" button restyle** — `src/app/admin/appointments/components/appointment-detail-dialog.tsx`:
+   - **UAT request**: Layer 8d shipped the trigger as a small "Edit" text link inside the Services block (poor discoverability). User asked for a button matching the admin shell's "Open POS" header pattern, positioned top-right of the dialog.
+   - **Fix**: button promoted to absolute-positioned `right-12 top-4` inside `DialogHeader` (left of the close X at `right-4`). Same icon (`MonitorSmartphone`), same shape, same colors as `admin-shell.tsx:949-960`'s "Open POS" button — `flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100`. Text reads "Edit in POS". The in-Services text link is removed (single entry point). Click behavior unchanged: `router.push('/pos?source=appointment&id=<uuid>&returnTo=/admin/appointments')`. Existing test (`edit-services-disabled.test.tsx`) updated to find the button by its new "Edit in POS" label.
+
+**Tests:** +5 new cases (1 file for register-tab favorites with 4 cases, +1 case in drain hook test for source=job sourceId resolution, +1 case for null appointment_id refusal, +1 no_show case in load test, +1 no_show case in services route test, +1 no_show case in service-edit module test). Existing edit-services-deep-link tests rewritten to flip the contract (id = JOB_UUID). Total 1500/1500 passing — was 1492 at Layer 8d.
+
+**Verification:** `npm run typecheck` (only pre-existing `quote-service.modifiers.test.ts` errors, unchanged by this session — confirmed via git stash on clean main), `npm run lint` (0 errors, 98 pre-existing warnings), `npx vitest run` (96 files, 1500 tests passing), `npm run build` (compiles clean in 14s).
+
+**Deferred (out of scope, tracked):**
+- Test 4 (banner format A-XXXXX appointment numbering) — interim banner shipped at Layer 8d uses customer + date fallback. Proper numbering scheme is post-Phase-1 engine-unification work.
+- Test 6 (10 legacy jobs with `appointment_id IS NULL`) — graceful refusal toast covers them at the click handler; full backfill is a separate Item 16 candidate, not a Phase 1 concern.
+- 5 other status-flow audit follow-ups (dead `pending_approval` enum value, admin appointment cancel NOT cascading to job, generic PATCH `/api/appointments/[id]` accepting any status, generic PATCH `/api/pos/jobs/[id]` accepting `closed` directly, post-complete-pre-checkout job-side guard) — all documented in the audit §7.4; none affect F1.
+
+**Manual UAT (post-deploy):**
+1. Jobs card pencil on an `in_progress` job → URL contains `id=<JOB_UUID>` → POS opens in edit mode with appointment data; Save Changes works; return to `/pos/jobs?jobId=<JOB_UUID>` re-opens the card.
+2. In edit mode: service favorites add to cart; product favorites greyed out + toast on click.
+3. Direct-link to `/pos?source=appointment&id=<no_show_uuid>...` → drain refuses with status-guard toast. Direct PUT to `/api/pos/appointments/<no_show_uuid>/services` → 400.
+4. Admin → Appointments → click row → "Edit in POS" button at top-right of dialog, styled identically to header "Open POS" button. Click navigates correctly.
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8d: source-side affordances + Layer 8c polish
 
 Fourth session of Phase 1 (edit-via-POS). Ships the buttons operators actually click to enter edit mode plus two polish fixes from Layer 8c UAT. With Layer 8d landed, the full edit-via-POS loop is reachable from operator-visible surfaces — Layers 8a–8c provided the backend cascade, deep-link drain, and Sale-tab UX; Layer 8d closes the trigger gap.

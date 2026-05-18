@@ -327,6 +327,18 @@ describe('PUT /api/pos/appointments/[id]/services', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 on no_show appointment (Layer 8d-bis audit finding #5)', async () => {
+    // Lockstep with the load endpoint's guard at
+    // /api/pos/appointments/[id]/load — refusing the same set so a
+    // successful load implies a successful save on status.
+    state.appointment = { ...state.appointment!, status: 'no_show' };
+    const res = await PUT(
+      req({ services: [{ service_id: SVC_A, price_at_booking: 200 }] }),
+      params
+    );
+    expect(res.status).toBe(400);
+  });
+
   it('returns 400 when a service id is unknown', async () => {
     state.serviceLookup = [];
     const res = await PUT(

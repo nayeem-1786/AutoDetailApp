@@ -253,6 +253,26 @@ describe('editAppointmentServices — structured error contract', () => {
     ).rejects.toMatchObject({ code: 'INVALID_STATUS', httpStatus: 400 });
   });
 
+  it('throws INVALID_STATUS (400) when appointment is no_show (Layer 8d-bis audit #5)', async () => {
+    // Lockstep with the load endpoint's guard at
+    // /api/pos/appointments/[id]/load — refusing the same set so a
+    // successful load implies a successful save on status.
+    state.appointment = { ...state.appointment!, status: 'no_show' };
+    await expect(
+      editAppointmentServices(mockSupabase() as never, {
+        appointmentId: APPT_ID,
+        body: { services: [{ service_id: SVC_A, price_at_booking: 200 }] },
+        actor: BASE_ACTOR,
+        source: 'pos',
+        ipAddress: null,
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_STATUS',
+      httpStatus: 400,
+      message: expect.stringContaining('no_show'),
+    });
+  });
+
   it('throws UNKNOWN_SERVICE (400) when a service id is not in the lookup', async () => {
     state.serviceLookup = [];
     await expect(

@@ -100,7 +100,7 @@ describe('AppointmentDetailDialog — Edit Services trigger routes to POS (Item 
       />,
     );
 
-    const editBtn = screen.getByRole('button', { name: 'Edit' });
+    const editBtn = screen.getByRole('button', { name: /Edit in POS/i });
     expect((editBtn as HTMLButtonElement).disabled).toBe(false);
     expect(editBtn.getAttribute('aria-disabled')).not.toBe('true');
   });
@@ -120,7 +120,7 @@ describe('AppointmentDetailDialog — Edit Services trigger routes to POS (Item 
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: /Edit in POS/i }));
 
     expect(mockPush).toHaveBeenCalledTimes(1);
     const url = mockPush.mock.calls[0][0];
@@ -144,7 +144,7 @@ describe('AppointmentDetailDialog — Edit Services trigger routes to POS (Item 
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: /Edit in POS/i }));
 
     // The dead `<EditServicesModal>` stays mounted (open={false}, renders
     // null) — Layer 8e deletes it. Confirm it does NOT open from this click.

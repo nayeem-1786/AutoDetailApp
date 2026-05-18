@@ -107,6 +107,15 @@ interface LoadItem {
 }
 
 export interface LoadResponseData {
+  /**
+   * Item 15f Phase 1 Layer 8d-bis (Option G4): job's linked appointment_id.
+   * Returned by `/api/pos/jobs/[id]/checkout-items` so the drain can use
+   * the appointment UUID as `ticket.sourceId` (Layer 8c's Save hits
+   * /api/pos/appointments/${sourceId}/services). The appointments/load
+   * endpoint doesn't return this field — the URL `id` IS the appointment
+   * UUID there, so `sourceId` falls through to the URL value.
+   */
+  appointment_id?: string | null;
   customer_id: string | null;
   vehicle_id: string | null;
   customer: LoadCustomer | null;
@@ -278,12 +287,30 @@ export async function runEditModeDrain(
     return { ok: false };
   }
 
+  // Item 15f Phase 1 Layer 8d-bis (Option G4): `sourceId` is ALWAYS the
+  // linked appointment UUID — Layer 8c's Save POSTs to
+  // `/api/pos/appointments/${sourceId}/services`. For source=appointment
+  // the URL `id` IS that UUID. For source=job the URL `id` is the JOB
+  // UUID and the appointment UUID arrives via the response. Refuse the
+  // drain when source=job and the linked appointment_id is missing
+  // (legacy pre-Phase-0a walk-ins) — Layer 8c's Save would otherwise hit
+  // /api/pos/appointments/null/services and 404.
+  let sourceId: string;
+  if (source === 'job') {
+    if (!data.appointment_id) {
+      return { ok: false };
+    }
+    sourceId = data.appointment_id;
+  } else {
+    sourceId = id;
+  }
+
   const ticketData = buildTicketStateFromLoad(data);
 
   dispatch({
     type: 'ENTER_EDIT_MODE',
     source,
-    sourceId: id,
+    sourceId,
     returnTo,
     ticketData,
     // Item 15f Phase 1 Layer 8d — surface scheduled_date so the banner

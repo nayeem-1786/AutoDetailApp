@@ -413,6 +413,15 @@ export async function GET(
     return NextResponse.json({
       data: {
         job_id: job.id,
+        // Item 15f Phase 1 Layer 8d-bis (Option G4): surface the linked
+        // appointment_id so the deep-link drain (source=job branch) can
+        // resolve `ticket.sourceId` — Layer 8c's Save POSTs to
+        // /api/pos/appointments/${sourceId}/services and that endpoint
+        // expects an appointment UUID. Null for legacy pre-Phase-0a
+        // walk-ins; the source-side click handler in job-detail.tsx
+        // refuses those before the deep-link is built, so a null here
+        // should never reach the drain in practice.
+        appointment_id: job.appointment_id ?? null,
         customer_id: job.customer_id,
         vehicle_id: job.vehicle_id,
         customer: job.customer,

@@ -72,7 +72,18 @@ export async function GET(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
     }
 
-    if (appt.status === 'completed' || appt.status === 'cancelled') {
+    // Item 15f Phase 1 Layer 8d-bis (Audit Finding #5): refuse terminal
+    // statuses — `completed` / `cancelled` / `no_show`. Per the appointment
+    // + job status flow audit (2026-05-17) §6.4, `no_show` is a terminal
+    // state with no semantic meaning for service editing (customer didn't
+    // arrive, no service is being delivered). The cascade endpoint
+    // (`src/lib/appointments/service-edit.ts`) refuses the same set in
+    // lockstep so load-success implies save-success on status.
+    if (
+      appt.status === 'completed' ||
+      appt.status === 'cancelled' ||
+      appt.status === 'no_show'
+    ) {
       return NextResponse.json(
         { error: `Cannot edit services on an appointment with status "${appt.status}"` },
         { status: 400 }
