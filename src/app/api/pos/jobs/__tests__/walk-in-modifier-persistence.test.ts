@@ -275,4 +275,26 @@ describe('POST /api/pos/jobs — Item 15g Layer 15g-iv walk-in modifier persiste
     expect(appt.manual_discount_value).toBeNull();
     expect(appt.manual_discount_label).toBeNull();
   });
+
+  // Item 15f Phase 1 Layer 8e — walk-in path was originally writing
+  // HH:MM:SS values for `scheduled_start_time` (capturing wall-clock
+  // seconds), which broke the Admin Appointment dialog's HTML5
+  // `<input type="time">` step=60 validator. Layer 8e normalizes the
+  // creator path to minute precision (HH:MM:00). This test pins the
+  // shape so a future "let's capture seconds again" refactor breaks
+  // loudly. End time follows the same shape via addMinutesToTime.
+  it('writes minute-precision scheduled_start_time / scheduled_end_time (no seconds, Layer 8e)', async () => {
+    const res = await POST(makeReq(buildWalkInBody()));
+    expect(res.status).toBeLessThan(400);
+
+    const appt = getAppointmentInsert();
+    const start = appt.scheduled_start_time as string;
+    const end = appt.scheduled_end_time as string;
+    expect(start).toMatch(/^\d{2}:\d{2}:00$/);
+    expect(end).toMatch(/^\d{2}:\d{2}:00$/);
+    // Defense-in-depth: the seconds segment must be exactly "00", never
+    // any other 2-digit number that might happen to slip through.
+    expect(start.slice(6)).toBe('00');
+    expect(end.slice(6)).toBe('00');
+  });
 });

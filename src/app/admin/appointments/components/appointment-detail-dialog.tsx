@@ -28,10 +28,9 @@ import {
   type EditMobileModalSavedResult,
 } from '@/components/jobs/edit-mobile-modal';
 import { PaymentMismatchBanner } from '@/components/jobs/payment-mismatch-banner';
-import { EditServicesModal } from '@/components/appointments/edit-services-modal';
 import { ModifierSummary } from '@/components/appointments/modifier-summary';
 import { STATUS_TRANSITIONS } from '../types';
-import type { AppointmentWithRelations, AppointmentService } from '../types';
+import type { AppointmentWithRelations } from '../types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
 
@@ -41,6 +40,14 @@ const CHANNEL_LABELS: Record<string, string> = {
   phone: 'Staff (Phone)',
   walk_in: 'Staff (Walk-in)',
 };
+
+// Strip an HH:MM:SS time string down to HH:MM for the native time input
+// (step=60 validator rejects seconds-precise values). Same helper shape as
+// the POS reschedule dialog. Item 15f Phase 1 Layer 8e — defensive against
+// any legacy walk-in row that pre-dates the minute-precision normalization.
+function toTimeInputValue(time: string | null | undefined): string {
+  return time?.slice(0, 5) ?? '';
+}
 
 interface AppointmentDetailDialogProps {
   open: boolean;
@@ -52,8 +59,6 @@ interface AppointmentDetailDialogProps {
   canReschedule: boolean;
   canCancel: boolean;
   canAddNotes?: boolean;
-  /** Item 15a — called after a services edit; lets the parent refetch. */
-  onServicesUpdated?: () => void;
 }
 
 export function AppointmentDetailDialog({
@@ -66,20 +71,9 @@ export function AppointmentDetailDialog({
   canReschedule,
   canCancel,
   canAddNotes = true,
-  onServicesUpdated,
 }: AppointmentDetailDialogProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
-  // Item 15a — Edit Services modal state. Same pattern as the mobile
-  // editor: modal owns its PATCH lifecycle, dialog surfaces an
-  // optimistic override so the totals re-render without waiting on a
-  // full list refetch.
-  const [editingServices, setEditingServices] = useState(false);
-  const [servicesOverride, setServicesOverride] = useState<{
-    services: AppointmentService[];
-    subtotal: number;
-    total_amount: number;
-  } | null>(null);
   // Phase Mobile-1.9: full mobile picker edit replaces the Phase 1.6
   // address-only inline editor. State drives the shared modal + the
   // post-save mismatch banner. Local overrides so the dialog reflects
@@ -115,8 +109,14 @@ export function AppointmentDetailDialog({
       reset({
         status: appointment.status,
         scheduled_date: appointment.scheduled_date,
-        scheduled_start_time: appointment.scheduled_start_time,
-        scheduled_end_time: appointment.scheduled_end_time,
+        // Item 15f Phase 1 Layer 8e — truncate to HH:MM so the native
+        // `<input type="time">` step=60 validator accepts legacy rows
+        // that were stored at HH:MM:SS precision (walk-in path pre-Layer-8e
+        // wrote seconds; backfill migration normalizes existing rows, but
+        // this truncation keeps the form correct against any future drift).
+        // Save round-trip stores HH:MM, which Postgres widens to HH:MM:00.
+        scheduled_start_time: toTimeInputValue(appointment.scheduled_start_time),
+        scheduled_end_time: toTimeInputValue(appointment.scheduled_end_time),
         employee_id: appointment.employee_id || '',
         job_notes: appointment.job_notes || '',
         internal_notes: appointment.internal_notes || '',
@@ -126,9 +126,6 @@ export function AppointmentDetailDialog({
       setEditingMobile(null);
       setMobileOverride(null);
       setPaymentMismatch(null);
-      // Item 15a — clear optimistic services override on reopen.
-      setEditingServices(false);
-      setServicesOverride(null);
     }
   }, [appointment, open, reset]);
 
@@ -160,9 +157,8 @@ export function AppointmentDetailDialog({
   const overrideStatuses = availableStatuses.filter((s) => !recommendedStatuses.includes(s));
   const showCancelButton =
     canCancel && appointment.status !== 'cancelled';
-  const services = servicesOverride?.services ?? appointment.appointment_services;
-  const displayedTotal =
-    servicesOverride?.total_amount ?? Number(appointment.total_amount);
+  const services = appointment.appointment_services;
+  const displayedTotal = Number(appointment.total_amount);
   // Item 15a — service edit follows the reschedule role distribution
   // (admin/cashier/super_admin yes; detailer no). Server enforces too.
   // Hidden once the appointment hits a terminal state; the API would
@@ -566,39 +562,6 @@ export function AppointmentDetailDialog({
           onSaved={handleMobileEditSaved}
         />
       )}
-      {/* Item 15a — Edit Services picker. Preloads from the latest
-          rendered service list (override-aware so the modal reopens to
-          the new selection without a refetch). */}
-      <EditServicesModal
-        open={editingServices}
-        appointmentId={appointment.id}
-        vehicleSizeClass={appointment.vehicle?.size_class ?? null}
-        initialServices={services.map((s) => ({
-          service_id: s.service_id,
-          service_name: s.service?.name || 'Service',
-          price_at_booking: Number(s.price_at_booking),
-          tier_name: s.tier_name,
-        }))}
-        onClose={() => setEditingServices(false)}
-        onSaved={(result) => {
-          // Optimistically reflect the server-side cascade in the
-          // dialog so totals + service list update immediately. The
-          // parent fetchAppointments() reconciles ids on the next pass.
-          setServicesOverride({
-            services: result.selected.map((s, idx) => ({
-              id: `optimistic-${idx}`,
-              service_id: s.service_id,
-              price_at_booking: s.price_at_booking,
-              tier_name: s.tier_name,
-              service: { id: s.service_id, name: s.service_name },
-            })),
-            subtotal: result.newSubtotal,
-            total_amount: result.newTotal,
-          });
-          setEditingServices(false);
-          onServicesUpdated?.();
-        }}
-      />
     </Dialog>
   );
 }

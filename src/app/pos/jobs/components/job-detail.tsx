@@ -50,9 +50,8 @@ import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
 import { ChangeTimeButton } from './change-time-button';
 import { CustomerLookup } from '../../components/customer-lookup';
-import { EditServicesDialog } from '@/lib/services/edit-services-dialog';
 import { ModifierSummary } from '@/components/appointments/modifier-summary';
-import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot, VehicleSizeClass } from '@/lib/supabase/types';
+import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 
 type ZonePickerMode = 'intake' | 'completion' | 'progress' | null;
@@ -292,11 +291,10 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [showEditVehicle, setShowEditVehicle] = useState(false);
   const [editVehicles, setEditVehicles] = useState<{ id: string; year: number | null; make: string | null; model: string | null; color: string | null }[]>([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
-  // Item 15f Layer 3a — Edit Services now mounted via the canonical
-  // `<EditServicesDialog>`. Local selection state holds the in-flight
-  // edit; `handleSaveEditServices` PATCHes the job and closes the dialog.
-  const [showEditServices, setShowEditServices] = useState(false);
-  const [editSelectedServices, setEditSelectedServices] = useState<JobServiceSnapshot[]>([]);
+  // Item 15f Phase 1 Layer 8e — Edit Services no longer mounts a local
+  // dialog; `handleOpenEditServices` deep-links to POS edit mode. The
+  // showEditServices/editSelectedServices state was deleted with the
+  // `<EditServicesDialog>` mount.
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesValue, setNotesValue] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -586,8 +584,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   //
   // Walk-ins post-Phase-0a all carry a synthetic appointment_id. Legacy
   // pre-0a walk-ins (appointment_id IS NULL) can't be edited via this
-  // path — toast a refusal and the existing dead `<EditServicesDialog>`
-  // mount stays inert. Layer 8e deletes the mount entirely.
+  // path — toast a refusal.
   function handleOpenEditServices() {
     if (!job) return;
     if (!job.appointment_id) {
@@ -604,40 +601,6 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         `/pos/jobs?jobId=${job.id}`
       )}`
     );
-  }
-
-  function handleEditServiceAdded(
-    service: { id: string; name: string },
-    pricing: { id: string; price: number; tier_name: string },
-    _vsc: VehicleSizeClass | null,
-    perUnitQty?: number,
-  ) {
-    setEditSelectedServices((prev) => {
-      // Duplicate-guard: if the catalog service is already selected, no-op.
-      // Custom assessments synthesize a unique id each time so they never
-      // collide. Catalog services use their UUID as the id.
-      if (prev.some((p) => p.id === service.id && !pricing.id.startsWith('custom-'))) {
-        return prev;
-      }
-      const snapshot: JobServiceSnapshot = {
-        id: service.id,
-        name: service.name,
-        price: Number(pricing.price),
-        tier_name: pricing.tier_name || null,
-      };
-      if (perUnitQty != null) snapshot.quantity = perUnitQty;
-      return [...prev, snapshot];
-    });
-  }
-
-  function handleEditServiceRemoved(serviceId: string) {
-    setEditSelectedServices((prev) => prev.filter((s) => s.id !== serviceId));
-  }
-
-  async function handleSaveEditServices() {
-    if (editSelectedServices.length === 0) return;
-    const ok = await handlePatchJob({ services: editSelectedServices });
-    if (ok) setShowEditServices(false);
   }
 
   function handleStartEditNotes() {
@@ -2000,31 +1963,6 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         </div>
       )}
 
-      {/* Edit Services Dialog — Item 15f Layer 3a. Canonical 2-pane
-          surface backed by `useServicePicker`. Tier-aware pricing for
-          all 6 pricing_model values (including custom assessments).
-          Per CLAUDE.md Rule 22, no bespoke pricing math lives here. */}
-      <EditServicesDialog
-        open={showEditServices}
-        onClose={() => setShowEditServices(false)}
-        title="Edit Services"
-        vehicleSizeClass={(job.vehicle?.size_class ?? null) as VehicleSizeClass | null}
-        vehicleSpecialtyTier={null}
-        selectedServices={editSelectedServices
-          .filter((s): s is JobServiceSnapshot & { id: string } => s.id != null)
-          .map((s) => ({
-            id: s.id,
-            name: s.name,
-            price: s.price,
-            tier_name: s.tier_name ?? null,
-            quantity: s.quantity,
-          }))}
-        onServiceAdded={handleEditServiceAdded}
-        onServiceRemoved={handleEditServiceRemoved}
-        onSave={handleSaveEditServices}
-        isSaving={savingEdit}
-        saveLabel="Update Services"
-      />
     </div>
   );
 }

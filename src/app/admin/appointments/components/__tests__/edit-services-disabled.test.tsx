@@ -1,21 +1,23 @@
 /**
- * Item 15f Phase 1 Layer 8d — Admin Appointment dialog: "Edit Services"
- * trigger is RE-ENABLED and routes to POS edit mode.
+ * Item 15f Phase 1 Layer 8d / 8e — Admin Appointment dialog: "Edit in POS"
+ * trigger routes to POS edit mode.
  *
  * Architectural arc:
  *  - Layer 4 (2026-05-17, earlier): disabled the inline Admin Edit
  *    trigger because `<EditServicesModal>`'s bespoke `resolveServicePrice`
  *    silently mispriced exotic/classic. Modal was deletion-scheduled.
- *  - Layer 8d (this layer): re-enables the trigger as a `router.push` to
+ *  - Layer 8d (this layer): re-enabled the trigger as a `router.push` to
  *    `/pos?source=appointment&id=...&returnTo=/admin/appointments`. The
- *    canonical edit surface is now the POS Sale tab (Layers 8a-8c). The
- *    `<EditServicesModal>` mount stays inert as dead code until Layer 8e
- *    deletes it.
+ *    canonical edit surface is the POS Sale tab (Layers 8a-8c).
+ *  - Layer 8d-bis: button restyled to match admin shell's "Open POS"
+ *    pattern; label changed to "Edit in POS"; positioned top-right.
+ *  - Layer 8e (current): `<EditServicesModal>` deleted. The legacy mount
+ *    is gone, so the prior "does NOT open the still-mounted modal" case
+ *    is retired — its premise no longer exists.
  *
  * This test pins:
- *  - The "Edit" trigger renders enabled (no `disabled` attribute).
+ *  - The "Edit in POS" trigger renders enabled (no `disabled` attribute).
  *  - Clicking it calls `router.push` with the correct deep-link URL.
- *  - Clicking it does NOT open the (still-mounted) `<EditServicesModal>`.
  */
 import React from 'react';
 import { describe, it, expect, afterEach, vi } from 'vitest';
@@ -29,8 +31,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Heavy child components are mocked — the test only cares about the
-// "Edit" trigger's navigation, not the surrounding mobile-edit / payment
-// / status UI.
+// "Edit in POS" trigger's navigation, not the surrounding mobile-edit /
+// payment / status UI.
 vi.mock('@/components/jobs/edit-mobile-modal', () => ({
   EditMobileModal: () => null,
 }));
@@ -39,10 +41,6 @@ vi.mock('@/components/jobs/payment-mismatch-banner', () => ({
 }));
 vi.mock('@/components/appointments/modifier-summary', () => ({
   ModifierSummary: () => null,
-}));
-vi.mock('@/components/appointments/edit-services-modal', () => ({
-  EditServicesModal: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="edit-services-modal">Edit Services</div> : null,
 }));
 
 afterEach(() => {
@@ -84,7 +82,7 @@ function makeAppointment() {
   };
 }
 
-describe('AppointmentDetailDialog — Edit Services trigger routes to POS (Item 15f Phase 1 Layer 8d)', () => {
+describe('AppointmentDetailDialog — Edit in POS trigger (Item 15f Phase 1 Layer 8d/8d-bis/8e)', () => {
   it('renders the Edit button enabled (no disabled attribute) when canReschedule', () => {
     render(
       <AppointmentDetailDialog
@@ -129,25 +127,4 @@ describe('AppointmentDetailDialog — Edit Services trigger routes to POS (Item 
     expect(url).toContain(`returnTo=${encodeURIComponent('/admin/appointments')}`);
   });
 
-  it('clicking Edit does NOT mount the legacy <EditServicesModal>', () => {
-    render(
-      <AppointmentDetailDialog
-        open
-        onOpenChange={() => {}}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        appointment={makeAppointment() as any}
-        employees={[]}
-        onSave={vi.fn().mockResolvedValue(true)}
-        onCancel={() => {}}
-        canReschedule={true}
-        canCancel={true}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /Edit in POS/i }));
-
-    // The dead `<EditServicesModal>` stays mounted (open={false}, renders
-    // null) — Layer 8e deletes it. Confirm it does NOT open from this click.
-    expect(screen.queryByTestId('edit-services-modal')).toBeNull();
-  });
 });

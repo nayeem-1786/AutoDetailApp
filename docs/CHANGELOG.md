@@ -6,6 +6,76 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8e: dead modal deletion + Layer 3a-i revert + appointment time precision fix
+
+Sixth session of Phase 1 (edit-via-POS). Two deliverables in one atomic commit: (1) the planned Layer 8e deletion of the two dead service-edit components now that Layer 8d routes both source-side affordances to POS, and (2) a UAT-driven appointment time-precision fix bundled per session brief (walk-in path was writing HH:MM:SS, breaking the Admin Appointment dialog's HTML5 `<input type="time">` step=60 validator). Layer 8f (Phase 1 comprehensive tests) is the next sequential session.
+
+**Deliverable 1 — Dead modal deletion + Layer 3a-i revert:**
+
+- **Deleted** `src/components/appointments/edit-services-modal.tsx` (Item 15a's bespoke modal — unreachable since Layer 8d routes the Admin "Edit in POS" button to POS).
+- **Deleted** `src/lib/services/edit-services-dialog.tsx` (Layer 3a-i's POS Jobs-card dialog — unreachable since Layer 8d routes the Jobs card pencil to POS).
+- **Deleted** the two orphan test files: `edit-services-modal-custom.test.tsx` and `edit-services-dialog.test.tsx`.
+- Removed imports + mounts from `src/app/admin/appointments/components/appointment-detail-dialog.tsx` and `src/app/pos/jobs/components/job-detail.tsx`. Cleaned up dead state (`editingServices`, `servicesOverride`, `setServicesOverride`, `onServicesUpdated` prop on the admin dialog; `showEditServices`, `setShowEditServices`, `editSelectedServices`, `handleEditServiceAdded`, `handleEditServiceRemoved`, `handleSaveEditServices` on the Jobs card).
+- Removed `onServicesUpdated` prop from `AppointmentDetailDialog` callers (`src/app/admin/appointments/page.tsx`). Optimistic-update path retired — operators re-open the dialog after POS edit completes; freshly-fetched data renders the change.
+- Removed barrel export of `EditServicesDialog` from `src/lib/services/index.ts`.
+- Pruned the now-unused `VehicleSizeClass` import from `job-detail.tsx`.
+- Removed the sanctioned `// eslint-disable-next-line services/no-bespoke-pricing` comment (it was inside the deleted modal). Grep confirms ZERO `eslint-disable.*services/no-bespoke-pricing` comments remain in `src/`.
+- Updated `edit-services-disabled.test.tsx`: removed the `EditServicesModal` mock (component no longer imported) and the "does NOT mount the legacy modal" test case (the modal no longer exists). Renamed describe block to reflect Layer 8e arc.
+- Grep verification: zero remaining references to `EditServicesDialog` or `EditServicesModal` in `src/` (the test file's header retains 2 historical mentions for the architectural arc comment).
+
+**Deliverable 2 — Appointment time precision fix:**
+
+Mini-audit (~10 min) of all `appointments.scheduled_start_time` writers — findings:
+
+| Path | File | Pre-Layer-8e shape | Verdict |
+|---|---|---|---|
+| Walk-in | `src/app/api/pos/jobs/route.ts:351-359` | `HH:MM:SS` (PST wall-clock w/ seconds) | **BROKEN — only path producing seconds** |
+| Online booking | `src/app/api/book/route.ts:344` | `HH:MM` (zod validates booking schema) | clean |
+| Voice agent | `src/app/api/voice-agent/appointments/route.ts:519` | `HH:MM` (`normalizeTimeTo24h` strips precision) | clean |
+| Quote convert | `src/lib/quotes/convert-service.ts:133` | `HH:MM` (`convertSchema` zod) | clean |
+| Admin PATCH | `src/app/api/appointments/[id]/route.ts:111` | accepts both (regex `^\d{2}:\d{2}(:\d{2})?$`) | clean (UI sends HH:MM) |
+| POS reschedule | `src/app/api/pos/jobs/[id]/reschedule/route.ts:109` | `HH:MM:00` (internal `normalizeTime` always pads) | clean |
+| Timeline drag | `src/app/pos/jobs/components/job-timeline.tsx:536` | `HH:MM:00` (manually appended) | clean |
+
+User's SQL data showed 5-10 affected rows — all walk-in path. UI surfaces audit:
+
+| UI | File | Pre-Layer-8e behavior | Verdict |
+|---|---|---|---|
+| Admin Appointment dialog | `appointment-detail-dialog.tsx:118` | Passed raw `appointment.scheduled_start_time` to `reset()` → HTML5 input rejected `17:19:11` | **BROKEN** |
+| POS reschedule dialog | `reschedule-appointment-dialog.tsx:47` | Already used `toTimeInputValue(time)` which `.slice(0, 5)` truncates | clean |
+
+**Three fixes shipped:**
+
+1. **Data layer — walk-in path** (`src/app/api/pos/jobs/route.ts:351-364`): replaced the `Intl.DateTimeFormat(... second: '2-digit' ...)` capture with a minute-precision formatter (`hour: '2-digit', minute: '2-digit'`) and appended `:00` for the seconds segment. The walk-in path now writes `HH:MM:00` matching every other appointment creation path. Updated comment block to document the new precision invariant and reference the HTML5 step=60 validator that drove the change.
+
+2. **UI layer — Admin Appointment dialog** (`src/app/admin/appointments/components/appointment-detail-dialog.tsx`): added local `toTimeInputValue(time)` helper (same shape as POS reschedule dialog) and wired it into `reset()` for both `scheduled_start_time` and `scheduled_end_time`. Defense-in-depth: even after the backfill migration normalizes existing rows, if any future creator path slips and writes seconds again, the Admin dialog still renders + saves cleanly.
+
+3. **One-time backfill migration** (`supabase/migrations/20260518000000_truncate_appointment_scheduled_times_to_minute.sql`): UPDATE statement truncates existing `scheduled_start_time` and `scheduled_end_time` values to minute precision via `date_trunc('minute', col::time)::time`. WHERE filter selects only rows that need the update (`EXTRACT(SECOND FROM ...) <> 0` on either column) — idempotent. Expected ~5-10 row touch per user's pre-session SQL.
+
+**NOT touched** (intake / receipt / audit / transaction precision must stay seconds-aware):
+- `jobs.actual_start_time` / `jobs.actual_end_time` (intake start/stop timing)
+- `transactions.created_at` / receipt timestamps
+- `audit_log.created_at`
+- Any timestamp column with full ISO precision
+
+**Tests** (+4 net new cases):
+
+- `walk-in-modifier-persistence.test.ts` (+1 case): `scheduled_start_time` and `scheduled_end_time` match `/^\d{2}:\d{2}:00$/` (defense-in-depth: explicitly assert the seconds segment is "00").
+- new `time-input-truncation.test.tsx` (+3 cases): Admin dialog truncates `17:19:11` legacy values to `17:19` for HTML5 input; minute-precision input passes through unchanged; `14:00:00` truncates to `14:00`. Validates the UI defense-in-depth even when DB rows are already clean.
+
+**Verification:** `npm run typecheck` (no new errors — pre-existing `quote-service.modifiers.test.ts` and `catalog-browser-custom-routing.test.tsx` errors persist, confirmed unchanged via `git stash` on clean main); `npm run lint` (0 errors, 98 warnings — unchanged baseline); `npx vitest run` 1486/1486 passing (was 1500 at Layer 8d-bis; net -14 = -4 from deleted `edit-services-modal-custom.test.tsx` -13 from deleted `edit-services-dialog.test.tsx` -1 from removed legacy-modal-not-mounted case +4 net new from this session); `rm -rf .next && npm run build` compiles clean in 30s for the static + dynamic combined build.
+
+**Manual UAT (post-deploy):**
+1. **Dead modal verification:** Jobs card pencil → still routes to POS edit mode (Layer 8d regression check). Admin "Edit in POS" button → still routes correctly. `grep -rn "EditServicesDialog\|EditServicesModal" src/` returns only doc-comment references.
+2. **Walk-in precision:** Create a fresh walk-in → SQL: `SELECT scheduled_start_time, scheduled_end_time FROM appointments ORDER BY created_at DESC LIMIT 1;` shows `HH:MM:00` shape.
+3. **Admin dialog legacy seconds:** Open an existing appointment that had seconds-precise time before the backfill ran → dialog renders `17:19` (not `17:19:11`). Save without changing → SQL confirms minute-precision write.
+4. **Backfill verification:** `SELECT COUNT(*) FROM appointments WHERE EXTRACT(SECOND FROM scheduled_start_time::time) <> 0 OR EXTRACT(SECOND FROM scheduled_end_time::time) <> 0;` returns 0 after migration runs.
+5. **Intake regression check:** Start a job intake → SQL: `actual_start_time` carries `HH:MM:SS` seconds (untouched by this fix). Complete a job → same for `actual_end_time`.
+
+**Commit:** `cleanup(pos): delete dead modals + Layer 3a-i revert + appointment time precision fix (Phase 1 Layer 8e)`
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8d-bis: UAT fix-up (Jobs card load + register product gate + no_show refusal + Edit-in-POS button)
 
 Fifth session of Phase 1 (edit-via-POS). Ships four targeted fixes surfaced by Layer 8d UAT — two CRITICAL (the Jobs-card edit flow was broken end-to-end, and the Register tab favorite grid bypassed Layer 8d's product gate), one audit gap (`no_show` is terminal but was loadable + saveable), and one cosmetic (admin "Edit in POS" button styled to match the existing "Open POS" header pattern). Driven by `docs/dev/APPOINTMENT_JOB_STATUS_FLOW_AUDIT_2026-05-17.md` (Finding #5) plus the UAT punch list. Layer 8e (revert Layer 3a-i + delete dead modals) remains the next sequential session.

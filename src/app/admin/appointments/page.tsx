@@ -538,12 +538,6 @@ export default function AppointmentsPage() {
         canReschedule={canReschedule}
         canCancel={canCancel}
         canAddNotes={canAddNotes}
-        onServicesUpdated={() => {
-          // Item 15a — refetch so id-level service rows and stat counts
-          // reflect the new state on next render.
-          fetchAppointments(currentMonth);
-          fetchStats();
-        }}
       />
 
       {/* Cancel dialog — only rendered if user has cancel permission */}

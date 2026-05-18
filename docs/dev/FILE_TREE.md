@@ -424,7 +424,7 @@ src/app/api/pos/jobs/[id]/start-work/route.ts
 src/app/api/pos/jobs/[id]/timer/route.ts
 src/app/api/pos/jobs/populate/route.ts
 src/app/api/pos/jobs/route.ts
-src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts  # 5 tests — pins Item 15g Layer 15g-iv Scenario C: walk-in synthetic appointment persists 7-field modifier snapshot, percent → dollar resolution, over-discount clamp
+src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts  # 6 tests — pins Item 15g Layer 15g-iv Scenario C: walk-in synthetic appointment persists 7-field modifier snapshot, percent → dollar resolution, over-discount clamp; + Item 15f Phase 1 Layer 8e — `scheduled_*_time` minute-precision shape
 src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
 src/app/api/pos/loyalty/redeem/route.ts
@@ -1055,12 +1055,10 @@ src/lib/services/shippo.ts
 src/lib/services/picker-engine.ts                    # Canonical service-pricing engine (Item 15f Layer 1; Layer 2 added `open-custom-price-dialog` ServiceTapRoute variant + branch) — resolveServicePrice, resolveServicePriceWithSale, getServicePriceRange, routeServiceTap. Per CLAUDE.md Rule 22.
 src/lib/services/use-service-picker.ts               # useServicePicker hook returning { CatalogPane, ActiveDialog, selectedServiceIds, tapService, reset } (Item 15f Layer 1; Layer 2 added tapService + custom-dialog wiring)
 src/lib/services/custom-price-dialog.tsx             # <CustomPriceDialog> + buildCustomPricing helper for pricing_model='custom' (Item 15f Layer 2) — staff-assessment prompt with Stripe-min validation
-src/lib/services/edit-services-dialog.tsx            # <EditServicesDialog> — shared 2-pane Edit Services wrapper around useServicePicker. Used by POS Jobs card today; Admin Appointment will adopt once POS-context decoupling lands. (Item 15f Layer 3a)
-src/lib/services/index.ts                            # Public barrel — re-exports engine + hook + custom-dialog + edit-services-dialog + types (Item 15f Layer 1 + 2 + 3a)
+src/lib/services/index.ts                            # Public barrel — re-exports engine + hook + custom-dialog + types (Item 15f Layer 1 + 2; Layer 8e removed `EditServicesDialog` export when the component was deleted)
 src/lib/services/__tests__/picker-engine.test.ts     # Engine tests — exhaustive size_class + sale + routing per pricing_model. Layer 2 flipped the 'custom' pin to assert open-custom-price-dialog.
 src/lib/services/__tests__/use-service-picker.test.tsx # Hook contract tests with vi-mocked CatalogBrowser/ServicePricingPicker/CustomPriceDialog (Item 15f Layer 1+2)
 src/lib/services/__tests__/custom-price-dialog.test.tsx # 11 tests — dialog rendering, validation, confirm/cancel emit, buildCustomPricing helper (Item 15f Layer 2)
-src/lib/services/__tests__/edit-services-dialog.test.tsx # 13 tests — wrapper rendering, prop forwarding, selected-services list, save/cancel, error/loading states (Item 15f Layer 3a)
 src/lib/services/__tests__/service-resolver.test.ts  # 27 tests — pin all 4 Layer-3d bug fixes (exotic/classic fall-through, per_unit $0, specialty first-tier, custom $0); covers flat / vehicle_size / scope / per_unit / specialty / custom dispatch + size-class edge cases.
 ```
 
@@ -1429,9 +1427,13 @@ Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
 - `src/app/api/admin/appointments/[id]/services/__tests__/route.test.ts`
 - `src/app/api/pos/appointments/[id]/services/route.ts` — Item 15f Phase 1 Layer 8a: POS-authed sibling. Same cascade helper, different auth surface (authenticatePosRequest + pos.jobs.manage). Audit row tagged `source: 'pos'`. Server-side only this layer; frontend wiring lands in Layer 8b/8d.
 - `src/app/api/pos/appointments/[id]/services/__tests__/route.test.ts` — Item 15f Phase 1 Layer 8a: 18 cases covering POS auth (401/403), validation parity with admin, cascade parity, audit source tagging, notification suppression, modifier preservation, idempotency.
-- `src/app/api/admin/services/active/route.ts` — Session-authed GET active services for admin pickers. Item 15f Layer 3e widened SELECT to include `description` + `custom_starting_price` so the modal can pass them to `<CustomPriceDialog>`.
-- `src/components/appointments/edit-services-modal.tsx` — Picker modal (search + toggle + total + save). Item 15f Layer 3e: routes `pricing_model === 'custom'` taps through `<CustomPriceDialog>` instead of the silent $0 add. Patch is temporary — modal is scheduled for deletion in Phase 1 Layer 8e.
-- `src/components/appointments/__tests__/edit-services-modal-custom.test.tsx` — Item 15f Layer 3e — pins the custom-pricing routing behavior of the modal.
+- `src/app/api/admin/services/active/route.ts` — Session-authed GET active services for admin pickers. Item 15f Layer 3e widened SELECT to include `description` + `custom_starting_price` so the modal could pass them to `<CustomPriceDialog>` (modal deleted in Phase 1 Layer 8e; SELECT widening retained — harmless).
+- _(deleted Layer 8e)_ `src/components/appointments/edit-services-modal.tsx` — Item 15a's bespoke modal; unreachable since Layer 8d routed Admin "Edit in POS" button to POS edit mode.
+- _(deleted Layer 8e)_ `src/components/appointments/__tests__/edit-services-modal-custom.test.tsx` — orphan after the modal was deleted.
+- _(deleted Layer 8e)_ `src/lib/services/edit-services-dialog.tsx` — Layer 3a-i's POS Jobs-card dialog; unreachable since Layer 8d routed the Jobs card pencil to POS edit mode.
+- _(deleted Layer 8e)_ `src/lib/services/__tests__/edit-services-dialog.test.tsx` — orphan after the dialog was deleted.
+- `src/app/admin/appointments/components/__tests__/time-input-truncation.test.tsx` — Item 15f Phase 1 Layer 8e — 3 cases pinning the Admin Appointment dialog's HH:MM truncation of legacy seconds-precise `scheduled_*_time` values. Defense-in-depth for the walk-in path's pre-Layer-8e seconds writes.
+- `supabase/migrations/20260518000000_truncate_appointment_scheduled_times_to_minute.sql` — Item 15f Phase 1 Layer 8e — idempotent one-time backfill: UPDATE appointments SET scheduled_*_time = date_trunc('minute', ...) WHERE seconds <> 0. Closes the walk-in legacy data drift.
 
 Item 15g Layer 15g-iii (UI surfacing + checkout hydration for modifiers) additions:
 - `src/components/appointments/modifier-summary.tsx` — Shared `<ModifierSummary variant="admin|pos">` + `hasAppliedModifiers()` helper. Read-only summary of coupon / loyalty / manual discount on appointment-derived surfaces. Mounted on Admin Appointment dialog + Jobs card Services tile.
@@ -1739,7 +1741,7 @@ Item 15f Layer 4 additions / changes (4 bespoke-pricer migrations + helper extra
 - Modified: `src/components/booking/booking-wizard.tsx` — `reconstructConfig` migrated to canonical engine.
 - Modified: `src/components/public/service-card.tsx` — `getStartingPrice` migrated to canonical engine.
 - Modified: `src/app/api/voice-agent/services/route.ts` — pricing array builder migrated; SELECT widened to fetch full ServicePricing.
-- Modified: `src/components/appointments/edit-services-modal.tsx` — single sanctioned `// eslint-disable-next-line services/no-bespoke-pricing` comment above the dead-code `resolveServicePrice` (modal deletion-scheduled in Phase 1 Layer 8e).
+- Modified: `src/components/appointments/edit-services-modal.tsx` — single sanctioned `// eslint-disable-next-line services/no-bespoke-pricing` comment above the dead-code `resolveServicePrice`. **Deleted in Phase 1 Layer 8e (2026-05-17)** — eslint-disable comment went with it. Codebase-wide `eslint-disable.*services/no-bespoke-pricing` count is now 0.
 - Modified: `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — Admin "Edit Services" button disabled (deletion-window safety).
 - New: `src/app/admin/appointments/components/__tests__/edit-services-disabled.test.tsx` — 2 cases pinning the disabled button + no-modal-mount.
 - Modified: `CLAUDE.md` Rule 22 — updated to reflect rule is now `'error'`-enforced.

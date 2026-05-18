@@ -31,9 +31,6 @@ export type {
 export { CustomPriceDialog, buildCustomPricing } from './custom-price-dialog';
 export type { CustomPriceDialogProps } from './custom-price-dialog';
 
-// Item 15f Layer 3a — shared dialog wrapper for Edit Services surfaces.
-export { EditServicesDialog } from './edit-services-dialog';
-export type {
-  EditServicesDialogProps,
-  SelectedService,
-} from './edit-services-dialog';
+// Item 15f Phase 1 Layer 8e — `EditServicesDialog` removed. The canonical
+// edit surface is the POS Sale tab; deep-link routing is owned by the
+// Jobs-card pencil and Admin Appointment "Edit in POS" button (Layer 8d).

@@ -343,19 +343,21 @@ export async function POST(request: NextRequest) {
     // so jobs.appointment_id is always non-null. Eliminates the IS NULL branch in
     // downstream consumers (receipt composer, refund plan, lifecycle engine, etc.).
     //
-    // Times: scheduled_start_time uses the EXACT current PST time (HH:MM:SS) — no
-    // 15-min rounding — because rounding can wrap past midnight (23:53 → 00:00 next
-    // day) which would place the appointment on tomorrow's date and hide the new
-    // walk-in from today's queue (Site 2 filters by scheduled_date=today). The
-    // rounded value remains on jobs.estimated_pickup_at for clean timeline slots.
-    const pstTimeExact = new Intl.DateTimeFormat('en-GB', {
-      timeZone: 'America/Los_Angeles',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).format(now);
-    const apptStartTime = pstTimeExact; // HH:MM:SS PST
+    // Times: scheduled_start_time stores MINUTE precision (HH:MM:00). Originally
+    // this path captured seconds (HH:MM:SS) to avoid the midnight-wrap issue with
+    // 15-min rounding (23:53 → 00:00 next day → wrong date), but the HTML5
+    // `<input type="time">` step=60 validator rejects seconds-precise values,
+    // which broke the Admin Appointment dialog edit form on walk-in rows
+    // (Layer 8e UAT finding). Minute precision avoids both pitfalls: no
+    // 15-min rounding (date stays on today), no seconds (admin input accepts).
+    // Intake start/stop (`actual_start_time`/`actual_end_time`) keep seconds.
+    const apptStartTime =
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'America/Los_Angeles',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).format(now) + ':00';
     const apptEndTime = addMinutesToTime(apptStartTime.slice(0, 5), 60) + ':00';
     const servicesTotal = services.reduce((sum, s) => sum + Number(s.price || 0), 0);
     const appointmentSubtotal = servicesTotal + mobileSurcharge;
