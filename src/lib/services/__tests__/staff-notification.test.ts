@@ -63,6 +63,10 @@ const adminState = {
   conversation: null as { id: string } | null,
   messageInsertCalled: false,
   conversationUpdateCalled: false,
+  /** Last payload passed to `messages.insert()` — captures channel value for assertions. */
+  lastMessageInsert: null as Record<string, unknown> | null,
+  /** Last payload passed to `conversations.update()` — captures last_channel value. */
+  lastConversationUpdate: null as Record<string, unknown> | null,
 };
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -74,8 +78,9 @@ vi.mock('@/lib/supabase/admin', () => ({
           select() { chain._action = 'select'; return chain; },
           eq() { return chain; },
           maybeSingle: async () => ({ data: adminState.conversation, error: null }),
-          update() {
+          update(payload: Record<string, unknown>) {
             adminState.conversationUpdateCalled = true;
+            adminState.lastConversationUpdate = payload;
             return {
               eq: async () => ({ error: null }),
             };
@@ -85,8 +90,9 @@ vi.mock('@/lib/supabase/admin', () => ({
       }
       if (table === 'messages') {
         return {
-          insert: async () => {
+          insert: async (payload: Record<string, unknown>) => {
             adminState.messageInsertCalled = true;
+            adminState.lastMessageInsert = payload;
             return { error: null };
           },
         };
@@ -113,6 +119,8 @@ beforeEach(() => {
   adminState.conversation = null;
   adminState.messageInsertCalled = false;
   adminState.conversationUpdateCalled = false;
+  adminState.lastMessageInsert = null;
+  adminState.lastConversationUpdate = null;
 });
 
 describe('STAFF_NOTIFICATION_REASONS — 7 reason codes including human_handoff', () => {
@@ -349,5 +357,81 @@ describe('notifyStaff — audit log to customer thread', () => {
       source: 'voice_agent',
     });
     expect(adminState.messageInsertCalled).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 1+2 fixup — version-free channel attribution
+// ---------------------------------------------------------------------------
+
+describe('notifyStaff — audit log channel attribution (fixup)', () => {
+  beforeEach(() => {
+    adminState.conversation = { id: 'conv-1' };
+    renderSmsTemplateMock.mockImplementation(async () => ({
+      body: 'body',
+      isActive: true,
+      canSilence: true,
+      recipientType: 'staff',
+      recipientPhones: ['+15551112222'],
+    }));
+  });
+
+  it('source=voice_agent → messages.insert receives channel="voice"', async () => {
+    await notifyStaff({
+      reason: 'custom_quote',
+      customerName: 'Kai',
+      customerPhone: '+14245551234',
+      details: 'voice path',
+      source: 'voice_agent',
+    });
+    expect(adminState.lastMessageInsert?.channel).toBe('voice');
+  });
+
+  it('source=voice_agent → conversations.update receives last_channel="voice"', async () => {
+    await notifyStaff({
+      reason: 'custom_quote',
+      customerName: 'Lara',
+      customerPhone: '+14245551234',
+      details: 'voice path',
+      source: 'voice_agent',
+    });
+    expect(adminState.lastConversationUpdate?.last_channel).toBe('voice');
+  });
+
+  it('source=sms_ai_v2 → messages.insert receives channel="sms_ai" (version-free)', async () => {
+    await notifyStaff({
+      reason: 'custom_quote',
+      customerName: 'Mei',
+      customerPhone: '+14245551234',
+      details: 'sms path',
+      source: 'sms_ai_v2',
+    });
+    expect(adminState.lastMessageInsert?.channel).toBe('sms_ai');
+    // Persistent column value must not embed the agent-runtime version.
+    expect(adminState.lastMessageInsert?.channel).not.toBe('sms_ai_v2');
+  });
+
+  it('source=sms_ai_v2 → conversations.update receives last_channel="sms_ai" (version-free)', async () => {
+    await notifyStaff({
+      reason: 'custom_quote',
+      customerName: 'Nico',
+      customerPhone: '+14245551234',
+      details: 'sms path',
+      source: 'sms_ai_v2',
+    });
+    expect(adminState.lastConversationUpdate?.last_channel).toBe('sms_ai');
+    expect(adminState.lastConversationUpdate?.last_channel).not.toBe('sms_ai_v2');
+  });
+
+  it('insert payload retains sender_type=system regardless of source', async () => {
+    await notifyStaff({
+      reason: 'other',
+      customerName: 'Omar',
+      customerPhone: '+14245551234',
+      details: 'd',
+      source: 'sms_ai_v2',
+    });
+    expect(adminState.lastMessageInsert?.sender_type).toBe('system');
+    expect(adminState.lastMessageInsert?.direction).toBe('outbound');
   });
 });

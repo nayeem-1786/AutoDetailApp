@@ -84,6 +84,17 @@ export function isStaffNotificationReason(
     && (STAFF_NOTIFICATION_REASONS as readonly string[]).includes(value);
 }
 
+/**
+ * Map the caller's agent-runtime `source` to a version-free persistent channel
+ * value. Audit-log rows (`messages.channel`, `conversations.last_channel`)
+ * outlive any specific agent version, so storing `'sms_ai_v2'` literally would
+ * lock the column to today's runtime. When v3 of the SMS agent ships, the
+ * channel stays `'sms_ai'`; only the runner's source identifier changes.
+ */
+function channelForSource(source: NotifyStaffParams['source']): string {
+  return source === 'voice_agent' ? 'voice' : 'sms_ai';
+}
+
 export async function notifyStaff(
   params: NotifyStaffParams,
 ): Promise<NotifyStaffResult> {
@@ -173,9 +184,11 @@ export async function notifyStaff(
     }
   }
 
-  // Audit log to customer's conversation thread when we have a phone. Mirrors
-  // voice-agent endpoint behavior — uses channel='voice' so the entry renders
-  // as a notification banner, not a chat bubble.
+  // Audit log to customer's conversation thread when we have a phone. The
+  // entry renders as a notification banner (sender_type='system'). Channel is
+  // derived from the caller's source so SMS AI v2 audit entries don't get
+  // mis-attributed to the voice channel (legacy behavior pre-Layer-1+2 fixup
+  // hardcoded 'voice' because the only caller was the voice agent).
   if (normalizedCustomerPhone) {
     try {
       const admin = createAdminClient();
@@ -187,20 +200,21 @@ export async function notifyStaff(
 
       if (conv) {
         const logBody = `Staff notification sent: ${reasonLabel} — ${cleanedDetails}`;
+        const auditChannel = channelForSource(source);
         await admin.from('messages').insert({
           conversation_id: conv.id,
           direction: 'outbound',
           body: logBody,
           sender_type: 'system',
           status: 'delivered',
-          channel: 'voice',
+          channel: auditChannel,
         });
         await admin
           .from('conversations')
           .update({
             last_message_at: new Date().toISOString(),
             last_message_preview: logBody.substring(0, 200),
-            last_channel: 'voice',
+            last_channel: auditChannel,
           })
           .eq('id', conv.id);
       }

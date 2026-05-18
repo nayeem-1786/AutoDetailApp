@@ -135,3 +135,82 @@ describe('buildV2SystemPrompt — structural output', () => {
     expect(b).not.toContain('Smart Details Auto Spa');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Layer 1+2 fixup — expanded prompt sections + structural invariants
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
+  it('includes Cross-channel awareness section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Cross-channel awareness');
+  });
+
+  it('includes Vehicle size mapping (for pricing lookup) section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Vehicle size mapping (for pricing lookup)');
+  });
+
+  it('includes RO Water section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# RO Water');
+  });
+
+  it('includes Multi-language support section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Multi-language support');
+  });
+
+  it('includes What you cannot do section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# What you cannot do');
+  });
+
+  it('Critical rules section contains exactly 13 numbered rules', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Slice from "# Critical rules" header to the next "# " header.
+    const criticalIdx = out.indexOf('# Critical rules');
+    expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
+    const afterHeader = out.slice(criticalIdx + '# Critical rules'.length);
+    const nextHeaderIdx = afterHeader.search(/\n# /);
+    const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
+    // Count lines that begin with `<digit>.` (1–13).
+    const numbered = section.match(/^\d+\./gm) ?? [];
+    expect(numbered.length).toBe(13);
+  });
+
+  it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const occurrences = out.split(CUSTOMER_CONTEXT_PLACEHOLDER).length - 1;
+    expect(occurrences).toBe(1);
+  });
+
+  it('all three dynamic inputs appear in the output (sanity)', () => {
+    const out = buildV2SystemPrompt({
+      businessName: 'Acme Detail Co',
+      businessHours: 'Mon–Sat 7am–9pm',
+      currentDate: '2026-12-25',
+    });
+    expect(out).toContain('Acme Detail Co');
+    expect(out).toContain('Mon–Sat 7am–9pm');
+    expect(out).toContain('2026-12-25');
+  });
+
+  it('cross-channel awareness section mentions voice agent and references quotes by number', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const crossIdx = out.indexOf('# Cross-channel awareness');
+    const section = out.slice(crossIdx, out.indexOf('# Vehicle size mapping', crossIdx));
+    expect(section.toLowerCase()).toContain('voice agent');
+    expect(section).toContain('Q-0023');
+  });
+
+  it('multi-language section lists all 4 supported languages', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const mlIdx = out.indexOf('# Multi-language support');
+    const section = out.slice(mlIdx, out.indexOf('# What you cannot do', mlIdx));
+    expect(section).toContain('Spanish');
+    expect(section).toContain('Filipino');
+    expect(section).toContain('Hindi');
+    expect(section).toContain('Urdu');
+  });
+});
