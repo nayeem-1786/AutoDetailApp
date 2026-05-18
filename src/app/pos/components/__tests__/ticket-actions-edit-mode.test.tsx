@@ -112,6 +112,7 @@ function emptyEditTicket(): TicketState {
     returnTo: RETURN_TO,
     editMode: true,
     editInitialSnapshot: null, // set per-test
+    editSourceScheduledDate: null,
   };
 }
 

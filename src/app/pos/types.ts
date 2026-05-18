@@ -124,6 +124,15 @@ export interface TicketState {
    * edit-mode fields (state-leak prevention).
    */
   editInitialSnapshot: string | null;
+  /**
+   * Item 15f Phase 1 Layer 8d — appointment's scheduled date (YYYY-MM-DD).
+   * Surfaced in the edit-mode banner alongside the customer name as a
+   * friendlier identifier than the UUID prefix Layer 8c shipped. Set by
+   * the drain when ENTER_EDIT_MODE fires; null outside edit mode.
+   * Banner falls back to UUID prefix when this is null (e.g., load
+   * endpoint didn't return it on a legacy row).
+   */
+  editSourceScheduledDate: string | null;
 }
 
 // ─── Ticket Actions ────────────────────────────────────────────
@@ -158,6 +167,13 @@ export type TicketAction =
       sourceId: string;
       returnTo: string;
       ticketData: TicketState;
+      /**
+       * Item 15f Phase 1 Layer 8d — appointment's `scheduled_date` (YYYY-MM-DD).
+       * Optional so existing call sites (tests, future direct dispatchers)
+       * can omit it without TS error; banner falls back to UUID prefix when
+       * absent.
+       */
+      scheduledDate?: string | null;
     }
   // EXIT_EDIT_MODE clears the 4 fields without disturbing items/customer/etc.
   // Used by Layer 8c's "Cancel Edit" affordance (still on the cart, still

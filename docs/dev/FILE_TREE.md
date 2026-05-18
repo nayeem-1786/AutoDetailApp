@@ -1356,9 +1356,11 @@ use-edit-mode-drain.ts      — Item 15f Phase 1 Layer 8b. POS deep-link drain (
 
 - `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` — 24 cases: validators (UUID + 5 open-redirect attack classes), build-state pure helper, drain endpoint selection + dispatch sequence + coupon re-validation, error paths (403/404/network/malformed), Layer 8c `MARK_EDIT_INITIAL_STATE` as final dispatch (ordering vs coupon revalidate).
 
-- `src/app/pos/components/edit-mode-banner.tsx` — Item 15f Phase 1 Layer 8c. Subtle amber banner at top of Sale workspace when `ticket.editMode` is true. Surfaces "Editing Appointment #XXX" / "Editing Job #XXX" + "Unsaved changes" badge (compares `serializeTicketEditSlice(ticket)` against `ticket.editInitialSnapshot`). Returns null outside edit mode.
-- `src/app/pos/components/__tests__/edit-mode-banner.test.tsx` — 6 cases: no render outside edit mode, appointment/job label, dirty/clean states, pre-MARK snapshot=null suppression.
+- `src/app/pos/components/edit-mode-banner.tsx` — Item 15f Phase 1 Layer 8c + Layer 8d label revamp. Subtle amber banner at top of Sale workspace when `ticket.editMode` is true. Surfaces "Editing Appointment: {customer} — {date}" via `buildEditLabel` helper (exported for tests), with fallback hierarchy: customer+date → customer-only → date-only → UUID-prefix safety net. "Unsaved changes" badge compares `serializeTicketEditSlice(ticket)` against `ticket.editInitialSnapshot`. Returns null outside edit mode.
+- `src/app/pos/components/__tests__/edit-mode-banner.test.tsx` — 14 cases: render gating, Layer 8d customer+date label (appointment + job variants), 4-tier fallback hierarchy, dirty/clean states, pre-MARK snapshot=null suppression, `buildEditLabel` pure-function unit tests.
 - `src/app/pos/components/__tests__/ticket-actions-edit-mode.test.tsx` — 12 cases for the editMode branch of `<TicketActions>`: button swap (Save Changes + Cancel), Save POST payload shape (services + 6 modifier fields, percent→dollar resolution), success/error paths, clean vs dirty Cancel UX.
+- `src/app/pos/components/__tests__/pos-workspace-products-gating.test.tsx` — Item 15f Phase 1 Layer 8d. 3 cases: Products tab interactive when editMode=false (no regression), disabled when editMode=true (aria + cursor-not-allowed), clicking disabled tab surfaces toast + does not switch active tab.
+- `src/app/pos/jobs/components/__tests__/edit-services-deep-link.test.ts` — Item 15f Phase 1 Layer 8d. 4 cases: pure URL-builder contract pinning `source=job` (not appointment), `id=APPOINTMENT_UUID` (not job UUID), `returnTo=/pos/jobs?jobId=<job>` URL-encoded, three-param outer query string structure.
 
 ---
 

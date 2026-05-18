@@ -71,6 +71,7 @@ function makeTicketData(overrides: Partial<TicketState> = {}): TicketState {
     returnTo: null,
     editMode: false,
     editInitialSnapshot: null,
+    editSourceScheduledDate: null,
     ...overrides,
   };
 }

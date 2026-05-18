@@ -120,6 +120,12 @@ export interface LoadResponseData {
   manual_discount_label?: string | null;
   deposit_amount: number;
   deposit_date: string | null;
+  /**
+   * Item 15f Phase 1 Layer 8d — appointment's `scheduled_date` (YYYY-MM-DD).
+   * Optional so legacy load-endpoint responses without the field still
+   * deserialize cleanly. Banner falls back to UUID prefix when null.
+   */
+  scheduled_date?: string | null;
   prior_payments?: PriorPayment[];
   prior_payments_total_cents?: number;
   status: string;
@@ -220,6 +226,7 @@ export function buildTicketStateFromLoad(data: LoadResponseData): TicketState {
     returnTo: null,
     editMode: false,
     editInitialSnapshot: null,
+    editSourceScheduledDate: null,
   };
 }
 
@@ -279,6 +286,10 @@ export async function runEditModeDrain(
     sourceId: id,
     returnTo,
     ticketData,
+    // Item 15f Phase 1 Layer 8d — surface scheduled_date so the banner
+    // can render "Editing Appointment: Jane Doe — Sat, May 16". Null when
+    // the load endpoint didn't return it (legacy rows or future drift).
+    scheduledDate: data.scheduled_date ?? null,
   });
 
   // Modifier hydration mirrors `pos/jobs/page.tsx:handleCheckout` lines

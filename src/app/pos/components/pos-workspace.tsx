@@ -114,6 +114,16 @@ export function PosWorkspace() {
   }, [handlePendingService]);
 
   const handleBarcodeScan = useCallback(async (barcode: string) => {
+    // Item 15f Phase 1 Layer 8d — barcode scans add a product. In edit
+    // mode the cascade endpoint doesn't accept products, so a scan would
+    // silently drop on save. Surface the same toast the disabled tab
+    // shows so the operator knows why.
+    if (ticket.editMode) {
+      toast.info(
+        'Products can only be added at checkout, not in edit mode'
+      );
+      return;
+    }
     try {
       const res = await posFetch('/api/pos/products/barcode-lookup', {
         method: 'POST',
@@ -143,7 +153,7 @@ export function PosWorkspace() {
     } catch {
       toast.error('Scan failed — try again');
     }
-  }, [dispatch]);
+  }, [dispatch, ticket.editMode]);
 
   useBarcodeScanner({
     onScan: handleBarcodeScan,
@@ -156,6 +166,11 @@ export function PosWorkspace() {
   // Filter products for global search
   const filteredProducts = useMemo(() => {
     if (!search || searchScope === 'services') return [];
+    // Item 15f Phase 1 Layer 8d — edit-mode tickets don't accept products
+    // (cascade endpoint's Zod accepts services only). Suppress them from
+    // global-search results so the operator can't tap-add a row that
+    // would be silently dropped on save.
+    if (ticket.editMode) return [];
     const q = search.toLowerCase();
     return products.filter(
       (p) =>
@@ -163,7 +178,7 @@ export function PosWorkspace() {
         p.sku?.toLowerCase().includes(q) ||
         p.barcode?.toLowerCase().includes(q)
     );
-  }, [products, search, searchScope]);
+  }, [products, search, searchScope, ticket.editMode]);
 
   // Filter services for global search
   const filteredServices = useMemo(() => {
@@ -174,6 +189,17 @@ export function PosWorkspace() {
 
   // Global search handlers
   function handleTapProduct(product: CatalogProduct) {
+    // Item 15f Phase 1 Layer 8d — defense in depth. Tab gating hides the
+    // Products tab in edit mode, and global-search filteredProducts is
+    // emptied when editMode is true, so this branch shouldn't normally
+    // execute. Catches the barcode-scanner path + any future tap site
+    // that bypasses the search-results filter.
+    if (ticket.editMode) {
+      toast.info(
+        'Products can only be added at checkout, not in edit mode'
+      );
+      return;
+    }
     dispatch({ type: 'ADD_PRODUCT', product });
     toast.success(`Added ${product.name}`);
   }
@@ -306,26 +332,48 @@ export function PosWorkspace() {
         {/* Tab bar */}
         <div className="shrink-0 px-4 pt-3">
           <div className="flex gap-1 rounded-lg bg-gray-200 dark:bg-gray-800 p-1">
-            {TABS.map((t) => (
+            {TABS.map((t) => {
+              // Item 15f Phase 1 Layer 8d — Products tab is disabled in
+              // edit mode. Appointments don't carry product rows (the
+              // cascade endpoint's Zod accepts services only); products
+              // only attach to a ticket at transaction commit. Letting
+              // the operator drop products into edit-mode cart would
+              // silently drop them on save — surface a toast instead.
+              const isProductsDisabled = t.key === 'products' && ticket.editMode;
+              return (
               <button
                 key={t.key}
                 onClick={() => {
+                  if (isProductsDisabled) {
+                    toast.info(
+                      'Products can only be added at checkout. Save your service changes first, then add products during checkout.'
+                    );
+                    return;
+                  }
                   if (t.key === 'promotions' && !ticket.customer) {
                     setShowCustomerLookup(true);
                   }
                   setTab(t.key);
                   setSearch('');
                 }}
+                aria-disabled={isProductsDisabled || undefined}
+                title={
+                  isProductsDisabled
+                    ? 'Products are added at checkout, not in edit mode'
+                    : undefined
+                }
                 className={cn(
                   'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all',
                   tab === t.key
                     ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm dark:shadow-gray-950/30'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300',
+                  isProductsDisabled && 'opacity-40 cursor-not-allowed'
                 )}
               >
                 {t.label}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 

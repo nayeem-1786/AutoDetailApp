@@ -31,6 +31,10 @@ export const initialTicketState: TicketState = {
   // alongside the other fields; cleared by EXIT_EDIT_MODE / CLEAR_TICKET /
   // RESTORE_TICKET.
   editInitialSnapshot: null,
+  // Item 15f Phase 1 Layer 8d — appointment scheduled_date (YYYY-MM-DD)
+  // for the edit-mode banner label. Cleared alongside other edit-mode
+  // fields on EXIT_EDIT_MODE / CLEAR_TICKET / RESTORE_TICKET.
+  editSourceScheduledDate: null,
 };
 
 /**
@@ -667,6 +671,7 @@ export function ticketReducer(
         returnTo: null,
         editMode: false,
         editInitialSnapshot: null,
+        editSourceScheduledDate: null,
       });
     }
 
@@ -687,6 +692,12 @@ export function ticketReducer(
       // initial-state snapshot must be taken AFTER those settle so the cart
       // doesn't appear dirty on hydration. The drain emits
       // `MARK_EDIT_INITIAL_STATE` as its final dispatch.
+      //
+      // Layer 8d: also stamps `editSourceScheduledDate` from the action's
+      // optional `scheduledDate` param so the banner can render
+      // "Editing Appointment: <customer name> — <date>" instead of the
+      // UUID prefix Layer 8c shipped. Null-tolerant — legacy rows without
+      // the field fall back to UUID prefix in the banner.
       return recalculateTotals({
         ...action.ticketData,
         priorPayments: action.ticketData.priorPayments ?? [],
@@ -696,6 +707,7 @@ export function ticketReducer(
         returnTo: action.returnTo,
         editMode: true,
         editInitialSnapshot: null,
+        editSourceScheduledDate: action.scheduledDate ?? null,
       });
     }
 
@@ -707,6 +719,7 @@ export function ticketReducer(
         returnTo: null,
         editMode: false,
         editInitialSnapshot: null,
+        editSourceScheduledDate: null,
       };
     }
 

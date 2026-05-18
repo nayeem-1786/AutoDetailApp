@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { formatPhone } from '@/lib/utils/format';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import {
@@ -236,6 +237,7 @@ interface JobDetailProps {
 }
 
 export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
+  const router = useRouter();
   const { employee } = usePosAuth();
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
   const { granted: canCancelJobs } = usePosPermission('pos.jobs.cancel');
@@ -566,19 +568,39 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
     if (ok) setShowEditVehicle(false);
   }
 
-  // Item 15f Layer 3a — Edit Services opens the canonical
-  // `<EditServicesDialog>`, which mounts `useServicePicker` and routes
-  // every tap through the canonical engine. Local selection state is
-  // seeded from the job's current services (filtering out the synthetic
-  // mobile-fee row — that's managed by the mobile picker, not here) and
-  // is mutated via add/remove callbacks from the dialog. Save calls
-  // `handlePatchJob({services})` which already accepts a
-  // `JobServiceSnapshot[]` payload.
+  // Item 15f Phase 1 Layer 8d — Edit Services routes to POS edit mode via
+  // the deep-link drain (Layer 8b). The full POS Sale tab opens with the
+  // appointment's services + modifiers pre-loaded; Save Changes hits the
+  // cascade endpoint (Layer 8a/8c) which writes appointment_services AND
+  // cascades to jobs.services.
+  //
+  // CRITICAL: deep-link `id` is the APPOINTMENT UUID, not the JOB UUID.
+  // Layer 8c's Save handler POSTs to /api/pos/appointments/${sourceId}/services
+  // unconditionally — passing the job id here would 404 the cascade. The
+  // source=job discriminator just tells the drain to use the jobs/checkout-items
+  // load endpoint (richer payload incl. prior_payments); save still targets
+  // the appointment row.
+  //
+  // Walk-ins post-Phase-0a all carry a synthetic appointment_id. Legacy
+  // pre-0a walk-ins (appointment_id IS NULL) can't be edited via this
+  // path — toast a refusal and the existing dead `<EditServicesDialog>`
+  // mount stays inert. Layer 8e deletes the mount entirely.
   function handleOpenEditServices() {
     if (!job) return;
-    const initial = job.services.filter((s) => !s.is_mobile_fee);
-    setEditSelectedServices(initial);
-    setShowEditServices(true);
+    if (!job.appointment_id) {
+      toast.error(
+        'This legacy ticket has no underlying appointment. Service editing is not available.'
+      );
+      return;
+    }
+    // returnTo is `/pos/jobs?jobId=<id>` — the Jobs page reads the param on
+    // mount and opens the detail view (Layer 8d adds this query-param hop
+    // since the Jobs page doesn't have per-job URL segments).
+    router.push(
+      `/pos?source=job&id=${job.appointment_id}&returnTo=${encodeURIComponent(
+        `/pos/jobs?jobId=${job.id}`
+      )}`
+    );
   }
 
   function handleEditServiceAdded(

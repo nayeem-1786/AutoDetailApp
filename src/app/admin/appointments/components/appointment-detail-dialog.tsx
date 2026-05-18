@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { MapPin, Pencil } from 'lucide-react';
@@ -67,6 +68,7 @@ export function AppointmentDetailDialog({
   canAddNotes = true,
   onServicesUpdated,
 }: AppointmentDetailDialogProps) {
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   // Item 15a — Edit Services modal state. Same pattern as the mobile
   // editor: modal owns its PATCH lifecycle, dialog surfaces an
@@ -261,24 +263,34 @@ export function AppointmentDetailDialog({
         <div className="mt-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-500">Services</p>
-            {canEditServices && (
-              // Item 15f Layer 4: the inline Admin "Edit Services" picker
-              // (`<EditServicesModal>`) carries a bespoke `resolveServicePrice`
-              // with the same drift-bug class Layer 3d fixed elsewhere
-              // (silent exotic/classic mispricing). Rather than patch a
-              // surface scheduled for deletion in Phase 1 Layer 8e, the
-              // Admin entry point is disabled — operators edit appointment
-              // services via the POS Jobs card, which already routes
-              // through the canonical engine via `useServicePicker`
-              // (Layer 3a-i). The modal mount below stays as dead code so
-              // the existing test pinning its internals (`<CustomPriceDialog>`
-              // routing from Layer 3e) keeps shipping until deletion.
+            {canEditServices && appointment && (
+              // Item 15f Phase 1 Layer 8d — re-enables the Admin "Edit
+              // Services" entry point. The Layer 4 disable was scoped to
+              // the deletion window for the bespoke `<EditServicesModal>`
+              // (silent exotic/classic mispricing). With Phase 1 Layers
+              // 8a-8c shipped, the canonical edit surface IS the POS Sale
+              // tab — services + modifier editing routes through the same
+              // cascade endpoint (`/api/pos/appointments/[id]/services`)
+              // regardless of operator entry point. The modal mount below
+              // stays inert as dead code; Layer 8e deletes it.
+              //
+              // returnTo lands the operator back at `/admin/appointments`
+              // (the list page that owns this dialog). The dialog itself
+              // doesn't auto-reopen on return — the operator clicks the
+              // appointment row again to see updated totals. Future
+              // ?dialogId=... query-param hop would auto-reopen, but the
+              // audit §7.2 marks that as a trivial follow-up, not Layer
+              // 8d scope.
               <button
                 type="button"
-                disabled
-                aria-disabled="true"
-                title="Service editing temporarily unavailable. Please use POS Jobs card to edit services."
-                className="text-xs font-medium text-gray-300 cursor-not-allowed"
+                onClick={() =>
+                  router.push(
+                    `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(
+                      '/admin/appointments'
+                    )}`
+                  )
+                }
+                className="text-xs font-medium text-blue-600 hover:text-blue-700"
               >
                 Edit
               </button>

@@ -262,14 +262,21 @@ export async function GET(
     let loyalty_discount: number | null = null;
     let manual_discount_value: number | null = null;
     let manual_discount_label: string | null = null;
+    // Item 15f Phase 1 Layer 8d — `scheduled_date` surfaces in the
+    // edit-mode banner so source=job edits show "Editing Appointment:
+    // Jane Doe — Sat, May 16" (the canonical edit target is the linked
+    // appointment, so reading scheduled_date from there matches the
+    // appointment-source endpoint's banner UX).
+    let scheduled_date: string | null = null;
     if (job.appointment_id) {
       const { data: appt } = await supabase
         .from('appointments')
         .select(
-          'payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot, coupon_code, coupon_discount, loyalty_points_redeemed, loyalty_discount, manual_discount_value, manual_discount_label'
+          'payment_type, deposit_amount, is_mobile, mobile_surcharge, mobile_zone_name_snapshot, coupon_code, coupon_discount, loyalty_points_redeemed, loyalty_discount, manual_discount_value, manual_discount_label, scheduled_date'
         )
         .eq('id', job.appointment_id)
         .single();
+      scheduled_date = appt?.scheduled_date ?? null;
 
       // Coupon fallback: if no quote-side coupon was found (no quote_id, or
       // quote had no coupon_code), inherit from the appointment row. The
@@ -422,6 +429,10 @@ export async function GET(
         manual_discount_label,
         deposit_amount,
         deposit_date,
+        // Item 15f Phase 1 Layer 8d — edit-mode banner reads scheduled_date
+        // alongside customer to render "Editing Appointment: Jane Doe —
+        // Sat, May 16". Null when job has no linked appointment.
+        scheduled_date,
         prior_payments,
         prior_payments_total_cents,
         status: job.status,

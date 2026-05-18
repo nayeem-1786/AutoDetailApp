@@ -30,6 +30,7 @@ const mockTicket: { value: TicketState } = {
     returnTo: null,
     editMode: false,
     editInitialSnapshot: null,
+    editSourceScheduledDate: null,
   },
 };
 
@@ -125,6 +126,7 @@ function setTicket(overrides: Partial<TicketState>) {
     returnTo: null,
     editMode: false,
     editInitialSnapshot: null,
+    editSourceScheduledDate: null,
     ...overrides,
   };
 }

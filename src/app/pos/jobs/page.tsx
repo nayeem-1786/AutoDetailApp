@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, Suspense } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { JobQueue } from './components/job-queue';
 import { JobDetail } from './components/job-detail';
@@ -17,9 +17,40 @@ type View =
 
 function JobsPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { dispatch } = useTicket();
   const [view, setView] = useState<View>({ mode: 'queue' });
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Item 15f Phase 1 Layer 8d — open the per-job detail view when the URL
+  // carries `?jobId=...`. Lets the POS edit-mode "Save Changes" handler
+  // return the operator to the exact job they were editing (returnTo) so
+  // the audit §7.1 "lands back on /pos/jobs/[id]" UX matches reality.
+  // The Jobs page doesn't have per-job URL segments; this query-param hop
+  // is the simplest way to deep-link without restructuring the route.
+  useEffect(() => {
+    const jobId = searchParams.get('jobId');
+    if (jobId) {
+      setView({ mode: 'detail', jobId });
+      // Strip the param so a refresh doesn't re-open + a back-navigation
+      // stays at the queue. Mirrors the deep-link drain's history.replaceState
+      // pattern in use-edit-mode-drain.ts.
+      if (typeof window !== 'undefined') {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('jobId');
+          window.history.replaceState(
+            null,
+            '',
+            url.pathname + (url.search || '') + url.hash
+          );
+        } catch {
+          // ignore
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCheckout = useCallback(async (jobId: string) => {
     // Fetch checkout items from API
@@ -187,6 +218,7 @@ function JobsPageInner() {
         returnTo: null,
         editMode: false,
         editInitialSnapshot: null,
+        editSourceScheduledDate: null,
       };
 
       dispatch({ type: 'RESTORE_TICKET', state: newTicket });

@@ -60,6 +60,7 @@ export async function GET(
          payment_type, deposit_amount, coupon_code, coupon_discount,
          loyalty_points_redeemed, loyalty_discount,
          manual_discount_value, manual_discount_label,
+         scheduled_date,
          customer:customers!appointments_customer_id_fkey(id, first_name, last_name, phone, email, customer_type, tags),
          vehicle:vehicles!appointments_vehicle_id_fkey(id, year, make, model, color, size_class),
          appointment_services(id, service_id, price_at_booking, tier_name)`
@@ -178,6 +179,11 @@ export async function GET(
         vehicle_id: appt.vehicle_id,
         customer: appt.customer,
         vehicle: appt.vehicle,
+        // Item 15f Phase 1 Layer 8d — scheduled_date surfaces in the
+        // edit-mode banner so operators see "Editing Appointment:
+        // Jane Doe — Sat, May 16" instead of a UUID prefix. Date-only
+        // column (YYYY-MM-DD), the banner formats for display in PST.
+        scheduled_date: appt.scheduled_date ?? null,
         items,
         coupon_code: appt.coupon_code ?? null,
         coupon_discount:

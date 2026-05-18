@@ -6,6 +6,84 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8d: source-side affordances + Layer 8c polish
+
+Fourth session of Phase 1 (edit-via-POS). Ships the buttons operators actually click to enter edit mode plus two polish fixes from Layer 8c UAT. With Layer 8d landed, the full edit-via-POS loop is reachable from operator-visible surfaces — Layers 8a–8c provided the backend cascade, deep-link drain, and Sale-tab UX; Layer 8d closes the trigger gap.
+
+**Four deliverables:**
+
+1. **Jobs card "Services" tile routes to POS edit mode** (`src/app/pos/jobs/components/job-detail.tsx`):
+   - `handleOpenEditServices` swapped from `setShowEditServices(true)` (mount `<EditServicesDialog>`) to `router.push('/pos?source=job&id=<APPOINTMENT_UUID>&returnTo=/pos/jobs?jobId=<JOB_UUID>')`.
+   - **Critical invariant**: the `id` param is the **APPOINTMENT UUID**, not the job UUID. Layer 8c's Save handler POSTs to `/api/pos/appointments/${sourceId}/services` unconditionally — passing the job id would 404 the cascade. Source=job is just the drain discriminator (richer load endpoint); save still targets the appointment row.
+   - Legacy pre-Phase-0a walk-ins with `appointment_id IS NULL` get a graceful refusal toast ("This legacy ticket has no underlying appointment. Service editing is not available."). The dead `<EditServicesDialog>` mount stays inert until Layer 8e deletes it.
+
+2. **`/pos/jobs?jobId=<id>` query-param hop** (`src/app/pos/jobs/page.tsx`):
+   - Layer 8d adds query-param-driven detail open. Lets the Save handler's `returnTo` land the operator back on the exact job they were editing, matching audit §7.1's "lands back on /pos/jobs/[id]; card auto-refreshes" UX.
+   - The Jobs page reads `?jobId=` on mount, sets view to detail, strips the param via `history.replaceState` (so refresh/back returns to the queue). Mirrors the deep-link drain's URL-cleanup pattern.
+
+3. **Admin Appointment dialog "Edit Services" re-enabled → POS** (`src/app/admin/appointments/components/appointment-detail-dialog.tsx`):
+   - Layer 4's disabled state ("Service editing temporarily unavailable. Please use POS Jobs card.") removed.
+   - Button click now `router.push('/pos?source=appointment&id=<uuid>&returnTo=/admin/appointments')`.
+   - Dead `<EditServicesModal>` mount stays inert until Layer 8e deletes it.
+   - Test file `edit-services-disabled.test.tsx` rewritten to pin the new enabled+navigate contract; the disabled-state test was the Layer 4 architectural-window pin that 8d explicitly retires.
+
+4. **Layer 8c polish — Products tab disabled in edit mode** (`src/app/pos/components/pos-workspace.tsx`):
+   - Tab bar gates `'products'` on `!ticket.editMode`. Disabled tab gets `cursor-not-allowed`, `aria-disabled="true"`, `title="Products are added at checkout, not in edit mode"`, and clicking surfaces `toast.info("Products can only be added at checkout. Save your service changes first, then add products during checkout.")`.
+   - Three defense-in-depth gates added: `handleTapProduct` (global search), `filteredProducts` useMemo (returns `[]` in edit mode so the search results don't even render product cards), and `handleBarcodeScan` (barcode scanner). All three surface the same toast.
+   - **Rationale**: the cascade endpoint's Zod schema accepts services only; products attach to a ticket at transaction commit. A product added in edit mode would silently drop on Save Changes — better to block at the UI layer.
+
+5. **Layer 8c polish — EditModeBanner customer + date label** (`src/app/pos/components/edit-mode-banner.tsx`):
+   - Layer 8c's UUID-prefix label ("Editing Appointment #aaaaaaaa") replaced with "Editing Appointment: Jane Doe — Sat, May 16".
+   - Fallback hierarchy: customer + date → customer only → date only → UUID prefix safety net.
+   - `buildEditLabel` exported as a pure function for unit-testing the fallback decision tree without rendering the component.
+   - Date formatting via `Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' })`. YYYY-MM-DD date columns are anchored at noon UTC (`T12:00:00Z`) before formatting to dodge cross-DST midnight ambiguity.
+   - This is interim labeling — proper A-XXXXX appointment numbering is deferred to post-Phase-1 engine-unification work.
+
+**Data plumbing for the banner:**
+
+- New `TicketState.editSourceScheduledDate: string | null` field. Cleared alongside other edit-mode fields by `EXIT_EDIT_MODE` / `CLEAR_TICKET` / `RESTORE_TICKET`.
+- `ENTER_EDIT_MODE` action gains optional `scheduledDate` payload — reducer stamps it onto `editSourceScheduledDate`. Optional so existing call sites (and future direct dispatchers) can omit without TS error.
+- `GET /api/pos/appointments/[id]/load` SELECT widened to include `scheduled_date`; response surfaces it as a top-level field.
+- `GET /api/pos/jobs/[id]/checkout-items` reads `scheduled_date` from the linked appointment (`job.appointment_id` → `appointments.scheduled_date`) and surfaces it on the response so source=job edits get the same banner UX.
+- Drain hook reads `data.scheduled_date` and threads it into `ENTER_EDIT_MODE`'s `scheduledDate` param.
+
+**Tests (+16 across 4 new/modified files; 1492/1492 passing — was 1476 at Layer 8c):**
+
+- `src/app/admin/appointments/components/__tests__/edit-services-disabled.test.tsx` (rewritten +3): Edit button enabled (no disabled attribute), click calls `router.push` with correct deep-link URL, click does NOT mount the legacy `<EditServicesModal>`.
+- New `src/app/pos/jobs/components/__tests__/edit-services-deep-link.test.ts` (+4): pure URL-builder contract — `source=job` (not appointment), `id=APPOINTMENT_UUID` (not job UUID), `returnTo=/pos/jobs?jobId=<job>` URL-encoded, three-param outer query string structure.
+- New `src/app/pos/components/__tests__/pos-workspace-products-gating.test.tsx` (+3): Products tab interactive when editMode=false (no regression), disabled when editMode=true (aria + cursor-not-allowed), clicking disabled tab surfaces toast + does NOT switch active tab.
+- `src/app/pos/components/__tests__/edit-mode-banner.test.tsx` (+8 from Layer 8d, total 14): all 4 banner-label fallback branches, "Editing Job:" variant, `buildEditLabel` pure-function tests with last_name="" edge case + each fallback path.
+
+Collateral typecheck-edits to keep `TicketState` fixtures consistent with the new `editSourceScheduledDate` field:
+- `src/app/pos/components/__tests__/ticket-actions.test.tsx`
+- `src/app/pos/components/__tests__/ticket-actions-edit-mode.test.tsx`
+- `src/app/pos/context/__tests__/ticket-reducer-edit-mode.test.ts`
+- `src/app/pos/jobs/page.tsx:handleCheckout` newTicket literal
+- `src/app/pos/hooks/use-edit-mode-drain.ts:buildTicketStateFromLoad`
+
+**Out of scope** (deferred to Layer 8e):
+- `<EditServicesDialog>` component file deletion (`src/lib/services/edit-services-dialog.tsx`).
+- `<EditServicesModal>` component file deletion (`src/components/appointments/edit-services-modal.tsx`).
+- Job-detail state cleanup (`showEditServices`, `editSelectedServices`, save handler, dialog mount).
+- Admin dialog state cleanup (`editingServices`, `servicesOverride`, modal mount).
+- A-XXXXX appointment numbering — deferred to post-Phase-1 engine-unification evaluation.
+- Pending-appointment visibility filter — deferred per brief.
+
+**Verification:** Typecheck 0 new errors on touched files (2 pre-existing unrelated test-file errors persist). ESLint 0 errors / 98 warnings unchanged baseline. Vitest 1492/1492 (was 1476 at Layer 8c; +16 net new). Production build compiled successfully.
+
+**Manual UAT** (user verifies post-deploy):
+
+1. **Jobs card → POS edit mode** — `/pos/jobs/<id>` → Services tile → navigates to `/pos?source=job&id=<APPOINTMENT_UUID>&returnTo=/pos/jobs?jobId=<jobid>`. POS loads in edit mode; banner shows "Editing Job: <customer> — <date>". Save Changes → returns to `/pos/jobs?jobId=<jobid>` which auto-opens the job detail. SQL: `appointments.subtotal/total_amount/discount_amount` updated; `jobs.services` JSONB cascade reflects the edit.
+2. **Admin → Appointments → POS edit mode** — `/admin/appointments` → row click → dialog opens → "Edit" button → `/pos?source=appointment&id=<uuid>&returnTo=/admin/appointments`. POS loads in edit mode; banner shows "Editing Appointment: <customer> — <date>". Save Changes → returns to `/admin/appointments`. (Dialog does NOT auto-reopen; operator clicks the row again to see updated totals — future `?dialogId=...` query-param hop deferred.)
+3. **Products tab disabled** — enter edit mode via either path → Products tab visibly disabled (greyed + cursor-not-allowed). Click → toast "Products can only be added at checkout...". Active tab does not switch. Barcode scan also blocked.
+4. **Banner customer + date** — verify "Editing Appointment: Jane Doe — Sat, May 16" format (real customer, real date in PST). No UUID prefix visible for normal cases. Legacy row without `scheduled_date` falls back to customer-only or UUID prefix.
+5. **Legacy walk-in (appointment_id IS NULL)** — for pre-Phase-0a walk-in jobs, Jobs-card Services tile shows a refusal toast ("This legacy ticket has no underlying appointment. Service editing is not available.") instead of navigating. Rare in practice.
+6. **No regression** — fresh /pos walk-in sale works, Products tab interactive, checkout flow unchanged. Quote-edit (existing pre-Phase-1 flow) works.
+
+**Next session:** Phase 1 Layer 8e — delete dead `<EditServicesDialog>` and `<EditServicesModal>` components + their inert mounts + the leftover state hooks in `job-detail.tsx` and `appointment-detail-dialog.tsx`.
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8c: edit-mode UX + modifier-editable cascade endpoint
 
 Third session of Phase 1 (edit-via-POS). Combines two deliverables: a backend extension to the Layer 8a cascade endpoint that accepts six optional modifier fields, and the POS Sale-tab UX that lets the operator save edits back through it. The reversibility audit (`docs/dev/LOYALTY_REVERSIBILITY_AUDIT_2026-05-17.md`) drove the scope — pre-transaction modifier edits don't touch `customers.loyalty_points_balance`, `loyalty_ledger`, or `coupons.use_count`, so the cascade endpoint extension is purely a wider write set on the appointment row.
