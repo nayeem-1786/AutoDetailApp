@@ -6,6 +6,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — SMS AI v2 design-input audit (read-only)
+
+Audit-only session. Zero production-code changes. Catalogs the voice-agent's 14 tool endpoints and the current Twilio inbound SMS handler architecture as design inputs for the upcoming SMS AI v2 work (single-shot Anthropic call → Anthropic tool-using agent that mirrors the voice agent's pattern, ported to SMS).
+
+**Deliverable:** `docs/dev/SMS_AI_V2_AUDIT_2026-05-19.md` — endpoint catalog with input/output/side-effects per tool, current SMS handler flow diagram, staff-notification investigation, Anthropic tool-use integration plan with latency budget, shared-code inventory, design constraints, and 7 open questions for product owner.
+
+**Voice-agent tool endpoints found (14 total — all `Bearer voice_agent_api_key`, all return JSON):** `customers` (lookup_customer), `services` (get_services), `vehicle-classify` (classify_vehicle), `availability` (check_availability), `appointments` (GET upcoming + POST create_appointment), `send-info-sms` (6-type universal info sender), `finalize-call` (voice-only, demonstrates return-early pattern), `products`, `products/details`, `notify-staff` (escalation alerts with 6 reason codes). Plus 4 not in the original brief: `context` (unified single-call snapshot — recommended bootstrapper for v2), `quotes`, `initiation` (voice-only), `send-quote-sms`. All 14 use phone (or quote-id) as the join key and have no per-tool scoping — SMS AI v2 reuses them as-is.
+
+**Current SMS handler shape:** single synchronous flow in `webhooks/twilio/inbound/route.ts:223-948`. No tool loop, no async, no return-early — every step awaited in series, with empty `<Response/>` ACK at the end. One Anthropic call shape: `claude-sonnet-4-20250514`, `max_tokens: 1000`, no prompt caching. Customer context built inline (5 parallel queries duplicating what `voice-agent/context` already returns in one call).
+
+**Staff-notification investigation:** the specialty-pivot staff-notification path IS wired correctly — `renderSmsTemplate('staff_notification_inbound_specialty', …)` + sendSms to template's `recipient_phones`, fallback `[biz.phone].filter(Boolean)`. **Most likely cause** of the user not receiving the test alert: the Session 2F seed migration (`20260427000006_seed_specialty_sub_slugs.sql`) intentionally sets `recipient_phones = NULL` so admins configure per-slug recipients in the UI. The fallback `business_phone` resolves to the storefront line (`BUSINESS_DEFAULTS.phone = +14242370913`) — not the owner's mobile. Voice-agent's `notify_staff` endpoint has the identical fallback logic; same config gap would apply if its recipients also weren't set. **Recommendation:** v2 deletes the inline pivot block, extracts a single `notifyStaff()` helper, and the v2 `notify_staff` tool + voice-agent endpoint both call it — one recipient_phones config, one send path.
+
+**Anthropic tool-use integration plan:** Twilio webhook timeout is 15s. A 3-5 tool-call loop with cold starts will blow that budget — v2 MUST adopt return-early (ACK Twilio immediately, run tool loop in background, send reply via `sendSms` from background task — exactly the pattern `voice-agent/finalize-call/route.ts:70-105` already uses). Realistic 3-tool turn ~5s; 5-tool turn ~8s; both comfortable under customer-tolerable ~15-30s. Recommended: parallelize independent tools per turn, per-tool 5s timeout, no auto-retries (model decides), 6-iteration hard cap, prompt caching for the static system prompt (5-10× larger with tool defs).
+
+**Shared-code inventory (helpers SMS AI v2 should reuse):** `sendSms` (already canonical, Rule 9), `findOrCreateVehicle` (already shared), `createQuote` / `convertQuote` (already shared), `createShortLink`, `getBusinessInfo` / `getBusinessHours`, `resolveServicePrice` (canonical pricing engine, Rule 22). Three new shared helpers recommended: `getCustomerContext()` (extract `voice-agent/context` body for both endpoint + v2 bootstrap), `getConversationHistory()` (single source of truth for the 100-message slice + voice-system filter), `notifyStaff()` (consolidate the two duplicate inline blocks). `findOrCreateCustomer` is duplicated across 5+ call sites — flagged for a separate cleanup phase, NOT v2 scope.
+
+**7 open questions for user (must resolve before v2 design lock):** (1) Anthropic model — Sonnet 4.6 main + Haiku 4.5 helpers? (2) v2 replaces single-shot path entirely or coexists? (3) Specialty pivot deletion bundled with v2 cutover? (4) Include transaction history in system prompt? (5) Which `notify_staff` reasons? (6) Tool surface — start with all 10 or narrow first? (7) Rollout — per-phone feature flag → global flag → full?
+
+**Out-of-scope (filed for follow-up):** `sender_type: 'ai'` is overloaded (real AI replies + canned pivot replies both labeled identically); no `MessageSid` dedup at the messages table; per-caller scoping for the voice-agent API key.
+
+**Constraints honored:** no code changes (per session brief); no calls to live endpoints; no fixes shipped even where obvious (e.g., the prior audit's specialty pivot Fix paths are HELD pending v2 design — fixing in isolation now creates work v2 will undo).
+
+**Files cited (read, not modified):**
+
+- `src/app/api/voice-agent/{customers,services,vehicle-classify,availability,appointments,send-info-sms,finalize-call,products,products/details,notify-staff,context,quotes,send-quote-sms}/route.ts` (all 13 read in full; `initiation/route.ts` cataloged from prior knowledge)
+- `src/lib/auth/api-key.ts:1-43`
+- `src/app/api/webhooks/twilio/inbound/route.ts:1-948` (re-read; same file as prior audit)
+- `src/lib/services/messaging-ai.ts:1-511` + `src/lib/services/messaging-ai-prompt.ts:1-114`
+- `src/app/api/messaging/conversations/[id]/messages/route.ts:1-172` + `src/app/api/messaging/conversations/[id]/route.ts:1-92`
+- `src/lib/sms/render-sms-template.ts:1-416` + `src/lib/utils/sms.ts:1-100`
+- `src/lib/data/business.ts:1-87` + `src/lib/data/business-defaults.ts:1-16`
+- `supabase/migrations/20260427000006_seed_specialty_sub_slugs.sql:1-58`
+
+**Next action:** user reviews audit, answers the 7 open questions, then proceeds to the SMS AI v2 design session.
+
+---
+
 ## 2026-05-19 — SMS AI auto-reply pipeline audit (read-only)
 
 Audit-only session. Zero production-code changes. Investigates two production symptoms reported after the Anthropic API key rotation (Fix #1): (1) the conversation-level `is_ai_enabled` flag flipping off after every AI reply, and (2) AI responses anchoring on an earlier vehicle (Ferrari Roma Spider) and ignoring subsequent inbound message bodies.
