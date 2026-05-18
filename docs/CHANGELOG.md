@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — SMS AI auto-reply pipeline audit (read-only)
+
+Audit-only session. Zero production-code changes. Investigates two production symptoms reported after the Anthropic API key rotation (Fix #1): (1) the conversation-level `is_ai_enabled` flag flipping off after every AI reply, and (2) AI responses anchoring on an earlier vehicle (Ferrari Roma Spider) and ignoring subsequent inbound message bodies.
+
+**Deliverable:** `docs/dev/SMS_AI_AUTOREPLY_AUDIT_2026-05-19.md` — full architecture trace, flag lifecycle map, AI-prompt assembly walkthrough, and per-bug fix recommendations with effort estimates.
+
+**Root cause (single shared root cause for both symptoms):** the **specialty-vehicle pre-AI gate** in `src/app/api/webhooks/twilio/inbound/route.ts:612-674`. For any customer whose `vehicles` table has at least one row with `size_class IN ('exotic','classic')`, every inbound is intercepted before the Anthropic call. A hardcoded canned reply is built from the vehicle record (year/make/model interpolated into `"Thanks for reaching out! For ${specialtyVehicleDesc}, we give custom quotes…"`), staff is SMS-notified, and `is_ai_enabled = false` is written to the conversation. The gate has zero idempotency — every subsequent inbound from the same customer re-fires it, regardless of message body, vehicle the customer is asking about, or whether staff has already responded. The Anthropic API is **never called** for these conversations; the Ferrari Roma reply that operators see in chat bubbles labeled "AI" is a hand-built string, not a model output.
+
+**Reported symptoms mapped:**
+
+- **Symptom 1 — toggle flips off after each AI response:** intentional per design of commit `86a9f06a` (specialty pivot, Apr 18 2026), but the *loop* (flipping off after every reply, not just the first) is a bug because the gate has no "already handed off" guard.
+- **Symptom 2 — stale Ferrari Roma responses ignoring message body:** the reply was never an AI output to begin with. The hardcoded specialty-pivot reply is logged with `sender_type: 'ai'` (route.ts:926), which is what conflates it with a real AI response in the admin UI.
+
+**Ruled out:** Anthropic prompt caching, application-side response cache, conversation auto-close cron (the cron consumer does not exist — `messaging_auto_close_hours` / `messaging_auto_archive_days` are settings without a runtime reader). The Anthropic API key rotation itself is not responsible for either symptom — the bugs have existed since the original specialty pivot landed on Apr 18 2026.
+
+**Recommended fix bundle:** Fix path 1 (add `last_specialty_handoff_at` cooldown column to `conversations`, ~1h) + Fix path 4 (insert a `sender_type: 'system'` notification when the pivot fires so operators see the handoff explicitly, ~30min). Optional follow-up Fix path 2 (LLM-classifier or token-match to skip the pivot when the customer is asking about a non-specialty vehicle, ~3h) if multi-vehicle specialty customers are common.
+
+**Out-of-scope findings (not the cause but worth noting):** conversation auto-close settings have no cron consumer; specialty-pivot replies count against the `MAX_AI_REPLIES_PER_HOUR = 25` budget despite not actually calling the AI; the specialty-check vehicles query duplicates a query already done in customer-context assembly. Full list in §6 of the audit doc.
+
+**Constraints honored:** no code changes (per session brief); audit doc only; user reviews findings before any fix is scoped.
+
+**Files cited (read, not modified):**
+
+- `src/app/api/webhooks/twilio/inbound/route.ts` (lines 234-948, with focus on 482-487, 612-674, 916-940)
+- `src/lib/services/messaging-ai.ts` (lines 1-511, full read)
+- `src/lib/services/messaging-ai-prompt.ts` (lines 1-50+, partial)
+- `src/app/api/messaging/conversations/[id]/messages/route.ts` (lines 100-172)
+- `src/app/api/messaging/conversations/[id]/route.ts` (full read)
+- `src/app/admin/messaging/components/thread-view.tsx` (lines 200-280)
+- `src/app/admin/settings/messaging/page.tsx` (lines 1-100)
+- `supabase/migrations/20260209000011_create_messaging_tables.sql` (line 11)
+- `src/lib/cron/scheduler.ts` (lines 100-130, for cron consumer check)
+- `src/lib/services/voice-post-call.ts` (line 246, for `is_ai_enabled = true` write path)
+- `src/lib/utils/conversation-helpers.ts` (line 60, for helper default)
+
+**Next action:** product owner reviews audit, picks fix path, confirms cooldown window for Fix path 1.
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8f: comprehensive test coverage — **Phase 1 COMPLETE — Item 15f COMPLETE**
 
 Seventh and **final** session of Phase 1 (edit-via-POS). Tests-only — zero production-code changes. Pins the cross-layer joins across Layers 8a-8e via a new integration test file, fills two narrow Layer 8d gating gaps surfaced during the coverage audit (barcode scanner + global-search filteredProducts), and publishes a per-surface coverage matrix doc for hand-off.
