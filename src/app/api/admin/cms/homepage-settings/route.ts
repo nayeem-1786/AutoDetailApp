@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { normalizeGooglePlaceId } from '@/lib/utils/google-place-id';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/homepage-settings — Read all homepage settings
@@ -69,13 +70,32 @@ export async function PUT(request: NextRequest) {
   // Only upsert keys that were provided in the request
   const rows: { key: string; value: string; updated_at: string }[] = [];
   for (const key of HOMEPAGE_KEYS) {
-    if (key in body) {
-      rows.push({
-        key,
-        value: JSON.stringify(body[key]),
-        updated_at: now,
-      });
+    if (!(key in body)) continue;
+
+    let toStore = body[key];
+
+    // google_place_id is the only key with structured format gating —
+    // operators historically saved quoted values and full Google Maps URLs
+    // that round-tripped through the form and reached Google's API as-is.
+    if (key === 'google_place_id' && toStore != null && toStore !== '') {
+      const normalized = normalizeGooglePlaceId(toStore);
+      if (!normalized.value) {
+        return NextResponse.json(
+          {
+            error:
+              'Invalid Place ID format. Expected format starts with ChIJ followed by alphanumeric and underscore/dash characters.',
+          },
+          { status: 400 }
+        );
+      }
+      toStore = normalized.value;
     }
+
+    rows.push({
+      key,
+      value: JSON.stringify(toStore),
+      updated_at: now,
+    });
   }
 
   if (rows.length === 0) {

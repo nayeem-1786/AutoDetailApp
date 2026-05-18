@@ -6,6 +6,81 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-18 — Google Place ID double-encoding fix (B + C hardening)
+
+**Root cause:** `business_settings.google_place_id` stored a double-JSON-encoded value in production (`"\"ChIJ1bR4uWNK3YAReKepydOFb20\""` — length 33, real ID is 27 chars). The Supabase JSONB read returned a JS string with embedded literal double-quote characters. The `google-reviews` cron at `src/app/api/cron/google-reviews/route.ts:64` cast `(placeIdSetting?.value as string)` without unwrapping, so the constructed URL was `?place_id=%22ChIJ...%22` — which Google's Place Details API rejected with `INVALID_REQUEST: Invalid 'place_id' parameter.` causing the daily 6 AM PST tick to 502.
+
+The previous session's parameter-rename hypothesis (`placeid` → `place_id`) did not apply: the cron URL has used `place_id` (snake_case) since the file was created on Feb 14, 2026 (commit `03aef149`). The error message Google returned was `Invalid 'place_id' parameter.` (transcribed without the underscore). Confirmed via production SQL: stored value has the double-encoded shape.
+
+**Fix B — defensive read at the cron handler** (`src/app/api/cron/google-reviews/route.ts`):
+
+- Imports new helper `normalizeGooglePlaceId` from `src/lib/utils/google-place-id.ts`.
+- Replaces the raw cast with a normalization pass that handles JSON unwrap, whitespace trim, surrounding-quote strip, URL extraction (`placeid` / `place_id` / `query_place_id` query params), and final regex validation (`/^ChIJ[A-Za-z0-9_-]+$/`).
+- Logs a `console.warn` when the stored value required any normalization steps so future drift is visible in logs: `Place ID required normalization (unwrap-json, trim) — stored value should be repaired`.
+- Falls back to the bundled `DEFAULT_PLACE_ID = 'ChIJf7qNDhW1woAROX-FX8CScGE'` on invalid stored values, with a `console.error` explaining why.
+
+**Voice agent SMS** (`src/app/api/voice-agent/send-info-sms/route.ts`) had its own ad-hoc strip-quotes defense (`rawPlaceId.replace(/['"]/g, '').trim()`). Replaced with the shared `normalizeGooglePlaceId` call for consistency.
+
+**Fix C — input hardening at the admin form + PUT route:**
+
+- **Server** (`src/app/api/admin/cms/homepage-settings/route.ts`): the PUT route now normalizes the `google_place_id` field through `normalizeGooglePlaceId` before `JSON.stringify`. If normalization fails, the route returns `400 Invalid Place ID format. Expected format starts with ChIJ followed by alphanumeric and underscore/dash characters.` instead of silently storing garbage. `null` and `''` are allowed (clear-the-field).
+- **Client** (`src/app/admin/website/homepage/page.tsx`): the input's `onChange` strips whitespace inline (handles paste with newlines); the `onBlur` runs the full normalizer so a pasted Google Maps URL collapses to the bare ID; an inline red error message displays when the typed value fails format validation; `save()` blocks submission when the value is invalid (defense-in-depth — the server still validates).
+
+**New helper** — `src/lib/utils/google-place-id.ts`:
+
+- `normalizeGooglePlaceId(raw: unknown): { value: string | null; steps: NormalizationStep[]; error?: string }` — single source of truth for Place ID cleanup. Returns the canonical Place ID or `null` with an error code (`empty`, `format`, `not-a-string`).
+- `isValidGooglePlaceId(value): boolean` — strict regex check, used by the admin form for inline validation gating.
+- `GOOGLE_PLACE_ID_REGEX = /^ChIJ[A-Za-z0-9_-]+$/` — canonical format pattern.
+- Normalization steps applied in order: JSON unwrap (handles double-encoded JSONB reads), trim, URL extraction (`placeid` / `place_id` / `query_place_id` query params), surrounding-quote strip, final validation. The `steps` array is the audit log used by the cron to warn when stored data needed repair.
+
+**Migration** — `supabase/migrations/20260518193527_normalize_google_place_id.sql`:
+
+- `UPDATE business_settings SET value = to_jsonb(trim(both '"' from (value #>> '{}'))) WHERE key = 'google_place_id' AND jsonb_typeof(value) = 'string' AND value::text LIKE '"\"%\""'`
+- Idempotent: re-running on already-clean data is a no-op (the WHERE clause matches only the exact double-encoded pattern `"\"...\""`).
+- Scope intentionally narrow — only `google_place_id`. The same drift could in principle affect other text-valued `business_settings` rows, but production has only confirmed this key. The migration includes a comment with the diagnostic SELECT operators should run against prod to identify any other affected keys before broader normalization is scoped.
+
+**Tests** — 33 new tests, all passing (`npx vitest run` full suite: 1,536/1,536 green):
+
+- `src/lib/utils/__tests__/google-place-id.test.ts` — 26 unit tests covering: clean string passthrough, double-encoded JSON unwrap, `JSON.stringify(JSON.stringify(id))` round-trip parity, whitespace/newline/tab trim, URL extraction (search.google.com `placeid`, maps API `place_id`, `query_place_id`), invalid-URL rejection, surrounding-quote strip (double + single), mid-string-quote rejection, empty/null/undefined/non-string handling, invalid-format rejection (non-ChIJ prefix, special characters), combined corrections.
+- `src/app/api/admin/cms/homepage-settings/__tests__/place-id-guard.test.ts` — 7 integration tests for the PUT route: clean ID stored, quoted ID unwrapped before store, URL-paste extracted before store, invalid format returns 400, `null` clears the field, empty string stores as empty, other keys not gated on Place ID format.
+
+**Net result:** cron will succeed on next 6 AM PST tick. Operators can paste a raw Place ID, a quoted Place ID, or a full Google Maps URL — all normalize to the same clean stored value. Stored garbage is rejected at the PUT route boundary before it can be persisted, and the cron has belt-and-suspenders defense for any legacy bad data that escaped the new server-side guard.
+
+**Out of scope (filed as follow-ups, NOT addressed in this PR):**
+
+- `business_settings.google_review_url` separately stores the OLD Place ID (configured at `/admin/settings/reviews`). The new `google_place_id` and the `google_review_url` are not synced — if the operator updates the Place ID via Homepage Settings, the public site's "See all reviews on Google" link will continue pointing to the previous Place ID until the operator manually updates `google_review_url` too. A future PR should either (a) auto-derive `google_review_url` from `google_place_id` at render time, or (b) sync the two values on PUT.
+- Two admin pages write related Google data without a shared form: `/admin/website/homepage` writes `google_place_id`; `/admin/settings/reviews` writes `google_review_url` (and the cached `google_review_rating` + `google_review_count` displays). UX drift risk — a future consolidation pass should unify these under one "Google Reviews" admin section.
+- Other `business_settings` keys may have similar double-encoded drift. The operator should run the diagnostic SELECT in the migration's comment block against prod and report any additional affected keys before any broader normalization migration is written.
+
+**Files changed:**
+
+- New: `src/lib/utils/google-place-id.ts` (130 lines, helper + types + regex)
+- New: `src/lib/utils/__tests__/google-place-id.test.ts` (26 tests)
+- New: `src/app/api/admin/cms/homepage-settings/__tests__/place-id-guard.test.ts` (7 tests)
+- New: `supabase/migrations/20260518193527_normalize_google_place_id.sql`
+- Modified: `src/app/api/cron/google-reviews/route.ts` — defensive read with logging
+- Modified: `src/app/api/admin/cms/homepage-settings/route.ts` — PUT route normalization + 400 guard
+- Modified: `src/app/admin/website/homepage/page.tsx` — input onChange/onBlur normalization, inline error, save gating
+- Modified: `src/app/api/voice-agent/send-info-sms/route.ts` — refactor ad-hoc strip-quotes to shared helper
+
+**Verification:**
+
+- `npm run typecheck` — no new errors (pre-existing errors in `src/lib/quotes/__tests__/quote-service.modifiers.test.ts` are unrelated to this fix and present on clean main)
+- `npm run lint` — 0 errors, 99 pre-existing warnings (none from this PR)
+- `npx vitest run` — 1,536/1,536 green
+- `npm run build` — clean
+
+**Manual UAT post-deploy:**
+
+1. Apply migration via Supabase migration runner (one-shot UPDATE; idempotent).
+2. SSH to VPS: `pm2 logs smart-details | grep google-reviews` after deploy.
+3. Wait for next 6 AM PST tick OR manually trigger via cron-endpoint manual fire.
+4. Confirm: no `Invalid 'place_id' parameter` error in logs.
+5. Confirm: a single `[CRON] google-reviews: Place ID required normalization (...) — stored value should be repaired` warning fires on the first tick *before* migration applies (the cron self-heals at runtime); after migration applies, no normalization warning should fire.
+6. Confirm: `business_settings.google_review_rating`, `google_review_count`, `google_reviews_data`, `google_reviews_updated_at` are all upserted with current values.
+
+---
+
 ## 2026-05-19 — SMS AI v2 design-input audit (read-only)
 
 Audit-only session. Zero production-code changes. Catalogs the voice-agent's 14 tool endpoints and the current Twilio inbound SMS handler architecture as design inputs for the upcoming SMS AI v2 work (single-shot Anthropic call → Anthropic tool-using agent that mirrors the voice agent's pattern, ported to SMS).

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { normalizeGooglePlaceId } from '@/lib/utils/google-place-id';
 
 const CRON_API_KEY = process.env.CRON_API_KEY;
 const GOOGLE_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
@@ -61,7 +62,24 @@ export async function GET(request: Request) {
       console.error('[CRON] google-reviews: Error fetching place ID:', settingsError);
     }
 
-    const placeId = (placeIdSetting?.value as string) || DEFAULT_PLACE_ID;
+    // Defensive read — production has shown rows with double-JSON-encoded
+    // values like `"\"ChIJ...\""`. Normalize, log any repairs, and fall back
+    // to the bundled default if the stored value is unrecoverable.
+    const normalized = normalizeGooglePlaceId(placeIdSetting?.value);
+    let placeId: string;
+    if (normalized.value) {
+      placeId = normalized.value;
+      if (normalized.steps.length > 0) {
+        console.warn(
+          `[CRON] google-reviews: Place ID required normalization (${normalized.steps.join(', ')}) — stored value should be repaired`
+        );
+      }
+    } else {
+      console.error(
+        `[CRON] google-reviews: Stored google_place_id is invalid (reason=${normalized.error}); falling back to DEFAULT_PLACE_ID`
+      );
+      placeId = DEFAULT_PLACE_ID;
+    }
     console.log('[CRON] google-reviews: Using place ID:', placeId);
 
     // Fetch from Google Places API

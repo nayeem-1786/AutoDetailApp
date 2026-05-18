@@ -1105,6 +1105,7 @@ src/lib/utils/compose-line-items.ts                     # Phase Mobile-1.7: disp
 src/lib/utils/format-address.ts
 src/lib/utils/format-channel.ts
 src/lib/utils/format.ts
+src/lib/utils/google-place-id.ts                                # Normalizer + validator for Google Place ID (handles double-encoded JSONB reads, URL paste, quote-stripping)
 src/lib/utils/idempotency.ts
 src/lib/utils/issue-types.ts
 src/lib/utils/job-zones.ts
@@ -1436,6 +1437,9 @@ Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job)
 - `supabase/migrations/20260518000000_truncate_appointment_scheduled_times_to_minute.sql` — Item 15f Phase 1 Layer 8e — idempotent one-time backfill: UPDATE appointments SET scheduled_*_time = date_trunc('minute', ...) WHERE seconds <> 0. Closes the walk-in legacy data drift.
 - `src/lib/appointments/__tests__/edit-flow.integration.test.ts` — Item 15f Phase 1 Layer 8f — 14 cases: end-to-end edit-via-POS joins (load → drain → save). Pins source=appointment + source=job (Option G4) happy paths, modifier-only / combined / all-services-removed edits, bogus UUID 404, status guard lockstep (`completed`/`cancelled`/`no_show`), drain↔cascade pricing parity.
 - `docs/dev/PHASE_1_TEST_COVERAGE.md` — Item 15f Phase 1 Layer 8f — Phase 1 test coverage matrix. Per-surface × test-type table, intentional gaps with rationale, file-to-test mapping for future maintenance. Updated whenever a Phase 1 contract changes.
+- `supabase/migrations/20260518193527_normalize_google_place_id.sql` — Idempotent one-time UPDATE that unwraps the double-encoded `business_settings.google_place_id` JSONB value. Scope: only the `google_place_id` key; WHERE clause matches the exact `"\"...\""` drift pattern.
+- `src/lib/utils/__tests__/google-place-id.test.ts` — 26 unit tests for the Place ID normalizer (double-encoded unwrap, URL extraction, quote-strip, trim, validation).
+- `src/app/api/admin/cms/homepage-settings/__tests__/place-id-guard.test.ts` — 7 integration tests for the PUT route's google_place_id 400 guard + normalization.
 
 Item 15g Layer 15g-iii (UI surfacing + checkout hydration for modifiers) additions:
 - `src/components/appointments/modifier-summary.tsx` — Shared `<ModifierSummary variant="admin|pos">` + `hasAppliedModifiers()` helper. Read-only summary of coupon / loyalty / manual discount on appointment-derived surfaces. Mounted on Admin Appointment dialog + Jobs card Services tile.

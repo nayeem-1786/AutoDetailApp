@@ -8,6 +8,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { getBusinessHours, formatBusinessHoursText } from '@/lib/data/business-hours';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { SITE_URL } from '@/lib/utils/constants';
+import { normalizeGooglePlaceId } from '@/lib/utils/google-place-id';
 
 const VALID_TYPES = ['store_info', 'product_link', 'category_link', 'service_page', 'booking_link', 'quote_link'] as const;
 type InfoType = (typeof VALID_TYPES)[number];
@@ -95,8 +96,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle();
         perf.mark('query:google_place_id', t);
 
-        const rawPlaceId = placeIdSetting?.value as string | undefined;
-        const placeId = rawPlaceId ? rawPlaceId.replace(/['"]/g, '').trim() : undefined;
+        const placeId = normalizeGooglePlaceId(placeIdSetting?.value).value;
         let mapsUrl: string;
         if (placeId) {
           mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(biz.name)}&query_place_id=${placeId}`;

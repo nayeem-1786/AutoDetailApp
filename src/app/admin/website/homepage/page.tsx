@@ -11,6 +11,10 @@ import { ImageUploadField } from '@/components/admin/image-upload-field';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import {
+  normalizeGooglePlaceId,
+  isValidGooglePlaceId,
+} from '@/lib/utils/google-place-id';
+import {
   Save, Plus, Trash2, GripVertical, ChevronUp, ChevronDown,
   Truck, Shield, Leaf, Star, Phone, Mail, MapPin, Clock, Globe,
   MessageCircle, Heart, Award, ThumbsUp, Calendar, CreditCard,
@@ -135,6 +139,12 @@ export default function HomepageSettingsPage() {
         toast.error('All differentiators must have a title');
         return;
       }
+    }
+
+    // Validate Place ID format if set
+    if (settings.googlePlaceId && !isValidGooglePlaceId(settings.googlePlaceId)) {
+      toast.error('Invalid Place ID format. It should start with ChIJ.');
+      return;
     }
 
     setSaving(true);
@@ -487,11 +497,36 @@ export default function HomepageSettingsPage() {
           </p>
           <Input
             value={settings.googlePlaceId}
-            onChange={(e) => setSettings((prev) => ({ ...prev, googlePlaceId: e.target.value }))}
-            placeholder="e.g. ChIJ..."
+            onChange={(e) =>
+              setSettings((prev) => ({
+                ...prev,
+                // Strip whitespace as the operator types — newlines/tabs
+                // from copy-paste leak through onChange.
+                googlePlaceId: e.target.value.replace(/\s/g, ''),
+              }))
+            }
+            onBlur={(e) => {
+              // Extract from full Google Maps / search URLs, unwrap quoted
+              // values, and trim. Only commit the rewrite if the normalizer
+              // produced a clean Place ID — otherwise leave the operator's
+              // raw input so they can see and fix what they typed.
+              const normalized = normalizeGooglePlaceId(e.target.value);
+              if (normalized.value && normalized.value !== e.target.value) {
+                setSettings((prev) => ({
+                  ...prev,
+                  googlePlaceId: normalized.value as string,
+                }));
+              }
+            }}
+            placeholder="e.g. ChIJ... (or paste a Google Maps URL)"
             className="font-mono text-sm"
             {...enterSubmitReviews}
           />
+          {settings.googlePlaceId && !isValidGooglePlaceId(settings.googlePlaceId) && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              Invalid format. Place IDs start with <code className="font-mono">ChIJ</code> followed by alphanumeric and underscore/dash characters.
+            </p>
+          )}
         </div>
       </div>
 
