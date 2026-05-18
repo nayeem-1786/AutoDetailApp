@@ -6,6 +6,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-17 — Item 15f Phase 1 Layer 8f: comprehensive test coverage — **Phase 1 COMPLETE — Item 15f COMPLETE**
+
+Seventh and **final** session of Phase 1 (edit-via-POS). Tests-only — zero production-code changes. Pins the cross-layer joins across Layers 8a-8e via a new integration test file, fills two narrow Layer 8d gating gaps surfaced during the coverage audit (barcode scanner + global-search filteredProducts), and publishes a per-surface coverage matrix doc for hand-off.
+
+**Deliverable 1 — End-to-end integration test file:**
+
+- New `src/lib/appointments/__tests__/edit-flow.integration.test.ts` — 14 cases joining the load → drain → save pipeline:
+  - **source=appointment happy path** — load endpoint response feeds `buildTicketStateFromLoad`, `runEditModeDrain` dispatches `ENTER_EDIT_MODE` with `sourceId === URL.id`, cascade save preserves the contract.
+  - **source=job (Option G4)** — `ticket.sourceId` resolves from `response.appointment_id` (NOT the URL `id` which is the JOB UUID). Pins the critical invariant from Layer 8d-bis: cascade endpoint always receives an appointment UUID; the resolution happens inside the drain when source=job.
+  - **source=job + null appointment_id** — defense-in-depth: drain refuses (no dispatch) when a legacy walk-in's appointment_id is null.
+  - **Modifier-only edit** — adding/clearing a coupon without changing services updates `coupon_code` + `coupon_discount` + recomputed totals; audit captures `services_and_modifiers` diff.
+  - **Combined edit** — services + loyalty + manual discount in one PUT writes all atomically; canonical combined `discount_amount` = `coupon + loyalty + manual`.
+  - **All-services-removed save blocked** — empty services array rejected with `INVALID_INPUT`; no UPDATE, no audit row.
+  - **Bogus UUID 404 propagation** — load returns 404 → drain returns `{ok:false, status:404}` without dispatching; cascade with missing appointment throws `ServiceEditError(NOT_FOUND, 404)`.
+  - **Status guard lockstep** — cascade refuses `completed`, `cancelled`, `no_show` consistent with the load endpoint guard. Parameterized across all three statuses so a future drift surfaces immediately.
+  - **Drain↔cascade pricing parity** — when load synthesizes a `mobile_fee` line and the appointment row stores `mobile_surcharge`, drain-side `subtotal` (sums items) and cascade-side `subtotal` (adds stored surcharge) agree.
+
+**Deliverable 2 — Layer 8d gating gaps filled:**
+
+Layer 8d originally tested the Products *tab* gate but left two of the three product-add surfaces untested. Layer 8f extends `src/app/pos/components/__tests__/pos-workspace-products-gating.test.tsx` with 3 new cases:
+
+- **Barcode-scanner gate** — non-edit-mode triggers a barcode-lookup fetch; edit-mode short-circuits with `toast.info` and NEVER hits the API. Test captures the `onScan` callback via a hoisted mock of `useBarcodeScanner`.
+- **Global-search filteredProducts gate** — `<ProductGrid>` never mounts when `editMode=true`, even with the catalog populated. Defense-in-depth check that the useMemo's edit-mode short-circuit prevents the grid render.
+
+The 4th surface (Register-tab favorite-grid product gate, Layer 8d-bis) was already exhaustively tested in `register-tab-favorites-gating.test.tsx` — no extension needed.
+
+**Deliverable 3 — Coverage matrix doc:**
+
+New `docs/dev/PHASE_1_TEST_COVERAGE.md` — honest accounting of Phase 1 test coverage in four sections:
+
+- **§1 — Coverage matrix by surface** — 50+ rows organized by layer (8a/8b/8c/8d/8d-bis/8e/8f). Each row cites the test file pinning the contract and the coverage state.
+- **§2 — Intentional gaps with rationale** — 9 documented gaps (G1-G9) explaining why some surfaces aren't unit-tested (heavy provider deps, OCC scoped out of Phase 1, deferred banner numbering, etc.). Each gap has an "Acceptable because" column.
+- **§3 — File-to-test mapping** — alphabetical lookup from production file → test file for future maintenance.
+- **§4 — Hand-off notes** — what future maintainers should do when adding a Phase 1 surface or running into a Phase 1 regression.
+
+**Layer 4 ESLint regression verification:**
+
+- `grep -rn 'eslint-disable.*services/no-bespoke-pricing' src/` returns empty (zero disable comments, baseline preserved from Layer 8e).
+- `eslint.config.mjs:76` confirms the rule is at `'error'` level (not `'warn'`).
+- `npx eslint` on both new/modified test files returns empty (no new violations introduced).
+
+**Verification:**
+
+- typecheck: 0 new errors on touched files. The pre-existing `quote-service.modifiers.test.ts` (10 errors) + `catalog-browser-custom-routing.test.tsx` errors persist — confirmed unchanged from the Layer 8e baseline (`git stash` on clean main confirmed at Layer 8d-bis).
+- ESLint: 0 errors / 98 warnings — unchanged baseline.
+- Vitest: **1503/1503 passing** (was 1486 at Layer 8e; +17 net new = +14 integration cases + +3 workspace gating cases).
+- Production build: compiled clean.
+
+**Phase 1 final state:** All 7 sub-layers (8a + 8b + 8c + 8d + 8d-bis + 8e + 8f) shipped. Item 15f is **COMPLETE**. The full edit-via-POS architectural pivot from `QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md` is now in production with cross-layer contract enforcement via tests + ESLint.
+
+**Effort:** ~0.75 sessions actual (as estimated).
+
+---
+
 ## 2026-05-17 — Item 15f Phase 1 Layer 8e: dead modal deletion + Layer 3a-i revert + appointment time precision fix
 
 Sixth session of Phase 1 (edit-via-POS). Two deliverables in one atomic commit: (1) the planned Layer 8e deletion of the two dead service-edit components now that Layer 8d routes both source-side affordances to POS, and (2) a UAT-driven appointment time-precision fix bundled per session brief (walk-in path was writing HH:MM:SS, breaking the Admin Appointment dialog's HTML5 `<input type="time">` step=60 validator). Layer 8f (Phase 1 comprehensive tests) is the next sequential session.

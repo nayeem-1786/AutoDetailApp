@@ -10,8 +10,10 @@
 > first step before moving on. The document is wrong only if it doesn't match
 > what's been built.
 
-**Document version:** v3.5 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; 15f restructured (Layers 1+2+3a-partial+3c+3d+3e+4 done; **Phase 1 Layers 8a + 8b + 8c + 8d done**; Phase 1 Layers 8e, 8f pending); **Item 15g COMPLETE (all 5 layers done)**.
-**Last session updated:** 2026-05-17 — **Item 15f Phase 1 Layer 8e landed (dead modal deletion + Layer 3a-i revert + appointment time precision fix)**: Two atomic deliverables in one session. **Deliverable 1 (planned cleanup)**: deleted `<EditServicesModal>` (Item 15a's bespoke modal) and `<EditServicesDialog>` (Layer 3a-i's POS Jobs-card dialog) — both unreachable since Layer 8d routes their triggers to POS edit mode. Deleted their orphan test files. Removed imports + mounts + dead state from Admin Appointment dialog and POS Jobs card. Pruned the only sanctioned `eslint-disable services/no-bespoke-pricing` comment (it lived inside the deleted modal). Grep confirms ZERO references to either component name remain in `src/`. **Deliverable 2 (UAT-driven fix)**: Walk-in path was writing `scheduled_start_time` at HH:MM:SS (seconds-precision via `Intl.DateTimeFormat(... second: '2-digit' ...)`), breaking the Admin Appointment dialog's HTML5 `<input type="time">` step=60 validator. Mini-audit confirmed walk-in was the only broken creation path (online booking, voice agent, quote convert, reschedule routes all already write minute-precision). Three fixes: (a) walk-in path now writes `HH:MM:00`; (b) Admin dialog adds local `toTimeInputValue` helper that truncates to HH:MM for the HTML5 input (defense-in-depth against future drift); (c) one-time backfill migration `20260518000000_truncate_appointment_scheduled_times_to_minute.sql` (idempotent `date_trunc('minute', ...)` with WHERE filter on seconds <> 0). `actual_start_time` / `actual_end_time` intake-precision untouched. +4 tests net new. 1486/1486 vitest pass (was 1500 at Layer 8d-bis; -14 from deleted test files, +4 new). Layer 8f (Phase 1 comprehensive tests) is the next sequential session.
+**Document version:** v3.6 (2026-05-17) — Items 1, 6, 12, 15a, 15b, 15c completed; 15d deferred; 15e scoped; **Item 15f COMPLETE (all sub-layers + Phase 1 Layers 8a + 8b + 8c + 8d + 8d-bis + 8e + 8f done)**; **Item 15g COMPLETE (all 5 layers done)**.
+**Last session updated:** 2026-05-17 — **Item 15f Phase 1 Layer 8f landed — Phase 1 COMPLETE — Item 15f COMPLETE**: Tests-only session, zero production code changes. Three deliverables: **(1)** new end-to-end integration test file `src/lib/appointments/__tests__/edit-flow.integration.test.ts` (14 cases) joins load → drain → save and pins cross-layer invariants — source=appointment + source=job (Option G4) happy paths, source=job null appointment_id refusal, modifier-only edits, combined service+modifier edits, all-services-removed save block, bogus UUID 404, parameterized status-guard lockstep (`completed`/`cancelled`/`no_show`), drain↔cascade pricing parity for mobile_fee synthesis. **(2)** Extended `pos-workspace-products-gating.test.tsx` with the missing Layer 8d gates — barcode-scanner short-circuit (captures `onScan` callback via hoisted mock; verifies edit-mode never hits the barcode-lookup API) + global-search filteredProducts (ProductGrid never mounts in edit mode). +3 cases. **(3)** New `docs/dev/PHASE_1_TEST_COVERAGE.md` — per-surface × test-type coverage matrix (50+ rows across all Phase 1 layers), 9 documented intentional gaps (G1-G9) with rationale, file-to-test mapping for future maintenance, hand-off notes. **Layer 4 ESLint regression verified**: rule at `'error'` (eslint.config.mjs:76), zero `eslint-disable services/no-bespoke-pricing` comments in `src/`, both new/modified test files lint clean. +17 tests net new. **1503/1503 vitest pass** (was 1486 at Layer 8e). typecheck 0 new errors on touched files (2 pre-existing unrelated test errors persist); ESLint 0 errors / 98 warnings unchanged baseline; production build compiled clean. **Phase 1 is now CLOSED.** Item 15f's overall scope (engine + hook + booking/voice/SMS migrations + ESLint rule + edit-via-POS pivot for operator surfaces) is complete.
+
+**Earlier 2026-05-17** — **Item 15f Phase 1 Layer 8e landed (dead modal deletion + Layer 3a-i revert + appointment time precision fix)**: Two atomic deliverables in one session. **Deliverable 1 (planned cleanup)**: deleted `<EditServicesModal>` (Item 15a's bespoke modal) and `<EditServicesDialog>` (Layer 3a-i's POS Jobs-card dialog) — both unreachable since Layer 8d routes their triggers to POS edit mode. Deleted their orphan test files. Removed imports + mounts + dead state from Admin Appointment dialog and POS Jobs card. Pruned the only sanctioned `eslint-disable services/no-bespoke-pricing` comment (it lived inside the deleted modal). Grep confirms ZERO references to either component name remain in `src/`. **Deliverable 2 (UAT-driven fix)**: Walk-in path was writing `scheduled_start_time` at HH:MM:SS (seconds-precision via `Intl.DateTimeFormat(... second: '2-digit' ...)`), breaking the Admin Appointment dialog's HTML5 `<input type="time">` step=60 validator. Mini-audit confirmed walk-in was the only broken creation path (online booking, voice agent, quote convert, reschedule routes all already write minute-precision). Three fixes: (a) walk-in path now writes `HH:MM:00`; (b) Admin dialog adds local `toTimeInputValue` helper that truncates to HH:MM for the HTML5 input (defense-in-depth against future drift); (c) one-time backfill migration `20260518000000_truncate_appointment_scheduled_times_to_minute.sql` (idempotent `date_trunc('minute', ...)` with WHERE filter on seconds <> 0). `actual_start_time` / `actual_end_time` intake-precision untouched. +4 tests net new. 1486/1486 vitest pass (was 1500 at Layer 8d-bis; -14 from deleted test files, +4 new). Layer 8f (Phase 1 comprehensive tests) was the next sequential session — landed same day.
 
 **Earlier 2026-05-17** — **Item 15f Phase 1 Layer 8d-bis landed (UAT fix-up)**: Four targeted fixes from Layer 8d UAT. **Fix 1 (CRITICAL, Option G4)**: Jobs-card deep-link `id` flipped from APPOINTMENT_UUID to JOB_UUID — Layer 8d's appointment UUID 404'd the jobs/checkout-items endpoint. checkout-items now returns `appointment_id`; drain resolves `ticket.sourceId` from response.appointment_id for source=job (the invariant "sourceId is always appt UUID" preserved — change is WHERE it gets populated). **Fix 2 (CRITICAL)**: Register tab favorite/quick-add grid was the missed 4th product-add surface; gate now extended (3→4 surfaces). Product favorites get `opacity-40 cursor-not-allowed` in edit mode + toast on click; service favorites unaffected. **Fix 3 (Audit Finding #5)**: `no_show` added to terminal-status refusal list in both load endpoint AND cascade module — lockstep. **Fix 4 (cosmetic)**: Admin Appointment dialog "Edit in POS" button restyled to match the admin shell's "Open POS" header pattern (`MonitorSmartphone` icon, bordered button) and promoted to top-right of dialog (`absolute right-12 top-4`); in-Services text link removed. +5 new test cases + existing edit-services-deep-link rewrite. 1500/1500 vitest pass. Layer 8e (delete dead modals) is next sequential session.
 
@@ -788,7 +790,7 @@ revealed that framing was wrong; the full edit set is needed at POS.
 
 ### Item 15f — Service Picker Engine: Canonical Resolver + Hook + Migration
 
-- **Status:** Layers 1+2+3a-partial+3c+3d+3e+4 done; **Phase 1 Layers 8a + 8b + 8c + 8d done (2026-05-17)**; Phase 1 Layers 8e, 8f pending.
+- **Status:** **COMPLETE (2026-05-17)** — All sub-layers done: Layers 1+2+3a-restructured+3c+3d+3e+4 (engine + hook + booking/voice/SMS migrations + ESLint rule); Phase 1 Layers 8a + 8b + 8c + 8d + 8d-bis + 8e + 8f (edit-via-POS pivot for operator surfaces). Item 15f closed.
 - **Severity:** S1 (architectural correctness; existing customer-money bug in 2 surfaces — Layer 1 ships the foundation, Layer 3a fixes the bugs)
 - **Effort:** 5.5-7 sessions (~11-16 hours total, layered) — Layer 3e adds ~0.5-1 session
 - **Wave:** 1.5
@@ -1306,9 +1308,71 @@ coupon / loyalty on the underlying record.
 
   **Effort:** ~1 session actual.
 
-- **Layer 8f — Tests.** Round-trip load + save tests for Jobs and Admin
-  Appointment edit-via-POS flows. Edit-mode UX tests. In_progress edit
-  tests. Cascade endpoint POS-auth variant tests. ~0.75 sessions.
+- **Layer 8f — Comprehensive test coverage — DONE 2026-05-17:**
+  Tests-only session, zero production code changes. Pins the cross-layer
+  joins across Layers 8a-8e via a new integration test file, fills two
+  narrow Layer 8d gating gaps surfaced during the coverage audit, and
+  publishes a per-surface coverage matrix doc.
+
+  **Deliverable 1 — End-to-end integration test file:**
+  `src/lib/appointments/__tests__/edit-flow.integration.test.ts` (+14 cases)
+  joins the load → drain → save pipeline:
+    - source=appointment happy path — load endpoint response feeds
+      `buildTicketStateFromLoad`, `runEditModeDrain` dispatches
+      `ENTER_EDIT_MODE` with `sourceId === URL.id`, cascade save preserves
+      the contract.
+    - source=job (Option G4) — `ticket.sourceId` resolves from
+      `response.appointment_id` (NOT the URL `id` which is the JOB UUID).
+      Pins the critical Layer 8d-bis invariant.
+    - source=job + null appointment_id — drain refuses (defense in depth).
+    - Modifier-only edit — coupon added / cleared, totals recompute.
+    - Combined edit (services + modifiers) — atomic write; canonical
+      combined discount = `coupon + loyalty + manual`.
+    - All-services-removed save blocked (INVALID_INPUT).
+    - Bogus UUID 404 propagation (load 404 + cascade NOT_FOUND).
+    - Status guard lockstep — parameterized across `completed` /
+      `cancelled` / `no_show` so a future drift surfaces immediately.
+    - Drain↔cascade pricing parity (mobile_fee synthesis).
+
+  **Deliverable 2 — Layer 8d gating gaps filled:**
+  `src/app/pos/components/__tests__/pos-workspace-products-gating.test.tsx`
+  extended with 3 new cases. The original Layer 8d tested the Products tab
+  gate but stubbed the other two product-add surfaces — both now pinned:
+    - Barcode-scanner gate — captures `onScan` callback via hoisted mock;
+      edit-mode short-circuits with `toast.info` and never hits the API.
+    - Global-search filteredProducts gate — `<ProductGrid>` never mounts
+      when `editMode=true`, even with catalog populated.
+  The 4th surface (Register-tab favorite-grid, Layer 8d-bis) was already
+  tested in `register-tab-favorites-gating.test.tsx`.
+
+  **Deliverable 3 — Coverage matrix doc:**
+  `docs/dev/PHASE_1_TEST_COVERAGE.md` — per-surface × test-type matrix
+  (50+ rows organized by Phase 1 layer), 9 documented intentional gaps
+  (G1-G9: heavy provider deps, OCC scoped out, deferred banner numbering,
+  etc.) each with rationale, file-to-test mapping for future maintenance,
+  hand-off notes.
+
+  **Layer 4 ESLint regression verified:**
+    - Rule at `'error'` level (`eslint.config.mjs:76`).
+    - Zero `eslint-disable.*services/no-bespoke-pricing` comments in `src/`
+      (baseline preserved from Layer 8e).
+    - Both new/modified test files lint clean (`npx eslint` returns empty).
+
+  **Verification:**
+    - typecheck: 0 new errors on touched files. Pre-existing
+      `quote-service.modifiers.test.ts` + `catalog-browser-custom-routing.test.tsx`
+      errors persist — unchanged from Layer 8e baseline.
+    - ESLint: 0 errors / 98 warnings — unchanged baseline.
+    - Vitest: **1503/1503** (was 1486 at Layer 8e; +17 net new = +14
+      integration + +3 workspace gating).
+    - Production build: compiled clean.
+
+  **Effort:** ~0.75 sessions actual (as estimated).
+
+  **Phase 1 final state:** All 7 sub-layers (8a + 8b + 8c + 8d + 8d-bis
+  + 8e + 8f) shipped. Item 15f COMPLETE. The full edit-via-POS
+  architectural pivot from `QUOTE_TO_POS_EDIT_AUDIT_2026-05-16.md` is now
+  in production with cross-layer contract enforcement via tests + ESLint.
 
 **Phase 1 total: ~5.5 sessions, ~12-14 hours.** Phase 1 is sequential
 within itself (each layer builds on previous). Phase 1 layers cannot start

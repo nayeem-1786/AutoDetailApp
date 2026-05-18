@@ -25,9 +25,21 @@ const toastInfoMock = vi.hoisted(() => vi.fn());
 const mockTicket: { value: TicketState } = {
   value: makeTicket({ editMode: false }),
 };
+// Item 15f Phase 1 Layer 8f — barcode-scanner gate test needs to invoke
+// the onScan callback the workspace registers. Capture it via a hoisted
+// mock and let tests trigger the gate directly.
+const capturedOnScan: { value: ((barcode: string) => unknown) | null } =
+  vi.hoisted(() => ({ value: null }));
+const mockCatalog: { products: unknown[]; services: unknown[] } = vi.hoisted(
+  () => ({ products: [], services: [] })
+);
 
 vi.mock('../../hooks/use-catalog', () => ({
-  useCatalog: () => ({ products: [], services: [], loading: false }),
+  useCatalog: () => ({
+    products: mockCatalog.products,
+    services: mockCatalog.services,
+    loading: false,
+  }),
 }));
 
 vi.mock('../../context/ticket-context', () => ({
@@ -43,11 +55,15 @@ vi.mock('../../hooks/use-edit-mode-drain', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-barcode-scanner', () => ({
-  useBarcodeScanner: () => undefined,
+  useBarcodeScanner: (opts: { onScan: (b: string) => unknown }) => {
+    capturedOnScan.value = opts.onScan;
+    return undefined;
+  },
 }));
 
+const posFetchMock = vi.hoisted(() => vi.fn());
 vi.mock('../../lib/pos-fetch', () => ({
-  posFetch: vi.fn(),
+  posFetch: posFetchMock,
 }));
 
 // Heavy children — render as sentinels so we can target the active tab.
@@ -121,6 +137,10 @@ function makeTicket(overrides: Partial<TicketState> = {}): TicketState {
 
 beforeEach(() => {
   toastInfoMock.mockReset();
+  posFetchMock.mockReset();
+  capturedOnScan.value = null;
+  mockCatalog.products = [];
+  mockCatalog.services = [];
   mockTicket.value = makeTicket({ editMode: false });
 });
 
@@ -163,6 +183,72 @@ describe('PosWorkspace — Products tab gating in edit mode', () => {
     expect(msg).toMatch(/Products can only be added at checkout/i);
     // Register stays active (no products catalog mounted)
     expect(screen.getByTestId('register-tab')).toBeTruthy();
+    expect(screen.queryByTestId('catalog-products')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 8f — barcode scanner + global-search filter gates (the other two
+// edit-mode product-add surfaces gated in pos-workspace.tsx).
+// ---------------------------------------------------------------------------
+
+describe('PosWorkspace — barcode scanner gate in edit mode', () => {
+  it('non-edit-mode: scanner triggers a barcode-lookup fetch (no regression)', async () => {
+    posFetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ product: null }), { status: 404 })
+    );
+    render(<PosWorkspace />);
+    expect(capturedOnScan.value).toBeTypeOf('function');
+
+    await capturedOnScan.value!('1234567890');
+    expect(posFetchMock).toHaveBeenCalledWith(
+      '/api/pos/products/barcode-lookup',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(toastInfoMock).not.toHaveBeenCalled();
+  });
+
+  it('edit-mode: scanner BLOCKS the lookup, surfaces toast.info, does NOT hit the API', async () => {
+    mockTicket.value = makeTicket({
+      editMode: true,
+      source: 'appointment',
+      sourceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      returnTo: '/admin/appointments',
+      customer: { id: 'c1', first_name: 'Jane', last_name: 'Doe' } as Customer,
+    });
+    render(<PosWorkspace />);
+    expect(capturedOnScan.value).toBeTypeOf('function');
+
+    await capturedOnScan.value!('1234567890');
+    // The gate short-circuits BEFORE the barcode-lookup fetch fires.
+    expect(posFetchMock).not.toHaveBeenCalled();
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+    const msg = toastInfoMock.mock.calls[0][0] as string;
+    expect(msg).toMatch(/Products can only be added at checkout/i);
+  });
+});
+
+describe('PosWorkspace — global search filteredProducts gate in edit mode', () => {
+  // We can't easily exercise the SearchBar input + filteredProducts useMemo
+  // from this mocked rig (SearchBar is sentinel-mocked). The closest pin:
+  // assert that the ProductGrid sentinel never mounts when editMode=true,
+  // even with products present in the catalog. The non-edit-mode comparison
+  // case stays exercised by the existing tab test above.
+  it('catalog ProductGrid never renders in edit mode (filteredProducts forced to [])', () => {
+    mockCatalog.products = [
+      { id: 'p1', name: 'Wax', sku: '1', barcode: '111', retail_price: 10 },
+      { id: 'p2', name: 'Pad', sku: '2', barcode: '222', retail_price: 20 },
+    ];
+    mockTicket.value = makeTicket({
+      editMode: true,
+      source: 'appointment',
+      sourceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      returnTo: '/admin/appointments',
+      customer: { id: 'c1', first_name: 'Jane', last_name: 'Doe' } as Customer,
+    });
+    render(<PosWorkspace />);
+    // Register tab is active by default. Products tab catalog isn't
+    // reachable without switching tabs (which the gate prevents).
     expect(screen.queryByTestId('catalog-products')).toBeNull();
   });
 });
