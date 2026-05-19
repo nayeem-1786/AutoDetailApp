@@ -9,6 +9,7 @@ import {
   type CartItem,
   type CustomerData,
 } from '@/lib/utils/coupon-helpers';
+import { getCouponEnforcementMode } from '@/lib/utils/coupon-enforcement';
 
 interface PromotionItem {
   id: string;
@@ -128,18 +129,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fetch enforcement mode
-    const { data: enforcementSetting } = await supabase
-      .from('business_settings')
-      .select('value')
-      .eq('key', 'coupon_type_enforcement')
-      .single();
-
-    const enforcementMode = (
-      typeof enforcementSetting?.value === 'string'
-        ? enforcementSetting.value
-        : 'soft'
-    ) as 'soft' | 'hard';
+    // Fetch enforcement mode via canonical helper. Was previously an
+    // un-compensated raw read which silently treated legacy double-encoded
+    // `'"hard"'` values as soft — causing hard-restricted coupons to
+    // appear in the eligible list under hard mode (cross-consumer drift
+    // with pos/coupons/validate). Audit:
+    // docs/dev/AUDIT_VOICE_POLL_AND_COUPON_ENFORCEMENT_2026-05-19.md.
+    const enforcementMode = await getCouponEnforcementMode(supabase);
 
     const forYou: PromotionItem[] = [];
     const eligible: PromotionItem[] = [];

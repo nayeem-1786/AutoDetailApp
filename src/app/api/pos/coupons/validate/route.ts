@@ -7,6 +7,7 @@ import {
   type CartItem,
   type CouponRewardRow,
 } from '@/lib/utils/coupon-helpers';
+import { getCouponEnforcementMode } from '@/lib/utils/coupon-enforcement';
 
 export async function POST(request: NextRequest) {
   try {
@@ -195,17 +196,11 @@ export async function POST(request: NextRequest) {
       if (typeMismatch) {
         const typeLabel = typeLabels[coupon.target_customer_type] || coupon.target_customer_type;
 
-        // Check enforcement mode
-        const { data: enforcementSetting } = await supabase
-          .from('business_settings')
-          .select('value')
-          .eq('key', 'coupon_type_enforcement')
-          .single();
-
-        const rawValue = enforcementSetting?.value;
-        const enforcementMode = typeof rawValue === 'string'
-          ? rawValue.replace(/"/g, '')
-          : 'soft';
+        // Check enforcement mode via canonical helper (defensive unwrap
+        // for any legacy double-encoded row). Was previously an inline
+        // `replace(/"/g, '')` strip — centralized to avoid drift with the
+        // other consumer at pos/promotions/available/route.ts.
+        const enforcementMode = await getCouponEnforcementMode(supabase);
 
         if (enforcementMode === 'hard') {
           return NextResponse.json(
