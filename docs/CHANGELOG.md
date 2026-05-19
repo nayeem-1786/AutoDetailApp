@@ -6,6 +6,66 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — SMS AI v2 Layer 3a: agent runner core + Anthropic SDK thin client
+
+Workstream A, sub-session of Layer 3. Ships the Anthropic SDK dependency, the thin client wrapper, and the agent runner that constructs the API call, runs the tool-use loop, caches the system prompt, respects the 6-iteration cap, and handles end_turn + API errors. The tool dispatcher itself is a STUB (Layer 3b replaces its body) — every tool call returns `is_error: true` so the round-trip mechanics can be exercised end-to-end without the real endpoints being wired up. The Twilio webhook is NOT yet calling this runner (that's Layer 4).
+
+**New:**
+- `@anthropic-ai/sdk` ^0.97.1 added to `dependencies`.
+- `src/lib/anthropic/client.ts` — `MODELS` const (`SONNET = 'claude-sonnet-4-6'`, `HAIKU = 'claude-haiku-4-5'`) + lazy-initialized `getAnthropicClient()` singleton. Throws on missing `ANTHROPIC_API_KEY`. No retry/timeout overrides at the client level — the runner is the authority on per-call deadline and retry policy (audit §4.4: NO library-level retries; the model decides based on `is_error` tool_result).
+- `src/lib/sms-ai/agent-runner.ts` — `runSmsAiV2Agent({...})` public surface. Substitutes `{CUSTOMER_CONTEXT}` in the cached system prompt with the rendered `getCustomerContext()` bundle. Caches the substituted system block via `cache_control: { type: 'ephemeral' }`. Loops up to 6 tool-use round-trips; on cap, makes ONE final tools-omitted call with an injected "Tool budget exhausted" nudge. On `end_turn` returns the joined text; on unknown stop_reason returns `null` + `stopReason: 'unknown'`; on SDK throw returns `null` + `stopReason: 'api_error'` with the error message. Logs one bracketed-prefix line per iteration plus a trailing summary (no JSON-structured logging — matches existing convention).
+- `src/lib/sms-ai/tool-dispatcher.ts` — STUB returning `{ content: 'Tool dispatch not yet implemented (Layer 3b)', isError: true }` for every call. Public signature `dispatchTool({ name, input })` MUST NOT change when Layer 3b lands; only the body is replaced.
+- Tests: `src/lib/anthropic/__tests__/client.test.ts` (3 cases — throws on missing env, returns singleton, MODELS non-empty; uses `// @vitest-environment node` because the SDK refuses to instantiate in jsdom default). `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` (1 case — stub returns `is_error` for all 10 tool names + arbitrary names). `src/lib/sms-ai/__tests__/agent-runner.test.ts` (9 cases — happy path, one tool round-trip, 6-iter cap forces tools-omitted final call, prompt-caching wire shape, `{CUSTOMER_CONTEXT}` substitution, API error, unknown stop_reason, history mapping with `sender_type` rules, and idempotent inbound append). Establishes the first Anthropic-SDK mock pattern in the codebase (discovery §F flagged the gap).
+
+**Modified — typecheck cleanup (29 → 27):**
+- `src/app/api/voice-agent/notify-staff/__tests__/route.test.ts:28` — re-typed `notifyStaffMock` with `vi.fn<typeof notifyStaff>()` so the spread-into-mock at line 42 satisfies arity.
+- `src/lib/services/__tests__/staff-notification.test.ts:21` — re-typed `sendSmsMock` with `vi.fn<typeof sendSms>()` so the mock's inferred return type includes the `{success: false; error: string}` failure variant the line-299 `mockImplementationOnce` returns.
+
+The 27 pre-existing errors in `src/lib/quotes/__tests__/quote-service.modifiers.test.ts` are explicitly out of scope (separate follow-up).
+
+**Verification gates (all green):**
+- `npx tsc --noEmit | grep -c "error TS"` = **27** (was 29).
+- `npm run lint` = 0 errors, 98 warnings (baseline preserved).
+- `npx vitest run src/lib/sms-ai src/lib/anthropic` = 79/79 pass.
+- `npx vitest run` (full suite) = 1723/1723 pass (1694 baseline + 29 new cases).
+- `rm -rf .next && npm run build` = clean (787 static pages).
+
+**Out of scope (DO NOT do in 3a):**
+- Real tool dispatcher (Layer 3b).
+- Twilio webhook integration (Layer 4).
+- Specialty-pivot deletion (Layer 5).
+- Migration of the 9 existing Anthropic-fetch sites to the new thin client (separate follow-up).
+
+**Branch:** `feat/sms-ai-v2-layer-3a-runner` — pushed for review, not merged. Next session: Layer 3b (real tool dispatcher).
+
+---
+
+## 2026-05-19 — SMS AI v2 Layer 3 discovery audit (read-only)
+
+Audit-only session. Zero production-code changes. Discovery doc consolidating every input Layer 3 (agent runner) needs to draft from — Layer 1+2 foundation files, the two prior audit docs (autoreply + design), the Anthropic SDK survey, the Twilio webhook anatomy, the logging convention, the test-mock conventions, the typecheck baseline, the voice-agent endpoint catalogue, and a per-tool latency classification table.
+
+**Deliverable:** `docs/dev/SMS_AI_V2_LAYER_3_DISCOVERY.md` — TL;DR (locked decisions + open questions + foundation file inventory + tool latency table + logger convention + typecheck baseline + follow-ups) followed by §A through §H.
+
+**Key facts surfaced:**
+- `@anthropic-ai/sdk` is NOT installed (10 existing Anthropic-fetch sites use direct `fetch`); Layer 3 brings the dependency.
+- Zero `cache_control` blocks anywhere in the codebase; Layer 3 introduces prompt caching.
+- Zero `AbortController` / `signal:` parameter on any voice-agent tool — no tool carries its own deadline today, so Layer 3's per-tool timeout policy will be the sole latency guard.
+- Specialty-pivot block to delete in Layer 5: `route.ts:612-674` (trigger: customer with `vehicles.size_class IN ('exotic','classic')`; sends hardcoded reply; sets `is_ai_enabled = false` at line 672).
+- `is_ai_enabled` is read at `route.ts:483` inside `shouldAiReply` and NEVER re-checked before the outbound send at lines 916-941 — Layer 4 fix surface.
+- Logger convention: bracketed-prefix `console.*` (no canonical logger module; not structured JSON; no trace IDs).
+- Typecheck baseline = 29 errors (27 pre-existing in `quote-service.modifiers.test.ts` + 2 CC-introduced during Layer 1+2: `vi.fn` arity in `notify-staff/__tests__/route.test.ts:42` and `sendSmsMock` type in `staff-notification.test.ts:299`). Roadmap line 127 schedules cleanup for Layer 3 start.
+- `staff_notification_inbound_specialty` template row currently exists in DB, `is_active=true`, with two configured `recipient_phones` (`+14242370913`, `+14243637450`) — NOT the NULL fallback state the v1 audit §3.2 highlighted; nevertheless Layer 5 deletes the row as part of v2 cutover.
+
+**Locked decisions (from Layer 1+2 commits + audit §7 recommendations):** replace not coexist (v2 is THE SMS AI path post-Layer-5); full 10 tools; 7 notify_staff reasons including `human_handoff`; transactions capped to last 5 for known customers only; 20-message history cap (down from 100); voice-agent endpoints reused as-is via shared Bearer key; return-early Twilio pattern at Layer 4; channel attribution `'sms_ai'` (version-free).
+
+**Still open for Layer 3:** Anthropic model selection (Sonnet 4.6 + Haiku 4.5 audit-recommended but not encoded); whether `notify_staff` tool should flip `is_ai_enabled = false` as a side effect; `sender_type` overload (whether tool-driven sends get distinct value).
+
+**Constraints honored:** no `src/` changes; no migrations; no `package.json` changes; no Layer 3 design recommendations in the deliverable (facts only); the 2 Layer 1+2 typecheck errors deliberately NOT fixed (scheduled for Layer 3 start). Lint 0 errors / 98 warnings (unchanged baseline). Typecheck error count unchanged at 29.
+
+**Branch:** `audit/sms-ai-v2-layer-3-discovery` — pushed for review, not merged. Next session: Layer 3 implementation prompt drafted from this discovery doc + the user's review of the open questions.
+
+---
+
 ## 2026-05-18 — SMS AI v2 Layer 1+2: shared helpers + tool definitions + v2 system prompt
 
 Foundation for SMS AI v2 (tool-using Anthropic agent that will replace the single-shot SMS auto-responder). This commit ships the static foundation; the agent loop runner (Layer 3), the webhook integration (Layer 4), and the legacy pivot deletion (Layer 5) come in separate sessions. **Zero production-behavior changes from this session** — the Twilio webhook handler keeps running the current single-shot path until Layer 4 wires v2 in.

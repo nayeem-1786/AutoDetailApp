@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { sendSms } from '@/lib/utils/sms';
 
 import {
   STAFF_NOTIFICATION_REASONS,
@@ -18,8 +19,8 @@ interface MockTemplateResult {
   missingVars?: string[];
 }
 
-const sendSmsMock = vi.fn(async (_to: string, _body: string) => ({
-  success: true as const,
+const sendSmsMock = vi.fn<typeof sendSms>(async () => ({
+  success: true,
   sid: 'mock-sid',
 }));
 

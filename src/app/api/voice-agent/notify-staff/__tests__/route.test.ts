@@ -25,8 +25,10 @@ vi.mock('@/lib/auth/api-key', () => ({
   }),
 }));
 
-const notifyStaffMock = vi.fn(async () => ({
-  success: true as boolean,
+const notifyStaffMock = vi.fn<
+  typeof import('@/lib/services/staff-notification').notifyStaff
+>(async () => ({
+  success: true,
   recipientsNotified: 1,
   errors: [] as string[],
   templateInactive: false as boolean | undefined,
