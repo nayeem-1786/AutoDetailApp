@@ -989,13 +989,13 @@ src/lib/sms/__tests__/render-sms-template-contract.test.ts
 src/lib/sms-ai/feature-flag.ts                    # shouldUseSmsAiV2 pure router + loadSmsAiV2Flags DB reader. Three flags: sms_ai_v2_kill_switch, sms_ai_v2_enabled_phones, sms_ai_v2_globally_enabled. Safe default = legacy.
 src/lib/sms-ai/tools.ts                           # 10 Anthropic tool definitions (declarative; no runner). Side-effecting tools carry "Only call when explicitly confirmed" gates. TOOL_NAMES const for type-safe runtime dispatch.
 src/lib/sms-ai/system-prompt.ts                   # buildV2SystemPrompt — 8 sections: identity, channel rules, critical rules, tool guide, escalation guide, conversation flow, context placeholder, grounding. Structured for prompt caching (audit §4.5). {CUSTOMER_CONTEXT} token left un-substituted for runner injection.
-src/lib/sms-ai/agent-runner.ts                    # SMS AI v2 Layer 3a — runSmsAiV2Agent() agent runner core. Builds cached system prompt (cache_control: ephemeral), substitutes {CUSTOMER_CONTEXT}, loops up to 6 tool-use round-trips, forces tools-omitted final call on iteration cap, handles end_turn / unknown stop_reason / APIError. Dispatches each tool_use via tool-dispatcher (stub in 3a).
-src/lib/sms-ai/tool-dispatcher.ts                 # SMS AI v2 Layer 3a — dispatchTool STUB returning {isError:true, content:'Tool dispatch not yet implemented (Layer 3b)'} for every call. Layer 3b replaces this file's body with real per-tool routing; public signature is the 3a/3b contract.
+src/lib/sms-ai/agent-runner.ts                    # SMS AI v2 Layer 3a + 3b — runSmsAiV2Agent() agent runner core. Builds cached system prompt (cache_control: ephemeral), substitutes {CUSTOMER_CONTEXT}, loops up to 6 tool-use round-trips, forces tools-omitted final call on iteration cap, handles end_turn / unknown stop_reason / APIError. Layer 3b: parallel tool dispatch via Promise.all (tool_result blocks reassembled in original order); per-inbound dispatcher reset via __resetForAgentRun().
+src/lib/sms-ai/tool-dispatcher.ts                 # SMS AI v2 Layer 3b — real dispatcher. 9 HTTP-wrapped tools call /api/voice-agent/* via shared voiceAgentFetch (AbortController + per-tool timeout 5s read/classify | 10s SLOW); notify_staff in-process via notifyStaff() (source:'sms_ai_v2') + Promise.race for timeout. Bearer key cached per agent run; reset via __resetForAgentRun() at the start of every inbound (operator key rotation takes effect on next message). NO retries (audit §4.4). DispatchToolResult contract preserved from 3a.
 src/lib/sms-ai/__tests__/feature-flag.test.ts     # 22 tests — kill-switch precedence, global enable, allowlist (E.164 normalization symmetric), DB reader coercion + safe defaults on missing keys.
 src/lib/sms-ai/__tests__/tools.test.ts            # 18 tests — schema validity, name uniqueness, required fields, side-effect-tool confirmation gate, enum coverage (info types, reason codes).
 src/lib/sms-ai/__tests__/system-prompt.test.ts    # 16 tests — interpolation, 8 sections present, all 10 tools named, all 7 reasons listed, STOP/UNSUBSCRIBE rule, deterministic output.
-src/lib/sms-ai/__tests__/agent-runner.test.ts     # 9 tests (Layer 3a) — happy path end_turn, one tool round-trip, 6-iter cap forces tools-omitted final, prompt-caching wire shape, {CUSTOMER_CONTEXT} substitution, API error, unknown stop_reason, history mapping (customer→user/staff+ai→assistant/system dropped), idempotent inbound append. Establishes the first Anthropic-SDK mock pattern (discovery §F gap).
-src/lib/sms-ai/__tests__/tool-dispatcher.test.ts  # 1 test (Layer 3a) — stub returns isError:true for every tool name.
+src/lib/sms-ai/__tests__/agent-runner.test.ts     # 13 tests (Layer 3a 9 + Layer 3b 4) — happy path end_turn, one tool round-trip, 6-iter cap forces tools-omitted final, prompt-caching wire shape, {CUSTOMER_CONTEXT} substitution, API error, unknown stop_reason, history mapping (customer→user/staff+ai→assistant/system dropped), idempotent inbound append, parallel dispatch concurrency proof, mixed success+failure pass-through, notify_staff input forwarded unmodified, dispatcher reset called once per run. Establishes the first Anthropic-SDK mock pattern (discovery §F gap).
+src/lib/sms-ai/__tests__/tool-dispatcher.test.ts  # 28 tests (Layer 3b) — per-tool routing for all 10 tools (URL/method/body/header), missing-input guards, HTTP non-2xx + thrown fetch, fake-timer timeout pre-emption (HTTP + in-process), notify_staff success/failure mapping (success:false → isError:true), Bearer-key load failures (4 cases), cache lifecycle.
 
 # Anthropic SDK thin client (Layer 3a — one place for SDK construction; future migration target for the 9 existing direct-fetch sites)
 src/lib/anthropic/client.ts                       # MODELS const (SONNET = 'claude-sonnet-4-6', HAIKU = 'claude-haiku-4-5' dateless aliases per workspace canonical IDs) + lazy-init getAnthropicClient() singleton. Throws on missing ANTHROPIC_API_KEY. No retry/timeout overrides — runner controls per-call deadline.
@@ -1474,7 +1474,7 @@ SMS AI v2 Layer 1+2 additions (foundation; no runner + no webhook integration ye
 - `src/lib/sms-ai/tools.ts` — 10 declarative Anthropic tool definitions.
 - `src/lib/sms-ai/system-prompt.ts` — buildV2SystemPrompt with {CUSTOMER_CONTEXT} placeholder.
 
-SMS AI v2 Layer 3a additions (agent runner core + Anthropic SDK thin client; tool dispatcher body is a stub — Layer 3b replaces it):
+SMS AI v2 Layer 3a additions (agent runner core + Anthropic SDK thin client; tool dispatcher body is a stub — replaced by Layer 3b):
 - `src/lib/anthropic/client.ts` — MODELS const + lazy-init getAnthropicClient() singleton (Anthropic SDK thin wrapper).
 - `src/lib/anthropic/__tests__/client.test.ts` — 3 tests; uses `// @vitest-environment node` because SDK refuses jsdom default.
 - `src/lib/sms-ai/agent-runner.ts` — runSmsAiV2Agent() core: caches system prompt, substitutes {CUSTOMER_CONTEXT}, 6-iter tool-use loop, forced tools-omitted final on cap, APIError handling.
@@ -1482,6 +1482,12 @@ SMS AI v2 Layer 3a additions (agent runner core + Anthropic SDK thin client; too
 - `src/lib/sms-ai/__tests__/agent-runner.test.ts` — 9 tests establishing the first Anthropic-SDK mock pattern in the codebase.
 - `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` — 1 test pinning the stub contract.
 - `package.json` — adds `@anthropic-ai/sdk` ^0.97.1 to `dependencies`.
+
+SMS AI v2 Layer 3b additions (tool dispatcher real routing + parallel agent dispatch — Layer 3 COMPLETE):
+- `src/lib/sms-ai/tool-dispatcher.ts` — full body replacement. 9 HTTP-wrapped tools via shared voiceAgentFetch + per-tool timeouts (5s read/classify | 10s SLOW); notify_staff in-process. NEW export `__resetForAgentRun()` for per-inbound Bearer-key cache reset.
+- `src/lib/sms-ai/agent-runner.ts` — serial dispatch loop replaced with Promise.all parallel dispatch; original-order tool_result reassembly; calls __resetForAgentRun() at start of every inbound.
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` — expanded 1 → 28 cases (per-tool routing, timeouts, HTTP/in-process failures, key-load failures, cache lifecycle).
+- `src/lib/sms-ai/__tests__/agent-runner.test.ts` — 4 new cases (parallel concurrency, mixed success+failure, notify_staff forwarding, dispatcher reset).
 
 Item 15g Layer 15g-iii (UI surfacing + checkout hydration for modifiers) additions:
 - `src/components/appointments/modifier-summary.tsx` — Shared `<ModifierSummary variant="admin|pos">` + `hasAppliedModifiers()` helper. Read-only summary of coupon / loyalty / manual discount on appointment-derived surfaces. Mounted on Admin Appointment dialog + Jobs card Services tile.

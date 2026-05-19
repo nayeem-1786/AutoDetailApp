@@ -6,6 +6,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — SMS AI v2 Layer 3b: tool dispatcher (parallel execution + per-tool timeouts) — Layer 3 complete
+
+Workstream A. Sequential successor to Layer 3a. Replaces Layer 3a's stub at `src/lib/sms-ai/tool-dispatcher.ts` with real routing for all 10 tools; wires `Promise.all` parallel dispatch in `agent-runner.ts`; adds per-inbound Bearer-key cache reset and per-tool timeout budgets. Comprehensive failure-mode test coverage. Layer 4 (Twilio webhook routing) is now unblocked.
+
+**Modified — `src/lib/sms-ai/tool-dispatcher.ts` (full body replacement):**
+- 9 HTTP-wrapped tools call `/api/voice-agent/*` via a shared `voiceAgentFetch(path, init, timeoutMs, bearerKey)` helper with `AbortController` + per-tool timeout (5s for read/classify tools, 10s for SLOW + MEDIUM-SLOW classes per audit §4.3 latency table).
+- `notify_staff` calls `notifyStaff()` in-process with `source: 'sms_ai_v2'` — skips the HTTP wrapper entirely. Discovery §7 follow-up: the voice-agent endpoint's 200 + `success:false` no-retry contract is irrelevant inside the SMS-AI loop. In-process call wrapped with `Promise.race` against the same 10s budget (helper has no abort signal). A `success:false` result (template inactive, no recipients, partial Twilio failures) bubbles up as `isError:true` so the model knows the handoff didn't land.
+- Bearer key loaded once per agent run from `business_settings.voice_agent_api_key` (strips JSONB-wrap quotes per `validateApiKey` convention). Per-run cache, reset by the runner at the start of each inbound via the new `__resetForAgentRun()` export — operator key rotation takes effect on the next inbound without a process restart.
+- Layer 3a contract preserved: `DispatchToolResult = { content: string; isError: boolean }` — no `latencyMs` field. Runner clocks dispatcher calls externally.
+- NO retries (audit §4.4). On HTTP non-2xx returns `Tool call returned <status>: <body slice 200>`; on throw returns `Tool call failed: <message>`; on timeout returns `Tool call timed out after <ms>ms`. The model decides whether to give up, escalate via `notify_staff`, or try a different tool.
+- Exhaustiveness guard: `switch (name)` `default` branch is a `never` assignment so any new tool added to `SmsAiV2ToolName` without a case fails to compile.
+- One bracketed-prefix `console.log` per dispatch: `[SmsAiV2 dispatch] tool=<name> latency=<ms> error=<bool>`.
+
+**Modified — `src/lib/sms-ai/agent-runner.ts`:**
+- Replaces the serial `for (const block of toolUseBlocks)` dispatch loop with `Promise.all(...)` per audit §4.3. Tool-result blocks are reassembled in original `tool_use` order so the model's input/output mapping is preserved.
+- New per-iteration log line includes parallel-dispatch count + aggregate latency + error count: `[SmsAiV2 runner] iter=N conv=<id> dispatched=K parallel_latency=<ms>ms errors=<count>`.
+- Calls `__resetForAgentRun()` on the dispatcher at the start of each `runSmsAiV2Agent(...)` invocation.
+- All Layer 3a runner behavior preserved (caching, iteration cap, end_turn / unknown / api_error handling, history mapping).
+
+**Tests (31 new cases, 4 existing files updated):**
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` — expanded from 1 stub case to 28 comprehensive cases: per-tool routing for all 10 tools with expected URL/method/body/header shape; missing-input guards (5 cases); HTTP non-2xx + thrown fetch (2 cases); fake-timer-driven timeout pre-emption for HTTP + in-process (2 cases); notify_staff success/failure mapping (2 cases); Bearer-key load failures (4 cases — null value, admin client throws, in-process notify_staff still works, JSONB-quote stripping); cache lifecycle (2 cases — caches across calls, `__resetForAgentRun` clears).
+- `src/lib/sms-ai/__tests__/agent-runner.test.ts` — added 4 new cases on top of the 9 from Layer 3a: parallel dispatch concurrency proof (wall-clock < sum-of-delays), mixed success+failure pass-through, notify_staff input shape forwarded to the dispatcher, dispatcher-reset called once per run. Mocks the new `__resetForAgentRun` export so the existing 9 tests still pass.
+
+**Verification gates (all green):**
+- `npx tsc --noEmit | grep -c "error TS"` = **27** (unchanged from Layer 3a end).
+- `npm run lint` = 0 errors, 98 warnings (baseline preserved).
+- `npx vitest run src/lib/sms-ai src/lib/anthropic` = 110/110 pass.
+- `npx vitest run` (full suite) = **1754/1754 pass** (1723 at Layer 3a end + 31 new).
+- `rm -rf .next && npm run build` = clean (787 static pages).
+
+**Out of scope (DO NOT do in 3b):**
+- Twilio webhook integration (Layer 4) — next.
+- Specialty-pivot deletion (Layer 5).
+- Migration of the 9 existing direct-`fetch` Anthropic sites (separate follow-up).
+- Automatic retries inside the dispatcher (audit §4.4 explicitly forbids).
+- Voice-agent route file modifications (reused as-is).
+
+**Branch:** `feat/sms-ai-v2-layer-3b-tool-dispatcher` — pushed for review. **Layer 3 complete. Layer 4 (Twilio webhook routing) is now unblocked.**
+
+---
+
 ## 2026-05-19 — SMS AI v2 Layer 3a: agent runner core + Anthropic SDK thin client
 
 Workstream A, sub-session of Layer 3. Ships the Anthropic SDK dependency, the thin client wrapper, and the agent runner that constructs the API call, runs the tool-use loop, caches the system prompt, respects the 6-iteration cap, and handles end_turn + API errors. The tool dispatcher itself is a STUB (Layer 3b replaces its body) — every tool call returns `is_error: true` so the round-trip mechanics can be exercised end-to-end without the real endpoints being wired up. The Twilio webhook is NOT yet calling this runner (that's Layer 4).

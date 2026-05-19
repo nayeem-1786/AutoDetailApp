@@ -37,8 +37,10 @@ vi.mock('@/lib/services/conversation-history', () => ({
 }));
 
 const dispatchToolMock = vi.fn();
+const resetDispatcherMock = vi.fn();
 vi.mock('@/lib/sms-ai/tool-dispatcher', () => ({
   dispatchTool: (...args: unknown[]) => dispatchToolMock(...args),
+  __resetForAgentRun: () => resetDispatcherMock(),
 }));
 
 // Import the runner AFTER mocks so the vi.mock factories win.
@@ -110,6 +112,7 @@ beforeEach(() => {
   getCustomerContextMock.mockReset();
   getConversationHistoryMock.mockReset();
   dispatchToolMock.mockReset();
+  resetDispatcherMock.mockReset();
 
   // Sensible defaults — each test overrides what it needs.
   getCustomerContextMock.mockResolvedValue(emptyCustomerContext());
@@ -365,5 +368,156 @@ describe('runSmsAiV2Agent — conversation history mapping', () => {
       role: 'user',
       content: BASE_INPUT.inboundMessageBody,
     });
+  });
+});
+
+// Helper: construct a single assistant turn carrying N parallel tool_use
+// blocks. The runner dispatches all of them in one `Promise.all` per
+// audit §4.3 (independent tools should not serialize).
+function multiToolUseMessage(
+  blocks: Array<{ id: string; name: string; input: unknown }>,
+) {
+  return {
+    id: 'msg_multi',
+    type: 'message',
+    role: 'assistant',
+    model: 'claude-sonnet-4-6',
+    content: blocks.map((b) => ({
+      type: 'tool_use',
+      id: b.id,
+      name: b.name,
+      input: b.input,
+    })),
+    stop_reason: 'tool_use',
+    stop_sequence: null,
+    usage: { input_tokens: 1, output_tokens: 1 },
+  };
+}
+
+describe('runSmsAiV2Agent — parallel tool dispatch (Layer 3b)', () => {
+  it('dispatches multiple tool_use blocks concurrently and preserves original order in the user turn', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        multiToolUseMessage([
+          { id: 'tu_a', name: 'lookup_customer', input: { phone: '+14245551234' } },
+          { id: 'tu_b', name: 'get_services', input: {} },
+          { id: 'tu_c', name: 'classify_vehicle', input: { make: 'Honda' } },
+        ]),
+      )
+      .mockResolvedValueOnce(endTurnMessage('all done'));
+
+    // Each tool resolves with a different delay to exercise concurrency.
+    // If the runner serialized, total wall-clock would be ~150ms (sum); in
+    // parallel it should be ~80ms (max). We assert an upper bound that
+    // distinguishes the two regimes.
+    const delays: Record<string, number> = {
+      lookup_customer: 80,
+      get_services: 40,
+      classify_vehicle: 60,
+    };
+    dispatchToolMock.mockImplementation(async ({ name }: { name: string }) => {
+      await new Promise((r) => setTimeout(r, delays[name] ?? 0));
+      return { content: `${name}:ok`, isError: false };
+    });
+
+    const t0 = Date.now();
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+    const elapsed = Date.now() - t0;
+
+    expect(dispatchToolMock).toHaveBeenCalledTimes(3);
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.toolCalls.map((c) => c.toolName)).toEqual([
+      'lookup_customer',
+      'get_services',
+      'classify_vehicle',
+    ]);
+    expect(result.toolCalls.every((c) => c.isError === false)).toBe(true);
+
+    // Wall-clock upper bound: max(delays)=80ms + slack. If serial, would
+    // be 80+40+60=180ms minimum. We allow generous slack for CI jitter.
+    expect(elapsed).toBeLessThan(180);
+
+    // The user-turn tool_result blocks must be in original tool_use order.
+    const secondCall = messagesCreateMock.mock.calls[1][0];
+    const userTurn = secondCall.messages[secondCall.messages.length - 1];
+    expect(userTurn.role).toBe('user');
+    const toolResultIds = (userTurn.content as Array<{ tool_use_id: string }>).map(
+      (b) => b.tool_use_id,
+    );
+    expect(toolResultIds).toEqual(['tu_a', 'tu_b', 'tu_c']);
+  });
+
+  it('passes mixed success + failure results through to the next assistant turn intact', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        multiToolUseMessage([
+          { id: 'tu_a', name: 'lookup_customer', input: { phone: '+14245551234' } },
+          { id: 'tu_b', name: 'get_services', input: {} },
+          { id: 'tu_c', name: 'check_availability', input: { date: '2026-05-20' } },
+        ]),
+      )
+      .mockResolvedValueOnce(endTurnMessage('handled mixed results'));
+
+    dispatchToolMock.mockImplementation(async ({ name }: { name: string }) => {
+      if (name === 'get_services') return { content: 'svc-err', isError: true };
+      return { content: `${name}:ok`, isError: false };
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.toolCalls).toHaveLength(3);
+    const errMap = Object.fromEntries(
+      result.toolCalls.map((c) => [c.toolName, c.isError]),
+    );
+    expect(errMap).toEqual({
+      lookup_customer: false,
+      get_services: true,
+      check_availability: false,
+    });
+
+    const userTurn = messagesCreateMock.mock.calls[1][0].messages.at(-1);
+    const blocks = userTurn.content as Array<{ tool_use_id: string; is_error: boolean }>;
+    expect(blocks.map((b) => [b.tool_use_id, b.is_error])).toEqual([
+      ['tu_a', false],
+      ['tu_b', true],
+      ['tu_c', false],
+    ]);
+  });
+
+  it('forwards notify_staff input to the dispatcher with the unmapped tool_use payload (mapping happens inside the dispatcher)', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('tu_ns', 'notify_staff', {
+          customer_name: 'Grace',
+          customer_phone: '+14245551234',
+          reason: 'custom_quote',
+          details: 'Customer asked about Ferrari ceramic',
+        }),
+      )
+      .mockResolvedValueOnce(endTurnMessage('Got it — staff will follow up.'));
+
+    dispatchToolMock.mockResolvedValueOnce({
+      content: '{"success":true,"recipientsNotified":2}',
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+    expect(result.stopReason).toBe('end_turn');
+    expect(dispatchToolMock).toHaveBeenCalledWith({
+      name: 'notify_staff',
+      input: {
+        customer_name: 'Grace',
+        customer_phone: '+14245551234',
+        reason: 'custom_quote',
+        details: 'Customer asked about Ferrari ceramic',
+      },
+    });
+    expect(result.toolCalls[0].isError).toBe(false);
+  });
+
+  it('resets the dispatcher Bearer-key cache once per agent run', async () => {
+    messagesCreateMock.mockResolvedValueOnce(endTurnMessage('ok'));
+    await runSmsAiV2Agent(BASE_INPUT);
+    expect(resetDispatcherMock).toHaveBeenCalledTimes(1);
   });
 });
