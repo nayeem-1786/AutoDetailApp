@@ -4,6 +4,7 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { normalizeGooglePlaceId } from '@/lib/utils/google-place-id';
+import type { Json } from '@/lib/supabase/database.types';
 
 // ---------------------------------------------------------------------------
 // GET  /api/admin/cms/homepage-settings — Read all homepage settings
@@ -43,12 +44,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  // Supabase auto-deserializes JSONB to native JS values. The try/catch
+  // remains as a transition shim for legacy double-encoded rows written by
+  // the pre-fix PUT handler (string values backfilled by migration
+  // 20260518225000; array values like homepage_differentiators self-heal on
+  // next operator Save). For a row that's already correctly typed,
+  // JSON.parse on a non-string deserialized value throws and the catch
+  // returns the value as-is — see /docs/dev/CHANGELOG.md for context.
   const settings: Record<string, unknown> = {};
   for (const row of data ?? []) {
-    try {
-      settings[row.key] = JSON.parse(row.value);
-    } catch {
-      settings[row.key] = row.value;
+    const raw = row.value;
+    if (typeof raw === 'string') {
+      try {
+        settings[row.key] = JSON.parse(raw);
+      } catch {
+        settings[row.key] = raw;
+      }
+    } else {
+      settings[row.key] = raw;
     }
   }
 
@@ -67,8 +80,14 @@ export async function PUT(request: NextRequest) {
   const admin = createAdminClient();
   const now = new Date().toISOString();
 
-  // Only upsert keys that were provided in the request
-  const rows: { key: string; value: string; updated_at: string }[] = [];
+  // Only upsert keys that were provided in the request. Values are passed
+  // RAW to Supabase — the JS client serializes for JSONB itself. Prior
+  // versions of this route called JSON.stringify(toStore) here, which
+  // caused immediate double-encoding on every Save (string `"X"` became
+  // JSONB string `"\"X\""`; arrays became JSONB strings of array JSON).
+  // See migration 20260518225000_normalize_homepage_settings_double_encoding.sql
+  // for the backfill.
+  const rows: { key: string; value: Json; updated_at: string }[] = [];
   for (const key of HOMEPAGE_KEYS) {
     if (!(key in body)) continue;
 
@@ -93,7 +112,7 @@ export async function PUT(request: NextRequest) {
 
     rows.push({
       key,
-      value: JSON.stringify(toStore),
+      value: toStore as Json,
       updated_at: now,
     });
   }
