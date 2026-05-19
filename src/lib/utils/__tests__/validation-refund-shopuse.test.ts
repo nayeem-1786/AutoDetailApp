@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { z } from 'zod';
 import { shopUseSchema, REFUND_DISPOSITIONS } from '../validation';
 
 // We need to re-import the refundCreateSchema to test it

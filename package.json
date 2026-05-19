@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint --no-config-lookup --config ./eslint.config.mjs",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "regen:sms-contracts": "tsx scripts/regen-sms-contracts.ts"
   },
   "dependencies": {
