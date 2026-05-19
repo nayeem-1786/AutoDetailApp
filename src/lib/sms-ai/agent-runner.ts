@@ -49,7 +49,10 @@ import {
   buildV2SystemPrompt,
 } from '@/lib/sms-ai/system-prompt';
 import { SMS_AI_V2_TOOLS } from '@/lib/sms-ai/tools';
-import { dispatchTool } from '@/lib/sms-ai/tool-dispatcher';
+import {
+  dispatchTool,
+  __resetForAgentRun as resetDispatcherForAgentRun,
+} from '@/lib/sms-ai/tool-dispatcher';
 
 import {
   getCustomerContext,
@@ -232,6 +235,11 @@ export async function runSmsAiV2Agent(
 
   const toolCalls: ToolCallRecord[] = [];
 
+  // Per-inbound dispatcher reset — drops the Bearer-key cache so an
+  // operator key rotation takes effect on the next inbound without an
+  // in-process restart. Cheap call (just two field resets).
+  resetDispatcherForAgentRun();
+
   // 1. Build cached system body. Substitution happens BEFORE the cache_control
   //    block is attached so the substituted text becomes the cache key.
   const promptShell = buildV2SystemPrompt({ businessName, businessHours, currentDate });
@@ -328,8 +336,31 @@ export async function runSmsAiV2Agent(
       }
 
       // stop_reason === 'tool_use': append assistant turn and dispatch each
-      // tool_use, then append the user turn with all tool_result blocks.
+      // tool_use IN PARALLEL via Promise.all (audit §4.3 — independent
+      // tools should not serialize; each tool already enforces its own
+      // per-tool timeout in the dispatcher, so no outer race needed).
+      // Tool-result blocks are reassembled in original tool_use order.
       messages.push({ role: 'assistant', content: response.content });
+
+      const dispatchStart = Date.now();
+      const dispatchResults = await Promise.all(
+        toolUseBlocks.map(async (block) => {
+          const toolInput =
+            (block.input as Record<string, unknown> | null) ?? {};
+          const t0 = Date.now();
+          const result = await dispatchTool({
+            name: block.name,
+            input: toolInput,
+          });
+          return {
+            block,
+            toolInput,
+            result,
+            latencyMs: Date.now() - t0,
+          };
+        }),
+      );
+      const parallelLatency = Date.now() - dispatchStart;
 
       const toolResultBlocks: Array<{
         type: 'tool_result';
@@ -338,25 +369,17 @@ export async function runSmsAiV2Agent(
         is_error: boolean;
       }> = [];
 
-      for (const block of toolUseBlocks) {
-        const toolName = block.name;
-        const toolInput =
-          (block.input as Record<string, unknown> | null) ?? {};
-        const t0 = Date.now();
-        const result = await dispatchTool({ name: toolName, input: toolInput });
-        const tLatency = Date.now() - t0;
+      for (const { block, toolInput, result, latencyMs } of dispatchResults) {
         const output = ensureString(result.content);
-
         toolCalls.push({
           iteration: iter,
-          toolName,
+          toolName: block.name,
           toolUseId: block.id,
           input: toolInput,
           output,
           isError: result.isError,
-          latencyMs: tLatency,
+          latencyMs,
         });
-
         toolResultBlocks.push({
           type: 'tool_result',
           tool_use_id: block.id,
@@ -364,6 +387,10 @@ export async function runSmsAiV2Agent(
           is_error: result.isError,
         });
       }
+
+      console.log(
+        `[SmsAiV2 runner] iter=${iter} conv=${conversationId} dispatched=${toolUseBlocks.length} parallel_latency=${parallelLatency}ms errors=${toolResultBlocks.filter((b) => b.is_error).length}`,
+      );
 
       messages.push({ role: 'user', content: toolResultBlocks });
     }
