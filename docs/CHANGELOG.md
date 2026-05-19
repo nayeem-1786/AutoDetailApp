@@ -6,6 +6,58 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-18 — SMS AI v2 Layer 1+2: shared helpers + tool definitions + v2 system prompt
+
+Foundation for SMS AI v2 (tool-using Anthropic agent that will replace the single-shot SMS auto-responder). This commit ships the static foundation; the agent loop runner (Layer 3), the webhook integration (Layer 4), and the legacy pivot deletion (Layer 5) come in separate sessions. **Zero production-behavior changes from this session** — the Twilio webhook handler keeps running the current single-shot path until Layer 4 wires v2 in.
+
+**Helpers extracted from inline call sites:**
+
+- **`src/lib/services/customer-context.ts` — `getCustomerContext()`.** Unified single-call snapshot bundle: customer + vehicles + upcoming_appointments + recent_quotes + recent_transactions (cents) + conversation_history. Caps history to 20 messages (down from 100 — audit §6.7 token-budget rationale), transactions to last 5 for known customers only, appointments to 5, quotes to 3. Matches voice-agent/context's return shape so both call sites will converge. Returns customer=null + empty arrays + non-empty conversation_history for unknown phones.
+- **`src/lib/services/conversation-history.ts` — `getConversationHistory()`.** Small focused helper for callers that need only messages, not the full context bundle. Resolves by conversationId OR phone fallback. Configurable limit (default 20) + optional system-message exclusion. Used by getCustomerContext internally.
+- **`src/lib/services/staff-notification.ts` — `notifyStaff()`.** Extracted from `/api/voice-agent/notify-staff` body. Adds 7th reason code `human_handoff` for SMS AI v2 use cases. Renders `staff_notification` template via renderSmsTemplate; recipient fallback chain unchanged from voice-agent endpoint (template.recipient_phones → business.phone → BUSINESS_DEFAULTS.phone). Returns structured per-recipient `{ success, recipientsNotified, errors, templateInactive?, noRecipients? }` instead of swallowing failures.
+- **`/api/voice-agent/notify-staff/route.ts` — REFACTORED to thin HTTP wrapper around notifyStaff helper.** Voice agent's HTTP contract is byte-identical: 401 on bad auth, 200 + `{ success: false }` on invalid input (preserves no-retry contract for ElevenLabs), 200 + `{ success: true }` on success or template-inactive. Forwards new `human_handoff` reason forward-compatibly. 8 pinning tests in route.test.ts.
+
+**Feature-flag infrastructure (settings only; no routing wired into webhook yet):**
+
+- Migration `20260518215003_add_sms_ai_v2_settings.sql` seeds 3 keys in `business_settings`: `sms_ai_v2_kill_switch` (false), `sms_ai_v2_enabled_phones` ([]), `sms_ai_v2_globally_enabled` (false). All three default to safe state — fresh install = v2 disabled. Idempotent via ON CONFLICT (key) DO NOTHING.
+- `src/lib/sms-ai/feature-flag.ts` — `shouldUseSmsAiV2()` pure-function router (kill_switch > globally_enabled > allowlist match) + `loadSmsAiV2Flags()` DB reader. Phone normalization symmetric on both sides of allowlist comparison (entries can be stored as `(424) 555-1234` or `+14245551234`; both match). Safe defaults on DB error or missing keys.
+
+**Agent foundation (not yet wired into a runner):**
+
+- `src/lib/sms-ai/tools.ts` — 10 declarative Anthropic tool definitions (`lookup_customer`, `get_services`, `classify_vehicle`, `check_availability`, `create_appointment`, `send_info_sms`, `get_products`, `get_product_details`, `notify_staff`, `send_quote_sms`). Side-effecting tools (5, 6, 9, 10) carry explicit "Only call this when the customer has explicitly confirmed they want to take this action." gates in descriptions. `TOOL_NAMES` const for runner dispatch. **`@anthropic-ai/sdk` is not yet installed** — Layer 3 adds it; for now, a minimal local `SmsAiV2Tool` type matches the Anthropic shape structurally.
+- `src/lib/sms-ai/system-prompt.ts` — `buildV2SystemPrompt()`. Eight sections: Identity (Tom persona, SMS-adapted from voice agent), Channel rules (160-320 char target, no markdown, plain text only, 1-2 questions/turn), Critical rules (13 rules including specialty-vehicle pivot via notify_staff, one-primary-service quote rule, never-guess-prices, STOP/UNSUBSCRIBE silent, no invented discounts), Tool usage guide, Escalation guide (7 reasons), Conversation flow, `{CUSTOMER_CONTEXT}` placeholder, Grounding (America/Los_Angeles, business hours). Static across turns for prompt-caching efficiency; per-conversation context injected at runner level (Layer 3).
+
+**Tests: +104 tests, 1536 → 1640 passing.**
+- `src/lib/sms-ai/__tests__/feature-flag.test.ts` — 22 tests
+- `src/lib/sms-ai/__tests__/tools.test.ts` — 18 tests
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts` — 16 tests
+- `src/lib/services/__tests__/conversation-history.test.ts` — 10 tests
+- `src/lib/services/__tests__/customer-context.test.ts` — 15 tests
+- `src/lib/services/__tests__/staff-notification.test.ts` — 15 tests
+- `src/app/api/voice-agent/notify-staff/__tests__/route.test.ts` — 8 tests (HTTP behavior preservation post-refactor)
+
+**Out of scope (deliberately — these are later layers):**
+- Agent loop runner (Anthropic SDK install + tool-call loop dispatcher) — Layer 3
+- Twilio webhook integration (return-early + flag routing + agent invocation) — Layer 4
+- Specialty pivot deletion + `staff_notification_inbound_specialty` slug removal — Layer 5
+- Observability + rollout dashboards — Layer 6
+
+**Discovery findings + scope deltas from brief:**
+- `vehicles.is_primary` does NOT exist as a DB column (DB_SCHEMA.md confirms). The brief speculatively included it in the `CustomerContextVehicle` shape; helper omits it cleanly with a JSDoc note. If a "primary vehicle" concept is needed later, derive it (most-recent? most-booked?) in a follow-up — not as a schema addition in Layer 1+2.
+- `appointments` table uses `scheduled_start_time` not `scheduled_time` — helper aliases the field to `scheduled_time` in the output shape for clean v2-consumer ergonomics; column read uses the actual column name.
+- `transactions` table has `transaction_date` not `completed_at` — helper aliases to `completed_at` in output, filters by `status='completed'` for accurate "recent transactions" semantics.
+- Money fields converted dollars→cents inside the helper (transactions + quotes both use NUMERIC(10,2) in DB). Helper output is integer cents per Smart Details Money-Unify convention.
+- `staff_notification` template contract already requires `reason_label`, `customer_name`, `details`, `customer_phone` — matched perfectly by the notifyStaff helper's render call. No template migration needed.
+- Branch base HEAD at session start was `bb74702f` (one commit ahead of the brief's specified `82cbcffe`). The newer commit is docs-only (Next.js upgrade audit) with zero overlap with Layer 1+2 surface — proceeded under the "work without stopping for clarifying questions" directive.
+
+**Constraints honored:** zero changes to Twilio webhook handler; voice-agent notify-staff endpoint HTTP behavior byte-identical (validated by route.test.ts); no legacy code deleted; no agent runner code written; lint 0 errors (99 pre-existing warnings unchanged); typecheck 27 pre-existing errors unchanged (all in test files I didn't touch — Quote modifier tests + POS catalog routing test); `npm run build` ✓ compiled successfully; migration dry-run via `supabase db push --dry-run` confirmed clean; migration NOT pushed to remote DB (per brief, user pushes during Layer 4 deploy).
+
+**Files cited (read-only):** CLAUDE.md, docs/dev/FILE_TREE.md, docs/dev/SMS_AI_V2_AUDIT_2026-05-19.md, docs/dev/DB_SCHEMA.md (business_settings, sms_templates, customers, vehicles, appointments, quotes, transactions, transaction_items), src/app/api/webhooks/twilio/inbound/route.ts, src/app/api/voice-agent/context/route.ts, src/app/api/voice-agent/notify-staff/route.ts (pre-refactor), src/lib/services/messaging-ai-prompt.ts, src/lib/sms/render-sms-template.ts, src/lib/sms/generated-contracts.ts, src/lib/utils/format.ts, src/lib/utils/sms.ts, src/lib/data/business.ts.
+
+**Branch:** `feat/sms-ai-v2-layer-1-2` (NOT merged to main — pending review). Next session: Layer 3 (agent loop runner with @anthropic-ai/sdk install).
+
+---
+
 ## 2026-05-18 — Next.js 15.5.18 upgrade audit + restore point (Phase 1 of 3)
 
 Audit-only session. Zero source/package changes. Single git mutation: annotated tag `pre-nextjs-15.5.18-upgrade` created at main HEAD (`82cbcffee587ddd56c51abd540b2f984269827d2`) and pushed to origin (`d3d3f6d630f507fdac426909a1f934737760730a refs/tags/pre-nextjs-15.5.18-upgrade`) as the rollback baseline.
