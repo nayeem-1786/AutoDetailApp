@@ -10,8 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Info, Loader2 } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { Spinner } from '@/components/ui/spinner';
+import {
+  COUPON_ENFORCEMENT_SETTING_KEY,
+  getCouponEnforcementMode,
+  type CouponEnforcementMode,
+} from '@/lib/utils/coupon-enforcement';
 
-type EnforcementMode = 'soft' | 'hard';
+type EnforcementMode = CouponEnforcementMode;
 
 export default function CouponEnforcementPage() {
   const { granted: canAccess, loading: permLoading } = usePermission('marketing.coupons');
@@ -23,16 +28,11 @@ export default function CouponEnforcementPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from('business_settings')
-        .select('value')
-        .eq('key', 'coupon_type_enforcement')
-        .single();
-
-      if (data?.value) {
-        const val = typeof data.value === 'string' ? data.value : 'soft';
-        setMode(val === 'hard' ? 'hard' : 'soft');
-      }
+      // Route through the canonical helper so legacy double-encoded rows
+      // (pre-fix `'"hard"'` / `'"soft"'` shapes) deserialize correctly.
+      // Mirrors the read path used by both POS consumers post-fix.
+      const stored = await getCouponEnforcementMode(supabase);
+      setMode(stored);
       setLoading(false);
     }
     load();
@@ -41,10 +41,16 @@ export default function CouponEnforcementPage() {
   async function handleSave() {
     setSaving(true);
     try {
+      // Pass the value RAW — the Supabase JS client serializes for JSONB
+      // itself. Prior versions called JSON.stringify(mode), producing
+      // immediate double-encoding (`'"hard"'` instead of `'hard'`) which
+      // the admin form's own load couldn't unwrap and silently reverted
+      // to soft on next reload. Audit:
+      // docs/dev/AUDIT_VOICE_POLL_AND_COUPON_ENFORCEMENT_2026-05-19.md.
       const { error } = await supabase
         .from('business_settings')
-        .update({ value: JSON.stringify(mode) })
-        .eq('key', 'coupon_type_enforcement');
+        .update({ value: mode })
+        .eq('key', COUPON_ENFORCEMENT_SETTING_KEY);
 
       if (error) throw error;
       toast.success('Enforcement mode saved');
