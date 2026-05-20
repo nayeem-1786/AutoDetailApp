@@ -61,6 +61,13 @@ vi.mock('@/lib/services/staff-notification', async (importOriginal) => {
   };
 });
 
+const approveAddonMock = vi.fn();
+const declineAddonMock = vi.fn();
+vi.mock('@/lib/services/job-addons', () => ({
+  approveAddon: (...args: unknown[]) => approveAddonMock(...args),
+  declineAddon: (...args: unknown[]) => declineAddonMock(...args),
+}));
+
 // Import dispatcher AFTER mocks so the vi.mock factories win.
 import {
   dispatchTool,
@@ -81,6 +88,8 @@ beforeEach(() => {
   fetchCalls = [];
   fetchMock.mockReset();
   notifyStaffMock.mockReset();
+  approveAddonMock.mockReset();
+  declineAddonMock.mockReset();
   apiKeyState.value = 'test-voice-agent-key';
   apiKeyState.shouldThrow = false;
   apiKeyState.error = null;
@@ -514,5 +523,131 @@ describe('dispatchTool — Bearer-key cache lifecycle', () => {
     expect((fetchCalls[1].init?.headers as Record<string, string>).Authorization).toBe(
       'Bearer rotated-key',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 3c — approve_addon / decline_addon dispatch
+// ---------------------------------------------------------------------------
+
+describe('dispatchTool — approve_addon', () => {
+  it('routes to approveAddon helper in-process (no fetch call, no key load)', async () => {
+    apiKeyState.value = null; // key load would fail — proves we skip it
+    approveAddonMock.mockResolvedValueOnce({ success: true });
+    const r = await dispatchTool({
+      name: 'approve_addon',
+      input: { addon_id: '11111111-1111-1111-1111-111111111111' },
+    });
+    expect(r.isError).toBe(false);
+    expect(fetchCalls).toHaveLength(0);
+    expect(approveAddonMock).toHaveBeenCalledTimes(1);
+    expect(approveAddonMock).toHaveBeenCalledWith(
+      '11111111-1111-1111-1111-111111111111',
+    );
+    const parsed = JSON.parse(r.content);
+    expect(parsed.status).toBe('approved');
+    expect(parsed.addon_id).toBe('11111111-1111-1111-1111-111111111111');
+  });
+
+  it('maps expired result to isError:true with status="expired"', async () => {
+    approveAddonMock.mockResolvedValueOnce({
+      success: false,
+      expired: true,
+      error: 'Authorization has expired',
+    });
+    const r = await dispatchTool({
+      name: 'approve_addon',
+      input: { addon_id: 'addon-expired' },
+    });
+    expect(r.isError).toBe(true);
+    const parsed = JSON.parse(r.content);
+    expect(parsed.status).toBe('expired');
+    expect(parsed.addon_id).toBe('addon-expired');
+  });
+
+  it('maps generic failure to isError:true with status="failed"', async () => {
+    approveAddonMock.mockResolvedValueOnce({
+      success: false,
+      error: 'Addon not found',
+    });
+    const r = await dispatchTool({
+      name: 'approve_addon',
+      input: { addon_id: 'addon-missing' },
+    });
+    expect(r.isError).toBe(true);
+    const parsed = JSON.parse(r.content);
+    expect(parsed.status).toBe('failed');
+    expect(parsed.error).toBe('Addon not found');
+  });
+
+  it('rejects missing addon_id with isError, helper NOT called', async () => {
+    const r = await dispatchTool({ name: 'approve_addon', input: {} });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('addon_id');
+    expect(approveAddonMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects wrong-type addon_id with isError, helper NOT called', async () => {
+    const r = await dispatchTool({
+      name: 'approve_addon',
+      input: { addon_id: 12345 },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('addon_id');
+    expect(approveAddonMock).not.toHaveBeenCalled();
+  });
+
+  it('pre-empts a hanging approveAddon with the 10s timeout', async () => {
+    approveAddonMock.mockImplementationOnce(() => new Promise(() => {}));
+    vi.useFakeTimers();
+    const promise = dispatchTool({
+      name: 'approve_addon',
+      input: { addon_id: 'addon-1' },
+    });
+    await vi.advanceTimersByTimeAsync(10100);
+    const r = await promise;
+    vi.useRealTimers();
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('timed out');
+    expect(r.content).toContain('10000ms');
+  });
+});
+
+describe('dispatchTool — decline_addon', () => {
+  it('routes to declineAddon helper in-process (no fetch call)', async () => {
+    declineAddonMock.mockResolvedValueOnce({ success: true });
+    const r = await dispatchTool({
+      name: 'decline_addon',
+      input: { addon_id: 'addon-1' },
+    });
+    expect(r.isError).toBe(false);
+    expect(fetchCalls).toHaveLength(0);
+    expect(declineAddonMock).toHaveBeenCalledTimes(1);
+    expect(declineAddonMock).toHaveBeenCalledWith('addon-1');
+    const parsed = JSON.parse(r.content);
+    expect(parsed.status).toBe('declined');
+    expect(parsed.addon_id).toBe('addon-1');
+  });
+
+  it('maps generic failure to isError:true with status="failed"', async () => {
+    declineAddonMock.mockResolvedValueOnce({
+      success: false,
+      error: 'Addon already approved',
+    });
+    const r = await dispatchTool({
+      name: 'decline_addon',
+      input: { addon_id: 'addon-1' },
+    });
+    expect(r.isError).toBe(true);
+    const parsed = JSON.parse(r.content);
+    expect(parsed.status).toBe('failed');
+    expect(parsed.error).toBe('Addon already approved');
+  });
+
+  it('rejects missing addon_id with isError, helper NOT called', async () => {
+    const r = await dispatchTool({ name: 'decline_addon', input: {} });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('addon_id');
+    expect(declineAddonMock).not.toHaveBeenCalled();
   });
 });

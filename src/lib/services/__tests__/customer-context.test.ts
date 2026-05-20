@@ -58,6 +58,11 @@ interface MockMessage {
   created_at: string;
 }
 
+interface AddonMessageRow {
+  id: string;
+  message_to_customer: string | null;
+}
+
 const state = {
   customer: null as Customer,
   conversationByPhone: null as Conversation,
@@ -67,6 +72,8 @@ const state = {
   quotes: [] as Quote[],
   transactions: [] as Transaction[],
   messages: [] as MockMessage[],
+  addonMessages: [] as AddonMessageRow[],
+  addonMessagesQueryFired: false,
   transactionsQueryFired: false,
   appointmentsLimit: undefined as number | undefined,
 };
@@ -158,8 +165,49 @@ vi.mock('@/lib/supabase/admin', () => ({
         };
         return chain;
       }
+      if (table === 'job_addons') {
+        // Follow-up SELECT for message_to_customer by addon IDs.
+        const chain = {
+          select: () => chain,
+          in: (_col: string, _ids: string[]) => {
+            state.addonMessagesQueryFired = true;
+            return Promise.resolve({ data: state.addonMessages, error: null });
+          },
+        };
+        return chain;
+      }
       throw new Error(`Unexpected table: ${table}`);
     },
+  }),
+}));
+
+interface PendingAddonRaw {
+  id: string;
+  job_id: string;
+  service_id: string | null;
+  product_id: string | null;
+  custom_description: string | null;
+  price: number;
+  discount_amount: number;
+  status: string;
+  sent_at: string | null;
+  expires_at: string | null;
+  pickup_delay_minutes: number;
+  created_by: string | null;
+  service_name?: string;
+  product_name?: string;
+  employee_name?: string;
+}
+
+const addonState: { pending: PendingAddonRaw[]; throwError: boolean } = {
+  pending: [],
+  throwError: false,
+};
+
+vi.mock('@/lib/services/job-addons', () => ({
+  getPendingAddonsForCustomer: vi.fn(async () => {
+    if (addonState.throwError) throw new Error('addon helper boom');
+    return addonState.pending;
   }),
 }));
 
@@ -174,8 +222,12 @@ beforeEach(() => {
   state.quotes = [];
   state.transactions = [];
   state.messages = [];
+  state.addonMessages = [];
+  state.addonMessagesQueryFired = false;
   state.transactionsQueryFired = false;
   state.appointmentsLimit = undefined;
+  addonState.pending = [];
+  addonState.throwError = false;
 });
 
 describe('getCustomerContext', () => {
@@ -403,6 +455,191 @@ describe('getCustomerContext', () => {
       state.conversationByPhone = { id: 'conv-1', is_ai_enabled: false };
       const out = await getCustomerContext({ phone: '+14245551234' });
       expect(out.customer?.is_ai_enabled).toBe(false);
+    });
+  });
+
+  describe('pending_addons', () => {
+    const futureExpiry = '2999-01-01T00:00:00.000Z';
+    const pastExpiry = '2000-01-01T00:00:00.000Z';
+
+    beforeEach(() => {
+      state.customer = {
+        id: 'cust-1',
+        first_name: 'Alice',
+        last_name: 'Anders',
+        phone: '+14245551234',
+        email: null,
+        loyalty_points_balance: 0,
+        sms_consent: true,
+      };
+      state.conversationByPhone = { id: 'conv-1', is_ai_enabled: true };
+    });
+
+    it('returns empty pending_addons when customer is unknown (does not invoke addon helper path)', async () => {
+      state.customer = null;
+      const out = await getCustomerContext({ phone: '+14245551234' });
+      expect(out.pending_addons).toEqual([]);
+      // The follow-up message_to_customer query MUST not fire when there are
+      // no addons (also covers the customer-null path).
+      expect(state.addonMessagesQueryFired).toBe(false);
+    });
+
+    it('returns empty pending_addons when known customer has no pending addons', async () => {
+      addonState.pending = [];
+      const out = await getCustomerContext({ phone: '+14245551234' });
+      expect(out.pending_addons).toEqual([]);
+      expect(state.addonMessagesQueryFired).toBe(false);
+    });
+
+    it('maps a pending non-expired addon with cents conversion and service_name resolution', async () => {
+      addonState.pending = [
+        {
+          id: 'addon-1',
+          job_id: 'job-1',
+          service_id: 'svc-1',
+          product_id: null,
+          custom_description: null,
+          price: 75.0,
+          discount_amount: 10.0,
+          status: 'pending',
+          sent_at: '2026-05-19T15:00:00.000Z',
+          expires_at: futureExpiry,
+          pickup_delay_minutes: 30,
+          created_by: 'emp-1',
+          service_name: 'Headlight Restoration',
+          product_name: undefined,
+          employee_name: 'Joe Detailer',
+        },
+      ];
+      state.addonMessages = [
+        { id: 'addon-1', message_to_customer: 'Noticed haze — restore?' },
+      ];
+
+      const out = await getCustomerContext({ phone: '+14245551234' });
+
+      expect(out.pending_addons).toHaveLength(1);
+      expect(out.pending_addons[0]).toEqual({
+        id: 'addon-1',
+        job_id: 'job-1',
+        service_name: 'Headlight Restoration',
+        message_to_customer: 'Noticed haze — restore?',
+        price_cents: 7500,
+        discount_amount_cents: 1000,
+        pickup_delay_minutes: 30,
+        expires_at: futureExpiry,
+        sent_at: '2026-05-19T15:00:00.000Z',
+      });
+      expect(state.addonMessagesQueryFired).toBe(true);
+    });
+
+    it('filters out expired and non-pending addons', async () => {
+      addonState.pending = [
+        {
+          id: 'pending-active',
+          job_id: 'job-1',
+          service_id: 'svc-1',
+          product_id: null,
+          custom_description: null,
+          price: 50,
+          discount_amount: 0,
+          status: 'pending',
+          sent_at: null,
+          expires_at: futureExpiry,
+          pickup_delay_minutes: 15,
+          created_by: null,
+          service_name: 'Clay Bar Treatment',
+        },
+        {
+          id: 'pending-expired',
+          job_id: 'job-1',
+          service_id: 'svc-1',
+          product_id: null,
+          custom_description: null,
+          price: 50,
+          discount_amount: 0,
+          status: 'pending',
+          sent_at: null,
+          expires_at: pastExpiry,
+          pickup_delay_minutes: 15,
+          created_by: null,
+          service_name: 'Should Be Filtered',
+        },
+        {
+          id: 'already-approved',
+          job_id: 'job-1',
+          service_id: 'svc-1',
+          product_id: null,
+          custom_description: null,
+          price: 50,
+          discount_amount: 0,
+          status: 'approved',
+          sent_at: null,
+          expires_at: futureExpiry,
+          pickup_delay_minutes: 15,
+          created_by: null,
+          service_name: 'Already Approved',
+        },
+      ];
+      state.addonMessages = [
+        { id: 'pending-active', message_to_customer: null },
+      ];
+
+      const out = await getCustomerContext({ phone: '+14245551234' });
+      expect(out.pending_addons.map((a) => a.id)).toEqual(['pending-active']);
+    });
+
+    it('resolves service_name from product_name when service_name absent', async () => {
+      addonState.pending = [
+        {
+          id: 'addon-product',
+          job_id: 'job-1',
+          service_id: null,
+          product_id: 'prod-1',
+          custom_description: null,
+          price: 20,
+          discount_amount: 0,
+          status: 'pending',
+          sent_at: null,
+          expires_at: futureExpiry,
+          pickup_delay_minutes: 0,
+          created_by: null,
+          service_name: undefined,
+          product_name: 'Ceramic Sealant Bottle',
+        },
+      ];
+      const out = await getCustomerContext({ phone: '+14245551234' });
+      expect(out.pending_addons[0].service_name).toBe('Ceramic Sealant Bottle');
+    });
+
+    it('resolves service_name from custom_description as last resort', async () => {
+      addonState.pending = [
+        {
+          id: 'addon-custom',
+          job_id: 'job-1',
+          service_id: null,
+          product_id: null,
+          custom_description: 'Pet hair removal — back seat',
+          price: 35,
+          discount_amount: 0,
+          status: 'pending',
+          sent_at: null,
+          expires_at: futureExpiry,
+          pickup_delay_minutes: 20,
+          created_by: null,
+          service_name: undefined,
+          product_name: undefined,
+        },
+      ];
+      const out = await getCustomerContext({ phone: '+14245551234' });
+      expect(out.pending_addons[0].service_name).toBe(
+        'Pet hair removal — back seat',
+      );
+    });
+
+    it('returns empty pending_addons (does not throw) when helper rejects', async () => {
+      addonState.throwError = true;
+      const out = await getCustomerContext({ phone: '+14245551234' });
+      expect(out.pending_addons).toEqual([]);
     });
   });
 });

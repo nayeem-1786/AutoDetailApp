@@ -8,8 +8,8 @@ import {
 } from '@/lib/sms-ai/tools';
 
 describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
-  it('contains exactly 10 tools', () => {
-    expect(SMS_AI_V2_TOOLS).toHaveLength(10);
+  it('contains exactly 12 tools', () => {
+    expect(SMS_AI_V2_TOOLS).toHaveLength(12);
   });
 
   it('every tool name is unique', () => {
@@ -34,6 +34,8 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
       'get_product_details',
       'notify_staff',
       'send_quote_sms',
+      'approve_addon',
+      'decline_addon',
     ];
     expect([...TOOL_NAMES].sort()).toEqual([...expected].sort());
   });
@@ -159,5 +161,25 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     expect(sample.name).toBeDefined();
     expect(sample.description).toBeDefined();
     expect(sample.input_schema).toBeDefined();
+  });
+
+  it('approve_addon requires addon_id and gates on explicit confirmation', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'approve_addon')!;
+    expect(tool.input_schema.required).toEqual(['addon_id']);
+    expect(
+      (tool.input_schema.properties.addon_id as { type?: string }).type,
+    ).toBe('string');
+    expect(tool.description.toLowerCase()).toContain('only call this when');
+    expect(tool.description.toLowerCase()).toContain('explicitly confirmed');
+  });
+
+  it('decline_addon requires addon_id and gates on explicit decline', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'decline_addon')!;
+    expect(tool.input_schema.required).toEqual(['addon_id']);
+    expect(
+      (tool.input_schema.properties.addon_id as { type?: string }).type,
+    ).toBe('string');
+    expect(tool.description.toLowerCase()).toContain('only call this when');
+    expect(tool.description.toLowerCase()).toContain('explicitly declined');
   });
 });

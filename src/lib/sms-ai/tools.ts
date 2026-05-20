@@ -30,7 +30,9 @@ export type SmsAiV2ToolName =
   | 'get_products'
   | 'get_product_details'
   | 'notify_staff'
-  | 'send_quote_sms';
+  | 'send_quote_sms'
+  | 'approve_addon'
+  | 'decline_addon';
 
 export const TOOL_NAMES: readonly SmsAiV2ToolName[] = [
   'lookup_customer',
@@ -43,6 +45,8 @@ export const TOOL_NAMES: readonly SmsAiV2ToolName[] = [
   'get_product_details',
   'notify_staff',
   'send_quote_sms',
+  'approve_addon',
+  'decline_addon',
 ] as const;
 
 export interface SmsAiV2Tool {
@@ -228,6 +232,38 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
         vehicle_color: { type: 'string', description: 'Vehicle color.' },
       },
       required: ['phone', 'services'],
+    },
+  },
+  {
+    name: 'approve_addon',
+    description:
+      "Approve a pending addon authorization on the customer's behalf. Only call this when the customer has explicitly confirmed they want to approve the pending addon (e.g., 'yes', 'go ahead', 'sounds good', 'approve it'). Pass the addon's UUID from the customer context's pending_addons list. Only call once per addon.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        addon_id: {
+          type: 'string',
+          description:
+            'The UUID of the pending addon to approve. Must match an id in the customer context pending_addons list.',
+        },
+      },
+      required: ['addon_id'],
+    },
+  },
+  {
+    name: 'decline_addon',
+    description:
+      "Decline a pending addon authorization on the customer's behalf. Only call this when the customer has explicitly declined the pending addon (e.g., 'no', 'skip it', 'not today', 'maybe next time'). Pass the addon's UUID from the customer context's pending_addons list. Only call once per addon.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        addon_id: {
+          type: 'string',
+          description:
+            'The UUID of the pending addon to decline. Must match an id in the customer context pending_addons list.',
+        },
+      },
+      required: ['addon_id'],
     },
   },
 ] as const;

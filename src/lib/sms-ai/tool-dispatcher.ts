@@ -49,6 +49,7 @@ import {
   notifyStaff,
   isStaffNotificationReason,
 } from '@/lib/services/staff-notification';
+import { approveAddon, declineAddon } from '@/lib/services/job-addons';
 
 export interface DispatchToolInput {
   name: string;
@@ -76,6 +77,8 @@ const TOOL_TIMEOUT_MS: Record<SmsAiV2ToolName, number> = {
   send_info_sms: 10000,
   send_quote_sms: 10000,
   notify_staff: 10000,
+  approve_addon: 10000,
+  decline_addon: 10000,
 };
 
 /** Per-agent-run Bearer key cache. Reset between inbounds via __resetForAgentRun. */
@@ -346,6 +349,69 @@ async function callSendQuoteSms(input: Record<string, unknown>, key: string): Pr
 }
 
 /**
+ * approve_addon / decline_addon — in-process calls. Wrap
+ * `approveAddon` / `declineAddon` from `@/lib/services/job-addons` with the
+ * same 10-second timeout class as `notify_staff` (both send a confirmation
+ * SMS to the customer as a side effect). Helper return shape:
+ *   `{ success: true }` → mapped to status='approved'|'declined', isError=false
+ *   `{ success: false, expired: true }` → mapped to status='expired', isError=true
+ *   `{ success: false, error }` → mapped to status='failed', isError=true
+ * The model reads isError and adjusts its customer-facing reply.
+ */
+async function callAddonAction(
+  action: 'approve' | 'decline',
+  input: Record<string, unknown>,
+): Promise<DispatchToolResult> {
+  const addonId = typeof input.addon_id === 'string' ? input.addon_id : '';
+  if (!addonId) {
+    return errResult(
+      `${action}_addon: missing required input "addon_id"`,
+    );
+  }
+  const label = `${action}_addon`;
+  const timeout =
+    action === 'approve'
+      ? TOOL_TIMEOUT_MS.approve_addon
+      : TOOL_TIMEOUT_MS.decline_addon;
+  const helper = action === 'approve' ? approveAddon : declineAddon;
+  const race = await withTimeout(helper(addonId), timeout, label);
+  if ('__ok' in race) {
+    const r = race.value;
+    if (r.success) {
+      const successStatus = action === 'approve' ? 'approved' : 'declined';
+      const message =
+        action === 'approve'
+          ? 'Addon approved. Confirmation SMS sent to customer.'
+          : 'Addon declined. Confirmation SMS sent to customer.';
+      return okResult({
+        status: successStatus,
+        addon_id: addonId,
+        message,
+      });
+    }
+    if (r.expired) {
+      return {
+        content: safeStringify({
+          status: 'expired',
+          addon_id: addonId,
+          message: 'This addon authorization has expired.',
+        }),
+        isError: true,
+      };
+    }
+    return {
+      content: safeStringify({
+        status: 'failed',
+        addon_id: addonId,
+        error: r.error ?? 'unknown error',
+      }),
+      isError: true,
+    };
+  }
+  return race;
+}
+
+/**
  * notify_staff — in-process call. Skips the HTTP wrapper entirely; the
  * voice-agent endpoint's "200 + { success: false } on bad input" no-retry
  * contract is a Twilio-agent concern, not an SMS-AI-loop concern.
@@ -401,9 +467,24 @@ export async function dispatchTool(
     return errResult(`unknown tool: ${name}`);
   }
 
-  // notify_staff is in-process — no Bearer key needed.
+  // notify_staff / approve_addon / decline_addon are in-process —
+  // no Bearer key needed.
   if (name === 'notify_staff') {
     const r = await callNotifyStaff(input.input);
+    console.log(
+      `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${r.isError}`,
+    );
+    return r;
+  }
+  if (name === 'approve_addon') {
+    const r = await callAddonAction('approve', input.input);
+    console.log(
+      `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${r.isError}`,
+    );
+    return r;
+  }
+  if (name === 'decline_addon') {
+    const r = await callAddonAction('decline', input.input);
     console.log(
       `[SmsAiV2 dispatch] tool=${name} latency=${Date.now() - t0}ms error=${r.isError}`,
     );

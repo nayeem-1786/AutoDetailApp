@@ -43,6 +43,7 @@ import {
   getConversationHistory,
   type ConversationMessage,
 } from '@/lib/services/conversation-history';
+import { getPendingAddonsForCustomer } from '@/lib/services/job-addons';
 
 const DEFAULT_MAX_HISTORY = 20;
 const RECENT_TRANSACTIONS_LIMIT = 5;
@@ -94,12 +95,25 @@ export interface CustomerContextTransaction {
   total_amount_cents: number;
 }
 
+export interface CustomerContextPendingAddon {
+  id: string;
+  job_id: string;
+  service_name: string | null;
+  message_to_customer: string | null;
+  price_cents: number;
+  discount_amount_cents: number;
+  pickup_delay_minutes: number;
+  expires_at: string;
+  sent_at: string | null;
+}
+
 export interface CustomerContext {
   customer: CustomerContextCustomer | null;
   vehicles: CustomerContextVehicle[];
   upcoming_appointments: CustomerContextAppointment[];
   recent_quotes: CustomerContextQuote[];
   recent_transactions: CustomerContextTransaction[];
+  pending_addons: CustomerContextPendingAddon[];
   conversation_history: ConversationMessage[];
 }
 
@@ -124,6 +138,7 @@ function emptyContext(): CustomerContext {
     upcoming_appointments: [],
     recent_quotes: [],
     recent_transactions: [],
+    pending_addons: [],
     conversation_history: [],
   };
 }
@@ -192,6 +207,7 @@ export async function getCustomerContext(
     { data: appointments },
     { data: quotes },
     transactionsResult,
+    pendingAddons,
     history,
   ] = await Promise.all([
     admin
@@ -242,6 +258,7 @@ export async function getCustomerContext(
           .order('transaction_date', { ascending: false })
           .limit(RECENT_TRANSACTIONS_LIMIT)
       : Promise.resolve({ data: [] as unknown[] }),
+    loadPendingAddons(admin, customer.id),
     historyPromise,
   ]);
 
@@ -305,6 +322,63 @@ export async function getCustomerContext(
         .filter(Boolean),
       total_amount_cents: dollarsToCents(t.total_amount),
     })),
+    pending_addons: pendingAddons,
     conversation_history: history,
   };
+}
+
+/**
+ * Load currently-actionable pending addons for a customer. Uses the legacy
+ * `getPendingAddonsForCustomer` helper as the source of truth for the
+ * customer→jobs→addons join, filters to status='pending' AND non-expired,
+ * then runs a small follow-up query for `message_to_customer` (not in the
+ * legacy helper's SELECT).
+ */
+async function loadPendingAddons(
+  admin: ReturnType<typeof createAdminClient>,
+  customerId: string,
+): Promise<CustomerContextPendingAddon[]> {
+  let raw: Awaited<ReturnType<typeof getPendingAddonsForCustomer>>;
+  try {
+    raw = await getPendingAddonsForCustomer(customerId);
+  } catch (err) {
+    console.error('[CustomerContext] pending addon load failed:', err);
+    return [];
+  }
+
+  const nowMs = Date.now();
+  const active = raw.filter(
+    (a) =>
+      a.status === 'pending' &&
+      typeof a.expires_at === 'string' &&
+      new Date(a.expires_at).getTime() > nowMs,
+  );
+  if (active.length === 0) return [];
+
+  const ids = active.map((a) => a.id);
+  const messageById = new Map<string, string | null>();
+  try {
+    const { data: msgs } = await admin
+      .from('job_addons')
+      .select('id, message_to_customer')
+      .in('id', ids);
+    for (const row of (msgs ?? []) as Array<{ id: string; message_to_customer: string | null }>) {
+      messageById.set(row.id, row.message_to_customer);
+    }
+  } catch (err) {
+    console.error('[CustomerContext] addon message_to_customer load failed:', err);
+  }
+
+  return active.map((a) => ({
+    id: a.id,
+    job_id: a.job_id,
+    service_name:
+      a.service_name ?? a.product_name ?? a.custom_description ?? null,
+    message_to_customer: messageById.get(a.id) ?? null,
+    price_cents: dollarsToCents(a.price),
+    discount_amount_cents: dollarsToCents(a.discount_amount),
+    pickup_delay_minutes: a.pickup_delay_minutes,
+    expires_at: a.expires_at as string,
+    sent_at: a.sent_at,
+  }));
 }
