@@ -6,6 +6,32 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — Addon authorization flow discovery audit (read-only)
+
+Audit-only session. Zero production-code changes. End-to-end discovery of the in-job addon-authorization flow (detailer "Flag Issue" wizard → customer SMS → landing page → Approve/Decline → second SMS → checkout join) plus the `[AUTHORIZE_ADDON]` AI-marker parse block in the Twilio inbound webhook. Output is design input for SMS AI v2 Layer 4 planning.
+
+**Deliverable:** `docs/dev/ADDON_AUTHORIZATION_FLOW_AUDIT.md` — TL;DR answering 3 specific Layer 4 questions + §A-§H end-to-end trace.
+
+**Three Layer 4 facts surfaced:**
+
+1. **The `[AUTHORIZE_ADDON]` webhook parse block (`webhooks/twilio/inbound/route.ts:866-913`) is designed-on-purpose fallback code that has NEVER fired in production.** Live DB queries confirm: `messages` where body contains `[AUTHORIZE_ADDON` or `[DECLINE_ADDON` → 0 rows. `job_addons` table → 0 rows. The shop is pre-launch; the entire flag-issue surface has never been used against a real customer. The path itself is intentional — the legacy single-shot AI prompt at `src/lib/services/messaging-ai.ts:202-211` injects pending-addon context via `getPendingAddonsForCustomer` + `buildAddonPromptSection`, and the model is instructed (per `job-addons.ts:339-345`) to emit `[AUTHORIZE_ADDON:<uuid>]` / `[DECLINE_ADDON:<uuid>]` on affirmative/negative replies for customers who reply via SMS instead of tapping the landing-page link.
+
+2. **SMS AI v2 has zero addon awareness.** Grep confirms `addon` does not appear in any file under `src/lib/sms-ai/` (feature-flag, system-prompt, tools, agent-runner, tool-dispatcher all clean). The Layer 1+2 `getCustomerContext()` helper does not load `job_addons`. The voice-agent `/context` endpoint does not either. If Layer 4 routes a v2-enabled customer's "yes" reply to the v2 agent, the model produces no token, the §E parse block has no input, and the addon stays `pending` until expiration.
+
+3. **`approveAddon()` / `declineAddon()` do NOT mutate `jobs.services` JSONB and do NOT notify the detailer.** Approved addon rows stay in `job_addons` independently; they are joined into checkout line items lazily at `/api/pos/jobs/[id]/checkout-items/route.ts:146-172`. Detailer notification is "in-app badge + console log" per PHASE8 design (`docs/planning/PHASE8_JOB_MANAGEMENT.md:640-641`) — no SMS / push / real-time signal.
+
+**Surfaces inventoried:** `src/app/pos/jobs/components/flag-issue-flow.tsx` (893-line 7-step wizard with 3 hardcoded message templates and **NO AI message-drafting integration** — verified by grep for `anthropic\|claude\|aiDraft` returning zero hits); `src/app/api/pos/jobs/[id]/addons/route.ts` (438 lines, POS-HMAC + `pos.jobs.flag_issue` perm, slug `addon_authorization`, raw-UUID `/authorize/<token>` URL — **no `createShortLink` involvement**); `src/app/api/pos/jobs/[id]/addons/[addonId]/resend/route.ts` (178 lines, slug `addon_authorization_resend` with MMS photo); `src/app/authorize/[token]/page.tsx` (314 lines, public token-scoped, server-rendered card with photo + price + new-ticket-total); `src/app/authorize/[token]/authorization-client.tsx` (104 lines, two buttons + email `?action=` auto-submit); `/api/authorize/[token]/{approve,decline}/route.ts` (50 lines each, public, delegate to helper); `src/lib/services/job-addons.ts` (395 lines — `extractAddonActions`, `approveAddon`, `declineAddon`, `getPendingAddonsForCustomer`, `buildAddonPromptSection`).
+
+**Schema:** `job_addons` table (DB_SCHEMA.md:1124-1161) — 21 columns including `authorization_token` (UNIQUE UUID), `status` (4-value CHECK enum `'pending'|'approved'|'declined'|'expired'`), `issue_type` (10-value CHECK enum), `photo_ids UUID[]`, `customer_notified_via TEXT[]`, `expires_at` (driven by `business_settings.addon_auth_expiration_minutes`, seeded default `'"30"'`). RLS enabled but policies are `USING (true) WITH CHECK (true)` — wide open at the SQL layer; all real writes go through service-role admin client which bypasses RLS anyway.
+
+**10 follow-ups surfaced (not fixed):** 0-row table = unexercised path; no detailer notification on approve/decline; checkout-time JOIN instead of JSONB mutation; v2 zero addon awareness; wide-open RLS policies; apparently-unused `/api/authorize/[token]` GET endpoint; expiry-reply SMS does not log to conversation thread (Session 3A "Preserved-for-now"); email CTA `?action=` query-param replay only protected by status-precheck; `final_price` chip Path A vs Path B inconsistency (CHANGELOG line ~5515); naming collision between `job_addons` (auth flow) and `service_addon_suggestions` (in-store chip UI).
+
+**Constraints honored:** no `src/` changes; no test/migration/package changes; no Layer 4 design recommendations in the deliverable (facts only). Lint 0 errors / 97 warnings (unchanged baseline). Typecheck 27 errors (unchanged baseline).
+
+**Branch:** `audit/addon-authorization-flow` — pushed for review, not merged. Next session: SMS AI v2 Layer 4 planning consumes this audit + the Layer 3 discovery doc as combined input.
+
+---
+
 ## 2026-05-19 — Three small cleanups (test scripts + SMS DEBUG revert + unused z import)
 
 Independent micro-cleanups landed together on branch `chore/parallel-cleanups-2026-05-19`.
