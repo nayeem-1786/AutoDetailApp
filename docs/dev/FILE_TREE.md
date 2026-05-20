@@ -504,6 +504,7 @@ src/app/api/webhooks/elevenlabs/call-complete/route.ts
 src/app/api/webhooks/stripe/route.ts
 src/app/api/webhooks/stripe/__tests__/payment-intent-succeeded.test.ts
 src/app/api/webhooks/twilio/inbound/route.ts
+src/app/api/webhooks/twilio/inbound/__tests__/sms-ai-v2-routing.test.ts  # 13 tests (Layer 4) — v2 routing decision: allowlist→v2, non-allowlist→legacy, globallyEnabled, killSwitch overrides, flag-throw fall-through, return-200 TwiML, dispatch-reject swallowed, 5 existing-gate skip cases, input-shape contract (3-key match, NO customerId — runner uses phone+conversationId via getCustomerContext).
 src/app/api/webhooks/twilio/status/route.ts
 src/app/api/webhooks/twilio/voice/route.ts
 ```
@@ -991,11 +992,13 @@ src/lib/sms-ai/tools.ts                           # 12 Anthropic tool definition
 src/lib/sms-ai/system-prompt.ts                   # buildV2SystemPrompt — 9 sections: identity, channel rules, critical rules, tool guide, escalation guide, conversation flow, pending addon authorization (Layer 3c), context placeholder, grounding. Structured for prompt caching (audit §4.5). {CUSTOMER_CONTEXT} token left un-substituted for runner injection.
 src/lib/sms-ai/agent-runner.ts                    # SMS AI v2 Layer 3a + 3b + 3c — runSmsAiV2Agent() agent runner core. Builds cached system prompt (cache_control: ephemeral), substitutes {CUSTOMER_CONTEXT}, loops up to 6 tool-use round-trips, forces tools-omitted final call on iteration cap, handles end_turn / unknown stop_reason / APIError. Layer 3b: parallel tool dispatch via Promise.all (tool_result blocks reassembled in original order); per-inbound dispatcher reset via __resetForAgentRun(). Layer 3c: renderCustomerContextBundle() renders pending_addons block with full UUID + price/delay/expiry/operator-message fields when non-empty.
 src/lib/sms-ai/tool-dispatcher.ts                 # SMS AI v2 Layer 3b + 3c — real dispatcher. 9 HTTP-wrapped tools call /api/voice-agent/* via shared voiceAgentFetch (AbortController + per-tool timeout 5s read/classify | 10s SLOW); notify_staff + approve_addon + decline_addon in-process via the corresponding helpers + Promise.race for timeout. Bearer key cached per agent run; reset via __resetForAgentRun() at the start of every inbound (operator key rotation takes effect on next message). NO retries (audit §4.4). DispatchToolResult contract preserved from 3a.
+src/lib/sms-ai/background-dispatch.ts             # SMS AI v2 Layer 4 — runV2AgentInBackground({inboundMessageBody, conversationId, phone}). Fire-and-forget wrapper called from the Twilio webhook AFTER it has already returned 200 to Twilio. Loads businessName + businessHours + currentDate internally, calls runSmsAiV2Agent, on end_turn/max_iterations + non-blank text chunks via splitSmsMessage + sends each via sendSms + INSERTs outbound `messages` rows with channel='sms_ai' (version-neutral) + updates conversation last_message_at/preview. On api_error/unknown/blank/null text: logs noReply=true, sends nothing, no retry. All paths try/catch — function NEVER throws.
 src/lib/sms-ai/__tests__/feature-flag.test.ts     # 22 tests — kill-switch precedence, global enable, allowlist (E.164 normalization symmetric), DB reader coercion + safe defaults on missing keys.
 src/lib/sms-ai/__tests__/tools.test.ts            # 18 tests — schema validity, name uniqueness, required fields, side-effect-tool confirmation gate, enum coverage (info types, reason codes).
 src/lib/sms-ai/__tests__/system-prompt.test.ts    # 16 tests — interpolation, 8 sections present, all 10 tools named, all 7 reasons listed, STOP/UNSUBSCRIBE rule, deterministic output.
 src/lib/sms-ai/__tests__/agent-runner.test.ts     # 13 tests (Layer 3a 9 + Layer 3b 4) — happy path end_turn, one tool round-trip, 6-iter cap forces tools-omitted final, prompt-caching wire shape, {CUSTOMER_CONTEXT} substitution, API error, unknown stop_reason, history mapping (customer→user/staff+ai→assistant/system dropped), idempotent inbound append, parallel dispatch concurrency proof, mixed success+failure pass-through, notify_staff input forwarded unmodified, dispatcher reset called once per run. Establishes the first Anthropic-SDK mock pattern (discovery §F gap).
 src/lib/sms-ai/__tests__/tool-dispatcher.test.ts  # 28 tests (Layer 3b) — per-tool routing for all 10 tools (URL/method/body/header), missing-input guards, HTTP non-2xx + thrown fetch, fake-timer timeout pre-emption (HTTP + in-process), notify_staff success/failure mapping (success:false → isError:true), Bearer-key load failures (4 cases), cache lifecycle.
+src/lib/sms-ai/__tests__/background-dispatch.test.ts # 12 tests (Layer 4) — happy end_turn (chunk+send+log+conv update), runner input shape from internal businessInfo/hours/currentDate lookups, max_iterations forwarding, multi-chunk path, no-reply paths (api_error/unknown/blank/null text), defensive runner-reject swallowed + logged + non-propagating, getBusinessInfo/Hours throws fall back, failed sendSms outbound-row contract (status='failed', twilio_sid=null).
 
 # Anthropic SDK thin client (Layer 3a — one place for SDK construction; future migration target for the 9 existing direct-fetch sites)
 src/lib/anthropic/client.ts                       # MODELS const (SONNET = 'claude-sonnet-4-6', HAIKU = 'claude-haiku-4-5' dateless aliases per workspace canonical IDs) + lazy-init getAnthropicClient() singleton. Throws on missing ANTHROPIC_API_KEY. No retry/timeout overrides — runner controls per-call deadline.
@@ -1152,7 +1155,7 @@ src/lib/utils/short-link.ts
 src/lib/utils/conversation-helpers.ts
 src/lib/utils/voice-perf.ts
 src/lib/utils/sms-consent.ts
-src/lib/utils/sms.ts
+src/lib/utils/sms.ts                              # Twilio send helpers + splitSmsMessage chunker (relocated from twilio/inbound/route.ts in Layer 4 so legacy auto-reply and v2 background dispatch share one chunker). Behavior byte-identical pre/post relocation.
 src/lib/utils/template.ts
 src/lib/utils/ticker-sections.ts
 src/lib/utils/validation.ts

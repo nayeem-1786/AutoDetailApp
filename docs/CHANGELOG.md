@@ -6,6 +6,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-20 — SMS AI v2 Layer 4: Twilio webhook routing + return-early background dispatch
+
+Workstream A. Sequential successor to Layer 3c. Wires v2 into the inbound Twilio webhook behind the existing 3 feature flags (`sms_ai_v2_kill_switch`, `sms_ai_v2_globally_enabled`, `sms_ai_v2_enabled_phones`); v2 fires only when legacy AI would have fired (audience + rate-limit + `is_ai_enabled` gates preserved). Twilio receives an empty 200 TwiML immediately; the agent loop + outbound SMS run in a fire-and-forget background promise (audit §4.2). Legacy code path is unchanged for non-allowlisted phones. **Layer 5 (legacy code eradication) now unblocked. Deploy to production: pending operator action post-merge.**
+
+**Modified:**
+- `src/app/api/webhooks/twilio/inbound/route.ts` — purely additive. Imports `loadSmsAiV2Flags` + `shouldUseSmsAiV2` from `@/lib/sms-ai/feature-flag` and `runV2AgentInBackground` from `@/lib/sms-ai/background-dispatch`. New routing decision inserted at the entry of the rate-limit-passed branch (inside `if ((recentAiCount ?? 0) < MAX_AI_REPLIES_PER_HOUR)`, line ~451) and BEFORE the legacy 5-query context block: if `shouldUseSmsAiV2(normalizedPhone, v2Flags)` returns true, fire-and-forget `runV2AgentInBackground` then `return new Response(TWIML_EMPTY, …)`. On flag-load failure, falls through to legacy unchanged (safe default per Layer 1+2). One bracketed-prefix log line per routing decision (`[SmsAiV2 routing]`). The `splitSmsMessage` helper previously local to this route file was moved to `@/lib/utils/sms` (named export) so both legacy auto-reply and v2 background dispatcher share one chunker. Behavior of the moved function is byte-identical.
+- `src/lib/utils/sms.ts` — new named export `splitSmsMessage(message, maxLength=320)` (relocated from `twilio/inbound/route.ts` verbatim).
+
+**New:**
+- `src/lib/sms-ai/background-dispatch.ts` — `runV2AgentInBackground({inboundMessageBody, conversationId, phone})`. Loads `businessName` / `businessHours` (from `getBusinessInfo()` + `getBusinessHours()` + `formatBusinessHoursText()`) + `currentDate` (PST, YYYY-MM-DD) itself rather than threading them through the webhook signature. Calls `runSmsAiV2Agent()`. On `stopReason==='end_turn'` or `'max_iterations'` with non-empty `assistantText`: chunks via `splitSmsMessage`, sends each via `sendSms`, INSERTs each outbound chunk into `messages` with `sender_type='ai'` + `channel='sms_ai'` (version-neutral per Layer 1+2 design), then updates the conversation's `last_message_at` + `last_message_preview`. On `api_error` / `unknown` / null-or-blank `assistantText`: logs the failure, does NOT send any SMS, does NOT retry (audit §4.4 — `create_appointment` is not idempotent; the customer gets no reply for this inbound; operator sees `noReply=true` in logs). Every external call wrapped in try/catch — the function NEVER throws (Twilio already got its 200 by the time we run). Single `[SmsAiV2 background]` summary log line per dispatch with `conv`, `stopReason`, `iterations`, `toolCalls`, `chunks`.
+- `src/lib/sms-ai/__tests__/background-dispatch.test.ts` — 12 cases covering happy path (end_turn + chunk + send + log + conversation update), input contract to the runner (businessName/businessHours/currentDate threading from internal lookups), max_iterations forwarding the forced final reply, multi-chunk wiring, the four no-reply paths (api_error, unknown, blank text, null text), defensive try/catch around runner and helpers (rejection caught + logged + never propagated), and outbound row contract (failed sendSms → `status='failed'`, `twilio_sid=null`).
+- `src/app/api/webhooks/twilio/inbound/__tests__/sms-ai-v2-routing.test.ts` — 13 cases covering the routing decision: allowlisted phone routes to v2 + legacy NOT called; non-allowlisted phone routes to legacy + v2 NOT called; `globallyEnabled` enables v2 for any phone; `killSwitch` overrides everything; flag-load throws → falls through to legacy; route returns empty TwiML 200 to Twilio; background dispatch rejection swallowed + logged + 200 still returned; existing gates skip BOTH paths (`is_ai_enabled=false`, `messaging_ai_customers_enabled=false`, STOP keyword, rate-limit exhausted, `two_way_sms` disabled); v2 input contract assertion (exact-key match: `inboundMessageBody`, `conversationId`, `phone` — NO `customerId`, because the runner internally fetches customer context via `getCustomerContext({phone, conversationId})` which is the Layer 3c contract).
+
+**Verification gates:**
+- `npm run typecheck` = **0 errors** (no regression).
+- `npm run lint` = 0 errors / 97 warnings (unchanged baseline).
+- `npm test` = **1806/1806 pass** (was 1781; +25 cases: 12 background-dispatch + 13 routing).
+- `npm run build` = clean.
+
+**Runtime config:** route file does NOT export `runtime`, so Next.js defaults to Node runtime — fire-and-forget promises hold the process alive until they resolve. Edge runtime would kill the agent task after the response flush; verified non-Edge before adding the fire-and-forget call.
+
+**Runner input contract — deviation from prompt:** the prompt's test case #13 asked to assert `customerId` is passed to the runner when the inbound is from a known customer. The current `RunAgentInput` type (locked from Layer 3a/b/c) does NOT accept `customerId`; the runner internally calls `getCustomerContext({phone, conversationId})` which looks up the customer by phone and loads `pending_addons` via the Layer 3c path. Test case #13 was reframed as an exact-key shape assertion (`Object.keys(passed).sort()` must equal `['conversationId', 'inboundMessageBody', 'phone']`) so it catches both regressions: missing fields AND accidentally-added fields. Pending-addon awareness for v2 customers is preserved end-to-end without any webhook-side `customerId` threading.
+
+**Out of scope (deliberately deferred):**
+- Legacy code deletion (`getAIResponse`, `messaging-ai.ts`, specialty pivot, `[AUTHORIZE_ADDON]` parse block) — Layer 5's territory.
+- Observability beyond the single summary log line — Layer 6.
+- Anthropic SDK migration of the 9 direct-fetch sites — separate workstream.
+- Deploy to VPS — operator-driven post-merge.
+
+**Deploy required: YES, by operator** (via `deploy-smartdetails`). Until deployed, production webhook still routes 100% to legacy. After deploy, operator can add their own phone to `sms_ai_v2_enabled_phones` (admin UI or direct DB) to take v2 for a live test.
+
+---
+
 ## 2026-05-19 — SMS AI v2 Layer 3c: addon awareness (customer context + tools + system prompt)
 
 Workstream A. Sequential successor to Layer 3b. Closes the regression risk where a v2-routed customer's "yes" reply to a pending addon SMS would be ignored: v2 agent now loads pending addons into customer context, the system prompt teaches it the approve/decline pattern, and two new tools (`approve_addon`, `decline_addon`) wrap the in-process `approveAddon` / `declineAddon` helpers from `@/lib/services/job-addons`. Layer 4 (Twilio webhook routing) is now unblocked.

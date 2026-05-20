@@ -18,13 +18,15 @@
 import { NextRequest } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizePhone } from '@/lib/utils/format';
-import { sendSms } from '@/lib/utils/sms';
+import { sendSms, splitSmsMessage } from '@/lib/utils/sms';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { getAIResponse, type CustomerContext } from '@/lib/services/messaging-ai';
 import { extractAddonActions, approveAddon, declineAddon } from '@/lib/services/job-addons';
+import { loadSmsAiV2Flags, shouldUseSmsAiV2 } from '@/lib/sms-ai/feature-flag';
+import { runV2AgentInBackground } from '@/lib/sms-ai/background-dispatch';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
@@ -139,57 +141,6 @@ function splitName(fullName: string): { firstName: string; lastName: string } {
 }
 
 /** Split a long message into SMS-friendly chunks at natural break points */
-function splitSmsMessage(message: string, maxLength: number = 320): string[] {
-  if (message.length <= maxLength) return [message];
-
-  const chunks: string[] = [];
-  let remaining = message;
-
-  while (remaining.length > 0) {
-    if (remaining.length <= maxLength) {
-      chunks.push(remaining.trim());
-      break;
-    }
-
-    let splitAt = -1;
-    const searchArea = remaining.substring(0, maxLength);
-
-    // Priority 1: Split at double newline (paragraph break)
-    const doubleNewline = searchArea.lastIndexOf('\n\n');
-    if (doubleNewline > maxLength * 0.3) {
-      splitAt = doubleNewline;
-    }
-    // Priority 2: Split at single newline (line/bullet break)
-    else {
-      const singleNewline = searchArea.lastIndexOf('\n');
-      if (singleNewline > maxLength * 0.3) {
-        splitAt = singleNewline;
-      }
-      // Priority 3: Split at last sentence end
-      else {
-        const sentenceEnd = Math.max(
-          searchArea.lastIndexOf('. '),
-          searchArea.lastIndexOf('! '),
-          searchArea.lastIndexOf('? ')
-        );
-        if (sentenceEnd > maxLength * 0.3) {
-          splitAt = sentenceEnd + 1; // Include the punctuation
-        }
-        // Priority 4: Split at last space
-        else {
-          splitAt = searchArea.lastIndexOf(' ');
-          if (splitAt <= 0) splitAt = maxLength; // No space found, hard break
-        }
-      }
-    }
-
-    chunks.push(remaining.substring(0, splitAt).trim());
-    remaining = remaining.substring(splitAt).trim();
-  }
-
-  return chunks;
-}
-
 /**
  * Validate Twilio request signature.
  * https://www.twilio.com/docs/usage/security#validating-requests
@@ -498,6 +449,44 @@ export async function POST(request: NextRequest) {
         .gte('created_at', oneHourAgo);
 
       if ((recentAiCount ?? 0) < MAX_AI_REPLIES_PER_HOUR) {
+        // -------------------------------------------------------------
+        // SMS AI v2 routing decision (Layer 4).
+        // Sits after ALL legacy gates — signature, STOP, two_way_sms,
+        // conversation create, inbound INSERT, is_ai_enabled, audience
+        // (messaging_ai_unknown/customers_enabled), rate-limit — so v2
+        // only fires when legacy AI would also have fired. If the
+        // shouldUseSmsAiV2 check fails or the flag load throws, fall
+        // through to legacy below; v2 is opt-in by allowlist or global
+        // toggle, legacy is the safe default. Kill switch wins all.
+        // -------------------------------------------------------------
+        try {
+          const v2Flags = await loadSmsAiV2Flags();
+          if (shouldUseSmsAiV2(normalizedPhone, v2Flags)) {
+            // Fire-and-forget background dispatch. Twilio gets 200 now;
+            // the agent loop + outbound SMS happen after this response
+            // is flushed. Errors are swallowed and logged inside
+            // runV2AgentInBackground — never propagate to the route.
+            runV2AgentInBackground({
+              inboundMessageBody: body,
+              conversationId: conversation.id,
+              phone: normalizedPhone,
+            }).catch((err) => {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.error(`[SmsAiV2 background] dispatch caught: ${msg}`);
+            });
+            console.log(
+              `[SmsAiV2 routing] conv=${conversation.id} phone=${normalizedPhone} → v2`,
+            );
+            return new Response(TWIML_EMPTY, { status: 200, headers: TWIML_HEADERS });
+          }
+        } catch (v2Err) {
+          const msg = v2Err instanceof Error ? v2Err.message : String(v2Err);
+          console.error(
+            `[SmsAiV2 routing] flag/dispatch threw — falling through to legacy: ${msg}`,
+          );
+          // Fall through to legacy below.
+        }
+
         try {
           const { data: allHistory } = await admin
             .from('messages')
