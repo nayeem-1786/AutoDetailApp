@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-20 — P1 fix: SMS AI v2 outbound channel CHECK violation + harden silent INSERT errors
+
+Workstream A / Layer 4 bug fix. Production incident on 2026-05-20: operator (Nayeem, `+13107564789`) tested v2 in production after adding their phone to `sms_ai_v2_enabled_phones`. Customer-facing SMS delivery worked — the operator received each AI reply on their phone — but several AI replies (12:04 PM onward) did NOT appear in the Admin > Messaging UI. Root cause: `background-dispatch.ts:138` wrote `channel: 'sms_ai'`, but the production `messages_channel_check` constraint (from migration `20260324000003_cross_channel_bridge.sql:4`) allows only `('sms', 'voice')`. Every v2 outbound INSERT was silently rejected by PG. Silently because supabase-js does NOT throw on PG-side errors — it resolves with `{ data, error }`, and the dispatcher's bare `await admin.from('messages').insert({...})` discarded the `error` field. Customer got the SMS (sendSms ran before the failed INSERT); audit-log row never landed. The Layer 4 test suite asserted `channel: 'sms_ai'` was written but mocked supabase to accept any INSERT — never validated against the real CHECK constraint. Diagnostic confirmed by reading `DB_SCHEMA.md:1402-1406` + the bridge migration.
+
+**Modified — `src/lib/sms-ai/background-dispatch.ts`:**
+- Line 138: `channel: 'sms_ai'` → `channel: 'sms'`. Matches legacy outbound channel (`route.ts:911-919`) exactly. Agent identity is captured via `sender_type='ai'`, which the schema accepts (`messages_sender_type_check` allows `('customer', 'staff', 'ai', 'system')`).
+- Updated the JSDoc on `sendAndLogChunks` and the file header to explain the schema constraint instead of the prior "version-neutral channel" framing.
+- Lines 131-148: `admin.from('messages').insert({...})` now destructures `{ error: insertError }` and logs PG errors loudly under `[SmsAiV2 background] message INSERT failed conv=… code=… message=… details=…`. Logging all three fields (code + message + details) — today's CHECK violation was code 23514 with the human-readable detail in `details`, not `message`.
+- Lines 159-175: same hardening on the trailing `conversations.update(...).eq('id', conversationId)` — destructures `{ error: updateError }` and logs PG errors loudly. Pattern matches the INSERT hardening so any future schema change failure surfaces in pm2 logs immediately.
+
+**Modified — `src/lib/sms-ai/__tests__/background-dispatch.test.ts`:**
+- Flipped the two existing `channel: 'sms_ai'` assertions (lines 175 + 333) to `channel: 'sms'`. Comment added to the happy-path assertion explaining the CHECK constraint.
+- New module-level `insertErrorQueue` / `updateErrorQueue` arrays on the supabase admin mock so individual tests can simulate PG-side errors per-call. FIFO drained; null/empty queue means success.
+- +3 regression cases (12 → 15) in a new `PG INSERT errors are logged (not swallowed)` describe block:
+  1. **INSERT CHECK violation** — supabase returns `{error:{code:'23514', message:'… messages_channel_check', details:'Failing row contains (..., sms_ai, ...)'}}`; dispatcher does NOT throw, logs all three fields, customer-facing `sendSms` still fired BEFORE the failed audit row (delivery-first ordering preserved).
+  2. **Multi-chunk error continuity** — first chunk's INSERT fails, second succeeds; both chunks deliver via `sendSms`, both INSERTs are attempted, only the first failure is logged. Proves the chunk loop does NOT abort on one failed audit-log row.
+  3. **UPDATE error** — `conversations.update(...).eq(...)` returns an error; dispatcher logs `[SmsAiV2 background] conversation UPDATE failed conv=… code=… message=… details=…` and does NOT throw.
+
+**Doc updates:**
+- `docs/dev/SMS_AI_V2_LAYER_3_DISCOVERY.md:28` — added inline errata block under the "Channel attribution = version-free" bullet. Original text preserved per history convention; errata explains the production CHECK constraint, points to the migration, and flags `staff-notification.ts:94-95` `channelForSource()` as carrying the same `'sms_ai'` literal (latent identical bug — see follow-up in ROADMAP ledger row #42).
+- `docs/dev/FILE_TREE.md` — updated `background-dispatch.ts` entry inline to reflect current code state (channel='sms' + error-checked INSERT/UPDATE).
+- `docs/dev/ROADMAP-13-ITEMS.md` — session ledger row #42 with this fix; Workstream A snapshot table unchanged (Layer 4 still ✅ done; this is a fix on its deliverable, not a layer flip).
+
+**Out of scope (explicit follow-ups surfaced):**
+- `src/lib/services/staff-notification.ts:94-95` `channelForSource()` returns `'sms_ai'` for v2 callers — same CHECK violation will fire when a v2 customer triggers `notify_staff` and the helper attempts to insert its audit-log row. Identical 1-line fix, deferred per the session brief's "bug is isolated to the dispatcher" + "Keep the change tight" instructions. Logged in roadmap session ledger row #42 follow-ups.
+- Legacy `src/app/api/webhooks/twilio/inbound/route.ts:911` outbound INSERT (lines 905-925) also discards supabase error returns. Same hardening should apply to legacy in a future session — separate scope, not blocking v2 because legacy writes `channel='sms'` which doesn't violate any CHECK.
+- Future widening of `messages_channel_check` to add `'sms_ai'` (or otherwise capture agent runtime in a structured column) — deferred to Layer 5+ when v2 owns the SMS AI path.
+
+**Verification gates:**
+- `npm run typecheck` = **0 errors**.
+- `npm run lint` = 0 errors / 97 warnings (unchanged baseline).
+- `npm test` = **1809/1809 pass** (was 1806; +3 cases).
+- `npm run build` = clean.
+
+**Deploy required: YES, by operator** via `deploy-smartdetails`. Until deployed, v2 outbounds will continue to be silently dropped from the `messages` table; admin UI will continue to show the regression visible in the operator's 2026-05-20 12:04 PM+ messages. Post-deploy, the operator can replay a v2 inbound and verify (a) the AI bubble appears in the admin UI, (b) any future schema mismatch surfaces in pm2 logs as `[SmsAiV2 background] message INSERT failed code=…`.
+
+---
+
 ## 2026-05-20 — SMS AI v2 Layer 4: Twilio webhook routing + return-early background dispatch
 
 Workstream A. Sequential successor to Layer 3c. Wires v2 into the inbound Twilio webhook behind the existing 3 feature flags (`sms_ai_v2_kill_switch`, `sms_ai_v2_globally_enabled`, `sms_ai_v2_enabled_phones`); v2 fires only when legacy AI would have fired (audience + rate-limit + `is_ai_enabled` gates preserved). Twilio receives an empty 200 TwiML immediately; the agent loop + outbound SMS run in a fire-and-forget background promise (audit §4.2). Legacy code path is unchanged for non-allowlisted phones. **Layer 5 (legacy code eradication) now unblocked. Deploy to production: pending operator action post-merge.**
