@@ -60,6 +60,12 @@ vi.mock('@/lib/data/business', () => ({
   getBusinessInfo: () => getBusinessInfoMock(),
 }));
 
+interface PgError {
+  code?: string;
+  message: string;
+  details?: string;
+}
+
 const adminState = {
   conversation: null as { id: string } | null,
   messageInsertCalled: false,
@@ -68,6 +74,9 @@ const adminState = {
   lastMessageInsert: null as Record<string, unknown> | null,
   /** Last payload passed to `conversations.update()` — captures last_channel value. */
   lastConversationUpdate: null as Record<string, unknown> | null,
+  /** Per-test PG error injection — FIFO drain. `null` means success. */
+  insertErrorQueue: [] as Array<PgError | null>,
+  updateErrorQueue: [] as Array<PgError | null>,
 };
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -83,7 +92,10 @@ vi.mock('@/lib/supabase/admin', () => ({
             adminState.conversationUpdateCalled = true;
             adminState.lastConversationUpdate = payload;
             return {
-              eq: async () => ({ error: null }),
+              eq: async () => {
+                const nextError = adminState.updateErrorQueue.shift() ?? null;
+                return { error: nextError };
+              },
             };
           },
         };
@@ -94,7 +106,8 @@ vi.mock('@/lib/supabase/admin', () => ({
           insert: async (payload: Record<string, unknown>) => {
             adminState.messageInsertCalled = true;
             adminState.lastMessageInsert = payload;
-            return { error: null };
+            const nextError = adminState.insertErrorQueue.shift() ?? null;
+            return { error: nextError };
           },
         };
       }
@@ -122,6 +135,8 @@ beforeEach(() => {
   adminState.conversationUpdateCalled = false;
   adminState.lastMessageInsert = null;
   adminState.lastConversationUpdate = null;
+  adminState.insertErrorQueue = [];
+  adminState.updateErrorQueue = [];
 });
 
 describe('STAFF_NOTIFICATION_REASONS — 7 reason codes including human_handoff', () => {
@@ -399,7 +414,12 @@ describe('notifyStaff — audit log channel attribution (fixup)', () => {
     expect(adminState.lastConversationUpdate?.last_channel).toBe('voice');
   });
 
-  it('source=sms_ai_v2 → messages.insert receives channel="sms_ai" (version-free)', async () => {
+  it('source=sms_ai_v2 → messages.insert receives channel="sms" (CHECK-compliant; agent identity via sender_type)', async () => {
+    // Schema constraint: messages_channel_check allows ('sms', 'voice') only.
+    // Pre-fix this asserted 'sms_ai', which silently violated the CHECK in
+    // production (supabase-js does NOT throw on PG errors — the row was
+    // dropped and the audit banner missing from admin UI). Fixed in
+    // roadmap session #43; mirrors background-dispatch fix in #42.
     await notifyStaff({
       reason: 'custom_quote',
       customerName: 'Mei',
@@ -407,12 +427,13 @@ describe('notifyStaff — audit log channel attribution (fixup)', () => {
       details: 'sms path',
       source: 'sms_ai_v2',
     });
-    expect(adminState.lastMessageInsert?.channel).toBe('sms_ai');
+    expect(adminState.lastMessageInsert?.channel).toBe('sms');
     // Persistent column value must not embed the agent-runtime version.
     expect(adminState.lastMessageInsert?.channel).not.toBe('sms_ai_v2');
+    expect(adminState.lastMessageInsert?.channel).not.toBe('sms_ai');
   });
 
-  it('source=sms_ai_v2 → conversations.update receives last_channel="sms_ai" (version-free)', async () => {
+  it('source=sms_ai_v2 → conversations.update receives last_channel="sms" (CHECK-compliant)', async () => {
     await notifyStaff({
       reason: 'custom_quote',
       customerName: 'Nico',
@@ -420,8 +441,9 @@ describe('notifyStaff — audit log channel attribution (fixup)', () => {
       details: 'sms path',
       source: 'sms_ai_v2',
     });
-    expect(adminState.lastConversationUpdate?.last_channel).toBe('sms_ai');
+    expect(adminState.lastConversationUpdate?.last_channel).toBe('sms');
     expect(adminState.lastConversationUpdate?.last_channel).not.toBe('sms_ai_v2');
+    expect(adminState.lastConversationUpdate?.last_channel).not.toBe('sms_ai');
   });
 
   it('insert payload retains sender_type=system regardless of source', async () => {
@@ -434,5 +456,93 @@ describe('notifyStaff — audit log channel attribution (fixup)', () => {
     });
     expect(adminState.lastMessageInsert?.sender_type).toBe('system');
     expect(adminState.lastMessageInsert?.direction).toBe('outbound');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Roadmap #43 — supabase PG errors on audit-log writes are logged loudly
+// (mirrors background-dispatch hardening from roadmap #42)
+// ---------------------------------------------------------------------------
+
+describe('notifyStaff — audit-log PG errors are logged (not swallowed)', () => {
+  beforeEach(() => {
+    adminState.conversation = { id: 'conv-1' };
+    renderSmsTemplateMock.mockImplementation(async () => ({
+      body: 'body',
+      isActive: true,
+      canSilence: true,
+      recipientType: 'staff',
+      recipientPhones: ['+15551112222'],
+    }));
+  });
+
+  it('on messages_channel_check violation: customer-facing recipient sendSms still fired BEFORE the failed INSERT; the error is logged with code+message+details; function does NOT throw; result remains success=true (no recipient failure)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    adminState.insertErrorQueue = [
+      {
+        code: '23514',
+        message:
+          'new row for relation "messages" violates check constraint "messages_channel_check"',
+        details: 'Failing row contains (..., sms_ai, ...).',
+      },
+    ];
+
+    const result = await notifyStaff({
+      reason: 'custom_quote',
+      customerName: 'Pat',
+      customerPhone: '+14245551234',
+      details: 'Ferrari ceramic quote',
+      source: 'sms_ai_v2',
+    });
+
+    // Customer-facing recipient send fired BEFORE the failed audit-log INSERT
+    expect(sendSmsMock).toHaveBeenCalledTimes(1);
+    expect(sendSmsMock).toHaveBeenCalledWith('+15551112222', 'body');
+    // INSERT was attempted (and PG rejected it)
+    expect(adminState.messageInsertCalled).toBe(true);
+    // Helper does NOT throw; primary outcome (notification recipients) stays success
+    expect(result.success).toBe(true);
+    expect(result.recipientsNotified).toBe(1);
+    expect(result.errors).toEqual([]);
+
+    const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).toMatch(/\[notifyStaff\] audit message INSERT failed/);
+    expect(logged).toMatch(/source=sms_ai_v2/);
+    expect(logged).toMatch(/code=23514/);
+    expect(logged).toMatch(/messages_channel_check/);
+    expect(logged).toMatch(/details=Failing row contains/);
+    errorSpy.mockRestore();
+  });
+
+  it('on conversations.update PG error: logged with code+message+details; function does NOT throw', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    adminState.updateErrorQueue = [
+      {
+        code: '23514',
+        message: 'check constraint "conversations_last_channel_check"',
+        details: 'Failing row contains (..., sms_ai, ...).',
+      },
+    ];
+
+    const result = await notifyStaff({
+      reason: 'custom_quote',
+      customerName: 'Quinn',
+      customerPhone: '+14245551234',
+      details: 'detail',
+      source: 'sms_ai_v2',
+    });
+
+    // INSERT path ran first (delivery-first ordering preserved)
+    expect(adminState.messageInsertCalled).toBe(true);
+    // UPDATE was attempted (and the mock returned an error)
+    expect(adminState.conversationUpdateCalled).toBe(true);
+    expect(result.success).toBe(true);
+
+    const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).toMatch(/\[notifyStaff\] audit conversation UPDATE failed/);
+    expect(logged).toMatch(/source=sms_ai_v2/);
+    expect(logged).toMatch(/code=23514/);
+    expect(logged).toMatch(/conversations_last_channel_check/);
+    errorSpy.mockRestore();
   });
 });
