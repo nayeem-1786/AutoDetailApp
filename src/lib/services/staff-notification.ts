@@ -85,14 +85,20 @@ export function isStaffNotificationReason(
 }
 
 /**
- * Map the caller's agent-runtime `source` to a version-free persistent channel
+ * Map the caller's agent-runtime `source` to the delivery-medium channel
  * value. Audit-log rows (`messages.channel`, `conversations.last_channel`)
- * outlive any specific agent version, so storing `'sms_ai_v2'` literally would
- * lock the column to today's runtime. When v3 of the SMS agent ships, the
- * channel stays `'sms_ai'`; only the runner's source identifier changes.
+ * are CHECK-constrained to ('sms', 'voice') per migration
+ * `20260324000003_cross_channel_bridge.sql`. Storing `'sms_ai'` literally
+ * would silently violate both constraints — supabase-js does NOT throw on
+ * PG-side errors, so the audit row would be dropped without surfacing.
+ *
+ * Agent-runtime identity is captured via `sender_type` (and the structured
+ * `source` field on this function's caller); the `channel` column is just
+ * the medium. Future widening of the CHECK to include `'sms_ai'` is
+ * deferred to Layer 5+ (see roadmap session ledger #42 / #43).
  */
-function channelForSource(source: NotifyStaffParams['source']): string {
-  return source === 'voice_agent' ? 'voice' : 'sms_ai';
+function channelForSource(source: NotifyStaffParams['source']): 'sms' | 'voice' {
+  return source === 'voice_agent' ? 'voice' : 'sms';
 }
 
 export async function notifyStaff(
@@ -201,7 +207,13 @@ export async function notifyStaff(
       if (conv) {
         const logBody = `Staff notification sent: ${reasonLabel} — ${cleanedDetails}`;
         const auditChannel = channelForSource(source);
-        await admin.from('messages').insert({
+        // supabase-js does NOT throw on PG-side errors (CHECK violations,
+        // constraint failures, etc.) — it resolves with `{ data, error }`.
+        // Both writes below MUST destructure `error` and log loudly; a bare
+        // `await admin.from(...).insert(...)` would silently drop the audit
+        // row and only surface as "missing audit banner in admin UI." Same
+        // hardening applied to background-dispatch.ts in roadmap #42.
+        const { error: insertError } = await admin.from('messages').insert({
           conversation_id: conv.id,
           direction: 'outbound',
           body: logBody,
@@ -209,7 +221,15 @@ export async function notifyStaff(
           status: 'delivered',
           channel: auditChannel,
         });
-        await admin
+        if (insertError) {
+          console.error(
+            `[notifyStaff] audit message INSERT failed source=${source} conv=${conv.id} ` +
+              `code=${insertError.code ?? 'unknown'} ` +
+              `message=${insertError.message} ` +
+              `details=${insertError.details ?? 'n/a'}`,
+          );
+        }
+        const { error: updateError } = await admin
           .from('conversations')
           .update({
             last_message_at: new Date().toISOString(),
@@ -217,6 +237,14 @@ export async function notifyStaff(
             last_channel: auditChannel,
           })
           .eq('id', conv.id);
+        if (updateError) {
+          console.error(
+            `[notifyStaff] audit conversation UPDATE failed source=${source} conv=${conv.id} ` +
+              `code=${updateError.code ?? 'unknown'} ` +
+              `message=${updateError.message} ` +
+              `details=${updateError.details ?? 'n/a'}`,
+          );
+        }
       }
     } catch (err) {
       console.error('[notifyStaff] audit log failed:', err);

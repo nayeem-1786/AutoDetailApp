@@ -6,6 +6,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-20 — P1 sibling fix: staff-notification channel CHECK violation + INSERT error handling
+
+Workstream A / Layer 1+2 bug fix. **Sibling of session #42** (background-dispatch outbound channel fix) — same root cause class, different file. `staff-notification.ts:94-95` `channelForSource()` returned `'sms_ai'` for `source='sms_ai_v2'` callers; the downstream `messages.channel` INSERT (line 204) and `conversations.last_channel` UPDATE (line 212) are both CHECK-constrained to `('sms', 'voice')` per migration `20260324000003_cross_channel_bridge.sql`. supabase-js does NOT throw on PG-side errors — both writes silently failed for any v2 notify_staff invocation. Currently latent in production (no v2 customer has triggered `notify_staff` yet); would have fired on first v2 escalation, leaving zero audit trail in admin UI even though staff received the recipient SMS. Sibling fix because the bug is identical in shape to #42 but in a separate caller.
+
+**Modified — `src/lib/services/staff-notification.ts`:**
+- `channelForSource()` return type narrowed from `string` to `'sms' | 'voice'` (compile-time pinning). Body changed: `source === 'voice_agent' ? 'voice' : 'sms_ai'` → `source === 'voice_agent' ? 'voice' : 'sms'`. JSDoc rewritten to explain the CHECK constraint rather than the prior "version-neutral channel" framing — agent-runtime identity is captured via `sender_type` and the structured `source` parameter; `channel` is the delivery medium only.
+- Lines 204-211: `admin.from('messages').insert({...})` destructures `{ error: insertError }` and logs `[notifyStaff] audit message INSERT failed source=… conv=… code=… message=… details=…` on any future PG-side error. Same pattern as #42 — logging all three error fields because the human-readable detail is usually in `details`, not `message`.
+- Lines 212-228: `admin.from('conversations').update({...}).eq('id', conv.id)` destructures `{ error: updateError }` and logs the symmetric `[notifyStaff] audit conversation UPDATE failed source=… conv=… code=… …`. Both writes already inside an outer `try/catch` (line 193) — but supabase-js doesn't throw on PG errors, so the catch never fires; the destructured-error pattern is required.
+
+**Modified — `src/lib/services/__tests__/staff-notification.test.ts`:**
+- Flipped 2 existing assertions: line 410 `channel === 'sms_ai'` → `channel === 'sms'`; line 423 `last_channel === 'sms_ai'` → `last_channel === 'sms'`. The companion `.not.toBe('sms_ai_v2')` assertions are retained (still valid invariant) and now also assert `.not.toBe('sms_ai')` so the old wrong value is explicitly excluded going forward.
+- New module-level `insertErrorQueue` / `updateErrorQueue` arrays on the supabase admin mock (FIFO drain, `null` = success) so individual tests can inject per-call PG errors. Pattern matches #42's mock upgrade.
+- +2 regression cases in a new `audit-log PG errors are logged (not swallowed)` describe block:
+  1. **INSERT CHECK violation** — supabase returns `{error:{code:'23514', message:'…messages_channel_check', details:'…sms_ai…'}}`. Asserts: customer-facing recipient `sendSms` fired BEFORE the failed audit-log INSERT (delivery-first ordering preserved), the error is logged with all three fields under `[notifyStaff] audit message INSERT failed source=sms_ai_v2`, the function does NOT throw, and the primary outcome (`result.success === true`, `recipientsNotified === 1`) is unaffected because the audit-log failure is a secondary concern.
+  2. **UPDATE CHECK violation** — symmetric test on `conversations_last_channel_check`. Asserts INSERT path ran first, UPDATE error is logged under `[notifyStaff] audit conversation UPDATE failed`, function does not throw.
+
+**Doc updates:**
+- `docs/dev/SMS_AI_V2_LAYER_3_DISCOVERY.md:28` — extended the existing errata under the "Channel attribution = version-free" bullet to note that the latent bug it flagged is now closed in session #43. Original design text preserved per history convention.
+- `docs/dev/ROADMAP-13-ITEMS.md` — session ledger row #43 with this fix; #42's "follow-ups surfaced" entry annotated to reference #43 as the closure. No Workstream A status flips (Layer 4 still ✅ done; this is fix work on an existing layer's surface area).
+
+**Out of scope (explicit, unchanged from #42 + new follow-up):**
+- Legacy `route.ts:911-919` outbound INSERT still discards supabase error returns — same hardening should land in a future session. Legacy writes `channel='sms'` so no CHECK violation; pure observability win.
+- Future widening of `messages_channel_check` / `conversations_last_channel_check` to include `'sms_ai'` (or capture agent runtime in a structured column) — deferred to Layer 5+.
+
+**Verification gates:**
+- `npm run typecheck` = **0 errors**.
+- `npm run lint` = 0 errors / 97 warnings (unchanged baseline).
+- `npm test` = **1808/1808 pass** (was 1806; +2 cases).
+- `npm run build` = clean.
+
+**Deploy required: YES, by operator** via `deploy-smartdetails`. Until deployed and a v2 customer triggers `notify_staff`, this fix is preventive. Once deployed, any future PG-side write failure in staff-notification will surface in pm2 logs immediately rather than silently dropping audit rows.
+
+**Confirmation of untouched files (per the session brief's hard rules):** no changes to `background-dispatch.ts`, `agent-runner.ts`, `tool-dispatcher.ts`, `system-prompt.ts`, `tools.ts`, `feature-flag.ts`, `customer-context.ts`, `messaging-ai.ts`, `job-addons.ts`, `route.ts`, or any migration. No new helper modules. `sender_type` values unchanged ('system' for audit rows, schema-compliant).
+
+---
+
 ## 2026-05-20 — SMS AI v2 Layer 4: Twilio webhook routing + return-early background dispatch
 
 Workstream A. Sequential successor to Layer 3c. Wires v2 into the inbound Twilio webhook behind the existing 3 feature flags (`sms_ai_v2_kill_switch`, `sms_ai_v2_globally_enabled`, `sms_ai_v2_enabled_phones`); v2 fires only when legacy AI would have fired (audience + rate-limit + `is_ai_enabled` gates preserved). Twilio receives an empty 200 TwiML immediately; the agent loop + outbound SMS run in a fire-and-forget background promise (audit §4.2). Legacy code path is unchanged for non-allowlisted phones. **Layer 5 (legacy code eradication) now unblocked. Deploy to production: pending operator action post-merge.**
