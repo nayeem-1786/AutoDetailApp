@@ -184,6 +184,66 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
   }
 }
 
+/**
+ * Split a long message into SMS-segment-sized chunks, preferring natural
+ * break points (paragraph → line → sentence → space). Shared between the
+ * legacy Twilio webhook auto-reply path and the SMS AI v2 background
+ * dispatcher so both produce identical chunk shape.
+ *
+ * Default `maxLength` = 320 (2 SMS segments). Behavior is byte-identical
+ * to the prior private helper in `twilio/inbound/route.ts`.
+ */
+export function splitSmsMessage(message: string, maxLength: number = 320): string[] {
+  if (message.length <= maxLength) return [message];
+
+  const chunks: string[] = [];
+  let remaining = message;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining.trim());
+      break;
+    }
+
+    let splitAt = -1;
+    const searchArea = remaining.substring(0, maxLength);
+
+    // Priority 1: Split at double newline (paragraph break)
+    const doubleNewline = searchArea.lastIndexOf('\n\n');
+    if (doubleNewline > maxLength * 0.3) {
+      splitAt = doubleNewline;
+    }
+    // Priority 2: Split at single newline (line/bullet break)
+    else {
+      const singleNewline = searchArea.lastIndexOf('\n');
+      if (singleNewline > maxLength * 0.3) {
+        splitAt = singleNewline;
+      }
+      // Priority 3: Split at last sentence end
+      else {
+        const sentenceEnd = Math.max(
+          searchArea.lastIndexOf('. '),
+          searchArea.lastIndexOf('! '),
+          searchArea.lastIndexOf('? ')
+        );
+        if (sentenceEnd > maxLength * 0.3) {
+          splitAt = sentenceEnd + 1; // Include the punctuation
+        }
+        // Priority 4: Split at last space
+        else {
+          splitAt = searchArea.lastIndexOf(' ');
+          if (splitAt <= 0) splitAt = maxLength; // No space found, hard break
+        }
+      }
+    }
+
+    chunks.push(remaining.substring(0, splitAt).trim());
+    remaining = remaining.substring(splitAt).trim();
+  }
+
+  return chunks;
+}
+
 export interface MarketingSmsOptions {
   /** Campaign ID for delivery tracking */
   campaignId?: string;
