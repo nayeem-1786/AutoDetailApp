@@ -105,6 +105,8 @@ describe('buildV2SystemPrompt — structural output', () => {
       'get_products',
       'get_product_details',
       'notify_staff',
+      'approve_addon',
+      'decline_addon',
     ]) {
       expect(out, `tool usage guide missing "${tool}"`).toContain(tool);
     }
@@ -212,5 +214,40 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(section).toContain('Filipino');
     expect(section).toContain('Hindi');
     expect(section).toContain('Urdu');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 3c — Pending Addon Authorization section invariants
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — pending addon authorization section', () => {
+  it('includes the "Pending addon authorization" section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Pending addon authorization (mid-job)');
+  });
+
+  it('mentions both approve_addon and decline_addon tools in the addon section', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const addonIdx = out.indexOf('# Pending addon authorization (mid-job)');
+    expect(addonIdx).toBeGreaterThan(-1);
+    const ctxIdx = out.indexOf('# Context for this conversation', addonIdx);
+    const section = out.slice(addonIdx, ctxIdx);
+    expect(section).toContain('approve_addon');
+    expect(section).toContain('decline_addon');
+  });
+
+  it('references pending_addons context list explicitly', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('pending_addons');
+  });
+
+  it('places the addon section BEFORE the {CUSTOMER_CONTEXT} placeholder (cache boundary)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const addonIdx = out.indexOf('# Pending addon authorization (mid-job)');
+    const placeholderIdx = out.indexOf(CUSTOMER_CONTEXT_PLACEHOLDER);
+    expect(addonIdx).toBeGreaterThan(-1);
+    expect(placeholderIdx).toBeGreaterThan(-1);
+    expect(addonIdx).toBeLessThan(placeholderIdx);
   });
 });

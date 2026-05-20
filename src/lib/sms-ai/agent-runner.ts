@@ -176,6 +176,24 @@ function renderCustomerContextBundle(ctx: CustomerContext): string {
     }
   }
 
+  if (ctx.pending_addons.length > 0) {
+    lines.push('PENDING ADDON AUTHORIZATIONS:');
+    for (const a of ctx.pending_addons) {
+      const priceDollars = (a.price_cents / 100).toFixed(2);
+      const discountSuffix =
+        a.discount_amount_cents > 0
+          ? ` (saves $${(a.discount_amount_cents / 100).toFixed(2)})`
+          : '';
+      const serviceLabel = a.service_name ?? 'Service Add-on';
+      lines.push(
+        `  - Addon id ${a.id}: "${serviceLabel}" — $${priceDollars}${discountSuffix}. ${a.pickup_delay_minutes} extra min. Expires ${a.expires_at}.`,
+      );
+      lines.push(
+        `    Operator message: ${a.message_to_customer ?? '(none)'}`,
+      );
+    }
+  }
+
   return lines.join('\n');
 }
 

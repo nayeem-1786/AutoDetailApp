@@ -6,6 +6,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — SMS AI v2 Layer 3c: addon awareness (customer context + tools + system prompt)
+
+Workstream A. Sequential successor to Layer 3b. Closes the regression risk where a v2-routed customer's "yes" reply to a pending addon SMS would be ignored: v2 agent now loads pending addons into customer context, the system prompt teaches it the approve/decline pattern, and two new tools (`approve_addon`, `decline_addon`) wrap the in-process `approveAddon` / `declineAddon` helpers from `@/lib/services/job-addons`. Layer 4 (Twilio webhook routing) is now unblocked.
+
+**Modified:**
+- `src/lib/services/customer-context.ts` — added `CustomerContextPendingAddon` interface + `pending_addons` field on `CustomerContext`; new `loadPendingAddons()` private helper calls `getPendingAddonsForCustomer(customer.id)`, filters to `status='pending'` AND `expires_at > now()`, then runs a small follow-up `job_addons.select('id, message_to_customer')` query for the operator-typed message body (not in the legacy helper's SELECT). Money fields converted to integer cents via the existing `dollarsToCents` helper. Returns `[]` on helper rejection; never throws.
+- `src/lib/sms-ai/tools.ts` — appended `approve_addon` + `decline_addon` to `SMS_AI_V2_TOOLS`. Both gate on explicit confirmation in their description ("Only call this when the customer has explicitly confirmed/declined…"). Single `addon_id` string input, required. `SmsAiV2ToolName` union and `TOOL_NAMES` const extended (10 → 12 tools).
+- `src/lib/sms-ai/tool-dispatcher.ts` — added in-process dispatch for both addon tools (mirrors the `notify_staff` pattern: routed BEFORE the Bearer-key load, no HTTP). Shared `callAddonAction('approve' | 'decline', input)` wraps the helper with the same 10s `withTimeout` race as `notify_staff`. Result mapping: `{success:true}` → `{status:'approved'|'declined', addon_id, message}` + `isError:false`; `{success:false, expired:true}` → `{status:'expired', addon_id, …}` + `isError:true`; other failure → `{status:'failed', addon_id, error}` + `isError:true`. `TOOL_TIMEOUT_MS` extended with both tools at 10000.
+- `src/lib/sms-ai/system-prompt.ts` — added `# Pending addon authorization (mid-job)` section placed BEFORE the `{CUSTOMER_CONTEXT}` placeholder (cached body, no per-conversation interpolation). Mirrors the legacy `job-addons.ts:339-345` RULES block in spirit but adapted for v2 tools (not `[AUTHORIZE_ADDON:uuid]` tokens). Tool-usage guide unchanged structurally.
+- `src/lib/sms-ai/agent-runner.ts` — extended `renderCustomerContextBundle()` with a `PENDING ADDON AUTHORIZATIONS:` block when `pending_addons.length > 0`. Renders full UUID (model needs it to call the tool), service name, dollar-formatted price + discount, pickup delay, expiry, and the operator message body. Omits the section entirely when the array is empty (matches existing convention).
+- `docs/dev/FILE_TREE.md` — noted the new `pending_addons` field on `CustomerContext` (contract surface change).
+- `docs/dev/ROADMAP-13-ITEMS.md` — Workstream A Layer 3c marked done; session ledger row #40.
+
+**Tests added/modified (net +27):**
+- `src/lib/services/__tests__/customer-context.test.ts` (+7 cases): unknown-customer-empty-addons, known-customer-no-addons, pending-non-expired-mapping (cents conversion + service_name resolution), filter-expired-and-non-pending, service_name-from-product, service_name-from-custom_description, helper-rejection-returns-empty. New module-level `vi.mock('@/lib/services/job-addons')` and `job_addons` table support in the supabase admin mock for the follow-up `message_to_customer` query.
+- `src/lib/sms-ai/__tests__/tools.test.ts` (+2 cases, 1 modified): tool count 10 → 12; expected names array extended; new `approve_addon` and `decline_addon` schema invariants (`addon_id` required, `string` type, explicit-confirmation gate sentence in description).
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` (+9 cases): `approve_addon` happy/expired/failed/missing-input/wrong-type/timeout, `decline_addon` happy/failed/missing-input. Module-level `vi.mock('@/lib/services/job-addons')` exposing `approveAddon`/`declineAddon` mocks.
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts` (+4 cases, 1 modified): tool-usage-guide tool list extended to 12; new section-header invariant, both-tools-mentioned, `pending_addons` keyword reference, cache-boundary placement (addon section appears before `{CUSTOMER_CONTEXT}` placeholder).
+- `src/lib/sms-ai/__tests__/agent-runner.test.ts` (+5 cases, 2 modified): `emptyCustomerContext()` fixture + Grace Hopper mock both extended with `pending_addons: []`; new `PENDING ADDON AUTHORIZATIONS` rendering (with addon), section-omitted-when-empty, approve_addon end-to-end (input forwarded, success result mapped, end_turn text returned), decline_addon end-to-end, multiple-addons-ambiguous-reply (runner allows end_turn without forcing a tool call).
+
+**Verification gates:**
+- `npm run typecheck` = **0 errors** (no regression).
+- `npm run lint` = 0 errors / 97 warnings (no new warnings).
+- `npm test` = **1781/1781 pass** (was 1754; +27 cases).
+- `npm run build` = clean.
+
+**Out of scope (deliberately deferred):**
+- No modifications to `src/lib/services/job-addons.ts` — its helpers are the contract; Layer 3c wraps them.
+- No modifications to `src/lib/services/messaging-ai.ts` — legacy stays as-is until Layer 5 deletes it.
+- No Twilio-webhook routing changes — Layer 4's territory.
+- No `addon_authorization_expired` template emission inside v2 — that's the legacy webhook's path; v2 tells the model via `tool_result` with `status='expired'` and the model crafts a customer-facing reply.
+
+---
+
 ## 2026-05-19 — Typecheck baseline 27 → 0 (as-unknown-as convention parity)
 
 Closes the long-standing 27 pre-existing typecheck errors that have shadowed the baseline since the SMS AI v2 discovery audit identified them on 2026-05-19 morning. Single mechanical fix applied across two test files; zero production code touched, zero new tests, zero removed tests.

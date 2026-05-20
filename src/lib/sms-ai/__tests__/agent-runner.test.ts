@@ -55,6 +55,7 @@ function emptyCustomerContext() {
     upcoming_appointments: [],
     recent_quotes: [],
     recent_transactions: [],
+    pending_addons: [],
     conversation_history: [],
   };
 }
@@ -243,6 +244,7 @@ describe('runSmsAiV2Agent — {CUSTOMER_CONTEXT} substitution', () => {
       upcoming_appointments: [],
       recent_quotes: [],
       recent_transactions: [],
+      pending_addons: [],
       conversation_history: [],
     });
 
@@ -519,5 +521,176 @@ describe('runSmsAiV2Agent — parallel tool dispatch (Layer 3b)', () => {
     messagesCreateMock.mockResolvedValueOnce(endTurnMessage('ok'));
     await runSmsAiV2Agent(BASE_INPUT);
     expect(resetDispatcherMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer 3c — pending_addons rendering + approve/decline end-to-end
+// ---------------------------------------------------------------------------
+
+const SAMPLE_ADDON_ID = 'b5e1c9a2-1234-4abc-9def-0123456789ab';
+
+function makePendingAddon(overrides: Partial<{
+  id: string;
+  job_id: string;
+  service_name: string | null;
+  message_to_customer: string | null;
+  price_cents: number;
+  discount_amount_cents: number;
+  pickup_delay_minutes: number;
+  expires_at: string;
+  sent_at: string | null;
+}> = {}) {
+  return {
+    id: SAMPLE_ADDON_ID,
+    job_id: 'job-1',
+    service_name: 'Headlight Restoration',
+    message_to_customer: 'We noticed haze on the headlights — want us to restore?',
+    price_cents: 7500,
+    discount_amount_cents: 0,
+    pickup_delay_minutes: 30,
+    expires_at: '2026-05-19T18:00:00.000Z',
+    sent_at: '2026-05-19T15:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('runSmsAiV2Agent — pending_addons context rendering', () => {
+  it('renders the PENDING ADDON AUTHORIZATIONS section with the full UUID', async () => {
+    getCustomerContextMock.mockResolvedValue({
+      ...emptyCustomerContext(),
+      customer: {
+        id: 'cust-1',
+        first_name: 'Grace',
+        last_name: 'Hopper',
+        phone: '+14245551234',
+        email: null,
+        loyalty_points_balance: 0,
+        is_ai_enabled: true,
+        sms_consent: true,
+      },
+      pending_addons: [makePendingAddon()],
+    });
+    messagesCreateMock.mockResolvedValueOnce(endTurnMessage('ok'));
+
+    await runSmsAiV2Agent(BASE_INPUT);
+
+    const systemText = messagesCreateMock.mock.calls[0][0].system[0].text;
+    expect(systemText).toContain('PENDING ADDON AUTHORIZATIONS:');
+    expect(systemText).toContain(SAMPLE_ADDON_ID);
+    expect(systemText).toContain('Headlight Restoration');
+    expect(systemText).toContain('$75.00');
+    expect(systemText).toContain('30 extra min');
+    expect(systemText).toContain('Operator message: We noticed haze');
+  });
+
+  it('omits the addon section when pending_addons is empty', async () => {
+    getCustomerContextMock.mockResolvedValue({
+      ...emptyCustomerContext(),
+      customer: {
+        id: 'cust-1',
+        first_name: 'Grace',
+        last_name: null,
+        phone: '+14245551234',
+        email: null,
+        loyalty_points_balance: 0,
+        is_ai_enabled: true,
+        sms_consent: true,
+      },
+    });
+    messagesCreateMock.mockResolvedValueOnce(endTurnMessage('ok'));
+
+    await runSmsAiV2Agent(BASE_INPUT);
+
+    const systemText = messagesCreateMock.mock.calls[0][0].system[0].text;
+    expect(systemText).not.toContain('PENDING ADDON AUTHORIZATIONS:');
+  });
+});
+
+describe('runSmsAiV2Agent — approve_addon / decline_addon end-to-end', () => {
+  it('forwards approve_addon tool_use input to the dispatcher unchanged', async () => {
+    getCustomerContextMock.mockResolvedValue({
+      ...emptyCustomerContext(),
+      pending_addons: [makePendingAddon()],
+    });
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('tu_app', 'approve_addon', { addon_id: SAMPLE_ADDON_ID }),
+      )
+      .mockResolvedValueOnce(endTurnMessage("Great — I've let the team know!"));
+
+    dispatchToolMock.mockResolvedValueOnce({
+      content: JSON.stringify({
+        status: 'approved',
+        addon_id: SAMPLE_ADDON_ID,
+        message: 'Addon approved. Confirmation SMS sent to customer.',
+      }),
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+    expect(result.stopReason).toBe('end_turn');
+    expect(dispatchToolMock).toHaveBeenCalledWith({
+      name: 'approve_addon',
+      input: { addon_id: SAMPLE_ADDON_ID },
+    });
+    expect(result.toolCalls[0].isError).toBe(false);
+    expect(result.assistantText).toContain('team know');
+  });
+
+  it('forwards decline_addon tool_use input to the dispatcher unchanged', async () => {
+    getCustomerContextMock.mockResolvedValue({
+      ...emptyCustomerContext(),
+      pending_addons: [makePendingAddon()],
+    });
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('tu_dec', 'decline_addon', { addon_id: SAMPLE_ADDON_ID }),
+      )
+      .mockResolvedValueOnce(endTurnMessage('Got it — next visit then.'));
+
+    dispatchToolMock.mockResolvedValueOnce({
+      content: JSON.stringify({
+        status: 'declined',
+        addon_id: SAMPLE_ADDON_ID,
+        message: 'Addon declined. Confirmation SMS sent to customer.',
+      }),
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+    expect(result.stopReason).toBe('end_turn');
+    expect(dispatchToolMock).toHaveBeenCalledWith({
+      name: 'decline_addon',
+      input: { addon_id: SAMPLE_ADDON_ID },
+    });
+    expect(result.toolCalls[0].isError).toBe(false);
+  });
+
+  it('allows end_turn without forcing a tool call when there are multiple pending addons (ambiguous reply)', async () => {
+    // Two pending addons + first response is end_turn (model asks a
+    // clarifying question instead of guessing). Runner must not force
+    // a tool call; it must surface the end_turn text intact.
+    getCustomerContextMock.mockResolvedValue({
+      ...emptyCustomerContext(),
+      pending_addons: [
+        makePendingAddon({ id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' }),
+        makePendingAddon({
+          id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+          service_name: 'Wheel Polish',
+        }),
+      ],
+    });
+    messagesCreateMock.mockResolvedValueOnce(
+      endTurnMessage(
+        "Sure — which one did you mean: the Headlight Restoration or the Wheel Polish?",
+      ),
+    );
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.toolCalls).toEqual([]);
+    expect(dispatchToolMock).not.toHaveBeenCalled();
+    expect(result.assistantText).toContain('which one');
   });
 });
