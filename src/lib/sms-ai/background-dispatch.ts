@@ -15,9 +15,10 @@
  *     from `@/lib/utils/sms` (same chunker the legacy auto-reply uses) so
  *     v2 output is shape-identical to legacy output.
  *   - Each chunk is sent via `sendSms()` AND logged to `messages` with
- *     `sender_type='ai'`, `channel='sms_ai'` (version-neutral channel per
- *     Layer 1+2 design decision — admins see v2 + legacy under the same
- *     channel label).
+ *     `sender_type='ai'`, `channel='sms'` (matches legacy outbounds; the
+ *     `messages_channel_check` constraint allows only `('sms', 'voice')`,
+ *     so agent identity is captured via `sender_type='ai'` rather than
+ *     a v2-specific channel value).
  *   - On `api_error` / `unknown` stop reason or null `assistantText`:
  *     logs the failure, does NOT send any SMS, does NOT retry. The
  *     customer gets no reply for this inbound; the operator sees the
@@ -114,8 +115,19 @@ export async function runV2AgentInBackground(
 /**
  * Send each chunk via sendSms() and INSERT a corresponding outbound row
  * into `messages`. Mirrors the legacy webhook's chunk-loop shape (lines
- * 916-941 of `twilio/inbound/route.ts`) so admin UI renders both paths
- * consistently. `channel='sms_ai'` (version-neutral).
+ * 905-919 of `twilio/inbound/route.ts`) so admin UI renders both paths
+ * consistently.
+ *
+ * Schema constraint: messages_channel_check allows ('sms', 'voice') only.
+ * v2 outbound rows use 'sms' to match legacy outbounds — agent identity
+ * is captured via sender_type='ai' rather than the channel column.
+ *
+ * INSERT error handling: supabase-js does NOT throw on PG-side errors
+ * (CHECK violations, constraint failures, etc.); it resolves with
+ * `{ data, error }`. We MUST check the returned `error` field — a bare
+ * `await admin.from(...).insert(...)` would silently drop the row and
+ * leak only as "customer got SMS but row not in admin UI". Same applies
+ * to the conversations.update below.
  */
 async function sendAndLogChunks(
   conversationId: string,
@@ -128,15 +140,23 @@ async function sendAndLogChunks(
   for (const chunk of chunks) {
     try {
       const smsResult = await sendSms(phone, chunk);
-      await admin.from('messages').insert({
+      const { error: insertError } = await admin.from('messages').insert({
         conversation_id: conversationId,
         direction: 'outbound',
         body: chunk,
         sender_type: 'ai',
         twilio_sid: smsResult.success ? smsResult.sid : null,
         status: smsResult.success ? 'sent' : 'failed',
-        channel: 'sms_ai',
+        channel: 'sms',
       });
+      if (insertError) {
+        console.error(
+          `${LOG_PREFIX} message INSERT failed conv=${conversationId} ` +
+            `code=${insertError.code ?? 'unknown'} ` +
+            `message=${insertError.message} ` +
+            `details=${insertError.details ?? 'n/a'}`,
+        );
+      }
       lastChunk = chunk;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -148,13 +168,21 @@ async function sendAndLogChunks(
 
   if (lastChunk) {
     try {
-      await admin
+      const { error: updateError } = await admin
         .from('conversations')
         .update({
           last_message_at: new Date().toISOString(),
           last_message_preview: lastChunk.substring(0, 100),
         })
         .eq('id', conversationId);
+      if (updateError) {
+        console.error(
+          `${LOG_PREFIX} conversation UPDATE failed conv=${conversationId} ` +
+            `code=${updateError.code ?? 'unknown'} ` +
+            `message=${updateError.message} ` +
+            `details=${updateError.details ?? 'n/a'}`,
+        );
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(

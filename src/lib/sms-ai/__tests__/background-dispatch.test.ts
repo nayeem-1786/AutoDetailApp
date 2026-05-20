@@ -48,8 +48,18 @@ interface UpdatedRow {
   eqCol: string;
   eqValue: unknown;
 }
+interface PgError {
+  code?: string;
+  message: string;
+  details?: string;
+}
 let inserts: InsertedRow[] = [];
 let updates: UpdatedRow[] = [];
+// Per-test error injection queues — tests that need to simulate a PG-side
+// CHECK violation or other supabase error push entries here. FIFO drain;
+// `null` (or empty queue) means the operation succeeds.
+let insertErrorQueue: Array<PgError | null> = [];
+let updateErrorQueue: Array<PgError | null> = [];
 
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
@@ -57,17 +67,15 @@ vi.mock('@/lib/supabase/admin', () => ({
       const chain = {
         insert(values: Record<string, unknown>) {
           inserts.push({ table, values });
-          return Promise.resolve({ data: null, error: null });
+          const nextError = insertErrorQueue.shift() ?? null;
+          return Promise.resolve({ data: null, error: nextError });
         },
         update(values: Record<string, unknown>) {
-          let _eqCol = '';
-          let _eqValue: unknown = '';
           const sub = {
             eq(col: string, value: unknown) {
-              _eqCol = col;
-              _eqValue = value;
               updates.push({ table, values, eqCol: col, eqValue: value });
-              return Promise.resolve({ data: null, error: null });
+              const nextError = updateErrorQueue.shift() ?? null;
+              return Promise.resolve({ data: null, error: nextError });
             },
           };
           return sub;
@@ -134,6 +142,8 @@ beforeEach(() => {
   getBusinessHoursMock.mockReset();
   inserts = [];
   updates = [];
+  insertErrorQueue = [];
+  updateErrorQueue = [];
 
   // Sensible defaults; tests override what they need.
   getBusinessInfoMock.mockResolvedValue({ name: 'Smart Details Auto Spa' });
@@ -147,7 +157,7 @@ beforeEach(() => {
 // ---- tests ---------------------------------------------------------------
 
 describe('runV2AgentInBackground — happy path', () => {
-  it('on end_turn + text: chunks, sends each chunk, inserts outbound rows with sms_ai channel', async () => {
+  it('on end_turn + text: chunks, sends each chunk, inserts outbound rows with sms channel (schema-compliant)', async () => {
     runSmsAiV2AgentMock.mockResolvedValueOnce(endTurnResult('Hey! That wax is $25.'));
 
     await runV2AgentInBackground(BASE_INPUT);
@@ -164,7 +174,10 @@ describe('runV2AgentInBackground — happy path', () => {
       direction: 'outbound',
       body: 'Hey! That wax is $25.',
       sender_type: 'ai',
-      channel: 'sms_ai',
+      // CHECK constraint `messages_channel_check` allows ('sms', 'voice') only.
+      // v2 outbounds use 'sms' to match legacy — agent identity comes from
+      // sender_type='ai'.
+      channel: 'sms',
       status: 'sent',
       twilio_sid: 'SMxxx',
     });
@@ -317,7 +330,99 @@ describe('runV2AgentInBackground — outbound row contract', () => {
     expect(messageInserts[0].values).toMatchObject({
       status: 'failed',
       twilio_sid: null,
-      channel: 'sms_ai',
+      channel: 'sms',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression suite — PG-side INSERT/UPDATE errors must be logged loudly.
+//
+// Pre-fix bug (2026-05-20): supabase-js does NOT throw on PG CHECK violations
+// — it resolves with { data, error }. The dispatcher previously discarded
+// the `error` field on its bare `await admin.from(...).insert(...)`, so an
+// `messages_channel_check` violation silently dropped the row and only
+// surfaced as "customer got SMS but no AI bubble in admin UI". This suite
+// pins the new error-checked path: SMS still sends, dispatcher does NOT
+// throw, error is logged with code+message+details, the chunk loop
+// continues to subsequent chunks rather than aborting.
+// ---------------------------------------------------------------------------
+
+describe('runV2AgentInBackground — PG INSERT errors are logged (not swallowed)', () => {
+  it('logs the supabase error from messages INSERT (code + message + details) without throwing', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(endTurnResult('Hi there!'));
+    insertErrorQueue = [
+      {
+        code: '23514',
+        message:
+          'new row for relation "messages" violates check constraint "messages_channel_check"',
+        details: 'Failing row contains (..., sms_ai, ...).',
+      },
+    ];
+
+    await expect(runV2AgentInBackground(BASE_INPUT)).resolves.toBeUndefined();
+
+    // Customer-facing send fired BEFORE the failed audit-log INSERT
+    expect(sendSmsMock).toHaveBeenCalledTimes(1);
+    // INSERT was attempted (and PG rejected it)
+    expect(inserts.filter((r) => r.table === 'messages')).toHaveLength(1);
+
+    const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).toMatch(/\[SmsAiV2 background\] message INSERT failed/);
+    expect(logged).toMatch(/code=23514/);
+    expect(logged).toMatch(/messages_channel_check/);
+    expect(logged).toMatch(/details=Failing row contains/);
+    errorSpy.mockRestore();
+  });
+
+  it('continues to subsequent chunks when one INSERT fails (no chunk-loop abort)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(endTurnResult('long reply'));
+    splitSmsMessageMock.mockImplementationOnce(() => ['chunk one', 'chunk two']);
+    insertErrorQueue = [
+      { code: '23514', message: 'CHECK violation', details: undefined },
+      null, // second INSERT succeeds
+    ];
+
+    await runV2AgentInBackground(BASE_INPUT);
+
+    // Both chunks sent to the customer regardless of audit-log failures
+    expect(sendSmsMock).toHaveBeenCalledTimes(2);
+    expect(inserts.filter((r) => r.table === 'messages')).toHaveLength(2);
+
+    const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+    // Only the first chunk's INSERT failure is logged
+    const matches = logged.match(/message INSERT failed/g) ?? [];
+    expect(matches).toHaveLength(1);
+    errorSpy.mockRestore();
+  });
+
+  it('logs the supabase error from conversations UPDATE without throwing', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    runSmsAiV2AgentMock.mockResolvedValueOnce(endTurnResult('Hello'));
+    updateErrorQueue = [
+      {
+        code: '23505',
+        message: 'duplicate key value',
+        details: 'irrelevant; just verifying the log path',
+      },
+    ];
+
+    await expect(runV2AgentInBackground(BASE_INPUT)).resolves.toBeUndefined();
+
+    // INSERT path still ran (delivery-first ordering preserved)
+    expect(sendSmsMock).toHaveBeenCalledTimes(1);
+    expect(inserts.filter((r) => r.table === 'messages')).toHaveLength(1);
+    // UPDATE was attempted (and the mock returned an error)
+    expect(updates.filter((r) => r.table === 'conversations')).toHaveLength(1);
+
+    const logged = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).toMatch(
+      /\[SmsAiV2 background\] conversation UPDATE failed/,
+    );
+    expect(logged).toMatch(/code=23505/);
+    expect(logged).toMatch(/duplicate key value/);
+    errorSpy.mockRestore();
   });
 });
