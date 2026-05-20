@@ -6,6 +6,22 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — Three small cleanups (test scripts + SMS DEBUG revert + unused z import)
+
+Independent micro-cleanups landed together on branch `chore/parallel-cleanups-2026-05-19`.
+
+- **Item 1 — `package.json` test scripts:** added `"test": "vitest run"` and `"test:watch": "vitest"` between `typecheck` and `regen:sms-contracts`. `npm test` (no watch) and `npm run test:watch` (watch mode) now work as expected; previously contributors had to run `npx vitest run` directly.
+- **Item 2 — SMS DEBUG diagnostic revert:** removed the `console.log('[SMS DEBUG] Twilio POST body:', formData.toString())` line and its preceding "Revert in follow-up session" comment block at `src/lib/utils/sms.ts:93-95`. This was a temporary diagnostic from the Twilio 30034 work; the original session's TODO is now resolved. Verified zero tests assert on the log output before deleting (grep `[SMS DEBUG]` returned only the source line + 3 doc-only mentions in CHANGELOG / SMS_AI_V2_AUDIT / SMS_AI_V2_LAYER_3_DISCOVERY). One less log line on every outbound SMS in production.
+- **Item 3 — unused `z` import:** removed the `import { z } from 'zod';` line at `src/lib/utils/__tests__/validation-refund-shopuse.test.ts:2`. Confirmed unused (no `z.` references anywhere in the file's 204 lines; tests use `shopUseSchema` / `refundCreateSchema` from `../validation` instead). Drops the one stale lint warning from the 98-warning baseline.
+
+**Verification:**
+- `npm run typecheck` = 27 errors (unchanged — pre-existing `quote-service.modifiers.test.ts` residue).
+- `npm run lint` = **97 warnings**, 0 errors (was 98 warnings — Item 3 closed exactly one).
+- `npm test` = **1754/1754 pass** (unchanged — no test count change).
+- `npm run build` = clean.
+
+---
+
 ## 2026-05-19 — SMS AI v2 Layer 3b: tool dispatcher (parallel execution + per-tool timeouts) — Layer 3 complete
 
 Workstream A. Sequential successor to Layer 3a. Replaces Layer 3a's stub at `src/lib/sms-ai/tool-dispatcher.ts` with real routing for all 10 tools; wires `Promise.all` parallel dispatch in `agent-runner.ts`; adds per-inbound Bearer-key cache reset and per-tool timeout budgets. Comprehensive failure-mode test coverage. Layer 4 (Twilio webhook routing) is now unblocked.
