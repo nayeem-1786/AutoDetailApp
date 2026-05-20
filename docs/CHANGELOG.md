@@ -6,6 +6,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-19 — Typecheck baseline 27 → 0 (as-unknown-as convention parity)
+
+Closes the long-standing 27 pre-existing typecheck errors that have shadowed the baseline since the SMS AI v2 discovery audit identified them on 2026-05-19 morning. Single mechanical fix applied across two test files; zero production code touched, zero new tests, zero removed tests.
+
+**Files touched:**
+- `src/lib/quotes/__tests__/quote-service.modifiers.test.ts` — 25 sites where the mock-to-`SupabaseClient` cast was written as `supabase as Parameters<typeof createQuote>[0]` / `supabase as Parameters<typeof updateQuote>[0]` are now `supabase as unknown as Parameters<typeof createQuote>[0]` / `...as unknown as Parameters<typeof updateQuote>[0]`. The lone TS2589 deep-instantiation companion at line 155 auto-resolved with the underlying TS2352 fix (no separate handling needed).
+- `src/app/pos/components/__tests__/catalog-browser-custom-routing.test.tsx:78` — `} as CatalogService` → `} as unknown as CatalogService` on the FLOOD_SERVICE literal cast (single site).
+
+**Convention:** matches sibling test files already using the pattern — `src/lib/quotes/__tests__/modifier-chain.test.ts` (lines 208, 264, 304, 346), `src/lib/products/__tests__/barcode-lookup.test.ts:33`. This is the codebase's accepted way to satisfy `SupabaseClient<any, "public", "public", any, any>` (deeply generic SDK shape) and similar contextually-narrow type targets without scaffolding full mock implementations. The previous session correctly stopped on this because `as unknown as` was forbidden in its rules; this re-issue authorized the pattern as convention parity (not an escape hatch — the cast preserves target type info, doesn't erase it the way `as any` would).
+
+**Verification gates:**
+- `npm run typecheck | grep -c "error TS"` = **0** (was 27).
+- `npm run lint` = 0 errors / 97 warnings (unchanged baseline).
+- `npm test` = **1754/1754 pass** (unchanged — zero test count delta).
+- `npm run build` = clean (787 static pages).
+
+**Out of scope (deliberately not done):**
+- Production-code refactor to make `createQuote`/`updateQuote`/`convertQuote` accept a narrower `Pick<SupabaseClient, 'from'>`-style interface that mocks could satisfy structurally. That's the proper long-term fix (eliminates the need for any `as unknown as` casts on the test side) but is a separate scope.
+
+---
+
 ## 2026-05-19 — Three small cleanups (test scripts + SMS DEBUG revert + unused z import)
 
 Independent micro-cleanups landed together on branch `chore/parallel-cleanups-2026-05-19`.
