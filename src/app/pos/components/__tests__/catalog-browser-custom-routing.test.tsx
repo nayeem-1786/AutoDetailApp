@@ -75,7 +75,7 @@ const FLOOD_SERVICE: CatalogService = {
   created_at: '',
   updated_at: '',
   pricing: [],
-} as CatalogService;
+} as unknown as CatalogService;
 
 vi.mock('../../hooks/use-catalog', () => ({
   useCatalog: () => ({

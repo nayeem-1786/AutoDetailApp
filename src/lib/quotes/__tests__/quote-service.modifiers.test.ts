@@ -152,7 +152,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
 
   it('persists coupon_discount snapshot when supplied', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       coupon_code: 'SAVE25',
       coupon_discount: 25,
@@ -165,7 +165,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
 
   it('persists loyalty_points_to_redeem + loyalty_discount coherently', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       loyalty_points_to_redeem: 100,
       loyalty_discount: 5,
@@ -178,7 +178,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
 
   it('persists manual_discount type=dollar + value + label coherently', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       manual_discount_type: 'dollar',
       manual_discount_value: 30,
@@ -193,7 +193,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
 
   it('collapses partial manual-discount (type without value) to fully-null to satisfy CHECK constraint', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       manual_discount_type: 'dollar',
       manual_discount_value: null,
@@ -208,7 +208,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
 
   it('collapses zero or negative manual-discount value to fully-null', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       manual_discount_type: 'percent',
       manual_discount_value: 0,
@@ -223,7 +223,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
   it('rejects percent manual-discount > 100 with QuoteValidationError', async () => {
     const supabase = makeSupabase({ inserts });
     await expect(
-      createQuote(supabase as Parameters<typeof createQuote>[0], {
+      createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
         ...BASE_INSERT_INPUT,
         manual_discount_type: 'percent',
         manual_discount_value: 150,
@@ -235,7 +235,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
   it('writes all-nulls for modifier columns when payload omits them', async () => {
     const supabase = makeSupabase({ inserts });
     await createQuote(
-      supabase as Parameters<typeof createQuote>[0],
+      supabase as unknown as Parameters<typeof createQuote>[0],
       BASE_INSERT_INPUT as Parameters<typeof createQuote>[1]
     );
 
@@ -262,7 +262,7 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       { coupon_discount: 25 } as unknown as Parameters<typeof updateQuote>[2]
     );
@@ -277,7 +277,7 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       { coupon_discount: null } as unknown as Parameters<typeof updateQuote>[2]
     );
@@ -292,7 +292,7 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       {
         manual_discount_type: 'percent',
@@ -313,7 +313,7 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       {
         loyalty_points_to_redeem: 50,
@@ -334,7 +334,7 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       { notes: 'just a note change' } as unknown as Parameters<typeof updateQuote>[2]
     );
@@ -354,7 +354,7 @@ describe('updateQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       {
         manual_discount_type: 'dollar',
@@ -400,7 +400,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
   it('writes subtotal + tax when no modifiers (regression baseline)', async () => {
     const supabase = makeSupabase({ inserts });
     await createQuote(
-      supabase as Parameters<typeof createQuote>[0],
+      supabase as unknown as Parameters<typeof createQuote>[0],
       BASE_INSERT_INPUT as Parameters<typeof createQuote>[1]
     );
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
@@ -410,7 +410,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
 
   it('subtracts coupon_discount from total_amount', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       coupon_code: 'SAVE25',
       coupon_discount: 25,
@@ -421,7 +421,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
 
   it('subtracts loyalty_discount from total_amount', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       loyalty_points_to_redeem: 100,
       loyalty_discount: 5,
@@ -432,7 +432,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
 
   it('subtracts manual_discount type=dollar from total_amount', async () => {
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       manual_discount_type: 'dollar',
       manual_discount_value: 30,
@@ -445,7 +445,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
   it('resolves manual_discount type=percent against subtotal before subtracting', async () => {
     // 10% of $200 = $20 manual discount
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       manual_discount_type: 'percent',
       manual_discount_value: 10,
@@ -458,7 +458,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
   it('combines all three modifiers: coupon + loyalty + manual', async () => {
     // Mirrors Q-0067-style scenario at smaller numbers (audit subject).
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       coupon_code: 'SAVE25',
       coupon_discount: 25,
@@ -476,7 +476,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
     // Defensive: oversized manual dollar discount must not produce a
     // negative persisted total.
     const supabase = makeSupabase({ inserts });
-    await createQuote(supabase as Parameters<typeof createQuote>[0], {
+    await createQuote(supabase as unknown as Parameters<typeof createQuote>[0], {
       ...BASE_INSERT_INPUT,
       manual_discount_type: 'dollar',
       manual_discount_value: 500, // > subtotal; resolveManualDiscountAmount clamps to 200
@@ -502,7 +502,7 @@ describe('updateQuote — Item 15g Layer 15g-v total_amount recompute', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       { notes: 'just a note change' } as unknown as Parameters<typeof updateQuote>[2]
     );
@@ -529,7 +529,7 @@ describe('updateQuote — Item 15g Layer 15g-v total_amount recompute', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       { coupon_discount: 25 } as unknown as Parameters<typeof updateQuote>[2]
     );
@@ -545,7 +545,7 @@ describe('updateQuote — Item 15g Layer 15g-v total_amount recompute', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       {
         loyalty_points_to_redeem: 50,
@@ -562,7 +562,7 @@ describe('updateQuote — Item 15g Layer 15g-v total_amount recompute', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       {
         manual_discount_type: 'percent',
@@ -582,7 +582,7 @@ describe('updateQuote — Item 15g Layer 15g-v total_amount recompute', () => {
       updates,
     });
     await updateQuote(
-      supabase as Parameters<typeof updateQuote>[0],
+      supabase as unknown as Parameters<typeof updateQuote>[0],
       'q-1',
       {
         items: [
