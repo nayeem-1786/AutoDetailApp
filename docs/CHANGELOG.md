@@ -6,6 +6,16 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-20 — docs: SMS AI v2 prompt observations doc created
+
+Captures behaviors observed during 2026-05-20 allowlist phase. Feeds future batched prompt-tuning session.
+
+**New file:** `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` — six-section observations doc covering: (1) Locked design decisions (vehicle rendering format, Mexican Spanish dialect, `channel='sms'` invariant, no-negotiation rule, sparing-emoji pattern); (2) Eight confirmed prompt-tuning issues with verbatim evidence + severity + proposed fix direction (color rendering inconsistency, closure not graceful on "Nope", short affirmatives after multi-option offers, Spanish dialect, language-switching not customer-current-message-led, past-context over-extension to new questions, agent jumps to suggestions instead of discovery, multi-language quote-request phrasings not all recognized); (3) Critical bug (Bug A — wrong-tier pricing in Q-0076 — flagged as P0-suspected, requires dedicated diagnostic + fix session, NOT prompt tuning); (4) Pre-emptive flags not yet tested (negotiation, MMS, multi-question, out-of-scope, stale conversation pickup); (5) Resolved (empty placeholder for future entries with resolving SHAs); (6) Process notes describing the doc's role as input to the future batched prompt-tuning session.
+
+**No code changes.** Documentation only. The eventual prompt-tuning session will read Sections 1 + 2 as the spec for edits to `src/lib/sms-ai/system-prompt.ts`.
+
+---
+
 ## 2026-05-20 — P1 fix: SMS AI v2 outbound channel CHECK violation + harden silent INSERT errors
 
 Workstream A / Layer 4 bug fix. Production incident on 2026-05-20: operator (Nayeem, `+13107564789`) tested v2 in production after adding their phone to `sms_ai_v2_enabled_phones`. Customer-facing SMS delivery worked — the operator received each AI reply on their phone — but several AI replies (12:04 PM onward) did NOT appear in the Admin > Messaging UI. Root cause: `background-dispatch.ts:138` wrote `channel: 'sms_ai'`, but the production `messages_channel_check` constraint (from migration `20260324000003_cross_channel_bridge.sql:4`) allows only `('sms', 'voice')`. Every v2 outbound INSERT was silently rejected by PG. Silently because supabase-js does NOT throw on PG-side errors — it resolves with `{ data, error }`, and the dispatcher's bare `await admin.from('messages').insert({...})` discarded the `error` field. Customer got the SMS (sendSms ran before the failed INSERT); audit-log row never landed. The Layer 4 test suite asserted `channel: 'sms_ai'` was written but mocked supabase to accept any INSERT — never validated against the real CHECK constraint. Diagnostic confirmed by reading `DB_SCHEMA.md:1402-1406` + the bridge migration.
