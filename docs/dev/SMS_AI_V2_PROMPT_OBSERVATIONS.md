@@ -267,6 +267,74 @@ Either expand the `send_quote_sms` tool description in `src/lib/sms-ai/tools.ts`
 
 ---
 
+#### Issue 9 — Vehicle field capitalization not normalized on write
+
+**Severity:** P2
+**Observed:** 2026-05-21
+**Channel:** SMS allowlist test
+**Root cause class:** data-integrity, missing-normalization
+
+**Evidence:**
+Operator tested a Tahoe quote from their phone. Typed "green" as the color (no capitalization).
+Customer record now shows vehicle color as "green" (lowercase). Similarly, "tahoe" would likely
+be stored as "tahoe" lowercase, "chevy" as "chevy" lowercase. Most customers don't capitalize
+when texting, so the storage layer ends up with inconsistent casing across thousands of records.
+
+**What should have happened:**
+Storage normalization should title-case Year + Make + Model + Color before persistence. "green" →
+"Green", "honda" → "Honda", "tahoe" → "Tahoe". This makes downstream rendering consistent without
+each renderer having to remember to apply title-case on every read.
+
+**What did happen:**
+Raw customer input persisted to DB without normalization. Causes inconsistent display in admin UI,
+SMS replies, receipt rendering. Particularly noticeable when the SMS agent renders the vehicle back
+to the customer (e.g., "your green Honda Accord" — the lowercase "green" looks unintentional).
+
+**Proposed fix direction:**
+Extend `sanitizeVehicleField()` in `src/lib/utils/vehicle-helpers.ts` to apply a `toTitleCase()`
+helper on Make + Model + Color fields before INSERT. Handle multi-word colors ("lime green" →
+"Lime green") and hyphenated values ("two-tone" → "Two-tone"). Fold into Workstream H Session 4
+where vehicle-helpers.ts is being modified for the vehicle_models table integration.
+
+**Status:** Open — scheduled for Workstream H Session 4
+
+---
+
+#### Issue 10 — Color is not consistently collected by agent
+
+**Severity:** P2
+**Observed:** 2026-05-20 / 2026-05-21
+**Channel:** SMS allowlist test
+**Root cause class:** missing-discovery, vehicle-data-collection-invariant
+
+**Evidence:**
+In multiple conversations, the SMS agent quoted vehicles after collecting Year + Make + Model but
+without asking for Color. This matches the agent's current behavior — `classify_vehicle` and
+`send_quote_sms` don't strictly require color, and the agent doesn't proactively ask.
+
+This matters because vehicle data integrity for the customer's record must include Color. Walk-in
+intake and phone-agent intake both collect Color. SMS agent should match this discipline.
+
+**What should have happened:**
+When the customer provides any vehicle info missing Color, the agent should ask ONE focused
+question before calling `classify_vehicle` or `send_quote_sms`. Example: "Got it — Honda Accord
+2016. What color is your Accord?"
+
+**What did happen:**
+Agent skips the Color question and proceeds to classification and quoting. Vehicle row gets
+created (or updated) without Color. Downstream "render the customer's vehicle" prose has
+incomplete data.
+
+**Proposed fix direction:**
+System prompt addition: "When the customer provides vehicle info, collect Year + Make + Model +
+Color. If any of the four is missing, ASK ONE focused question before proceeding to
+classify_vehicle, send_quote_sms, or any other tool that needs vehicle context." Fold into the
+batched prompt-tuning session.
+
+**Status:** Open — scheduled for batched prompt-tuning session
+
+---
+
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
 These look like prompt issues but are actually code / tool-flow bugs. Tracked here so they're visible alongside prompt observations; resolved via dedicated fix sessions, not prompt tuning.
@@ -308,3 +376,136 @@ Each future entry format:
 - Critical bugs (Section 3) become their own fix-session prompts, not prompt-tuning items. The tuning session should explicitly skip Bug A until its dedicated fix session lands.
 - New observations get appended to Section 2 as they're captured from production conversations. Pre-emptive flags (Section 4) graduate to Section 2 once they have evidence from a real test.
 - Locked design decisions (Section 1) are not negotiable in a tuning session without explicit operator sign-off — they're the constraints the tuning operates within.
+
+---
+
+## Section 7 — Vehicle Classification & Escalation Architecture (planned)
+
+This section captures the architectural decisions for handling vehicle
+classification, exotic/classic vehicles, and unknown vehicles. The build
+itself is sequenced in `ROADMAP-13-ITEMS.md` under Workstream H. Decisions
+here are locked unless explicitly revisited by the operator.
+
+### Background
+
+Before this architecture: the classifier in `src/lib/utils/vehicle-categories.ts`
+returned `'sedan'` as a silent fallback for any vehicle it couldn't recognize.
+The send-quote-sms endpoint ALSO hardcoded sedan (Bug A — fixed 2026-05-20
+in commit `190f23be`). Net effect: ~half of all non-sedan vehicles received
+wrong-tier pricing for the lifetime of the voice-agent + SMS-AI v2 endpoints.
+Bug A's fix addressed the endpoint half. This architecture addresses the
+classifier half and introduces a structured escalation path for genuinely-
+unknown vehicles.
+
+### Design decisions (locked)
+
+**D1 — Exotics and classics ALWAYS escalate (Design B).**
+Exotic + classic vehicles will NOT be auto-quoted by SMS agent or voice
+agent. They will NOT appear in the public booking widget's price-display
+path. Pricing for exotic/classic tiers exists in the catalog ONLY for
+staff use via POS / walk-ins / manual quote creation. Rationale: operator
+wants visual confirmation of vehicle condition before pricing high-value
+work; staff can up-charge based on what they see; the bar for "auto-quote"
+is lower for standard vehicles.
+
+**D2 — Unknown vehicles escalate via the same path as exotic/classic.**
+When the classifier returns `size_class === null` (no rule, no match), the
+backend refuses to auto-quote and triggers an escalation. Customer receives
+an LLM-adapted "we'll follow up" message; staff receives a notification
+with vehicle details and a deep link to the customer record.
+
+**D3 — Two-tier classification system: `vehicle_models` table FIRST, regex fallback SECOND.**
+A new `vehicle_models` table will store curated Make+Model rows with
+authoritative size_class assignments. The classifier checks this table
+before falling through to the existing regex-based logic. The regex layer
+is preserved as a safety net but is no longer the only path. Hardcoded
+arrays (`EXOTIC_MAKES`, `CLASSIC_ELIGIBLE_MAKES`, `MODEL_SIZE_HINTS`)
+remain in code as the final fallback layer.
+
+**D4 — Customer-facing message is LLM-adapted, not template-verbatim.**
+Templates provide guidance about WHAT to say (key facts: vehicle, reason,
+expected follow-up). LLM adapts WORDING to maintain conversational
+naturalness and respect customer language (English/Spanish/etc.). This
+preserves the agent's casual conversational tone established in Layer 4.
+
+**D5 — Staff notification is template-controlled via existing `staff_notification_templates`.**
+New template `staff_notification_escalation` covers all three reasons
+(exotic, classic, unknown) using a single template with placeholders.
+Reason field differentiates triage. Other fields: customer name, phone,
+vehicle (year/make/model/color), last message excerpt, deep link to admin.
+No customer-facing deep link in SMS.
+
+**D6 — Deep link lives in admin escalation panel only, not in any SMS.**
+Operator must use desktop to handle escalations; mobile SMS notification
+carries only the alerting payload. Reasons: SMS character limits, URL
+preview rendering risks, separation of "alert" vs "act."
+
+**D7 — Vehicle Makes + Vehicle Models = master-detail relationship in admin UI.**
+Vehicle Makes card (existing) remains the primary list. Selecting a Make
+populates a Vehicle Models card below it. Models are scoped to the
+selected Make. Unselected Make = empty/placeholder state in Models card.
+Inline CRUD with auto-save. New makes can be auto-created from the
+escalation "Add to catalog" form with operator confirmation prompt
+("Make 'Lordstown' doesn't exist. Create it as automobile category?").
+Auto-create handles both vehicle_makes + vehicle_models row inline.
+
+**D8 — Escalations queue lives at Admin > Reports > Escalations.**
+Separate from POS Settings (where catalog management happens). Reports
+section emphasizes the queue+analytics nature: filter by date/type/status,
+table with per-row actions (open conversation, view customer + vehicles,
+add to catalog, mark resolved), aggregate metrics. Operators come here to
+handle unresolved escalations and review trends.
+
+**D9 — Color is required for vehicle persistence.**
+Year, Make, Model, AND Color must be collected by SMS agent before any
+vehicle row is created. System prompt enforced; backend permits null
+color if customer abandons mid-conversation but logs that color is
+missing in the escalation notification.
+
+**D10 — Vehicle re-classification on null `size_class`.**
+If a customer-vehicle row was previously created with `size_class=null`
+(via escalation), the classifier on subsequent agent calls should
+re-classify (consult the vehicle_models table again, since staff may
+have added a row in the meantime). Once a non-null size_class is stamped,
+the classifier uses the stamped value.
+
+**D11 — Voice agent (Retell) follows the same escalation policy.**
+Same backend guards apply to voice-agent endpoints. Voice agent's prompt
+will be updated to match. After-hours customer calls trigger same
+escalation but customer-facing message reflects next-day callback.
+
+**D12 — Legacy specialty-pivot block deletion deferred to Layer 5.**
+The existing legacy specialty-pivot code (route.ts:604-674) is functionally
+the same pattern this new escalation will use. Layer 5's "eradicate legacy"
+plan deletes it. No bridge work needed before Layer 5 — the new escalation
+handles allowlisted phones; legacy continues for non-allowlisted phones
+until Layer 5 ships, at which point the legacy path is removed entirely.
+
+**D13 — Vehicle field capitalization normalized on write.**
+Make, Model, and Color stored with title-case applied via
+`sanitizeVehicleField()` regardless of customer input case. "green" →
+"Green", "honda" → "Honda", "tahoe" → "Tahoe". Folds into Session 4
+(vehicle_models integration) since both touch `vehicle-helpers.ts`.
+
+### Coverage targets
+
+After full architecture lands:
+- 97-99% accurate classification on common cases (table + regex)
+- Remaining 1-3% gracefully escalates to staff (no silent miscoding)
+- Operator visibility via Admin > Reports > Escalations
+- Self-improving system: every escalation can result in a new vehicle_models row → fewer future escalations
+
+### What this does NOT solve (out of scope)
+
+These are operator-aware limitations of the planned architecture, NOT bugs:
+
+- **Heavily modified vehicles** (e.g., 1969 Mustang with modern V8 swap):
+  classifier sees the make/model; operator handles up-charge during walk-in
+  inspection via POS. Per-customer `size_class_manual_override` available
+  if needed.
+- **Trim-level differentiation** (e.g., Civic LX vs Civic Type R):
+  classifier treats them the same; pricing config differentiates if needed
+  via service-level tier configuration, not classifier logic.
+- **Online booking widget for exotics/classics:** separate workstream;
+  widget should NOT auto-price exotics/classics regardless of catalog
+  pricing being present. To be scoped after SMS/voice flows are stable.
