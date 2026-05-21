@@ -271,22 +271,7 @@ Either expand the `send_quote_sms` tool description in `src/lib/sms-ai/tools.ts`
 
 These look like prompt issues but are actually code / tool-flow bugs. Tracked here so they're visible alongside prompt observations; resolved via dedicated fix sessions, not prompt tuning.
 
-#### Bug A — Wrong-tier pricing in quote_sms tool output (P0, suspected)
-
-**Observed:** 2026-05-20, staff conversation, conv=`a89b4b20-ce99-448f-88f2-e989968c4d59`
-**Customer:** Joselyn Reyes / `+14243396994`
-**Vehicle in conversation context:** 2015 Chevy Tahoe (SUV 3-row tier — $320 quoted by agent in chat)
-**Quote actually sent:** Q-0076, short link `8qh2ui`, suspected to contain sedan-tier pricing ($210 from earlier in the same conversation when discussing a Civic).
-
-The conversation pinned Tahoe pricing at $320 in multiple agent turns before the quote send. The quote SMS went out for "Signature Complete Detail" with the Tahoe context. Operator observed that the rendered quote page showed sedan pricing, not SUV.
-
-**Hypothesis A:** `send_quote_sms` tool received a `service_id` only and resolved pricing against the customer's first vehicle on file (Joselyn's record may have a Civic-tier default), not the vehicle established in conversation. Vehicle context in conversation didn't flow into the tool call.
-
-**Hypothesis B:** `send_quote_sms` tool received the correct payload but the quote-rendering page has a bug that renders against the customer's primary vehicle, not the quote's service tier.
-
-**Status:** Open — needs diagnostic. Operator should run the parent-session SQL query to inspect quote Q-0076's stored fields (`quote_items.unit_price`, `quote_items.tier_name`, `quote_items.service_id`, the linked `vehicle_id`) before any tuning happens.
-
-**Fix direction:** Likely a code fix in either the tool dispatcher's `send_quote_sms` case (`src/lib/sms-ai/tool-dispatcher.ts`) OR the underlying voice-agent quote endpoint (`/api/voice-agent/send-quote-sms`). NOT a prompt issue. The prompt-tuning session should leave Bug A alone and wait for the dedicated fix session.
+_(Bug A resolved 2026-05-20 — see Section 5.)_
 
 ---
 
@@ -306,7 +291,7 @@ Items flagged early in the allowlist phase that haven't been fully exercised. Ea
 
 ## Section 5 — Resolved
 
-(Empty for now; structured to add entries as prompt-tuning sessions close issues with SHA references.)
+- **Bug A: Wrong-tier pricing in quote_sms tool output (Q-0076)** — resolved 2026-05-20 via session #45 (`fix/send-quote-sms-hardcoded-sedan-tier`). **Root cause:** `src/app/api/voice-agent/send-quote-sms/route.ts:82` hardcoded `const sizeClass = 'sedan';` before the service price-resolution loop, regardless of agent-provided `vehicle_year/make/model`. Q-0076 live-row inspection confirmed `quotes.vehicle_id` correctly pointed at a Tahoe with `size_class='suv_3row_van'`, but `quote_items.tier_name='sedan'` / `unit_price=210` was frozen by the hardcoded constant (the Tahoe's correct suv_3row_van tier was $320). Neither original hypothesis (A: vehicle context didn't flow; B: rendering bug) was exact — the actual layer was the endpoint accepting vehicle data but throwing it away for pricing. **Approach:** reordered the endpoint handler so `findOrCreateVehicle` (which internally classifies via `resolveVehicleClassification`) runs BEFORE the price-resolution loop, exposing `size_class` + `specialty_tier` via two new fields on `FindOrCreateVehicleResult`. `resolvePrice(service, sizeClass)` now receives the classified value. Explicit `'sedan'` fallback (with `console.warn`) survives only for the no-vehicle / null-result case. Fix reordered `findOrCreateVehicle` to run before `resolvePrice`; the agent's prompt-tuning issue around specialty-vehicle routing (agent should call `classify_vehicle` first for non-sedan vehicles, and route exotic/classic/RV/boat/aircraft to `notify_staff` instead of `send_quote_sms`) remains in Section 2 for future prompt-tuning work — not addressed by this code fix.
 
 Each future entry format:
 

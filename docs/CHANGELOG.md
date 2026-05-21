@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-20 — P0 fix: send-quote-sms hardcoded sedan tier (Bug A / Q-0076)
+
+Voice-agent + SMS-AI v2 quote endpoint `/api/voice-agent/send-quote-sms` hardcoded `const sizeClass = 'sedan';` at line 82 before running the service price-resolution loop, regardless of the agent-provided `vehicle_year/make/model`. Every non-sedan quote routed through this endpoint since it shipped silently underpriced — customers with truck/SUV/3-row/exotic/classic vehicles all received sedan-tier pricing. Confirmed in production via Q-0076 (Joselyn Reyes, 2015 Chevy Tahoe): `quotes.vehicle_id` correctly pointed at the Tahoe row with `size_class='suv_3row_van'`, but `quote_items.tier_name='sedan'` / `unit_price=210` was locked in by the hardcoded constant. The Tahoe's correct `suv_3row_van` tier on the same service was $320. Customer + vehicle render correctly on the quote page because they read from `quotes.customer_id` / `vehicle_id` joins; price + tier render the wrong frozen `quote_items` values.
+
+**Revenue impact:** Every voice-agent + SMS-AI v2 quote since the endpoint shipped where the customer's vehicle was non-sedan. Per the current fleet distribution (~half of vehicles in `truck_suv_2row` or `suv_3row_van` tiers, plus all exotic/classic), the typical underprice was $50-$200 per quote on the Signature Complete Detail service alone. Bug surface is the voice-agent + SMS-AI v2 path; POS/admin/booking paths used the canonical picker engine correctly and were not affected.
+
+**Modified — `src/app/api/voice-agent/send-quote-sms/route.ts`:**
+- Reordered handler: customer find-or-create + vehicle find-or-create now run BEFORE the service price-resolution loop. Vehicle's classified `size_class` flows into `resolvePrice(service, sizeClass)`.
+- Deleted obsolete defect-acknowledgement comment ("Mid-call tool doesn't have vehicle_type/size_class params, so sedan is the safe default"). Replaced with a comment documenting the corrected behavior and the defect history.
+- `vehicleSizeClass` captures the classified value from the new `FindOrCreateVehicleResult.size_class` field; falls back to `'sedan'` explicitly (with `console.warn`) when no vehicle was supplied. The fallback is now scoped to no-vehicle, no longer a universal default.
+- Block order: auth → body destructure → customer block → vehicle block (with `size_class` capture) → `const sizeClass = vehicleSizeClass ?? 'sedan'` → price-resolution loop → quote validity → `createQuote(...)`. Customer block moved up because vehicle find-or-create needs `customerId`. Surrounding `createQuote`, short-link, SMS, and `quote_communications` blocks unchanged.
+
+**Modified — `src/lib/utils/vehicle-helpers.ts`:**
+- Extended `FindOrCreateVehicleResult` interface with two new fields: `size_class: string | null` and `specialty_tier: string | null`. Backward-compatible additive change — six existing callers (`book/route.ts`, `voice-post-call.ts`, `twilio/inbound/route.ts`, `voice-agent/appointments/route.ts`, `voice-agent/quotes/route.ts`, the SMS-AI v2 routing test) only read `{ id, vehicle_category }` and continue to compile and run unchanged.
+- Populated the new fields at all three return points: existing-row branch (post-backfill, respects `size_class_manual_override`), race-winner branch (re-query result), and new-vehicle insert branch (from classifier output `resolvedSizeClass` / `resolvedSpecialtyTier`).
+- Field-level JSDoc on the new fields documents intent: `size_class` for automobiles → `resolvePrice(service, sizeClass)`; `specialty_tier` for non-automobile categories → `resolvePrice(service, sizeClass, { specialtyTier })`. Specialty wiring is intentionally not done in this session (see follow-ups).
+
+**New — `src/app/api/voice-agent/send-quote-sms/__tests__/route.test.ts` (8 cases):**
+1. 401 on bad auth — auth contract preserved
+2. Sedan vehicle (Honda Accord) → `resolvePrice` called with `'sedan'`, items at $210 / `tier_name='sedan'`
+3. truck_suv_2row (Tesla Model Y) → `resolvePrice` called with `'truck_suv_2row'`, items at $260 / matching tier
+4. **regression: Q-0076 — 2015 Chevy Tahoe → `resolvePrice` called with `'suv_3row_van'`, items at $320, with explicit negative assertions that `tier_name !== 'sedan'` and `unit_price !== 210` (pins the historical defect values so they cannot reappear on this code path)**
+5. Exotic vehicle (Ferrari Roma Spider) → `resolvePrice` called with `'exotic'`, items at $425
+6. Classic vehicle (1969 Mustang) → `resolvePrice` called with `'classic'`, items at $425
+7. Missing `vehicle_make` → `findOrCreateVehicle` not invoked, `resolvePrice` called with `'sedan'` fallback, `console.warn('No vehicle_make supplied …')` logged (observable in production logs)
+8. `findOrCreateVehicle` returns `null` (race/RLS) → falls back to `'sedan'`, quote created with `vehicle_id: undefined`
+
+Tests mock `validateApiKey`, `findOrCreateVehicle`, `resolveServiceByName`, `resolvePrice`, `createQuote`, `createShortLink`, `sendSms`, `getBusinessInfo`, `renderSmsTemplate`, and `createAdminClient` (thenable supabase stub for the customer/business_settings/quotes/quote_communications writes). Real `normalizePhone` + `sanitizeVehicleField` run.
+
+**Out of scope (explicit follow-ups surfaced):**
+- **`resolvePrice` `options.specialtyTier` is not wired** at this endpoint. Motorcycle/RV/boat/aircraft services with `pricing_model === 'specialty'` still fall back to the first `service_pricing` tier instead of dispatching to the customer's `specialty_tier` row. The new `FindOrCreateVehicleResult.specialty_tier` field exposes the right value — a future ~3-line patch wires it through without touching the helper again. Latent in production today.
+- **Sibling endpoint check (per operator request):**
+  - `src/app/api/voice-agent/quotes/route.ts` — **DIFFERENT pattern, not affected.** Caller passes `services: QuoteServiceInput[]` where each input optionally carries `tier_name`. When `tier_name` is supplied, the endpoint looks it up correctly (lines 170-177). When NOT supplied, it falls back to the first tier (lines 181-187) — a related but milder issue (caller-API-driven, not hardcoded). The send-quote-sms hardcoded-sedan bug does NOT exist here.
+  - `src/app/api/voice-agent/appointments/route.ts` — **DIFFERENT pattern by design.** Ad-hoc booking branch deliberately writes `price_at_booking: 0, tier_name: null` (line 549-550) per comment at line 573 ("voice-agent ad-hoc bookings don't price the service at booking time"). Quote-conversion branch defers entirely to `convertQuote()` which inherits whatever tier the source quote carries (so a Bug-A-mispriced quote → mispriced converted appointment, but the appointments endpoint itself doesn't hardcode).
+- **Agent-prompt issue (unchanged):** the `send_quote_sms` tool description in `src/lib/sms-ai/tools.ts` doesn't tell the agent to first call `classify_vehicle` before quoting non-sedan vehicles, or to route specialty (exotic/classic/RV/boat/aircraft) cases to `notify_staff` instead. Separate prompt-tuning workstream (Section 2 of SMS_AI_V2_PROMPT_OBSERVATIONS.md).
+
+**Verification:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (no new warnings)
+- `npm test` → 1819 passing (1811 baseline + 8 new in this session)
+- `npm run build` → clean (Compiled successfully in 12.0s; 787 pages generated)
+
+**ROADMAP ledger:** session row #45 (P0).
+
+---
+
 ## 2026-05-20 — docs: SMS AI v2 prompt observations doc created
 
 Captures behaviors observed during 2026-05-20 allowlist phase. Feeds future batched prompt-tuning session.

@@ -65,49 +65,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No valid services provided' }, { status: 400 });
     }
 
-    // Resolve services to quote items (sale-aware via resolvePrice)
-    const quoteItems: Array<{
-      service_id: string;
-      item_name: string;
-      quantity: number;
-      unit_price: number;
-      tier_name: string | null;
-      standard_price: number | null;
-      pricing_type: 'standard' | 'sale' | 'combo' | null;
-    }> = [];
-
-    // We don't know the vehicle yet, so default to sedan.
-    // Vehicle is created below — but service resolution needs a size class hint.
-    // Mid-call tool doesn't have vehicle_type/size_class params, so sedan is the safe default.
-    const sizeClass = 'sedan';
-
-    let t = perf.now();
-    for (const serviceName of serviceNames) {
-      const service = await resolveServiceByName(admin, serviceName);
-      if (!service) {
-        console.warn(`[SendQuoteSMS] Service not found: "${serviceName}"`);
-        continue;
-      }
-      const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
-      quoteItems.push({
-        service_id: service.id,
-        item_name: service.name,
-        quantity: 1,
-        unit_price: isOnSale ? salePrice! : price,
-        tier_name: tierName,
-        standard_price: isOnSale ? price : null,
-        pricing_type: isOnSale ? 'sale' : 'standard',
-      });
-    }
-    perf.mark('resolve:services_batch', t);
-
-    if (quoteItems.length === 0) {
-      return NextResponse.json(
-        { error: 'None of the specified services were found' },
-        { status: 400 }
-      );
-    }
-
     // Find or create customer.
     // Session 2B: SELECT expanded with last_name/email/phone for forward
     // compatibility. Session 3C migrated quote_sms_midcall to chip-driven
@@ -115,7 +72,7 @@ export async function POST(request: NextRequest) {
     // short_url; the additional customer fields remain available for any
     // future operator-driven body edits without further engineering.
     let customerId: string | null = null;
-    t = perf.now();
+    let t = perf.now();
     const { data: existingCustomer } = await admin
       .from('customers')
       .select('id, first_name, last_name, email, phone, sms_consent')
@@ -189,8 +146,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find or create vehicle — shared dedup by make + model + category
+    // Find or create vehicle — shared dedup by make + model + category.
+    // MUST run BEFORE service price resolution so the classified size_class
+    // flows into resolvePrice. Defect history: prior to 2026-05-20, this
+    // endpoint hardcoded sizeClass = 'sedan' and ran the price loop first,
+    // silently underpricing every non-sedan quote (Bug A / Q-0076 Tahoe).
     let vehicleId: string | undefined;
+    let vehicleSizeClass: string | null = null;
     if (vehicle_make) {
       const { findOrCreateVehicle } = await import('@/lib/utils/vehicle-helpers');
       t = perf.now();
@@ -202,7 +164,57 @@ export async function POST(request: NextRequest) {
         color: sanitizeVehicleField(vehicle_color),
       });
       perf.mark('query:vehicles_findOrCreate', t);
-      if (vehicleResult) vehicleId = vehicleResult.id;
+      if (vehicleResult) {
+        vehicleId = vehicleResult.id;
+        vehicleSizeClass = vehicleResult.size_class;
+      }
+    } else {
+      console.warn('[SendQuoteSMS] No vehicle_make supplied — pricing will fall back to sedan tier');
+    }
+
+    // Pricing tier is determined by the vehicle's classified size_class
+    // (sedan / truck_suv_2row / suv_3row_van / exotic / classic). Fall back
+    // to 'sedan' when no vehicle was supplied or findOrCreateVehicle failed —
+    // matches prior behavior for the no-vehicle case but is now explicit, not
+    // a silent universal default.
+    const sizeClass = vehicleSizeClass ?? 'sedan';
+
+    // Resolve services to quote items (sale-aware via resolvePrice)
+    const quoteItems: Array<{
+      service_id: string;
+      item_name: string;
+      quantity: number;
+      unit_price: number;
+      tier_name: string | null;
+      standard_price: number | null;
+      pricing_type: 'standard' | 'sale' | 'combo' | null;
+    }> = [];
+
+    t = perf.now();
+    for (const serviceName of serviceNames) {
+      const service = await resolveServiceByName(admin, serviceName);
+      if (!service) {
+        console.warn(`[SendQuoteSMS] Service not found: "${serviceName}"`);
+        continue;
+      }
+      const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
+      quoteItems.push({
+        service_id: service.id,
+        item_name: service.name,
+        quantity: 1,
+        unit_price: isOnSale ? salePrice! : price,
+        tier_name: tierName,
+        standard_price: isOnSale ? price : null,
+        pricing_type: isOnSale ? 'sale' : 'standard',
+      });
+    }
+    perf.mark('resolve:services_batch', t);
+
+    if (quoteItems.length === 0) {
+      return NextResponse.json(
+        { error: 'None of the specified services were found' },
+        { status: 400 }
+      );
     }
 
     // Read quote validity
