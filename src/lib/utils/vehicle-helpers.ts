@@ -56,6 +56,21 @@ export interface FindOrCreateVehicleResult {
   created: boolean;
   /** Resolved vehicle category (automobile, motorcycle, rv, boat, aircraft) */
   vehicle_category: string;
+  /**
+   * Canonical pricing-tier value for automobiles. `null` for non-automobile
+   * categories (motorcycle/RV/boat/aircraft). Callers performing money math
+   * (e.g., resolvePrice) must read this rather than defaulting to 'sedan' —
+   * see Bug A 2026-05-20 (Q-0076 mispriced because send-quote-sms hardcoded
+   * 'sedan' instead of reading the classified value).
+   */
+  size_class: string | null;
+  /**
+   * Specialty pricing-tier value for non-automobile categories
+   * (e.g., 'rv_25_35', 'boat_21_26'). `null` for automobiles. Pass into
+   * resolvePrice's `options.specialtyTier` when pricing services with
+   * `pricing_model === 'specialty'`.
+   */
+  specialty_tier: string | null;
 }
 
 /**
@@ -147,7 +162,18 @@ export async function findOrCreateVehicle(
         console.log(`[findOrCreateVehicle] Backfilled vehicle ${existing.id}:`, updates);
       }
 
-      return { id: existing.id, created: false, vehicle_category: resolvedCategory };
+      // size_class: prefer existing row (respects size_class_manual_override),
+      // fall back to just-backfilled classifier value.
+      const finalSizeClass = existing.size_class || resolvedSizeClass || null;
+      const finalSpecialtyTier = existing.specialty_tier || resolvedSpecialtyTier || null;
+
+      return {
+        id: existing.id,
+        created: false,
+        vehicle_category: resolvedCategory,
+        size_class: finalSizeClass,
+        specialty_tier: finalSpecialtyTier,
+      };
     }
 
     // Step 4: Insert new vehicle with full classification
@@ -173,7 +199,13 @@ export async function findOrCreateVehicle(
         console.log(`[findOrCreateVehicle] Constraint violation — re-querying for ${make} ${model}`);
         const { data: raceWinner } = await query.limit(1).maybeSingle();
         if (raceWinner) {
-          return { id: raceWinner.id, created: false, vehicle_category: resolvedCategory };
+          return {
+            id: raceWinner.id,
+            created: false,
+            vehicle_category: resolvedCategory,
+            size_class: raceWinner.size_class || resolvedSizeClass || null,
+            specialty_tier: raceWinner.specialty_tier || resolvedSpecialtyTier || null,
+          };
         }
       }
       console.error('[findOrCreateVehicle] Insert failed:', insertErr.message);
@@ -186,7 +218,13 @@ export async function findOrCreateVehicle(
       `[findOrCreateVehicle] Created vehicle: ${year || ''} ${params.color || ''} ${make} ${model || ''} ` +
       `(${resolvedCategory}/${resolvedSizeClass || resolvedSpecialtyTier})`
     );
-    return { id: newVehicle.id, created: true, vehicle_category: resolvedCategory };
+    return {
+      id: newVehicle.id,
+      created: true,
+      vehicle_category: resolvedCategory,
+      size_class: resolvedSizeClass ?? null,
+      specialty_tier: resolvedSpecialtyTier ?? null,
+    };
   } catch (err) {
     console.error('[findOrCreateVehicle] Unexpected error:', err);
     return null;

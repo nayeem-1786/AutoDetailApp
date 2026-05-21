@@ -1473,6 +1473,7 @@ SMS AI v2 Layer 1+2 additions (foundation; no runner + no webhook integration ye
 - `src/lib/services/staff-notification.ts` — notifyStaff canonical dispatcher (extracted from voice-agent endpoint body). 7 reason codes including new `human_handoff`.
 - `src/app/api/voice-agent/notify-staff/route.ts` — REFACTORED to thin HTTP wrapper around notifyStaff helper. Behavior-preserving.
 - `src/app/api/voice-agent/notify-staff/__tests__/route.test.ts` — 8 tests pinning HTTP contract post-refactor (401 / { success: false } on bad input / { success: true } on success, all 6 original reasons + new human_handoff forward-compat).
+- `src/app/api/voice-agent/send-quote-sms/__tests__/route.test.ts` — 8 tests pinning Bug A fix (size_class flows from vehicle, not hardcoded). 5 size-class tiers + missing-make fallback + findOrCreateVehicle-null fallback + named regression case `regression: Q-0076 — Tahoe quote uses suv_3row_van tier ($320), not sedan ($210)`.
 - `src/lib/sms-ai/feature-flag.ts` — shouldUseSmsAiV2 pure router + loadSmsAiV2Flags reader.
 - `src/lib/sms-ai/tools.ts` — 10 declarative Anthropic tool definitions.
 - `src/lib/sms-ai/system-prompt.ts` — buildV2SystemPrompt with {CUSTOMER_CONTEXT} placeholder.
