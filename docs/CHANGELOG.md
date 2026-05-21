@@ -6,6 +6,26 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-21 — docs: Vehicle Classification & Escalation Architecture (Workstream H) captured
+
+Multi-session planning conversation between operator and assistant finalized the architecture for handling vehicle classification, exotic/classic auto-quote policy, genuinely-unknown vehicles, and admin observability. Bug A fix (Workstream H Session 1, commit `190f23be`) verified in production 2026-05-21 via Tahoe re-test — Q-0077 priced correctly at $320 / suv_3row_van. This docs-only session captures decisions, surfaces two newly-observed issues, and sequences the remaining 7 sessions of the workstream build.
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- New **Section 7 — Vehicle Classification & Escalation Architecture (planned)** with 13 locked design decisions D1–D13: exotics/classics always escalate (D1); unknown vehicles escalate via same path (D2); two-tier classification with `vehicle_models` table first + regex fallback second (D3); LLM-adapted customer-facing escalation message, not template-verbatim (D4); template-controlled staff notification via new `staff_notification_escalation` (D5); deep link in admin panel only, never in customer SMS (D6); Vehicle Makes + Vehicle Models as master-detail admin UI with inline CRUD + auto-create from escalation form (D7); escalations queue at Admin > Reports > Escalations (D8); Color required for vehicle persistence (D9); re-classification on null size_class (D10); Retell voice agent follows same policy (D11); legacy specialty-pivot deletion deferred to Layer 5 (D12); field capitalization normalized on write (D13). Coverage targets: 97-99% accurate classification, 1-3% graceful escalation, self-improving via vehicle_models additions. Explicit out-of-scope: heavily modified vehicles, trim-level differentiation, online booking widget exotic/classic handling.
+- New entries appended to Section 2: **Issue 9 — Vehicle field capitalization not normalized on write** (P2; observed 2026-05-21 when operator typed "green" as color and DB persisted "green" lowercase; fix folds into Workstream H Session 4 since both touch `vehicle-helpers.ts`); **Issue 10 — Color is not consistently collected by agent** (P2; observed across multiple conversations where agent quoted after Year+Make+Model but skipped Color; fix is system-prompt addition requiring agent to ask one focused question before classification/quoting if Color missing).
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:**
+- New **Workstream H — Vehicle Classification & Escalation Architecture** under Out-of-Scope Workstreams. 8 sub-items: Session 1 (Bug A fix) ✅ done; Sessions 2-7 ⚪ not started (pricing tier audit / backend escalation engine / vehicle_models table + classifier integration + capitalization fix / Admin UI Vehicle Models card / Admin Escalations panel / agent + voice agent prompt updates); Session 8 ⚪ deferred (Layer 5 cleanup integration — legacy specialty-pivot deletion). Coverage targets + out-of-scope boundaries inline.
+- New session ledger row #46 documenting this docs-only session.
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**No source code touched.** No migrations. No test changes. Architecture is decisions-locked; implementation is sequenced across Workstream H Sessions 2-7.
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers anywhere in `docs/`. Section 7 header + Issue 9/10 entries + Workstream H entry all present and located as specified.
+
+---
+
 ## 2026-05-20 — P0 fix: send-quote-sms hardcoded sedan tier (Bug A / Q-0076)
 
 Voice-agent + SMS-AI v2 quote endpoint `/api/voice-agent/send-quote-sms` hardcoded `const sizeClass = 'sedan';` at line 82 before running the service price-resolution loop, regardless of the agent-provided `vehicle_year/make/model`. Every non-sedan quote routed through this endpoint since it shipped silently underpriced — customers with truck/SUV/3-row/exotic/classic vehicles all received sedan-tier pricing. Confirmed in production via Q-0076 (Joselyn Reyes, 2015 Chevy Tahoe): `quotes.vehicle_id` correctly pointed at the Tahoe row with `size_class='suv_3row_van'`, but `quote_items.tier_name='sedan'` / `unit_price=210` was locked in by the hardcoded constant. The Tahoe's correct `suv_3row_van` tier on the same service was $320. Customer + vehicle render correctly on the quote page because they read from `quotes.customer_id` / `vehicle_id` joins; price + tier render the wrong frozen `quote_items` values.
