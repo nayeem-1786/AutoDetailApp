@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-22 — feat(sms-ai-v2): batched prompt tuning addressing Issues 1-8, 10-15
+
+Production-affecting prompt rewrite. 14 confirmed observations from 2026-05-20 → 2026-05-22 allowlist testing folded into a single restructured prompt. Tool definitions, dispatcher, endpoints, schema all untouched — pure prompt work per the diagnostic that confirmed `get_services` already exposes `addon_suggestions` (with `addon_id` / `combo_price` / `savings`) to the agent.
+
+**Modified — `src/lib/sms-ai/system-prompt.ts`:**
+- Rewrote the template from 15 sections to 18 (+3 new sections, 1 renamed). New: `# Formatting and naming` (after Channel rules), `# Conversation freshness` (after Cross-channel awareness), `# Add-ons and bundle quoting` (after Tool usage guide). Renamed: `# Multi-language support` → `# Language handling`. Renamed: `# Conversation flow` → `# Discovery and conversation flow` (existing section extended with three new subsections — Discovery before menu enumeration, Reading short replies, Graceful closure).
+- Critical rules expanded from 13 to 14 — new rule 14 ("Tool-grounded add-ons only") establishes the hard guardrail against bundle-pricing hallucination (Issue 14, D15). Existing rule 9 strengthened to forbid asking for first name when on file and forbid asking for phone always (Issues 11 + 12).
+- New `# Formatting and naming` section pins Year + Color + Make + Model order with explicit lowercase-to-Title-Case rule (Issue 1, Section 1 design decision).
+- New `# Conversation freshness` section codifies the 4-hour soft-reset rule with both branches (gap < 4h continuation; gap ≥ 4h fresh — re-ask vehicle for multi-vehicle customers AND re-evaluate service intent) and the explicit-prior-reference exception (Issue 13, D14).
+- New `# Add-ons and bundle quoting` section dedicated to the tool-grounding guidance for Issues 14 + 15 (D15 + D16). Specifies use of `addon_suggestions[].standard_price` / `combo_price` / `savings` verbatim; canned response for empty-array case ("no current bundle pricing configured"); proactive surfacing rule (1-2 most-relevant add-ons in the same message as the standalone quote, picked by highest savings or topical fit, one mention per turn).
+- `# Vehicle info requirement` rewritten: Color is now ask-once-then-proceed (per operator clarification — don't loop indefinitely; backend records null and team follows up). Multi-vehicle disambiguation rule fires every turn for any pricing inquiry where the current message doesn't specify a vehicle (Issue 6 + Issue 10).
+- `# Tool usage guide` extended with "Quote-send intent recognition" paragraph listing English and Spanish phrasings (Issue 8). Don't require the literal word "quote".
+- `# Language handling` (renamed) declares Mexican Spanish vocabulary (carro/auto NOT coche; ustedes NEVER vosotros; usted/le default; avoid Castilian phrasing; Mexican confirmations) + current-message-led switching (Issues 4 + 5, Section 1 design decision). Service/product/tier names stay English regardless of language.
+- Cross-channel awareness, Vehicle size mapping, Escalation guide, RO Water, What you cannot do, Pending addon authorization (Layer 3c), Context for this conversation, and Grounding sections all preserved unchanged.
+
+**Token budget delta:** prompt runtime output grew from 13,389 chars / 170 lines (old) to 17,780 chars / 212 lines (new). **+32.8% chars** vs the 20% target ceiling in the session brief. After two compression passes (tightening Critical rule 9, rule 14, Cross-channel awareness, Vehicle info requirement, Quote-intent recognition, Add-ons section, Discovery/short-replies/closure subsections, Language handling), 14 substantive new rules + 3 new sections + 1 rename could not compress below ~33% growth without losing the rule. Operator should review the prompt size in context and reconcile against future model cost/cache behavior.
+
+**Modified — `src/lib/sms-ai/__tests__/system-prompt.test.ts`:**
+- Updated existing assertions for renamed/renumbered structure: section-headings test references `# Discovery and conversation flow`; Critical rules count assertion 13 → 14; `# Multi-language support` → `# Language handling` with explicit negative assertion that the old header is absent.
+- Added **19 new test cases** covering Issues 1, 2+3, 4+5, 6+10, 7, 8, 11+12, 13, 14, 15 + section-ordering invariants. Total file: 33 tests → 52 tests (+19).
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- Section 2: Issues 1-8 and Issues 10-15 collapsed to one-line markers (heading + `_(resolved 2026-05-22 — see Section 5.)_`). Issue 9 (capitalization not normalized on write) remains open in Section 2 — that's Workstream H Session 4 code work, not prompt-side.
+- Section 5: new resolution entries appended, one per resolved issue (or one per resolved pair where two issues were addressed jointly: 2+3, 4+5, 6+10, 14+15). Each entry follows the format `**Issue N: [Title]** — resolved 2026-05-22 via session #49. Approach: [one-line summary].`
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:** session ledger row #49 added.
+
+**No other source files touched.** No tool changes (`tools.ts`), no dispatcher changes (`tool-dispatcher.ts`), no endpoint changes, no schema changes, no `agent-runner.ts` changes, no `customer-context.ts` changes, no new tools, no migrations. Per the session brief's hard rules.
+
+**Verification:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → **1841/1841 pass** (was 1822 on the branch's main baseline; +19 new in this session)
+- `npm run build` → clean (Compiled successfully in 25.0s; 787 pages generated)
+
+**Deploy required: YES, by operator** via `deploy-smartdetails` post-merge. Live re-test against the 14 observation cases will confirm behavioral landings — structural tests verify the prompt CONTAINS the rules; whether the LLM applies them well per turn is observable only in production.
+
+**Follow-ups carried forward (NOT in this session):**
+- Issue 9 (vehicle field capitalization normalized on write) — Workstream H Session 4 code work in `src/lib/utils/vehicle-helpers.ts`.
+- Retell voice agent prompt update — Workstream H Session 7. Same rule set per D11; out of scope here.
+- Token budget reconciliation — operator should review the +32.8% delta against cost/cache behavior; deferred to a separate review pass.
+
+**ROADMAP ledger:** session row #49.
+
+---
+
 ## 2026-05-22 — docs: SMS AI v2 testing — Issues 13/14/15 + Issue 6 refinement + locked decisions D14/D15/D16
 
 Docs-only session capturing three new prompt-tuning observations from 2026-05-22 operator testing, a refinement to Issue 6, and three new locked design decisions (D14-D16). No source code, migrations, or tests touched. Source conversations: Engine Bay Detail bundle-hallucination test; 3-vehicle multi-context "how much to clean my engine?" test; 4-hour staleness behavioral discussion.
