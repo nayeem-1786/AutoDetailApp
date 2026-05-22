@@ -45,234 +45,59 @@ Entries with evidence, ready to be addressed in the batched prompt-tuning sessio
 
 #### Issue 1 — Color rendering inconsistency
 
-**Severity:** P3
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test
-**Root cause class:** vehicle-rendering
-
-**Evidence:**
-
-> "your Ferrari Roma Spider or your silver 2016 Accord"
-
-…and later in the same conversation, in a staff-alert payload:
-
-> "(Yellow, exotic)"
-
-**What should have happened:**
-
-Both vehicles rendered identically per locked format: "your 2026 Yellow Ferrari Roma Spider" and "your 2016 Silver Honda Accord". Capitalization consistent. Color included on both. Order: Year + Color + Make + Model.
-
-**What did happen:**
-
-Within a single agent turn, the Accord got "silver" (lowercase color, no year-first ordering, missing Honda make), and the Ferrari got no color at all. Then in the staff-alert downstream payload, color appeared as "Yellow" capitalized in parentheses. Three different renderings of the same data within one conversation.
-
-**Proposed fix direction:**
-
-System-prompt instruction in `src/lib/sms-ai/system-prompt.ts` for vehicle-mention formatting — likely a new bullet under the existing "Reference customer context naturally" critical rule, or a small new section. The render format is in Section 1 of this doc.
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 2 — Conversation closure not graceful
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test
-**Root cause class:** short-reply-interpretation
-
-**Evidence:**
-
-Customer replied "Nope" to an agent follow-up; agent responded with another summary instead of recognizing the closure signal. Later in the same conversation, a "No" reply was handled gracefully — but the behavior is inconsistent across one-word negatives.
-
-**What should have happened:**
-
-One-word negatives following an agent question that offered to continue (e.g., "Anything else I can help with?") should close the conversation cleanly: a short acknowledgment + an optional closure emoji, no further info push.
-
-**What did happen:**
-
-"Nope" triggered another summary message restating earlier content. The agent did not recognize the customer's intent to end the exchange.
-
-**Proposed fix direction:**
-
-Add explicit short-reply interpretation guidance to the system prompt: list common one-word negatives ("nope", "no", "nah", "not now", "all good") as closure signals when preceded by an agent "anything else?" turn. Pair with the existing emoji-on-closure pattern.
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 3 — Short affirmative replies after multi-option offers
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test
-**Root cause class:** short-reply-interpretation
-
-**Evidence:**
-
-"Si porfavor", "Yes", and "Si" all failed to advance the agent to the action they were supposed to confirm. The agent re-stated the same multi-option list each time. Pattern reproduced in both English and Spanish.
-
-**What should have happened:**
-
-When an agent offers a multi-option menu and the customer replies with a bare affirmative ("yes" / "si" / "sure"), the agent should ask one focused clarifying question ("Which one — A, B, or C?") rather than re-listing the same options as if the customer hadn't replied.
-
-**What did happen:**
-
-Agent re-presented the original options verbatim in response to the affirmative. Customer's intent was lost; the conversation looped on the same menu.
-
-**Proposed fix direction:**
-
-System-prompt instruction: when the model emits a multi-option offer and the next customer turn is a bare affirmative without a selection, the next agent turn must ask a single targeted clarifying question, not repeat the menu. May want a worked example in the prompt for both English and Spanish bare-affirmative cases.
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 4 — Spanish-Mexico vs Spain dialect
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test (staff conversation)
-**Root cause class:** language-switching
-
-**Evidence:**
-
-Agent's Spanish was grammatically correct but used neutral / non-Mexican vocabulary defaults. Operator's customer base is predominantly Mexican.
-
-**What should have happened:**
-
-Per the locked decision in Section 1: Mexican Spanish, `usted`/`le` for adults, `carro`/`auto` not `coche`, no `vosotros`. Vocabulary defaults that read as locally familiar to the Smart Details customer base.
-
-**What did happen:**
-
-Spanish output was grammatically valid but dialectally neutral / closer to Spain. Specific instances captured in conversation history but not transcribed here verbatim.
-
-**Proposed fix direction:**
-
-Extend the existing "Multi-language support" section of the system prompt with explicit Mexican Spanish guidance (formality default = `usted`/`le`; preferred vocabulary set; terms to avoid). Likely a short paragraph or bullet list, not a wholesale rewrite.
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 5 — Language switching not customer-current-message-led
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test (staff conversation)
-**Root cause class:** language-switching
-
-**Evidence:**
-
-Earlier turns of the conversation were in Spanish. Operator then wrote: "Hi can I get pricing for a wash?" (English). Agent replied in Spanish.
-
-**What should have happened:**
-
-Agent should respond in the language of the customer's CURRENT message, not the language of conversation history. A customer who switches to English mid-conversation should get English replies starting with the next agent turn.
-
-**What did happen:**
-
-Agent stayed in the conversation-history language (Spanish) even after the customer's explicit English turn. Required an "In English please" clarification to switch.
-
-**Proposed fix direction:**
-
-Tighten the "Multi-language support" section of the system prompt to explicitly state: respond in the language of the customer's current message, not the language of previous turns. Conversation-history language is a tiebreaker only when the current message is ambiguous (e.g., emoji-only, or punctuation only).
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 6 — Past-context-over-extension to new questions
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test (operator conversation)
-**Root cause class:** vehicle-disambiguation
-
-**Evidence:**
-
-Customer has 2 vehicles on file (Ferrari Roma + Honda Accord). Earlier in the conversation, customer specified "The Roma" for a quote. Later, customer asked: "Hi can I get pricing for a wash?" — agent assumed Accord without asking which vehicle.
-
-**What should have happened:**
-
-For multi-vehicle customers, every new pricing or service question should re-confirm which vehicle is in scope before quoting, unless the question explicitly references one of their vehicles ("the Ferrari", "my Accord", etc.).
-
-**What did happen:**
-
-Agent silently picked one vehicle (the Accord, not the previously-referenced Roma) and quoted against it. The customer's prior "The Roma" disambiguation didn't persist, AND the agent didn't ask.
-
-**Proposed fix direction:**
-
-Add a "Multi-vehicle disambiguation" rule to the system prompt: when the customer context shows 2+ vehicles AND the customer asks a service/price question without naming a vehicle, the agent must ask which one before invoking pricing tools. The existing "Reference customer context naturally" rule covers acknowledging vehicles but doesn't enforce disambiguation.
-
-**Status:** Open
-
-**Additional evidence — 2026-05-22:**
-Operator tested with their 3-vehicle customer record (Tahoe, Accord, Ferrari). Asked "Hey how much to clean my engine?" with no vehicle context in the message. Agent answered with Accord pricing ($175 Engine Bay Detail) without asking. When pushed back, agent acknowledged: "Fair point — I assumed since the Accord was your last mentioned car. I should've asked which vehicle you wanted."
-
-This confirms the issue isn't just about new conversations after gaps — it's about EVERY pricing inquiry from a multi-vehicle customer when no vehicle is specified, even within an active session. The fix rule needs to be unconditional: ALWAYS ask which vehicle for any pricing/service question from a multi-vehicle customer when the customer's current message doesn't specify one.
-
-Strengthened fix direction: System prompt must explicitly state — "When a customer has 2+ vehicles on file AND their current message doesn't specify a vehicle, you MUST ask which vehicle before quoting, classifying, or calling any service-resolution tool. Never assume continuity from prior turns. Each service inquiry is independent."
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 7 — Agent jumps to suggestions instead of discovery questions
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test
-**Root cause class:** missing-discovery
-
-**Evidence:**
-
-Customer: "Hi can I get pricing for a wash?"
-Agent: listed 3 services (Exterior Wash, Interior Clean, Signature Complete Detail).
-
-**What should have happened:**
-
-The customer used the word "wash" — typically implies exterior. Agent should ask one clarifying question first: "By 'wash' do you mean exterior, interior, or both?" — then quote only the matching tier(s).
-
-**What did happen:**
-
-Agent dumped a multi-service menu including services the customer didn't ask about (Interior Clean, full detail). Over-broad response when a single clarifying question would have narrowed the field.
-
-**Proposed fix direction:**
-
-System-prompt guidance to prefer one focused discovery question when the customer's term is ambiguous (e.g., "wash" could be exterior-only or basic-package), rather than enumerating the full catalog. Pairs with Issue 3 (short-reply-interpretation) — the customer's response to the clarifying question becomes the trigger for the actual quote.
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 8 — Multiple ways to ask for a quote — only some recognized
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test (staff conversation)
-**Root cause class:** missing-discovery
-
-**Evidence:**
-
-Staff member tried three Spanish phrasings in the same conversation:
-- "Me puedes dar un presupuesto" — did NOT trigger `send_quote_sms`
-- "Me puedes cotizar" — did NOT trigger `send_quote_sms`
-- "Me puedes mandar un quote" — DID trigger `send_quote_sms`
-
-**What should have happened:**
-
-All three phrasings (and their English equivalents — "can you quote me", "give me an estimate", "send me a quote", etc.) should be recognized as quote-request intent and trigger the `send_quote_sms` tool consistently.
-
-**What did happen:**
-
-Only the literal-English-loanword phrasing ("mandar un quote") triggered the tool. The Spanish-native phrasings ("presupuesto", "cotizar") did not.
-
-**Proposed fix direction:**
-
-Either expand the `send_quote_sms` tool description in `src/lib/sms-ai/tools.ts` with example trigger phrasings in multiple languages, or add a system-prompt note clarifying the intent-recognition set for quote requests. The tool description is the model's primary signal for tool selection per Layer 1+2 convention, so that's the likely fix surface — but verify before tuning.
-
-**Status:** Open
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 9 — Vehicle field capitalization not normalized on write
 
@@ -309,205 +134,45 @@ where vehicle-helpers.ts is being modified for the vehicle_models table integrat
 
 #### Issue 10 — Color is not consistently collected by agent
 
-**Severity:** P2
-**Observed:** 2026-05-20 / 2026-05-21
-**Channel:** SMS allowlist test
-**Root cause class:** missing-discovery, vehicle-data-collection-invariant
-
-**Evidence:**
-In multiple conversations, the SMS agent quoted vehicles after collecting Year + Make + Model but
-without asking for Color. This matches the agent's current behavior — `classify_vehicle` and
-`send_quote_sms` don't strictly require color, and the agent doesn't proactively ask.
-
-This matters because vehicle data integrity for the customer's record must include Color. Walk-in
-intake and phone-agent intake both collect Color. SMS agent should match this discipline.
-
-**What should have happened:**
-When the customer provides any vehicle info missing Color, the agent should ask ONE focused
-question before calling `classify_vehicle` or `send_quote_sms`. Example: "Got it — Honda Accord
-2016. What color is your Accord?"
-
-**What did happen:**
-Agent skips the Color question and proceeds to classification and quoting. Vehicle row gets
-created (or updated) without Color. Downstream "render the customer's vehicle" prose has
-incomplete data.
-
-**Proposed fix direction:**
-System prompt addition: "When the customer provides vehicle info, collect Year + Make + Model +
-Color. If any of the four is missing, ASK ONE focused question before proceeding to
-classify_vehicle, send_quote_sms, or any other tool that needs vehicle context." Fold into the
-batched prompt-tuning session.
-
-**Status:** Open — scheduled for batched prompt-tuning session
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 11 — Agent asks for customer name unnecessarily when context is present
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test (Spanish, staff member testing as customer Joselyn Reyes)
-**Root cause class:** redundant-discovery, context-not-honored
-
-**Evidence:**
-In the Spanish quote conversation, after the customer agreed to receive a quote, the agent asked:
-"¿A qué nombre lo envío y confirmo que el número es 4243396994?" (To what name do I send it,
-and confirm the number is 4243396994?)
-
-The customer's name was already attached to the customer record via prior context. The phone
-was already established via the inbound SMS. Both pieces of information were available to the
-agent through `getCustomerContext()`.
-
-**What should have happened:**
-Agent should silently use the customer's name and phone from the existing customer record.
-If the customer was new (no prior record) AND name was missing, ASK for the name. Otherwise,
-proceed without asking. The phone number is NEVER asked — the SMS came from that phone, so
-the phone is the identity, period.
-
-**What did happen:**
-Agent treated the conversation as if information was unknown, asked redundantly. Felt robotic
-and slowed the conversation flow.
-
-**Proposed fix direction:**
-System prompt addition: "Customer name and phone come from the conversation context bundle.
-NEVER ask the customer to confirm their phone number — the SMS is the source of truth for
-the phone. NEVER ask for the customer's name UNLESS the customer record has no name on file
-AND it's needed for the next action (e.g., creating a quote for a brand-new customer). When
-a name is needed, ask casually in conversation, not as a formal verification."
-
-**Status:** Open — scheduled for batched prompt-tuning session
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 12 — Agent asks for phone number despite SMS being the conversation channel
 
-**Severity:** P2
-**Observed:** 2026-05-20
-**Channel:** SMS allowlist test
-**Root cause class:** redundant-discovery, channel-context-not-honored
-
-**Evidence:**
-Same Spanish quote conversation as Issue 11. Agent asked "confirmo que el número es 4243396994?"
-during a conversation where the customer was actively texting on that exact number.
-
-The phone number is structurally the conversation key — the Twilio inbound webhook receives the
-phone in the `From` field, the conversation row is keyed on it, and all message rows reference
-the conversation. Asking the customer to confirm their phone via SMS is logically redundant.
-
-**What should have happened:**
-Agent should ALWAYS use the conversation's phone as the source of truth. Phone confirmation is
-NEVER part of an SMS conversation flow.
-
-**What did happen:**
-Agent included phone-confirmation language in the customer-facing message, making the
-conversation feel more robotic and bureaucratic than it should.
-
-**Proposed fix direction:**
-System prompt addition: "NEVER ask the customer to confirm their phone number. The SMS came
-from their phone — that IS the phone number. Use it silently for any tool calls that need a
-phone (e.g., send_quote_sms). If the customer mentions a different phone number for some
-reason, that's data to capture, not a confirmation to request."
-
-**Status:** Open — scheduled for batched prompt-tuning session
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 13 — No defined "fresh conversation" threshold; agent treats all conversation history as relevant context
 
-**Severity:** P2
-**Observed:** 2026-05-22
-**Channel:** SMS allowlist test (operator)
-**Root cause class:** context-bleeding, missing-conversation-state-policy
-
-**Evidence:**
-Operator tested across multiple sessions, including hours-old conversations being treated as continuous. No prompt rule defines when a conversation should be treated as "stale" vs. "active continuation."
-
-When operator asked the agent to articulate its own behavior, it agreed to a 4-hour soft-reset rule: any conversation older than 4 hours of inactivity should be treated as a fresh request, with the agent re-asking vehicle and re-evaluating intent rather than carrying forward stale assumptions about which service or vehicle the customer is interested in.
-
-**What should have happened:**
-A defined threshold should exist for "this conversation is fresh / start over" vs. "this is a continuation." Combined with a content-override exception: if the customer's CURRENT message explicitly references prior context (e.g., "book that quote you sent", "yes proceed", "the Tahoe one"), recognize the continuation regardless of elapsed time.
-
-**What did happen:**
-No threshold exists. Agent treats all history within `getConversationHistory()`'s 20-message window as equally relevant context, even when 6+ hours have passed between messages.
-
-**Proposed fix direction:**
-Add to system prompt: "If 4+ hours have elapsed since either party's last message, treat the next inbound as a fresh conversation. Re-ask vehicle for any multi-vehicle customer. Don't assume prior service context applies. EXCEPTION: If the customer's current message explicitly references prior context (e.g., 'book that quote', 'yes proceed', 'the Tahoe one'), recognize the continuation regardless of elapsed time."
-
-Implementation note: the agent has access to message timestamps via `getConversationHistory()`. The 4-hour gate is a runtime check on the most recent prior message timestamp, not a separate tool call.
-
-**Status:** Open — scheduled for batched prompt-tuning session
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 14 — Agent hallucinates bundle/add-on pricing for services that have no configured add-ons (P1)
 
-**Severity:** P1 — customer-trust and revenue-affecting
-**Observed:** 2026-05-22
-**Channel:** SMS allowlist test (operator)
-**Root cause class:** hallucination, missing-tool-data-guardrail
-
-**Evidence:**
-Operator asked agent about Engine Bay Detail. Agent quoted the standalone price correctly ($175). When operator pushed back about not getting all options, agent fabricated three add-on bundles with specific savings numbers:
-
-```
-AI: It can also be booked as an add-on with some services at a discount:
-- With Express Exterior Wash: $125 (save $50)
-- With Signature Complete Detail: $140 (save $35)
-- With 1, 3, or 5-Year Ceramic Shield: $140 (save $35)
-```
-
-**These add-on configurations DO NOT EXIST in the admin panel for Engine Bay Detail.** The agent invented the bundles and the savings amounts.
-
-Revenue/trust impact: If a customer accepted one of these fabricated bundles ("yes, book me the Express Wash + Engine Bay at $125"), the POS would price the actual services as their standalone sum (e.g., $75 + $175 = $250). Either staff honors the fabricated price (lose $125 of revenue) or corrects the customer (lose trust). Both are bad outcomes.
-
-**What should have happened:**
-If a service has NO configured add-ons in the catalog, the agent should say so explicitly: "Engine Bay Detail is $175 standalone — no current bundle pricing on that one." It should NEVER invent bundles.
-
-When a service DOES have configured add-ons (per the catalog), the agent should surface them with their actual configured pricing.
-
-**What did happen:**
-Agent fabricated plausible-sounding bundles with invented dollar amounts.
-
-**Proposed fix direction:**
-TWO-LAYER FIX needed:
-
-(a) **Hard prompt guardrail:** "NEVER invent add-on or bundle pricing. ONLY mention add-ons that are returned by the `get_services` tool response for the specific service. If a customer asks about bundling and the service has no configured add-ons, say so directly. Do not extrapolate, generalize, or suggest 'this would work with...' unless the combination is explicitly present in tool data."
-
-(b) **Tool-data verification (separate diagnostic):** Confirm what `get_services` currently returns. If add-on pricing data is not in the tool response, that's a tool-schema gap to close BEFORE the prompt rule can function correctly. Diagnostic scheduled before the batched prompt-tuning session.
-
-**Status:** Open — gated on `get_services` tool-data diagnostic. Stopgap consideration: operator may choose to add a temporary prompt rule (Option Z) forbidding ALL bundle/add-on discussion until the proper fix lands. Not selected at this time; risk accepted because allowlist is limited to 3 phones.
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 #### Issue 15 — When add-ons ARE configured, agent should surface them proactively (not just on customer pushback)
 
-**Severity:** P2 — revenue-affecting (under-surfaces legitimate upsell opportunities)
-**Observed:** 2026-05-22
-**Channel:** SMS allowlist test (operator)
-**Root cause class:** missing-proactive-disclosure
-
-**Evidence:**
-Same conversation as Issue 14. Even setting aside the hallucination problem, the agent's behavior pattern was wrong: it didn't mention bundle/add-on options on the first quote. It only surfaced them (in fabricated form) after the customer pushed back.
-
-If Engine Bay Detail genuinely had configured add-ons like Under Carriage Clean (the natural "top + bottom" engine compartment bundle), the customer would never have heard about that bundle from the initial quote. They'd get the standalone $175 quote, accept or decline, and the upsell opportunity would be lost.
-
-**What should have happened:**
-When quoting a service that has configured add-ons in the catalog, the agent should briefly mention the relevant add-ons in the SAME message as the standalone quote. Not as an overwhelming menu, but as 1-2 relevant bundle options with savings context.
-
-Example (hypothetical, with actual configured add-ons):
-> "Engine Bay Detail is $175 for your Accord. If you'd like full engine compartment coverage (top + bottom), Under Carriage Clean as an add-on brings the combined price to $X. Want me to bundle it, or just the engine bay?"
-
-**What did happen:**
-Agent quoted only the standalone service. Customer had to ask explicitly to discover add-on possibilities.
-
-**Proposed fix direction:**
-System prompt addition: "When quoting a service that has configured add-ons (returned in the `get_services` tool response), briefly mention 1-2 relevant add-ons in the quote message with combined-price context. Don't list every possible bundle as a menu — surface the most natural complement. Use language like 'often booked together' or 'common pairing'."
-
-This rule complements Issue 14's guardrail: surface real add-ons, never invent ones. The two rules together produce: "if add-ons exist, mention them; if they don't, say so."
-
-**Status:** Open — gated on Issue 14's tool-data diagnostic. Both addressed in batched prompt-tuning session once diagnostic confirms data shape.
+_(resolved 2026-05-22 — see Section 5.)_
 
 ---
+
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
@@ -534,6 +199,16 @@ Items flagged early in the allowlist phase that haven't been fully exercised. Ea
 ## Section 5 — Resolved
 
 - **Bug A: Wrong-tier pricing in quote_sms tool output (Q-0076)** — resolved 2026-05-20 via session #45 (`fix/send-quote-sms-hardcoded-sedan-tier`). **Root cause:** `src/app/api/voice-agent/send-quote-sms/route.ts:82` hardcoded `const sizeClass = 'sedan';` before the service price-resolution loop, regardless of agent-provided `vehicle_year/make/model`. Q-0076 live-row inspection confirmed `quotes.vehicle_id` correctly pointed at a Tahoe with `size_class='suv_3row_van'`, but `quote_items.tier_name='sedan'` / `unit_price=210` was frozen by the hardcoded constant (the Tahoe's correct suv_3row_van tier was $320). Neither original hypothesis (A: vehicle context didn't flow; B: rendering bug) was exact — the actual layer was the endpoint accepting vehicle data but throwing it away for pricing. **Approach:** reordered the endpoint handler so `findOrCreateVehicle` (which internally classifies via `resolveVehicleClassification`) runs BEFORE the price-resolution loop, exposing `size_class` + `specialty_tier` via two new fields on `FindOrCreateVehicleResult`. `resolvePrice(service, sizeClass)` now receives the classified value. Explicit `'sedan'` fallback (with `console.warn`) survives only for the no-vehicle / null-result case. Fix reordered `findOrCreateVehicle` to run before `resolvePrice`; the agent's prompt-tuning issue around specialty-vehicle routing (agent should call `classify_vehicle` first for non-sedan vehicles, and route exotic/classic/RV/boat/aircraft to `notify_staff` instead of `send_quote_sms`) remains in Section 2 for future prompt-tuning work — not addressed by this code fix.
+
+- **Issue 1: Color rendering inconsistency** — resolved 2026-05-22 via session #49 (batched prompt tuning). Approach: new `# Formatting and naming` section pins Year + Color + Make + Model order with capitalization (lowercase customer input rendered as Title Case in agent prose).
+- **Issue 2: Conversation closure not graceful** + **Issue 3: Short affirmative replies after multi-option offers** — resolved 2026-05-22 via session #49. Approach: `# Discovery and conversation flow` section adds "Reading short replies" subsection (interpret short affirmatives/negatives against the most recent agent message) + "Graceful closure" subsection (one brief acknowledgment after short-negative to "anything else?", no repeat-summary, no second "anything else?").
+- **Issue 4: Spanish-Mexico vs Spain dialect** + **Issue 5: Language switching not customer-current-message-led** — resolved 2026-05-22 via session #49. Approach: `# Language handling` section (renamed from `# Multi-language support`) declares Mexican Spanish vocabulary pins (carro/auto NOT coche; ustedes NEVER vosotros; usted/le default mirroring; Mexican confirmations) + current-message-led switching rule (current message language wins over history; immediate switch on explicit request).
+- **Issue 6: Past-context-over-extension to new questions** + **Issue 10: Color not consistently collected** — resolved 2026-05-22 via session #49. Approach: `# Vehicle info requirement` section declares Multi-vehicle disambiguation rule that fires every turn (ALWAYS ask which vehicle for any pricing inquiry from a multi-vehicle customer when current message doesn't specify) + Color: ask-once-then-proceed rule (don't loop; backend records null color for staff follow-up). Compounds with Issue 13's 4-hour rule.
+- **Issue 7: Agent jumps to suggestions instead of discovery questions** — resolved 2026-05-22 via session #49. Approach: `# Discovery and conversation flow` adds "Discovery before menu enumeration" rule with good/bad examples ("Looking for just the outside, or interior too?" vs catalog enumeration).
+- **Issue 8: Multiple quote-request phrasings not all recognized** — resolved 2026-05-22 via session #49. Approach: `# Tool usage guide` extended with "Quote-send intent recognition" paragraph listing English ("text me the price", "give me an estimate", etc.) and Spanish ("me puedes mandar un quote", "me puedes cotizar", "me puedes dar un presupuesto", "mándame la cotización") phrasings; don't require literal word "quote".
+- **Issue 11: Agent asks for customer name unnecessarily** + **Issue 12: Agent asks for phone number on SMS channel** — resolved 2026-05-22 via session #49. Approach: Critical rule 9 strengthened to forbid asking for first name when on file and forbid asking for phone always (customer is texting from it).
+- **Issue 13: No defined "fresh conversation" threshold (D14)** — resolved 2026-05-22 via session #49. Approach: new `# Conversation freshness` section codifies the 4-hour soft-reset rule (gap < 4h continues, gap ≥ 4h treats current message as fresh — re-ask vehicle for multi-vehicle customers AND re-evaluate service intent) with the explicit-prior-reference exception (continuation regardless of elapsed time when current message names a prior item).
+- **Issue 14: Bundle pricing hallucination, P1 (D15)** + **Issue 15: Proactive add-on disclosure (D16)** — resolved 2026-05-22 via session #49. Approach: new Critical rule 14 (tool-grounded add-ons only — every bundle/combo/savings MUST come from `addon_suggestions` for that specific primary service; never invent) + new `# Add-ons and bundle quoting` section with the "no current bundle pricing configured" canned response for empty add-on arrays + proactive surfacing rule (1-2 most-relevant add-ons in the same message as the standalone quote, picked by highest savings or topical fit, one mention per turn).
 
 Each future entry format:
 

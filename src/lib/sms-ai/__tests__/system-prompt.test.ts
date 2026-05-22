@@ -35,15 +35,14 @@ describe('buildV2SystemPrompt — structural output', () => {
     expect(CUSTOMER_CONTEXT_PLACEHOLDER).toBe('{CUSTOMER_CONTEXT}');
   });
 
-  it('contains all 8 required sections by heading', () => {
+  it('contains all 8 required section headings (post-2026-05-22 rename)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    // Loose heading checks — text-search resilient to formatting tweaks.
     expect(out).toMatch(/# Identity/);
     expect(out).toMatch(/# Channel rules/);
     expect(out).toMatch(/# Critical rules/);
     expect(out).toMatch(/# Tool usage guide/);
     expect(out).toMatch(/# Escalation guide/);
-    expect(out).toMatch(/# Conversation flow/);
+    expect(out).toMatch(/# Discovery and conversation flow/);
     expect(out).toMatch(/# Context for this conversation/);
     expect(out).toMatch(/# Grounding/);
   });
@@ -158,9 +157,11 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# RO Water');
   });
 
-  it('includes Multi-language support section header', () => {
+  it('includes Language handling section header (renamed from Multi-language support 2026-05-22)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('# Multi-language support');
+    expect(out).toContain('# Language handling');
+    // Old header must NOT remain — prevents accidental duplicate section
+    expect(out).not.toContain('# Multi-language support');
   });
 
   it('includes What you cannot do section header', () => {
@@ -168,17 +169,15 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 13 numbered rules', () => {
+  it('Critical rules section contains exactly 14 numbered rules (Issue 14 add-on guardrail added 2026-05-22)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    // Slice from "# Critical rules" header to the next "# " header.
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
     const afterHeader = out.slice(criticalIdx + '# Critical rules'.length);
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
-    // Count lines that begin with `<digit>.` (1–13).
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(13);
+    expect(numbered.length).toBe(14);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -201,15 +200,15 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
   it('cross-channel awareness section mentions voice agent and references quotes by number', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const crossIdx = out.indexOf('# Cross-channel awareness');
-    const section = out.slice(crossIdx, out.indexOf('# Vehicle size mapping', crossIdx));
+    const section = out.slice(crossIdx, out.indexOf('# Conversation freshness', crossIdx));
     expect(section.toLowerCase()).toContain('voice agent');
     expect(section).toContain('Q-0023');
   });
 
-  it('multi-language section lists all 4 supported languages', () => {
+  it('language-handling section lists supported languages', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    const mlIdx = out.indexOf('# Multi-language support');
-    const section = out.slice(mlIdx, out.indexOf('# What you cannot do', mlIdx));
+    const langIdx = out.indexOf('# Language handling');
+    const section = out.slice(langIdx, out.indexOf('# RO Water', langIdx));
     expect(section).toContain('Spanish');
     expect(section).toContain('Filipino');
     expect(section).toContain('Hindi');
@@ -249,5 +248,197 @@ describe('buildV2SystemPrompt — pending addon authorization section', () => {
     expect(addonIdx).toBeGreaterThan(-1);
     expect(placeholderIdx).toBeGreaterThan(-1);
     expect(addonIdx).toBeLessThan(placeholderIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2026-05-22 batched prompt tuning — Issues 1-8, 10-15 from
+// docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md. Each test pins the prompt
+// CONTAINS the rule wording; behavioral testing happens via live re-test
+// after deploy. Issue 9 (capitalization) is code work (Workstream H
+// Session 4), not prompt — no test here.
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — Issue 1 (vehicle naming Y+C+M+M)', () => {
+  it('includes Formatting and naming section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Formatting and naming');
+  });
+
+  it('specifies Year + Color + Make + Model order with capitalization', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Year + Color + Make + Model');
+    // At least one positive Y+C+M+M example present
+    expect(out).toMatch(/2016 Silver Honda Accord|2026 Yellow Ferrari Roma Spider/);
+    // Lowercase-to-Title example pinned
+    expect(out).toContain('"silver" → "Silver"');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 2 + Issue 3 (closure + short replies)', () => {
+  it('includes Reading short replies subsection in Discovery and conversation flow', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Reading short replies');
+    // Short affirmatives enumerated
+    expect(out).toContain('"yes"');
+    expect(out).toContain('"yeah"');
+    expect(out).toContain('"sí"');
+  });
+
+  it('includes Graceful closure rule + canonical examples', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Graceful closure');
+    expect(out).toContain('You got it');
+    expect(out).toMatch(/talk soon|see you then/i);
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 4 + Issue 5 (Mexican Spanish + current-message-led switching)', () => {
+  it('declares Mexican Spanish dialect with vocab pins', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Mexican Spanish');
+    expect(out).toContain('carro');
+    expect(out).toContain('ustedes');
+    expect(out).toContain('NOT "coche"');
+    expect(out).toContain('NEVER "vosotros"');
+  });
+
+  it('declares current-message-led language switching rule', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/language of the customer's CURRENT message/);
+    expect(out).toContain('in English please');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 6 + Issue 10 (multi-vehicle disambiguation + color rule)', () => {
+  it('declares multi-vehicle disambiguation fires every turn', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Multi-vehicle disambiguation');
+    expect(out).toContain('fires every turn');
+    expect(out).toContain('ALWAYS ask which vehicle');
+  });
+
+  it('declares color-ask-once-then-proceed rule (D9 / Issue 10)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The exact non-loop language
+    expect(out).toContain('Color: ask once if missing');
+    expect(out).toMatch(/don't loop/i);
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 7 (discovery before menu)', () => {
+  it('declares Discovery before menu enumeration rule', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Discovery before menu enumeration');
+    expect(out).toMatch(/ONE focused clarifying question/);
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 8 (quote-intent recognition phrasings)', () => {
+  it('declares quote-send intent recognition with English + Spanish phrasings', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Quote-send intent recognition');
+    // English variants
+    expect(out).toContain('text me the price');
+    expect(out).toContain('give me an estimate');
+    // Spanish variants from Issue 8 evidence
+    expect(out).toContain('me puedes mandar un quote');
+    expect(out).toContain('me puedes cotizar');
+    expect(out).toContain('me puedes dar un presupuesto');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 11 + Issue 12 (don\'t ask for name or phone when on file)', () => {
+  it('forbids asking for name when context has one and forbids asking for phone always', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Both forbids inside Critical rule 9
+    expect(out).toContain('Use the first name on file; never ask for it');
+    expect(out).toContain('NEVER ask the customer to confirm or provide their phone');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 13 (4-hour fresh-conversation threshold, D14)', () => {
+  it('includes Conversation freshness section header', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Conversation freshness');
+  });
+
+  it('declares the 4-hour threshold with both branches', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/Gap < 4 hours/);
+    expect(out).toMatch(/Gap ≥ 4 hours/);
+    expect(out).toContain('FRESH request');
+  });
+
+  it('declares the explicit-prior-reference exception (carries continuation regardless of elapsed time)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('explicitly references prior context');
+    expect(out).toMatch(/regardless of elapsed time/);
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard guardrail, D15)', () => {
+  it('Critical rule 14 declares tool-grounded add-ons only', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Rule 14 specifically
+    expect(out).toMatch(/14\.\s+\*\*Tool-grounded add-ons only/);
+    expect(out).toContain('NEVER invent add-ons');
+    expect(out).toContain('addon_suggestions');
+  });
+
+  it('Add-ons and bundle quoting section provides the "no configured bundles" canned response', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('# Add-ons and bundle quoting');
+    expect(out).toContain('no current bundle pricing configured');
+    expect(out).toContain("Don't fabricate");
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 15 (proactive add-on disclosure, D16)', () => {
+  it('declares proactive add-on surfacing rule when configured', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('surface proactively');
+    expect(out).toMatch(/SAME message as the standalone quote/);
+    expect(out).toContain("don't wait for pushback");
+  });
+
+  it('uses tool-response fields combo_price + savings when surfacing', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('combo_price');
+    expect(out).toContain('savings');
+  });
+
+  it('caps add-on disclosure at one mention per turn', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('One mention per turn');
+  });
+});
+
+describe('buildV2SystemPrompt — section ordering (post-2026-05-22 outline)', () => {
+  it('Formatting and naming appears between Channel rules and Critical rules', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const channelIdx = out.indexOf('# Channel rules');
+    const formatIdx = out.indexOf('# Formatting and naming');
+    const criticalIdx = out.indexOf('# Critical rules');
+    expect(channelIdx).toBeLessThan(formatIdx);
+    expect(formatIdx).toBeLessThan(criticalIdx);
+  });
+
+  it('Conversation freshness appears between Cross-channel awareness and Vehicle size mapping', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const crossIdx = out.indexOf('# Cross-channel awareness');
+    const freshIdx = out.indexOf('# Conversation freshness');
+    const vmapIdx = out.indexOf('# Vehicle size mapping');
+    expect(crossIdx).toBeLessThan(freshIdx);
+    expect(freshIdx).toBeLessThan(vmapIdx);
+  });
+
+  it('Add-ons and bundle quoting appears between Tool usage guide and Discovery and conversation flow', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const toolsIdx = out.indexOf('# Tool usage guide');
+    const addonsIdx = out.indexOf('# Add-ons and bundle quoting');
+    const flowIdx = out.indexOf('# Discovery and conversation flow');
+    expect(toolsIdx).toBeLessThan(addonsIdx);
+    expect(addonsIdx).toBeLessThan(flowIdx);
   });
 });
