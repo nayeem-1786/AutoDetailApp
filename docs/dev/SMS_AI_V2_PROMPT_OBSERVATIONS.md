@@ -207,6 +207,13 @@ Add a "Multi-vehicle disambiguation" rule to the system prompt: when the custome
 
 **Status:** Open
 
+**Additional evidence — 2026-05-22:**
+Operator tested with their 3-vehicle customer record (Tahoe, Accord, Ferrari). Asked "Hey how much to clean my engine?" with no vehicle context in the message. Agent answered with Accord pricing ($175 Engine Bay Detail) without asking. When pushed back, agent acknowledged: "Fair point — I assumed since the Accord was your last mentioned car. I should've asked which vehicle you wanted."
+
+This confirms the issue isn't just about new conversations after gaps — it's about EVERY pricing inquiry from a multi-vehicle customer when no vehicle is specified, even within an active session. The fix rule needs to be unconditional: ALWAYS ask which vehicle for any pricing/service question from a multi-vehicle customer when the customer's current message doesn't specify one.
+
+Strengthened fix direction: System prompt must explicitly state — "When a customer has 2+ vehicles on file AND their current message doesn't specify a vehicle, you MUST ask which vehicle before quoting, classifying, or calling any service-resolution tool. Never assume continuity from prior turns. Each service inquiry is independent."
+
 ---
 
 #### Issue 7 — Agent jumps to suggestions instead of discovery questions
@@ -405,6 +412,103 @@ reason, that's data to capture, not a confirmation to request."
 
 ---
 
+#### Issue 13 — No defined "fresh conversation" threshold; agent treats all conversation history as relevant context
+
+**Severity:** P2
+**Observed:** 2026-05-22
+**Channel:** SMS allowlist test (operator)
+**Root cause class:** context-bleeding, missing-conversation-state-policy
+
+**Evidence:**
+Operator tested across multiple sessions, including hours-old conversations being treated as continuous. No prompt rule defines when a conversation should be treated as "stale" vs. "active continuation."
+
+When operator asked the agent to articulate its own behavior, it agreed to a 4-hour soft-reset rule: any conversation older than 4 hours of inactivity should be treated as a fresh request, with the agent re-asking vehicle and re-evaluating intent rather than carrying forward stale assumptions about which service or vehicle the customer is interested in.
+
+**What should have happened:**
+A defined threshold should exist for "this conversation is fresh / start over" vs. "this is a continuation." Combined with a content-override exception: if the customer's CURRENT message explicitly references prior context (e.g., "book that quote you sent", "yes proceed", "the Tahoe one"), recognize the continuation regardless of elapsed time.
+
+**What did happen:**
+No threshold exists. Agent treats all history within `getConversationHistory()`'s 20-message window as equally relevant context, even when 6+ hours have passed between messages.
+
+**Proposed fix direction:**
+Add to system prompt: "If 4+ hours have elapsed since either party's last message, treat the next inbound as a fresh conversation. Re-ask vehicle for any multi-vehicle customer. Don't assume prior service context applies. EXCEPTION: If the customer's current message explicitly references prior context (e.g., 'book that quote', 'yes proceed', 'the Tahoe one'), recognize the continuation regardless of elapsed time."
+
+Implementation note: the agent has access to message timestamps via `getConversationHistory()`. The 4-hour gate is a runtime check on the most recent prior message timestamp, not a separate tool call.
+
+**Status:** Open — scheduled for batched prompt-tuning session
+
+---
+
+#### Issue 14 — Agent hallucinates bundle/add-on pricing for services that have no configured add-ons (P1)
+
+**Severity:** P1 — customer-trust and revenue-affecting
+**Observed:** 2026-05-22
+**Channel:** SMS allowlist test (operator)
+**Root cause class:** hallucination, missing-tool-data-guardrail
+
+**Evidence:**
+Operator asked agent about Engine Bay Detail. Agent quoted the standalone price correctly ($175). When operator pushed back about not getting all options, agent fabricated three add-on bundles with specific savings numbers:
+
+```
+AI: It can also be booked as an add-on with some services at a discount:
+- With Express Exterior Wash: $125 (save $50)
+- With Signature Complete Detail: $140 (save $35)
+- With 1, 3, or 5-Year Ceramic Shield: $140 (save $35)
+```
+
+**These add-on configurations DO NOT EXIST in the admin panel for Engine Bay Detail.** The agent invented the bundles and the savings amounts.
+
+Revenue/trust impact: If a customer accepted one of these fabricated bundles ("yes, book me the Express Wash + Engine Bay at $125"), the POS would price the actual services as their standalone sum (e.g., $75 + $175 = $250). Either staff honors the fabricated price (lose $125 of revenue) or corrects the customer (lose trust). Both are bad outcomes.
+
+**What should have happened:**
+If a service has NO configured add-ons in the catalog, the agent should say so explicitly: "Engine Bay Detail is $175 standalone — no current bundle pricing on that one." It should NEVER invent bundles.
+
+When a service DOES have configured add-ons (per the catalog), the agent should surface them with their actual configured pricing.
+
+**What did happen:**
+Agent fabricated plausible-sounding bundles with invented dollar amounts.
+
+**Proposed fix direction:**
+TWO-LAYER FIX needed:
+
+(a) **Hard prompt guardrail:** "NEVER invent add-on or bundle pricing. ONLY mention add-ons that are returned by the `get_services` tool response for the specific service. If a customer asks about bundling and the service has no configured add-ons, say so directly. Do not extrapolate, generalize, or suggest 'this would work with...' unless the combination is explicitly present in tool data."
+
+(b) **Tool-data verification (separate diagnostic):** Confirm what `get_services` currently returns. If add-on pricing data is not in the tool response, that's a tool-schema gap to close BEFORE the prompt rule can function correctly. Diagnostic scheduled before the batched prompt-tuning session.
+
+**Status:** Open — gated on `get_services` tool-data diagnostic. Stopgap consideration: operator may choose to add a temporary prompt rule (Option Z) forbidding ALL bundle/add-on discussion until the proper fix lands. Not selected at this time; risk accepted because allowlist is limited to 3 phones.
+
+---
+
+#### Issue 15 — When add-ons ARE configured, agent should surface them proactively (not just on customer pushback)
+
+**Severity:** P2 — revenue-affecting (under-surfaces legitimate upsell opportunities)
+**Observed:** 2026-05-22
+**Channel:** SMS allowlist test (operator)
+**Root cause class:** missing-proactive-disclosure
+
+**Evidence:**
+Same conversation as Issue 14. Even setting aside the hallucination problem, the agent's behavior pattern was wrong: it didn't mention bundle/add-on options on the first quote. It only surfaced them (in fabricated form) after the customer pushed back.
+
+If Engine Bay Detail genuinely had configured add-ons like Under Carriage Clean (the natural "top + bottom" engine compartment bundle), the customer would never have heard about that bundle from the initial quote. They'd get the standalone $175 quote, accept or decline, and the upsell opportunity would be lost.
+
+**What should have happened:**
+When quoting a service that has configured add-ons in the catalog, the agent should briefly mention the relevant add-ons in the SAME message as the standalone quote. Not as an overwhelming menu, but as 1-2 relevant bundle options with savings context.
+
+Example (hypothetical, with actual configured add-ons):
+> "Engine Bay Detail is $175 for your Accord. If you'd like full engine compartment coverage (top + bottom), Under Carriage Clean as an add-on brings the combined price to $X. Want me to bundle it, or just the engine bay?"
+
+**What did happen:**
+Agent quoted only the standalone service. Customer had to ask explicitly to discover add-on possibilities.
+
+**Proposed fix direction:**
+System prompt addition: "When quoting a service that has configured add-ons (returned in the `get_services` tool response), briefly mention 1-2 relevant add-ons in the quote message with combined-price context. Don't list every possible bundle as a menu — surface the most natural complement. Use language like 'often booked together' or 'common pairing'."
+
+This rule complements Issue 14's guardrail: surface real add-ons, never invent ones. The two rules together produce: "if add-ons exist, mention them; if they don't, say so."
+
+**Status:** Open — gated on Issue 14's tool-data diagnostic. Both addressed in batched prompt-tuning session once diagnostic confirms data shape.
+
+---
+
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
 These look like prompt issues but are actually code / tool-flow bugs. Tracked here so they're visible alongside prompt observations; resolved via dedicated fix sessions, not prompt tuning.
@@ -556,6 +660,40 @@ Make, Model, and Color stored with title-case applied via
 `sanitizeVehicleField()` regardless of customer input case. "green" →
 "Green", "honda" → "Honda", "tahoe" → "Tahoe". Folds into Session 4
 (vehicle_models integration) since both touch `vehicle-helpers.ts`.
+
+**D14 — 4-hour fresh-conversation soft-reset rule.**
+After 4+ hours of inactivity (no inbound or outbound on the conversation),
+the agent treats the next inbound as a fresh conversation. Re-asks vehicle.
+Re-evaluates intent. Does not carry forward assumed service context from
+earlier in the message history. EXCEPTION: explicit content references
+("book that quote", "yes proceed", "the Tahoe one") override the reset
+and the agent recognizes continuation. This applies to v2 SMS agent;
+voice agent follows the same rule per D11. Threshold value (4 hours) is
+intentional middle-ground between aggressive resets (favors fresh starts
+but disrupts continuations) and lazy continuity (continues across
+overnight gaps inappropriately). Revisit if real-world data suggests
+adjustment.
+
+**D15 — Bundle/add-on pricing comes from tool data ONLY; agent never invents.**
+Hard guardrail. The agent may ONLY mention add-ons and bundle pricing
+that are returned by the `get_services` tool response for the specific
+service being discussed. If a service has no configured add-ons in the
+catalog, the agent says so directly rather than fabricating options.
+This is a P1 customer-trust + revenue rule. Violations create
+expectations the POS cannot honor at checkout. Tool-data shape must
+support this rule before the prompt rule is meaningful — separate
+diagnostic confirms whether `get_services` returns add-on data today.
+
+**D16 — Proactive add-on disclosure when configured.**
+When `get_services` returns configured add-ons for the service being
+quoted, the agent briefly mentions 1-2 relevant add-ons in the quote
+message with combined-price context. Surfaces upsell naturally rather
+than waiting for customer pushback. Not a menu of every possible
+bundle — the most natural complement, with savings context. Pairs
+with D15: surface real add-ons, never invent ones. Add-on relationships
+are defined in the catalog by operator (Admin > Catalog > Services
+add-on configuration); the agent reports what's configured, doesn't
+decide what bundles together.
 
 ### Coverage targets
 
