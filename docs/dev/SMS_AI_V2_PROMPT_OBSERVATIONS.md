@@ -335,6 +335,76 @@ batched prompt-tuning session.
 
 ---
 
+#### Issue 11 — Agent asks for customer name unnecessarily when context is present
+
+**Severity:** P2
+**Observed:** 2026-05-20
+**Channel:** SMS allowlist test (Spanish, staff member testing as customer Joselyn Reyes)
+**Root cause class:** redundant-discovery, context-not-honored
+
+**Evidence:**
+In the Spanish quote conversation, after the customer agreed to receive a quote, the agent asked:
+"¿A qué nombre lo envío y confirmo que el número es 4243396994?" (To what name do I send it,
+and confirm the number is 4243396994?)
+
+The customer's name was already attached to the customer record via prior context. The phone
+was already established via the inbound SMS. Both pieces of information were available to the
+agent through `getCustomerContext()`.
+
+**What should have happened:**
+Agent should silently use the customer's name and phone from the existing customer record.
+If the customer was new (no prior record) AND name was missing, ASK for the name. Otherwise,
+proceed without asking. The phone number is NEVER asked — the SMS came from that phone, so
+the phone is the identity, period.
+
+**What did happen:**
+Agent treated the conversation as if information was unknown, asked redundantly. Felt robotic
+and slowed the conversation flow.
+
+**Proposed fix direction:**
+System prompt addition: "Customer name and phone come from the conversation context bundle.
+NEVER ask the customer to confirm their phone number — the SMS is the source of truth for
+the phone. NEVER ask for the customer's name UNLESS the customer record has no name on file
+AND it's needed for the next action (e.g., creating a quote for a brand-new customer). When
+a name is needed, ask casually in conversation, not as a formal verification."
+
+**Status:** Open — scheduled for batched prompt-tuning session
+
+---
+
+#### Issue 12 — Agent asks for phone number despite SMS being the conversation channel
+
+**Severity:** P2
+**Observed:** 2026-05-20
+**Channel:** SMS allowlist test
+**Root cause class:** redundant-discovery, channel-context-not-honored
+
+**Evidence:**
+Same Spanish quote conversation as Issue 11. Agent asked "confirmo que el número es 4243396994?"
+during a conversation where the customer was actively texting on that exact number.
+
+The phone number is structurally the conversation key — the Twilio inbound webhook receives the
+phone in the `From` field, the conversation row is keyed on it, and all message rows reference
+the conversation. Asking the customer to confirm their phone via SMS is logically redundant.
+
+**What should have happened:**
+Agent should ALWAYS use the conversation's phone as the source of truth. Phone confirmation is
+NEVER part of an SMS conversation flow.
+
+**What did happen:**
+Agent included phone-confirmation language in the customer-facing message, making the
+conversation feel more robotic and bureaucratic than it should.
+
+**Proposed fix direction:**
+System prompt addition: "NEVER ask the customer to confirm their phone number. The SMS came
+from their phone — that IS the phone number. Use it silently for any tool calls that need a
+phone (e.g., send_quote_sms). If the customer mentions a different phone number for some
+reason, that's data to capture, not a confirmation to request."
+
+**Status:** Open — scheduled for batched prompt-tuning session
+
+---
+
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
 These look like prompt issues but are actually code / tool-flow bugs. Tracked here so they're visible alongside prompt observations; resolved via dedicated fix sessions, not prompt tuning.
