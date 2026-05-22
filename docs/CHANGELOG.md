@@ -6,6 +6,23 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-22 — docs: SMS AI v2 testing — Issues 13/14/15 + Issue 6 refinement + locked decisions D14/D15/D16
+
+Docs-only session capturing three new prompt-tuning observations from 2026-05-22 operator testing, a refinement to Issue 6, and three new locked design decisions (D14-D16). No source code, migrations, or tests touched. Source conversations: Engine Bay Detail bundle-hallucination test; 3-vehicle multi-context "how much to clean my engine?" test; 4-hour staleness behavioral discussion.
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- Section 2 — Issue 6 (Past-context over-extension) refined via append-only `**Additional evidence — 2026-05-22:**` block (existing text preserved). 3-vehicle customer ("how much to clean my engine?") test confirms issue isn't just gap-related — every pricing inquiry from a multi-vehicle customer without an explicit vehicle reference triggers the bug. Strengthened fix language requires unconditional vehicle disambiguation before any pricing tool call.
+- Section 2 — three new entries appended after Issue 12: **Issue 13 — No defined "fresh conversation" threshold** (P2; agent treats entire 20-message history window as equally relevant context; proposed fix is 4-hour soft-reset rule with explicit-reference content override); **Issue 14 — Agent hallucinates bundle/add-on pricing** (P1, customer-trust + revenue-affecting; operator-witnessed fabrication of three Engine Bay Detail bundles with invented savings amounts that don't exist in admin catalog; two-layer fix needed — hard prompt guardrail + `get_services` tool-data diagnostic; stopgap Option Z not selected since allowlist limited to 3 phones); **Issue 15 — Proactive add-on disclosure when configured** (P2, revenue-affecting; complements Issue 14 — agent should surface real add-ons in first quote, not wait for pushback; pairs with the D15 guardrail to produce "if add-ons exist, mention them; if they don't, say so"). Issues 1-5 and 7-12 untouched.
+- Section 7 — three new locked decisions appended after D13: **D14 — 4-hour fresh-conversation soft-reset rule** (with explicit-content-reference exception; applies to v2 SMS and voice agent per D11); **D15 — Bundle/add-on pricing comes from tool data ONLY** (hard guardrail; agent never invents; gated on `get_services` data-shape diagnostic); **D16 — Proactive add-on disclosure when configured** (1-2 relevant add-ons surfaced in initial quote message with combined-price context; agent reports configured relationships, doesn't decide bundling). D1-D13 untouched.
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:** new session ledger row #48 documenting this docs-only session. Workstream F, Workstream H, and all other sub-items unchanged.
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers anywhere in `docs/`. Issues 13/14/15 + D14/D15/D16 + Issue 6 `Additional evidence` block all grep cleanly.
+
+---
+
 ## 2026-05-21 — docs: loose-thread follow-ups + 2026-05-21 observations (Issues 11+12 + Workstream F)
 
 Docs-only session capturing two new SMS-allowlist observations from 2026-05-20 testing and two follow-up items surfaced during recent work. No source code, migrations, or tests touched.
