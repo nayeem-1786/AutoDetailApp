@@ -6,6 +6,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-21 — docs: loose-thread follow-ups + 2026-05-21 observations (Issues 11+12 + Workstream F)
+
+Docs-only session capturing two new SMS-allowlist observations from 2026-05-20 testing and two follow-up items surfaced during recent work. No source code, migrations, or tests touched.
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- New entries appended to Section 2 (after Issue 10): **Issue 11 — Agent asks for customer name unnecessarily when context is present** (P2; Spanish quote conversation where agent asked "¿A qué nombre lo envío?" despite customer name being on file via `getCustomerContext()`; proposed fix is system-prompt addition instructing agent to silently use name from context bundle and only ask when record is missing the field); **Issue 12 — Agent asks for phone number despite SMS being the conversation channel** (P2; same Spanish conversation, agent included "confirmo que el número es 4243396994?" though the SMS arrived from that exact number; proposed fix is system-prompt addition stating the SMS IS the phone — never confirm).
+- Issues 1-10 and Section 7 (Vehicle Classification & Escalation Architecture) untouched.
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:**
+- New `### Tasks` subsection within **Workstream F — Process Improvements** with two detailed entries: **`refresh_token_not_found` auth error spam in production logs** (P3 ⚪ not started; recurring `AuthApiError` in `pm2 logs smart-details` traced to Next.js middleware — predates SMS AI v2 work; pollutes logs but no customer impact identified; investigation needed to determine which routes trigger middleware auth refresh unnecessarily); **`specialty_tier` not wired through `resolvePrice` from send-quote-sms endpoint** (P3 ⚪ not started; surfaced during Bug A diagnostic — `FindOrCreateVehicleResult` now exposes `specialty_tier` per commit `190f23be` but the endpoint doesn't pass it to `resolvePrice`, so motorcycle/RV/boat/aircraft specialty-pricing services still fall back to first tier silently; ~3-line fix estimated). Workstream F existing table rows and Workstream H sub-items unchanged.
+- New session ledger row #47 documenting this docs-only session.
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers anywhere in `docs/`. Issue 11/12 + Workstream F entries grep cleanly.
+
+---
+
 ## 2026-05-21 — docs: Vehicle Classification & Escalation Architecture (Workstream H) captured
 
 Multi-session planning conversation between operator and assistant finalized the architecture for handling vehicle classification, exotic/classic auto-quote policy, genuinely-unknown vehicles, and admin observability. Bug A fix (Workstream H Session 1, commit `190f23be`) verified in production 2026-05-21 via Tahoe re-test — Q-0077 priced correctly at $320 / suv_3row_van. This docs-only session captures decisions, surfaces two newly-observed issues, and sequences the remaining 7 sessions of the workstream build.
