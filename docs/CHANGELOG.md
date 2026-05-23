@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-22 — fix(twilio-webhook): align STOP_WORDS + START_WORDS with Twilio Console compliance keywords
+
+Follow-up to commit `1aedee4e` (Yes-fix). The Yes-fix shipped with the pre-existing keyword lists `STOP_WORDS = ['STOP','STOPALL','UNSUBSCRIBE','CANCEL','END','QUIT']` and `START_WORDS = ['START','YES','UNSTOP']`, which DIVERGED from the actual Twilio Console compliance keywords for +14244010094 (verified 2026-05-22 — opt-in: START / SUBSCRIBE / LETSGO / SIGNMEUP; opt-out: OPTOUT / CANCEL / END / QUIT / UNSUBSCRIBE / REVOKE / STOP / STOPALL). Both Twilio and this app intercept these messages independently; misalignment caused inconsistent handling.
+
+**Modified — `src/app/api/webhooks/twilio/inbound/route.ts`:**
+- `STOP_WORDS` gained **`OPTOUT`** + **`REVOKE`** (both already in Twilio Console; app now also handles them).
+- `START_WORDS` gained **`SUBSCRIBE`** + **`LETSGO`** + **`SIGNMEUP`** (in Twilio Console; app now matches).
+- `START_WORDS` lost **`YES`** + **`UNSTOP`** (never in Twilio Console; were defensive heuristics from the original Layer 4 implementation; the Yes-fix consent gate now correctly handles conversational YES via fall-through to the agent regardless).
+- Alignment comment added above the constants documenting the Twilio-Console-pairing invariant ("When changing either, update both surfaces. Twilio Console state captured 2026-05-22.").
+
+**Gate logic unchanged.** `customerIsOptedOut`, `isStartWordKeyword`, `isStartWord` definitions and the `if (isStopWord || isStartWord)` block body are identical to the Yes-fix shipped state. Only the keyword list values changed.
+
+**Modified — `src/app/api/webhooks/twilio/inbound/__tests__/start-words-gate.test.ts`:**
+- **3 existing tests modified** to use still-valid opt-in keywords (the "no new tests / don't modify tests" rule was explicitly relaxed by operator since the test failures were an expected consequence of the keyword removal, not a regression in behavior):
+  - "opted-out customer + YES → opt-in fires" → "opted-out customer + SUBSCRIBE → opt-in fires"
+  - "opted-out customer + UNSTOP → opt-in fires" → "opted-out customer + LETSGO → opt-in fires"
+  - "STOP-then-YES round-trip" → "STOP-then-SUBSCRIBE round-trip"
+- **2 new fall-through tests added** documenting the new behavior so it can't silently regress:
+  - "opted-out customer + YES → falls through to agent (YES is no longer a START_WORD)"
+  - "opted-out customer + UNSTOP → falls through to agent (UNSTOP is no longer a START_WORD)"
+- File test count: 17 → 19 (+2 net).
+
+**No other source files touched.** No changes to gating logic, `updateSmsConsent()`, helpers, v2 routing, tools, dispatcher, prompts, agent-runner, customer-context, schema, migrations.
+
+**Verification:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → **1860/1860 pass** (was 1858; +2 net new in this session)
+- `npm run build` → clean (787 pages, 25.0s)
+
+**Deploy required: YES, by operator** via `deploy-smartdetails` post-merge. Post-deploy the only behavioral changes for end customers are: (a) opted-out customers texting `'OPTOUT'` or `'REVOKE'` now get TCPA-honored opt-out at the app layer (previously app skipped these, Twilio platform still handled at carrier level — net behavior unchanged but now consistent); (b) opted-out customers texting `'SUBSCRIBE'` / `'LETSGO'` / `'SIGNMEUP'` get app-side opt-in (previously app skipped these); (c) opted-out customers texting `'YES'` or `'UNSTOP'` fall through to the agent instead of triggering app-side opt-in (near-zero blast radius — only ~10 of ~1,384 customers are opted out, and those are imported Square contacts not actively using SMS; if any do text these words, Twilio platform-level handling may still process them as opt-in independently).
+
+**Customer-base context** (unchanged from Yes-fix): 1,374 of 1,384 non-deleted customers have `sms_consent=true`; only 10 are opted out; zero recent `sms_consent_log` rows are `source='inbound_sms'`.
+
+**Docs:** SMS_AI_V2_PROMPT_OBSERVATIONS.md — Issue 16's Section 5 resolution entry extended with a follow-up bullet referencing this session. ROADMAP ledger row #51.
+
+---
+
 ## 2026-05-22 — fix(twilio-webhook): YES keyword no longer intercepts opted-in customers' affirmative replies (P1)
 
 Production-affecting bug fix. The Twilio inbound webhook unconditionally treated `'YES'` / `'START'` / `'UNSTOP'` as TCPA opt-in keywords and returned early with `TWIML_EMPTY` BEFORE the SMS AI v2 routing block could see the message. Effect: any English-speaking customer who replied "Yes" to a short-affirmative agent question was silently ghosted. Live evidence: conv `23ee4f02` had 6 inbound 'Yes' messages and 0 agent replies in the past ~2 days. Customer-base impact: 1,374 of 1,384 non-deleted customers have `sms_consent=true`; only 10 are opted out — the bug overwhelmed its only legitimate purpose. Spanish `'Si'` / `'Sí'` were NOT affected.

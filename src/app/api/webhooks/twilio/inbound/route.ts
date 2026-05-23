@@ -37,11 +37,31 @@ import crypto from 'crypto';
 const TWIML_EMPTY = '<Response/>';
 const TWIML_HEADERS = { 'Content-Type': 'text/xml' };
 
+// Keyword lists MUST stay aligned with Twilio Console compliance keywords
+// (Twilio number +14244010094 > Messaging Service > Advanced Opt-Out > Keywords).
+// Both Twilio and this app code intercept these messages independently;
+// misalignment causes inconsistent behavior. When changing either, update
+// both surfaces. Twilio Console state captured 2026-05-22.
+
 /** TCPA opt-out keywords — exact match only */
-const STOP_WORDS = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
+const STOP_WORDS = [
+  'STOP',
+  'STOPALL',
+  'UNSUBSCRIBE',
+  'CANCEL',
+  'END',
+  'QUIT',
+  'OPTOUT',
+  'REVOKE',
+];
 
 /** TCPA opt-in keywords — exact match only */
-const START_WORDS = ['START', 'YES', 'UNSTOP'];
+const START_WORDS = [
+  'START',
+  'SUBSCRIBE',
+  'LETSGO',
+  'SIGNMEUP',
+];
 
 /** Max AI auto-replies per conversation per hour */
 const MAX_AI_REPLIES_PER_HOUR = 25;
