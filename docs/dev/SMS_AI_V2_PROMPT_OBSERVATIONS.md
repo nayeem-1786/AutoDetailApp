@@ -982,6 +982,102 @@ Out of scope for the prompt session (deferred to future code session):
 - Adding a structured `preferred_appointment_time` column to quotes
 - Backend hardening to enforce quote-first at the endpoint level
 
+**D20 — Quote status refresh on context load (operator-locked 2026-05-23).**
+The customer-context bundle loaded at the start of each agent turn must
+refresh the quote_status of any quotes referenced in the conversation.
+Currently context is loaded once with whatever quote_status was at that
+moment. Workstream J implementation: in `customer-context.ts`, when
+loading recent quotes for a customer, re-query quote_status as part of
+the same fetch (don't introduce a new round-trip — extend the existing
+SELECT). This ensures if customer accepts a quote via link between
+turns, the agent sees `status='accepted'` on the next inbound.
+
+**D21 — SMS verbal acceptance = quote 'accepted' (operator-locked 2026-05-23).**
+When the customer verbally agrees in SMS ("Yes book it" / "Let's do
+this" / "Sounds good — book me"), the quote is marked `status='accepted'`
+in the same transaction as the appointment creation. No new status value
+needed. No distinguishing column needed — staff manually verifies
+acceptance via the SMS conversation log when needed.
+
+**D22 — Multi-quote disambiguation (operator-locked 2026-05-23).**
+When multiple quotes are 'sent' or 'viewed' for the same customer and
+customer asks to book without specifying which service, agent asks
+explicitly: "Which service are you booking — [service A] ($X) or
+[service B] ($Y)?" Parallel to multi-vehicle disambiguation (Issue 6).
+Prompt rule encoded in Workstream J Session 2.
+
+**D23 — All agent-created appointments → Pending status (operator-locked 2026-05-23).**
+Appointments created by the agent (via the refined quote-conversion path)
+are written with `status='pending'`. Only staff manually flipping the
+status creates `status='confirmed'` appointments. Calendar UI already
+distinguishes Pending from Confirmed visually (verified by operator
+2026-05-23). No schema change needed — existing appointment_status enum
+already has 'pending' value.
+
+**D24 — Time not volunteered → agent asks (operator-locked 2026-05-23).**
+When customer agrees to book but hasn't stated a preferred time, agent
+asks: "What day/time works best for you?" Captures the response as the
+appointment's scheduled_at. Appointment status remains 'pending' so staff
+can adjust if conflicts arise. This REVERSES session #53's D19 absolute
+rule ("agent does not ask for time") for the refined flow.
+
+**D25 — Same-day urgency → notify_staff immediately (operator-locked 2026-05-23).**
+When customer requests same-day or next-day service, agent fires
+`notify_staff` in addition to creating the pending appointment, so staff
+sees urgency signal. Note: operator believes notify_staff already fires
+for new appointments via existing template flow; Workstream J Session 1
+verifies and adds explicit notification template if needed.
+
+**D26 — Mid-conversation reschedule → update existing appointment (operator-locked 2026-05-23).**
+If customer changes their mind on time within the same conversation
+(e.g., "Actually Wednesday morning works better"), agent updates the
+existing pending appointment record via tool call. Only valid for
+appointments still in `status='pending'`. Confirmed appointments require
+staff handling per D27.
+
+**D27 — All cancellations handled by staff (operator-locked 2026-05-23).**
+Agent does NOT cancel appointments — even ones it just created. When
+customer asks to cancel, agent fires `notify_staff` with intent
+"appointment cancellation requested" and tells customer: "Got it —
+passing this to our team to handle." Staff cancels via POS, applies any
+refund logic, etc.
+
+**D28 — Service change mid-conversation → quote supersession (operator-locked 2026-05-23).**
+If customer asks for a different service after a quote has been sent
+(e.g., "Actually I want ceramic instead of wash"), agent supersedes the
+existing quote via the Workstream I supersession path. Pre-Workstream I
+(supersession infrastructure not yet built): agent sends a new quote
+and lets the old one expire naturally. Post-Workstream I: agent
+explicitly supersedes. This decision pairs with D18 and Workstream I
+Session 2.
+
+**D29 — Additional service inquiry → reference existing quote + offer new (operator-locked 2026-05-23).**
+If customer asks about a new service ALONGSIDE an existing quote (not
+replacing — adding), agent references the existing quote in conversation
+and offers a separate new quote: "Your current quote (Q-XXXX) is $X for
+[services]. [Additional service] alone would be $Y — want me to send
+that as a separate quote?" Two quotes can be active simultaneously
+for the same customer.
+
+**D30 — Spanish path follows English flow (operator-locked 2026-05-23).**
+The refined flow applies identically in Spanish. Quote templates,
+appointment confirmations, and notify_staff messages must have Spanish
+variants. Per D11 (Mexican Spanish dialect rules), the voice agent
+follows the same flow. No new prompt rules needed — Issues 4/5 cover
+language switching; refined-flow rules are language-agnostic.
+
+**D31 — Quote acceptance after conversation ends → deferred (operator-locked 2026-05-23).**
+If customer accepts a quote via link AFTER the conversation has ended
+(no recent inbound), no automatic agent follow-up is sent. Future
+enhancement: cron-driven follow-up SMS when quote acceptance occurs
+in isolation. Not P0. Future workstream.
+
+**D32 — Stale quote reminders → deferred (operator-locked 2026-05-23).**
+If customer never responds after quote sent, no automatic follow-up
+beyond eventual expiration (Workstream I Session 1 — expiration cron).
+Future enhancement: 24-hour-before-expiration reminder SMS. Not P0.
+Future workstream.
+
 ### Coverage targets
 
 After full architecture lands:
