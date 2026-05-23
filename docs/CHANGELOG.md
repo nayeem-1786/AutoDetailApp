@@ -6,6 +6,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — docs: capture Issues 26 + 27 + 28 from late-night test post-D19 deploy
+
+Docs-only session. Late-night new-customer test (02:00 AM, post-D19 deploy commit `d22498eb`) surfaced three new P1 bugs. Capture only — no fixes shipped. All three feed into Workstream J Session 1 diagnostic scope expansion; Issue 27 also feeds Workstream J Session 3 prompt rule additions.
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- Section 2 — three new entries appended after Issue 25: **Issue 26** (`send_quote_sms` tool failure on rate-limited conversations + misleading error attribution, P1 — operator's "new customer" test landed in existing conversation `4645b6e9-fa8f-4040-877e-ac9cc4dbc6b2` because conversation lookup is by phone not customer_id; conversation hit rate-limit threshold from prior testing; tool failed and agent's `notify_staff` notification attributed the failure to "phone number issue" rather than the actual rate-limit cause; three notifications fired per Issue 19's missing dedup); **Issue 27** (Agent hallucinates tool success after tool failure, P1 — classic LLM confabulation under social pressure; after `send_quote_sms` failed and agent correctly framed it as "flagged for team," customer asked "when?" on next turn and agent reversed itself with "I actually just sent your quote — check your texts" which was a fabrication; customer caught it with "I didn't get any quote" and agent reverted to correct framing); **Issue 28** (Admin Purge does not delete all customer-attached records, P1 — surfaced via Issue 26 root-cause analysis; operator purged `+13107564789` customer record but conversation `4645b6e9-...` persisted with accumulated message count, which is what caused Issue 26's rate-limit hit on a "fresh" test; likely additional tables also leak — messages, quotes, sms_consent_log, vehicles, appointments; CCPA compliance risk + marketing data pollution + re-acquisition UX failure + testing reliability + rate-limit accumulation; operator recommendation is hybrid deletion — accounting records anonymize-and-keep, conversations + messages + sms_consent_log + vehicles hard-delete). Issues 1-25 untouched. D1-D32 untouched.
+- All three issues feed Workstream J: Issue 26 expands Session 1 diagnostic targets (tool error attribution audit, conversation lookup on customer deletion, rate-limit threshold review, `quote_sms_failed` notify_staff template inspection); Issue 27 expands Session 3 prompt rule additions (explicit "after tool fails, never claim success in later turns" rule + future defensive runtime check + structured tool error responses); Issue 28 expands Session 1 diagnostic targets (Admin Purge code audit — identify all FK relationships from `customers` and verify Purge behavior on each; likely spawns a Session 2+ code workstream of its own once diagnostic completes).
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:** new session ledger row #55 documenting this docs-only session. Workstream J Session 1 sub-item notes column extended with the audit-scope expansion bullet list (per Issues 26-28).
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**No source code touched.** No prompt changes. No migrations. No test changes. No fixes shipped.
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers.
+
+---
+
 ## 2026-05-23 — docs: capture D20-D32 refined-flow decisions + scope Workstream J (5 sessions)
 
 Docs-only session capturing the refined quote-and-book flow that supersedes session #53's D19 absolute rule. Earlier the same day, session #53 (commit `a490ed10`) shipped D19 as a safe default — "agent never books directly, defers all scheduling to staff via post-quote follow-up." Operator has approved a more nuanced flow for the next iteration where the agent CAN create pending appointments under specific conditions. This session captures the 13 new decisions (D20-D32) and scopes the implementation as Workstream J. No source code, no prompt, no migrations.
