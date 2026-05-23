@@ -6,6 +6,41 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — audit: Workstream J Session 1 diagnostic — refined-flow tool surface + Admin Purge audit
+
+Read-only diagnostic session. Audited 10 distinct surfaces across (a) refined-flow tool plumbing for D20-D32 controlled-booking flow, and (b) Issue 26-28 post-mortem from the late-night new-customer test. No source code, prompt, migration, or test changes. Output is an implementation specification for Workstream J Sessions 2-5.
+
+**New — `docs/dev/WORKSTREAM_J_SESSION_1_DIAGNOSTIC.md`:** complete diagnostic deliverable. Major findings:
+
+1. **Admin Purge cascade is more complete than Issue 28 assumed.** The Purge route at `src/app/api/admin/customers/purge/route.ts` DOES delete conversations (by `phone_number` OR `customer_id`), messages, vehicles, quotes, sms_consent_log, and ~20 other customer-attached tables. Two genuine gaps remain — `coupons.customer_id` is nulled (not deleted) leaving customer-scoped coupon metadata, and `print_jobs.payload` (TEXT) may contain receipt PII after `transaction_id` is SET NULL'd. Issue 28's "conversations leak" pattern is more likely explained by operator using per-customer DELETE handler (soft-delete only — does NOT touch conversations) instead of Data Management Purge. **Open Question Q1** flagged for operator: which UI flow did the test purge use?
+
+2. **Rate-limit attribution in Issue 26 is misidentified.** The `MAX_AI_REPLIES_PER_HOUR = 25` gate is at the webhook level (`src/app/api/webhooks/twilio/inbound/route.ts:67`), checked BEFORE v2 routing. When the limit fires, the agent NEVER runs — no tool call. So Issue 26's "tool failed → agent attributed to phone" attribution did NOT come from a rate-limited tool call. The likely source is an earlier turn where `send_quote_sms` returned 400 "Invalid phone number" and the agent paraphrased into the notify_staff details field.
+
+3. **D20 is mostly already implemented.** `customer-context.ts` already SELECTs `quotes.status` and `getCustomerContext()` is called fresh per inbound at `agent-runner.ts:265`. Minimal D20 work is adding `valid_until`, `accepted_at` (optionally `sent_at`, `viewed_at`) to the existing SELECT — zero new round-trips. Spec'd as S4.1.
+
+4. **`get_availability` tool is reliable enough to keep.** Reads live DB, no caching, correct conflict checks. Issue 23's slot hallucination is a prompt-side reasoning failure (already addressed via session #53), not a tool reliability issue. Verdict: keep tool, tighten description to reinforce "result for your reasoning only, never quoted to customer." No endpoint code change.
+
+5. **Tool schema gaps confirmed (Session 2 scope).** `send_quote_sms` doesn't accept `customer_type` (Issue 18) or `notes` (D19/D24); endpoint has matching gaps. `create_appointment` already supports the quote-id conversion branch + accepts `notes`, but the agent uses the direct-booking branch which writes `price_at_booking=0, tier_name=null` — confirming the $0.00 evidence from Issue 25. `convertQuote()` shared helper is the canonical conversion path used by POS + voice agent; the new `convert_quote_to_appointment` tool wraps it via the existing voice-agent endpoint Branch A.
+
+6. **`notify_staff` enum has 7 reasons — no `quote_sms_failed`.** Agent has to stuff failure context into the free-form `details` field under an inexact reason like `custom_quote`. Session 2 spec adds the new reason; Session 3 spec adds the verbatim-error prompt rule.
+
+**Three open questions surfaced for operator decision before Session 2 starts:**
+- Q1 — Purge vs DELETE path (determines whether Session 2 includes DELETE handler extension)
+- Q2 — `convert_quote_to_appointment` implementation: dedicated wrapper vs reuse voice-agent endpoint
+- Q3 — Remove `create_appointment` from agent tool surface, or keep + tighten prompt
+
+**Total gaps identified across 10 targets: 14** (detailed in diagnostic deliverable's Risk matrix). **Estimated implementation effort: Session 2 ~3-4h + Session 3 ~2-3h + Session 4 ~1-2h + Session 5 ~1-2h.** No genuine P1 regressions surfaced; the refined-flow build can proceed once the 3 open questions are answered.
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:** new session ledger row #56 documenting this audit. Workstream J Session 1 sub-item status flipped from `⚪ not started` to `✅ done` with diagnostic-deliverable reference.
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**No source code touched. No prompt changes. No migrations. No test changes. No fixes shipped.**
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers anywhere in `docs/`.
+
+---
+
 ## 2026-05-23 — docs: capture Issues 26 + 27 + 28 from late-night test post-D19 deploy
 
 Docs-only session. Late-night new-customer test (02:00 AM, post-D19 deploy commit `d22498eb`) surfaced three new P1 bugs. Capture only — no fixes shipped. All three feed into Workstream J Session 1 diagnostic scope expansion; Issue 27 also feeds Workstream J Session 3 prompt rule additions.
