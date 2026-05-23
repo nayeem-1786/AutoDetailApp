@@ -764,6 +764,50 @@ Classic LLM confabulation under social pressure. Customer asked "when?" The mode
 
 ---
 
+#### Issue 28 — Admin Purge does not delete all customer-attached records
+
+**Severity:** P1 — privacy compliance (CCPA) + product correctness + testing reliability
+**Observed:** 2026-05-23 02:00 AM (surfaced via Issue 26 root-cause analysis)
+**Channel:** Admin > Settings > Data Management — Purge customer feature
+**Root cause class:** incomplete-cascade-deletion, application-level-purge-gaps
+
+**Evidence:**
+
+Operator purged customer record for `+13107564789` via Admin > Settings > Data Management before running new-customer test. Test failed (Issue 26) because conversation `4645b6e9-fa8f-4040-877e-ac9cc4dbc6b2` STILL EXISTED post-purge with accumulated message count from prior testing. PM2 logs confirm rate limit hit on this conversation, which should not have existed if Purge worked correctly.
+
+This means: customer row was deleted (admin panel showed no record), but conversation persisted. Likely additional records also leaked through — vehicles, quotes, messages, sms_consent_log, appointments, etc.
+
+**Implications:**
+- **CCPA compliance risk** — California customer-base; "Purge" implies legal-grade deletion. Leaving conversations + quotes + messages behind doesn't satisfy data-deletion obligations under privacy regulations.
+- **Marketing data pollution** — Orphaned records may surface in admin reports, marketing exports, analytics.
+- **Re-acquisition UX failure** — If same phone re-engages, agent retrieves yesterday's conversation context; customer sees "you" remembered things they thought were forgotten.
+- **Testing reliability** — Cannot reliably test "new customer" code paths because conversation persists. Every test from a previously-used phone is contaminated by prior conversation message count + history.
+- **Storage + rate-limit accumulation** — Conversations keep accumulating message counts even when the customer is "gone." Eventually rate limits trigger as observed tonight.
+
+**What should have happened:**
+"Purge" should delete (or anonymize) ALL records FK'd to the customer. The UI should be clear about scope — ideally a preview ("This will delete: 1 customer, 3 vehicles, 5 conversations, 47 messages, 8 quotes, 2 appointments, ..."). After purge, the phone should be fully unknown to the system.
+
+**What did happen:**
+Customer row was deleted (or soft-deleted) but conversation + likely other attached records persisted. Specific gap surface is unknown without code audit.
+
+**Proposed fix direction (Workstream J Session 1 diagnostic scope expansion):**
+
+1. **Find the Purge code** — Locate the admin Data Management Purge endpoint/handler.
+2. **Audit all FK relationships from `customers` table** — list every table that references customer_id (directly or transitively).
+3. **For each, determine current Purge behavior:**
+   - Hard delete (row removed)
+   - Soft delete (sets `deleted_at`)
+   - Cascade via FK constraint (DB-level)
+   - Application-level loop
+   - Or: not touched (BUG)
+4. **Identify all leaks** — start with `conversations` (confirmed leak), check messages, quotes, quote_items, quote_communications, appointments, job_addons, transactions, sms_consent_log, customer_addresses, customer_loyalty, customer_communications, escalations.
+5. **Operator decision on deletion strategy:** hard delete, soft delete, or hybrid (anonymize PII + keep accounting trail). Recommend hybrid for an auto detailing business — accounting records (transactions, quotes for tax) keep with anonymized PII; conversations + messages + sms_consent_log HARD DELETE; vehicles HARD DELETE.
+6. **Build complete Purge implementation** — atomic transaction across all affected tables, clear UI preview of what will be deleted, post-purge verification.
+
+**Status:** Open — Workstream J Session 1 diagnostic scope expansion. Likely a Session 2+ code workstream of its own once diagnostic completes.
+
+---
+
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
 These look like prompt issues but are actually code / tool-flow bugs. Tracked here so they're visible alongside prompt observations; resolved via dedicated fix sessions, not prompt tuning.
