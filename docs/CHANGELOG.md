@@ -6,6 +6,7 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+
 ## 2026-05-22 — fix(twilio-webhook): align STOP_WORDS + START_WORDS with Twilio Console compliance keywords
 
 Follow-up to commit `1aedee4e` (Yes-fix). The Yes-fix shipped with the pre-existing keyword lists `STOP_WORDS = ['STOP','STOPALL','UNSUBSCRIBE','CANCEL','END','QUIT']` and `START_WORDS = ['START','YES','UNSTOP']`, which DIVERGED from the actual Twilio Console compliance keywords for +14244010094 (verified 2026-05-22 — opt-in: START / SUBSCRIBE / LETSGO / SIGNMEUP; opt-out: OPTOUT / CANCEL / END / QUIT / UNSUBSCRIBE / REVOKE / STOP / STOPALL). Both Twilio and this app intercept these messages independently; misalignment caused inconsistent handling.
@@ -75,6 +76,24 @@ Production-affecting bug fix. The Twilio inbound webhook unconditionally treated
 **Follow-up flagged:** operator should verify Twilio Console doesn't have Advanced Opt-Out enabled at the carrier level for +14244010094. If platform-level interception is also enabled, customer could see a duplicate reply post-fix. Out of scope for this code fix.
 
 **Docs:** SMS_AI_V2_PROMPT_OBSERVATIONS.md — new Issue 16 marker in Section 2, full resolution in Section 5. ROADMAP ledger row #50.
+
+## 2026-05-22 — docs: SMS AI v2 follow-up — Issues 17-21 + Issue 14 refinement + decisions D17/D18 + Workstream I (5 sessions)
+
+Docs-only session capturing five new prompt-tuning / infrastructure observations from late 2026-05-22 operator testing, an append-only refinement to Issue 14, two new locked design decisions (D17 + D18), and a new five-session Workstream I covering quote expiration + agent supersession + Copy Quote feature. No source code, migrations, or tests touched. Two read-only diagnostics informed the work — the quote supersession infrastructure audit (path-of-least-resistance recommendation) and the `onReQuote` handler verification (signature-vs-binding mismatch).
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- Section 2 — Issue 14 (Bundle/add-on pricing hallucination) extended via append-only `Additional refinements — 2026-05-22 testing` block (existing resolved-stub preserved). Two refinements: (a) avoid mentioning ABSENCE of bundle pricing — silence when none exists, don't say "no bundle configured"; (b) sum-vs-combo language clarification — arithmetic sums OK and helpful, but never use combo language ("combining both for $300") unless tool data returns a configured `combo_price`.
+- Section 2 — five new entries appended after Issue 15: **Issue 17** (Agent doesn't auto-invoke `get_products` for catalog/product link requests, P2 — Spanish conversation where agent asked for phone instead of calling the tool); **Issue 18** (Customer Type not classified on new customer record creation, P2 — defaults to Unknown despite clear Enthusiast/Professional signals in conversation; two-layer fix needed: prompt rule + tool/endpoint accepting `customer_type`); **Issue 19** (`notify_staff` deduplication missing, P2 — same intent fired three notifications during one reschedule conversation; recommended prompt-only fix first, backend dedup as defense-in-depth); **Issue 20** (Quote modification needs supersession pattern, P2 — old quote stays acceptable when agent issues a new one; diagnostic confirms `expired` infrastructure half-built — banner + conversion guard + button gating already exist; scoped as Workstream I Sessions 1 + 2); **Issue 21** (Re-Quote button is dead code, P3 — `onReQuote` handler discards quoteId at parent binding `pos/quotes/page.tsx:40` so builder opens empty; misleading comment at quote-detail.tsx:178 describes never-implemented behavior; scoped as Workstream I Session 3 with rename to Copy Quote).
+- Section 7 — two new locked decisions appended after D16: **D17** (Copy Quote field-mapping — identity + content carries over: customer_id, vehicle_id, items, notes, mobile fields; lifecycle + system state resets: coupon, loyalty, manual discount, validity dates, status, access_token, quote_number, etc.); **D18** (Supersession via existing `expired` status, NOT new infrastructure — finish the half-built expired path + add minimal `superseded_by_quote_id` nullable FK column for lineage; total marginal schema cost is one column).
+- Issues 1-16 and D1-D16 untouched.
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:**
+- New **Workstream I — Quote Expiration + Agent Supersession + Copy Quote Feature** under Out-of-Scope Workstreams (after Workstream H). Five sub-items: Session 1 (Expiration cron — flip `sent`/`viewed` quotes to `expired` when `valid_until < now()`), Session 2 (Agent supersession — `superseded_by_quote_id` column + `send_quote_sms` accepts optional `supersedes_quote_id`), Session 3 (Copy Quote rebuild — fix parent binding + builder pre-population per D17 + rename Re-Quote → Copy Quote + expand status gating), Session 4 (Quote History rename + audit logging — extends Communication History at `quote-detail.tsx:619-664`), Session 5 (Edit warning UI on viewed/accepted quotes — depends on Session 4 for dismissal logging). Coverage targets + sequencing notes (recommended order: 1 → 4 → 3 → 5 → 2) + out-of-scope boundaries inline. Workstream H sub-items untouched. All other workstreams untouched.
+- New session ledger row #50 documenting this docs-only session.
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers anywhere in `docs/`. Issues 17/18/19/20/21 + Issue 14 `Additional refinements` block + D17/D18 + Workstream I all grep cleanly.
 
 ---
 

@@ -164,6 +164,31 @@ _(resolved 2026-05-22 — see Section 5.)_
 
 _(resolved 2026-05-22 — see Section 5.)_
 
+**Additional refinements — 2026-05-22 testing:**
+
+Two refinements surfaced during multi-vehicle + multi-service operator testing:
+
+(a) **Avoid mentioning the ABSENCE of bundle pricing.** When a service has no
+configured add-ons, the agent currently says things like "no bundle discount
+configured" or "no current bundle pricing on that one." This makes the system
+sound either broken (jargon-y "configured" language) or stingy (customer
+thinks they're missing a discount others got). The fix is silence: don't
+mention bundle pricing at all when there's none to mention. Just state the
+standalone price.
+
+(b) **Sum vs combo language clarification.** When a customer asks about
+multiple separate services in one turn (e.g., "engine bay detail and
+undercarriage steam cleaning"), the agent may state the arithmetic sum
+($175 + $125 = $300) so the customer sees the total. This is acceptable AND
+helpful, BUT the language must NOT imply a configured combo discount when
+none exists. Acceptable phrasing: "$175 + $125 = $300 total" or "$300 for
+both services." Unacceptable phrasing: "combining both services for $300"
+(implies a configured combo). When a real configured combo_price exists in
+addon_suggestions, present it using the combo math from the tool data. When
+it doesn't, present a plain sum without combo language.
+
+Both refinements scheduled for follow-up prompt-tuning session.
+
 ---
 
 
@@ -179,6 +204,285 @@ _(resolved 2026-05-22 — see Section 5.)_
 
 ---
 
+
+#### Issue 17 — Agent doesn't auto-invoke `get_products` for catalog/product link requests
+
+**Severity:** P2
+**Observed:** 2026-05-22
+**Channel:** SMS allowlist test (Spanish, staff member testing)
+**Root cause class:** missing-tool-invocation, prompt-rule-gap
+
+**Evidence:**
+During a Spanish conversation, the customer asked for the product catalog:
+```
+Customer: Hola que productos venden?
+AI: [lists categories]
+Customer: Tienes catalogo?
+AI: ¿Quieres que te mande un link al catálogo de productos por mensaje?
+Customer: Si
+AI: Para mandarte el link necesito tu número.
+```
+
+The agent has access to the `get_products` tool (per tools.ts), which can
+return product information AND generate catalog/product links. Instead of
+calling the tool when the customer affirmed they wanted the link, the agent
+asked for the customer's phone number — which is redundant (Issue 12) AND
+unnecessary (the tool can construct the link without re-asking).
+
+**What should have happened:**
+When customer asks about products or requests a catalog/product link, the
+agent should call `get_products` to retrieve product info. When a link is
+needed, the tool returns/generates it; the agent sends it directly without
+asking for phone (already known via SMS).
+
+**What did happen:**
+Agent improvised a "I need your phone to send the link" affordance that
+doesn't exist as a tool path. Customer experience: redundant ask, conversation
+stalled.
+
+**Proposed fix direction:**
+System prompt addition in the Tool usage guide: "For any product-related
+question, catalog request, or product link request, call `get_products` BEFORE
+asking the customer for anything. The tool returns the data needed. Don't
+ask for phone, name, or any other info as a prerequisite for sending product
+info — the conversation context already has everything required."
+
+**Status:** Open — scheduled for follow-up prompt-tuning session
+
+---
+
+#### Issue 18 — Customer Type not classified on new customer record creation
+
+**Severity:** P2 — affects marketing pipeline
+**Observed:** 2026-05-22
+**Channel:** SMS allowlist test (Spanish, agent-created customer)
+**Root cause class:** missing-classification, marketing-data-gap
+
+**Evidence:**
+During Spanish testing, the agent collected customer name + phone and created
+a new customer record (Crystal Lopez). The resulting customer record defaulted
+to `customer_type='Unknown'`. No classification logic ran to determine if the
+customer is Enthusiast (B2C consumer interested in services) or Professional
+(detailer, body shop, dealership purchasing products).
+
+Marketing implications:
+- Unknown customers don't fit into either marketing track (B2C service
+  offers vs. B2B product sales)
+- Manual reclassification required by staff at follow-up
+- Lost opportunity to tag customers at signup based on conversation signals
+
+Operator definition (per chat history):
+- **Enthusiast** — B2C customers interested in services, may also buy products.
+  Marketing track: service offers, coupons, seasonal promotions.
+- **Professional** — Detailers, auto body shops, dealerships. Marketing track:
+  product-only sales, bulk pricing, no service offers.
+
+**What should have happened:**
+When the agent creates a new customer record AND the conversation signals
+strongly suggest a type:
+- Service inquiry → likely Enthusiast
+- Product-only inquiry with bulk/wholesale signals → likely Professional
+- Mixed or ambiguous → Unknown (default)
+
+The classification should be a tool call or extension to the existing
+customer-creation flow.
+
+**What did happen:**
+Crystal's record was created with `customer_type='Unknown'` despite the
+conversation clearly indicating Enthusiast behavior (asked about Express
+Wash, Signature Complete Detail, multi-vehicle owner).
+
+**Proposed fix direction:**
+Two-layer approach:
+(a) System prompt addition: "When creating a new customer record, infer
+customer_type from conversation context. Service-focused inquiries → tag
+Enthusiast. Bulk product / wholesale / business-account signals → tag
+Professional. Default to Unknown only when neither signal is clear."
+(b) Tool/endpoint check: confirm the customer-creation path (likely inside
+`send_quote_sms` or `find_or_create_customer` helper) accepts a customer_type
+parameter and persists it. If not, that's a small endpoint extension.
+
+**Status:** Open — gated on tool-data verification + prompt rule. Scheduled for follow-up prompt-tuning session.
+
+---
+
+#### Issue 19 — notify_staff deduplication missing; same intent repeats firing
+
+**Severity:** P2 — operator-experience and noise
+**Observed:** 2026-05-22
+**Channel:** SMS allowlist test (Spanish, appointment reschedule)
+**Root cause class:** missing-state-tracking, agent-doesnt-recognize-continuation
+
+**Evidence:**
+Customer asked to reschedule an appointment. Agent correctly fired
+`notify_staff` once. Customer then asked clarifying follow-up questions on
+the same intent (still about rescheduling). Agent fired `notify_staff` two
+more times for the same intent within minutes:
+
+```
+Customer: Hola niecesito reagendar mi cita
+Staff notification sent: Appointment Change/Cancel — Crystal quiere reagendar...
+
+Customer: Si sabes de cual cita te hablo?
+Staff notification sent: Appointment Change/Cancel — Customer wants to reschedule...
+
+Customer: La puedo reagendar ahora?
+Staff notification sent: Appointment Change/Cancel — Crystal quiere reagendar de hoy...
+```
+
+Three notifications fired for one underlying intent. Staff receives the same
+ping three times within a few minutes.
+
+**What should have happened:**
+Once `notify_staff` fires for a given intent in a conversation, subsequent
+customer messages on the same topic should NOT re-fire the notification.
+The agent should recognize the continuation and respond conversationally
+("Yes I notified them already — they'll reach out soon").
+
+**What did happen:**
+Each on-topic customer message triggered another notification. No
+deduplication.
+
+**Proposed fix direction:**
+Two possible approaches:
+(a) **Prompt-only:** System prompt addition: "After calling `notify_staff`
+for an intent, do NOT call it again for the SAME intent in the same
+conversation. Subsequent customer messages on the same topic should get a
+conversational reply acknowledging the prior notification."
+(b) **Tool-level:** Add a backend dedup check in `notify_staff` that
+prevents duplicate notifications for the same conversation_id + reason
+within a time window (e.g., 1 hour).
+
+Recommend (a) first as a prompt-level fix. (b) is defense-in-depth for if
+the prompt fails to honor the rule.
+
+**Status:** Open — scheduled for follow-up prompt-tuning session (prompt-level fix); backend dedup is a future enhancement.
+
+---
+
+#### Issue 20 — Quote modification needs supersession pattern; current behavior leaves stale quotes acceptable
+
+**Severity:** P2 — data integrity + customer confusion
+**Observed:** 2026-05-22 (originally discussed; diagnostic completed same day)
+**Channel:** SMS allowlist test (operator testing multi-service modification)
+**Root cause class:** missing-supersession-infrastructure, half-built-expired-state
+
+**Evidence:**
+When the customer modifies a quote ("I want the undercarriage done too,"
+then later "actually just the engine bay"), the agent generates a new quote
+via `send_quote_sms`. The OLD quote remains valid with its full validity
+window (default 7 days). The customer's SMS history contains both quote
+links, both clickable, both with active "Accept Quote" buttons. Risk: customer
+clicks the older quote and accepts stale pricing/services.
+
+**Diagnostic findings (read-only audit, 2026-05-22):**
+
+(1) The `quotes.status` enum already has `'expired'` value. The public quote
+page already renders a red "expired" banner. The `convert-service` already
+rejects conversion on expired status. The `Re-Quote` button (currently dead
+code per Issue 21 diagnostic) already gates on expired. The infrastructure
+is half-built — the WRITE path for `status='expired'` does not exist.
+
+(2) Specifically missing:
+- No cron job, trigger, or runtime code writes `status='expired'`
+- The `valid_until` column is set on every quote but never enforced
+- No `cancel_quote` tool or endpoint for sent/viewed/accepted quotes
+- No `superseded_by_quote_id` column for tracking lineage
+
+(3) Staff POS already supports in-place mutation for editable statuses
+(draft, sent, viewed, accepted — confirmed via quote-detail.tsx button gating
+at lines 343-475). Mutation works for staff because operator judgment
+compensates. Agent-driven supersession is a different concern because
+the agent has no operator judgment.
+
+**What should have happened:**
+When the agent modifies a previously-sent quote, the OLD quote should
+become unacceptable (status='expired') and the NEW quote should be the only
+acceptable one. Customer's SMS history still shows both links, but clicking
+the old one reveals the existing "expired" banner — no Accept button visible.
+
+**What did happen:**
+Old quote stays acceptable. New quote also acceptable. Risk of accidental
+acceptance.
+
+**Proposed fix direction (Path D-prime):**
+Finish the half-built expired infrastructure + add lineage tracking. NOT
+build a parallel "supersession" concept from scratch.
+
+Specific work (sequenced as Workstream I in the roadmap):
+- Add expiration cron (nightly: flip status='expired' when valid_until < now())
+- Add `superseded_by_quote_id` nullable FK column on quotes
+- Extend `send_quote_sms` with optional `supersedes_quote_id` parameter
+- In same transaction: old quote → expired status + lineage column set,
+  new quote created
+- Agent system prompt: pass `supersedes_quote_id` when modifying a
+  previously-sent quote
+
+Smaller scope than the "Path B" originally considered because the expired
+status + banner + page rendering already exist. Marginal cost is one
+cron + one column + one optional parameter.
+
+**Status:** Open — scoped as Workstream I. Sessions 1 + 2 (expiration cron + agent supersession) directly address this issue. See Workstream I details in `ROADMAP-13-ITEMS.md`.
+
+---
+
+#### Issue 21 — Re-Quote button is dead code (mechanically functional, semantically broken)
+
+**Severity:** P3 — feature gap rather than active bug
+**Observed:** 2026-05-22 (verified via code audit of quote-detail.tsx + page.tsx + quote-builder.tsx)
+**Channel:** POS code review
+**Root cause class:** half-built-feature, signature-vs-binding-mismatch
+
+**Evidence:**
+
+The Re-Quote button at `quote-detail.tsx:462-466` gates on
+`quote.status === 'expired'`. The handler `handleReQuote()` at line 177
+accepts a quoteId argument and calls `onReQuote(quoteId)`.
+
+But the parent binding at `src/app/pos/quotes/page.tsx:40` discards the
+quoteId argument:
+```tsx
+onReQuote={() => setView({ mode: 'builder', quoteId: null })}
+```
+
+The arrow function signature `() =>` ignores the quote_id parameter. The
+builder then mounts with `quoteId={null}`, runs CLEAR_QUOTE, and renders
+an empty "New Quote" UI with NO data carryover.
+
+Result: clicking Re-Quote on an expired quote opens a blank New Quote
+builder — same as clicking "+ New Quote" from the list. The source quote
+data (customer, vehicle, services, modifiers, notes) is never loaded.
+
+The inline comment at line 178 (`// Clear quote state — builder will create new from this quote's data`)
+describes intended behavior that was never implemented.
+
+Double-broken in practice:
+- The `expired` gating status never fires (per Issue 20)
+- Even when the button does render, the handler doesn't copy source data
+
+**What should have happened:**
+A genuine "copy this quote's data into a new draft" feature, available on
+ANY non-draft status (sent, viewed, accepted, expired, converted).
+
+**Proposed fix direction:**
+Rebuild the handler as a true "Copy Quote" feature (scoped as Workstream I
+Session 3). Three changes required:
+
+(a) Fix the parent binding to forward quoteId
+(b) Add builder pre-population logic (new prop `copyFromQuoteId` or new
+reducer action `LOAD_QUOTE_AS_COPY` that fetches source data and seeds
+customer/vehicle/items/modifiers/notes)
+(c) Audit log entry on save: "Created as copy of Q-XXXX on [date] by [user]"
+
+Plus:
+(d) Rename button label "Re-Quote" → "Copy Quote"
+(e) Expand status gating from `expired` only → all non-draft (sent, viewed,
+accepted, expired, converted)
+(f) Remove the misleading comment at line 178
+
+**Status:** Open — scoped as Workstream I Session 3. Depends on Session 4 (Quote History audit logging) for the audit entry mechanism.
+
+---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
@@ -379,6 +683,47 @@ with D15: surface real add-ons, never invent ones. Add-on relationships
 are defined in the catalog by operator (Admin > Catalog > Services
 add-on configuration); the agent reports what's configured, doesn't
 decide what bundles together.
+
+**D17 — Copy Quote field-mapping decision (operator-locked 2026-05-22).**
+When the Copy Quote feature (Workstream I Session 3) creates a new draft
+from a source quote, the following fields carry over:
+- customer_id (identity)
+- vehicle_id (default vehicle)
+- items / services / products (the whole point of the copy)
+- notes (internal notes carry forward)
+- is_mobile / mobile_zone / mobile_surcharge (service location)
+
+The following fields RESET:
+- coupon_code + coupon_discount (coupons are time-bound)
+- loyalty_points_to_redeem + loyalty_discount (loyalty balance may have changed)
+- manual_discount_type/value/label (operator decides whether to re-apply)
+- valid_until (new validity window from current date)
+- sent_at / viewed_at / accepted_at (lifecycle starts over)
+- access_token (fresh token for new quote URL)
+- status (set to 'draft')
+- quote_number (newly generated)
+- converted_appointment_id (not converted)
+- follow_up_status (reset to 'not_contacted')
+- last_activity_at (fresh from now)
+- created_by (set to current operator)
+
+Principle: identity + content carries over; lifecycle + system state resets.
+
+**D18 — Supersession via existing expired status, NOT new infrastructure (operator-locked 2026-05-22).**
+The agent-driven quote supersession path uses the existing `quote_status`
+enum value 'expired' rather than introducing a new 'superseded' value.
+Reasons:
+- The `expired` status is already half-implemented: enum value, public page
+  banner, conversion guard, and Re-Quote button gating all exist
+- Adding a separate `'superseded'` value would create a parallel concept
+  with overlapping semantics
+- Lineage tracking via `superseded_by_quote_id` nullable FK column gives
+  the ability to distinguish "expired naturally" (null) from "expired via
+  supersession" (set) without needing a separate status
+
+Path-of-least-resistance pattern: finish the half-built `expired`
+infrastructure, then add minimal lineage column. Total marginal schema
+cost: one nullable FK column.
 
 ### Coverage targets
 
