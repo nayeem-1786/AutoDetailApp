@@ -74,6 +74,9 @@ import {
   __resetForAgentRun,
 } from '@/lib/sms-ai/tool-dispatcher';
 
+const DEFAULT_TEST_PHONE = '+14245551234';
+const DEFAULT_TEST_CONV = 'test-conv-id';
+
 // ---- fetch stubbing ------------------------------------------------------
 
 interface FetchCall {
@@ -93,7 +96,11 @@ beforeEach(() => {
   apiKeyState.value = 'test-voice-agent-key';
   apiKeyState.shouldThrow = false;
   apiKeyState.error = null;
-  __resetForAgentRun();
+  // Default: runtime context set with the canonical test phone so the
+  // bulk of tests don't have to re-establish it. Tests exercising the
+  // "no context" defensive path override by calling __resetForAgentRun()
+  // (no args) after the beforeEach.
+  __resetForAgentRun({ phone: DEFAULT_TEST_PHONE, conversationId: DEFAULT_TEST_CONV });
   process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000';
 
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) => {
@@ -263,11 +270,15 @@ describe('dispatchTool — routing per tool', () => {
 });
 
 describe('dispatchTool — missing required inputs', () => {
-  it('lookup_customer without phone → isError, no network call', async () => {
+  it('lookup_customer with empty input → succeeds via runtime phone injection', async () => {
+    // Post-Workstream-J-S2: phone always comes from runtime context, not
+    // from the LLM. An empty input is no longer an error — the dispatcher
+    // injects the conversation's phone server-side.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { customer: { id: 'c1' } }));
     const r = await dispatchTool({ name: 'lookup_customer', input: {} });
-    expect(r.isError).toBe(true);
-    expect(r.content).toContain('phone');
-    expect(fetchCalls).toHaveLength(0);
+    expect(r.isError).toBe(false);
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0].url).toContain('phone=%2B14245551234');
   });
 
   it('classify_vehicle without make → isError, no network call', async () => {
@@ -516,7 +527,7 @@ describe('dispatchTool — Bearer-key cache lifecycle', () => {
     // Operator rotates the key. Without reset, the new value wouldn't take
     // effect; the reset hook is the contract the runner uses per inbound.
     apiKeyState.value = 'rotated-key';
-    __resetForAgentRun();
+    __resetForAgentRun({ phone: DEFAULT_TEST_PHONE, conversationId: DEFAULT_TEST_CONV });
 
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
     await dispatchTool({ name: 'get_products', input: {} });
@@ -649,5 +660,190 @@ describe('dispatchTool — decline_addon', () => {
     expect(r.isError).toBe(true);
     expect(r.content).toContain('addon_id');
     expect(declineAddonMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 2 — runtime phone injection
+//
+// Five tools require phone at the endpoint layer: lookup_customer (query
+// string), create_appointment (customer_phone in body), send_info_sms
+// (phone in body), send_quote_sms (phone in body), notify_staff
+// (customer_phone in-process). For new customers the LLM has no source of
+// phone — the system prompt forbids asking on SMS, and customer-context
+// has no row to draw from. The dispatcher now reads phone from runtime
+// context (set per-inbound by the runner) and OVERRIDES any LLM-provided
+// value. The LLM never sees the phone and cannot get it wrong.
+// ---------------------------------------------------------------------------
+
+describe('dispatchTool — runtime phone injection (Workstream J Session 2)', () => {
+  it('send_quote_sms — injects runtime phone when LLM provides none', async () => {
+    // The exact failure mode from 2026-05-23 02:00 AM PST: new-customer
+    // run, LLM had no phone to provide, endpoint rejected in <300ms.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { quote_number: 'Q-0123' }));
+    const r = await dispatchTool({
+      name: 'send_quote_sms',
+      input: { services: 'Express Wax' }, // NO phone — like the failing test
+    });
+    expect(r.isError).toBe(false);
+    expect(fetchCalls).toHaveLength(1);
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.phone).toBe(DEFAULT_TEST_PHONE);
+    expect(body.services).toBe('Express Wax');
+  });
+
+  it('send_quote_sms — runtime phone OVERRIDES LLM-provided phone', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { quote_number: 'Q-0124' }));
+    await dispatchTool({
+      name: 'send_quote_sms',
+      input: { phone: '+19998887777', services: 'Express Wax' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.phone).toBe(DEFAULT_TEST_PHONE); // runtime wins
+  });
+
+  it('send_info_sms — runtime phone OVERRIDES LLM-provided phone', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true }));
+    await dispatchTool({
+      name: 'send_info_sms',
+      input: { phone: '+19998887777', type: 'store_info' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.phone).toBe(DEFAULT_TEST_PHONE);
+    expect(body.type).toBe('store_info');
+  });
+
+  it('create_appointment — runtime phone OVERRIDES LLM-provided customer_phone', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { appointment_id: 'ap1' }));
+    await dispatchTool({
+      name: 'create_appointment',
+      input: {
+        customer_name: 'Grace',
+        customer_phone: '+19998887777', // LLM's value — should be overridden
+        service_id: 'svc-1',
+        date: '2026-05-20',
+        time: '10:00',
+      },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.customer_phone).toBe(DEFAULT_TEST_PHONE);
+    expect(body.customer_name).toBe('Grace');
+  });
+
+  it('lookup_customer — uses runtime phone in query string regardless of input', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { customer: null }));
+    await dispatchTool({
+      name: 'lookup_customer',
+      input: { phone: '+19998887777' }, // LLM's value — should be ignored
+    });
+    expect(fetchCalls[0].url).toContain('phone=%2B14245551234');
+    expect(fetchCalls[0].url).not.toContain('9998887777');
+  });
+
+  it('notify_staff — runtime phone OVERRIDES LLM-provided customer_phone (audit log integrity)', async () => {
+    notifyStaffMock.mockResolvedValueOnce({
+      success: true,
+      recipientsNotified: 1,
+      errors: [],
+    });
+    await dispatchTool({
+      name: 'notify_staff',
+      input: {
+        customer_name: 'Grace',
+        customer_phone: '+19998887777', // LLM's value — should be overridden
+        reason: 'custom_quote',
+        details: 'Ferrari ceramic',
+      },
+    });
+    expect(notifyStaffMock).toHaveBeenCalledTimes(1);
+    expect(notifyStaffMock).toHaveBeenCalledWith({
+      reason: 'custom_quote',
+      customerName: 'Grace',
+      customerPhone: DEFAULT_TEST_PHONE, // runtime wins → audit log lands on correct conversation
+      details: 'Ferrari ceramic',
+      source: 'sms_ai_v2',
+    });
+  });
+});
+
+describe('dispatchTool — defensive guard when runtime context not set', () => {
+  // Production runner always calls __resetForAgentRun({...context}) at the
+  // start of every inbound (see agent-runner.ts:259). These tests guard
+  // against a regression where a future caller bypasses that contract — or
+  // where a test/script invokes the dispatcher directly.
+
+  it('send_quote_sms returns isError with diagnostic message when runtime context not set', async () => {
+    __resetForAgentRun(); // explicitly clear
+    const r = await dispatchTool({
+      name: 'send_quote_sms',
+      input: { phone: '+14245551234', services: 'Express Wax' },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('runtime phone not set');
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  it('lookup_customer returns isError when runtime context not set', async () => {
+    __resetForAgentRun();
+    const r = await dispatchTool({
+      name: 'lookup_customer',
+      input: { phone: '+14245551234' },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('runtime phone not set');
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  it('create_appointment returns isError when runtime context not set', async () => {
+    __resetForAgentRun();
+    const r = await dispatchTool({
+      name: 'create_appointment',
+      input: {
+        customer_name: 'X',
+        customer_phone: '+14245551234',
+        service_id: 'svc-1',
+        date: '2026-05-20',
+        time: '10:00',
+      },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('runtime phone not set');
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  it('send_info_sms returns isError when runtime context not set', async () => {
+    __resetForAgentRun();
+    const r = await dispatchTool({
+      name: 'send_info_sms',
+      input: { phone: '+14245551234', type: 'store_info' },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('runtime phone not set');
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  it('notify_staff returns isError when runtime context not set (helper NOT called)', async () => {
+    __resetForAgentRun();
+    const r = await dispatchTool({
+      name: 'notify_staff',
+      input: {
+        customer_name: 'X',
+        customer_phone: '+14245551234',
+        reason: 'custom_quote',
+        details: 'y',
+      },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('runtime phone not set');
+    expect(notifyStaffMock).not.toHaveBeenCalled();
+  });
+
+  it('non-phone tools (get_services, get_products) succeed without runtime context', async () => {
+    // Phone-injection guard only applies to phone-bearing tools.
+    __resetForAgentRun();
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    const r = await dispatchTool({ name: 'get_services', input: {} });
+    expect(r.isError).toBe(false);
+    expect(fetchCalls).toHaveLength(1);
   });
 });

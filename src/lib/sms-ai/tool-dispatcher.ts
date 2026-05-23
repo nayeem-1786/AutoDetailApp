@@ -40,6 +40,26 @@
  * key takes effect on the next message without an in-process restart. We
  * deliberately avoid a module-global cache to keep operator key rotation
  * cheap.
+ *
+ * Runtime phone injection (Workstream J Session 2 — Issue 26 root cause):
+ * The system prompt (per D19 / Issue 22 resolution) forbids the LLM from
+ * asking the customer for their phone on SMS. For new customers (no row
+ * in `customers` yet, customer-context bundle has no phone), the LLM has
+ * no source of phone — yet `send_quote_sms`, `create_appointment`,
+ * `send_info_sms`, `lookup_customer`, and `notify_staff` all REQUIRE phone
+ * server-side. The webhook captures `From` as E.164 and passes it through
+ * `runV2AgentInBackground`; the runner forwards it into
+ * `__resetForAgentRun({ phone, conversationId })`. Phone-bearing helpers
+ * read from the module-private `runtimeContext` and inject the value into
+ * the HTTP body (or query string for `lookup_customer`) BEFORE dispatch,
+ * always OVERRIDING any LLM-provided value. The LLM never sees the phone
+ * and cannot get it wrong. Endpoint contracts stay unchanged — they still
+ * require `phone` / `customer_phone`; the dispatcher just supplies it.
+ *
+ * Defensive: any phone-injecting helper called without `runtimeContext`
+ * set returns `errResult('Internal: runtime phone not set …')`. Production
+ * runner always sets it at the start of every inbound; this guard catches
+ * regressions in test or future callers that bypass the runner.
  */
 
 import type { SmsAiV2ToolName } from '@/lib/sms-ai/tools';
@@ -86,14 +106,37 @@ let _cachedApiKey: string | null = null;
 let _apiKeyLoadFailed = false;
 
 /**
- * Reset the per-run cache. The agent runner calls this once at the start
- * of every inbound. Module-global state survives between agent runs by
- * default — that's a bug for operator key rotation, hence the explicit
- * reset hook.
+ * Runtime context for the in-flight agent run. Carries values the
+ * dispatcher needs but the LLM should never be responsible for (phone
+ * in particular — see file header for the design rationale). Set by the
+ * runner via `__resetForAgentRun({...})`; consumed by phone-injecting
+ * helpers.
  */
-export function __resetForAgentRun(): void {
+export interface RuntimeContext {
+  /** Customer E.164 phone — already normalized upstream by the webhook. */
+  phone: string;
+  /** Conversation UUID for the in-flight inbound. Reserved for future use. */
+  conversationId: string;
+}
+
+let _runtimeContext: RuntimeContext | null = null;
+
+/**
+ * Reset the per-run caches. The agent runner calls this once at the start
+ * of every inbound. Module-global state survives between agent runs by
+ * default — that's a bug for operator key rotation AND for runtime phone
+ * leakage across conversations, hence the explicit reset hook.
+ *
+ * The `context` parameter is optional in the function signature so the
+ * existing test corpus (which exercises non-phone tools like `get_services`)
+ * can keep calling `__resetForAgentRun()` without arguments. Production
+ * callers (the runner) MUST always pass a context; phone-injecting helpers
+ * return `errResult(...)` when the context is unset.
+ */
+export function __resetForAgentRun(context?: RuntimeContext): void {
   _cachedApiKey = null;
   _apiKeyLoadFailed = false;
+  _runtimeContext = context ?? null;
 }
 
 async function loadVoiceAgentApiKey(): Promise<string | null> {
@@ -238,9 +281,14 @@ function qs(params: Record<string, string | number | undefined | null>): string 
   return s ? `?${s}` : '';
 }
 
-async function callLookupCustomer(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
-  const phone = typeof input.phone === 'string' ? input.phone : '';
-  if (!phone) return errResult('lookup_customer: missing required input "phone"');
+async function callLookupCustomer(_input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+  // Phone injection: runtime phone is the source of truth (see file header).
+  // The LLM's `input.phone`, if any, is ignored — `lookup_customer` only
+  // ever runs against the conversation's own phone.
+  if (!_runtimeContext?.phone) {
+    return errResult('lookup_customer: internal — runtime phone not set');
+  }
+  const phone = _runtimeContext.phone;
   return voiceAgentFetch(
     `/api/voice-agent/customers${qs({ phone })}`,
     { method: 'GET' },
@@ -290,12 +338,18 @@ async function callCheckAvailability(input: Record<string, unknown>, key: string
 }
 
 async function callCreateAppointment(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+  // Phone injection: endpoint requires `customer_phone`. Runtime overrides
+  // any LLM-provided value (see file header).
+  if (!_runtimeContext?.phone) {
+    return errResult('create_appointment: internal — runtime phone not set');
+  }
+  const injectedBody = { ...input, customer_phone: _runtimeContext.phone };
   return voiceAgentFetch(
     `/api/voice-agent/appointments`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(injectedBody),
     },
     TOOL_TIMEOUT_MS.create_appointment,
     key,
@@ -303,12 +357,18 @@ async function callCreateAppointment(input: Record<string, unknown>, key: string
 }
 
 async function callSendInfoSms(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+  // Phone injection: endpoint requires `phone`. Runtime overrides any
+  // LLM-provided value (see file header).
+  if (!_runtimeContext?.phone) {
+    return errResult('send_info_sms: internal — runtime phone not set');
+  }
+  const injectedBody = { ...input, phone: _runtimeContext.phone };
   return voiceAgentFetch(
     `/api/voice-agent/send-info-sms`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(injectedBody),
     },
     TOOL_TIMEOUT_MS.send_info_sms,
     key,
@@ -336,12 +396,20 @@ async function callGetProductDetails(input: Record<string, unknown>, key: string
 }
 
 async function callSendQuoteSms(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+  // Phone injection: endpoint requires `phone`. Runtime overrides any
+  // LLM-provided value (see file header). THE fix for Issue 26 —
+  // new-customer test runs were failing here with sub-300ms 400 responses
+  // because the LLM had no phone source for unknown customers.
+  if (!_runtimeContext?.phone) {
+    return errResult('send_quote_sms: internal — runtime phone not set');
+  }
+  const injectedBody = { ...input, phone: _runtimeContext.phone };
   return voiceAgentFetch(
     `/api/voice-agent/send-quote-sms`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+      body: JSON.stringify(injectedBody),
     },
     TOOL_TIMEOUT_MS.send_quote_sms,
     key,
@@ -421,12 +489,18 @@ async function callNotifyStaff(input: Record<string, unknown>): Promise<Dispatch
   if (!isStaffNotificationReason(reason)) {
     return errResult(`notify_staff: invalid reason "${String(reason)}"`);
   }
+  // Phone injection: notifyStaff needs `customerPhone` for the audit log
+  // lookup (`conversations.phone_number` → message INSERT). Runtime
+  // overrides any LLM-provided value so the audit log always lands on the
+  // correct conversation thread.
+  if (!_runtimeContext?.phone) {
+    return errResult('notify_staff: internal — runtime phone not set');
+  }
   const customerName =
     typeof input.customer_name === 'string' && input.customer_name.trim()
       ? input.customer_name
       : 'Unknown';
-  const customerPhone =
-    typeof input.customer_phone === 'string' ? input.customer_phone : '';
+  const customerPhone = _runtimeContext.phone;
   const details =
     typeof input.details === 'string' ? input.details : '';
 

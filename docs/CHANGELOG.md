@@ -6,6 +6,57 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — feat(sms-ai-v2): inject phone server-side in tool-dispatcher (resolves Issue 26 root cause)
+
+THE fix for the late-night new-customer test failures. The agent's prompt rules (D19 + Issue 22 resolution) correctly forbid the LLM from asking for phone on SMS — but the `send_quote_sms` endpoint requires phone as a parameter, and for new customers (no row in `customers` yet, customer-context bundle has no phone), the LLM had no source for it. The four `send_quote_sms` calls that failed at 02:00 AM PST on 2026-05-23 all returned 400 in sub-300ms — the endpoint's "phone is required" gate, not a downstream DB or rate-limit error.
+
+**The fix:** `src/lib/sms-ai/tool-dispatcher.ts` now holds runtime context (phone + conversationId) installed by the runner at the start of every inbound, and phone-bearing helpers inject the value server-side, always OVERRIDING any LLM-provided value. The LLM never sees the phone and cannot get it wrong. Endpoint contracts unchanged — they still require `phone` / `customer_phone`; the dispatcher just supplies it.
+
+**Why this approach:** Cleanest separation of concerns. Tool schemas in `tools.ts` stay as-is (phone remains "required" in the JSON Schema reflecting the endpoint's contract, not the LLM's responsibility). The system prompt stays as-is (no need to explain phone injection to the LLM). The endpoint stays as-is (no signature change). The bug is fixed at the single layer that has both the runtime phone AND the tool inputs.
+
+**Files modified:**
+- `src/lib/sms-ai/tool-dispatcher.ts` — added `RuntimeContext` type + module-private `_runtimeContext` + extended `__resetForAgentRun(context?)`. Phone-injecting helpers (`callLookupCustomer`, `callCreateAppointment`, `callSendInfoSms`, `callSendQuoteSms`, `callNotifyStaff`) now read phone from runtime and override LLM input. Non-phone tools (`get_services`, `classify_vehicle`, `check_availability`, `get_products`, `get_product_details`, `approve_addon`, `decline_addon`) unchanged. Defensive: phone-injecting helpers return `errResult('… runtime phone not set')` if context absent (production runner always sets it; guard catches future regressions).
+- `src/lib/sms-ai/agent-runner.ts` — single-line change at the dispatcher-reset call site, `resetDispatcherForAgentRun()` → `resetDispatcherForAgentRun({ phone, conversationId })`. Phone is already in `RunAgentInput`; just forwarding it through.
+
+**Tools that received phone injection (5):**
+1. `lookup_customer` — runtime phone → query string. LLM input ignored entirely (the lookup is always against the conversation's own phone).
+2. `create_appointment` — runtime phone → `customer_phone` in body. Overrides LLM input.
+3. `send_info_sms` — runtime phone → `phone` in body. Overrides LLM input.
+4. `send_quote_sms` — runtime phone → `phone` in body. Overrides LLM input. **THE fix for Issue 26.**
+5. `notify_staff` (in-process) — runtime phone → `customerPhone` arg to `notifyStaff()`. Ensures the audit-log message lands on the correct conversation thread regardless of what the LLM stuffed into the input.
+
+**Tests modified:**
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` — `beforeEach` updated to call `__resetForAgentRun({ phone, conversationId })` with the canonical test phone. Existing "lookup_customer without phone → isError" test updated to "lookup_customer with empty input → succeeds via runtime injection" (the contract changed). Existing `__resetForAgentRun clears the cached key` test passes context. Six new tests added under "runtime phone injection": injection-when-LLM-provides-none + override-LLM-phone for each of the 4 HTTP body tools + lookup_customer query string + notify_staff in-process. Six new tests under "defensive guard when runtime context not set": one per phone-injecting tool + one verifying non-phone tools still succeed without context.
+- `src/lib/sms-ai/__tests__/agent-runner.test.ts` — `__resetForAgentRun` mock signature updated to forward all args. New test verifying the runner passes `{phone, conversationId}` from `RunAgentInput` into the dispatcher reset.
+
+**Verification (all gates green):**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → **1897/1897 pass** (was 1884; +13 net new tests)
+- `npm run build` → clean, 787 pages, 12.0s
+
+**Deploy required: YES**, by operator via `deploy-smartdetails` post-merge. After deploy, the new-customer test scenario should succeed: agent calls `send_quote_sms` with no LLM-provided phone, dispatcher injects, endpoint accepts, quote sent, latency back to the normal 1500-2500ms range (not the 150-300ms fast-fail range from the failed runs).
+
+**Scope was deliberately tight (Workstream J Session 2, Option α scoping per operator):** just the phone injection. Deferred to future sessions:
+- `customer_type` parameter on `send_quote_sms` (Issue 18 — partially addressed via prompt rule per session #53; tool-side wiring future)
+- `notes` parameter on `send_quote_sms` (D19/D24 preferred-time capture)
+- New `convert_quote_to_appointment` tool (Workstream J Session 2 broader scope, deferred)
+- `quote_sms_failed` notify_staff reason + Issue 27 confabulation prompt rule (Workstream J Session 3)
+- Customer-context quote_status refresh extensions for D20 (Workstream J Session 4)
+- `create_appointment` removal from agent tool surface (Workstream J Session 4)
+
+**Hard rules honored — UNCHANGED files:** `src/lib/sms-ai/tools.ts`, `src/lib/sms-ai/system-prompt.ts`, all `src/app/api/voice-agent/**` endpoints, `src/lib/services/customer-context.ts`, `src/lib/sms-ai/background-dispatch.ts`, `src/lib/sms-ai/feature-flag.ts`. No migrations. No tool schema changes. No tools added or removed. No prompt rule changes about phone injection (the LLM is intentionally unaware).
+
+**Manual verification scenario (operator runs post-deploy):**
+1. Purge previous test data for `+13107564789` via Admin > Settings > Data Management.
+2. From the allowlisted phone, send: "Hi how much for a wash?"
+3. Continue: discovery → "2016 Honda Accord Silver" → service selection → "Sure" (send quote) → "Nayeem" (when asked for name).
+4. Expected: agent calls `send_quote_sms` successfully (no failed dispatch), customer receives quote SMS with link.
+5. PM2 logs should show `[SmsAiV2 dispatch] tool=send_quote_sms latency=1500-2500ms error=false` (not the 150-300ms fast-fail range).
+6. Admin: new customer record created with phone `+13107564789`, quote in `quotes` table linked to that customer.
+
+---
+
 ## 2026-05-23 — docs: capture Issues 26 + 27 + 28 from late-night test post-D19 deploy
 
 Docs-only session. Late-night new-customer test (02:00 AM, post-D19 deploy commit `d22498eb`) surfaced three new P1 bugs. Capture only — no fixes shipped. All three feed into Workstream J Session 1 diagnostic scope expansion; Issue 27 also feeds Workstream J Session 3 prompt rule additions.
