@@ -6,6 +6,40 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-22 — fix(twilio-webhook): YES keyword no longer intercepts opted-in customers' affirmative replies (P1)
+
+Production-affecting bug fix. The Twilio inbound webhook unconditionally treated `'YES'` / `'START'` / `'UNSTOP'` as TCPA opt-in keywords and returned early with `TWIML_EMPTY` BEFORE the SMS AI v2 routing block could see the message. Effect: any English-speaking customer who replied "Yes" to a short-affirmative agent question was silently ghosted. Live evidence: conv `23ee4f02` had 6 inbound 'Yes' messages and 0 agent replies in the past ~2 days. Customer-base impact: 1,374 of 1,384 non-deleted customers have `sms_consent=true`; only 10 are opted out — the bug overwhelmed its only legitimate purpose. Spanish `'Si'` / `'Sí'` were NOT affected.
+
+**Modified — `src/app/api/webhooks/twilio/inbound/route.ts`:**
+- Customer SELECT extended from `select('id')` to `select('id, sms_consent')` — cheap piggyback, no extra round-trip.
+- Introduced `customerIsOptedOut = customer?.sms_consent === false` gate.
+- Split keyword check into `isStartWordKeyword` (raw match) and `isStartWord = isStartWordKeyword && customerIsOptedOut`. The `if (isStopWord || isStartWord)` block now only fires the opt-in path when the customer is genuinely opted out. For opted-in / unknown / new customers, START_WORDS fall through to the normal pipeline.
+- `STOP_WORDS` interception is unconditional (TCPA floor — unchanged).
+- `updateSmsConsent()` helper untouched (its idempotency guard remains as defense in depth).
+
+**New — `src/app/api/webhooks/twilio/inbound/__tests__/start-words-gate.test.ts` (17 cases):**
+- 5 pass-through (opted-in + "Yes" / "YES" / "yes" / whitespace; sms_consent=null; new customer no row)
+- 3 legitimate opt-in (opted-out + YES / Start / UNSTOP)
+- 3 STOP unconditional (preserves TCPA for opted-in/opted-out/new customer)
+- 4 exact-match regression ("Yes please", Spanish "Sí", "Yes." with period, "yeah" — all fall through)
+- 1 STOP→YES sequenced round-trip integration
+
+**No other source files touched.** No changes to `updateSmsConsent()`, no changes to v2 routing logic, no changes to tools / dispatcher / prompts, no changes to STOP_WORDS interception, no schema changes, no migrations.
+
+**Verification:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → **1858/1858 pass** (was 1841; +17 new)
+- `npm run build` → clean (787 pages, 25.0s)
+
+**Deploy required: YES, by operator** via `deploy-smartdetails` post-merge. Post-deploy re-test: send "Yes" to conv 23ee4f02 — agent should reply normally instead of the system intercept message.
+
+**Follow-up flagged:** operator should verify Twilio Console doesn't have Advanced Opt-Out enabled at the carrier level for +14244010094. If platform-level interception is also enabled, customer could see a duplicate reply post-fix. Out of scope for this code fix.
+
+**Docs:** SMS_AI_V2_PROMPT_OBSERVATIONS.md — new Issue 16 marker in Section 2, full resolution in Section 5. ROADMAP ledger row #50.
+
+---
+
 ## 2026-05-22 — feat(sms-ai-v2): batched prompt tuning addressing Issues 1-8, 10-15
 
 Production-affecting prompt rewrite. 14 confirmed observations from 2026-05-20 → 2026-05-22 allowlist testing folded into a single restructured prompt. Tool definitions, dispatcher, endpoints, schema all untouched — pure prompt work per the diagnostic that confirmed `get_services` already exposes `addon_suggestions` (with `addon_id` / `combo_price` / `savings`) to the agent.

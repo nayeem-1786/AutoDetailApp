@@ -210,11 +210,15 @@ export async function POST(request: NextRequest) {
 
     // -------------------------------------------------------------------
     // 3. Customer lookup (ALWAYS — needed for STOP/START consent)
+    //    sms_consent is pulled here so the START_WORDS gate (below) can
+    //    distinguish "rejoining after opt-out" from "casual affirmative
+    //    reply to an agent question". Cheap piggyback on an already-
+    //    required SELECT — no extra round-trip.
     // -------------------------------------------------------------------
     let customerId: string | null = null;
     const { data: customer } = await admin
       .from('customers')
-      .select('id')
+      .select('id, sms_consent')
       .eq('phone', normalizedPhone)
       .single();
 
@@ -226,10 +230,26 @@ export async function POST(request: NextRequest) {
     // 4. STOP/START keyword handling (ALWAYS — TCPA compliance)
     //    This block MUST run before the feature flag check. Legally required
     //    regardless of whether two-way SMS messaging is enabled.
+    //
+    //    STOP_WORDS: unconditional interception (TCPA requires honoring
+    //    STOP regardless of prior consent state).
+    //
+    //    START_WORDS: gated on customer being currently opted out
+    //    (sms_consent === false). Prior to 2026-05-22 every inbound "YES"
+    //    was unconditionally intercepted, silently breaking the agent's
+    //    short-affirmative-reply flow (e.g., customer replies "Yes" to
+    //    "want me to send the quote?" — agent never saw it, conversation
+    //    stalled). For opted-in / unknown / new customers, START_WORDS
+    //    fall through to the normal pipeline; the agent interprets them
+    //    via its short-reply rules. See PROMPT_OBSERVATIONS Section 5 /
+    //    Issue 16 for the diagnostic and live evidence (conv 23ee4f02
+    //    had 6 'Yes' inbounds, 0 agent replies).
     // -------------------------------------------------------------------
     const normalizedBody = body.trim().toUpperCase();
     const isStopWord = STOP_WORDS.includes(normalizedBody);
-    const isStartWord = START_WORDS.includes(normalizedBody);
+    const isStartWordKeyword = START_WORDS.includes(normalizedBody);
+    const customerIsOptedOut = customer?.sms_consent === false;
+    const isStartWord = isStartWordKeyword && customerIsOptedOut;
 
     if (isStopWord || isStartWord) {
       // Update consent on customer record — TCPA critical
