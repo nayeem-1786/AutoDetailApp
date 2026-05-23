@@ -338,9 +338,9 @@ describe('START_WORDS gate — opted-in customers fall through to agent', () => 
 // ---- legitimate opt-in cases (gate fires) -----------------------------
 
 describe('START_WORDS gate — opted-out customers trigger opt-in path', () => {
-  it('opted-out customer + "YES" → opt-in fires, system message written, agent NOT invoked', async () => {
+  it('opted-out customer + "SUBSCRIBE" → opt-in fires, system message written, agent NOT invoked', async () => {
     fixture.customer = { id: 'cust-1', sms_consent: false };
-    const res = await POST(makeRequest({ From: PHONE, Body: 'YES', MessageSid: 'SM6' }));
+    const res = await POST(makeRequest({ From: PHONE, Body: 'SUBSCRIBE', MessageSid: 'SM6' }));
     expect(res.status).toBe(200);
     expect(inboundV2Routed()).toBe(false);
     expect(updateSmsConsentMock).toHaveBeenCalledWith(
@@ -348,7 +348,7 @@ describe('START_WORDS gate — opted-out customers trigger opt-in path', () => {
         customerId: 'cust-1',
         phone: PHONE,
         action: 'opt_in',
-        keyword: 'YES',
+        keyword: 'SUBSCRIBE',
         source: 'inbound_sms',
       }),
     );
@@ -366,14 +366,39 @@ describe('START_WORDS gate — opted-out customers trigger opt-in path', () => {
     expect(loggedConsentSystemMessage()).toBe(true);
   });
 
-  it('opted-out customer + "UNSTOP" → opt-in fires', async () => {
+  it('opted-out customer + "LETSGO" → opt-in fires', async () => {
     fixture.customer = { id: 'cust-1', sms_consent: false };
-    const res = await POST(makeRequest({ From: PHONE, Body: 'UNSTOP', MessageSid: 'SM8' }));
+    const res = await POST(makeRequest({ From: PHONE, Body: 'LETSGO', MessageSid: 'SM8' }));
     expect(res.status).toBe(200);
     expect(inboundV2Routed()).toBe(false);
     expect(updateSmsConsentMock).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'opt_in', keyword: 'UNSTOP' }),
+      expect.objectContaining({ action: 'opt_in', keyword: 'LETSGO' }),
     );
+  });
+});
+
+// ---- 2026-05-22 follow-up: post-Twilio-Console-alignment ---------------
+// Removing YES + UNSTOP from START_WORDS means opted-out customers texting
+// those words now fall through to the agent INSTEAD of triggering opt-in.
+// These tests document the new behavior so it can't silently regress.
+
+describe('START_WORDS — post-alignment fall-through: YES + UNSTOP no longer trigger opt-in', () => {
+  it('opted-out customer + "YES" → falls through to agent (YES is no longer a START_WORD)', async () => {
+    fixture.customer = { id: 'cust-1', sms_consent: false };
+    const res = await POST(makeRequest({ From: PHONE, Body: 'YES', MessageSid: 'SM-YES-postalign' }));
+    expect(res.status).toBe(200);
+    expect(inboundV2Routed()).toBe(true);
+    expect(updateSmsConsentMock).not.toHaveBeenCalled();
+    expect(loggedConsentSystemMessage()).toBe(false);
+  });
+
+  it('opted-out customer + "UNSTOP" → falls through to agent (UNSTOP is no longer a START_WORD)', async () => {
+    fixture.customer = { id: 'cust-1', sms_consent: false };
+    const res = await POST(makeRequest({ From: PHONE, Body: 'UNSTOP', MessageSid: 'SM-UNSTOP-postalign' }));
+    expect(res.status).toBe(200);
+    expect(inboundV2Routed()).toBe(true);
+    expect(updateSmsConsentMock).not.toHaveBeenCalled();
+    expect(loggedConsentSystemMessage()).toBe(false);
   });
 });
 
@@ -445,10 +470,10 @@ describe('START_WORDS — exact-match regression: ambiguous phrasings fall throu
   });
 });
 
-// ---- STOP-then-YES race (TCPA + opt-in flow integration) -------------
+// ---- STOP→opt-in race (TCPA + opt-in flow integration) -------------
 
-describe('START_WORDS gate — sequenced STOP then YES round-trip', () => {
-  it('after STOP flips sms_consent=false, a subsequent YES triggers opt-in', async () => {
+describe('START_WORDS gate — sequenced STOP then opt-in keyword round-trip', () => {
+  it('after STOP flips sms_consent=false, a subsequent SUBSCRIBE triggers opt-in', async () => {
     // Step 1: opted-in customer texts STOP → opt-out fires.
     fixture.customer = { id: 'cust-1', sms_consent: true };
     const stopRes = await POST(makeRequest({ From: PHONE, Body: 'STOP', MessageSid: 'SM-STOP' }));
@@ -464,12 +489,14 @@ describe('START_WORDS gate — sequenced STOP then YES round-trip', () => {
     updateSmsConsentMock.mockClear();
     runV2AgentInBackgroundMock.mockClear();
 
-    // Step 3: same customer texts YES → opt-in fires, agent NOT invoked.
-    const yesRes = await POST(makeRequest({ From: PHONE, Body: 'YES', MessageSid: 'SM-YES' }));
-    expect(yesRes.status).toBe(200);
+    // Step 3: same customer texts SUBSCRIBE (a current opt-in keyword) →
+    // opt-in fires, agent NOT invoked. Post-2026-05-22 alignment YES is
+    // no longer a START_WORD; SUBSCRIBE is the canonical opt-in fixture.
+    const subRes = await POST(makeRequest({ From: PHONE, Body: 'SUBSCRIBE', MessageSid: 'SM-SUBSCRIBE' }));
+    expect(subRes.status).toBe(200);
     expect(inboundV2Routed()).toBe(false);
     expect(updateSmsConsentMock).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'opt_in', keyword: 'YES' }),
+      expect.objectContaining({ action: 'opt_in', keyword: 'SUBSCRIBE' }),
     );
   });
 });
