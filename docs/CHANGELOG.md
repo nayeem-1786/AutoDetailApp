@@ -6,6 +6,24 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — docs: capture Issues 26 + 27 from late-night test post-D19 deploy
+
+Docs-only session. Late-night new-customer test (02:00 AM, post-D19 deploy commit `d22498eb`) surfaced two new P1 bugs. Capture only — no fixes shipped. Both feed into Workstream J Session 1 diagnostic scope expansion + Workstream J Session 3 prompt rule additions.
+
+**Modified — `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- Section 2 — two new entries appended after Issue 25: **Issue 26** (`send_quote_sms` tool failure on rate-limited conversations + misleading error attribution, P1 — operator's "new customer" test landed in existing conversation `4645b6e9-fa8f-4040-877e-ac9cc4dbc6b2` because conversation lookup is by phone not customer_id; conversation hit rate-limit threshold from prior testing; tool failed and agent's `notify_staff` notification attributed the failure to "phone number issue" rather than the actual rate-limit cause; three notifications fired per Issue 19's missing dedup); **Issue 27** (Agent hallucinates tool success after tool failure, P1 — classic LLM confabulation under social pressure; after `send_quote_sms` failed and agent correctly framed it as "flagged for team," customer asked "when?" on next turn and agent reversed itself with "I actually just sent your quote — check your texts" which was a fabrication; customer caught it with "I didn't get any quote" and agent reverted to correct framing). Issues 1-25 untouched. D1-D32 untouched.
+- Both issues feed Workstream J: Issue 26 expands Session 1 diagnostic targets (tool error attribution audit, conversation lookup on customer deletion, rate-limit threshold review, `quote_sms_failed` notify_staff template inspection); Issue 27 expands Session 3 prompt rule additions (explicit "after tool fails, never claim success in later turns" rule + future defensive runtime check + structured tool error responses).
+
+**Modified — `docs/dev/ROADMAP-13-ITEMS.md`:** new session ledger row #55 documenting this docs-only session.
+
+**Modified — `docs/CHANGELOG.md`:** this entry.
+
+**No source code touched.** No prompt changes. No migrations. No test changes. No fixes shipped.
+
+**Verification:** `git status` confirms only `docs/` files modified. No conflict markers.
+
+---
+
 ## 2026-05-23 — docs: capture D20-D32 refined-flow decisions + scope Workstream J (5 sessions)
 
 Docs-only session capturing the refined quote-and-book flow that supersedes session #53's D19 absolute rule. Earlier the same day, session #53 (commit `a490ed10`) shipped D19 as a safe default — "agent never books directly, defers all scheduling to staff via post-quote follow-up." Operator has approved a more nuanced flow for the next iteration where the agent CAN create pending appointments under specific conditions. This session captures the 13 new decisions (D20-D32) and scopes the implementation as Workstream J. No source code, no prompt, no migrations.
