@@ -6,6 +6,56 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — feat(sms-ai-v2): D19 quote-first booking + 6 new prompt rules + resolve Issues 18/22/23/24/25
+
+Production-affecting prompt rewrite. D19 fundamentally reshapes the agent's role from "scheduling assistant" to "intake/quote agent" — agent calls `send_quote_sms` when customer agrees to a service, never `create_appointment` directly. Staff confirms scheduling in a follow-up. Five supporting prompt rules close the 2026-05-23 new-customer test observations (Issues 22-25) and confirm Issue 18 (Customer Type classification). Tool definitions, dispatcher, voice-agent endpoints, customer-context, and agent-runner are all untouched — pure prompt + test work + docs.
+
+**Modified — `src/lib/sms-ai/system-prompt.ts`:**
+- Critical rules expanded 14 → 15. New rule 15 ("Quote first, never book directly") encodes D19's hard guardrail — agent calls `send_quote_sms` on service agreement, NEVER calls `create_appointment` directly; references the ad-hoc booking path's `price_at_booking: 0` issue and the agent's lack of reliable specific-slot availability data.
+- New `## Contact information handling` subsection inside Discovery and conversation flow (closes Issue 22). Hard rule: "NEVER ask the customer for their phone number on SMS." Positive-acknowledgment examples for "this one" / "the number I'm texting from" / "the one you have." Tool-error language: don't ask the customer even if a tool reports phone missing. Final line: "Asking the customer for their phone on SMS is wrong every single time. There is no scenario where it is acceptable."
+- New `## Vehicle information collection` subsection inside Discovery and conversation flow (closes Issue 25). Declares year + make + model + color collected in the SAME turn. Correct/incorrect pattern examples. If color omitted, ask ONCE in next turn then proceed (per D9 — don't loop).
+- New `## Booking flow — quote first, scheduling second` subsection inside Discovery and conversation flow (closes Issue 23 + encodes D19). Six numbered steps. Canonical post-quote line: "Sent the quote to your phone — tap the link to review and accept. Our team will call to confirm scheduling." Forbidden availability phrases enumerated verbatim ("Monday is fully booked", "9 AM just filled up", "we don't have anything Saturday"). Distinguishes business-hours statements (OK from `businessHours` context) from specific-slot availability claims (NEVER). Forbids predicting staff follow-up timing ("within a few hours" / "by end of day").
+- New `## Customer type classification` subsection inside Discovery and conversation flow (closes Issue 18). Enthusiast (B2C personal-vehicle service) / Professional (B2B bulk/wholesale — "for my shop", "for my dealership", "for my fleet") / Unknown (default only when neither signal clear). Both branches present: if `send_quote_sms` accepts a `customer_type` parameter pass the inferred value; if not (verified against tool schema), don't invent — operator classifies manually. Customer never asked the classification question directly.
+- New `## Never expose internal mechanics` subsection inside `# What you cannot do` (closes Issue 24). Enumerates forbidden language (service/customer/quote/vehicle/appointment IDs; "Behind the scenes"; tool names; database concepts; internal codes like `size_class` names; schema-level details). Two recovery modes: recoverable (redirect conversationally) vs non-recoverable (handoff to staff plainly via `notify_staff` with "Let me have a team member follow up with you shortly").
+- Tool usage guide bullets updated: new "Customer asked about products, the catalog, or a product link?" bullet directs to `get_products` / `get_product_details` BEFORE asking the customer for anything (closes Issue 17 leftover). "Customer agreed to book?" bullet replaced with quote-first language: call `send_quote_sms`, do NOT call `create_appointment` directly.
+- "For NEW conversations" step 5 in Discovery and conversation flow rewritten to match D19 — call `send_quote_sms`, inform customer staff will follow up, do NOT call `create_appointment` or `check_availability` for specific time slot offers.
+
+**Modified — `src/lib/sms-ai/__tests__/system-prompt.test.ts`:**
+- Critical rules count assertion updated: 14 → 15.
+- 23 new test cases across 8 new describe blocks covering Issues 22/25/24/23/18/17 + section ordering and tool-usage-guide updates. Each pins canonical wording via `toContain` / `toMatch`. Test count: 52 → 76 in this file.
+
+**Token delta:** prompt runtime grew 17,780 → 25,071 chars (+41.0%), exceeding the 25% compression-trigger threshold. Canonical text is operator-locked verbatim; non-canonical phrasing in the new rules is minimal. Operator should review the delta against cost/cache behavior before deploying. Compression would damage canonical phrasing — if reduction is required, an operator-led compression pass in a future session can decide which canonical lines to negotiate.
+
+**`docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:**
+- Section 2 — four new entries appended after Issue 21: Issue 22 (Phone-from-SMS regression, P1 — agent asked phone 4 times in one new-customer conversation despite "this one" affirmations), Issue 23 (Slot unavailability claim AFTER successful booking, P1 — agent fabricated "9 AM just filled up" after writing the row), Issue 24 (Internal mechanics leakage, P2 — "behind the scenes" + "service ID" in customer-facing message), Issue 25 (Color asked mid-booking instead of during vehicle gathering, P2). Issue 18 Status line updated to Resolved with admin-panel verification reference. Issues 1-17, 19, 20, 21 untouched.
+- Section 5 — five new resolution entries appended for Issues 18, 22, 23, 24, 25. Issue 18 resolution includes the tool-schema gap finding (send_quote_sms does NOT accept `customer_type` today) and the follow-up code session needed. Issue 23 resolution notes prompt-side resolved + tool-side audit deferred.
+- Section 7 — D19 (Quote-first booking flow) locked after D18. Four rationale points (price never transfers via ad-hoc path; agent has no reliable availability source; customer experience improves; audit trail preserved). Operator decisions DA (no timing promise on staff follow-up), DB (use existing notes field, no new schema), DC (business-hours statements OK, specific-slot claims NEVER) captured inline. Out-of-scope deferrals enumerated (removing tools from surface, schema additions, backend enforcement).
+
+**`docs/dev/ROADMAP-13-ITEMS.md`:** new session ledger row #53 documenting this prompt-tuning + docs session.
+
+**`docs/CHANGELOG.md`:** this entry.
+
+**Verification (all gates green):**
+- `npx tsc --noEmit`: 0 errors
+- `npm run lint`: 0 errors / 97 warnings (unchanged baseline)
+- `npm test`: 1884/1884 pass (was 1860; +24 new)
+- `npm run build`: clean (787 pages, 13.0s)
+
+**Tool-schema gaps found (informs future code sessions):**
+- `send_quote_sms` does NOT accept a `customer_type` parameter (verified against `src/lib/sms-ai/tools.ts:218-236`). The Customer Type classification prompt rule includes a "tool doesn't accept it" branch that activates at runtime. Future code session: add the parameter + persist it via the customer-creation path.
+- `send_quote_sms` does NOT accept a `notes` parameter either. The booking-flow rule's step 4 references passing preferred appointment time via `notes` — currently no path. Future code session: add the parameter + persist into `quotes.notes` (the column already exists).
+
+**Out of scope (per session brief):**
+- No removal of `create_appointment` / `get_availability` from `SMS_AI_V2_TOOLS` (prompt rule alone instructs agent not to call directly; tools remain in dispatcher).
+- No `customer_type` / `notes` parameter additions to `send_quote_sms` schema.
+- No schema migrations, no new modules, no voice-agent / tool-dispatcher / customer-context / agent-runner / background-dispatch changes.
+
+**Confirmation of untouched files (hard rules):** `tools.ts`, `tool-dispatcher.ts`, `agent-runner.ts`, `background-dispatch.ts`, `customer-context.ts`, `feature-flag.ts`, all `src/app/api/voice-agent/**` endpoints — all UNCHANGED. No migrations. No test changes outside `system-prompt.test.ts`.
+
+**Deploy required: YES, by operator** via `deploy-smartdetails` post-merge. Live re-test of the 2026-05-23 new-customer scenario after deploy is the behavioral verification.
+
+---
+
 
 ## 2026-05-22 — fix(twilio-webhook): align STOP_WORDS + START_WORDS with Twilio Console compliance keywords
 
