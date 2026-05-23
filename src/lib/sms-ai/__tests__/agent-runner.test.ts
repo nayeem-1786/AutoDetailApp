@@ -40,7 +40,10 @@ const dispatchToolMock = vi.fn();
 const resetDispatcherMock = vi.fn();
 vi.mock('@/lib/sms-ai/tool-dispatcher', () => ({
   dispatchTool: (...args: unknown[]) => dispatchToolMock(...args),
-  __resetForAgentRun: () => resetDispatcherMock(),
+  // Post-Workstream-J-S2: reset accepts a RuntimeContext object — forward
+  // all args to the mock so tests can assert on the runtime phone +
+  // conversationId that flow through.
+  __resetForAgentRun: (...args: unknown[]) => resetDispatcherMock(...args),
 }));
 
 // Import the runner AFTER mocks so the vi.mock factories win.
@@ -521,6 +524,19 @@ describe('runSmsAiV2Agent — parallel tool dispatch (Layer 3b)', () => {
     messagesCreateMock.mockResolvedValueOnce(endTurnMessage('ok'));
     await runSmsAiV2Agent(BASE_INPUT);
     expect(resetDispatcherMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards runtime phone + conversationId into the dispatcher reset (Workstream J S2)', async () => {
+    // Phone-injection contract: the runner must hand the dispatcher the
+    // phone and conversationId at the start of every inbound so phone-
+    // bearing tools can supply them server-side without the LLM ever
+    // seeing the value.
+    messagesCreateMock.mockResolvedValueOnce(endTurnMessage('ok'));
+    await runSmsAiV2Agent(BASE_INPUT);
+    expect(resetDispatcherMock).toHaveBeenCalledWith({
+      phone: BASE_INPUT.phone,
+      conversationId: BASE_INPUT.conversationId,
+    });
   });
 });
 

@@ -255,8 +255,10 @@ export async function runSmsAiV2Agent(
 
   // Per-inbound dispatcher reset — drops the Bearer-key cache so an
   // operator key rotation takes effect on the next inbound without an
-  // in-process restart. Cheap call (just two field resets).
-  resetDispatcherForAgentRun();
+  // in-process restart, AND installs the runtime context so phone-
+  // injecting helpers can supply the conversation's phone server-side
+  // (Workstream J Session 2 — Issue 26 root cause; see dispatcher header).
+  resetDispatcherForAgentRun({ phone, conversationId });
 
   // 1. Build cached system body. Substitution happens BEFORE the cache_control
   //    block is attached so the substituted text becomes the cache key.
