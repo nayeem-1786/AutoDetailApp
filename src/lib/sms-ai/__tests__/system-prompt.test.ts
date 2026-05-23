@@ -169,7 +169,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 14 numbered rules (Issue 14 add-on guardrail added 2026-05-22)', () => {
+  it('Critical rules section contains exactly 15 numbered rules (D19 quote-first / never-book-directly added 2026-05-23)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
@@ -177,7 +177,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(14);
+    expect(numbered.length).toBe(15);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -440,5 +440,189 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-22 outline)', (
     const flowIdx = out.indexOf('# Discovery and conversation flow');
     expect(toolsIdx).toBeLessThan(addonsIdx);
     expect(addonsIdx).toBeLessThan(flowIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2026-05-23 batched prompt tuning — Issues 18, 22-25 + D19 quote-first
+// booking. Each test pins the prompt CONTAINS the rule wording; behavioral
+// testing happens via live re-test after deploy.
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — Issue 22 (phone-from-SMS, no asking)', () => {
+  it('includes Contact information handling subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('## Contact information handling');
+  });
+
+  it('declares the hard "never ask for phone on SMS" rule with no-exception wording', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('NEVER ask the customer for their phone number on SMS');
+    expect(out).toContain('There is no scenario where it is acceptable');
+  });
+
+  it('lists positive acknowledgment examples for "this one" / "number I\'m texting from"', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('the number I\'m texting from');
+    expect(out).toContain('Got it — using this number');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 25 (vehicle info collected in same turn, color not asked mid-booking)', () => {
+  it('includes Vehicle information collection subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('## Vehicle information collection');
+  });
+
+  it('declares year + make + model + color in the SAME turn', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('year,\nmake, model, AND color in the SAME turn');
+    expect(out).toContain('Year, make, model, and color');
+  });
+
+  it('declares ask-color-once-in-next-turn if omitted, then proceed (per D9)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('ask for color ONCE in the next turn');
+    expect(out).toContain("don't loop on it");
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 24 (no internal-mechanics leakage)', () => {
+  it('includes Never expose internal mechanics subsection inside What you cannot do', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const mechanicsIdx = out.indexOf('## Never expose internal mechanics');
+    const cannotDoIdx = out.indexOf('# What you cannot do');
+    const pendingIdx = out.indexOf('# Pending addon authorization');
+    expect(cannotDoIdx).toBeGreaterThan(-1);
+    expect(mechanicsIdx).toBeGreaterThan(cannotDoIdx);
+    expect(mechanicsIdx).toBeLessThan(pendingIdx);
+  });
+
+  it('enumerates forbidden language: tool names, IDs, "behind the scenes", database concepts', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('"Behind the scenes"');
+    expect(out).toContain('Service IDs, customer IDs, quote IDs');
+    expect(out).toContain('Tool names');
+    expect(out).toContain('size_class names like "suv_3row_van"');
+  });
+
+  it('declares recoverable vs non-recoverable handling without leaking the issue', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('If recoverable: redirect conversationally without mentioning the issue');
+    expect(out).toContain('Let me have a team member follow up with you');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availability claims)', () => {
+  it('includes Booking flow — quote first, scheduling second subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('## Booking flow — quote first, scheduling second');
+  });
+
+  it('forbids direct create_appointment call in the booking flow', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('DO NOT call `create_appointment` in this flow');
+    expect(out).toContain('You DO NOT book the appointment\ndirectly');
+  });
+
+  it('includes the canonical post-quote handoff line', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Sent the quote to your phone — tap the link to review and accept.\n   Our team will call to confirm scheduling.');
+  });
+
+  it('distinguishes business-hours statements (OK) from specific-slot availability claims (NEVER)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Open/closed days and hours: OK to state from your `businessHours`');
+    expect(out).toContain('Specific time slot availability: NEVER state');
+  });
+
+  it('lists forbidden availability phrases verbatim', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('"Monday is fully booked,"');
+    expect(out).toContain('"9 AM just filled up,"');
+  });
+
+  it('forbids predicting staff follow-up timing ("within a few hours")', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('NEVER say "within a\nfew hours"');
+  });
+
+  it('Critical rule 15 declares quote-first / never-book-directly', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/15\.\s+\*\*Quote first, never book directly/);
+    expect(out).toContain('NEVER call `create_appointment` directly');
+  });
+});
+
+describe('buildV2SystemPrompt — Issue 18 (customer type classification)', () => {
+  it('includes Customer type classification subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('## Customer type classification');
+  });
+
+  it('declares Enthusiast / Professional / Unknown values with signals', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('**Enthusiast**');
+    expect(out).toContain('**Professional**');
+    expect(out).toContain('**Unknown**');
+    expect(out).toContain('for my shop');
+    expect(out).toContain('for my dealership');
+  });
+
+  it('forbids asking the customer the classification question directly', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('do NOT ask the customer\n"are you a professional or an enthusiast?"');
+    expect(out).toContain('this is internal\ncategorization, never customer-facing');
+  });
+
+  it('handles both branches: tool accepts customer_type vs does not', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('If `send_quote_sms` tool accepts a `customer_type` parameter, pass the\ninferred value');
+    expect(out).toContain('do NOT invent a parameter');
+  });
+});
+
+describe('buildV2SystemPrompt — Tool usage guide updates (Issue 17 + D19)', () => {
+  it('Tool usage guide directs product/catalog inquiries to get_products BEFORE asking customer for anything', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Call `get_products` or `get_product_details` BEFORE asking the customer for anything');
+  });
+
+  it('Tool usage guide replaces the old "call create_appointment with confirmed date+time+service" bullet with the quote-first path', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Old bullet content must NOT remain unchanged — the quote-first replacement points to send_quote_sms.
+    expect(out).toContain('This is the booking path — staff handles scheduling confirmation in a follow-up');
+    expect(out).toContain('Do NOT call `create_appointment` directly');
+  });
+});
+
+describe('buildV2SystemPrompt — section ordering (post-2026-05-23 outline)', () => {
+  it('Discovery and conversation flow subsections appear in expected order: Contact info → Vehicle info → Booking flow → Customer type', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const contactIdx = out.indexOf('## Contact information handling');
+    const vehicleIdx = out.indexOf('## Vehicle information collection');
+    const bookingIdx = out.indexOf('## Booking flow — quote first, scheduling second');
+    const customerTypeIdx = out.indexOf('## Customer type classification');
+    expect(contactIdx).toBeGreaterThan(-1);
+    expect(contactIdx).toBeLessThan(vehicleIdx);
+    expect(vehicleIdx).toBeLessThan(bookingIdx);
+    expect(bookingIdx).toBeLessThan(customerTypeIdx);
+  });
+
+  it('All new 2026-05-23 subsections live inside their parent # sections', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Contact / Vehicle / Booking / Customer-type live inside Discovery and conversation flow
+    const flowIdx = out.indexOf('# Discovery and conversation flow');
+    const escalIdx = out.indexOf('# Escalation guide');
+    const contactIdx = out.indexOf('## Contact information handling');
+    const customerTypeIdx = out.indexOf('## Customer type classification');
+    expect(flowIdx).toBeLessThan(contactIdx);
+    expect(customerTypeIdx).toBeLessThan(escalIdx);
+    // Never-expose-mechanics lives inside What you cannot do
+    const cannotDoIdx = out.indexOf('# What you cannot do');
+    const mechanicsIdx = out.indexOf('## Never expose internal mechanics');
+    const pendingIdx = out.indexOf('# Pending addon authorization');
+    expect(cannotDoIdx).toBeLessThan(mechanicsIdx);
+    expect(mechanicsIdx).toBeLessThan(pendingIdx);
   });
 });

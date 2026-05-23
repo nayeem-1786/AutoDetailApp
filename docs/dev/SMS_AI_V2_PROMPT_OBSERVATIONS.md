@@ -302,7 +302,7 @@ Professional. Default to Unknown only when neither signal is clear."
 `send_quote_sms` or `find_or_create_customer` helper) accepts a customer_type
 parameter and persists it. If not, that's a small endpoint extension.
 
-**Status:** Open — gated on tool-data verification + prompt rule. Scheduled for follow-up prompt-tuning session.
+**Status:** Resolved 2026-05-23 via session #53 — see Section 5. Confirmed by admin panel verification post-test (customer_type='Unknown' after new-customer conversation).
 
 ---
 
@@ -484,6 +484,205 @@ accepted, expired, converted)
 
 ---
 
+#### Issue 22 — Agent repeatedly asks for phone number on SMS despite customer affirming "this one" (P1 regression)
+
+**Severity:** P1 — customer trust + conversation usability
+**Observed:** 2026-05-23
+**Channel:** SMS allowlist test (new-customer test, English)
+**Root cause class:** prompt-rule-failure, context-not-honored
+
+**Evidence:**
+The 2026-05-23 new-customer test conversation showed the agent asking for
+phone repeatedly across multiple turns, despite the customer affirming
+their texted-from number each time:
+
+```
+Agent: "What's the best phone number to reach you, Nayeem?"
+Customer: "This one"
+Agent: [pivoted to color question]
+Agent: "I need your phone number to complete the booking, Nayeem. What's the best number to reach you?"
+Customer: "This one"
+Agent: "9 AM Tuesday is open. I'll need a phone number to complete the booking — what number should we use?"
+Customer: "I told you to use the one I am texting you from"
+Agent: "I'm sorry Nayeem — the system needs a valid phone number to create the booking. What number should we use?"
+Customer: "3107564789"
+```
+
+Database state post-conversation: phone WAS captured ((310) 756-4789 shown
+in admin appointment record). The agent had access to From metadata in
+conversation context throughout. This is a prompt-rule failure, not a
+missing-data issue. Critical rule 9 already says "NEVER ask the customer
+to confirm or provide their phone (they're texting from it)" — the agent
+violated the rule four times in one conversation.
+
+**What should have happened:**
+The agent should silently use the SMS From metadata. If "this one" is
+spoken, acknowledge positively ("Got it — using this number") and proceed.
+NEVER re-ask. Critical rule 9's existing language must be strengthened
+into a dedicated section so the agent honors it without exception.
+
+**What did happen:**
+Agent asked four separate times. Customer frustration. Conversation
+dragged through redundant turns.
+
+**Proposed fix direction:**
+New dedicated `## Contact information handling` subsection (under
+Discovery and conversation flow) with absolute "There is no scenario
+where it is acceptable" wording. Positive-acknowledgment examples for
+"this one" / "the number I'm texting from" / "the one you have"
+included. Tool-error language clarified — even if a tool requires
+phone and it's missing from context, don't ask the customer.
+
+**Status:** Resolved 2026-05-23 via session #53 — see Section 5.
+
+---
+
+#### Issue 23 — Agent claims slot unavailability AFTER successful booking (post-booking hallucination)
+
+**Severity:** P1 — customer experience + agent reliability
+**Observed:** 2026-05-23
+**Channel:** SMS allowlist test (new-customer test, English)
+**Root cause class:** unreliable-availability-source, agent-makes-claims-without-grounding
+
+**Evidence:**
+In the 2026-05-23 test, the appointment for 9 AM Tuesday May 26 was
+successfully written to the database (admin calendar confirmed). After
+the booking succeeded, the agent fired:
+
+```
+[booking already confirmed for 9 AM Tuesday]
+Agent: "Sorry Nayeem, 9 AM just filled up. Only slot left Tuesday is 1:00 PM. Want that instead, or would another day work better?"
+```
+
+The agent contradicted the database state it had just successfully written
+to. The agent has no reliable source of truth for current slot availability
+— `check_availability` may return stale data, the agent may confuse turns,
+the booking confirmation may not propagate to the agent's next reasoning
+step. Whatever the mechanism, the failure mode is the agent making
+declarative claims about specific time slots being unavailable.
+
+**What should have happened:**
+The agent should NEVER state specific time slot availability or
+unavailability. Open/closed days and hours from `businessHours` context
+are OK to state ("we're open Saturdays 9-5", "we're closed Sundays").
+Specific slot availability ("Monday is fully booked", "9 AM just filled
+up") is NEVER acceptable.
+
+This pairs with D19 (quote-first booking flow): if the agent doesn't
+book directly, there's no need to make availability claims. Staff
+handles all scheduling confirmation in a follow-up.
+
+**What did happen:**
+Agent hallucinated unavailability for a slot it had just successfully
+booked. Customer received a contradictory message that would have damaged
+trust if not for the test environment.
+
+**Proposed fix direction:**
+Address prompt-side via D19 + booking-flow subsection ("forbidden phrases"
+enumerated verbatim: "Monday is fully booked," "9 AM just filled up,"
+"we don't have anything Saturday"). The underlying tool-side concern
+(`get_availability` returning stale/wrong data, agent reasoning over
+multi-turn state) is deferred to a future code session — restricting
+or auditing `get_availability` is the root cause fix. Prompt rule reduces
+damage by stopping the agent from making the claims AT ALL.
+
+**Status:** Resolved 2026-05-23 via session #53 (prompt-side); tool-side audit deferred to future code session.
+
+---
+
+#### Issue 24 — Agent leaks internal mechanics in customer-facing messages
+
+**Severity:** P2 — customer experience + brand voice
+**Observed:** 2026-05-23
+**Channel:** SMS allowlist test (new-customer test, English)
+**Root cause class:** missing-guardrail, no-prompt-rule-against-system-detail-exposure
+
+**Evidence:**
+The 2026-05-23 conversation surfaced an explicit "behind the scenes"
+leak:
+
+```
+Agent: "I need to look up the service ID. Let me get that sorted behind the scenes — your appointment is confirmed for Tuesday May 26 at 9 AM. Staff will follow up if anything's needed!"
+```
+
+The customer-facing message references internal mechanics (service ID,
+"behind the scenes" language). The customer should never see system
+seams. This violates the "talk like a real person texting" identity but
+no specific prompt rule enumerated the forbidden language.
+
+**What should have happened:**
+The agent should never expose internal mechanics — IDs, "let me look
+that up", tool names, database concepts, internal codes (size_class
+names like "suv_3row_van"), schema-level details. Even when something
+goes wrong on the agent's end, redirect conversationally without
+mentioning the issue, or handoff to staff plainly.
+
+**What did happen:**
+Agent narrated its internal process to the customer. The conversation
+felt like talking to a system showing its seams, not a competent person.
+
+**Proposed fix direction:**
+New `## Never expose internal mechanics` subsection inside `# What you
+cannot do`, with explicit enumeration of forbidden language (IDs,
+"behind the scenes", tool names, database concepts, internal codes,
+schema details). Two recovery modes specified: recoverable (redirect
+conversationally) vs non-recoverable (handoff to staff plainly with
+"Let me have a team member follow up with you shortly").
+
+**Status:** Resolved 2026-05-23 via session #53 — see Section 5.
+
+---
+
+#### Issue 25 — Agent asks for color mid-booking instead of during vehicle data gathering
+
+**Severity:** P2 — conversation flow
+**Observed:** 2026-05-23
+**Channel:** SMS allowlist test (new-customer test, English)
+**Root cause class:** out-of-order-discovery, missing-collect-all-in-same-turn-rule
+
+**Evidence:**
+The 2026-05-23 test conversation showed the agent collecting year/make/model
+upfront, persisting the vehicle, beginning booking flow, then asking for
+color late:
+
+```
+Customer: "2016 Honda accord"
+Agent: [proceeds with pricing for Sedan class]
+... [conversation continues through service selection + booking flow]
+Agent: "What color is your Accord?"
+```
+
+Color was asked AFTER vehicle was persisted (with size_class='Sedan') and
+AFTER booking flow had begun. By that point the vehicle record was already
+written without color, downstream rendering had already happened without
+color, and asking interrupted the booking flow. Critical rules already
+say "ask once if missing; if not provided, proceed" but the rule doesn't
+specify WHEN to ask — first turn vs. mid-conversation.
+
+**What should have happened:**
+When gathering vehicle info, collect year + make + model + color in the
+SAME turn. One ask, four pieces of information. Asking for color
+separately later is wrong — color is part of vehicle identification.
+
+If the customer omits color in their initial vehicle reply, ask for
+color ONCE in the next turn before proceeding to service selection.
+After that one ask, proceed even without color (per D9 — color required
+for vehicle persistence, but don't loop).
+
+**What did happen:**
+Color was asked mid-booking. Vehicle record persisted without color.
+Conversation flow interrupted.
+
+**Proposed fix direction:**
+New `## Vehicle information collection` subsection (under Discovery and
+conversation flow) with explicit "Year, make, model, and color in the
+SAME turn" rule, correct/incorrect pattern examples, and the
+ask-once-then-proceed clarification for when the customer omits color.
+
+**Status:** Resolved 2026-05-23 via session #53 — see Section 5.
+
+---
+
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
 
 These look like prompt issues but are actually code / tool-flow bugs. Tracked here so they're visible alongside prompt observations; resolved via dedicated fix sessions, not prompt tuning.
@@ -523,6 +722,16 @@ Items flagged early in the allowlist phase that haven't been fully exercised. Ea
 - **Issue 16: Twilio webhook intercepts inbound 'YES' / 'START' / 'UNSTOP' unconditionally (P1)** — resolved 2026-05-22 via session #50 (`fix/twilio-yes-keyword-interception`). **Root cause:** `src/app/api/webhooks/twilio/inbound/route.ts:230-315` unconditionally treated any inbound matching the `START_WORDS = ['START', 'YES', 'UNSTOP']` list (exact-match, case-insensitive after `body.trim().toUpperCase()`) as a TCPA opt-in keyword — calling `updateSmsConsent({action:'opt_in'})`, writing a "Customer sent 'Yes' — opted back in to SMS" system message, and returning early with `TWIML_EMPTY` BEFORE the SMS AI v2 routing block (line 462+) could fire. Effect: agent silently ghosted any English-speaking customer who replied "Yes" to a short-affirmative question. Live evidence: conv `23ee4f02` had 6 inbound 'Yes' messages and zero agent replies in the past ~2 days; the system "opted back in" message all-time count was 6, all in that single conversation. Customer-base impact: 1,374 of 1,384 non-deleted customers have `sms_consent=true`; only 10 are opted out, and zero recent `sms_consent_log` rows are `source='inbound_sms'`. The bug overwhelmed its only legitimate purpose. Spanish "Si" / "Sí" were NOT affected (not in keyword list). **Approach:** piggybacked an extra column on the existing customer SELECT (`select('id, sms_consent')`), introduced a gate `customerIsOptedOut = customer?.sms_consent === false`, and split the keyword check into `isStartWordKeyword` (raw match) and `isStartWord = isStartWordKeyword && customerIsOptedOut`. The `if (isStopWord || isStartWord)` block now only fires the opt-in path when the customer is genuinely opted out. For opted-in / unknown / new customers, START_WORDS fall through to the normal pipeline; the agent's short-reply rules (Issue 3, resolved in session #49) interpret them. STOP_WORDS interception is unconditional (TCPA floor — unchanged). `updateSmsConsent()` helper untouched (its idempotency guard remains as defense in depth). The system "opted back in" message no longer fires for opted-in customers' casual "Yes" replies. **Tests:** new `src/app/api/webhooks/twilio/inbound/__tests__/start-words-gate.test.ts` with 17 cases covering pass-through (5: opted-in, opted-in with caps/lowercase/whitespace, new customer no row, sms_consent=null), legitimate opt-in (3: opted-out + YES/Start/UNSTOP), STOP unconditional (3: opted-in/opted-out/new customer), exact-match regression (4: "Yes please", Spanish "Sí", "Yes." with period, "yeah"), and a STOP-then-YES sequenced round-trip integration case. **Verification:** tsc 0 errors, lint 0 errors / 97 warnings (unchanged baseline), 1858/1858 vitest pass (was 1841; +17 new), build clean. **Deploy required: YES** via `deploy-smartdetails`. After deploy, re-test conv 23ee4f02 by sending "Yes" — agent should reply normally instead of the system intercept message.
 
   - **Follow-up — Twilio Console keyword list alignment** — completed 2026-05-22 via session #51 (`fix/twilio-keyword-alignment`). The Yes-fix shipped with the pre-existing keyword lists `STOP_WORDS = ['STOP','STOPALL','UNSUBSCRIBE','CANCEL','END','QUIT']` and `START_WORDS = ['START','YES','UNSTOP']`, which diverged from the actual Twilio Console compliance keywords for +14244010094 (Console verified 2026-05-22 — opt-in: START / SUBSCRIBE / LETSGO / SIGNMEUP; opt-out: OPTOUT / CANCEL / END / QUIT / UNSUBSCRIBE / REVOKE / STOP / STOPALL). Both Twilio and this app intercept these messages independently; misalignment caused inconsistent handling. **Change:** STOP_WORDS gained `OPTOUT` + `REVOKE`. START_WORDS gained `SUBSCRIBE` + `LETSGO` + `SIGNMEUP` and lost `YES` + `UNSTOP` (those were originally defensive heuristics, never in Twilio Console; the Yes-fix consent gate now correctly handles conversational YES via fall-through to the agent regardless). Alignment comment added above the constants documenting the Twilio-Console-pairing invariant. Gate logic unchanged. Test impact: 3 existing tests modified (opted-out + YES → opted-out + SUBSCRIBE; opted-out + UNSTOP → opted-out + LETSGO; STOP→YES round-trip → STOP→SUBSCRIBE round-trip) + 2 new fall-through tests added documenting the new behavior (opted-out + YES → falls through to agent; opted-out + UNSTOP → falls through to agent). Test count 17 → 19 in this file. Verification: tsc 0 errors, lint 0/97 warnings, 1860/1860 vitest pass (was 1858; +2 net), build clean. Customer-base impact identical to the Yes-fix: only ~10 of ~1,384 customers are opted out, and those are imported Square contacts not actively using SMS — the YES/UNSTOP keyword removal has near-zero blast radius.
+
+- **Issue 18: Customer Type not classified on new customer record creation** — resolved 2026-05-23 via session #53 (`feat/sms-ai-v2-prompt-tuning-batch-2`). Approach: new `## Customer type classification` subsection under Discovery and conversation flow declares Enthusiast (B2C personal-vehicle service inquiries) / Professional (B2B bulk/wholesale, "for my shop / my dealership / my fleet") / Unknown (default only when neither signal clear) values with conversation-signal patterns. Tool schema gap surfaced and reported: `send_quote_sms` does NOT accept a `customer_type` parameter today (verified against `src/lib/sms-ai/tools.ts:218-236`). Prompt rule includes both branches — if tool accepts it pass the inferred value; if not, the operator classifies manually post-conversation. **Follow-up code session needed** to add the `customer_type` parameter to `send_quote_sms` (and the endpoint path that creates new customer records) before the prompt rule's "pass the inferred value" branch becomes active. Until then, agent will infer + carry the value in context but not persist it.
+
+- **Issue 22: Phone-from-SMS regression, P1** — resolved 2026-05-23 via session #53. Approach: new `## Contact information handling` subsection under Discovery and conversation flow declares "NEVER ask the customer for their phone number on SMS" + "There is no scenario where it is acceptable" + positive-acknowledgment examples for "this one" / "the number I'm texting from" / "the one you have" + tool-error language ("If a tool returns an error suggesting phone is required, do NOT ask the customer. Move on conversationally — the operator will reconcile."). Strengthens Critical rule 9's existing "NEVER ask the customer to confirm or provide their phone" into a dedicated section that the agent honored four times in the 2026-05-23 test.
+
+- **Issue 23: Agent claims slot unavailability AFTER successful booking** — resolved 2026-05-23 via session #53 (prompt-side; tool-side audit deferred to future code session). Approach: D19's quote-first booking flow removes the agent from direct scheduling entirely. New `## Booking flow — quote first, scheduling second` subsection (with new Critical rule 15 backing) enumerates forbidden phrases verbatim ("Monday is fully booked", "9 AM just filled up", "we don't have anything Saturday") and distinguishes business-hours statements (OK from context) from specific-slot availability claims (NEVER). The underlying root cause (unreliable availability data flowing to the agent + agent reasoning over multi-turn state) is fully closed only when `get_availability` is audited or restricted in a future code session. Prompt rule REDUCES damage by stopping the claims at the agent layer; defense-in-depth tool-side work remains queued.
+
+- **Issue 24: Agent leaks internal mechanics in customer-facing messages** — resolved 2026-05-23 via session #53. Approach: new `## Never expose internal mechanics` subsection inside `# What you cannot do` enumerates forbidden language (service IDs / customer IDs / quote IDs / vehicle IDs / appointment IDs / "Behind the scenes" / "let me look that up" / "let me check the system" / tool names / database concepts / internal codes like `size_class` names like `suv_3row_van` / schema-level details) and specifies two recovery modes — recoverable (redirect conversationally without mentioning the issue) vs non-recoverable (handoff to staff plainly via `notify_staff` + customer-facing "Let me have a team member follow up with you shortly"). Final line: "The customer's experience must feel like talking to a competent person, not a system that is showing its seams."
+
+- **Issue 25: Agent asks for color mid-booking instead of during vehicle data gathering** — resolved 2026-05-23 via session #53. Approach: new `## Vehicle information collection` subsection under Discovery and conversation flow declares "year, make, model, AND color in the SAME turn (one ask, four pieces of information)" with correct/incorrect pattern examples. If customer omits color, ask for color ONCE in the next turn before proceeding to service selection, then proceed even without color (per D9 — don't loop). Color persisted at vehicle write time rather than asked mid-booking flow.
 
 Each future entry format:
 
@@ -724,6 +933,54 @@ Reasons:
 Path-of-least-resistance pattern: finish the half-built `expired`
 infrastructure, then add minimal lineage column. Total marginal schema
 cost: one nullable FK column.
+
+**D19 — Quote-first booking flow (operator-locked 2026-05-23).**
+The agent's role contracts from "scheduling assistant" to "intake/quote
+agent." When a customer agrees to a service after price discussion, the
+agent calls `send_quote_sms` to create a quote and send the SMS link.
+The agent does NOT call `create_appointment` directly. Staff confirms
+scheduling after quote acceptance via a follow-up call/text.
+
+Rationale captured 2026-05-23:
+- The current ad-hoc booking path (agent → `create_appointment` directly)
+  writes `price_at_booking: 0` and `tier_name: null` per existing
+  voice-agent-ad-hoc endpoint logic — the discussed price NEVER transfers
+  to the appointment. Quote-conversion is the only code path that
+  preserves pricing.
+- The agent has been observed making false availability claims ("Monday
+  is fully booked", "9 AM just filled up" — the latter AFTER a successful
+  booking). The agent has no reliable source of truth for slot
+  availability. Removing the agent from scheduling claims removes the
+  hallucination class entirely.
+- Customer experience improves. Staff confirmation call is a trust-building
+  moment, not a friction point. Agent never tells customer "we're closed
+  / fully booked," which removed the rejection feeling from operator's
+  business value proposition.
+- Audit trail preserved — every booking has a corresponding quote with
+  agreed price.
+
+Specific rules encoded in system prompt:
+- Agent calls `send_quote_sms` when customer agrees to a service. Never
+  `create_appointment` directly.
+- After quote is sent, agent informs customer: "Sent the quote to your
+  phone — tap the link to review and accept. Our team will call to
+  confirm scheduling." (No time promise; "within a few hours" or similar
+  is NOT acceptable phrasing — operator decision DA.)
+- Preferred appointment time, if customer mentions one, captured in the
+  quote's existing `notes` field. No new schema needed (operator
+  decision DB).
+- Agent CAN state opening hours / open-days from `businessHours` context
+  (e.g., "We're open Saturdays 9-5"). Agent CANNOT state specific time
+  slot availability (operator decision DC). The distinction: static
+  facts about business hours = OK from context. Dynamic facts about
+  specific slot availability = NEVER.
+
+Out of scope for the prompt session (deferred to future code session):
+- Removing or restricting `create_appointment` tool from the agent's
+  tool surface
+- Removing or repurposing `get_availability` tool
+- Adding a structured `preferred_appointment_time` column to quotes
+- Backend hardening to enforce quote-first at the endpoint level
 
 ### Coverage targets
 
