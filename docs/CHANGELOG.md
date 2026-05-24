@@ -6,6 +6,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — docs: revise Workstream J Session 4 scope based on Test 4 evidence (Issues 33-34 + D37 supersedes D35)
+
+Docs-only revision session. Branch `docs/2026-05-24-workstream-j-session-4-scope-revision`. NO source code touched. NO prompt changes. NO migrations. NO test changes. No fixes shipped — capture + decision revision only.
+
+**Empirical basis (Test 4 — Honda Accord, stains + pet).** Operator ran a fourth back-to-back test from `+13107564789` at approximately 12:05 AM PST against deploy commit `acef3613` (which is the first deploy that ACTUALLY contains the upsert_customer feature on production — the prior `13a7421f` deploy referenced in the 2026-05-23 docs session was an orphan-conversations purge tool; upsert_customer merged into main later as part of `971f06ee` and shipped as part of `acef3613`). Test 4 evolved a single conversation through stains → pet urine → multi-service quote. Agent stated total $435 with $25 bundle savings on Pet Hair & Dander Removal ($100 bundled vs $125 standalone); quote arrived at $460 with the pet-hair line item billed at $125 standalone, no $25 discount applied. Clean closure ("Nope" → "talk soon Nayeem 🐶"); no double-send (D36 idempotency-guard scope still valid pending implementation).
+
+**PM2 dispatch evidence (5 upsert_customer calls in single conversation):**
+- `tool=upsert_customer latency=388ms error=false`
+- `tool=upsert_customer latency=273ms error=false`
+- `tool=upsert_customer latency=333ms error=false`
+- `tool=upsert_customer latency=241ms error=false`
+- `tool=upsert_customer latency=425ms error=false`
+- `tool=send_quote_sms latency=1968ms error=false`
+
+Plus repeated `classify_vehicle` (3×) and `get_services` (6×) calls — confirms Issue 17 redundancy is real but remains a separate concern.
+
+**Customer record after Test 4 (admin panel):** First Name = Nayeem, Last Name = empty, Mobile = (310) 756-4789, Customer Type = Enthusiast (correctly defaulted per D34 Q6), SMS Marketing = ON (correctly defaulted per D34 Q1), Email Marketing = OFF, address fields all empty, Customer Since = May 24, 2026. The empty last_name is the missed capture opportunity captured as Issue 34.
+
+**Captured findings:**
+
+- **Issue 32 REVISED (P3 → reframed as P3 over-eager-invocation, not redundancy)** — The original 2026-05-23 claim ("upsert_customer never fires for creation in practice") was a deploy-timing artifact: Tests 1-3 ran against `13a7421f` which did not contain upsert_customer. Test 4 (against `acef3613`) shows the tool fires reliably 5× in one conversation. Revised root cause class: over-eager-tool-invocation. The agent calls upsert_customer too OFTEN, not too rarely.
+
+- **Issue 33 captured (P1 — pricing fidelity bug)** — `send_quote_sms` endpoint does not apply combo/bundle pricing. Agent quoted $435 with bundle ($100 pet-hair combo vs $125 standalone, saves $25); actual quote rendered $460 with the pet-hair line item billed at full $125 standalone. Suspected root cause: `src/lib/services/service-resolver.ts` exports `resolvePrice(service, sizeClass)` which handles standard + sale branches in isolation; combo pricing requires awareness of OTHER services in the same quote (anchor service triggering the bundle). Endpoint-level combo-pricing fix DEFERRED to a separate diagnostic + fix session (likely Workstream H concern or its own workstream). Prompt-level mitigation included in Workstream J Session 4 scope: agent should NOT state combo/bundle pricing without first calling get_services to verify.
+
+- **Issue 34 captured (P3 — data quality gap)** — last_name not captured by SMS-AI flow despite admin panel marking it required for staff-initiated customer creation. Operator confirmed this asymmetry is intentional: SMS/Phone agent serves top-of-funnel discovery (first_name + phone sufficient); POS sale, online booking, and admin entry serve committed-customer scenarios (full identity required). The asymmetry should remain. Missed-capture opportunity: the moment the customer agrees to receive a quote ("Sure" / "Yes") is natural to ask for last_name as quote attribution. Prompt rule scoped for Workstream J Session 4.
+
+**Locked decisions:**
+
+- **D35 superseded by D37** — D35's pivot recommendation (upsert_customer → update_customer, error-on-missing-customer) was based on empirical evidence from Tests 1-3 against a build that did not contain upsert_customer. D35 retains a revision note pointing to D37. Tool name, responsibility, schema, and server-side behavior all stay as locked in D34.
+
+- **D37 locked (operator-locked 2026-05-24 post Test 4)** — upsert_customer retains create+update responsibility. Tool not renamed. Schema unchanged. Server-side behavior unchanged. Invocation discipline enforced via prompt rule (to be added in Workstream J Session 4): call upsert_customer ONLY when new field data exists — first call on first_name learn, subsequent calls only on last_name/email/address/customer_type signal change; no redundant idempotent writes. Rationale: the architectural complaint in D35 was based on missing evidence; the agent's over-eager calling is a prompt-tuning issue, not an architectural one — cheaper to fix in prompt than to refactor the tool.
+
+**`docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:** Section 2 — Issue 32 appended with a REVISED 2026-05-24 block (preserves original 2026-05-23 framing as historical record; adds new evidence + revised root cause class + revised fix path + revised status); two new entries appended after Issue 32: Issue 33 (P1, combo/bundle pricing not applied in send_quote_sms, endpoint fix deferred + prompt-level mitigation in Session 4) and Issue 34 (P3, last_name capture opportunity at quote-send moment + operator-locked architectural asymmetry framing). Section 7 — D35 appended with a REVISED 2026-05-24 block (marked SUPERSEDED, pointing to D37); D37 appended after D36 (operator-locked 2026-05-24, full decision body — name/responsibility/schema/server-behavior all unchanged from D34, invocation discipline rule with 4-bullet prompt text + rationale + D37 supersedes D35 statement). Issues 1-31 untouched. D1-D34 + D36 untouched.
+
+**`docs/dev/ROADMAP-13-ITEMS.md`:** Workstream J Session 4 row REPLACED in place ("Session 4 (revised 2026-05-24)" — bundles D36 + D37 + Issue 33 mitigation + Issue 34 capture in a tighter 4-item scope that does NOT pivot the tool; status ⚪ ready; estimated 2-2.5 hours CC). The previous session's Session 4 scope (D35 pivot + D36 idempotency guard) is replaced because D35 is superseded; the prior Session 5-7 renumbering from 2026-05-23 is preserved as-is. Sequencing notes unchanged (recommended order `1 → 2 → 3 → 4 → 6 → 5 → 7` still valid). Workstreams A-I, K untouched. Session ledger row appended (#61).
+
+**`docs/CHANGELOG.md`:** this entry, at top.
+
+**Verification:** `grep -n "Issue 33"` / `Issue 34` / `^\*\*D37` / `REVISED 2026-05-24` in `SMS_AI_V2_PROMPT_OBSERVATIONS.md` all return content; `git status` shows only docs files modified; no conflict markers anywhere in `docs/`.
+
+---
+
 ## 2026-05-23 — docs: capture Workstream J Session 4 prep (Issues 30-32 + D35-D36)
 
 Docs-only capture session. Branch `docs/2026-05-23-workstream-j-session-4-prep`. NO source code touched. NO prompt changes. NO migrations. NO test changes.

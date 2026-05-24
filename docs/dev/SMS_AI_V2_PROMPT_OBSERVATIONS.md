@@ -994,6 +994,95 @@ update-only is structurally cleaner.
 
 **Status:** Open — to be addressed in Workstream J Session 4.
 
+**REVISED 2026-05-24 (post Test 4):** Issue 32's original empirical claim was based on Tests 1-3 which ran against deploy commit `13a7421f` — that deploy did NOT contain upsert_customer (the upsert_customer merge into main happened later, in commit `971f06ee`, shipped as part of commit `acef3613`). Tests 1-3 could not exercise upsert_customer because the tool was not in the deployed build.
+
+Test 4 ran against commit `acef3613` (upsert_customer fully deployed). PM2 logs show upsert_customer was called 5 times in one conversation:
+
+```
+[SmsAiV2 dispatch] tool=upsert_customer latency=388ms error=false
+[SmsAiV2 dispatch] tool=upsert_customer latency=273ms error=false
+[SmsAiV2 dispatch] tool=upsert_customer latency=333ms error=false
+[SmsAiV2 dispatch] tool=upsert_customer latency=241ms error=false
+[SmsAiV2 dispatch] tool=upsert_customer latency=425ms error=false
+```
+
+The tool fires reliably and works as designed. The problem is the OPPOSITE of the original claim: the agent calls upsert_customer too OFTEN, not too rarely. The agent appears to call the tool on nearly every turn rather than only when new fields are learned.
+
+**Revised root cause class:** over-eager-tool-invocation (not redundant-tool-responsibility as originally framed)
+
+**Revised fix path:**
+
+Prompt rule to be added in Workstream J Session 4: agent should call upsert_customer (1) once when first_name is first learned, then (2) only when additional new fields are learned (last_name, email, address, customer_type signal). Idempotent calls with no new info are wasteful — multiple turns of duplicate writes add latency and DB load without benefit.
+
+The tool itself stays as-is. D35's "pivot to update-only / rename to update_customer" is superseded by D37 (see Section 7).
+
+**Revised status:** Open — prompt-level fix scoped for Workstream J Session 4.
+
+#### Issue 33 — Combo/bundle pricing not applied in send_quote_sms
+
+**Severity:** P1 — pricing fidelity bug, customer-facing discrepancy
+**Observed:** 2026-05-24 (Test 4, Q-0084)
+**Channel:** send_quote_sms endpoint → resolvePrice function
+**Root cause class:** missing-pricing-logic-branch
+
+**Evidence:**
+
+Test 4 multi-service quote (Q-0084) included Pet Hair & Dander Removal alongside Express Interior Clean. The agent correctly stated the combo price ($100 instead of $125 standalone, saves $25). DB verification confirmed the product record has combo_price=$100 defined.
+
+However, the actual quote line items in the database show Pet Hair & Dander Removal at unit_price=$125 (standalone), pricing_type='standard', no combo applied. Quote total $460 instead of the $435 the agent quoted to the customer.
+
+This is a real customer-facing fidelity bug — the agent honestly relays available pricing from product definitions, but the quote endpoint's pricing resolution does not apply combo logic when bundleable services co-occur in the same quote.
+
+**Suspected root cause:**
+
+`src/lib/services/service-resolver.ts` exports `resolvePrice(service, sizeClass)` which handles standard pricing and sale pricing branches. The combo pricing path requires awareness of OTHER services in the same quote (a combo "bundles" with a specific anchor service), which the per-service resolvePrice cannot detect in isolation.
+
+`send_quote_sms` route at `src/app/api/voice-agent/send-quote-sms/route.ts` calls `resolvePrice` per service in a loop (line ~190 area). It does not pass quote-level context that would allow detecting "is there an anchor service in this quote that triggers the combo price for this add-on?"
+
+**Fix direction (separate session, not Workstream J Session 4):**
+
+A dedicated diagnostic + fix session is needed:
+1. Audit the pricing data model — where combo_price lives, what anchor service triggers combo pricing, how combo relationships are defined in the DB
+2. Refactor send_quote_sms's pricing loop to be combo-aware: after resolving standard/sale prices for all line items, run a second pass that checks for combo eligibility based on the set of services in the quote
+3. Apply combo discount to the appropriate add-on line item, mark pricing_type='combo' and standard_price=<original> for transparency
+
+This affects voice agent flow too (same endpoint). Likely Workstream H concern (vehicle/pricing fidelity) or its own new workstream.
+
+**Mitigation in Workstream J Session 4 (prompt-level):**
+
+Prompt rule addition: agent should NOT state combo/bundle pricing in conversation without first calling `get_services` to verify the combo will actually apply. Better to give standalone prices and let the actual quote document carry whatever the system computes, than to promise discounts that don't materialize.
+
+**Status:** Open — endpoint fix deferred to separate session; prompt-level mitigation in Workstream J Session 4.
+
+#### Issue 34 — last_name not captured by SMS agent flow despite admin panel marking it required
+
+**Severity:** P3 — data quality gap, no immediate user impact
+**Observed:** 2026-05-24 (Test 4)
+**Channel:** SMS-AI v2 agent flow
+**Root cause class:** intentional-design-asymmetry + missed-capture-opportunity
+
+**Evidence:**
+
+The customers table allows `last_name` to be null (verified in tests where SMS-created customers have only first_name populated). The admin panel marks Last Name as required (red asterisk) when staff manually creates customers. This is an intentional asymmetry per the operator's framing: SMS-AI agent serves top-of-funnel discovery where the customer has not yet decided to do business; POS sale, online booking, and admin entry serve committed-customer scenarios where full identity data is appropriate.
+
+The asymmetry is acceptable. However, there is a missed opportunity in the SMS flow: at the moment the customer agrees to receive a quote ("Sure" / "Yes" / "Send it"), they have demonstrated meaningful commitment. This is a natural moment to ask for last_name as part of quote attribution.
+
+**Proposed prompt rule (Workstream J Session 4):**
+
+When the customer agrees to receive a quote AND the existing customer record has no last_name OR an empty last_name, ask casually: "What name should I put on the quote?" or "Last name?" If the customer provides full name (e.g., "Nayeem Khan"), parse into first_name and last_name. If they provide first name only or decline, proceed without — don't block the quote on last_name.
+
+Then call `upsert_customer` with the captured last_name before calling `send_quote_sms`. Per Policy B (D34/D35), last_name only updates if currently null/empty, preserving any human-curated value.
+
+**Operator architectural framing (operator-locked 2026-05-24):**
+
+Customer-journey-stage drives data-quality requirements:
+- SMS/Phone agent (top-of-funnel, no commitment): first_name + phone sufficient
+- POS sale, online booking, admin entry (committed): full identity required
+
+This asymmetry should remain. The customers table schema remains permissive (most fields nullable); UX layers enforce required-ness contextually.
+
+**Status:** Open — prompt-level capture rule scoped for Workstream J Session 4.
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
@@ -1565,6 +1654,14 @@ the lazy path. Always reuse existing code, components, and architecture." The
 existing send_quote_sms creation path is mature and correct; duplicating it in
 upsert_customer was the lazy path.
 
+**REVISED 2026-05-24 (post Test 4): D35's pivot recommendation is SUPERSEDED by D37 below.**
+
+D35 was based on empirical evidence from Tests 1-3 showing zero upsert_customer calls. That evidence is now known to be artifact of the deploy timing — Tests 1-3 ran against a build that did not contain upsert_customer.
+
+Test 4 (running against the full deploy `acef3613`) demonstrated upsert_customer fires reliably. The tool is not redundant. D35's pivot direction was based on incomplete information.
+
+D37 supersedes D35 with the revised recommendation: keep upsert_customer's create+update design, add prompt rules to prevent over-eager invocation.
+
 **D36 — send_quote_sms 60-second idempotency guard (operator-locked 2026-05-23
 evening).**
 
@@ -1603,6 +1700,36 @@ Issue 30 scope and Workstream I's broader quote-lifecycle policy.
 
 The guard is bulletproof for the immediate intermittent bug without
 overreaching into territory that requires broader product decisions.
+
+**D37 — upsert_customer retains create+update responsibility; invocation discipline enforced via prompt (operator-locked 2026-05-24 post Test 4).**
+
+D35's pivot recommendation is superseded. Empirical evidence from Test 4 (the first test against a deploy that actually contained upsert_customer) shows the tool fires reliably and creates customer records correctly. The tool is not architecturally redundant.
+
+The observed problem is over-eager invocation: the agent called upsert_customer 5 times in a single conversation, with most calls being no-op idempotent writes containing no new fields.
+
+**Decision:**
+
+1. Tool name: stays `upsert_customer` (not renamed to `update_customer`)
+2. Tool responsibility: stays create-or-update (current behavior)
+3. Tool schema: unchanged from D34
+4. Server-side behavior: unchanged from D34 (Policy B updates)
+5. Prompt rules (to be added in Workstream J Session 4): introduce invocation discipline
+
+**Invocation discipline rule (to be added to system prompt):**
+
+> Call `upsert_customer` ONLY when you have NEW field data to persist:
+> - First call: when you first learn the customer's first_name
+> - Subsequent calls: only when learning last_name, email, address fields, or detecting a customer_type signal change
+> - Do NOT call upsert_customer just to "confirm" or "save" data you already provided in an earlier call this conversation. The tool is idempotent at the database layer but not free at the latency layer.
+> - Do NOT call upsert_customer with no new fields. The tool will still succeed, but the call is wasteful.
+
+**Rationale:**
+
+upsert_customer is genuinely useful for both create-time (first name capture) and enrichment-time (later fields like last_name at quote-send per Issue 34, email if shared, address if mobile detail requested, customer_type signal updates). The architectural complaint in D35 was based on missing empirical evidence. With correct evidence, the create+update design is structurally fine.
+
+The agent's over-eager calling is a prompt-tuning issue, not an architectural issue. Cheaper to fix in prompt than to refactor the tool.
+
+D37 supersedes D35.
 
 ### Coverage targets
 
