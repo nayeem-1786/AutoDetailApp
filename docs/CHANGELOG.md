@@ -6,6 +6,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — docs: capture Workstream J Session 4 prep (Issues 30-32 + D35-D36)
+
+Docs-only capture session. Branch `docs/2026-05-23-workstream-j-session-4-prep`. NO source code touched. NO prompt changes. NO migrations. NO test changes.
+
+**Empirical basis.** Three back-to-back test conversations from `+13107564789` on the evening of 2026-05-23, post-deploy of commit `13a7421f` (Workstream J Session 3: upsert_customer + orphan UI + Workstream K docs). Tests covered: Test 1 (Honda Accord, new customer creation → Q-0084 sent → duplicate Q-0085 fired on "Nope" closure); Test 2 (Tesla Model 3, existing customer + new vehicle → Q-0086 sent, clean closure); Test 3 (Honda Ridgeline, existing customer + second new vehicle → Q-0087 sent, clean closure on same "Nope" pattern that triggered Test 1's bug). Final DB state for `+13107564789`: 1 customer (Nayeem, enthusiast, sms_consent=true), 3 vehicles correctly ADDED without overwriting (Honda Accord + Tesla Model 3 + Honda Ridgeline), 4 quotes. PM2 logs across all 3 tests: 0 `tool=upsert_customer` dispatch entries.
+
+**Captured findings:**
+
+- **Issue 30 (P2, deferred to Workstream I)** — Quote duplication across multi-day conversations. The `send_quote_sms` endpoint creates a new quote on each call with no detection of existing active quotes (same customer + vehicle + services within validity window). Open product question (Options A-D) deferred to Workstream I's broader quote-lifecycle policy.
+
+- **Issue 31 (P2, scoped for Workstream J Session 4)** — Intermittent double `send_quote_sms` within single conversation. Test 1 fired send_quote_sms twice on "Nope" closure (Q-0084 + Q-0085, 1432ms + 1237ms latencies, both error=false). Test 3 had identical closure pattern and did NOT trigger — LLM non-determinism. Fix path: server-side 60-second idempotency guard.
+
+- **Issue 32 (P3, scoped for Workstream J Session 4)** — `upsert_customer` never fires for creation in practice. PM2 logs across all 3 tests show 0 upsert_customer calls; existing send_quote_sms find-or-create handles creation correctly. The tool's CREATE responsibility duplicates existing creation paths; UPDATE responsibility is genuinely needed. Pivot to update-only is structurally cleaner.
+
+**Locked decisions:**
+
+- **D35** — `upsert_customer` → `update_customer` pivot. Tool renamed, endpoint behavior errors when customer doesn't exist (with `instructions_for_agent` directing agent to send_quote_sms / create_appointment for creation). Policy B update behavior from D34 retained. Fields: first_name, last_name, email, customer_type, address_1, address_2, city, zip_code. Vehicles excluded (one-to-many → findOrCreateVehicle). Architectural principle: one-to-many relationships use ADD semantics; singular fields use UPDATE semantics. Three prompt rule rewrites (remove eager-creation language, add automatic-via-side-effect note, add enrich-on-new-info trigger). D35 supersedes the relevant portion of D34.
+
+- **D36** — `send_quote_sms` 60-second idempotency guard. Match on customer_id + vehicle_id + service-set (order-independent) within last 60 sec → return existing quote_id with `was_duplicate: true` flag + `instructions_for_agent` silent-acknowledge text. No new quote row, no duplicate SMS. Window narrow enough to ONLY catch immediate LLM-confabulation duplicates; multi-day return inquiries (Issue 30) fall under Workstream I scope.
+
+**`docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`:** Section 2 — three new entries appended after Issue 29 (Issue 30 P2 deferred-to-WS-I, Issue 31 P2 scoped-for-J-S4, Issue 32 P3 scoped-for-J-S4). Section 7 — two new locked decisions appended after D33 (D35 update-only pivot, D36 60-sec idempotency guard). Issues 1-29 untouched. D1-D34 untouched.
+
+**`docs/dev/ROADMAP-13-ITEMS.md`:** Workstream J Session 4 row UPDATED in place (now "Session 4 (refined)" — bundles D35 + D36 changes; status ⚪ ready; estimated 2-2.5 hours CC). Existing Workstream J Session 4-6 work renumbered to Session 5-7 to preserve scope: old Session 4 (refined-flow prompt rewrite per D20-D29) → Session 5; old Session 5 (customer context refresh) → Session 6; old Session 6 (live verification) → Session 7. Sequencing notes updated: recommended order now 1 → 2 → 3 → 4 → 6 → 5 → 7 (Session 4 D35/D36 is immediate next executable; Session 6 D20 context refresh feeds Session 5 prompt rewrite; Session 7 verification last). Session ledger row appended (#60). Workstreams A-I, K untouched.
+
+**`docs/CHANGELOG.md`:** new entry at top describing the empirical basis, three new issues, two locked decisions, and Workstream J Session 4 scope refinement.
+
+**Merge resolution note (one-time).** This branch was created after resolving the in-progress merge of `feat/sms-ai-v2-upsert-customer-tool` → `main` (CHANGELOG.md conflict — both branches added new 2026-05-23 entries; resolution kept both blocks). Merge commit `971f06ee` shipped both Session 3 (upsert_customer) and the orphan-conversations purge tool onto main before this docs branch was cut.
+
+**Boundary check.** This is ADDITIONS + one in-place row update + renumbering of preserved scope. No existing observations, decisions (D1-D34), workstreams (A-I, K), or shipped session-ledger rows were content-modified. Verification: `grep -n "Issue 30" docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` returns content; `grep -n "Issue 31" ...` returns content; `grep -n "Issue 32" ...` returns content; `grep -n "^\*\*D35" ...` returns content; `grep -n "^\*\*D36" ...` returns content; `git status` shows only docs files modified; no conflict markers anywhere in `docs/`.
+
+---
+
 ## 2026-05-23 — fix: Admin can purge orphan conversations (closes Issue 28 follow-up gap)
 
 Operator evidence at 4:00 PM PST surfaced a gap left by Workstream J Session 1's diagnostic (session #56): the 2026-05-23 02:00 AM new-customer test left conversation `85508f89-c9c5-4a48-97a6-352c89c81436` (24 messages, phone `+13107564789`) ORPHANED — `customer_id IS NULL` because `send_quote_sms` (which creates the customer record as a side effect) failed at the "phone is required" gate before commit `9273ff1c` shipped the phone-injection fix. The main Purge tool at `/api/admin/customers/purge` couldn't reach it: its lookup walks `customers.phone → conversations`, and no customer record exists for that phone — admin search returns "No customers found", nothing selectable, dead-end.

@@ -851,6 +851,149 @@ Scope as Workstream K — Walk-In Customer Identity Resolution. See ROADMAP for 
 
 **Status:** Open — scoped as Workstream K for future implementation.
 
+#### Issue 30 — Quote duplication across multi-day conversations
+
+**Severity:** P2 — data hygiene + customer experience
+**Observed:** 2026-05-23 (Workstream J Session 3 multi-test verification)
+**Channel:** send_quote_sms endpoint
+**Root cause class:** missing-deduplication-at-endpoint-layer
+
+**Evidence:**
+
+The send_quote_sms endpoint always creates a new quote on each call. There is no
+detection of:
+- Existing active quotes for the same customer + same vehicle + same services
+- Quote validity window (default 10 days per quote_validity_days setting)
+- Status transitions (sent / viewed / accepted) that might indicate a quote
+  shouldn't be duplicated
+
+Result: when a customer returns days later about the same vehicle + same services,
+a new quote is created. Over time, a single customer can accumulate multiple
+"active" quotes for the same items.
+
+**Open product question:**
+
+When a returning customer asks about the same vehicle + same services within the
+validity window, what should happen?
+- Option A: Always create new quote (current behavior, simple but messy)
+- Option B: Resend existing active quote's link (preserves quote state, may lock
+  in old pricing if rates changed)
+- Option C: Supersede old quote and create new with current pricing (clean state,
+  customer may be confused by changed link)
+- Option D: Hybrid — check if line-item prices changed; reuse if not, supersede
+  if yes
+
+**Resolution path:**
+
+Defer to Workstream I (Quote Lifecycle), which is scoped to address quote
+expiration, supersession, Copy Quote pattern, and Re-Quote button. The
+canonical quote deduplication policy should be defined there as part of the
+unified quote lifecycle.
+
+Until Workstream I lands, accept duplicate quote creation as known behavior.
+Staff can resolve manually by archiving outdated quotes.
+
+**Status:** Open — deferred to Workstream I.
+
+#### Issue 31 — Intermittent double send_quote_sms within single conversation
+
+**Severity:** P2 — customer confusion + data duplication
+**Observed:** 2026-05-23 Test 1 only (not reproducible in Tests 2 and 3 with
+similar closure patterns)
+**Channel:** Agent runner → send_quote_sms tool dispatch
+**Root cause class:** LLM-non-determinism + missing-server-side-idempotency
+
+**Evidence:**
+
+Test 1 transcript (Honda Accord):
+- Agent: "Quote's on its way, Nayeem! Tap the link to review and accept. Our team
+  will reach out to confirm your scheduling. Anything else?"
+- Customer: "Nope"
+- Agent: [fires send_quote_sms AGAIN — creates Q-0085 with different short link]
+- Agent: "You're all set, Nayeem! Quote Q-0085 has been sent — tap the link to
+  review and accept..."
+
+PM2 logs:
+- iter=1: send_quote_sms latency=1432ms error=false (Q-0084)
+- iter=2: send_quote_sms latency=1237ms error=false (Q-0085, on next inbound)
+
+Test 3 had identical closure pattern ("Anything else?" → "Nope") and did NOT
+trigger the bug. The LLM's interpretation of ambiguous closure is non-deterministic.
+
+**Fix path:**
+
+Server-side idempotency guard in send_quote_sms endpoint:
+- Before creating new quote, check for matching active quote (same customer_id +
+  same vehicle_id + same service list) within last 60 seconds
+- If match found, return existing quote_id with `was_duplicate: true` flag
+- Include `instructions_for_agent` in response: "Recent identical quote exists.
+  Don't re-send confirmation to customer."
+- Dispatcher passes through structured response per existing pattern
+
+The 60-second window is narrow enough to ONLY catch immediate duplicates from
+LLM confabulation, not legitimate re-quotes (those fall under Issue 30 scope).
+
+**Status:** Open — to be addressed in Workstream J Session 4.
+
+#### Issue 32 — upsert_customer never fires for creation in practice
+
+**Severity:** P3 — architectural inconsistency (no data corruption, no user impact)
+**Observed:** 2026-05-23 (all three tests in Workstream J Session 3 verification)
+**Channel:** Agent runner tool selection
+**Root cause class:** redundant-tool-responsibility
+
+**Evidence:**
+
+PM2 logs across all three tests show zero `tool=upsert_customer` dispatch entries.
+In all three tests:
+- Customer record was created (Test 1) or recognized (Tests 2 and 3)
+- send_quote_sms handled creation via its existing find-or-create pattern
+- Customer record state was correct at end of conversation in all cases
+
+The agent had multiple opportunities to call upsert_customer:
+- Test 1: After "Nayeem" was provided (Turn 6), before send_quote_sms
+- Tests 2 and 3: Could have called upsert_customer with no new fields just to
+  acknowledge customer presence
+
+In all cases, the agent skipped upsert_customer and went directly to
+send_quote_sms. The customer record creation responsibility in upsert_customer
+duplicates the existing creation in send_quote_sms (and create_appointment).
+
+**Architectural insight (operator-provided, 2026-05-23):**
+
+Vehicles have a one-to-many relationship with customers. When a customer
+mentions a new vehicle, the system should ADD a vehicle record, not UPDATE
+the existing one. This is correctly handled by findOrCreateVehicle in
+send_quote_sms today (verified in Tests 2 and 3 where new vehicles were
+added without overwriting existing).
+
+This generalizes to a broader principle: tools that handle one-to-many
+relationships (vehicles, appointments, quotes) should ADD; tools that
+handle singular customer fields (first_name, email, address, customer_type)
+should UPDATE.
+
+The current upsert_customer conflates CREATE responsibility (handled
+elsewhere) with UPDATE responsibility (genuinely needed). Pivot to
+update-only is structurally cleaner.
+
+**Fix path:**
+
+- Rename `upsert_customer` → `update_customer`
+- Endpoint behavior: error if customer doesn't exist (with instructions_for_agent
+  telling agent to use send_quote_sms / create_appointment to create)
+- Tool description rewritten to emphasize update-only semantics
+- Three prompt rule rewrites:
+  - Remove "ask name early, call upsert_customer immediately"
+  - Add "Customer record creation happens automatically via send_quote_sms or
+    create_appointment"
+  - Add "Call update_customer when customer shares: name correction, additional
+    name (last name), email, address (for mobile detail), customer_type signals
+    (B2B language)"
+  - Vehicles explicitly excluded — findOrCreateVehicle handles them
+- Tests updated for renamed tool and error-on-missing-customer behavior
+
+**Status:** Open — to be addressed in Workstream J Session 4.
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
@@ -1359,6 +1502,107 @@ This decision aligns with D17 (Copy Quote field-mapping) principle of
 "identity + content carries; lifecycle + system state resets" — at POS
 walk-in moment, we're capturing minimum identity to attach a real
 transaction to.
+
+**D35 — upsert_customer pivots to update_customer (operator-locked 2026-05-23
+evening, post-deploy of D34).**
+
+Empirical evidence from three back-to-back test conversations on the evening of
+2026-05-23 demonstrated that:
+
+1. The agent does not naturally call upsert_customer (0 calls across 3 tests)
+2. send_quote_sms and create_appointment already handle customer creation
+   correctly via their existing find-or-create patterns
+3. New-vehicle handling via findOrCreateVehicle correctly ADDS additional
+   vehicles without overwriting existing ones (one-to-many respected)
+4. The customer record at end-of-conversation was correct in all three tests
+   despite zero upsert_customer calls
+
+D34's name-first eager creation design was based on theory ("prevent orphans
+by creating early"). Empirical testing showed the existing creation paths
+suffice for the new-customer conversion path, and the dominant orphan source
+(walk-in receipts per Issue 29) was unrelated to this design.
+
+D35 supersedes the relevant portion of D34. The tool is repurposed:
+
+**Renamed:** `upsert_customer` → `update_customer`
+
+**Responsibility:** UPDATE existing customer records only. Never creates.
+
+**Endpoint behavior:** If no customer exists for the conversation phone, return
+structured error with `instructions_for_agent` text: "No customer record exists
+yet. Customer is created automatically when send_quote_sms or create_appointment
+is called. Continue conversation; capture this update when the customer is
+created."
+
+**Update policy (Policy B from D34 retained):** Preserves human-curated values;
+fills nulls only for first_name/last_name/email/address. customer_type updates
+on each call. sms_consent only false→true (never auto-revoked).
+
+**Fields:** first_name, last_name, email, customer_type, address_1, address_2,
+city, zip_code.
+
+**Explicitly NOT in scope:**
+- Vehicles (one-to-many; handled by findOrCreateVehicle in quote/appointment tools)
+- Appointments (one-to-many; their own tools)
+- Phone number (identity-immutable; never updated via this tool)
+
+**Prompt rule changes:**
+- Remove eager-creation language from D34
+- Add "Customer creation happens via send_quote_sms or create_appointment
+  automatically"
+- Add "Call update_customer when customer shares new info to enrich the
+  existing record"
+
+**Rationale for architectural principle:**
+
+One-to-many relationships (vehicles, appointments, quotes) require ADD semantics.
+Singular fields (name, email, address, customer_type) require UPDATE semantics.
+Tool naming and responsibility should reflect this distinction. update_customer
+is now structurally honest about its scope.
+
+This decision aligns with the operator's principle from CLAUDE.md: "Never take
+the lazy path. Always reuse existing code, components, and architecture." The
+existing send_quote_sms creation path is mature and correct; duplicating it in
+upsert_customer was the lazy path.
+
+**D36 — send_quote_sms 60-second idempotency guard (operator-locked 2026-05-23
+evening).**
+
+To address Issue 31 (intermittent double-send within single conversation), the
+send_quote_sms endpoint gains a narrow idempotency guard.
+
+**Scope:**
+
+Match criteria for "duplicate":
+- Same customer_id
+- Same vehicle_id
+- Same service list (exact set, order-independent)
+- Last matching quote created within the last 60 seconds
+
+**Behavior on match:**
+- Return existing quote's quote_id, quote_number, and short_url
+- Include `was_duplicate: true` in response
+- Include `instructions_for_agent: "Recent identical quote exists. Acknowledge
+  the customer naturally without mentioning that you've already sent the quote."`
+- Do NOT create a new quote row
+- Do NOT send a duplicate SMS
+
+**Behavior on no match:** Normal flow — create new quote, send SMS.
+
+**Why 60 seconds:**
+
+Narrow enough to ONLY catch immediate duplicates from LLM confabulation in a
+single conversation. Beyond 60 seconds, multi-day return inquiries fall under
+Issue 30 scope and Workstream I's broader quote-lifecycle policy.
+
+**Explicitly NOT in scope:**
+- Multi-day duplicate detection (Issue 30 / Workstream I)
+- Cross-conversation supersession
+- Pricing-change detection
+- Quote expiration handling
+
+The guard is bulletproof for the immediate intermittent bug without
+overreaching into territory that requires broader product decisions.
 
 ### Coverage targets
 
