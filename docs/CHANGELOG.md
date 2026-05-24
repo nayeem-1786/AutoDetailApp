@@ -6,6 +6,67 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — audit: Issue 33 implementation pre-flight reuse audit (operator-locked Q1–Q5)
+
+Pre-flight read-only audit of the implementation plan from `docs/dev/ISSUE_33_COMBO_PRICING_DIAGNOSTIC.md` (commit `5d3c3576`). Operator review confirmed Approach C with locked answers to all 5 open questions:
+- Q1: lowest combo_price wins
+- Q2: size-aware addon savings figures MUST also be fixed (additional scope)
+- Q3: lowest wins (combo OR sale, whichever is lower)
+- Q4: defer combo_source_primary_id column
+- Q5: public booking form in same implementation session
+
+This audit validates that every "new" construct proposed in the diagnostic reuses existing schema, naming, helpers, and patterns per CLAUDE.md "never take the lazy path." Branch `audit/issue-33-implementation-reuse`. NO source code touched.
+
+**New — `docs/dev/ISSUE_33_IMPLEMENTATION_REUSE_AUDIT.md`:** 8-target audit + updated implementation specification.
+
+**Key findings:**
+
+1. **`size_class` is the operator-locked canonical name** (CLAUDE.md rule 19) — `vehicles.size_class` enum, `VehicleSizeClass` TS type, `VEHICLE_SIZE_CLASS_KEYS` constant (5 values: sedan/truck_suv_2row/suv_3row_van/exotic/classic). The proposed `get_services({size_class})` parameter is naming-consistent, NOT a new construct. `classify_vehicle` already returns `size_class` to the agent (`vehicle-classify/route.ts:82`) so the agent can pass it through to get_services unchanged. NO reuse opportunity missed.
+
+2. **The combo helper should be a NEW file** (`src/lib/services/combo-resolver.ts`), not extracted from the POS reducer. The POS reducer's combo logic (`quote-reducer.ts:182-188`, `ticket-reducer.ts:278-284`) operates per-line-item with caller-pre-bound `comboPrice` from a UI selection. The agent-side problem is the inverse direction: DETECT combo eligibility from the set of services. Detection is genuinely new logic; only the "lowest wins" per-item comparison mirrors the reducer's semantics. Follow the existing `picker-engine.ts` (pure) + `service-resolver.ts` (admin-aware wrapper) split pattern — export BOTH `applyCombosFromSuggestions(items, suggestions, options)` (pure, testable without DB mocks) AND `applyCombosToQuoteItems(admin, items, options)` (admin-injected one-line caller API).
+
+3. **Sessions can run in PARALLEL.** Zero file overlap between Layer 1 (combo helper + 5 quote-creation path adoptions) and Layer 2 (get_services size_class + prompt rule + Session 4 rollback). Recommend two parallel branches: `feat/issue-33-combo-resolver-helper` and `feat/issue-33-get-services-size-class`. Session 4 rollback bundles with Layer 2 since both touch `system-prompt.ts`.
+
+**Findings beyond the diagnostic (3 minor adjustments):**
+
+- **Test file count corrected from 3 → 5 net-new.** Diagnostic missed that `voice-post-call.ts` and `voice-agent/services/route.ts` have ZERO existing test files — both are greenfield, not gap-extensions.
+- **`is_seasonal` filter logic duplicated** in 2 sites today (`voice-agent/services/route.ts:111-118`, `pos/hooks/use-addon-suggestions.ts:53-56`). New helper becomes the 3rd. Recommend exposing `isComboInSeason(suggestion, today)` as a public sub-helper from the new combo-resolver. Future cleanup adopts from the other 2 sites. Not blocking.
+- **`CUSTOMER_SELF_SERVICE_SIZE_CLASSES`** (3-value subset at `src/lib/utils/constants.ts:75`) is the booking form's customer-facing allowed set. The new helper accepts the full 5-value taxonomy because internal agent + POS paths handle all sizes. Pin in booking-form tests that exotic/classic never reach the helper from that path.
+
+**Confirmed reuse / no-op findings:**
+
+- `pricing_type: z.enum(['standard', 'sale', 'combo'])` is already validated by `quoteItemSchema` at `src/lib/utils/validation.ts` — Layer 1 implementation does NOT need schema validator changes.
+- `service_addon_suggestions` shape is already in `database.types.ts` (auto-generated, line 4753). No type plumbing needed.
+- `resolvePrice` cleanly returns standalone price for size-aware addons when given a non-null sizeClass (`service-resolver.ts:197-225`). Layer 2 calls it directly for addons with `pricing_model in ('vehicle_size', 'scope')`.
+- The booking client (`step-service-select.tsx:248`, `booking-wizard.tsx:492`) ALREADY surfaces combo_price to customers via `suggestion.combo_price`. The booking form's submitted `addon.price` already EQUALS `combo_price`. Q5 migration is narrow: drop the server's hardcoded `pricing_type: 'standard'` (line 481) and `standard_price: addon.price` (line 480); route the addon array through `applyCombosToQuoteItems` so `pricing_type='combo'` + `standard_price=original standalone` populate correctly. Customer-facing UX unchanged.
+
+**Updated test-file plan:**
+- **5 NEW test files:** `combo-resolver.test.ts`, `voice-agent/quotes/route.test.ts`, `voice-agent/services/route.test.ts`, `voice-post-call.test.ts`, `auto-quote-combo.test.ts`.
+- **3 EXISTING extended:** `send-quote-sms/route.test.ts`, `book/compute-expected-price.test.ts`, `tools.test.ts`.
+- **1 EXISTING extended-with-deletions:** `system-prompt.test.ts` (delete Session 4 combo describe block, add Layer 2 prompt rule tests).
+- **Estimated +35 to +50 new tests** across both layers.
+
+**Updated implementation file plan:**
+
+| Layer | New files | Modified files | Branch |
+|---|---|---|---|
+| Layer 1 (combo helper + 5 adoptions) | `combo-resolver.ts` + 4 new test files | 6 (5 routes + 1 test extension) | `feat/issue-33-combo-resolver-helper` |
+| Layer 2 (get_services size_class + prompt + Session 4 rollback) | 1 new test file | 5 (services/route.ts + tools.ts + system-prompt.ts + 2 test extensions) | `feat/issue-33-get-services-size-class` |
+
+**Naming locks confirmed:**
+- get_services parameter: `size_class` (snake_case, matches DB column + classify_vehicle response).
+- Helper file: `src/lib/services/combo-resolver.ts`.
+- Pure function export: `applyCombosFromSuggestions(items, suggestions, options?)`.
+- Admin-injected wrapper export: `applyCombosToQuoteItems(admin, items, options?)`.
+- Sub-helper for seasonal filtering: `isComboInSeason(suggestion, today)`.
+- pricing_type literal: `'combo'` (matches existing zod enum + POS reducer convention).
+
+**No structural concerns require operator input.** All 5 Q-answers are sufficient. The audit only refines the implementation plan; it does not surface any blocker.
+
+**Verification:** `git diff --name-only` shows ONLY `docs/dev/ISSUE_33_IMPLEMENTATION_REUSE_AUDIT.md` (new) + `docs/CHANGELOG.md` + `docs/dev/ROADMAP-13-ITEMS.md`. NO files in `src/` modified. NO migrations. NO tests added/removed. NO prompt changes.
+
+---
+
 ## 2026-05-24 — audit: Issue 33 combo/bundle pricing diagnostic
 
 Read-only diagnostic of every quote-creation path in the codebase. Output: a root-cause fix specification that obsoletes the Workstream J Session 4 prompt-rule workaround (which told the agent to verify combos via `get_services` before stating them — a Band-Aid that violated CLAUDE.md's "never take the lazy path" principle). Branch `audit/issue-33-combo-pricing`. NO source code touched.
