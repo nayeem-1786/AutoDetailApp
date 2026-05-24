@@ -284,6 +284,7 @@ src/app/api/book/route.ts
 src/app/api/book/slots/route.ts
 src/app/api/book/validate-coupon/route.ts
 src/app/api/book/__tests__/modifier-persistence.test.ts  # 4 tests — pins Item 15g Layer 15g-iv Scenario A: POST /api/book persists coupon + loyalty to dedicated columns, never to internal_notes (post-cleanup contract)
+src/app/api/book/__tests__/booking-combo.test.ts        # NEW Issue 33 Layer 1 — 11 tests. Boundary pin: bookingVehicleSchema rejects exotic/classic size_class at Zod layer (CUSTOMER_SELF_SERVICE_SIZE_CLASSES). Combo HIT/MISS on booking-shaped items (primary + addons), lowestWins prevents combo from raising addon price.
 ```
 
 ### Checkout (Online Store)
@@ -507,6 +508,7 @@ src/app/api/webhooks/stripe/route.ts
 src/app/api/webhooks/stripe/__tests__/payment-intent-succeeded.test.ts
 src/app/api/webhooks/twilio/inbound/route.ts
 src/app/api/webhooks/twilio/inbound/__tests__/sms-ai-v2-routing.test.ts  # 13 tests (Layer 4) — v2 routing decision: allowlist→v2, non-allowlist→legacy, globallyEnabled, killSwitch overrides, flag-throw fall-through, return-200 TwiML, dispatch-reject swallowed, 5 existing-gate skip cases, input-shape contract (3-key match, NO customerId — runner uses phone+conversationId via getCustomerContext).
+src/app/api/webhooks/twilio/inbound/__tests__/auto-quote-combo.test.ts   # NEW Issue 33 Layer 1 — 5 tests pinning the auto-quote loop's data-shape contract with applyCombosToQuoteItems (combo HIT/MISS, mapVehicleSizeClass values flow through helper, sale-vs-combo lowest-wins).
 src/app/api/webhooks/twilio/status/route.ts
 src/app/api/webhooks/twilio/voice/route.ts
 ```
@@ -536,6 +538,7 @@ src/app/api/voice-agent/initiation/route.ts
 src/app/api/voice-agent/products/route.ts
 src/app/api/voice-agent/products/details/route.ts
 src/app/api/voice-agent/quotes/route.ts
+src/app/api/voice-agent/quotes/__tests__/route.test.ts  # NEW Issue 33 Layer 1 — 9 tests (no existing coverage). Combo HIT/MISS through this route's bespoke pricing loop, standard_price + pricing_type column persistence (Layer-1 alignment with createQuote pattern), subtotal recompute from combo-rewritten items.
 src/app/api/voice-agent/send-info-sms/route.ts
 src/app/api/voice-agent/notify-staff/route.ts
 src/app/api/voice-agent/send-quote-sms/route.ts
@@ -1077,6 +1080,7 @@ src/lib/services/__tests__/customer-context.test.ts     # 15 tests — known cus
 src/lib/services/__tests__/staff-notification.test.ts   # 15 tests — all 7 reason codes + isStaffNotificationReason guard, recipient fallback chain, partial-failure reporting, template-inactive short-circuit, audit-log to customer thread.
 src/lib/services/page-content-extractor.ts
 src/lib/services/service-resolver.ts                 # resolveServiceByName + resolvePrice for voice agent / SMS auto-responder. Layer 3d: resolvePrice rewritten as thin wrapper around canonical engine; 4 silent-mispricing bugs (exotic/classic, per_unit, specialty, custom) closed.
+src/lib/services/combo-resolver.ts                    # Issue 33 Layer 1 — applyCombosFromSuggestions (pure) + applyCombosToQuoteItems (admin-injected wrapper) + isComboInSeason. Detects combo eligibility from the SET of services in a quote and rewrites addon line items with combo_price + pricing_type='combo'. Adopted in send_quote_sms, voice-agent quotes, Twilio inbound auto-quote, voice-post-call, and the public booking form.
 src/lib/services/voice-post-call.ts
 src/lib/services/shippo.ts
 src/lib/services/picker-engine.ts                    # Canonical service-pricing engine (Item 15f Layer 1; Layer 2 added `open-custom-price-dialog` ServiceTapRoute variant + branch) — resolveServicePrice, resolveServicePriceWithSale, getServicePriceRange, routeServiceTap. Per CLAUDE.md Rule 22.
@@ -1087,6 +1091,8 @@ src/lib/services/__tests__/picker-engine.test.ts     # Engine tests — exhausti
 src/lib/services/__tests__/use-service-picker.test.tsx # Hook contract tests with vi-mocked CatalogBrowser/ServicePricingPicker/CustomPriceDialog (Item 15f Layer 1+2)
 src/lib/services/__tests__/custom-price-dialog.test.tsx # 11 tests — dialog rendering, validation, confirm/cancel emit, buildCustomPricing helper (Item 15f Layer 2)
 src/lib/services/__tests__/service-resolver.test.ts  # 27 tests — pin all 4 Layer-3d bug fixes (exotic/classic fall-through, per_unit $0, specialty first-tier, custom $0); covers flat / vehicle_size / scope / per_unit / specialty / custom dispatch + size-class edge cases.
+src/lib/services/__tests__/combo-resolver.test.ts    # 29 tests — pure function + admin wrapper + isComboInSeason. Covers combo HIT/MISS, auto_suggest gate, seasonal window in/out of season, multi-anchor tiebreak (lowest_price default + first_match), lowestWins gate (sale-vs-combo), input non-mutation, defensive null/zero combo_price handling.
+src/lib/services/__tests__/voice-post-call.test.ts   # 3 tests — pin the combo-resolver integration contract used by voice-post-call's autoGenerateQuote loop (greenfield: voice-post-call.ts had no existing tests; full processVoiceCallEnd integration intentionally deferred per file header).
 ```
 
 Backward-compat shim for the canonical engine (Item 15f Layer 1):

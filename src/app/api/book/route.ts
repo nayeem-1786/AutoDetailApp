@@ -22,6 +22,7 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 import { buildPaymentInfo, buildDepositInfo } from '@/lib/sms/composites';
+import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 
 export async function POST(request: NextRequest) {
   try {
@@ -441,6 +442,41 @@ export async function POST(request: NextRequest) {
             ? data.vehicle.size_class
             : null;
 
+          // Issue 33 Layer 1: detect combos across primary + addons so the
+          // audit trail (transaction_items.pricing_type + .standard_price)
+          // reflects reality. The customer-facing addon.price already carries
+          // combo_price from the booking client UI; the combo helper finds
+          // the corresponding service_addon_suggestions row, rewrites the
+          // addon line item with pricing_type='combo', and captures the
+          // standalone standard_price for reporting. Boundary pin: the
+          // booking schema (bookingVehicleSchema) restricts size_class to
+          // CUSTOMER_SELF_SERVICE_SIZE_CLASSES (sedan / truck_suv_2row /
+          // suv_3row_van) — exotic/classic are rejected upstream at the
+          // Zod layer and never reach this code.
+          const comboInputItems = [
+            {
+              service_id: data.service_id,
+              item_name: serviceRow.name as string,
+              quantity: 1,
+              unit_price: data.price,
+              tier_name: data.tier_name || null,
+              standard_price: null,
+              pricing_type: 'standard' as const,
+            },
+            ...data.addons.map((addon) => ({
+              service_id: addon.service_id,
+              item_name: addon.name,
+              quantity: 1,
+              unit_price: addon.price,
+              tier_name: addon.tier_name || null,
+              standard_price: null as number | null,
+              pricing_type: 'standard' as const,
+            })),
+          ];
+          const resolvedItems = await applyCombosToQuoteItems(supabase, comboInputItems);
+          const resolvedPrimary = resolvedItems[0];
+          const resolvedAddons = resolvedItems.slice(1);
+
           const lineItems = [
             {
               transaction_id: depositTx.id,
@@ -450,35 +486,35 @@ export async function POST(request: NextRequest) {
               package_id: null,
               item_name: serviceRow.name as string,
               quantity: 1,
-              unit_price: data.price,
-              total_price: data.price,
+              unit_price: resolvedPrimary.unit_price,
+              total_price: resolvedPrimary.unit_price,
               tax_amount: 0,
               is_taxable: false,
               tier_name: data.tier_name || null,
               vehicle_size_class: sizeClass,
               notes: null,
-              standard_price: data.price,
-              pricing_type: 'standard',
+              standard_price: resolvedPrimary.standard_price ?? resolvedPrimary.unit_price,
+              pricing_type: resolvedPrimary.pricing_type ?? 'standard',
               is_addon: false,
               prerequisite_note: null,
             },
-            ...data.addons.map((addon) => ({
+            ...resolvedAddons.map((addon) => ({
               transaction_id: depositTx.id,
               item_type: 'service' as const,
               product_id: null,
               service_id: addon.service_id,
               package_id: null,
-              item_name: addon.name,
+              item_name: addon.item_name,
               quantity: 1,
-              unit_price: addon.price,
-              total_price: addon.price,
+              unit_price: addon.unit_price,
+              total_price: addon.unit_price,
               tax_amount: 0,
               is_taxable: false,
-              tier_name: addon.tier_name || null,
+              tier_name: addon.tier_name,
               vehicle_size_class: sizeClass,
               notes: null,
-              standard_price: addon.price,
-              pricing_type: 'standard',
+              standard_price: addon.standard_price ?? addon.unit_price,
+              pricing_type: addon.pricing_type ?? 'standard',
               is_addon: true,
               prerequisite_note: null,
             })),

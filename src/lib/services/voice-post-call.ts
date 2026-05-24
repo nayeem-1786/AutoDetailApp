@@ -5,6 +5,7 @@ import { generateConversationSummary } from '@/lib/services/conversation-summary
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
+import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { buildFirstNameGreeting } from '@/lib/sms/composites';
@@ -499,7 +500,7 @@ async function autoGenerateQuote(
   }
 
   // Resolve service names to IDs with correct tier pricing (sale-aware)
-  const quoteItems: Array<{
+  let quoteItems: Array<{
     service_id: string;
     item_name: string;
     quantity: number;
@@ -526,6 +527,9 @@ async function autoGenerateQuote(
       pricing_type: isOnSale ? 'sale' : 'standard',
     });
   }
+
+  // Issue 33 Layer 1: apply combo pricing from service_addon_suggestions.
+  quoteItems = await applyCombosToQuoteItems(admin, quoteItems);
 
   if (quoteItems.length === 0) {
     console.log('[VoicePostCall] Auto-quote aborted — no services resolved to valid IDs');

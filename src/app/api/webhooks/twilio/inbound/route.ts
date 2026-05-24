@@ -32,6 +32,7 @@ import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
+import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 import crypto from 'crypto';
 
 const TWIML_EMPTY = '<Response/>';
@@ -788,7 +789,7 @@ export async function POST(request: NextRequest) {
           }
 
           // Resolve services and prices (sale-aware)
-          const quoteItems: Array<{
+          let quoteItems: Array<{
             service_id: string;
             item_name: string;
             quantity: number;
@@ -815,6 +816,9 @@ export async function POST(request: NextRequest) {
               pricing_type: isOnSale ? 'sale' : 'standard',
             });
           }
+
+          // Issue 33 Layer 1: apply combo pricing from service_addon_suggestions.
+          quoteItems = await applyCombosToQuoteItems(admin, quoteItems);
 
           if (quoteItems.length > 0) {
             // Read quote validity from admin settings

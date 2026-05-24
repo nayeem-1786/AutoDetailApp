@@ -6,6 +6,7 @@ import { sendSms } from '@/lib/utils/sms';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
+import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
@@ -180,7 +181,7 @@ export async function POST(request: NextRequest) {
     const sizeClass = vehicleSizeClass ?? 'sedan';
 
     // Resolve services to quote items (sale-aware via resolvePrice)
-    const quoteItems: Array<{
+    let quoteItems: Array<{
       service_id: string;
       item_name: string;
       quantity: number;
@@ -209,6 +210,14 @@ export async function POST(request: NextRequest) {
       });
     }
     perf.mark('resolve:services_batch', t);
+
+    // Issue 33 Layer 1: apply combo pricing across the resolved item set.
+    // When both the anchor and an addon are in the quote, the addon's
+    // unit_price is rewritten to the combo_price from
+    // `service_addon_suggestions`. Mirrors POS reducer "lowest wins".
+    t = perf.now();
+    quoteItems = await applyCombosToQuoteItems(admin, quoteItems);
+    perf.mark('resolve:combos', t);
 
     if (quoteItems.length === 0) {
       return NextResponse.json(

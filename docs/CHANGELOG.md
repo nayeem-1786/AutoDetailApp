@@ -6,6 +6,208 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(combo-pricing): Issue 33 Layer 1 — combo-resolver helper + 5 quote-creation path adoptions
+
+Branch `feat/issue-33-combo-resolver-helper`. Layer 1 of the Issue 33 root-cause
+fix per the operator-approved implementation reuse audit (commit `96c239ab`).
+Layer 2 (get_services size_class + Session 4 prompt rollback) ships in parallel
+from branch `feat/issue-33-get-services-size-class` (Session B). Zero file
+overlap between the two layers — both independently mergeable.
+
+**New helper** — `src/lib/services/combo-resolver.ts` (~200 lines):
+- `applyCombosFromSuggestions(items, suggestions, options?)` — pure function,
+  no DB mocks needed for tests. Detects combo eligibility from the SET of
+  service_ids in the quote (anchor + addon co-occurrence). Mirrors POS
+  reducer's "lowest wins" semantic (`quote-reducer.ts:182-188`).
+- `applyCombosToQuoteItems(admin, items, options?)` — admin-injected wrapper.
+  Fetches `service_addon_suggestions` rows for the item set + delegates to
+  the pure function. One-line API for quote-creation paths.
+- `isComboInSeason(suggestion, today)` — exported sub-helper; the 2 existing
+  duplicated seasonal-window check sites
+  (`voice-agent/services/route.ts:111-118` and
+  `pos/hooks/use-addon-suggestions.ts:53-56`) can migrate to it in a future
+  cleanup session.
+- Reuses the auto-generated `service_addon_suggestions` row type from
+  `database.types.ts:4753` — no parallel type declarations.
+- Operator-locked options: `lowestWins=true` default (combo applies only when
+  `combo_price <= unit_price`), `multipleAnchorTiebreak='lowest_price'`
+  default (per Q1).
+- Helper input is never mutated (verified by test); returns a new array.
+
+**5 quote-creation path adoptions** (~1-3 lines each):
+- `src/app/api/voice-agent/send-quote-sms/route.ts` (SMS-AI v2 — Test 4 /
+  Q-0084 failing path). Adds `applyCombosToQuoteItems` call after the
+  per-service `resolvePrice` loop. New `perf.mark('resolve:combos')` for
+  observability.
+- `src/app/api/voice-agent/quotes/route.ts` (ElevenLabs voice agent direct
+  quotes). Adds combo call + ALSO aligns this path with the canonical
+  `createQuote` pattern: `quote_items` rows now carry `standard_price` and
+  `pricing_type` columns. Pre-Layer-1 this route wrote neither, breaking
+  the audit trail.
+- `src/app/api/webhooks/twilio/inbound/route.ts` (legacy Twilio auto-quote).
+- `src/lib/services/voice-post-call.ts` (voice-post-call auto-quote during
+  finalize-call / cron poll / webhook).
+- `src/app/api/book/route.ts` (public online booking form — Q5 in scope).
+  Migrates the `transaction_items` deposit-line build off the hardcoded
+  `pricing_type: 'standard'` / `standard_price: addon.price` defaults. The
+  customer-facing addon price was already correct (client UI submits combo
+  price); the audit trail is now coherent.
+
+**Tests** — 6 new files / extensions, +60 tests on Layer 1 alone (combo
+resolver 29 + voice-agent quotes 9 + auto-quote-combo 5 + voice-post-call 3
++ booking-combo 11 + send-quote-sms extension 4; full Layer 1 + Layer 2
+combined working tree reaches 2065 tests):
+- NEW `src/lib/services/__tests__/combo-resolver.test.ts` — 29 tests covering
+  the pure function, `isComboInSeason`, and the admin wrapper.
+- NEW `src/app/api/voice-agent/quotes/__tests__/route.test.ts` — 9 tests
+  (route had zero existing test coverage).
+- NEW `src/app/api/webhooks/twilio/inbound/__tests__/auto-quote-combo.test.ts`
+  — 5 tests pinning the auto-quote loop's data-shape contract with the helper.
+- NEW `src/lib/services/__tests__/voice-post-call.test.ts` — 3 tests
+  (helper had zero existing test coverage; full processVoiceCallEnd
+  integration coverage is intentionally deferred — see file header).
+- NEW `src/app/api/book/__tests__/booking-combo.test.ts` — 11 tests
+  including the **boundary pin**: exotic/classic size_class is rejected at
+  the Zod schema layer (`bookingVehicleSchema` restricts to
+  `CUSTOMER_SELF_SERVICE_SIZE_CLASSES`), so they never reach the combo
+  helper. The schema rejection is the contract.
+- EXTEND `src/app/api/voice-agent/send-quote-sms/__tests__/route.test.ts`
+  — 4 new combo tests (Q-0084 reproduction + combo MISS + helper-invocation
+  contract + exotic boundary).
+
+**Hard rules respected:**
+- NO modifications to exotic/classic agent-escalation behavior. Booking
+  form's customer-facing 3-value subset preserved.
+- NO new database columns. NO migrations. NO changes to
+  `service_addon_suggestions` table.
+- NO changes to `quoteItemSchema` (`pricing_type: 'combo'` was already
+  validated).
+- NO changes to `system-prompt.ts`, `tools.ts`, or
+  `voice-agent/services/route.ts` (Session B / Layer 2 territory).
+- NO refactor of `resolvePrice` (Approach A rejected by diagnostic).
+- NO extraction from POS reducer (different problem per audit).
+- NO `combo_source_primary_id` column (Q4 deferred).
+
+**Verification scenario for operator** — reproduce Test 4 / Q-0084:
+1. SMS the test phone with a vehicle + Express Interior Clean + Pet Hair &
+   Dander Removal in the same quote request.
+2. The agent's quoted total should now equal the customer-facing quote
+   document. `quote_items` for Pet Hair should carry `unit_price=100`,
+   `standard_price=125`, `pricing_type='combo'`.
+
+---
+
+## 2026-05-24 — audit: Issue 33 implementation pre-flight reuse audit (operator-locked Q1–Q5)
+
+Pre-flight read-only audit of the implementation plan from `docs/dev/ISSUE_33_COMBO_PRICING_DIAGNOSTIC.md` (commit `5d3c3576`). Operator review confirmed Approach C with locked answers to all 5 open questions:
+- Q1: lowest combo_price wins
+- Q2: size-aware addon savings figures MUST also be fixed (additional scope)
+- Q3: lowest wins (combo OR sale, whichever is lower)
+- Q4: defer combo_source_primary_id column
+- Q5: public booking form in same implementation session
+
+This audit validates that every "new" construct proposed in the diagnostic reuses existing schema, naming, helpers, and patterns per CLAUDE.md "never take the lazy path." Branch `audit/issue-33-implementation-reuse`. NO source code touched.
+
+**New — `docs/dev/ISSUE_33_IMPLEMENTATION_REUSE_AUDIT.md`:** 8-target audit + updated implementation specification.
+
+**Key findings:**
+
+1. **`size_class` is the operator-locked canonical name** (CLAUDE.md rule 19) — `vehicles.size_class` enum, `VehicleSizeClass` TS type, `VEHICLE_SIZE_CLASS_KEYS` constant (5 values: sedan/truck_suv_2row/suv_3row_van/exotic/classic). The proposed `get_services({size_class})` parameter is naming-consistent, NOT a new construct. `classify_vehicle` already returns `size_class` to the agent (`vehicle-classify/route.ts:82`) so the agent can pass it through to get_services unchanged. NO reuse opportunity missed.
+
+2. **The combo helper should be a NEW file** (`src/lib/services/combo-resolver.ts`), not extracted from the POS reducer. The POS reducer's combo logic (`quote-reducer.ts:182-188`, `ticket-reducer.ts:278-284`) operates per-line-item with caller-pre-bound `comboPrice` from a UI selection. The agent-side problem is the inverse direction: DETECT combo eligibility from the set of services. Detection is genuinely new logic; only the "lowest wins" per-item comparison mirrors the reducer's semantics. Follow the existing `picker-engine.ts` (pure) + `service-resolver.ts` (admin-aware wrapper) split pattern — export BOTH `applyCombosFromSuggestions(items, suggestions, options)` (pure, testable without DB mocks) AND `applyCombosToQuoteItems(admin, items, options)` (admin-injected one-line caller API).
+
+3. **Sessions can run in PARALLEL.** Zero file overlap between Layer 1 (combo helper + 5 quote-creation path adoptions) and Layer 2 (get_services size_class + prompt rule + Session 4 rollback). Recommend two parallel branches: `feat/issue-33-combo-resolver-helper` and `feat/issue-33-get-services-size-class`. Session 4 rollback bundles with Layer 2 since both touch `system-prompt.ts`.
+
+**Findings beyond the diagnostic (3 minor adjustments):**
+
+- **Test file count corrected from 3 → 5 net-new.** Diagnostic missed that `voice-post-call.ts` and `voice-agent/services/route.ts` have ZERO existing test files — both are greenfield, not gap-extensions.
+- **`is_seasonal` filter logic duplicated** in 2 sites today (`voice-agent/services/route.ts:111-118`, `pos/hooks/use-addon-suggestions.ts:53-56`). New helper becomes the 3rd. Recommend exposing `isComboInSeason(suggestion, today)` as a public sub-helper from the new combo-resolver. Future cleanup adopts from the other 2 sites. Not blocking.
+- **`CUSTOMER_SELF_SERVICE_SIZE_CLASSES`** (3-value subset at `src/lib/utils/constants.ts:75`) is the booking form's customer-facing allowed set. The new helper accepts the full 5-value taxonomy because internal agent + POS paths handle all sizes. Pin in booking-form tests that exotic/classic never reach the helper from that path.
+
+**Confirmed reuse / no-op findings:**
+
+- `pricing_type: z.enum(['standard', 'sale', 'combo'])` is already validated by `quoteItemSchema` at `src/lib/utils/validation.ts` — Layer 1 implementation does NOT need schema validator changes.
+- `service_addon_suggestions` shape is already in `database.types.ts` (auto-generated, line 4753). No type plumbing needed.
+- `resolvePrice` cleanly returns standalone price for size-aware addons when given a non-null sizeClass (`service-resolver.ts:197-225`). Layer 2 calls it directly for addons with `pricing_model in ('vehicle_size', 'scope')`.
+- The booking client (`step-service-select.tsx:248`, `booking-wizard.tsx:492`) ALREADY surfaces combo_price to customers via `suggestion.combo_price`. The booking form's submitted `addon.price` already EQUALS `combo_price`. Q5 migration is narrow: drop the server's hardcoded `pricing_type: 'standard'` (line 481) and `standard_price: addon.price` (line 480); route the addon array through `applyCombosToQuoteItems` so `pricing_type='combo'` + `standard_price=original standalone` populate correctly. Customer-facing UX unchanged.
+
+**Updated test-file plan:**
+- **5 NEW test files:** `combo-resolver.test.ts`, `voice-agent/quotes/route.test.ts`, `voice-agent/services/route.test.ts`, `voice-post-call.test.ts`, `auto-quote-combo.test.ts`.
+- **3 EXISTING extended:** `send-quote-sms/route.test.ts`, `book/compute-expected-price.test.ts`, `tools.test.ts`.
+- **1 EXISTING extended-with-deletions:** `system-prompt.test.ts` (delete Session 4 combo describe block, add Layer 2 prompt rule tests).
+- **Estimated +35 to +50 new tests** across both layers.
+
+**Updated implementation file plan:**
+
+| Layer | New files | Modified files | Branch |
+|---|---|---|---|
+| Layer 1 (combo helper + 5 adoptions) | `combo-resolver.ts` + 4 new test files | 6 (5 routes + 1 test extension) | `feat/issue-33-combo-resolver-helper` |
+| Layer 2 (get_services size_class + prompt + Session 4 rollback) | 1 new test file | 5 (services/route.ts + tools.ts + system-prompt.ts + 2 test extensions) | `feat/issue-33-get-services-size-class` |
+
+**Naming locks confirmed:**
+- get_services parameter: `size_class` (snake_case, matches DB column + classify_vehicle response).
+- Helper file: `src/lib/services/combo-resolver.ts`.
+- Pure function export: `applyCombosFromSuggestions(items, suggestions, options?)`.
+- Admin-injected wrapper export: `applyCombosToQuoteItems(admin, items, options?)`.
+- Sub-helper for seasonal filtering: `isComboInSeason(suggestion, today)`.
+- pricing_type literal: `'combo'` (matches existing zod enum + POS reducer convention).
+
+**No structural concerns require operator input.** All 5 Q-answers are sufficient. The audit only refines the implementation plan; it does not surface any blocker.
+
+**Verification:** `git diff --name-only` shows ONLY `docs/dev/ISSUE_33_IMPLEMENTATION_REUSE_AUDIT.md` (new) + `docs/CHANGELOG.md` + `docs/dev/ROADMAP-13-ITEMS.md`. NO files in `src/` modified. NO migrations. NO tests added/removed. NO prompt changes.
+
+---
+
+## 2026-05-24 — audit: Issue 33 combo/bundle pricing diagnostic
+
+Read-only diagnostic of every quote-creation path in the codebase. Output: a root-cause fix specification that obsoletes the Workstream J Session 4 prompt-rule workaround (which told the agent to verify combos via `get_services` before stating them — a Band-Aid that violated CLAUDE.md's "never take the lazy path" principle). Branch `audit/issue-33-combo-pricing`. NO source code touched.
+
+**New — `docs/dev/ISSUE_33_COMBO_PRICING_DIAGNOSTIC.md`:** comprehensive 6-target audit + implementation specification.
+
+**Key findings across 6 audit targets:**
+
+1. **Data model is well-defined.** `service_addon_suggestions` table (existing) carries `primary_service_id` + `addon_service_id` + `combo_price` + `auto_suggest` + seasonal window. Composite UNIQUE `(primary_service_id, addon_service_id)`. No `combo_price` column on `services`. No per-size-class combo data — `combo_price` is a single flat value per (anchor, addon) pair. Schema is sufficient — NO migrations needed for the root-cause fix. Sample for Test 4 case confirmed: Pet Hair & Dander Removal has a row with primary=Express Interior Clean, combo_price=$100 vs standalone $125.
+
+2. **`get_services` tool response correctly surfaces combos** (`src/app/api/voice-agent/services/route.ts:75-150`) with `addon_suggestions: [{ addon_name, addon_id, standard_price, combo_price, savings }]` per primary service. **Known limitation:** size-aware addons (pricing_model='vehicle_size' etc.) get `standard_price: null` in the response because the catalog endpoint has no vehicle context (lines 130-138). Combos involving size-aware addons can't surface savings figures to the agent. Flagged as operator Q2; not blocking the root-cause fix.
+
+3. **`resolvePrice` is structurally per-service** (`src/lib/services/service-resolver.ts:168`). Signature `resolvePrice(service, sizeClass, options?)` takes ONE service at a time. Combo eligibility depends on the SET of services in the quote (anchor + addon co-occurrence) — a per-service resolver cannot detect it without a signature change forcing every caller to pass quote-context. Approach A (refactor resolvePrice) rejected for this reason. The right abstraction is a second pass over the resolved-items list.
+
+4. **8 quote-creation paths audited:**
+   - **POS quote builder** (`src/app/pos/context/quote-reducer.ts:182-188`) → ✅ correctly applies combos via reducer when operator explicitly invokes "Add as addon" via UI; reference implementation.
+   - **POS sale flow** (`src/app/pos/context/ticket-reducer.ts:278-284`) → ✅ same reducer pattern.
+   - **SMS-AI v2 `send_quote_sms`** (`src/app/api/voice-agent/send-quote-sms/route.ts:193-211`) → ❌ NEVER applies combos. THIS IS THE TEST 4 / Q-0084 FAILING PATH.
+   - **ElevenLabs voice agent direct quotes** (`src/app/api/voice-agent/quotes/route.ts:158-197`) → ❌ NEVER applies combos. Does its own bespoke per-service pricing without even calling `resolvePrice`.
+   - **Twilio inbound auto-quote (legacy)** (`src/app/api/webhooks/twilio/inbound/route.ts:801-816`) → ❌ NEVER applies combos. Same pattern as send_quote_sms.
+   - **voice-post-call finalize** (`src/lib/services/voice-post-call.ts:516-528`) → ❌ NEVER applies combos.
+   - **Public online booking form** (`src/app/api/book/route.ts:444-484`) → ⚠️ HYBRID — combo price flows through from the client UI (which displays "Add for $X"), but server-side hard-codes `pricing_type='standard'` (line 481) and `standard_price=addon.price` (line 480), breaking the audit trail. Combo total is correct, but data-model coherence is broken.
+   - **ElevenLabs voice agent appointments** (`src/app/api/voice-agent/appointments/route.ts:549`) → N/A (Branch B writes `price_at_booking: 0` by design; Branch A inherits the quote's stored prices).
+
+5. **Test coverage gaps.** Combo tests exist only at the POS reducer layer (`ticket-reducer-vehicle-change.test.ts`, `ticket-reducer-edit-mode.test.ts`). Zero combo coverage at `service-resolver.test.ts`, `send-quote-sms/__tests__/route.test.ts`, no test file at all for `voice-agent/quotes`, no auto-quote-combo test for the Twilio path, no booking-form combo test. Gap is ordered by importance in the diagnostic.
+
+6. **POS / admin UI:** POS reducer correctly applies combos at add-time (operator-confirmed via reading both reducer files); no admin quote-creation route exists (admin lists quotes only; creation flows through POS deep-link). Admin catalog UI is the EDITOR for the suggestions table — single source of truth, unchanged.
+
+**Recommended approach: C — extract a server-side `applyCombosToQuoteItems(admin, items, options?)` helper into `src/lib/services/combo-resolver.ts`.** Keep `resolvePrice` per-service as the correct abstraction. Helper reads `service_addon_suggestions` filtered to the items' service_ids on both sides (anchor AND addon), applies combo_price where both halves are present in the quote, and rewrites the addon item's `unit_price` / `standard_price` / `pricing_type='combo'`. Each agent path adopts via ONE LINE addition. POS paths stay as-is (reducer already does the equivalent client-side).
+
+**Why C over A/B/D:**
+- A (refactor `resolvePrice` to take quote context) — pollutes per-service abstraction, breaks 4+ caller contracts. Rejected.
+- B (two-pass logic duplicated in each path) — ~40 lines of combo detection in each of 4 paths. Drift risk. Single-helper is centralized once in C.
+- D (SQL function `compute_quote_total`) — splits the canonical-engine invariant (CLAUDE.md Rule 22) and duplicates the totals model that lives in TypeScript (`src/lib/quotes/quote-service.ts:886`).
+
+**Estimated implementation effort:** 1 focused session for the helper + 4 agent path adoptions + tests; 1 optional follow-up for the booking form migration. Total **1-2 sessions**.
+
+**Operator decisions required before implementation (5 questions):**
+1. Q1 — Multiple-anchor tie-break when an addon bundles with multiple anchors all in the quote. Recommended: lowest combo_price wins.
+2. Q2 — Size-aware addon `standard_price` in `get_services` response (currently null). Recommended: defer.
+3. Q3 — Combo vs sale interaction. Recommended: "lowest wins" (mirror POS reducer).
+4. Q4 — Persist `combo_source_primary_id` as new column. Recommended: defer.
+5. Q5 — Booking form scope (same session or deferred). Recommended: same session, since the helper is one function and the booking form is a high-visibility customer surface.
+
+**Implementation spec ready** for the next session — full file list, line-level insertion points, test plan (~30-40 new tests), manual verification scenario reproducing Test 4 / Q-0084. Workstream J Session 4 prompt-rule workaround (`## Combo and bundle pricing — confirm before stating`) gets deleted as part of the implementation session, since the endpoint will now produce correct combos.
+
+**Verification:** `git diff --name-only` shows ONLY `docs/dev/ISSUE_33_COMBO_PRICING_DIAGNOSTIC.md` (new) + `docs/CHANGELOG.md` + `docs/dev/ROADMAP-13-ITEMS.md`. NO files in `src/` modified. NO migrations. NO tests added/removed. NO prompt changes.
+
+---
+
 ## 2026-05-24 — feat(sms-ai-v2): Workstream J Session 4 — idempotency guard + 3 prompt rules (D36 + D37 + Issues 33-34 mitigation)
 
 Bundles four targeted improvements per the operator-locked Session 4 scope (docs revision commit `327f046a`). All four address observations from Workstream J Session 3's post-deploy verification (Tests 1-4, 2026-05-23/24). Tight scope: ONE endpoint change + THREE prompt rule additions. NO tool schema changes, NO new tools, NO migrations, NO architectural shifts. D37 keeps `upsert_customer`'s create+update design intact; Session 4 refines invocation patterns at the prompt layer. Branch `feat/sms-ai-v2-session-4-idempotency-and-prompt-refinement`.
