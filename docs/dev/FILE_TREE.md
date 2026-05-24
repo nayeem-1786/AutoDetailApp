@@ -37,6 +37,8 @@ src/app/api/admin/customers/search/route.ts
 src/app/api/admin/customers/stats/route.ts
 src/app/api/admin/customers/purge/route.ts
 src/app/api/admin/customers/[id]/purge-preview/route.ts
+src/app/api/admin/orphan-conversations/route.ts
+src/app/api/admin/orphan-conversations/purge/route.ts
 src/app/api/admin/global-search/route.ts
 src/app/api/admin/footer/bottom-links/route.ts
 src/app/api/admin/footer/columns/[columnId]/links/route.ts

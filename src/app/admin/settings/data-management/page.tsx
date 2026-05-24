@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import { toast } from 'sonner';
-import { X, Trash2, AlertTriangle, UserX } from 'lucide-react';
+import { X, Trash2, AlertTriangle, UserX, MessageSquareWarning, RefreshCw } from 'lucide-react';
 import { usePermission } from '@/lib/hooks/use-permission';
 import { formatPhone } from '@/lib/utils/format';
 
@@ -39,6 +39,15 @@ interface PurgeQueueItem {
   loadingCounts: boolean;
 }
 
+interface OrphanConversation {
+  id: string;
+  phone_number: string;
+  last_message_at: string | null;
+  created_at: string;
+  status: string;
+  message_count: number;
+}
+
 export default function DataManagementPage() {
   const { granted: canAccess, loading: permLoading } = usePermission('settings.backup_export');
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +57,86 @@ export default function DataManagementPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [purging, setPurging] = useState(false);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Orphan conversations (Workstream J follow-up — conversations whose
+  // customer record was never created because send_quote_sms /
+  // create_appointment failed before the side-effect INSERT could run).
+  const [orphans, setOrphans] = useState<OrphanConversation[]>([]);
+  const [orphansLoading, setOrphansLoading] = useState(true);
+  const [orphanSelected, setOrphanSelected] = useState<Set<string>>(new Set());
+  const [orphanConfirmOpen, setOrphanConfirmOpen] = useState(false);
+  const [orphanPurging, setOrphanPurging] = useState(false);
+
+  const loadOrphans = useCallback(async () => {
+    setOrphansLoading(true);
+    try {
+      const res = await adminFetch('/api/admin/orphan-conversations');
+      if (res.ok) {
+        const { conversations } = await res.json();
+        setOrphans(conversations || []);
+      } else {
+        setOrphans([]);
+      }
+    } catch {
+      setOrphans([]);
+    } finally {
+      setOrphansLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canAccess) loadOrphans();
+  }, [canAccess, loadOrphans]);
+
+  function toggleOrphan(id: string) {
+    setOrphanSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllOrphans() {
+    setOrphanSelected(new Set(orphans.map((o) => o.id)));
+  }
+
+  function clearOrphanSelection() {
+    setOrphanSelected(new Set());
+  }
+
+  async function executeOrphanPurge() {
+    setOrphanPurging(true);
+    try {
+      const ids = Array.from(orphanSelected);
+      const res = await adminFetch('/api/admin/orphan-conversations/purge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationIds: ids }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`${data.purgedCount} orphan conversation(s) deleted.`);
+        setOrphanSelected(new Set());
+        await loadOrphans();
+      } else if (res.ok && data.errors?.length > 0) {
+        toast.warning(
+          `Purge completed with ${data.errors.length} error(s).`,
+          { description: data.errors.map((e: { table: string; error: string }) => `${e.table}: ${e.error}`).join(', ') }
+        );
+        setOrphanSelected(new Set());
+        await loadOrphans();
+      } else {
+        toast.error(data.error || 'Orphan purge failed');
+      }
+    } catch (err) {
+      toast.error('Orphan purge failed — check console for details');
+      console.error('Orphan purge error:', err);
+    } finally {
+      setOrphanPurging(false);
+      setOrphanConfirmOpen(false);
+    }
+  }
 
   const queuedIds = new Set(purgeQueue.map((item) => item.customer.id));
 
@@ -333,6 +422,128 @@ export default function DataManagementPage() {
         </CardContent>
       </Card>
 
+      {/* Section 3 — Orphan Conversations */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MessageSquareWarning className="h-4 w-4" />
+              Orphan Conversations
+              {orphans.length > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  {orphans.length}
+                </span>
+              )}
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadOrphans}
+              disabled={orphansLoading}
+              className="gap-2"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${orphansLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+          <p className="mt-2 text-sm text-gray-500">
+            Conversations whose customer record was never created (typically because a tool failed
+            before the side-effect customer INSERT could run). The main Purge tool above cannot
+            reach these — there is no customer to select.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {orphansLoading ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
+              <Spinner className="h-4 w-4" /> Loading orphan conversations...
+            </div>
+          ) : orphans.length === 0 ? (
+            <p className="py-6 text-center text-sm text-gray-400">
+              No orphan conversations. All conversations are linked to customer records.
+            </p>
+          ) : (
+            <>
+              <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
+                <button
+                  type="button"
+                  onClick={selectAllOrphans}
+                  className="text-blue-600 hover:underline"
+                  disabled={orphanSelected.size === orphans.length}
+                >
+                  Select all ({orphans.length})
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={clearOrphanSelection}
+                  className="text-blue-600 hover:underline"
+                  disabled={orphanSelected.size === 0}
+                >
+                  Clear selection
+                </button>
+                {orphanSelected.size > 0 && (
+                  <span className="ml-auto font-medium text-gray-700">
+                    {orphanSelected.size} selected
+                  </span>
+                )}
+              </div>
+
+              <div className="divide-y rounded-lg border">
+                {orphans.map((o) => {
+                  const checked = orphanSelected.has(o.id);
+                  return (
+                    <label
+                      key={o.id}
+                      className="flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleOrphan(o.id)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatPhone(o.phone_number) || o.phone_number}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {o.message_count} message{o.message_count !== 1 ? 's' : ''}
+                          {' · '}
+                          last activity{' '}
+                          {o.last_message_at
+                            ? new Date(o.last_message_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })
+                            : 'never'}
+                          {' · '}
+                          status {o.status}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex items-center justify-end">
+                <Button
+                  variant="destructive"
+                  onClick={() => setOrphanConfirmOpen(true)}
+                  disabled={orphanPurging || orphanSelected.size === 0}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete Selected ({orphanSelected.size})
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -342,6 +553,18 @@ export default function DataManagementPage() {
         variant="destructive"
         loading={purging}
         onConfirm={executePurge}
+        requireConfirmText="PURGE"
+      />
+
+      <ConfirmDialog
+        open={orphanConfirmOpen}
+        onOpenChange={setOrphanConfirmOpen}
+        title="Permanently Delete Orphan Conversations"
+        description={`You are about to permanently delete ${orphanSelected.size} orphan conversation(s) and all associated messages. This action CANNOT be undone.`}
+        confirmLabel="Delete Orphans"
+        variant="destructive"
+        loading={orphanPurging}
+        onConfirm={executeOrphanPurge}
         requireConfirmText="PURGE"
       />
     </div>

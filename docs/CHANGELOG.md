@@ -6,6 +6,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — fix: Admin can purge orphan conversations (closes Issue 28 follow-up gap)
+
+Operator evidence at 4:00 PM PST surfaced a gap left by Workstream J Session 1's diagnostic (session #56): the 2026-05-23 02:00 AM new-customer test left conversation `85508f89-c9c5-4a48-97a6-352c89c81436` (24 messages, phone `+13107564789`) ORPHANED — `customer_id IS NULL` because `send_quote_sms` (which creates the customer record as a side effect) failed at the "phone is required" gate before commit `9273ff1c` shipped the phone-injection fix. The main Purge tool at `/api/admin/customers/purge` couldn't reach it: its lookup walks `customers.phone → conversations`, and no customer record exists for that phone — admin search returns "No customers found", nothing selectable, dead-end.
+
+**Diagnostic findings (4 targets):**
+
+1. **Customer-creation flow** — Twilio webhook at `src/app/api/webhooks/twilio/inbound/route.ts:371-390` does NOT create a customer record on first inbound from an unknown phone. It creates the conversation with `customer_id: null` and defers customer creation to side effects of `send_quote_sms` / `create_appointment` endpoints. Tools that DO create customers: `send_quote_sms` (POST `/api/voice-agent/send-quote-sms`), `create_appointment` Branch B (POST `/api/voice-agent/appointments` direct booking), auto-quote legacy path in twilio webhook lines 728+. Tools that do NOT: `notify_staff`, all GETs, `classify_vehicle`, etc.
+
+2. **Orphan count (empirical via supabase db query against linked project)** — **9 orphan conversations** exist as of 2026-05-23, spanning 2026-04-17 → 2026-05-23 (≈5 weeks). Most have 2-5 messages each (test runs that stopped before quote-send); the operator's `+13107564789` orphan has 24 messages (peak from the late-night testing session). Roughly 2 orphans per week — low-volume but consistent, proving the gap is real.
+
+3. **Purge lookup paths cannot reach orphans** — `src/app/api/admin/customers/purge/route.ts:127-143` builds `conversationIds` via either `conversations.phone_number IN customers.phone[]` OR `conversations.customer_id IN customerIds`. An orphan has `customer_id = NULL` (second path fails) AND its phone is not in any customer's `phone` column (first path needs a customer to begin with — confirmed via `SELECT * FROM customers WHERE phone = '+13107564789'` returning `[]`). The Data Management UI cannot even invoke the Purge endpoint for these because the customer search returns no results to add to the queue.
+
+4. **Webhook behavior** — confirmed: conversation row INSERTed with `customer_id: customerId` where `customerId` was looked up by phone earlier (returns null for unknown phones). No skeleton customer created. Orphan creation is structurally guaranteed whenever any unknown-phone inbound completes without a customer-creating tool succeeding.
+
+**Option chosen: A (extend Purge surface for orphan conversations).** Options B (webhook creates customer up-front) and C (A + B combined) would touch the Twilio webhook hot path — out of scope per session hard rules ("NO changes to the Twilio webhook UNLESS implementing Option B/C — and even then, get operator confirmation first"). Option A is small, contained, surgical. Option B is flagged as a future session recommendation below.
+
+**The fix — Option A:**
+
+- **NEW `GET /api/admin/orphan-conversations`** (`src/app/api/admin/orphan-conversations/route.ts`) — lists conversations where `customer_id IS NULL` with phone, last_message_at, created_at, status, and a per-conversation message count. Ordered by `last_message_at DESC` so freshest test traces sit at the top. Permission gate: `settings.manage` (matches main Purge tool). Non-fatal degradation: if message-count query fails, returns conversations with `message_count: 0` rather than 500.
+
+- **NEW `POST /api/admin/orphan-conversations/purge`** (`src/app/api/admin/orphan-conversations/purge/route.ts`) — accepts `conversationIds: string[]` (1-100), validates EVERY id has `customer_id IS NULL` server-side (refuses the entire batch if any row is customer-bound — those belong to the main Purge tool), then deletes `messages` then `conversations` with explicit `count: 'exact'` for per-table deletion counts. CASCADE on `messages.conversation_id` would handle messages alone, but explicit ordering matches the existing `customers/purge` pattern for operator visibility into row counts. Permission gate: `settings.manage`. Defensive double-check on the customer_id check is the key safety property — even if the UI somehow passes a customer-bound id, the server rejects the whole call.
+
+- **UI extension** to `src/app/admin/settings/data-management/page.tsx`: new "Orphan Conversations" Card below the existing search + purge-queue cards. Renders the list with per-row checkboxes, Select all / Clear selection links, a Refresh button (auto-loads on mount), and a "Delete Selected (N)" destructive button gated by selection count. Confirmation dialog requires typing `PURGE` (matches main Purge UX). On success: toast + refresh list. On partial-error: warning toast with details.
+
+- **FILE_TREE.md** updated with the two new route paths.
+
+**Tests** (`src/app/api/admin/orphan-conversations/__tests__/route.test.ts`, 16 tests): GET (auth-deny / permission-deny / empty / with-counts / select-error / count-error-non-fatal); POST (auth-deny / permission-deny / missing-ids / empty-ids / over-cap / not-found / **customer-bound-refused** / happy-path-with-ordered-deletes / partial-error-on-delete / validation-error).
+
+**Verification (all gates green):**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → **1913/1913 pass** on this branch (vs main's 1884; +13 from phone-injection branch already in flight + 16 new for orphan-conversations endpoints)
+- `npm run build` → clean, **789 pages** (was 787; +2 for the new endpoints)
+
+**Hard rules honored:**
+- `src/app/api/voice-agent/send-quote-sms/route.ts` UNCHANGED (phone-injection already shipped on `feat/sms-ai-v2-tool-dispatcher-phone-injection`)
+- System prompt UNCHANGED
+- `src/app/api/webhooks/twilio/inbound/route.ts` UNCHANGED (Option B/C deferred — see below)
+- No migrations
+- No tool schema changes
+
+**Manual verification (operator runs post-merge + deploy):**
+1. From operator's allowlisted phone, send a fresh inbound that fails before the customer-creating tool runs (e.g. message that doesn't trigger send_quote_sms).
+2. Visit Admin > Settings > Data Management. The new "Orphan Conversations" card should list the new orphan with its phone, message count, and last-activity timestamp.
+3. Select the orphan (checkbox), click "Delete Selected (1)", confirm with "PURGE". Toast confirms deletion.
+4. Refresh the card — orphan is gone. Spot-check the DB: `SELECT COUNT(*) FROM conversations WHERE id = '<the_id>'` → 0.
+5. Optionally clear the existing 9 backlogged orphans via the same UI.
+
+**Recommendation for future session (Option B — out-of-scope here):** modify `src/app/api/webhooks/twilio/inbound/route.ts:377-390` so the conversation INSERT for an unknown phone is preceded by a skeleton-customer INSERT (phone-only, no name/email yet). Subsequent tool calls would UPDATE rather than CREATE. This eliminates orphan creation at the source — the orphan-conversations endpoint becomes a one-time cleanup tool rather than ongoing maintenance. Trade-off: the webhook is on the TCPA-sensitive hot path; any change there carries broader regression risk. Worth scheduling once the refined-flow work (Workstream J Sessions 3-5) stabilizes.
+
+**Workstream J post-Session-2 follow-up — separate from the Session 2 partial scope shipped on the phone-injection branch.** This branch should merge alongside (or after) `feat/sms-ai-v2-tool-dispatcher-phone-injection`. Branch order doesn't matter for code conflict (different files) but the CHANGELOG headers may need rebase merge.
+
+---
+
 ## 2026-05-23 — feat(sms-ai-v2): inject phone server-side in tool-dispatcher (resolves Issue 26 root cause)
 
 THE fix for the late-night new-customer test failures. The agent's prompt rules (D19 + Issue 22 resolution) correctly forbid the LLM from asking for phone on SMS — but the `send_quote_sms` endpoint requires phone as a parameter, and for new customers (no row in `customers` yet, customer-context bundle has no phone), the LLM had no source for it. The four `send_quote_sms` calls that failed at 02:00 AM PST on 2026-05-23 all returned 400 in sub-300ms — the endpoint's "phone is required" gate, not a downstream DB or rate-limit error.
