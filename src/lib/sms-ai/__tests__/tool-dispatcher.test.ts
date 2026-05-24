@@ -159,6 +159,24 @@ describe('dispatchTool — routing per tool', () => {
     expect(fetchCalls[0].init?.method).toBe('GET');
   });
 
+  it('get_services → GET /api/voice-agent/services?size_class=sedan (Issue 33 Layer 2)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: { size_class: 'sedan' } });
+    expect(fetchCalls[0].url).toBe(
+      'http://localhost:3000/api/voice-agent/services?size_class=sedan',
+    );
+    expect(fetchCalls[0].init?.method).toBe('GET');
+  });
+
+  it('get_services → omits size_class param when LLM passes a non-string', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    // Defensive: LLM might pass null / number; dispatcher should drop it
+    // rather than emit `?size_class=null` and let the endpoint silently
+    // ignore.
+    await dispatchTool({ name: 'get_services', input: { size_class: null as unknown as string } });
+    expect(fetchCalls[0].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
   it('classify_vehicle → GET /api/voice-agent/vehicle-classify with make/model/year', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'sedan' }));
     await dispatchTool({

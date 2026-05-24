@@ -80,10 +80,17 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
   {
     name: 'get_services',
     description:
-      'Return the full active service catalog with current pricing tiers, add-on suggestions, and prerequisites. Call this BEFORE quoting any service — never guess prices from memory. Response is large (~18KB); call once per conversation and reuse.',
+      'Return the full active service catalog with current pricing tiers, add-on suggestions, and prerequisites. Call this BEFORE quoting any service — never guess prices from memory. Response is large (~18KB); call once per conversation and reuse.\n\nWhen you have called classify_vehicle and know the customer\'s vehicle size class, pass `size_class` so addon_suggestions[].standard_price and .savings populate for size-aware addons. Without size_class, addons whose pricing depends on vehicle size return standard_price=null and savings=null.',
     input_schema: {
       type: 'object',
-      properties: {},
+      properties: {
+        size_class: {
+          type: 'string',
+          enum: ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'],
+          description:
+            'OPTIONAL. The customer\'s vehicle size class (from classify_vehicle response). Enables accurate savings figures for size-aware addons. Note: exotic and classic vehicles still require escalation via notify_staff per existing rules — do NOT use this parameter to bypass the custom-quote escalation flow.',
+        },
+      },
     },
   },
   {

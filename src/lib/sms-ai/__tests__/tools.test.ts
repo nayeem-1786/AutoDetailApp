@@ -157,6 +157,41 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     }
   });
 
+  // -------------------------------------------------------------------------
+  // Issue 33 Layer 2 (2026-05-24) — get_services size_class optional param
+  // -------------------------------------------------------------------------
+
+  it('get_services declares optional size_class as a property (not required)', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    const sizeClassProp = tool.input_schema.properties.size_class as {
+      type?: string;
+      enum?: string[];
+      description?: string;
+    } | undefined;
+    expect(sizeClassProp).toBeDefined();
+    expect(sizeClassProp!.type).toBe('string');
+    expect(tool.input_schema.required ?? []).not.toContain('size_class');
+  });
+
+  it('get_services size_class enum lists all 5 VehicleSizeClass values', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    const sizeClassProp = tool.input_schema.properties.size_class as { enum?: string[] };
+    expect([...(sizeClassProp.enum ?? [])].sort()).toEqual(
+      ['classic', 'exotic', 'sedan', 'suv_3row_van', 'truck_suv_2row'].sort(),
+    );
+  });
+
+  it('get_services description mentions classify_vehicle as the source of size_class + escalation reminder', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    expect(tool.description).toContain('classify_vehicle');
+    expect(tool.description.toLowerCase()).toContain('size_class');
+    // size_class enum description should still flag exotic/classic escalation
+    const sizeClassProp = tool.input_schema.properties.size_class as { description?: string };
+    expect(sizeClassProp.description!.toLowerCase()).toContain('exotic');
+    expect(sizeClassProp.description!.toLowerCase()).toContain('classic');
+    expect(sizeClassProp.description).toContain('notify_staff');
+  });
+
   it('SmsAiV2Tool type matches the readonly array entries structurally', () => {
     const sample: SmsAiV2Tool = SMS_AI_V2_TOOLS[0];
     expect(sample.name).toBeDefined();

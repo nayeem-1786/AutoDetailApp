@@ -6,6 +6,133 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(get-services): Issue 33 Layer 2 — size_class parameter + Session 4 prompt rollback
+
+Branch `feat/issue-33-get-services-size-class`. Layer 2 of the Issue 33
+root-cause fix per the operator-approved implementation reuse audit
+(commit `96c239ab`). Layer 1 (combo-resolver helper + 5 quote-creation
+path adoptions) ships in parallel from branch
+`feat/issue-33-combo-resolver-helper` (Session A). Zero file overlap
+between the two layers — both are independently mergeable.
+
+**Endpoint** — `src/app/api/voice-agent/services/route.ts`:
+- Accepts optional `size_class` query parameter, validated against
+  `VEHICLE_SIZE_CLASS_KEYS` (5 values: sedan / truck_suv_2row /
+  suv_3row_van / exotic / classic). Invalid values are silently
+  ignored — falls back to the pre-Layer-2 null behavior so existing
+  callers stay backward-compatible.
+- Addon enrichment loop gains a new branch for size-aware addons
+  (`pricing_model in ('vehicle_size', 'scope')`): when `size_class`
+  is provided, resolves the addon's standalone price through the
+  canonical engine via `resolvePrice` (`service-resolver.ts:168`)
+  per CLAUDE.md Rule 22. `savings` is then computed against
+  `combo_price` and surfaced to the agent (previously both fields
+  returned `null` for size-aware addons because the endpoint had no
+  vehicle context). Other pricing models (`flat`, `per_unit`,
+  `custom`) keep their existing branches; `specialty` intentionally
+  stays at `null` (per the audit, specialty + combo is unsupported
+  by design — operator hasn't surfaced a use case).
+- Addon SELECT widened to fetch `sale_price`, `sale_starts_at`,
+  `sale_ends_at`, and the embedded `service_pricing` rows the
+  resolver needs.
+
+**Tool schema** — `src/lib/sms-ai/tools.ts`:
+- `get_services` input_schema gains optional `size_class` (string enum
+  of all 5 `VehicleSizeClass` values). NOT in `required`. Description
+  explicitly reminds the LLM that exotic / classic vehicles still
+  require `notify_staff` with reason="custom_quote" — `size_class` is
+  not a bypass for the custom-quote escalation flow.
+- Tool description updated to direct the LLM: after `classify_vehicle`
+  returns `size_class`, pass it to subsequent `get_services` calls so
+  size-aware addon savings figures populate.
+
+**Dispatcher** — `src/lib/sms-ai/tool-dispatcher.ts`:
+- `callGetServices` now forwards `input.size_class` as a query string
+  parameter when present and string-typed. Defensive against non-string
+  LLM input (drops it rather than emitting `?size_class=null`).
+
+**System prompt** — `src/lib/sms-ai/system-prompt.ts`:
+- **NEW subsection** `## Passing size_class to get_services after
+  classify_vehicle` inside `# Add-ons and bundle quoting` (replaces
+  the deleted Session 4 subsection in the same anchor location).
+  Explains the classify_vehicle → get_services({size_class}) flow,
+  why it matters (size-aware addons need a vehicle context to compute
+  savings), when NOT to pass it, AND defensively repeats the
+  exotic/classic escalation reminder (existing rule, not new).
+- **DELETED subsection** `## Combo and bundle pricing — confirm before
+  stating` (added Session 4, ~32 lines). The rule was a temporary
+  prompt-level workaround for the Issue 33 endpoint bug; Layer 1's
+  endpoint fix obsoletes it. The agent can now confidently quote
+  combos from `get_services` because the endpoint produces correct
+  combo line items at quote-creation time.
+- Rule 16 (`instructions_for_agent` silent-follow), Rule 3 (specialty
+  vehicles require staff), the Vehicle size mapping section, the
+  Escalation guide, and `# What you cannot do` are all unchanged.
+  Verified by `grep` and pinned by 2 new prompt tests.
+
+**Tests +14 net for this branch (1984 → 1998 with Layer 2 alone on top
+of `main`; combined working-tree run including Session A's in-flight
+Layer 1 files showed 2032/2032 pass; breakdown below):**
+- 10 NEW endpoint tests at `src/app/api/voice-agent/services/__tests__/route.test.ts`
+  (auth gating + size_class backward-compat (null on omission) +
+  5 valid size_class values (sedan, truck_suv_2row, suv_3row_van,
+  exotic, classic) producing correct standalone + savings +
+  invalid-value silent-ignore (2 forms) + flat-priced addon unaffected
+  + custom-priced addon unaffected).
+- 3 NEW tool-schema tests in `src/lib/sms-ai/__tests__/tools.test.ts`
+  (size_class optional / enum has 5 values / description mentions
+  classify_vehicle + escalation reminder).
+- 2 NEW dispatcher tests in `tool-dispatcher.test.ts` (size_class
+  forwarded as `?size_class=sedan` / non-string input dropped).
+- 6 NEW prompt tests in `system-prompt.test.ts` for Layer 2
+  (replacement subsection placement + classify_vehicle reference +
+  exotic/classic escalation preserved + Session 4 subsection deleted +
+  Rule 16 preserved + Rule 3 preserved).
+- 3 REMOVED prompt tests (`Workstream J Session 4 (Issue 33
+  combo-pricing mitigation)` describe block — assertions pin
+  now-deleted prompt rules).
+- Net Layer 2 = +14 tests.
+
+**Gates green:**
+- `tsc --noEmit` → 0 errors.
+- `npm run lint` → 0 errors / 98 warnings (matches current `main`
+  baseline; spec named 97 but `main` was rebased between spec
+  authoring and implementation — no new warnings introduced by Layer 2
+  files; `grep` against changed files shows 0).
+- `npm test` → 2032/2032 pass.
+- `npm run build` → 789 pages clean.
+
+**Hard rules honored — files NOT touched (per session brief):**
+- `src/lib/services/service-resolver.ts` — `resolvePrice` reused as-is.
+- `src/lib/services/picker-engine.ts` — canonical engine untouched.
+- `src/lib/services/combo-resolver.ts` — Session A territory (does
+  not yet exist on this branch).
+- `src/app/api/voice-agent/send-quote-sms/route.ts` — Session A
+  territory (Layer 1 quote-creation path).
+- `src/app/api/voice-agent/quotes/route.ts` — Session A.
+- `src/app/api/webhooks/twilio/inbound/route.ts` — Session A.
+- `src/lib/services/voice-post-call.ts` — Session A.
+- `src/app/api/book/route.ts` — Session A.
+- Exotic/classic escalation language preserved in 4 sites (Critical
+  rule 3, Vehicle size mapping table, Escalation guide, What you
+  cannot do).
+
+**No schema migrations. No new tools. No tool renames.**
+
+**Manual verification scenario (post-deploy):**
+- From an allowlisted phone, text "Hi, I have a 2018 Tesla Model 3,
+  what would Engine Bay Detail cost with my Signature Complete?"
+- Agent calls `classify_vehicle` (Tesla Model 3 → size_class='sedan'),
+  then `get_services({size_class: 'sedan'})`.
+- `addon_suggestions[*]` for Engine Bay Detail now contains a concrete
+  `standard_price` (sedan-priced from `service_pricing`) and a
+  computed `savings` value — not the pre-Layer-2 `null`.
+- Agent quotes the savings figure verbally and the actual quote
+  document (created via Layer 1's combo-aware path) shows the same
+  combo applied. Agent's words and the SMS receipt now match.
+
+---
+
 ## 2026-05-24 — audit: Issue 33 implementation pre-flight reuse audit (operator-locked Q1–Q5)
 
 Pre-flight read-only audit of the implementation plan from `docs/dev/ISSUE_33_COMBO_PRICING_DIAGNOSTIC.md` (commit `5d3c3576`). Operator review confirmed Approach C with locked answers to all 5 open questions:
