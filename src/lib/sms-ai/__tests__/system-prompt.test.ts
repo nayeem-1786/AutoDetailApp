@@ -170,7 +170,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 16 numbered rules (D34 upsert_customer tool-error handling added 2026-05-23)', () => {
+  it('Critical rules section contains exactly 17 numbered rules (D38 mandatory-reply rule added 2026-05-24 as Rule 2)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
@@ -178,7 +178,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(16);
+    expect(numbered.length).toBe(17);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -379,10 +379,10 @@ describe('buildV2SystemPrompt — Issue 13 (4-hour fresh-conversation threshold,
 });
 
 describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard guardrail, D15)', () => {
-  it('Critical rule 14 declares tool-grounded add-ons only', () => {
+  it('Critical rule 15 declares tool-grounded add-ons only (was Rule 14 pre-D38 renumber)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    // Rule 14 specifically
-    expect(out).toMatch(/14\.\s+\*\*Tool-grounded add-ons only/);
+    // Rule 15 specifically — shifted from 14 when D38 (Issue 35) added Rule 2.
+    expect(out).toMatch(/15\.\s+\*\*Tool-grounded add-ons only/);
     expect(out).toContain('NEVER invent add-ons');
     expect(out).toContain('addon_suggestions');
   });
@@ -548,9 +548,9 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
     expect(out).toContain('NEVER say "within a\nfew hours"');
   });
 
-  it('Critical rule 15 declares quote-first / never-book-directly', () => {
+  it('Critical rule 16 declares quote-first / never-book-directly (was Rule 15 pre-D38 renumber)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/15\.\s+\*\*Quote first, never book directly/);
+    expect(out).toMatch(/16\.\s+\*\*Quote first, never book directly/);
     expect(out).toContain('NEVER call `create_appointment` directly');
   });
 });
@@ -665,12 +665,14 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 
-  it('Critical rule 16 declares instructions_for_agent silent-follow handling (broadened Session 4 to cover success responses)', () => {
+  it('Critical rule 17 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38 renumber; broadened Session 4 to cover success responses)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Session 4 broadened "Tool errors" → "Tool responses" so the same rule
     // covers both isError:true error paths AND isError:false success paths
     // that ship a directive (e.g. send_quote_sms's was_duplicate:true case).
-    expect(out).toMatch(/16\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // Session 5 (D38, Issue 35) renumbered this from Rule 16 → Rule 17 after
+    // inserting the mandatory-reply rule as Rule 2.
+    expect(out).toMatch(/17\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('Never share tool error messages');
     // Explicit Session 4 additions — confirm both success+error wording and
@@ -795,16 +797,16 @@ describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)'
     expect(out).not.toContain('JUST called `get_services`');
   });
 
-  it('preserves Rule 16 (instructions_for_agent silent-follow) — untouched by Layer 2', () => {
+  it('preserves Rule 17 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38 Issue 35)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/16\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/17\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
   });
 
-  it('preserves Critical rule 3 exotic/classic escalation (untouched by Layer 2)', () => {
+  it('preserves Critical rule 4 exotic/classic escalation (untouched by Layer 2; renumbered 3→4 by D38 Issue 35)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/3\.\s+\*\*Specialty vehicles require staff/);
+    expect(out).toMatch(/4\.\s+\*\*Specialty vehicles require staff/);
     expect(out).toContain('"exotic" or "classic"');
   });
 });
@@ -857,5 +859,106 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name cap
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('"What name should I put on the quote?"');
     expect(out).toContain('"Last name?"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 5 — D38 + Issue 35 (2026-05-24): mandatory
+// customer-facing reply on every turn. Inserted as Critical rule 2 in
+// the system prompt; renumbers prior Rules 2-16 → 3-17.
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing reply on every turn)', () => {
+  it('declares Critical rule 2 as the mandatory-reply rule with the distinctive headline phrase', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The new rule is the second numbered item under # Critical rules.
+    expect(out).toMatch(/2\.\s+\*\*Every customer turn requires a customer-facing reply/);
+  });
+
+  it('mandatory-reply rule appears WITHIN the # Critical rules section (high-priority placement)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    expect(criticalIdx).toBeGreaterThan(-1);
+    const ruleIdx = out.indexOf('Every customer turn requires a customer-facing reply', criticalIdx);
+    expect(ruleIdx).toBeGreaterThan(-1);
+    // Find the next top-level header — must come AFTER the rule
+    const nextH1 = out.indexOf('\n# ', criticalIdx + '# Critical rules'.length);
+    expect(nextH1).toBeGreaterThan(ruleIdx);
+  });
+
+  it('mandatory-reply rule explicitly names upsert_customer (the Issue 35 trigger tool)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    // The new rule lists upsert_customer among the internal tool calls.
+    // Use [\s\S]* instead of the `s` flag for tsconfig target compatibility.
+    expect(section).toMatch(/Tool calls[\s\S]*upsert_customer/);
+  });
+
+  it('mandatory-reply rule classifies tool calls as INTERNAL ACTIONS, not replies', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('INTERNAL ACTIONS');
+    expect(out).toContain('are NOT replies');
+  });
+
+  it('mandatory-reply rule includes BOTH the WRONG (silent) and RIGHT (text + tool) example labels', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Verify the Issue 35 reproduction example uses Sarah / Camry shape
+    expect(out).toContain("I'm Sarah with a 2020 Camry");
+    expect(out).toContain('WRONG — silent after tool');
+    expect(out).toContain('RIGHT — tool plus conversational reply');
+  });
+
+  it('mandatory-reply rule asserts "Silence is never the right answer to a customer message"', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Silence is never the right answer to a customer message');
+  });
+
+  it('mandatory-reply rule includes coexistence cross-reference to Rule 17 (instructions_for_agent)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // D38 must explicitly call out that following instructions_for_agent
+    // still satisfies the reply requirement (both rules satisfied).
+    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 17\)/);
+  });
+
+  it('Rule 17 (was Rule 16) wording for instructions_for_agent is preserved unchanged in substance', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Substantive wording must be intact — only the rule NUMBER changed
+    // from 16 → 17 because D38 added a new Rule 2.
+    expect(out).toMatch(/17\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toContain('follow those instructions silently');
+    expect(out).toContain('success OR error');
+    expect(out).toContain('was_duplicate');
+  });
+
+  it('D37 invocation discipline (When NOT to call upsert_customer) remains intact alongside D38', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // D37 governs WHEN to call upsert_customer; D38 governs ALWAYS reply.
+    // Both must coexist. Verify the D37-distinctive substrings are still present.
+    expect(out).toContain('You already called `upsert_customer` earlier in this conversation');
+    expect(out).toContain('200-400ms of latency');
+    expect(out).toContain('No new fields = no call');
+  });
+
+  it('Critical rule 4 (exotic/classic escalation) language remains intact at every pinned site', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The exotic/classic escalation lives at Critical rule 4 (was Rule 3
+    // pre-D38) and is referenced from "Vehicle size mapping" and the
+    // size_class-on-get_services subsection. Verify all three sites intact.
+    expect(out).toMatch(/4\.\s+\*\*Specialty vehicles require staff/);
+    expect(out).toContain('"exotic" or "classic"');
+    // Vehicle size mapping section still references custom_quote handoff
+    const vmapIdx = out.indexOf('# Vehicle size mapping');
+    const nextHeader = out.indexOf('# ', vmapIdx + 1);
+    const vmapSection = out.slice(vmapIdx, nextHeader);
+    expect(vmapSection).toContain('Exotic, Classic, RV, Boat, Aircraft');
+    expect(vmapSection).toContain('custom_quote');
+    // size_class subsection still has the exotic/classic reminder
+    const sizeIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
+    const sizeSectionEnd = out.indexOf('\n# ', sizeIdx);
+    const sizeSection = out.slice(sizeIdx, sizeSectionEnd);
+    expect(sizeSection).toContain('exotic and classic');
+    expect(sizeSection).toContain('custom_quote');
   });
 });
