@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — audit: name-first customer creation flow diagnostic + reuse analysis
+
+Read-only diagnostic for the operator-proposed flow: create customer record IMMEDIATELY when the customer provides their first name (not as a side effect of `send_quote_sms` succeeding). Goal: eliminate the orphan-conversation class of bugs (Issues 26-28) at the source. Honors the operator's reuse principle from CLAUDE.md spirit ("Never take the lazy path. Always reuse existing code, components, and architecture").
+
+**New — `docs/dev/NAME_FIRST_CUSTOMER_FLOW_DIAGNOSTIC.md`:** complete diagnostic deliverable + implementation specification for the follow-up code session. Major findings across 9 audit targets:
+
+1. **Seven distinct customer find-or-create implementations exist** in the codebase: admin POST, POS walk-in, public booking form, Twilio webhook auto-quote (legacy), voice-agent send-quote-sms, voice-agent appointments Branch B, voice-agent quotes, plus the voice-post-call service helper. Each has subtly different default-field choices (3 of 7 set `customer_type`, 5 of 7 set `sms_consent`). Worthwhile tech-debt cleanup but not blocking the proposed flow — flagged as Option B for a separate session.
+
+2. **No existing tool can be called with just `first_name` + `phone`.** Both side-effect creators (`send_quote_sms`, `create_appointment`) require quote/booking data alongside name; `send_quote_sms` endpoint validates `services is required` and returns 400 without it. This is the structural reason a new tool is genuinely needed despite the reuse principle — the contract loosening required to make minimal-args mode work would be more invasive than a focused new endpoint.
+
+3. **The `customers` table schema is sufficient — no new columns, no migrations.** Verified against `docs/dev/DB_SCHEMA.md:578-639` (auto-generated from live DB). Gotchas to document in the implementation: `last_name` is NOT NULL (empty string is the convention); `customer_type` CHECK enforces lowercase only (`'enthusiast'` / `'professional'`); `zip` column name (not `zip_code` / `postal_code`); phone UNIQUE index filtered by `WHERE deleted_at IS NULL` (soft-delete pattern).
+
+4. **`findOrCreateConversation()` in `src/lib/utils/conversation-helpers.ts:42-50` already has the retroactive backfill pattern** — when an existing conversation has `customer_id IS NULL` and a customerId is supplied, it backfills with `.is('customer_id', null)` guard preventing overwrites. The new POST handler doesn't even need to call this helper since `runtimeContext.conversationId` is already in scope; simpler direct UPDATE suffices. Pattern fully reusable.
+
+5. **The dispatcher's structured-error feasibility is high** — current wire format is `{content: string, isError: boolean}` and `content` already holds JSON-stringified payloads via `okResult`. A 10-line passthrough patch handles structured error bodies carrying `instructions_for_agent` field, preserving legacy snippet format as fallback. Applies to all phone-bearing tools, not just the new one.
+
+**Option recommended: C (new tool + endpoint via existing route file extension, reusing every supporting helper).** Option A (reuse `send_quote_sms` in minimal-args mode) structurally rejected. Option B (extract shared helper across 7 duplicates) deferred to a separate cleanup session — useful but doesn't replace Option C since the new tool definition is structurally necessary.
+
+**Implementation spec for the follow-up session** (~1.5-2 hours, single focused session):
+- **+1 new tool definition** in `src/lib/sms-ai/tools.ts` (~20 lines): `upsert_customer` accepting `first_name` required + `last_name` / `email` / address fields / `customer_type` optional. Phone NOT in schema — dispatcher injects (same pattern as the 5 phone-bearing tools shipped commit `9273ff1c`).
+- **+1 new POST handler** in `src/app/api/voice-agent/customers/route.ts` (currently GET-only; ~80-100 lines added): find-or-create-or-update with phone from runtime, plus retroactive conversation linkage UPDATE.
+- **+3 prompt rule additions** in `src/lib/sms-ai/system-prompt.ts` (~+400 chars net): name-first capture timing in Discovery section, new `## Customer-record creation timing` subsection with when-to-call / when-NOT-to-call / deflection-handling, updated `## Customer type classification` removing the obsolete "if tool accepts customer_type" conditional.
+- **+10-line dispatcher passthrough** in `tool-dispatcher.ts` for structured `instructions_for_agent` errors across all phone-bearing tools.
+- **+12-15 new tests** (4 dispatcher + 8-11 endpoint).
+- **Zero migrations. Zero schema changes. Zero tool removals.**
+
+**Six open questions surfaced for operator decision before implementation:** sms_consent default on creation (recommend YES); vehicle data scope (recommend NO — separate concern); helper extraction sequencing (recommend AFTER the new tool); tool name (recommend `upsert_customer`); deletion scope (recommend NO — admin-only); customer_type default (recommend `'enthusiast'` over NULL).
+
+**Reuse summary (Option C):**
+- Reuses: `src/app/api/voice-agent/customers/route.ts` file (adds POST to existing GET); phone injection mechanism; `runtimeContext.conversationId`; retroactive backfill pattern; `validateApiKey` Bearer auth; `normalizePhone`; `updateSmsConsent` consent-log helper; existing `customer_type` CHECK enum; existing UNIQUE phone constraint + soft-delete filter.
+- Genuinely new: 1 tool definition + 1 POST handler + 3 prompt rule snippets + 1 dispatcher passthrough patch. Everything else is reuse.
+
+**Workstream J follow-up.** This audit answers the operator's question "Why do we need a new tool? I believe we already have one. Let's reuse what is already built." — structurally, the 12 existing tools cannot create a customer from just first_name; reuse principle is satisfied at every other layer (helpers, route file, auth, conversation backfill, runtime injection).
+
+**No source code touched.** No migrations. No test changes. No tool schema changes. No prompt changes. Verification: `git status` shows only `docs/dev/NAME_FIRST_CUSTOMER_FLOW_DIAGNOSTIC.md` (new) + `docs/CHANGELOG.md`.
+
+---
+
 ## 2026-05-23 — feat(sms-ai-v2): inject phone server-side in tool-dispatcher (resolves Issue 26 root cause)
 
 THE fix for the late-night new-customer test failures. The agent's prompt rules (D19 + Issue 22 resolution) correctly forbid the LLM from asking for phone on SMS — but the `send_quote_sms` endpoint requires phone as a parameter, and for new customers (no row in `customers` yet, customer-context bundle has no phone), the LLM had no source for it. The four `send_quote_sms` calls that failed at 02:00 AM PST on 2026-05-23 all returned 400 in sub-300ms — the endpoint's "phone is required" gate, not a downstream DB or rate-limit error.
