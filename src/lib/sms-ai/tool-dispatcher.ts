@@ -99,6 +99,7 @@ const TOOL_TIMEOUT_MS: Record<SmsAiV2ToolName, number> = {
   notify_staff: 10000,
   approve_addon: 10000,
   decline_addon: 10000,
+  upsert_customer: 5000,
 };
 
 /** Per-agent-run Bearer key cache. Reset between inbounds via __resetForAgentRun. */
@@ -221,6 +222,24 @@ async function voiceAgentFetch(
     });
     const text = await res.text();
     if (!res.ok) {
+      // Structured-error passthrough (Workstream J Session 3 — instructional
+      // errors). If the response body parses to JSON carrying an
+      // `instructions_for_agent` field, return the full JSON to the agent
+      // so it can react conversationally without leaking system details.
+      // Legacy non-instructional errors keep their truncated-snippet format.
+      try {
+        const parsed: unknown = JSON.parse(text);
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          typeof (parsed as { instructions_for_agent?: unknown }).instructions_for_agent ===
+            'string'
+        ) {
+          return { content: text, isError: true };
+        }
+      } catch {
+        // fall through to legacy snippet
+      }
       const snippet = text.length > 200 ? `${text.slice(0, 200)}…` : text;
       return errResult(`Tool call returned ${res.status}: ${snippet}`);
     }
@@ -417,6 +436,35 @@ async function callSendQuoteSms(input: Record<string, unknown>, key: string): Pr
 }
 
 /**
+ * upsert_customer — POST /api/voice-agent/customers. Workstream J
+ * Session 3. Persists the customer record AS SOON AS the agent learns the
+ * customer's first name, eliminating the orphan-conversation class of
+ * bugs (Issues 26-28) that resulted from the prior send_quote_sms
+ * side-effect path. Phone AND conversation_id are runtime-injected — the
+ * LLM never sees them and cannot get them wrong.
+ */
+async function callUpsertCustomer(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+  if (!_runtimeContext?.phone) {
+    return errResult('upsert_customer: internal — runtime phone not set');
+  }
+  const injectedBody = {
+    ...input,
+    phone: _runtimeContext.phone,
+    conversation_id: _runtimeContext.conversationId,
+  };
+  return voiceAgentFetch(
+    `/api/voice-agent/customers`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(injectedBody),
+    },
+    TOOL_TIMEOUT_MS.upsert_customer,
+    key,
+  );
+}
+
+/**
  * approve_addon / decline_addon — in-process calls. Wrap
  * `approveAddon` / `declineAddon` from `@/lib/services/job-addons` with the
  * same 10-second timeout class as `notify_staff` (both send a confirmation
@@ -602,6 +650,9 @@ export async function dispatchTool(
       break;
     case 'send_quote_sms':
       result = await callSendQuoteSms(input.input, key);
+      break;
+    case 'upsert_customer':
+      result = await callUpsertCustomer(input.input, key);
       break;
     default: {
       // Exhaustiveness guard. `name` is `never` here if the switch covers

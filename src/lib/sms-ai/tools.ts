@@ -32,7 +32,8 @@ export type SmsAiV2ToolName =
   | 'notify_staff'
   | 'send_quote_sms'
   | 'approve_addon'
-  | 'decline_addon';
+  | 'decline_addon'
+  | 'upsert_customer';
 
 export const TOOL_NAMES: readonly SmsAiV2ToolName[] = [
   'lookup_customer',
@@ -47,6 +48,7 @@ export const TOOL_NAMES: readonly SmsAiV2ToolName[] = [
   'send_quote_sms',
   'approve_addon',
   'decline_addon',
+  'upsert_customer',
 ] as const;
 
 export interface SmsAiV2Tool {
@@ -264,6 +266,50 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
         },
       },
       required: ['addon_id'],
+    },
+  },
+  {
+    name: 'upsert_customer',
+    description:
+      'Create or update the customer record for this conversation. Call this AS SOON as you learn the customer\'s first name — do not wait for a quote or booking trigger. Call AGAIN later in the same conversation as you learn more (last_name, email, address, customer_type signal); only the fields you pass are updated, and human-curated values on existing records are preserved. The customer\'s phone is captured automatically from the SMS conversation — do NOT pass it. customer_type defaults to "enthusiast" if omitted; only pass "professional" on EXPLICIT B2B signals (for my shop, dealership, fleet, bulk purchase). This tool is idempotent — calling it twice with overlapping data is safe. Skip when the customer is already in CUSTOMER CONTEXT (record exists) or when you do not yet have a usable first name.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        first_name: {
+          type: 'string',
+          description: 'Customer first name (required). Never pass placeholder values like "Customer" or "Caller".',
+        },
+        last_name: {
+          type: 'string',
+          description: 'Customer last name. Optional; pass when learned.',
+        },
+        email: {
+          type: 'string',
+          description: 'Customer email address. Optional; pass when learned.',
+        },
+        customer_type: {
+          type: 'string',
+          enum: ['enthusiast', 'professional'],
+          description: 'Customer classification. Defaults to "enthusiast" on creation when omitted. Only pass "professional" on explicit B2B signals.',
+        },
+        address_1: {
+          type: 'string',
+          description: 'Street address line 1. Optional; pass when learned (e.g. mobile-service location).',
+        },
+        address_2: {
+          type: 'string',
+          description: 'Street address line 2 (apt/suite). Optional.',
+        },
+        city: {
+          type: 'string',
+          description: 'City. Optional.',
+        },
+        zip_code: {
+          type: 'string',
+          description: 'ZIP code. Optional.',
+        },
+      },
+      required: ['first_name'],
     },
   },
 ] as const;
