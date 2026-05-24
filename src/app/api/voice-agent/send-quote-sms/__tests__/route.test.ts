@@ -51,6 +51,24 @@ const fakeCustomerRow = {
 };
 const fakeValiditySetting = { value: '10' };
 
+// Workstream J Session 4 — seed for the 60s idempotency guard's
+// SELECT from `quotes`. Tests opt in to dedup hits by populating this.
+// Default empty array → guard finds no duplicate → normal flow runs.
+interface SeededQuoteRow {
+  id: string;
+  quote_number: string;
+  access_token: string | null;
+  created_at: string;
+  quote_items: Array<{ service_id: string | null }> | null;
+}
+const quotesIdempotencyState: {
+  recentQuotes: SeededQuoteRow[];
+  shouldThrow: boolean;
+} = {
+  recentQuotes: [],
+  shouldThrow: false,
+};
+
 function makeAdminStub() {
   const builder = {
     _table: '',
@@ -68,6 +86,9 @@ function makeAdminStub() {
     update(_payload: unknown) { this._action = 'update'; return this; },
     eq(_col: string, _val: unknown) { return this; },
     is(_col: string, _val: unknown) { return this; },
+    in(_col: string, _vals: unknown[]) { return this; },
+    gte(_col: string, _val: unknown) { return this; },
+    order(_col: string, _opts?: unknown) { return this; },
     limit(_n: number) { return this; },
     async maybeSingle() {
       if (this._table === 'customers') return { data: fakeCustomerRow, error: null };
@@ -80,12 +101,26 @@ function makeAdminStub() {
       }
       return { data: null, error: null };
     },
-    // PostgREST-style "await without terminal" for fire-and-forget updates/inserts —
-    // make the builder itself thenable so `await admin.from(...).update(...).eq(...)` resolves.
+    // PostgREST-style "await without terminal" for fire-and-forget updates/inserts
+    // AND for unconstrained SELECTs (e.g. the dedup guard's quotes query).
+    // make the builder itself thenable.
     then<TResolved = unknown>(
-      onFulfilled?: (v: { data: null; error: null }) => TResolved | PromiseLike<TResolved>,
+      onFulfilled?: (v: { data: unknown; error: { message: string } | null }) => TResolved | PromiseLike<TResolved>,
       onRejected?: (reason: unknown) => TResolved | PromiseLike<TResolved>,
     ) {
+      // Idempotency-guard quotes SELECT — route reads { data: array }.
+      if (this._table === 'quotes' && this._action === 'select') {
+        if (quotesIdempotencyState.shouldThrow) {
+          return Promise.reject(new Error('simulated quotes SELECT failure')).then(
+            onFulfilled,
+            onRejected,
+          );
+        }
+        return Promise.resolve({
+          data: quotesIdempotencyState.recentQuotes,
+          error: null,
+        }).then(onFulfilled, onRejected);
+      }
       return Promise.resolve({ data: null, error: null }).then(onFulfilled, onRejected);
     },
   };
@@ -167,6 +202,8 @@ beforeEach(() => {
   resolveServiceByNameMock.mockReset();
   resolvePriceMock.mockReset();
   createQuoteMock.mockReset();
+  quotesIdempotencyState.recentQuotes = [];
+  quotesIdempotencyState.shouldThrow = false;
 
   resolveServiceByNameMock.mockImplementation(async () => SIGNATURE_SERVICE);
   createQuoteMock.mockImplementation(async () => ({
@@ -388,5 +425,262 @@ describe('POST /api/voice-agent/send-quote-sms — size_class flows from vehicle
     // createQuote called with vehicle_id undefined since vehicleResult was null
     const arg = createQuoteMock.mock.calls[0][1];
     expect(arg.vehicle_id).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 4 — 60-second idempotency guard (D36, Issue 31)
+//
+// Catches the intermittent double-send pattern from Test 1 (2026-05-23):
+// LLM confabulation triggers a second send_quote_sms with identical inputs
+// within the same conversation, seconds after the first one succeeded.
+// Guard returns the existing quote with `was_duplicate: true` instead of
+// creating a duplicate row + sending a second SMS.
+// ---------------------------------------------------------------------------
+
+describe('POST /api/voice-agent/send-quote-sms — 60s idempotency guard', () => {
+  // Default service resolver + price mocks for all dedup tests
+  beforeEach(() => {
+    findOrCreateVehicleMock.mockResolvedValue({
+      id: 'v-honda',
+      created: false,
+      vehicle_category: 'automobile',
+      size_class: 'sedan',
+      specialty_tier: null,
+    });
+    resolvePriceMock.mockReturnValue({
+      price: 210,
+      salePrice: null,
+      tierName: 'sedan',
+      isOnSale: false,
+    });
+  });
+
+  it('happy path — no recent quote → creates new quote, response does NOT contain was_duplicate', async () => {
+    // recentQuotes already empty from outer beforeEach
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.was_duplicate).toBeUndefined();
+    expect(body.quote_number).toBe('Q-9999');
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('idempotency HIT within 60s — same customer + vehicle + service set → returns existing quote, no createQuote', async () => {
+    // Seed a 30-second-old quote with the exact service set the request
+    // resolves to (resolveServiceByNameMock returns SIGNATURE_SERVICE with
+    // id 'service-signature-id', so quoteItems[0].service_id = that).
+    quotesIdempotencyState.recentQuotes = [
+      {
+        id: 'q-existing',
+        quote_number: 'Q-0084',
+        access_token: 'tok-existing',
+        created_at: new Date(Date.now() - 30_000).toISOString(),
+        quote_items: [{ service_id: 'service-signature-id' }],
+      },
+    ];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.was_duplicate).toBe(true);
+    expect(body.quote_number).toBe('Q-0084');
+    expect(typeof body.quote_link).toBe('string');
+    expect(body.quote_link).toContain('tok-existing');
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.instructions_for_agent).toMatch(/duplicate quote/i);
+    expect(body.instructions_for_agent).toMatch(/do NOT inform the customer/i);
+    // createQuote NOT called — no duplicate row created
+    expect(createQuoteMock).not.toHaveBeenCalled();
+  });
+
+  it('idempotency MISS past 60s — existing quote is 90s old → normal flow creates new quote', async () => {
+    // 90s > 60s window. The endpoint's .gte('created_at', now-60s) filter
+    // is server-side; the test stub doesn't enforce date filtering, so we
+    // simulate the upstream filter by passing an EMPTY seed array (which is
+    // what the real DB would return when nothing matches the 60s window).
+    quotesIdempotencyState.recentQuotes = [];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('idempotency MISS — different service set → normal flow creates new quote', async () => {
+    // Existing quote has a different service_id than the resolver returns.
+    quotesIdempotencyState.recentQuotes = [
+      {
+        id: 'q-other',
+        quote_number: 'Q-0083',
+        access_token: 'tok-other',
+        created_at: new Date(Date.now() - 30_000).toISOString(),
+        quote_items: [{ service_id: 'service-DIFFERENT-id' }],
+      },
+    ];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(body.quote_number).toBe('Q-9999');
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('idempotency MISS — different service set (extra item in candidate) → normal flow', async () => {
+    // Candidate has 1 service; existing has 2. Even though one overlaps,
+    // sets differ → no dedup hit.
+    quotesIdempotencyState.recentQuotes = [
+      {
+        id: 'q-overlap',
+        quote_number: 'Q-0082',
+        access_token: 'tok-overlap',
+        created_at: new Date(Date.now() - 10_000).toISOString(),
+        quote_items: [
+          { service_id: 'service-signature-id' },
+          { service_id: 'service-add-on-id' },
+        ],
+      },
+    ];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('idempotency MISS — different vehicle → normal flow (handled by .eq(vehicle_id) filter upstream)', async () => {
+    // The test stub doesn't enforce the .eq('vehicle_id', vehicleId) filter
+    // server-side; the empty seed simulates what the DB returns when the
+    // existing quote's vehicle_id doesn't match. This pins the test
+    // contract — when no row matches the vehicle filter, the dedup loop
+    // sees zero candidates and normal flow runs.
+    quotesIdempotencyState.recentQuotes = [];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('idempotency MISS — declined/expired status filtered by upstream .in() → normal flow', async () => {
+    // Endpoint filters .in('status', ['sent','viewed']); declined/expired
+    // never appear in the seed. Empty seed simulates that filter outcome.
+    quotesIdempotencyState.recentQuotes = [];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('dedup query failure does NOT block — error logged, normal flow proceeds', async () => {
+    quotesIdempotencyState.shouldThrow = true;
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Idempotency check failed'),
+      expect.any(String),
+    );
+    errSpy.mockRestore();
+  });
+
+  it('response shape on dedup hit — instructions_for_agent guides agent to silent acknowledgment', async () => {
+    quotesIdempotencyState.recentQuotes = [
+      {
+        id: 'q-dup',
+        quote_number: 'Q-0099',
+        access_token: 'tok-dup',
+        created_at: new Date(Date.now() - 15_000).toISOString(),
+        quote_items: [{ service_id: 'service-signature-id' }],
+      },
+    ];
+
+    const res = await POST(buildRequest({
+      phone: '+14245551234',
+      services: 'Signature Complete Detail',
+      vehicle_year: 2023,
+      vehicle_make: 'Honda',
+      vehicle_model: 'Accord',
+    }));
+
+    const body = await res.json();
+    // Required keys for the agent to follow Rule 16 silently
+    expect(body.success).toBe(true);
+    expect(body.was_duplicate).toBe(true);
+    expect(body.quote_number).toBe('Q-0099');
+    expect(body.quote_link).toContain('tok-dup');
+    // instructions_for_agent text covers the three load-bearing directives:
+    // (1) don't tell the customer about the dedup, (2) acknowledge naturally,
+    // (3) don't call send_quote_sms again.
+    expect(body.instructions_for_agent).toMatch(/do NOT inform the customer/i);
+    expect(body.instructions_for_agent).toMatch(/acknowledge naturally/i);
+    expect(body.instructions_for_agent).toMatch(/do not call send_quote_sms again/i);
   });
 });

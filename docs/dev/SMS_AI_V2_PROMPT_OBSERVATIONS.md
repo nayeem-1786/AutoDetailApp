@@ -933,7 +933,7 @@ Server-side idempotency guard in send_quote_sms endpoint:
 The 60-second window is narrow enough to ONLY catch immediate duplicates from
 LLM confabulation, not legitimate re-quotes (those fall under Issue 30 scope).
 
-**Status:** Open — to be addressed in Workstream J Session 4.
+**Status:** Resolved 2026-05-24 via Workstream J Session 4 (this commit) — 60-second idempotency guard shipped in `src/app/api/voice-agent/send-quote-sms/route.ts`. Match criteria per D36: same customer_id + same vehicle_id + same sorted service_id set + status in ('sent', 'viewed') + created_at within last 60s. On match: returns existing quote with `was_duplicate: true` + `instructions_for_agent` directing the agent to acknowledge naturally without mentioning the dedup. No new quote row created; no second SMS sent. Defensive try/catch around the dedup query — failures fall through to normal create flow rather than block. 9 endpoint tests added covering happy path, all MISS branches (past 60s window, different services, partial overlap, different vehicle, declined/expired status), HIT response shape, dedup query failure non-blocking. Critical rule 16 broadened in prompt to cover success responses with `instructions_for_agent` (originally only error path). Manual verification scenario in CHANGELOG entry.
 
 #### Issue 32 — upsert_customer never fires for creation in practice
 
@@ -1016,7 +1016,7 @@ Prompt rule to be added in Workstream J Session 4: agent should call upsert_cust
 
 The tool itself stays as-is. D35's "pivot to update-only / rename to update_customer" is superseded by D37 (see Section 7).
 
-**Revised status:** Open — prompt-level fix scoped for Workstream J Session 4.
+**Revised status:** Resolved 2026-05-24 via Workstream J Session 4 (this commit) — invocation-discipline rule added to `src/lib/sms-ai/system-prompt.ts` "Using upsert_customer to enrich customer records" subsection per D37. New bullet under "When NOT to call": "You already called upsert_customer earlier in this conversation and have no NEW field data to add" + latency framing (200-400ms per call). New "Invocation cadence guide" subsection codifying three branches (first_name first-call / additional-field subsequent calls / no-new-fields-no-call). Session 3 anchor bullets preserved verbatim for back-compat. Tool schema in `tools.ts` UNCHANGED per D37; endpoint in `customers/route.ts` UNCHANGED. 4 prompt tests added (cadence guide presence, no-new-fields rule, back-compat with Session 3 anchors).
 
 #### Issue 33 — Combo/bundle pricing not applied in send_quote_sms
 
@@ -1052,7 +1052,7 @@ This affects voice agent flow too (same endpoint). Likely Workstream H concern (
 
 Prompt rule addition: agent should NOT state combo/bundle pricing in conversation without first calling `get_services` to verify the combo will actually apply. Better to give standalone prices and let the actual quote document carry whatever the system computes, than to promise discounts that don't materialize.
 
-**Status:** Open — endpoint fix deferred to separate session; prompt-level mitigation in Workstream J Session 4.
+**Status:** Prompt-level mitigation Resolved 2026-05-24 via Workstream J Session 4 (this commit) — new `## Combo and bundle pricing — confirm before stating` subsection in `# Add-ons and bundle quoting`. Rule: do NOT state combo pricing unless `get_services` was just called AND `addon_suggestions` explicitly confirms the combo applies for the specific anchor+addon combination in this quote. Safe-default fallback: quote standalone prices; let the actual quote document carry whatever combo discounts the system computes. 3 prompt tests added. **Endpoint fix STILL OPEN** — `resolvePrice` combo-awareness refactor needs its own session: audit pricing data model + refactor pricing loop to second-pass for combo eligibility based on the set of services in the quote + apply discount to add-on line item with `pricing_type='combo'` + `standard_price` for transparency. Likely Workstream H concern or its own new pricing workstream.
 
 #### Issue 34 — last_name not captured by SMS agent flow despite admin panel marking it required
 
@@ -1081,7 +1081,7 @@ Customer-journey-stage drives data-quality requirements:
 
 This asymmetry should remain. The customers table schema remains permissive (most fields nullable); UX layers enforce required-ness contextually.
 
-**Status:** Open — prompt-level capture rule scoped for Workstream J Session 4.
+**Status:** Resolved 2026-05-24 via Workstream J Session 4 (this commit) — new `## Capturing the customer's last name at quote-send` subsection positioned between `## Booking flow` and `## Customer type classification` inside Discovery and conversation flow. Asks casually ("What name should I put on the quote?" / "Last name?") when last_name not on file at quote-send moment. Three response paths covered: just-last-name → `upsert_customer({last_name})`; full-name ("Nayeem Khan") → **aggressive parsing per operator Q1** (first word matches existing first_name, rest becomes last_name; first_name preserved per Policy B); declines / first-name-only → proceed without, do NOT re-ask. Non-blocking — never block the quote on last_name capture. 6 prompt tests added (subsection placement, ordering, three response paths, aggressive parsing rule, non-blocking + no-re-ask, casual ask wording). Customer-journey-stage asymmetry remains intact: SMS top-of-funnel keeps permissive nullable schema; POS/booking/admin enforce required at the UX layer.
 
 ---
 

@@ -217,6 +217,125 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 60-second idempotency guard (Workstream J Session 4 — D36, Issue 31).
+    // Same customer + same vehicle + same service set within 60 seconds
+    // returns the existing quote instead of creating a duplicate. Catches the
+    // intermittent double-send from LLM confabulation observed in Test 1
+    // (2026-05-23) without overreaching into multi-day duplicate detection
+    // (Issue 30 / Workstream I scope).
+    //
+    // Position: AFTER customer/vehicle/service resolution (so we can compare
+    // against the actual computed service_id set) and BEFORE createQuote.
+    // Match window: 60 seconds. Match scope: status in ('sent', 'viewed') —
+    // never block on drafts (incomplete), accepted (already converted), or
+    // expired/converted (lifecycle-terminal).
+    //
+    // Failure mode: wrapped in try/catch — if the dedup query errors, fall
+    // through to normal create flow. A dedup-check failure must not block a
+    // legitimate quote.
+    try {
+      const candidateServiceIds = quoteItems
+        .map((qi) => qi.service_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+        .sort();
+
+      if (candidateServiceIds.length > 0) {
+        t = perf.now();
+        const dedupQuery = admin
+          .from('quotes')
+          .select(`
+            id,
+            quote_number,
+            access_token,
+            created_at,
+            quote_items ( service_id )
+          `)
+          .eq('customer_id', customerId)
+          .in('status', ['sent', 'viewed'])
+          .gte(
+            'created_at',
+            new Date(Date.now() - 60_000).toISOString(),
+          )
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        // vehicle_id filter must be an explicit IS NULL when undefined —
+        // PostgREST treats .eq(col, null) differently from .is(col, null).
+        const dedupResult = vehicleId
+          ? await dedupQuery.eq('vehicle_id', vehicleId)
+          : await dedupQuery.is('vehicle_id', null);
+        perf.mark('query:idempotency_check', t);
+
+        const recentQuotes = (dedupResult.data ?? []) as Array<{
+          id: string;
+          quote_number: string;
+          access_token: string | null;
+          created_at: string;
+          quote_items: Array<{ service_id: string | null }> | null;
+        }>;
+
+        let duplicateQuote: (typeof recentQuotes)[number] | null = null;
+        for (const existing of recentQuotes) {
+          const existingServiceIds = (existing.quote_items ?? [])
+            .map((qi) => qi.service_id)
+            .filter((id): id is string => typeof id === 'string' && id.length > 0)
+            .sort();
+          if (
+            existingServiceIds.length === candidateServiceIds.length &&
+            existingServiceIds.every(
+              (id, i) => id === candidateServiceIds[i],
+            )
+          ) {
+            duplicateQuote = existing;
+            break;
+          }
+        }
+
+        if (duplicateQuote && duplicateQuote.access_token) {
+          // Reconstruct the customer-facing link from the existing quote's
+          // access_token. Try to short-link for parity with the original
+          // send; fall back to the full URL on failure. The customer
+          // already received the SMS during the original send — we do NOT
+          // re-send Twilio here.
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+          const existingQuoteUrl = `${appUrl}/quote/${duplicateQuote.access_token}`;
+          let existingLinkUrl = existingQuoteUrl;
+          try {
+            existingLinkUrl = await createShortLink(existingQuoteUrl);
+          } catch {
+            /* use full URL */
+          }
+
+          const ageSec = Math.round(
+            (Date.now() - new Date(duplicateQuote.created_at).getTime()) /
+              1000,
+          );
+          console.log(
+            `[SendQuoteSMS] Idempotency guard hit: returning existing Q-${duplicateQuote.quote_number} for customer=${customerId} vehicle=${vehicleId ?? 'null'} (created ${ageSec}s ago) — no new quote created, no SMS sent`,
+          );
+
+          const dedupResponse = {
+            success: true as const,
+            was_duplicate: true as const,
+            quote_number: duplicateQuote.quote_number,
+            quote_link: existingLinkUrl,
+            instructions_for_agent:
+              'A duplicate quote for this customer + vehicle + service set was already sent within the last 60 seconds. Do NOT inform the customer that a duplicate was prevented. Acknowledge naturally as if the quote was just sent — it was, just moments ago and the customer already received the SMS. A short reply like "Quote sent — check your texts!" is fine. Do not call send_quote_sms again this turn.',
+          };
+          perf.done(dedupResponse);
+          return NextResponse.json(dedupResponse);
+        }
+      }
+    } catch (dedupErr) {
+      // Dedup-check failure must NOT block a legitimate quote. Log and fall
+      // through to the normal create flow.
+      console.error(
+        '[SendQuoteSMS] Idempotency check failed (non-blocking):',
+        dedupErr instanceof Error ? dedupErr.message : String(dedupErr),
+      );
+    }
+
     // Read quote validity
     t = perf.now();
     const { data: validitySetting } = await admin
