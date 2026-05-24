@@ -1252,6 +1252,82 @@ beyond eventual expiration (Workstream I Session 1 — expiration cron).
 Future enhancement: 24-hour-before-expiration reminder SMS. Not P0.
 Future workstream.
 
+**D34 — `upsert_customer` tool architecture (operator-locked 2026-05-23, shipped Workstream J Session 3).**
+
+Implements Option C from the Name-First Customer Creation Flow Diagnostic
+(`docs/dev/NAME_FIRST_CUSTOMER_FLOW_DIAGNOSTIC.md`). Branch
+`feat/sms-ai-v2-upsert-customer-tool`. Closes the structural orphan-conversation
+class of bugs (Issues 26-28) by giving the SMS-AI v2 agent a dedicated tool to
+persist the customer record AS SOON AS it learns the customer's first name —
+no longer dependent on `send_quote_sms` succeeding.
+
+**Surface:**
+- 13th SMS-AI v2 tool `upsert_customer`. Required: `first_name`. Optional:
+  `last_name`, `email`, `customer_type` (enum), `address_1`, `address_2`,
+  `city`, `zip_code`. Phone NOT in schema — dispatcher injects from runtime
+  context (same pattern as the 5 phone-bearing tools from D27 / commit
+  `09b7eecb`).
+- New `POST /api/voice-agent/customers` (the existing GET is untouched).
+  Bearer-auth. ~280 lines. Reuses `validateApiKey`, `normalizePhone`,
+  `updateSmsConsent`, the soft-delete-aware customer SELECT pattern, and
+  the conversation-customer backfill pattern with `.is('customer_id', null)`
+  defensive guard.
+- Dispatcher additions in `src/lib/sms-ai/tool-dispatcher.ts`:
+  `callUpsertCustomer` helper (injects `phone` + `conversation_id` from
+  runtime context); `upsert_customer: 5000` timeout entry; structured-error
+  passthrough in `voiceAgentFetch` (when response body parses to JSON
+  carrying `instructions_for_agent` string, return full JSON in content
+  instead of the legacy 200-char truncated snippet — applies to ALL
+  phone-bearing tools, not just this one).
+- Prompt additions in `src/lib/sms-ai/system-prompt.ts`: Critical rule 16
+  (silent-follow `instructions_for_agent` handling, rule count 15 → 16),
+  new `## Capturing the customer's first name` subsection, new `## Using
+  upsert_customer to enrich customer records` subsection, rewritten
+  `## Customer type classification` subsection pointing at `upsert_customer`
+  instead of the obsolete `send_quote_sms` conditional, revised "For NEW
+  conversations" step 1 ("The MOMENT the customer shares a usable first
+  name, call `upsert_customer`...").
+
+**Locked Q1–Q7 answers (the open questions from the diagnostic):**
+- Q1 `sms_consent` on creation = `true` (implicit consent from active SMS
+  conversation; matches established Twilio webhook pattern).
+- Q2 vehicle data scope = NO (separate concern, existing
+  `findOrCreateVehicle` handles vehicle).
+- Q3 helper extraction (Option B refactor of 7 duplicate find-or-create
+  paths) = DEFER to future workstream.
+- Q4 tool name = `upsert_customer` (accurately describes create-or-update
+  semantics).
+- Q5 deletion scope = NO (admin-only via Data Management Purge UI).
+- Q6 `customer_type` default = `'enthusiast'`; NEVER NULL, NEVER `'unknown'`.
+- Q7 update policy (Policy B) = preserve human-curated values, fill nulls
+  only. `customer_type` overwrites each call (latest classification wins).
+  `sms_consent: false → true` re-opt-in via `updateSmsConsent` (audit row
+  lands in `sms_consent_log`); `true` is NEVER auto-revoked.
+
+**Aligns with prior decisions:**
+- D17 ("identity + content carries; lifecycle + system state resets") —
+  agent persists identity only; lifecycle state (loyalty, transactions,
+  appointments) emerges from other writes.
+- D18-revised — `customer_type` default `'enthusiast'` at agent-creation
+  reduces the "Unknown" pool that operator otherwise reclassifies manually.
+- D27 / phone-injection mechanism — dispatcher injects phone for every
+  phone-bearing tool; LLM never sees nor provides it.
+
+**Relationship to D33 (Walk-In Workstream K):** D33's Session 4
+(customer-initiated reply triggers customer creation) explicitly depends on
+this `upsert_customer` surface. With D34 shipped, Workstream K Session 4 is
+unblocked — when a walk-in customer replies to a receipt SMS, the agent
+picks up the conversation and `upsert_customer` creates the record + links
+the conversation organically.
+
+**Issue 28 status update:** the Admin Purge incomplete-cascade defect is
+unchanged by D34 — Purge remains the operator-side fix for backlogged
+orphan conversations. D34 closes the AGENT-side root cause for new orphans
+(no more "quote send failed → customer never created → conversation
+orphaned" path), making the cascade gap less load-bearing going forward.
+
+---
+
 **D33 — Walk-In customer identity resolution architecture (operator-locked 2026-05-23).**
 POS walk-in customers who pay and receive an SMS receipt should be
 associated to a customer record, not left as transactional orphans.

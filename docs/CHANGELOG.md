@@ -6,6 +6,66 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-23 — feat(sms-ai-v2): upsert_customer tool + endpoint + prompt rules (Workstream J Session 3)
+
+Implements Option C from the Name-First Customer Creation Flow Diagnostic (commit `913657c6`). The SMS-AI v2 agent can now persist the customer record AS SOON AS it learns the customer's first name, instead of waiting for the `send_quote_sms` side-effect path. This eliminates the orphan-conversation class of bugs (Issues 26-28) at the source: even when a quote send fails or the conversation deflects before a quote, the customer record + conversation linkage are already in place. Branch `feat/sms-ai-v2-upsert-customer-tool`.
+
+**Operator-locked decisions (locked 2026-05-23, see D34 in `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`):**
+- Q1 `sms_consent` on creation → `true` (implicit consent from active SMS conversation; matches the established Twilio webhook pattern).
+- Q2 vehicle data scope → NO — vehicle stays a separate concern (existing `findOrCreateVehicle` in `send_quote_sms` and `appointments`).
+- Q3 helper extraction (Option B refactor of the 7 duplicate find-or-create paths) → DEFER to a future workstream.
+- Q4 tool name → `upsert_customer` (accurately describes the create-or-update semantics; `create_customer` would mislead the LLM into thinking it shouldn't call twice).
+- Q5 deletion scope → NO — admin-only via existing Data Management Purge UI.
+- Q6 `customer_type` default → `'enthusiast'` on agent-initiated creation; NEVER NULL, NEVER `'unknown'`.
+- Q7 update policy (Policy B) → preserve human-curated values, fill nulls only; `customer_type` overwrites each call (latest classification wins); `sms_consent` re-opt-in path only (`false → true`), never auto-revoke.
+
+**New tool — `src/lib/sms-ai/tools.ts`:** 13th tool `upsert_customer`. Required: `first_name`. Optional: `last_name`, `email`, `customer_type` (enum `enthusiast`/`professional`), `address_1`, `address_2`, `city`, `zip_code`. `phone` is NOT in the schema — the dispatcher injects from runtime context. Description explicitly tells the LLM "do not pass it" and "idempotent — calling it twice is safe". `TOOL_NAMES` union + `SmsAiV2ToolName` type both updated.
+
+**New endpoint — `src/app/api/voice-agent/customers/route.ts`:** added `POST` handler (existing `GET` untouched). ~280 lines. Reuses every supporting helper:
+- `validateApiKey` Bearer auth (same as GET handler and all voice-agent endpoints).
+- `normalizePhone` defensive validation (phone arrives pre-normalized from the dispatcher but the endpoint re-validates).
+- `updateSmsConsent` for the re-opt-in audit row in `sms_consent_log`.
+- Existing soft-delete-aware customer SELECT pattern (`.is('deleted_at', null)`).
+- `conversations.customer_id` retroactive backfill with `.is('customer_id', null)` guard (defensive — never stomp an existing link).
+
+Endpoint behavior:
+- **CREATE path** (no existing row by phone): INSERT with `first_name`, `last_name || ''`, `phone`, `sms_consent: true`, `customer_type: 'enthusiast'` (default). Optional fields persisted when provided. The tool's LLM-facing `address_1`/`address_2`/`zip_code` are mapped to DB columns `address_line_1`/`address_line_2`/`zip`.
+- **UPDATE path** (existing row found): Policy B conditional UPDATE. Generic placeholder first_name/last_name (`'New Customer'`, `'Phone Caller'`, `'Walk-In'`, `'Unknown'`, ...) are overwritten with the real value; real human-curated values are NEVER overwritten. `email` / address fields fill nulls only. `customer_type` overwrites each call when it differs from the current value. `sms_consent: false` is upgraded to `true` via `updateSmsConsent({action: 'opt_in'})` so the audit row lands in `sms_consent_log` — `true` is never downgraded.
+- **Conversation linkage**: when the dispatcher injects `conversation_id`, the endpoint backfills `conversations.customer_id` with `.is('customer_id', null)` guard. Response carries `conversation_linked: true|false` for diagnostic clarity.
+
+Response shape:
+- Success: `{ success: true, customer_id, was_created, updated_fields: string[], conversation_linked }`.
+- Error: `{ error, instructions_for_agent, do_not_share_with_customer: true, missing_fields? }`. `instructions_for_agent` tells the agent what to ask or do next, conversationally, without leaking system details to the customer.
+
+**Dispatcher patch — `src/lib/sms-ai/tool-dispatcher.ts`:** Three additions.
+1. `upsert_customer: 5000` in `TOOL_TIMEOUT_MS` (read/classify tier).
+2. `callUpsertCustomer` helper — injects `phone` AND `conversation_id` from `_runtimeContext`. Same defensive guard as the other phone-bearing tools (`errResult('upsert_customer: internal — runtime phone not set')`).
+3. **Structured-error passthrough** in `voiceAgentFetch`: when a non-2xx response body parses to JSON carrying an `instructions_for_agent` string, the dispatcher returns the full JSON body in `content` instead of the legacy 200-char truncated snippet. Applies to ALL phone-bearing tools — `send_quote_sms`, `create_appointment`, etc. can now return rich agent-facing instructions. Legacy non-instructional errors keep their snippet format as a fallback.
+
+**Prompt additions — `src/lib/sms-ai/system-prompt.ts`:**
+- **Critical rule 16** (new): "Tool errors with `instructions_for_agent` are silent guidance" — directs the agent to follow embedded instructions silently and never share system details with the customer. Rule count bumped 15 → 16.
+- **`## Capturing the customer's first name`** (new subsection under Discovery and conversation flow): when and how to ask, examples, IMMEDIATELY call `upsert_customer` upon receiving a name, one-polite-re-ask-then-proceed deflection rule.
+- **`## Using upsert_customer to enrich customer records`** (new subsection): idempotent — call multiple times as you learn more; the tool merges and preserves human-curated values; "When NOT to call" list (already in CUSTOMER CONTEXT, no usable first name yet, customer just browsing).
+- **`## Customer type classification`** (rewritten): now points at `upsert_customer` instead of the obsolete `send_quote_sms` conditional language. Defaults to `'enthusiast'` server-side when omitted; only pass `'professional'` on explicit B2B signals.
+- **"For NEW conversations" step 1** (revised): "The MOMENT the customer shares a usable first name, call `upsert_customer` with that `first_name`..."
+
+**Tests — +21 new across 4 files.** Existing test counts updated for the +1 tool / +1 critical rule:
+- `src/lib/sms-ai/__tests__/tools.test.ts` — bumped expected tool count 12 → 13; added 5 `upsert_customer`-specific invariants (required field, optional fields, customer_type enum, schema does NOT include phone, description signals idempotency).
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` — +5 upsert_customer dispatch tests (routing, phone+conversation_id injection, override-LLM-phone, defensive guard, optional customer_type passthrough); +4 structured-error passthrough tests (full JSON body when `instructions_for_agent` present, legacy snippet fallback when absent, snippet fallback when body isn't JSON, applies to other phone-bearing tools).
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts` — bumped expected critical-rule count 15 → 16; added `upsert_customer` to "names every tool" assertion; +10 new prompt-rule tests covering both new subsections, rule 16, step-1 wording, customer-type-subsection rewrite, subsection ordering inside Discovery flow. Revised the 3 pre-Session-3 Issue 18 assertions (Customer type classification subsection) to match the rewritten content.
+- `src/app/api/voice-agent/customers/__tests__/route.test.ts` — NEW FILE, 23 tests covering: 401 auth gating, 400 + `instructions_for_agent` validation (missing first_name, placeholder first_name, missing/invalid phone), CREATE path defaults (sms_consent=true, customer_type=enthusiast, full optional-fields persistence, invalid customer_type ignored), 500 + `instructions_for_agent` on INSERT failure, UPDATE Policy B (preserve real names, overwrite generic placeholders, fill null email, preserve existing email, overwrite customer_type each call, skip when matching, fill null address fields, preserve existing address fields, sms_consent re-opt-in via `updateSmsConsent`, never auto-revoke when true), conversation linkage (UPDATE happens, `.is(null)` guard rejects already-linked, skip entirely when conversation_id omitted), and response-shape invariants.
+
+**Final test count: 1947 (was 1926; +21).** All gates green: `tsc --noEmit` 0 errors, `lint` 0 errors / 97 warnings (unchanged baseline), `npm test` 1947 passed, `npm run build` 787 pages clean.
+
+**Files NOT touched (per session prompt hard rules):** `customer-context.ts`, `agent-runner.ts`, `background-dispatch.ts`, `feature-flag.ts`. No schema migrations. No changes to existing tools beyond the dispatcher case addition + structured-error passthrough (which is additive — legacy snippet format preserved as fallback). No changes to `customers` table or related schema.
+
+**Reference docs:**
+- `docs/dev/NAME_FIRST_CUSTOMER_FLOW_DIAGNOSTIC.md` — full diagnostic + implementation spec.
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` — Section 7, D34 added.
+- `docs/dev/ROADMAP-13-ITEMS.md` — Workstream J Session 3 marked done.
+
+---
+
 ## 2026-05-23 — docs: capture Workstream K (Walk-In Customer Identity Resolution) + D33 + Issue 29
 
 Docs-only capture session. Branch `docs/2026-05-23-workstream-k-walk-in-identity-resolution`. NO source code touched. NO prompt changes. NO migrations. NO test changes.

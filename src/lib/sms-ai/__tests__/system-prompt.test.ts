@@ -106,6 +106,7 @@ describe('buildV2SystemPrompt — structural output', () => {
       'notify_staff',
       'approve_addon',
       'decline_addon',
+      'upsert_customer',
     ]) {
       expect(out, `tool usage guide missing "${tool}"`).toContain(tool);
     }
@@ -169,7 +170,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 15 numbered rules (D19 quote-first / never-book-directly added 2026-05-23)', () => {
+  it('Critical rules section contains exactly 16 numbered rules (D34 upsert_customer tool-error handling added 2026-05-23)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
@@ -177,7 +178,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(15);
+    expect(numbered.length).toBe(16);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -554,31 +555,37 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
   });
 });
 
-describe('buildV2SystemPrompt — Issue 18 (customer type classification)', () => {
+describe('buildV2SystemPrompt — Issue 18 (customer type classification) [revised Workstream J Session 3]', () => {
   it('includes Customer type classification subsection', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('## Customer type classification');
   });
 
-  it('declares Enthusiast / Professional / Unknown values with signals', () => {
+  it('declares Enthusiast / Professional values with signals', () => {
+    // Session 3: subsection rewritten to point at upsert_customer; the
+    // "Unknown" enum value was dropped — the server now defaults to
+    // 'enthusiast' rather than leaving the column nullable.
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('**Enthusiast**');
     expect(out).toContain('**Professional**');
-    expect(out).toContain('**Unknown**');
     expect(out).toContain('for my shop');
     expect(out).toContain('for my dealership');
   });
 
   it('forbids asking the customer the classification question directly', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('do NOT ask the customer\n"are you a professional or an enthusiast?"');
-    expect(out).toContain('this is internal\ncategorization, never customer-facing');
+    expect(out).toContain('are you a professional or an enthusiast?');
+    expect(out).toContain('internal\ncategorization, never customer-facing');
   });
 
-  it('handles both branches: tool accepts customer_type vs does not', () => {
+  it('directs the agent to upsert_customer with customer_type (replaces old send_quote_sms branch language)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('If `send_quote_sms` tool accepts a `customer_type` parameter, pass the\ninferred value');
-    expect(out).toContain('do NOT invent a parameter');
+    // New wording (Workstream J Session 3 — D34)
+    expect(out).toContain('`upsert_customer` accepts a `customer_type` parameter');
+    expect(out).toContain("defaults to `'enthusiast'`");
+    // The old conditional language must be gone — guards against
+    // accidentally restoring the pre-Session-3 wording.
+    expect(out).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 });
 
@@ -593,6 +600,88 @@ describe('buildV2SystemPrompt — Tool usage guide updates (Issue 17 + D19)', ()
     // Old bullet content must NOT remain unchanged — the quote-first replacement points to send_quote_sms.
     expect(out).toContain('This is the booking path — staff handles scheduling confirmation in a follow-up');
     expect(out).toContain('Do NOT call `create_appointment` directly');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 3 — upsert_customer prompt rules
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () => {
+  it('includes "Capturing the customer\'s first name" subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain("## Capturing the customer's first name");
+  });
+
+  it('directs the agent to call upsert_customer IMMEDIATELY upon learning first_name', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('IMMEDIATELY call `upsert_customer`');
+  });
+
+  it('declares one-polite-re-ask-then-proceed deflection rule', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('After ONE polite\nre-ask, proceed without');
+  });
+
+  it('includes "Using upsert_customer to enrich customer records" subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('## Using upsert_customer to enrich customer records');
+  });
+
+  it('describes upsert_customer as idempotent in the enrichment subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('`upsert_customer` is idempotent');
+  });
+
+  it('lists the "When NOT to call upsert_customer" cases (already in context, no name, just browsing)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('When NOT to call `upsert_customer`');
+    expect(out).toContain('already in CUSTOMER CONTEXT');
+    expect(out).toContain('just browsing');
+  });
+
+  it('forbids passing placeholder values like "Customer" or "Caller" as first_name', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Never pass\n  placeholder values like "Customer" or "Caller"');
+  });
+
+  it('"For NEW conversations" step 1 now references upsert_customer call timing', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The updated step 1 wording — pinned literally so we catch silent regressions
+    expect(out).toContain('The MOMENT the customer shares a usable first name, call `upsert_customer`');
+  });
+
+  it('Customer type classification subsection now references upsert_customer (not send_quote_sms)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const ctIdx = out.indexOf('## Customer type classification');
+    expect(ctIdx).toBeGreaterThan(-1);
+    // Section ends at the next top-level header (e.g. `# Escalation guide`).
+    // Using `\n# ` avoids matching `##` substrings within the subsection.
+    const nextH1 = out.indexOf('\n# ', ctIdx + 1);
+    const ctSection = nextH1 === -1 ? out.slice(ctIdx) : out.slice(ctIdx, nextH1);
+    expect(ctSection).toContain('`upsert_customer`');
+    expect(ctSection).toContain("defaults to `'enthusiast'`");
+    // The old send_quote_sms-customer_type conditional language must be gone
+    expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
+  });
+
+  it('Critical rule 16 declares instructions_for_agent silent-follow handling', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/16\.\s+\*\*Tool errors with `instructions_for_agent`/);
+    expect(out).toContain('follow those instructions silently');
+    expect(out).toContain('Never share tool error messages');
+  });
+
+  it('upsert_customer subsections appear inside Discovery and conversation flow (before Escalation guide)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const flowIdx = out.indexOf('# Discovery and conversation flow');
+    const captureIdx = out.indexOf("## Capturing the customer's first name");
+    const enrichIdx = out.indexOf('## Using upsert_customer to enrich customer records');
+    const escalIdx = out.indexOf('# Escalation guide');
+    expect(flowIdx).toBeGreaterThan(-1);
+    expect(flowIdx).toBeLessThan(captureIdx);
+    expect(captureIdx).toBeLessThan(enrichIdx);
+    expect(enrichIdx).toBeLessThan(escalIdx);
   });
 });
 

@@ -8,8 +8,8 @@ import {
 } from '@/lib/sms-ai/tools';
 
 describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
-  it('contains exactly 12 tools', () => {
-    expect(SMS_AI_V2_TOOLS).toHaveLength(12);
+  it('contains exactly 13 tools', () => {
+    expect(SMS_AI_V2_TOOLS).toHaveLength(13);
   });
 
   it('every tool name is unique', () => {
@@ -36,6 +36,7 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
       'send_quote_sms',
       'approve_addon',
       'decline_addon',
+      'upsert_customer',
     ];
     expect([...TOOL_NAMES].sort()).toEqual([...expected].sort());
   });
@@ -181,5 +182,51 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     ).toBe('string');
     expect(tool.description.toLowerCase()).toContain('only call this when');
     expect(tool.description.toLowerCase()).toContain('explicitly declined');
+  });
+
+  // -------------------------------------------------------------------------
+  // Workstream J Session 3 — upsert_customer tool definition invariants
+  // -------------------------------------------------------------------------
+
+  it('upsert_customer requires only first_name', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'upsert_customer')!;
+    expect(tool.input_schema.required).toEqual(['first_name']);
+  });
+
+  it('upsert_customer declares optional fields: last_name, email, customer_type, address_1/2, city, zip_code', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'upsert_customer')!;
+    const props = tool.input_schema.properties;
+    for (const field of [
+      'first_name',
+      'last_name',
+      'email',
+      'customer_type',
+      'address_1',
+      'address_2',
+      'city',
+      'zip_code',
+    ]) {
+      expect(props[field], `missing property ${field}`).toBeDefined();
+      expect((props[field] as { type?: string }).type).toBe('string');
+    }
+  });
+
+  it('upsert_customer customer_type enum is exactly ["enthusiast", "professional"]', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'upsert_customer')!;
+    const ctProp = tool.input_schema.properties.customer_type as { enum?: string[] };
+    expect([...(ctProp.enum ?? [])].sort()).toEqual(['enthusiast', 'professional']);
+  });
+
+  it('upsert_customer description does NOT request phone (dispatcher-injected, never from LLM)', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'upsert_customer')!;
+    // Schema must not include phone
+    expect(tool.input_schema.properties.phone).toBeUndefined();
+    // Description must affirmatively tell the LLM not to pass phone
+    expect(tool.description.toLowerCase()).toMatch(/do not pass it|phone.*captured automatically/);
+  });
+
+  it('upsert_customer description signals idempotency and call-multiple-times semantics', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'upsert_customer')!;
+    expect(tool.description.toLowerCase()).toContain('idempotent');
   });
 });

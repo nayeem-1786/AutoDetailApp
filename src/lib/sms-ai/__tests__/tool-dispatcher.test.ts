@@ -847,3 +847,138 @@ describe('dispatchTool — defensive guard when runtime context not set', () => 
     expect(fetchCalls).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 3 — upsert_customer dispatch + structured-error
+// passthrough
+// ---------------------------------------------------------------------------
+
+describe('dispatchTool — upsert_customer (Workstream J Session 3)', () => {
+  it('routes to POST /api/voice-agent/customers with JSON body', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, { success: true, customer_id: 'c-new', was_created: true }),
+    );
+    const r = await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem' },
+    });
+    expect(r.isError).toBe(false);
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0].url).toBe('http://localhost:3000/api/voice-agent/customers');
+    expect(fetchCalls[0].init?.method).toBe('POST');
+    expect((fetchCalls[0].init?.headers as Record<string, string>)['Content-Type']).toBe(
+      'application/json',
+    );
+    expect((fetchCalls[0].init?.headers as Record<string, string>).Authorization).toBe(
+      'Bearer test-voice-agent-key',
+    );
+  });
+
+  it('injects runtime phone AND conversation_id into the request body', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true, customer_id: 'c1' }));
+    await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem', email: 'n@example.com' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.phone).toBe(DEFAULT_TEST_PHONE);
+    expect(body.conversation_id).toBe(DEFAULT_TEST_CONV);
+    expect(body.first_name).toBe('Nayeem');
+    expect(body.email).toBe('n@example.com');
+  });
+
+  it('runtime phone OVERRIDES any LLM-provided phone in the input', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true, customer_id: 'c1' }));
+    await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem', phone: '+19998887777' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.phone).toBe(DEFAULT_TEST_PHONE);
+  });
+
+  it('returns isError with diagnostic message when runtime context not set', async () => {
+    __resetForAgentRun(); // clear runtime context
+    const r = await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem' },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toContain('runtime phone not set');
+    expect(fetchCalls).toHaveLength(0);
+  });
+
+  it('passes optional customer_type through unchanged', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true, customer_id: 'c1' }));
+    await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem', customer_type: 'professional' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.customer_type).toBe('professional');
+  });
+});
+
+describe('dispatchTool — structured-error passthrough (Workstream J Session 3)', () => {
+  it('returns full JSON body (not truncated snippet) when error carries instructions_for_agent', async () => {
+    const payload = {
+      error: 'first_name is required',
+      missing_fields: ['first_name'],
+      instructions_for_agent:
+        'You called upsert_customer without a usable first_name. Ask the customer for their first name naturally in the conversation — do not mention this error or any system details to the customer. Once they answer, call upsert_customer again with their first_name.',
+      do_not_share_with_customer: true,
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(400, payload));
+    const r = await dispatchTool({
+      name: 'upsert_customer',
+      input: { last_name: 'Khan' },
+    });
+    expect(r.isError).toBe(true);
+    // Full JSON in content — NOT the legacy "Tool call returned 400: …" snippet.
+    expect(r.content).not.toMatch(/^Tool call returned/);
+    const parsed = JSON.parse(r.content);
+    expect(parsed.instructions_for_agent).toContain('Ask the customer for their first name');
+    expect(parsed.do_not_share_with_customer).toBe(true);
+  });
+
+  it('falls back to legacy snippet format for errors WITHOUT instructions_for_agent', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, { error: 'database down' }));
+    const r = await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem' },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toMatch(/^Tool call returned 500/);
+    expect(r.content).toContain('database down');
+  });
+
+  it('falls back to legacy snippet when response body is not valid JSON', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('Internal Server Error', { status: 500 }),
+    );
+    const r = await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Nayeem' },
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toMatch(/^Tool call returned 500/);
+  });
+
+  it('applies to other phone-bearing tools too (e.g. send_quote_sms)', async () => {
+    // The passthrough lives in voiceAgentFetch — any phone-bearing tool that
+    // returns instructions_for_agent gets the full-body treatment.
+    const payload = {
+      error: 'duplicate_quote',
+      instructions_for_agent:
+        'A quote was already sent within the last hour. Apologize and offer to send a new one with a different vehicle if relevant.',
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(409, payload));
+    const r = await dispatchTool({
+      name: 'send_quote_sms',
+      input: { services: 'Express Wax' },
+    });
+    expect(r.isError).toBe(true);
+    const parsed = JSON.parse(r.content);
+    expect(parsed.instructions_for_agent).toContain('already sent within the last hour');
+  });
+});
