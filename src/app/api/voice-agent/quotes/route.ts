@@ -6,6 +6,7 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
+import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 
 interface QuoteServiceInput {
   service_id: string;
@@ -146,13 +147,14 @@ const body = await request.json();
     );
 
     // Build quote items and calculate totals
-    const quoteItems: {
+    let quoteItems: {
       service_id: string;
       item_name: string;
       quantity: number;
       unit_price: number;
-      total_price: number;
       tier_name: string | null;
+      standard_price: number | null;
+      pricing_type: 'standard' | 'sale' | 'combo' | null;
     }[] = [];
 
     for (const input of serviceInputs) {
@@ -191,12 +193,20 @@ const body = await request.json();
         item_name: svc.name as string,
         quantity: 1,
         unit_price: price,
-        total_price: price,
         tier_name: tierName,
+        standard_price: null,
+        pricing_type: 'standard',
       });
     }
 
-    const subtotal = quoteItems.reduce((sum, item) => sum + item.total_price, 0);
+    // Issue 33 Layer 1: apply combo pricing from service_addon_suggestions.
+    // Rewrites addon line items' unit_price → combo_price, standard_price →
+    // prior unit_price, pricing_type → 'combo' when the anchor is in the set.
+    t = perf.now();
+    quoteItems = await applyCombosToQuoteItems(supabase, quoteItems);
+    perf.mark('resolve:combos', t);
+
+    const subtotal = quoteItems.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
 
     // Generate quote number
     t = perf.now();
@@ -258,15 +268,19 @@ const body = await request.json();
       );
     }
 
-    // Create quote_items
+    // Create quote_items — Layer 1 adds standard_price + pricing_type
+    // so combo applications produce a coherent audit trail
+    // (matches createQuote behavior used by the SMS-AI / post-call paths).
     const itemRows = quoteItems.map((item) => ({
       quote_id: quote.id,
       service_id: item.service_id,
       item_name: item.item_name,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      total_price: item.total_price,
+      total_price: item.unit_price * item.quantity,
       tier_name: item.tier_name,
+      standard_price: item.standard_price,
+      pricing_type: item.pricing_type,
     }));
 
     t = perf.now();
@@ -309,7 +323,7 @@ const body = await request.json();
         items: quoteItems.map((item) => ({
           service_id: item.service_id,
           name: item.item_name,
-          price: item.total_price,
+          price: item.unit_price * item.quantity,
           tier_name: item.tier_name,
         })),
       },
@@ -330,7 +344,7 @@ const body = await request.json();
         items: quoteItems.map((item) => ({
           service_id: item.service_id,
           name: item.item_name,
-          price: item.total_price,
+          price: item.unit_price * item.quantity,
           tier_name: item.tier_name,
         })),
       },

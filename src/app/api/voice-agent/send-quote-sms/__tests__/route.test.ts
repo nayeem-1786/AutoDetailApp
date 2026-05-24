@@ -157,6 +157,15 @@ vi.mock('@/lib/services/service-resolver', () => ({
   resolvePrice: (...args: unknown[]) => resolvePriceMock(...args),
 }));
 
+// --- combo resolver: pass-through by default; tests can override to
+//     simulate combo application without seeding the suggestions table ---
+const applyCombosToQuoteItemsMock = vi.fn();
+vi.mock('@/lib/services/combo-resolver', () => ({
+  applyCombosToQuoteItems: (
+    ...args: unknown[]
+  ) => applyCombosToQuoteItemsMock(...args),
+}));
+
 // --- quote service: mock createQuote — assert quote_items.tier_name + unit_price ---
 const createQuoteMock = vi.fn();
 vi.mock('@/lib/quotes/quote-service', () => ({
@@ -202,10 +211,15 @@ beforeEach(() => {
   resolveServiceByNameMock.mockReset();
   resolvePriceMock.mockReset();
   createQuoteMock.mockReset();
+  applyCombosToQuoteItemsMock.mockReset();
   quotesIdempotencyState.recentQuotes = [];
   quotesIdempotencyState.shouldThrow = false;
 
   resolveServiceByNameMock.mockImplementation(async () => SIGNATURE_SERVICE);
+  // Default: combo resolver is a pass-through (no combos applied)
+  applyCombosToQuoteItemsMock.mockImplementation(
+    async (_admin: unknown, items: unknown[]) => items,
+  );
   createQuoteMock.mockImplementation(async () => ({
     quote: {
       id: 'quote-fake-id',
@@ -682,5 +696,184 @@ describe('POST /api/voice-agent/send-quote-sms — 60s idempotency guard', () =>
     expect(body.instructions_for_agent).toMatch(/do NOT inform the customer/i);
     expect(body.instructions_for_agent).toMatch(/acknowledge naturally/i);
     expect(body.instructions_for_agent).toMatch(/do not call send_quote_sms again/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 33 Layer 1 — combo pricing application
+//
+// Reproduces the Q-0084 (Test 4) failure surface: agent says "Express Interior
+// $85 + Pet Hair bundles for $100 (saves $25)" but quote total shipped without
+// combo applied. Layer 1 adoption wraps the resolved items through the combo
+// resolver helper, which rewrites the addon line item with combo_price.
+// ---------------------------------------------------------------------------
+
+const EXPRESS_INTERIOR_ID = 'service-express-interior-id';
+const PET_HAIR_ID = 'service-pet-hair-id';
+
+const EXPRESS_INTERIOR = {
+  id: EXPRESS_INTERIOR_ID,
+  name: 'Express Interior Clean',
+  pricing_model: 'vehicle_size',
+  service_pricing: [],
+};
+const PET_HAIR = {
+  id: PET_HAIR_ID,
+  name: 'Pet Hair & Dander Removal',
+  pricing_model: 'flat',
+  service_pricing: [],
+};
+
+describe('POST /api/voice-agent/send-quote-sms — combo pricing application (Issue 33)', () => {
+  beforeEach(() => {
+    findOrCreateVehicleMock.mockResolvedValue({
+      id: 'v-honda',
+      created: false,
+      vehicle_category: 'automobile',
+      size_class: 'sedan',
+      specialty_tier: null,
+    });
+  });
+
+  it('combo HIT — Q-0084 reproduction: Express Interior + Pet Hair → Pet Hair rewritten with combo_price=$100', async () => {
+    // Each call to resolveServiceByName returns the matching service.
+    resolveServiceByNameMock
+      .mockResolvedValueOnce(EXPRESS_INTERIOR)
+      .mockResolvedValueOnce(PET_HAIR);
+    // resolvePrice: anchor $85 sedan tier, addon $125 standalone
+    resolvePriceMock
+      .mockReturnValueOnce({ price: 85, salePrice: null, tierName: 'sedan', isOnSale: false })
+      .mockReturnValueOnce({ price: 125, salePrice: null, tierName: null, isOnSale: false });
+
+    // Simulate the combo helper applying the combo: Pet Hair gets $100,
+    // standard_price=$125, pricing_type='combo'.
+    applyCombosToQuoteItemsMock.mockImplementation(
+      async (
+        _admin: unknown,
+        items: Array<{
+          service_id: string;
+          unit_price: number;
+          standard_price: number | null;
+          pricing_type: string | null;
+          [k: string]: unknown;
+        }>,
+      ) =>
+        items.map((it) =>
+          it.service_id === PET_HAIR_ID
+            ? { ...it, unit_price: 100, standard_price: 125, pricing_type: 'combo' }
+            : it,
+        ),
+    );
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Express Interior Clean, Pet Hair & Dander Removal',
+        vehicle_year: 2023,
+        vehicle_make: 'Honda',
+        vehicle_model: 'Accord',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(applyCombosToQuoteItemsMock).toHaveBeenCalledTimes(1);
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items).toHaveLength(2);
+    const petHair = items.find((i: { service_id: string }) => i.service_id === PET_HAIR_ID);
+    expect(petHair).toMatchObject({
+      unit_price: 100,
+      standard_price: 125,
+      pricing_type: 'combo',
+    });
+  });
+
+  it('combo MISS — only addon, no anchor → addon stays at standalone', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(PET_HAIR);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 125,
+      salePrice: null,
+      tierName: null,
+      isOnSale: false,
+    });
+    // Combo resolver returns items unchanged (no anchor in set)
+    applyCombosToQuoteItemsMock.mockImplementation(async (_admin: unknown, items: unknown[]) => items);
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Pet Hair & Dander Removal',
+        vehicle_year: 2023,
+        vehicle_make: 'Honda',
+        vehicle_model: 'Accord',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items[0]).toMatchObject({
+      service_id: PET_HAIR_ID,
+      unit_price: 125,
+      pricing_type: 'standard',
+    });
+  });
+
+  it('combo helper is invoked with the resolved item set (admin, items[, options])', async () => {
+    resolveServiceByNameMock
+      .mockResolvedValueOnce(EXPRESS_INTERIOR)
+      .mockResolvedValueOnce(PET_HAIR);
+    resolvePriceMock
+      .mockReturnValueOnce({ price: 85, salePrice: null, tierName: 'sedan', isOnSale: false })
+      .mockReturnValueOnce({ price: 125, salePrice: null, tierName: null, isOnSale: false });
+
+    await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Express Interior Clean, Pet Hair & Dander Removal',
+        vehicle_year: 2023,
+        vehicle_make: 'Honda',
+        vehicle_model: 'Accord',
+      }),
+    );
+
+    expect(applyCombosToQuoteItemsMock).toHaveBeenCalled();
+    const passedItems = applyCombosToQuoteItemsMock.mock.calls[0][1];
+    expect(passedItems).toHaveLength(2);
+    expect(passedItems[0]).toMatchObject({ service_id: EXPRESS_INTERIOR_ID, unit_price: 85 });
+    expect(passedItems[1]).toMatchObject({ service_id: PET_HAIR_ID, unit_price: 125 });
+  });
+
+  it('exotic size_class still resolves through combo helper (no special bypass)', async () => {
+    // Boundary pin (not a behavior change): exotic vehicles still reach the
+    // combo helper. The existing exotic/classic agent escalation lives at
+    // the prompt layer (out of scope for this session). This test pins that
+    // the combo helper itself does not crash or throw on exotic size_class.
+    findOrCreateVehicleMock.mockReset();
+    findOrCreateVehicleMock.mockResolvedValue({
+      id: 'v-ferrari',
+      created: false,
+      vehicle_category: 'automobile',
+      size_class: 'exotic',
+      specialty_tier: null,
+    });
+    resolveServiceByNameMock.mockResolvedValueOnce(EXPRESS_INTERIOR);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 425,
+      salePrice: null,
+      tierName: 'exotic',
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Express Interior Clean',
+        vehicle_year: 2024,
+        vehicle_make: 'Ferrari',
+        vehicle_model: 'Roma',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(applyCombosToQuoteItemsMock).toHaveBeenCalledTimes(1);
   });
 });
