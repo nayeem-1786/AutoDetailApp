@@ -665,11 +665,19 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 
-  it('Critical rule 16 declares instructions_for_agent silent-follow handling', () => {
+  it('Critical rule 16 declares instructions_for_agent silent-follow handling (broadened Session 4 to cover success responses)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/16\.\s+\*\*Tool errors with `instructions_for_agent`/);
+    // Session 4 broadened "Tool errors" → "Tool responses" so the same rule
+    // covers both isError:true error paths AND isError:false success paths
+    // that ship a directive (e.g. send_quote_sms's was_duplicate:true case).
+    expect(out).toMatch(/16\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('Never share tool error messages');
+    // Explicit Session 4 additions — confirm both success+error wording and
+    // the was_duplicate exemplar are present so the rule covers Session 4's
+    // dedup-response path.
+    expect(out).toContain('success OR error');
+    expect(out).toContain('was_duplicate');
   });
 
   it('upsert_customer subsections appear inside Discovery and conversation flow (before Escalation guide)', () => {
@@ -713,5 +721,112 @@ describe('buildV2SystemPrompt — section ordering (post-2026-05-23 outline)', (
     const pendingIdx = out.indexOf('# Pending addon authorization');
     expect(cannotDoIdx).toBeLessThan(mechanicsIdx);
     expect(mechanicsIdx).toBeLessThan(pendingIdx);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 4 — Three prompt rule additions per D37 + Issue 33
+// mitigation + Issue 34 capture (operator-locked 2026-05-24).
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — Workstream J Session 4 (D37 invocation discipline)', () => {
+  it('declares the no-new-fields-no-call rule under upsert_customer enrichment subsection', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('You already called `upsert_customer` earlier in this conversation');
+    expect(out).toContain('200-400ms of latency');
+    expect(out).toContain('ONLY call `upsert_customer` when you are\n  persisting NEW information');
+  });
+
+  it('includes Invocation cadence guide with first/subsequent/no-fields branches', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Invocation cadence guide');
+    expect(out).toContain('**First call**');
+    expect(out).toContain('**Subsequent calls**');
+    expect(out).toContain('**No new fields = no call.**');
+  });
+
+  it('keeps the existing "When NOT to call" anchor bullets (back-compat with Session 3)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Session 3 bullets must persist — Session 4 only APPENDED, did not delete
+    expect(out).toContain('Customer is already in CUSTOMER CONTEXT');
+    expect(out).toContain("You don't have a usable first name yet");
+    expect(out).toContain('"just browsing"');
+  });
+});
+
+describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 33 combo-pricing mitigation)', () => {
+  it('includes "Combo and bundle pricing — confirm before stating" subsection inside # Add-ons and bundle quoting', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('## Combo and bundle pricing — confirm before stating');
+    const addonIdx = out.indexOf('# Add-ons and bundle quoting');
+    const comboIdx = out.indexOf('## Combo and bundle pricing — confirm before stating');
+    const discoveryIdx = out.indexOf('# Discovery and conversation flow');
+    expect(addonIdx).toBeLessThan(comboIdx);
+    expect(comboIdx).toBeLessThan(discoveryIdx);
+  });
+
+  it('declares the verification-required rule for stating combo pricing', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Do NOT state combo/bundle pricing');
+    expect(out).toContain('JUST called `get_services`');
+    expect(out).toContain('explicitly confirms the combo applies');
+  });
+
+  it('provides safe-default fallback (quote standalone + let document carry combos)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Safe default:');
+    expect(out).toContain('standalone price');
+    expect(out).toContain('Final total will be on the quote');
+  });
+});
+
+describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 34 last_name capture at quote-send)', () => {
+  it('includes "Capturing the customer\'s last name at quote-send" subsection inside Discovery and conversation flow', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain("## Capturing the customer's last name at quote-send");
+    const flowIdx = out.indexOf('# Discovery and conversation flow');
+    const lastNameIdx = out.indexOf("## Capturing the customer's last name at quote-send");
+    const escalIdx = out.indexOf('# Escalation guide');
+    expect(flowIdx).toBeLessThan(lastNameIdx);
+    expect(lastNameIdx).toBeLessThan(escalIdx);
+  });
+
+  it('positions last_name capture between Booking flow and Customer type classification', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const bookingIdx = out.indexOf('## Booking flow — quote first, scheduling second');
+    const lastNameIdx = out.indexOf("## Capturing the customer's last name at quote-send");
+    const customerTypeIdx = out.indexOf('## Customer type classification');
+    expect(bookingIdx).toBeGreaterThan(-1);
+    expect(bookingIdx).toBeLessThan(lastNameIdx);
+    expect(lastNameIdx).toBeLessThan(customerTypeIdx);
+  });
+
+  it('declares the three response paths (just-last-name, full-name, declines)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Just their last name');
+    expect(out).toContain('Their full name');
+    expect(out).toContain('First name only or declines');
+  });
+
+  it('declares the aggressive full-name parsing rule (Q1 operator answer)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Parse aggressively');
+    expect(out).toContain('"Nayeem Khan"');
+    expect(out).toContain('`last_name: "Khan"`');
+    // Existing first_name must be preserved per Policy B
+    expect(out).toContain('preserved per\n   Policy B');
+  });
+
+  it('declares non-blocking + no-re-ask rule', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('Do not block the quote on last_name capture');
+    expect(out).toContain('Do NOT re-ask');
+    expect(out).toContain("customer's choice is respected");
+  });
+
+  it('uses casual ask wording — "What name should I put on the quote?" or "Last name?"', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toContain('"What name should I put on the quote?"');
+    expect(out).toContain('"Last name?"');
   });
 });

@@ -6,6 +6,66 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(sms-ai-v2): Workstream J Session 4 — idempotency guard + 3 prompt rules (D36 + D37 + Issues 33-34 mitigation)
+
+Bundles four targeted improvements per the operator-locked Session 4 scope (docs revision commit `327f046a`). All four address observations from Workstream J Session 3's post-deploy verification (Tests 1-4, 2026-05-23/24). Tight scope: ONE endpoint change + THREE prompt rule additions. NO tool schema changes, NO new tools, NO migrations, NO architectural shifts. D37 keeps `upsert_customer`'s create+update design intact; Session 4 refines invocation patterns at the prompt layer. Branch `feat/sms-ai-v2-session-4-idempotency-and-prompt-refinement`.
+
+**D36 — `send_quote_sms` 60-second idempotency guard (Issue 31 fix):**
+- Endpoint change in `src/app/api/voice-agent/send-quote-sms/route.ts` between line ~218 (after `quoteItems` validation) and line ~220 (before `createQuote`). The guard runs AFTER customer + vehicle + service resolution so it can compare against the actual computed service_id set.
+- **Match criteria:** same `customer_id` + same `vehicle_id` (or both null) + same sorted service_id set + existing quote `status` in `('sent', 'viewed')` + `created_at >= NOW() - 60 seconds` + `deleted_at IS NULL`. Order-independent service comparison (both sides `.sort()`).
+- **On match:** returns `{ success: true, was_duplicate: true, quote_number, quote_link, instructions_for_agent }`. The `quote_link` is reconstructed from the existing quote's `access_token` via `${appUrl}/quote/${access_token}` and best-effort short-linked (falls back to full URL on `createShortLink` failure). NO new quote row is created; NO SMS is sent (the customer already received it from the original send moments earlier). A diagnostic `[SendQuoteSMS] Idempotency guard hit` log line includes the existing quote number, customer/vehicle IDs, and age in seconds.
+- **On no match:** normal flow — `createQuote` runs unchanged, response shape unchanged (no `was_duplicate` field present, NOT `was_duplicate: false`, so the LLM clearly distinguishes the two paths).
+- **Defensive failure handling:** the entire dedup block is wrapped in try/catch. A query error logs `[SendQuoteSMS] Idempotency check failed (non-blocking)` and falls through to normal create flow — a dedup-check failure NEVER blocks a legitimate quote.
+- **Vehicle-id branching:** when `vehicleId` is undefined the guard issues `.is('vehicle_id', null)` instead of `.eq('vehicle_id', null)` (PostgREST treats these differently for NULL semantics).
+- **Window choice:** 60 seconds is narrow enough to only catch LLM confabulation within a single turn-pair. Multi-day duplicate detection remains out of scope (deferred to Issue 30 / Workstream I).
+
+**D37 — `upsert_customer` invocation discipline (Issue 32 revised, Test 4 evidence):**
+- Test 4 logs showed `upsert_customer` firing 5 times in a single conversation, with most calls being no-op idempotent writes containing no new fields. The tool itself works correctly — the agent is over-eager.
+- Prompt rule added to `src/lib/sms-ai/system-prompt.ts` "Using upsert_customer to enrich customer records" subsection. APPENDS to the existing Session 3 "When NOT to call" bullets (back-compat: Session 3 bullets preserved verbatim). New fourth bullet: "You already called `upsert_customer` earlier in this conversation and have no NEW field data to add" + latency cost (200-400ms) framing + "ONLY call when persisting NEW information".
+- New "Invocation cadence guide" subsection with three branches: **First call** (when first_name first learned), **Subsequent calls** (only on additional fields — last_name, email, address, customer_type signal), **No new fields = no call** (no-op response).
+- Tool schema in `src/lib/sms-ai/tools.ts` UNCHANGED. Endpoint logic in `src/app/api/voice-agent/customers/route.ts` UNCHANGED. D35's pivot to `update_customer` rename remains superseded by D37.
+
+**Issue 33 mitigation — combo/bundle pricing confirmation (prompt-level only):**
+- Test 4 Q-0084 evidence: agent stated "$25 combo savings" that did NOT materialize in the actual quote (endpoint's `resolvePrice` doesn't apply combo logic when bundleable services co-occur). Endpoint-level fix is deferred to a separate `resolvePrice` refactor session.
+- Prompt mitigation: new `## Combo and bundle pricing — confirm before stating` subsection at the end of `# Add-ons and bundle quoting`. Rule: do NOT state combo/bundle pricing unless `get_services` was JUST called AND the returned `addon_suggestions` explicitly confirms the combo applies for the specific anchor+addon combination in this quote. Safe-default fallback: quote each service at its standalone price; let the actual quote document carry whatever combo discounts the system computes.
+- Until the endpoint is combo-aware, the prompt rule prevents the customer-facing fidelity gap from recurring.
+
+**Issue 34 capture — last_name at quote-send (prompt-level):**
+- Customer-journey-stage asymmetry locked: SMS top-of-funnel agent serves discovery (first_name + phone sufficient); POS/online-booking/admin serve committed-customer scenarios (full identity required). The `customers` table schema remains permissive (last_name nullable in DB; admin panel marks it required); UX layers enforce required-ness contextually.
+- New `## Capturing the customer's last name at quote-send` subsection, positioned between `## Booking flow` and `## Customer type classification` inside Discovery and conversation flow. Rule: when customer agrees to receive a quote AND `last_name` is not on file, ask casually ("What name should I put on the quote?" or "Last name?"). Three response paths handled:
+  - **Just last name** ("Khan") → `upsert_customer({ last_name: "Khan" })` before `send_quote_sms`.
+  - **Full name** ("Nayeem Khan") → **aggressive parsing per operator Q1**: first word matches existing first_name, rest becomes last_name. Existing first_name preserved per Policy B.
+  - **First name only or declines** ("Just send it") → proceed without; do NOT re-ask.
+- Non-blocking: never block the quote on last_name capture.
+
+**Critical rule 16 broadened (Session 3 → Session 4):**
+- Session 3 wording: "Tool errors with `instructions_for_agent` are silent guidance."
+- Session 4 wording: "Tool **responses** with `instructions_for_agent` are silent guidance. … This applies equally to error paths (`isError: true`) and success paths that include directives (e.g. `was_duplicate: true` on `send_quote_sms`)."
+- Necessary because D36's dedup response ships `instructions_for_agent` on an `isError: false` success — the original Rule 16 only covered the error case. Per operator Q2, agent acknowledges the dedup naturally as if the quote was just sent (which it was, moments ago) without mentioning the system dedup.
+
+**Tests +37 (1947 → 1984):**
+- `src/app/api/voice-agent/send-quote-sms/__tests__/route.test.ts` — admin stub extended with `quotesIdempotencyState` seed + `.in()` / `.gte()` / `.order()` chain methods + thenable that returns seeded array for `quotes` SELECTs and rejects on `shouldThrow`. New `describe('60s idempotency guard')` block with 9 tests: happy path (no recent quote → `was_duplicate` absent), idempotency HIT within 60s with same service set, MISS past 60s (empty seed simulates server-side `.gte` filter), MISS different service set, MISS partial overlap with extra item, MISS different vehicle, MISS declined/expired status filtered upstream, dedup query failure does NOT block normal flow, and response-shape pin (`instructions_for_agent` contains "do NOT inform the customer" + "acknowledge naturally" + "do not call send_quote_sms again").
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts` — Rule 16 assertion updated to expect "Tool responses" (was "Tool errors") + new pins on "success OR error" and "was_duplicate" exemplar. Three new describe blocks (+15 tests): D37 invocation discipline (no-new-fields-no-call rule, cadence guide with three branches, back-compat with Session 3 anchor bullets); Issue 33 combo-pricing mitigation (subsection placement inside Add-ons block, verification-required wording, safe-default fallback); Issue 34 last_name capture (subsection placement between Booking and Customer-type, three response paths, aggressive full-name parsing per Q1, non-blocking + no-re-ask rule, casual ask wording).
+- Final test count: 1984/1984 pass (was 1947; +37 net new).
+
+**Gates all green:** `npx tsc --noEmit` 0 errors • `npm run lint` 0 errors / 97 warnings (baseline unchanged) • `npm test` 1984/1984 • `npm run build` 789 pages clean (12.0s compile).
+
+**Files NOT touched (per session hard rules):** `src/lib/sms-ai/tools.ts` (no schema changes); `src/lib/sms-ai/tool-dispatcher.ts` (existing structured-success passthrough already routes `instructions_for_agent` to agent); `src/lib/sms-ai/customer-context.ts`; `src/lib/sms-ai/agent-runner.ts`; `src/lib/sms-ai/background-dispatch.ts`; `src/lib/sms-ai/feature-flag.ts`; `src/lib/services/service-resolver.ts` (Issue 33 endpoint fix deferred); `src/app/api/voice-agent/customers/route.ts` (upsert_customer endpoint unchanged per D37). NO schema migrations. NO new tools. NO renamed tools.
+
+**Manual verification for operator (post-deploy):**
+1. From an allowlisted SMS phone, ask for and accept a quote (e.g. "Express Wash for my Honda Accord — yes send it").
+2. Immediately, in the same conversation, repeat the quote-send trigger ("Send me the quote again" or wait for the agent's confabulation regression).
+3. Verify ONLY ONE Twilio SMS arrives.
+4. Verify PM2 logs show `[SendQuoteSMS] Idempotency guard hit: returning existing Q-XXXX … (created Ns ago) — no new quote created, no SMS sent`.
+5. Verify the database has ONE row in `quotes` for that customer+vehicle+service combination in the last minute.
+6. After 60+ seconds, retry — verify a new quote IS created (window has elapsed; legitimate re-quote flow works).
+
+**Docs:** `SMS_AI_V2_PROMPT_OBSERVATIONS.md` Section 2 — Issue 31 marked Resolved (endpoint guard), Issue 32 (revised) marked Resolved (prompt mitigation), Issue 33 mitigation portion marked Resolved (prompt-level pending endpoint refactor session), Issue 34 marked Resolved (prompt rule shipped). Section 7 — D36 + D37 unchanged (already in final form pre-implementation). `ROADMAP-13-ITEMS.md` — Workstream J Session 4 row ✅ done; ledger row #62.
+
+**Deferred to future session:** Issue 33 endpoint fix (`resolvePrice` refactor to be combo-aware when multiple bundleable services co-occur in the same quote) — to be scoped as its own session under Workstream H or a new pricing workstream.
+
+---
+
 ## 2026-05-24 — docs: revise Workstream J Session 4 scope based on Test 4 evidence (Issues 33-34 + D37 supersedes D35)
 
 Docs-only revision session. Branch `docs/2026-05-24-workstream-j-session-4-scope-revision`. NO source code touched. NO prompt changes. NO migrations. NO test changes. No fixes shipped — capture + decision revision only.
