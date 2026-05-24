@@ -754,29 +754,58 @@ describe('buildV2SystemPrompt — Workstream J Session 4 (D37 invocation discipl
   });
 });
 
-describe('buildV2SystemPrompt — Workstream J Session 4 (Issue 33 combo-pricing mitigation)', () => {
-  it('includes "Combo and bundle pricing — confirm before stating" subsection inside # Add-ons and bundle quoting', () => {
+// ---------------------------------------------------------------------------
+// Issue 33 Layer 2 (2026-05-24) — get_services size_class prompt rule
+// (REPLACES the Workstream J Session 4 combo-pricing mitigation rule, which
+// was a temporary prompt-level workaround for the Issue 33 endpoint bug.
+// Layer 1 fixes combos at the endpoint level, obsoleting the workaround.)
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)', () => {
+  it('includes the new "Passing size_class to get_services after classify_vehicle" subsection inside # Add-ons and bundle quoting', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('## Combo and bundle pricing — confirm before stating');
+    expect(out).toContain('## Passing size_class to get_services after classify_vehicle');
     const addonIdx = out.indexOf('# Add-ons and bundle quoting');
-    const comboIdx = out.indexOf('## Combo and bundle pricing — confirm before stating');
+    const sizeClassIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
     const discoveryIdx = out.indexOf('# Discovery and conversation flow');
-    expect(addonIdx).toBeLessThan(comboIdx);
-    expect(comboIdx).toBeLessThan(discoveryIdx);
+    expect(addonIdx).toBeLessThan(sizeClassIdx);
+    expect(sizeClassIdx).toBeLessThan(discoveryIdx);
   });
 
-  it('declares the verification-required rule for stating combo pricing', () => {
+  it('directs the agent to pass size_class after classify_vehicle returns', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('Do NOT state combo/bundle pricing');
-    expect(out).toContain('JUST called `get_services`');
-    expect(out).toContain('explicitly confirms the combo applies');
+    expect(out).toContain('classify_vehicle');
+    expect(out).toMatch(/pass that same `size_class` value to subsequent\n`get_services`/);
   });
 
-  it('provides safe-default fallback (quote standalone + let document carry combos)', () => {
+  it('preserves the exotic/classic escalation reminder in the size_class subsection', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('Safe default:');
-    expect(out).toContain('standalone price');
-    expect(out).toContain('Final total will be on the quote');
+    const sizeClassIdx = out.indexOf('## Passing size_class to get_services after classify_vehicle');
+    const nextSection = out.indexOf('# Discovery and conversation flow', sizeClassIdx);
+    const section = out.slice(sizeClassIdx, nextSection);
+    expect(section).toContain('exotic and classic');
+    expect(section).toContain('notify_staff');
+    expect(section).toContain('custom_quote');
+  });
+
+  it('DELETES the obsolete Session 4 combo-pricing-mitigation subsection (replaced by Layer 1 endpoint fix)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).not.toContain('## Combo and bundle pricing — confirm before stating');
+    expect(out).not.toContain('Do NOT state combo/bundle pricing');
+    expect(out).not.toContain('JUST called `get_services`');
+  });
+
+  it('preserves Rule 16 (instructions_for_agent silent-follow) — untouched by Layer 2', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/16\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toContain('success OR error');
+    expect(out).toContain('was_duplicate');
+  });
+
+  it('preserves Critical rule 3 exotic/classic escalation (untouched by Layer 2)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/3\.\s+\*\*Specialty vehicles require staff/);
+    expect(out).toContain('"exotic" or "classic"');
   });
 });
 

@@ -3,7 +3,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { resolveServicePriceWithSale } from '@/lib/services/picker-engine';
-import type { ServicePricing } from '@/lib/supabase/types';
+import { resolvePrice, type ResolvedService } from '@/lib/services/service-resolver';
+import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
+import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+
+const VEHICLE_SIZE_CLASS_SET = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 /**
  * GET /api/voice-agent/services
@@ -21,6 +25,17 @@ export async function GET(request: NextRequest) {
     if (!auth.valid) {
       return NextResponse.json({ error: auth.error }, { status: 401 });
     }
+
+    // Optional `size_class` query parameter (Issue 33 Layer 2): when
+    // provided and valid, size-aware addons (`pricing_model in
+    // ('vehicle_size', 'scope')`) get a concrete `standard_price` +
+    // `savings` instead of the legacy `null`. Invalid values are
+    // silently ignored so the response stays backward-compatible.
+    const sizeClassParam = request.nextUrl.searchParams.get('size_class');
+    const sizeClass: VehicleSizeClass | null =
+      sizeClassParam && VEHICLE_SIZE_CLASS_SET.has(sizeClassParam)
+        ? (sizeClassParam as VehicleSizeClass)
+        : null;
 
     const supabase = createAdminClient();
 
@@ -82,7 +97,15 @@ export async function GET(request: NextRequest) {
         seasonal_start,
         seasonal_end,
         addon_service:services!service_addon_suggestions_addon_service_id_fkey (
-          id, name, flat_price, pricing_model, per_unit_price, custom_starting_price
+          id, name, flat_price, pricing_model, per_unit_price, custom_starting_price,
+          sale_price, sale_starts_at, sale_ends_at,
+          service_pricing (
+            id, service_id, tier_name, tier_label, price, sale_price, display_order,
+            is_vehicle_size_aware,
+            vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price,
+            vehicle_size_exotic_price, vehicle_size_classic_price,
+            max_qty, qty_label, created_at
+          )
         )
       `)
       .eq('auto_suggest', true)
@@ -124,6 +147,10 @@ export async function GET(request: NextRequest) {
         pricing_model: string;
         per_unit_price: number | null;
         custom_starting_price: number | null;
+        sale_price: number | null;
+        sale_starts_at: string | null;
+        sale_ends_at: string | null;
+        service_pricing: ServicePricing[] | null;
       } | null;
       if (!addon) continue;
 
@@ -135,6 +162,29 @@ export async function GET(request: NextRequest) {
         standardPrice = Number(addon.per_unit_price);
       } else if (addon.pricing_model === 'custom' && addon.custom_starting_price != null) {
         standardPrice = Number(addon.custom_starting_price);
+      } else if (
+        sizeClass &&
+        (addon.pricing_model === 'vehicle_size' || addon.pricing_model === 'scope')
+      ) {
+        // Issue 33 Layer 2: size-aware addons resolve their standalone
+        // price through the canonical engine via `resolvePrice` (per
+        // CLAUDE.md Rule 22). Without `size_class` from the caller this
+        // branch is skipped — preserving the legacy `null` return so
+        // existing callers stay backward-compatible.
+        const addonAsResolved: ResolvedService = {
+          id: addon.id,
+          name: addon.name,
+          pricing_model: addon.pricing_model,
+          flat_price: addon.flat_price,
+          per_unit_price: addon.per_unit_price,
+          custom_starting_price: addon.custom_starting_price,
+          sale_price: addon.sale_price,
+          sale_starts_at: addon.sale_starts_at,
+          sale_ends_at: addon.sale_ends_at,
+          service_pricing: addon.service_pricing ?? [],
+        };
+        const resolved = resolvePrice(addonAsResolved, sizeClass);
+        standardPrice = resolved.price;
       }
 
       const comboPrice = row.combo_price != null ? Number(row.combo_price) : null;

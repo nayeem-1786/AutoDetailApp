@@ -316,9 +316,14 @@ async function callLookupCustomer(_input: Record<string, unknown>, key: string):
   );
 }
 
-async function callGetServices(_input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+async function callGetServices(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
+  // Issue 33 Layer 2: forward optional `size_class` so the endpoint can
+  // resolve standalone prices + savings for size-aware addons. The
+  // endpoint silently ignores invalid values, so we don't need to
+  // validate here.
+  const sizeClass = typeof input.size_class === 'string' ? input.size_class : undefined;
   return voiceAgentFetch(
-    `/api/voice-agent/services`,
+    `/api/voice-agent/services${qs({ size_class: sizeClass })}`,
     { method: 'GET' },
     TOOL_TIMEOUT_MS.get_services,
     key,
