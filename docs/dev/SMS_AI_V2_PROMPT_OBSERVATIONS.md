@@ -1091,6 +1091,62 @@ This asymmetry should remain. The customers table schema remains permissive (mos
 
 **Status:** Resolved 2026-05-24 via Workstream J Session 4 (this commit) — new `## Capturing the customer's last name at quote-send` subsection positioned between `## Booking flow` and `## Customer type classification` inside Discovery and conversation flow. Asks casually ("What name should I put on the quote?" / "Last name?") when last_name not on file at quote-send moment. Three response paths covered: just-last-name → `upsert_customer({last_name})`; full-name ("Nayeem Khan") → **aggressive parsing per operator Q1** (first word matches existing first_name, rest becomes last_name; first_name preserved per Policy B); declines / first-name-only → proceed without, do NOT re-ask. Non-blocking — never block the quote on last_name capture. 6 prompt tests added (subsection placement, ordering, three response paths, aggressive parsing rule, non-blocking + no-re-ask, casual ask wording). Customer-journey-stage asymmetry remains intact: SMS top-of-funnel keeps permissive nullable schema; POS/booking/admin enforce required at the UX layer.
 
+#### Issue 35 — Agent silent (noReply) when upsert_customer is sole tool call
+
+**Severity:** P1 — customer-facing UX failure
+**Observed:** 2026-05-24 (conv `aa1e198e-03c6-4caf-b1f6-c5dcd459c23f`, phone `+13107564789`, ~4:00 PM PST)
+**Channel:** SMS-AI v2 runner / LLM iteration behavior
+**Root cause class:** missing-prompt-rule + LLM-behavior-pattern
+
+**Evidence:**
+
+In a single test conversation, the agent went silent TWICE after dispatching only `upsert_customer`. PM2 logs from production testing show `chunks=0 noReply=true` on iterations where:
+
+- Customer provided info ("Nayeem 2016 Honda" / "Sure")
+- Agent dispatched `upsert_customer` as the sole tool call
+- Next iteration ended with `stop=end_turn, tool_calls=0, latency~1s`
+- ZERO text content produced for customer
+
+Customer experienced this as "the agent is broken" and sent "??" to prompt the agent. Agent then responded normally on the prompted turn.
+
+**Stuck moment #1 — after "Nayeem 2016 Honda":**
+```
+[SmsAiV2 runner] iter=1 conv=aa1e198e... stop=tool_use tool_calls=1 latency=2140ms
+[SmsAiV2 dispatch] tool=upsert_customer latency=393ms error=false
+[SmsAiV2 runner] iter=2 conv=aa1e198e... stop=end_turn tool_calls=0 latency=949ms
+[SmsAiV2 background] stopReason=end_turn iterations=2 toolCalls=1 chunks=0 noReply=true
+```
+
+Customer received NO message. Customer typed "??" 60 seconds later. Agent then responded normally ("Thanks Nayeem! What's the model and color of your 2016 Honda?").
+
+**Stuck moment #2 — after "Sure":**
+```
+[SmsAiV2 runner] iter=1 conv=aa1e198e... stop=tool_use tool_calls=1 latency=2752ms
+[SmsAiV2 dispatch] tool=upsert_customer latency=411ms error=false
+[SmsAiV2 runner] iter=2 conv=aa1e198e... stop=end_turn tool_calls=0 latency=1123ms
+[SmsAiV2 background] stopReason=end_turn iterations=2 toolCalls=1 chunks=0 noReply=true
+```
+
+Customer received NO message. Customer typed "??". Agent then responded ("What last name should I put on the quote?").
+
+**Pattern confirmed across both stuck moments:**
+
+Every iteration in the same conversation with MULTIPLE tool calls (classify_vehicle + upsert_customer, classify_vehicle + upsert_customer + get_services, upsert_customer + send_quote_sms) responded normally with `chunks >= 1`. ONLY iterations with `upsert_customer` as the SOLE tool call exhibited the silent behavior.
+
+**Hypothesis:**
+
+D37's invocation discipline trained the agent to call `upsert_customer` "when you learn new info." Combined with no explicit rule mandating customer-facing text on every turn, the LLM treats the upsert as a complete response to the customer's input. The runner's post-tool iteration prompt apparently doesn't enforce "you MUST produce text content for the customer."
+
+**Fix approach: prompt-level**
+
+Add an explicit rule near the top of the system prompt mandating that EVERY customer-initiated turn must produce customer-facing text content, regardless of how many tool calls were made. Tool calls are internal actions; they are NOT replies. The agent must always respond conversationally to acknowledge what the customer said, even when also calling `upsert_customer` (or any other tool).
+
+**Fix path (Workstream J Session 5):**
+
+See D38.
+
+**Status:** Resolved 2026-05-24 via Workstream J Session 5 (this commit) — new Critical rule 2 in system prompt mandating customer-facing reply on every turn. Rule explicitly names tool calls (`upsert_customer`, `classify_vehicle`, `get_services`, `send_quote_sms`, `notify_staff`) as internal actions that are NOT replies. Includes WRONG (silent after tool) vs RIGHT (tool + conversational reply) examples using the Issue 35 trigger scenario ("I'm Sarah with a 2020 Camry"). Coexistence with Rule 16 (`instructions_for_agent` silent guidance) verified via inline cross-reference. Coexistence with D37 (upsert_customer invocation discipline) verified — D37 governs WHEN to call, D38 governs that reply text accompanies the call. 8 prompt tests added pinning the new rule + coexistence invariants. Runner unchanged — fix is prompt-only per D38 rationale (LLM produces text reliably when prompt requires it).
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
@@ -1738,6 +1794,38 @@ upsert_customer is genuinely useful for both create-time (first name capture) an
 The agent's over-eager calling is a prompt-tuning issue, not an architectural issue. Cheaper to fix in prompt than to refactor the tool.
 
 D37 supersedes D35.
+
+**D38 — Customer-facing reply mandatory on every turn (operator-locked 2026-05-24, post Issue 35 evidence).**
+
+The SMS agent must produce customer-facing text content on EVERY customer-initiated turn. Tool calls (`upsert_customer`, `classify_vehicle`, `get_services`, `send_quote_sms`, `notify_staff`, etc.) are internal actions — they are NOT replies. The customer never sees tool dispatch; they only see text.
+
+**Failure mode observed (Issue 35):**
+
+When the LLM dispatches a single tool (especially `upsert_customer`) and ends the next iteration with no text content, the customer sees silence. They interpret it as "broken" and abandon or send clarification ("??", "hello?"). Two stuck moments in a single test conversation (conv `aa1e198e-03c6-4caf-b1f6-c5dcd459c23f`, 2026-05-24) — both triggered by `upsert_customer` being the sole tool dispatched in an iteration.
+
+**Decision:**
+
+1. Prompt rule added near the TOP of the system prompt (high priority placement, before tool-specific guidance) stating: every customer turn requires customer-facing reply text.
+2. Tool calls are internal; ALWAYS pair them with conversational reply.
+3. If the agent learns new info (e.g., name), acknowledge it conversationally AS WELL AS persisting via `upsert_customer`.
+4. The runner's behavior is NOT modified. The fix is prompt-only because the LLM is capable of always replying when instructed; the issue is that the current prompt doesn't make this requirement explicit.
+
+**Rationale for prompt-only fix (not runner-level enforcement):**
+
+- A runner-level "force re-prompt if chunks=0" would compound LLM cost and add fragility (potential infinite loops)
+- The LLM produces text reliably when the prompt requires it
+- Issue 35 is fundamentally an instruction-clarity problem, not a runner-loop problem
+
+**Rationale for high prompt placement:**
+
+This rule applies universally across all turns, including conditions where other rules might suggest "wait" or "background" behavior. Placing it near the top (with other critical foundational rules like exotic/classic escalation, Critical rule 3) ensures it takes precedence.
+
+**Coexistence with prior rules:**
+
+- **Rule 16 (`instructions_for_agent` silent guidance):** Rule 16 governs WHAT to say (don't reveal system internals). D38 governs WHETHER to say something (always yes, on customer turns). When following an `instructions_for_agent` directive (e.g., "duplicate quote — acknowledge naturally"), the agent still produces customer-facing text — just text that follows the instruction without revealing the dedup. Both rules satisfied.
+- **D37 (upsert_customer invocation discipline):** D37 says "call upsert_customer when you learn new info." D38 says "always reply conversationally on customer turns." Both can be satisfied: when the agent learns new info, call the tool AND reply conversationally.
+
+**Implementation:** Workstream J Session 5 (2026-05-24, this commit).
 
 ### Coverage targets
 

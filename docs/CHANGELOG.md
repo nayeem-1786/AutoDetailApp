@@ -6,6 +6,110 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(sms-ai-v2): Issue 35 + D38 — mandatory customer-facing reply on every turn (Workstream J Session 5)
+
+Branch `feat/issue-35-mandatory-customer-reply`. Targeted hotfix for the SMS agent
+going silent after dispatching `upsert_customer` as a sole tool call. Two stuck
+moments observed in production testing 2026-05-24 (conv
+`aa1e198e-03c6-4caf-b1f6-c5dcd459c23f`); customer received zero text content,
+typed "??" to wake the agent. Pattern: every iteration in the conversation with
+multiple tool calls responded normally; only iterations with `upsert_customer`
+as the SOLE tool dispatched produced `chunks=0 noReply=true`.
+
+**Docs:**
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` Section 2 — Issue 35 captured
+  (P1 — customer-facing UX failure) with both stuck-moment PM2 log excerpts.
+  Status set to Resolved via this session.
+- Section 7 — D38 locked: every customer-initiated turn requires
+  customer-facing text reply, regardless of tool calls. Tool calls are
+  internal actions, not replies. Rationale captured for the prompt-only
+  fix (no runner-loop enforcement: cost + fragility risk; LLM produces
+  text reliably when prompted). Coexistence with Rule 17
+  (`instructions_for_agent`) and D37 (upsert_customer invocation
+  discipline) documented.
+
+**System prompt** — `src/lib/sms-ai/system-prompt.ts`:
+- New Critical rule 2: **Every customer turn requires a customer-facing
+  reply**. Inserted at high-priority placement directly after Rule 1
+  ("Never guess prices") and before the exotic/classic escalation
+  (now Rule 4). Explicitly names tool calls (`upsert_customer`,
+  `classify_vehicle`, `get_services`, `send_quote_sms`, `notify_staff`)
+  as internal actions that are NOT replies. Includes both ❌ WRONG
+  (silent after tool) and ✅ RIGHT (tool + conversational reply)
+  examples using the Issue 35 trigger scenario ("I'm Sarah with a 2020
+  Camry"). Closes with "Silence is never the right answer to a customer
+  message."
+- Rules 2-16 renumbered to 3-17 in source order. Cross-references
+  inside the prompt body ("see Critical rule 15" → "see Critical rule
+  16") updated to match.
+- Inline coexistence cross-reference: D38 explicitly states that
+  following an `instructions_for_agent` directive (per Rule 17) IS
+  the customer-facing reply — both rules satisfied.
+
+**Rule numbering changes (D38 inserts at position 2):**
+
+| Old # | New # | Title |
+|---|---|---|
+| — | 2 | Every customer turn requires a customer-facing reply (NEW) |
+| 2 | 3 | One primary service per quote |
+| 3 | 4 | Specialty vehicles require staff |
+| 4 | 5 | Classify before quoting |
+| ... | ... | (all subsequent rules +1) |
+| 16 | 17 | Tool responses with `instructions_for_agent` (Rule 16 wording unchanged) |
+
+**Tests** — `src/lib/sms-ai/__tests__/system-prompt.test.ts`:
+- Counted-rule test updated 16 → 17.
+- Existing rule-number-pinned tests updated: Rule 14 → 15
+  (tool-grounded add-ons), Rule 15 → 16 (quote first / never book),
+  Rule 16 → 17 (instructions_for_agent). Substantive wording assertions
+  unchanged.
+- Layer 2 "preserves Rule 16 / preserves Critical rule 3" tests
+  updated to Rule 17 / Rule 4 with explanatory comments.
+- NEW describe block "Workstream J Session 5 — D38 / Issue 35" with
+  **10 tests**: rule headline pinned, high-priority placement inside
+  Critical rules section, explicitly names `upsert_customer`,
+  classifies tool calls as INTERNAL ACTIONS, includes WRONG/RIGHT
+  example labels, "Silence is never the right answer" pinned,
+  coexistence cross-reference to Rule 17, Rule 17 substance preserved,
+  D37 invocation discipline intact, Critical rule 4 (exotic/classic)
+  language intact at all 3 prompt sites.
+
+**Hard rules respected:**
+- NO changes to `agent-runner.ts` (D38 is prompt-only).
+- NO changes to `tool-dispatcher.ts`, `tools.ts`, `customer-context.ts`,
+  `feature-flag.ts`, `background-dispatch.ts`.
+- NO changes to `combo-resolver.ts` or any quote-creation route.
+- NO new tools. NO new fields. NO new migrations.
+- Rule 16 (now Rule 17 — `instructions_for_agent`) wording UNCHANGED
+  in substance.
+- D37 invocation discipline UNCHANGED.
+- Exotic/classic escalation language UNCHANGED at all 3 sites
+  (Critical rule 4, Vehicle size mapping, size_class subsection).
+- Runner does NOT receive a noReply-retry loop (D38 explicitly rejects
+  this approach).
+
+**Gates green:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → 2075/2075 pass (was 2065 — +10 net new)
+- `npm run build` → 789 pages clean
+
+**Verification scenario for operator (post-deploy):**
+
+From an allowlisted phone, start a fresh conversation with a name +
+vehicle in one message ("Hi, I'm Sarah with a 2020 Camry"). Expect the
+agent's first reply to:
+1. Dispatch `upsert_customer` with first_name=Sarah (per D37 invocation
+   discipline)
+2. ALSO produce customer-facing text content acknowledging Sarah and
+   continuing the discovery flow (per D38)
+3. The `chunks=0 noReply=true` log line should NOT appear for this
+   iteration.
+
+**Deploy required:** YES via `deploy-smartdetails` post-merge.
+
+---
+
 ## 2026-05-24 — feat(combo-pricing): Issue 33 Layer 1 — combo-resolver helper + 5 quote-creation path adoptions
 
 Branch `feat/issue-33-combo-resolver-helper`. Layer 1 of the Issue 33 root-cause
