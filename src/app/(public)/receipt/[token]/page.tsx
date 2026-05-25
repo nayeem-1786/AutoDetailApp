@@ -14,6 +14,10 @@ import {
   RECEIPT_VOCAB,
 } from '@/lib/data/receipt-composer';
 import { toCents } from '@/lib/utils/refund-math';
+import {
+  getLineItemPricingInfo,
+  sumLineItemSavings,
+} from '@/lib/quotes/line-item-pricing';
 
 // Phase 1A: replicate the renderer-side first-with-remainder derivation so
 // the JSX payment loop can construct labels via the composer helper without
@@ -218,6 +222,13 @@ export default async function PublicReceiptPage({ params }: PageProps) {
               {tx.items.map((item) => {
                 const itemRefund = refundedMap.get(item.id);
                 const isFullyRefunded = itemRefund && itemRefund.qty >= item.quantity;
+                const pricingInfo = getLineItemPricingInfo({
+                  unit_price: item.unit_price,
+                  standard_price: item.standard_price ?? null,
+                  pricing_type:
+                    (item.pricing_type as 'standard' | 'sale' | 'combo' | null) ?? null,
+                  quantity: item.quantity,
+                });
                 return (
                   <tr key={item.id} className="border-b border-site-border">
                     <td className="px-6 py-4">
@@ -227,9 +238,9 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                           <span className="text-site-text-muted font-normal"> — {item.tier_name}</span>
                         )}
                       </div>
-                      {item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price && (
+                      {pricingInfo.hasDiscount && (
                         <div className="text-xs text-green-500 mt-0.5">
-                          {item.pricing_type === 'combo' ? 'Combo' : 'Sale'}: Reg {formatCurrency(item.standard_price)} | Saved {formatCurrency(item.standard_price - item.unit_price)}!
+                          {pricingInfo.label}: Reg {formatCurrency(pricingInfo.standardPrice as number)} | Saved {formatCurrency(pricingInfo.savingsPerUnit)}!
                         </div>
                       )}
                       {item.prerequisite_note && (
@@ -299,6 +310,28 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                 </span>
               </div>
             )}
+            {/* Issue 33 follow-up UX (operator Q3): roll-up footer of
+                combo/sale savings across the receipt. Hidden when zero. */}
+            {(() => {
+              const totalSavings = sumLineItemSavings(
+                tx.items.map((item) => ({
+                  unit_price: item.unit_price,
+                  standard_price: item.standard_price ?? null,
+                  pricing_type:
+                    (item.pricing_type as 'standard' | 'sale' | 'combo' | null) ??
+                    null,
+                  quantity: item.quantity,
+                })),
+              );
+              return totalSavings > 0 ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-500">Total saved today</span>
+                  <span className="font-medium text-green-500">
+                    -{formatCurrency(totalSavings)}
+                  </span>
+                </div>
+              ) : null;
+            })()}
             {/* Phase 1A LOCKED-5: deposit chrome retired. Deposit-paid lines
                 (both is_deposit and deposit_credit branches), "Total Charged"
                 relabel, "Est. Balance Due at Service" amber row, and the

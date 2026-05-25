@@ -14,6 +14,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft, Car, Mail, MessageSquare, User, Calendar, DollarSign, Award, Clock, ExternalLink, Eye } from 'lucide-react';
 import Link from 'next/link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import {
+  getLineItemPricingInfo,
+  sumLineItemSavings,
+} from '@/lib/quotes/line-item-pricing';
 import { usePermission } from '@/lib/hooks/use-permission';
 import {
   deriveCommPillState,
@@ -378,26 +382,59 @@ export default function QuoteDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {(quote.items || []).map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100">
-                    <td className="py-3">
-                      <div className="font-medium text-gray-900">{item.item_name}</div>
-                      {item.tier_name && (
-                        <div className="text-xs text-gray-500">{item.tier_name}</div>
-                      )}
-                      {item.notes && (
-                        <div className="text-xs text-gray-400">{item.notes}</div>
-                      )}
-                    </td>
-                    <td className="py-3 text-center text-gray-600">{item.quantity}</td>
-                    <td className="py-3 text-right text-gray-600">
-                      {formatCurrency(item.unit_price)}
-                    </td>
-                    <td className="py-3 text-right font-medium text-gray-900">
-                      {formatCurrency(item.total_price)}
-                    </td>
-                  </tr>
-                ))}
+                {(quote.items || []).map((item) => {
+                  // Issue 33 follow-up UX: full strikethrough viz on admin
+                  // detail (operator Q2 — match customer-facing surface).
+                  const pricingInfo = getLineItemPricingInfo({
+                    unit_price: item.unit_price,
+                    standard_price: item.standard_price ?? null,
+                    pricing_type:
+                      (item.pricing_type as
+                        | 'standard'
+                        | 'sale'
+                        | 'combo'
+                        | null) ?? null,
+                    quantity: item.quantity,
+                  });
+                  return (
+                    <tr key={item.id} className="border-b border-gray-100">
+                      <td className="py-3">
+                        <div className="font-medium text-gray-900">{item.item_name}</div>
+                        {item.tier_name && (
+                          <div className="text-xs text-gray-500">{item.tier_name}</div>
+                        )}
+                        {pricingInfo.hasDiscount && (
+                          <div className="text-xs text-green-600 mt-0.5">
+                            {pricingInfo.label}: Reg{' '}
+                            {formatCurrency(pricingInfo.standardPrice as number)} | Saved{' '}
+                            {formatCurrency(pricingInfo.savingsPerUnit)}!
+                          </div>
+                        )}
+                        {item.notes && (
+                          <div className="text-xs text-gray-400">{item.notes}</div>
+                        )}
+                      </td>
+                      <td className="py-3 text-center text-gray-600">{item.quantity}</td>
+                      <td className="py-3 text-right">
+                        {pricingInfo.hasDiscount ? (
+                          <div>
+                            <span className="text-gray-400 line-through text-xs">
+                              {formatCurrency(pricingInfo.standardPrice as number)}
+                            </span>
+                            <div className="font-semibold text-green-600">
+                              {formatCurrency(item.unit_price)}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-600">{formatCurrency(item.unit_price)}</span>
+                        )}
+                      </td>
+                      <td className="py-3 text-right font-medium text-gray-900">
+                        {formatCurrency(item.total_price)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -411,6 +448,31 @@ export default function QuoteDetailPage() {
               <span className="text-gray-600">Tax</span>
               <span className="font-medium">{formatCurrency(quote.tax_amount)}</span>
             </div>
+            {(() => {
+              // Issue 33 follow-up UX (operator Q1): "You saved" row above
+              // Total. Hidden when zero so unmodified quotes look identical.
+              const totalSavings = sumLineItemSavings(
+                (quote.items || []).map((i) => ({
+                  unit_price: i.unit_price,
+                  standard_price: i.standard_price ?? null,
+                  pricing_type:
+                    (i.pricing_type as
+                      | 'standard'
+                      | 'sale'
+                      | 'combo'
+                      | null) ?? null,
+                  quantity: i.quantity,
+                })),
+              );
+              return totalSavings > 0 ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-green-600">You saved</span>
+                  <span className="font-medium text-green-600">
+                    -{formatCurrency(totalSavings)}
+                  </span>
+                </div>
+              ) : null;
+            })()}
             <div className="flex justify-between border-t border-gray-200 pt-2 text-base">
               <span className="font-semibold">Total</span>
               <span className="font-bold">{formatCurrency(quote.total_amount)}</span>

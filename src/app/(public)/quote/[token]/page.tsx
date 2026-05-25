@@ -8,6 +8,10 @@ import { AcceptQuoteButton } from './accept-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
+import {
+  getLineItemPricingInfo,
+  sumLineItemSavings,
+} from '@/lib/quotes/line-item-pricing';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -236,13 +240,23 @@ export default async function PublicQuotePage({ params }: PageProps) {
                   displayItem.is_mobile_fee
                     ? null
                     : ((quote.items as QuoteItem[] | undefined)?.[idx] ?? null);
-                const isSaleItem =
-                  !!original &&
-                  original.pricing_type === 'sale' &&
-                  original.standard_price != null &&
-                  original.standard_price > original.unit_price;
-                const savings =
-                  isSaleItem && original ? original.standard_price! - original.unit_price : 0;
+                // Issue 33 follow-up UX: shared formatter handles combo + sale
+                // uniformly. The defective predicate that filtered on 'sale' only
+                // (silently dropping combo) is replaced here.
+                const pricingInfo = original
+                  ? getLineItemPricingInfo({
+                      unit_price: original.unit_price,
+                      standard_price: original.standard_price ?? null,
+                      pricing_type:
+                        (original.pricing_type as
+                          | 'standard'
+                          | 'sale'
+                          | 'combo'
+                          | null) ?? null,
+                      quantity: original.quantity,
+                    })
+                  : null;
+                const hasDiscount = pricingInfo?.hasDiscount ?? false;
                 const rowKey = original?.id ?? `mobile-fee-${idx}`;
 
                 return (
@@ -258,10 +272,10 @@ export default async function PublicQuotePage({ params }: PageProps) {
                     </td>
                     <td className="px-4 py-4 text-center text-site-text-muted">{displayItem.quantity}</td>
                     <td className="px-4 py-4 text-right">
-                      {isSaleItem && original ? (
+                      {hasDiscount && pricingInfo ? (
                         <div>
                           <span className="text-site-text-muted line-through text-xs">
-                            {formatCurrency(original.standard_price!)}
+                            {formatCurrency(pricingInfo.standardPrice as number)}
                           </span>
                           <div className="font-semibold text-green-500">
                             {formatCurrency(displayItem.unit_price)}
@@ -273,9 +287,9 @@ export default async function PublicQuotePage({ params }: PageProps) {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="font-medium text-site-text">{formatCurrency(displayItem.total_price)}</div>
-                      {isSaleItem && (
+                      {hasDiscount && pricingInfo && (
                         <div className="text-xs text-green-500">
-                          Save {formatCurrency(savings)}
+                          Save {formatCurrency(pricingInfo.totalSavings)}
                         </div>
                       )}
                     </td>
@@ -302,15 +316,24 @@ export default async function PublicQuotePage({ params }: PageProps) {
               </div>
             )}
             {(() => {
-              const totalSavings = (quote.items || []).reduce((sum, item) => {
-                if (item.pricing_type === 'sale' && item.standard_price != null && item.standard_price > item.unit_price) {
-                  return sum + (item.standard_price - item.unit_price) * item.quantity;
-                }
-                return sum;
-              }, 0);
+              // Issue 33 follow-up UX (operator Q1): "You saved" wording,
+              // shared formatter generalizes the predicate to include combo.
+              const totalSavings = sumLineItemSavings(
+                (quote.items || []).map((item) => ({
+                  unit_price: item.unit_price,
+                  standard_price: item.standard_price ?? null,
+                  pricing_type:
+                    (item.pricing_type as
+                      | 'standard'
+                      | 'sale'
+                      | 'combo'
+                      | null) ?? null,
+                  quantity: item.quantity,
+                })),
+              );
               return totalSavings > 0 ? (
                 <div className="flex justify-between text-sm">
-                  <span className="text-green-500">Sale Savings</span>
+                  <span className="text-green-500">You saved</span>
                   <span className="font-medium text-green-500">
                     -{formatCurrency(totalSavings)}
                   </span>

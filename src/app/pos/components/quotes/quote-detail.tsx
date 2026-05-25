@@ -21,6 +21,10 @@ import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehic
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 import {
+  getLineItemPricingInfo,
+  sumLineItemSavings,
+} from '@/lib/quotes/line-item-pricing';
+import {
   deriveCommPillState,
   type CommPillTone,
 } from '@/lib/quotes/derive-comm-pill';
@@ -101,6 +105,10 @@ interface QuoteData {
     notes: string | null;
     service_id: string | null;
     product_id: string | null;
+    // Issue 33 follow-up UX: surface combo/sale fields so the line-row
+    // strikethrough viz and "You saved" totals row can render.
+    standard_price: number | null;
+    pricing_type: 'standard' | 'sale' | 'combo' | null;
   }[];
 }
 
@@ -523,6 +531,17 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                 const rowKey = item.is_mobile_fee
                   ? `mobile-fee-${idx}`
                   : (sourceItem?.id ?? `item-${idx}`);
+                // Issue 33 follow-up UX: full strikethrough viz to match the
+                // customer-facing quote page (operator preparing the quote
+                // should see exactly what the customer sees).
+                const pricingInfo = sourceItem
+                  ? getLineItemPricingInfo({
+                      unit_price: sourceItem.unit_price,
+                      standard_price: sourceItem.standard_price ?? null,
+                      pricing_type: sourceItem.pricing_type ?? null,
+                      quantity: sourceItem.quantity,
+                    })
+                  : null;
                 return (
                   <div key={rowKey} className="flex items-center justify-between px-4 py-3">
                     <div className="min-w-0 flex-1">
@@ -530,15 +549,33 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                       {item.tier_name && (
                         <p className="text-xs text-gray-500 dark:text-gray-400">{item.tier_name}</p>
                       )}
+                      {pricingInfo?.hasDiscount && (
+                        <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                          {pricingInfo.label}: Reg{' '}
+                          {formatCurrency(pricingInfo.standardPrice as number)} | Saved{' '}
+                          {formatCurrency(pricingInfo.savingsPerUnit)}!
+                        </p>
+                      )}
                       {sourceItem?.notes && (
                         <p className="text-xs text-gray-400 dark:text-gray-500 italic">{sourceItem.notes}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                       <span className="text-gray-500 dark:text-gray-400">x{item.quantity}</span>
-                      <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                        {formatCurrency(item.total_price)}
-                      </span>
+                      {pricingInfo?.hasDiscount ? (
+                        <div className="text-right">
+                          <div className="text-[10px] text-gray-400 dark:text-gray-500 line-through">
+                            {formatCurrency(pricingInfo.standardPrice as number)}
+                          </div>
+                          <div className="font-medium tabular-nums text-green-600 dark:text-green-400">
+                            {formatCurrency(item.total_price)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                          {formatCurrency(item.total_price)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -557,6 +594,24 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                   <span className="tabular-nums">{formatCurrency(quote.tax_amount)}</span>
                 </div>
               )}
+              {(() => {
+                // Issue 33 follow-up UX (operator Q1): "You saved" row above
+                // any modifier rows + Total. Hidden when zero.
+                const totalSavings = sumLineItemSavings(
+                  (quote.items || []).map((i) => ({
+                    unit_price: i.unit_price,
+                    standard_price: i.standard_price ?? null,
+                    pricing_type: i.pricing_type ?? null,
+                    quantity: i.quantity,
+                  })),
+                );
+                return totalSavings > 0 ? (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                    <span>You saved</span>
+                    <span className="tabular-nums">-{formatCurrency(totalSavings)}</span>
+                  </div>
+                ) : null;
+              })()}
               {/* Item 15g Layer 15g-v: coupon / loyalty / manual modifier
                   rows between Tax and Total. Conditional per modifier;
                   green styling matches operator UI <QuoteTotals> intent

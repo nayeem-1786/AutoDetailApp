@@ -7,6 +7,7 @@ import { generateReceiptHtml } from '@/app/pos/lib/receipt-template';
 import { LOYALTY } from '@/lib/utils/constants';
 import { fetchReceiptData } from '@/lib/data/receipt-data';
 import { formatReceiptDateTime } from '@/lib/utils/format';
+import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,10 +46,16 @@ export async function POST(request: NextRequest) {
         let line = i.quantity > 1
           ? `${i.item_name}\n  ${i.quantity} x $${i.unit_price.toFixed(2)} each${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`
           : `${i.item_name}${i.tax_amount > 0 ? '  TX' : ''}  $${i.total_price.toFixed(2)}`;
-        if (i.pricing_type && i.pricing_type !== 'standard' && i.standard_price != null && i.standard_price > i.unit_price) {
-          const savings = i.standard_price - i.unit_price;
-          const label = i.pricing_type === 'combo' ? 'Combo' : 'Sale';
-          line += `\n  ${label}: Reg $${i.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!`;
+        // Sale/combo savings sub-text — shared formatter (Issue 33 follow-up UX).
+        const pricingInfo = getLineItemPricingInfo({
+          unit_price: i.unit_price,
+          standard_price: i.standard_price ?? null,
+          pricing_type:
+            (i.pricing_type as 'standard' | 'sale' | 'combo' | null) ?? null,
+          quantity: i.quantity,
+        });
+        if (pricingInfo.hasDiscount) {
+          line += `\n  ${pricingInfo.label}: Reg $${(pricingInfo.standardPrice as number).toFixed(2)} | Saved $${pricingInfo.savingsPerUnit.toFixed(2)}!`;
         }
         return line;
       })

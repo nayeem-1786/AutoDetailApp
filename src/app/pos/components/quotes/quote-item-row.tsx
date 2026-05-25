@@ -224,11 +224,25 @@ export function QuoteItemRow({ item, onRemoveItem }: QuoteItemRowProps) {
             </>
           )}
 
-          {/* Price */}
+          {/* Price — Issue 33 follow-up UX: compact strikethrough when
+              a combo or sale discount applies (operator Q2 — compact
+              treatment in row-density components). */}
           <div className="w-16 text-right">
-            <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              ${item.totalPrice.toFixed(2)}
-            </p>
+            {item.pricingType !== 'standard' &&
+            item.standardPrice > item.unitPrice ? (
+              <>
+                <p className="text-[10px] tabular-nums text-gray-400 dark:text-gray-500 line-through">
+                  ${(item.standardPrice * item.quantity).toFixed(2)}
+                </p>
+                <p className="text-sm font-medium tabular-nums text-green-600 dark:text-green-400">
+                  ${item.totalPrice.toFixed(2)}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                ${item.totalPrice.toFixed(2)}
+              </p>
+            )}
             {item.taxAmount > 0 && (
               <p className="text-xs tabular-nums text-gray-400 dark:text-gray-500">
                 +${item.taxAmount.toFixed(2)}
