@@ -6,6 +6,80 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-25 — feat(voice-agent): Issue 38 D43 — wire `tiers` + `quantities` through send-quote-sms route + idempotency triple (Session C)
+
+Branch `feat/issue-38-route-integration`. Session C — the final session of
+the three-part Issue 38 fix (A = `resolvePrice` resolver seam `options.tierName`;
+B = `send_quote_sms` tool schema `tiers`/`quantities` + Critical Rule 7;
+**C = route handler that consumes both — this session**). With A + B + C all on
+main, the agent's verbalized tier + quantity now reach the persisted quote, so
+the price the customer hears matches the quote link (closes the Q-0084 $250-told /
+$450-charged gap).
+
+**Scope:** `src/app/api/voice-agent/send-quote-sms/route.ts` + its test only.
+No `src/lib/services/**` (Session A), no `src/lib/sms-ai/**` (Session B), no
+other voice-agent endpoints, no migrations, no new files.
+
+**What changed (`route.ts`):**
+
+- **Request parsing** — destructures the two optional CSV params `tiers` +
+  `quantities`. Both split to positional token arrays padded to
+  `serviceNames.length` (empty tier token = auto-pick; empty/missing quantity
+  token = 1). Quantities validated up front: each must be a canonical positive
+  integer — zero, negatives, non-integers (`"two"`), and non-canonical forms
+  (`"01"`, `"2.0"`) hard-reject with `400 + instructions_for_agent +
+  do_not_share_with_customer: true` (no silent clamp, per operator decision).
+- **Per-service loop** — now indexed. When a tier token is present the route
+  opts into Session A's fail-loud overload `resolvePrice(service, sizeClass,
+  { tierName })`; a `null` return (typo / hallucinated / deleted tier) →
+  `400 'Tier not found'` with the service's available `tier_name`s listed in
+  `instructions_for_agent` for conversational recovery. When no tier token is
+  present the legacy 2-arg `resolvePrice(service, sizeClass)` runs unchanged
+  (never null). After resolution, if `quantity > 1` AND the resolved tier
+  carries a `max_qty` (e.g. `per_row` `max_qty=3`), exceeding it →
+  `400 'Quantity exceeds maximum'` citing the max + `qty_label`. The
+  `quote_item` is built with the real `quantity` (was hardcoded `1`) and the
+  resolved `unit_price`; `total_price = quantity × unit_price` is computed
+  downstream in `createQuote` (Pattern X — one row per (service, tier) with
+  `quantity` reflecting the count). flat/per_unit/custom resolve with a null
+  tierName, so their quantity passes through honored with no `max_qty` gate.
+- **D36 idempotency guard extended** — the 60-second dedup previously compared
+  the sorted set of `service_id`s; it now compares the sorted
+  `(service_id, tier_name, quantity)` TRIPLE per item via the new module-level
+  `buildItemTripleKey` helper. Two quotes for the same services at different
+  tiers/quantities are legitimately distinct and no longer collapse into one
+  dedup hit. The dedup SELECT widened from `quote_items ( service_id )` to
+  `quote_items ( service_id, tier_name, quantity )`. Backward compatible: a
+  legacy null `tier_name` collapses to `''` and a missing `quantity` to `1`,
+  matching the pre-D43 row shape so legacy "no tiers/quantities" re-sends still
+  dedup. Failure-mode try/catch and the `was_duplicate` 200 response are
+  unchanged.
+
+**Tests +14 net new** (`__tests__/route.test.ts`, new `Issue 38 D43 — tier +
+quantity handling` describe block): 6 happy (per_row × 2 = $250; complete × 1 =
+$450; Motorcycle touring_bagger over default standard_cruiser; two-service
+mixed auto-pick + per_row; quantities-omitted defaults to 1; tiers-omitted
+auto-picks via 2-arg call), 5 error (unknown tier → 400 + available-tiers list;
+qty > max_qty → 400 citing max + qty_label; non-integer / negative / zero
+quantity → 400 `Invalid quantity`), 2 idempotency (same triple → HIT
+`was_duplicate`; same service different tier → MISS, new quote), 1 boundary
+(flat service + quantity=2 honored, no max_qty gate). Two pre-existing D36 HIT
+seeds updated to carry `tier_name`/`quantity` (reflecting the widened SELECT;
+the real DB always stored these). `resolvePrice` stays mocked — its own
+behavior is pinned by Session A's resolver tests.
+
+**Gates green:** `npx tsc --noEmit` 0 errors; `npm run lint` 0 errors / 97
+warnings (baseline unchanged); targeted route suite 35/35; `npm test`
+**2290/2290** (was 2276; +14 net new); `npm run build` clean (789 pages).
+
+**Deploy:** YES via `deploy-smartdetails` — but only as the A+B+C set, which is
+now complete on main. **Manual verification (operator):** reproduce Q-0084 —
+SMS "2018 Suburban, seat cleaning" → agent enumerates the 4 Hot Shampoo
+Extraction tiers → "2 rows" → agent verbalizes "Per Row × 2 = $250" → "send it"
+→ quote link MUST render **$250** (not $450); `SELECT tier_name, quantity,
+unit_price, total_price FROM quote_items WHERE quote_id = <new>` shows
+`('per_row', 2, 125, 250)`.
+
 ## 2026-05-25 — feat(sms-ai): Issue 38 D43 — `send_quote_sms` tool schema gains `tiers` + `quantities` + Critical Rule 7 (Session B)
 
 Branch `feat/issue-38-tool-schema-and-prompt`. Session B of the parallel
