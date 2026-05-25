@@ -6,6 +6,108 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-25 — feat(services): Issue 38 D43 — add `options.tierName` to resolvePrice (Session A)
+
+Branch `feat/issue-38-resolver-tier-option`. Session A of the parallel
+implementation plan that closes Issue 38 (Session A = resolver-side
+seam; Session B = tool schema + system-prompt; Session C = `send-quote-
+sms` route handler that consumes both).
+
+**Scope:** resolver-side seam ONLY. No tool-schema, prompt, or route
+changes — those land in parallel/follow-up sessions.
+
+**What changed:**
+
+- `ResolvePriceOptions` gains `tierName?: string | null` with extensive
+  semantics doc. Supplied + match → tier honored; supplied + NO match
+  → returns `null` (fail-loud); empty string / null / undefined →
+  legacy precedence preserved byte-identically.
+- New `resolvePrice` TS overload set:
+  - **(1)** no options arg → `ResolvedPrice` (existing call shape).
+  - **(2)** options without `tierName` (or with null/undefined) →
+    `ResolvedPrice` (covers existing `{specialtyTier:…}` callers).
+  - **(3)** options with `tierName: string` → `ResolvedPrice | null`
+    (opt-in fail-loud path).
+- Implementation: a single `tierIntent` narrowing at the top of the
+  function body collapses empty-string / null / undefined to "no
+  intent", so every non-opt-in caller follows the legacy precedence
+  unchanged. Only when `tierIntent` is a non-empty string does the
+  new branch fire.
+- `scope` / `vehicle_size`: lookup by `tier_name === tierIntent`,
+  then engine-dispatch with `sized`. If tier missing OR `tiers.length
+  === 0` → return null.
+- `specialty`: lookup by `tier_name === tierIntent`, then
+  engine-dispatch with `null` (specialty rows aren't size-aware). If
+  tier missing → return null WITHOUT consulting `specialtyTier`
+  (explicit caller intent dominates inferred vehicle metadata).
+- `flat` / `per_unit` / `custom` / default branches IGNORE
+  `tierIntent` (no tiers to select against; documented inline).
+
+**Why TS overloads:** the 3 existing call sites destructure the
+return value directly (`const { price, … } = resolvePrice(…)`). A
+union return of `ResolvedPrice | null` would break that destructure
+type-narrowing. Overload 1 / 2 preserve the non-nullable return for
+callers that don't opt in; overload 3 widens only for callers that
+explicitly request the new behavior.
+
+**3 existing call sites UNCHANGED** (Issue 38 audit Target 4 listed
+them): `src/app/api/voice-agent/send-quote-sms/route.ts:201`,
+`src/app/api/webhooks/twilio/inbound/route.ts:807`,
+`src/lib/services/voice-post-call.ts:519`. All match overload 1 →
+`ResolvedPrice`. Zero TS regression, zero behavior regression.
+
+**Test contract pinned (+18 cases):** new
+`Issue 38 D43 — options.tierName` describe block in
+`src/lib/services/__tests__/service-resolver.test.ts`.
+- **scope ×6** — `per_row` overrides the `complete` size-aware
+  precedence; `complete` still resolves to size-aware $450 for
+  suv_3row_van; unknown tier → null; undefined / null / empty-string
+  tierName → legacy precedence (sizeAwareTier wins for Hot Shampoo
+  Extraction).
+- **vehicle_size ×3** — matching tier honored; `tierName` wins over
+  `sizeClass` when they disagree (operator/agent override path);
+  unknown tier → null.
+- **specialty ×5** — `touring_bagger` override of `tiers[0]` default;
+  `tierName` wins when both set; `tierName` not-found → null even
+  when `specialtyTier` is set; undefined → existing `specialtyTier`
+  path preserved; empty-string tierName collapses, specialtyTier
+  honored.
+- **ignored branches ×3** — flat / per_unit / custom each pass
+  `tierName:"anything"` and verify it's silently dropped.
+- **edge ×1** — scope + tierName + zero tiers → null (fail-loud above
+  the misconfigured-service flat_price fallback).
+
+Fixtures mirror the live DB shape:
+- Hot Shampoo Extraction (`scope`, 4 tiers, `complete` size-aware at
+  $300/$325/$375/$450/$350/$350) — the empirical Q-0084 case.
+- Complete Motorcycle Detail (`specialty`, 2 tiers — the latent
+  Issue 38 case).
+- Express Exterior Wash (`vehicle_size`, 5 row-pattern tiers).
+
+`mockTier` / `mockService` helpers reused from existing test file.
+
+**Verification:**
+- `npx tsc --noEmit` 0 errors.
+- `npm run lint` 0 errors / 97 warnings (unchanged baseline).
+- `npx vitest run src/lib/services/__tests__/service-resolver.test.ts`
+  59/59 (was 41 pre-D43; +18 net new).
+- `npm test` (full suite) **2256/2256** (was 2238 pre-D43).
+
+**Deploy: NO** — Session A alone has no observable production
+behavior change (no caller opts in yet). Operator merges A + B + C
+together when all three pass review.
+
+**Next sessions (parallel-then-merge):**
+- **Session B** — add `tiers` + `quantities` to `send_quote_sms` tool
+  schema + system-prompt guidance (Critical Rule N parallel to
+  Rule 6).
+- **Session C** — `send-quote-sms` route handler parses parallel
+  CSVs, passes per-item `tierName` into `resolvePrice`, validates
+  `quantity ≤ max_qty`, surfaces 400 + `instructions_for_agent`
+  when resolver returns null.
+
+---
+
 ## 2026-05-24 — fix(services): Issue 37 D42 — prefix-match fallback in resolveServiceByName
 
 Branch `feat/issue-37-resolver-prefix-fallback`. Surfaced immediately
