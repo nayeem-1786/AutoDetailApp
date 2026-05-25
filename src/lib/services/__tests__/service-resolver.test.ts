@@ -423,6 +423,270 @@ describe('resolvePrice — size class edge cases', () => {
 });
 
 // ───────────────────────────────────────────────────────────────
+// D43 (2026-05-25) — Issue 38: `options.tierName` opt-in honors the
+// agent-verbalized tier intent. Pre-D43 the size-aware-first precedence
+// silently overrode the agent's choice for Hot Shampoo Extraction
+// (always quoted `complete`, $450) and the `tiers[0]` default for
+// Complete Motorcycle Detail (always quoted `standard_cruiser`).
+// D43 adds an explicit `options.tierName` seam; supplied + match wins,
+// supplied + no match returns null (fail loud — caller surfaces the
+// error to the LLM via `instructions_for_agent`).
+// ───────────────────────────────────────────────────────────────
+
+describe('resolvePrice — Issue 38 D43: options.tierName', () => {
+  // Canonical fixture: Hot Shampoo Extraction (`scope`, 4 tiers, only
+  // `complete` is size-aware). Mirrors the live DB shape that drove
+  // Q-0084's $200 fidelity gap.
+  const hotShampooExtraction = (): ResolvedService =>
+    mockService({
+      id: 'svc-hot-shampoo',
+      name: 'Hot Shampoo Extraction',
+      pricing_model: 'scope',
+      service_pricing: [
+        mockTier({
+          tier_name: 'floor_mats',
+          tier_label: 'Floor Mats Only',
+          price: 75,
+          display_order: 0,
+        }),
+        mockTier({
+          tier_name: 'per_row',
+          tier_label: 'Per Seat Row',
+          price: 125,
+          display_order: 1,
+          max_qty: 3,
+          qty_label: 'row',
+        }),
+        mockTier({
+          tier_name: 'carpet_mats',
+          tier_label: 'Carpet & Mats Package',
+          price: 175,
+          display_order: 2,
+        }),
+        mockTier({
+          tier_name: 'complete',
+          tier_label: 'Complete Interior',
+          is_vehicle_size_aware: true,
+          price: 300,
+          vehicle_size_sedan_price: 325,
+          vehicle_size_truck_suv_price: 375,
+          vehicle_size_suv_van_price: 450,
+          vehicle_size_exotic_price: 350,
+          vehicle_size_classic_price: 350,
+          display_order: 3,
+        }),
+      ],
+    });
+
+  // Canonical fixture: Complete Motorcycle Detail (`specialty`, 2 tiers,
+  // neither size-aware). Pre-D43 always returned tiers[0] (`standard_cruiser`)
+  // because no caller supplied `specialtyTier` from the SMS-AI path.
+  const motorcycleDetail = (): ResolvedService =>
+    mockService({
+      id: 'svc-motorcycle',
+      name: 'Complete Motorcycle Detail',
+      pricing_model: 'specialty',
+      service_pricing: [
+        mockTier({ tier_name: 'standard_cruiser', tier_label: 'Standard/Cruiser', price: 275, display_order: 0 }),
+        mockTier({ tier_name: 'touring_bagger', tier_label: 'Touring/Bagger', price: 350, display_order: 1 }),
+      ],
+    });
+
+  // Canonical fixture: row-pattern vehicle_size (one tier per size_class).
+  // Mirrors the 8 active `vehicle_size` services in the live catalog.
+  const expressWash = (): ResolvedService =>
+    mockService({
+      id: 'svc-express-wash',
+      name: 'Express Exterior Wash',
+      pricing_model: 'vehicle_size',
+      service_pricing: [
+        mockTier({ tier_name: 'sedan', price: 75 }),
+        mockTier({ tier_name: 'truck_suv_2row', price: 90 }),
+        mockTier({ tier_name: 'suv_3row_van', price: 110 }),
+        mockTier({ tier_name: 'exotic', price: 150 }),
+        mockTier({ tier_name: 'classic', price: 175 }),
+      ],
+    });
+
+  // ── scope branch ──────────────────────────────────────────────
+
+  it('scope + tierName=per_row → returns the per_row tier, overriding sizeAwareTier precedence', () => {
+    // The Issue 38 empirical case. Pre-D43 the suv_3row_van Suburban
+    // would have resolved to `complete` ($450); D43 honors `per_row`.
+    const r = resolvePrice(hotShampooExtraction(), 'suv_3row_van', { tierName: 'per_row' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(125);
+    expect(r!.tierName).toBe('per_row');
+    expect(r!.isOnSale).toBe(false);
+  });
+
+  it('scope + tierName=complete → returns complete with size-aware suv_3row_van price ($450)', () => {
+    const r = resolvePrice(hotShampooExtraction(), 'suv_3row_van', { tierName: 'complete' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(450);
+    expect(r!.tierName).toBe('complete');
+  });
+
+  it('scope + tierName="unknown_tier" → returns null', () => {
+    const r = resolvePrice(hotShampooExtraction(), 'suv_3row_van', { tierName: 'unknown_tier' });
+    expect(r).toBeNull();
+  });
+
+  it('scope + tierName=undefined → byte-identical to current behavior (sizeAwareTier wins)', () => {
+    // Pin the legacy precedence: for Hot Shampoo Extraction at
+    // suv_3row_van, sizeAwareTier=`complete` wins → $450.
+    const r = resolvePrice(hotShampooExtraction(), 'suv_3row_van');
+    expect(r.price).toBe(450);
+    expect(r.tierName).toBe('complete');
+  });
+
+  it('scope + tierName=null → byte-identical to undefined (sizeAwareTier wins)', () => {
+    const r = resolvePrice(hotShampooExtraction(), 'suv_3row_van', { tierName: null });
+    expect(r.price).toBe(450);
+    expect(r.tierName).toBe('complete');
+  });
+
+  it('scope + tierName="" (empty string) → byte-identical to undefined (sizeAwareTier wins)', () => {
+    // Empty string from a CSV parser (e.g., "Hot Shampoo,," → ['', ''])
+    // is treated as no-intent at runtime, NOT as a literal lookup.
+    // Mirrors the expected Session C CSV-parsing contract. The type
+    // system can't distinguish `''` from a non-empty string at the
+    // overload boundary, so the return type is widened to
+    // `ResolvedPrice | null` — but runtime is guaranteed non-null
+    // here (the implementation collapses empty string to "no intent").
+    const r = resolvePrice(hotShampooExtraction(), 'suv_3row_van', { tierName: '' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(450);
+    expect(r!.tierName).toBe('complete');
+  });
+
+  // ── vehicle_size branch ──────────────────────────────────────
+
+  it('vehicle_size + tierName=truck_suv_2row → returns truck_suv_2row tier (pins contract, no behavior change)', () => {
+    const r = resolvePrice(expressWash(), 'truck_suv_2row', { tierName: 'truck_suv_2row' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(90);
+    expect(r!.tierName).toBe('truck_suv_2row');
+  });
+
+  it('vehicle_size + tierName mismatching the sizeClass → tier_name wins (e.g., quote sedan price for a truck)', () => {
+    // tierName is authoritative. Operator/agent override: pass sedan
+    // tier_name even though the vehicle is suv_3row_van — D43 honors
+    // the intent without trying to second-guess.
+    const r = resolvePrice(expressWash(), 'suv_3row_van', { tierName: 'sedan' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(75);
+    expect(r!.tierName).toBe('sedan');
+  });
+
+  it('vehicle_size + tierName="unknown" → returns null', () => {
+    const r = resolvePrice(expressWash(), 'truck_suv_2row', { tierName: 'unknown' });
+    expect(r).toBeNull();
+  });
+
+  // ── specialty branch ─────────────────────────────────────────
+
+  it('specialty + tierName=touring_bagger → returns touring_bagger ($350), overriding tiers[0] default', () => {
+    const r = resolvePrice(motorcycleDetail(), null, { tierName: 'touring_bagger' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(350);
+    expect(r!.tierName).toBe('touring_bagger');
+  });
+
+  it('specialty + tierName AND specialtyTier both supplied, tierName found → tierName wins', () => {
+    // Operator/agent intent (tierName) dominates inferred vehicle
+    // metadata (specialtyTier). When tierName is found, specialtyTier
+    // is ignored.
+    const r = resolvePrice(motorcycleDetail(), null, {
+      tierName: 'touring_bagger',
+      specialtyTier: 'standard_cruiser',
+    });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(350);
+    expect(r!.tierName).toBe('touring_bagger');
+  });
+
+  it('specialty + tierName supplied + NOT found + specialtyTier also supplied → returns null (no fallback)', () => {
+    // Fail-loud semantic. When the agent explicitly asked for a tier
+    // and it doesn't exist, we do NOT silently fall back to the
+    // vehicle's specialtyTier — that would hide the bug.
+    const r = resolvePrice(motorcycleDetail(), null, {
+      tierName: 'sport_bike',
+      specialtyTier: 'standard_cruiser',
+    });
+    expect(r).toBeNull();
+  });
+
+  it('specialty + tierName=undefined + specialtyTier=standard_cruiser → existing behavior preserved', () => {
+    const r = resolvePrice(motorcycleDetail(), null, { specialtyTier: 'standard_cruiser' });
+    expect(r.price).toBe(275);
+    expect(r.tierName).toBe('standard_cruiser');
+  });
+
+  it('specialty + tierName="" (empty string) + specialtyTier=touring_bagger → empty tierName collapses, specialtyTier honored', () => {
+    // Empty-string tierName collapses to "no intent" at runtime; the
+    // specialtyTier path then resolves normally. Type widens via the
+    // string-tierName overload — assert non-null before accessing.
+    const r = resolvePrice(motorcycleDetail(), null, {
+      tierName: '',
+      specialtyTier: 'touring_bagger',
+    });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(350);
+    expect(r!.tierName).toBe('touring_bagger');
+  });
+
+  // ── ignored branches ─────────────────────────────────────────
+
+  it('flat + tierName="anything" → tierName ignored, returns flat_price', () => {
+    const svc = mockService({ pricing_model: 'flat', flat_price: 199 });
+    const r = resolvePrice(svc, 'sedan', { tierName: 'anything' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(199);
+    expect(r!.tierName).toBeNull();
+  });
+
+  it('per_unit + tierName="anything" → tierName ignored, returns per_unit_price', () => {
+    const svc = mockService({
+      pricing_model: 'per_unit',
+      per_unit_price: 150,
+      service_pricing: [],
+    });
+    const r = resolvePrice(svc, 'sedan', { tierName: 'anything' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(150);
+    expect(r!.tierName).toBeNull();
+  });
+
+  it('custom + tierName="anything" → tierName ignored, returns custom_starting_price', () => {
+    const svc = mockService({
+      pricing_model: 'custom',
+      custom_starting_price: 475,
+      service_pricing: [],
+    });
+    const r = resolvePrice(svc, 'sedan', { tierName: 'anything' });
+    expect(r).not.toBeNull();
+    expect(r!.price).toBe(475);
+    expect(r!.tierName).toBeNull();
+  });
+
+  // ── edge: scope with tier intent but ZERO tiers configured ───
+
+  it('scope + tierName supplied + zero tiers configured → returns null (does not silently fall back to flat_price)', () => {
+    // Position guard: the tierIntent check fires ABOVE the
+    // misconfigured-service fallback in the implementation. A
+    // misconfigured service + explicit intent should still fail loud.
+    const svc = mockService({
+      pricing_model: 'scope',
+      flat_price: 99,
+      service_pricing: [],
+    });
+    const r = resolvePrice(svc, 'sedan', { tierName: 'per_row' });
+    expect(r).toBeNull();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────
 // D42 (2026-05-24) — Issue 37: prefix-match fallback. The voice
 // agent verbalizes "Hot Shampoo Extraction Complete" to the customer
 // (service name + tier label) and then passes the same string to

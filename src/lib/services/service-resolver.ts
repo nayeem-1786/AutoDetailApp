@@ -168,6 +168,39 @@ export interface ResolvePriceOptions {
    * default for sized automobiles).
    */
   specialtyTier?: string | null;
+
+  /**
+   * Issue 38 D43 (2026-05-25) — agent-verbalized tier intent.
+   *
+   * When supplied as a non-empty string AND the service has a tier whose
+   * `tier_name` matches, this overrides the default selection precedence
+   * for `scope` / `vehicle_size` / `specialty` branches.
+   *
+   * Semantics:
+   * - Supplied + match found → that tier is used; canonical engine still
+   *   dispatches per-size when the matched tier is `is_vehicle_size_aware`.
+   * - Supplied + NO match (typo, hallucination, deleted tier) → function
+   *   returns `null`. Caller surfaces the error (e.g., 400 +
+   *   `instructions_for_agent` so the LLM recovers conversationally).
+   *   Intentional fail-loud — never silently fall back to the default
+   *   precedence when the caller asked for a specific tier.
+   * - Empty string / null / undefined → existing precedence is preserved
+   *   byte-identically (no behavior change for any caller that doesn't
+   *   opt in).
+   *
+   * For `specialty`, when both `tierName` and `specialtyTier` are
+   * supplied, `tierName` wins. If `tierName` is supplied but does NOT
+   * match, the function returns null without consulting `specialtyTier`
+   * — explicit caller intent dominates inferred vehicle metadata.
+   *
+   * Ignored for `flat` / `per_unit` / `custom` and the default
+   * fallthrough branch — those have no tier to select against.
+   *
+   * Use case: SMS-AI v2 `send_quote_sms` (D44 / Session C) passes the
+   * tier the agent verbalized to the customer (e.g., `per_row`) so the
+   * persisted quote item matches what the customer was told.
+   */
+  tierName?: string | null;
 }
 
 /**
@@ -247,12 +280,45 @@ function syntheticPricing(
  * - `custom` — synthesizes a ServicePricing row from
  *   `service.custom_starting_price` (no sale logic — custom is operator-
  *   assessed). Fix: pre-Layer-3d returned $0.
+ *
+ * Issue 38 D43 (2026-05-25) — `options.tierName` opt-in:
+ * When the caller supplies a non-empty `options.tierName`, the function
+ * returns `null` if no tier on this service matches the requested name.
+ * This is opt-in: callers that omit `options.tierName` (or pass it as
+ * null / undefined / empty string) get the existing precedence and the
+ * existing non-nullable return type via overload 1 / 2. Only the
+ * explicit-tier-intent overload (3) widens the return type to
+ * `ResolvedPrice | null`. See `ResolvePriceOptions.tierName` for full
+ * semantics and the rationale for fail-loud-on-no-match.
  */
+// Overload 1 — no options arg. Existing call shape; never returns null.
+export function resolvePrice(
+  service: ResolvedService,
+  sizeClass: string | null | undefined,
+): ResolvedPrice;
+// Overload 2 — options supplied without `tierName` (or with an explicit
+// null/undefined `tierName`). Covers existing callers that pass only
+// `{ specialtyTier: ... }`; never returns null.
+export function resolvePrice(
+  service: ResolvedService,
+  sizeClass: string | null | undefined,
+  options: Omit<ResolvePriceOptions, 'tierName'> & { tierName?: null | undefined },
+): ResolvedPrice;
+// Overload 3 — `options.tierName` supplied as a non-null string. May
+// return null if no tier matches (caller surfaces the error). Picked
+// only when the call site narrows `tierName` to `string` — if a caller
+// has a `string | null | undefined` value, they should branch on it
+// before calling so the resolved type matches their intent.
+export function resolvePrice(
+  service: ResolvedService,
+  sizeClass: string | null | undefined,
+  options: ResolvePriceOptions & { tierName: string },
+): ResolvedPrice | null;
 export function resolvePrice(
   service: ResolvedService,
   sizeClass: string | null | undefined,
   options: ResolvePriceOptions = {}
-): ResolvedPrice {
+): ResolvedPrice | null {
   const tiers = service.service_pricing || [];
   const saleWindow = {
     sale_starts_at: service.sale_starts_at,
@@ -260,8 +326,18 @@ export function resolvePrice(
   };
   const sized = coerceSizeClass(sizeClass);
 
+  // Issue 38 D43: normalize the explicit tier intent. Empty string,
+  // null, and undefined collapse to `null` (= no intent), so every
+  // caller that doesn't opt in follows the legacy precedence below
+  // unchanged.
+  const tierIntent =
+    typeof options.tierName === 'string' && options.tierName.length > 0
+      ? options.tierName
+      : null;
+
   switch (service.pricing_model) {
     case 'flat': {
+      // tierIntent IGNORED: flat services have no tiers to select against.
       const pricing = syntheticPricing(
         service,
         'flat',
@@ -279,6 +355,23 @@ export function resolvePrice(
 
     case 'vehicle_size':
     case 'scope': {
+      // Issue 38 D43: explicit tier intent fails loud when the named
+      // tier doesn't exist on this service (typo, hallucination, deleted
+      // tier). Position: ABOVE the misconfigured-service fallback so a
+      // tierIntent + zero-tier shape correctly returns null rather than
+      // silently returning flat_price.
+      if (tierIntent) {
+        const tier = tiers.find((t) => t.tier_name === tierIntent);
+        if (!tier) return null;
+        const r = resolveServicePriceWithSale(tier, sized, saleWindow);
+        return {
+          price: r.standardPrice,
+          salePrice: r.isOnSale ? r.effectivePrice : null,
+          tierName: tier.tier_name,
+          isOnSale: r.isOnSale,
+        };
+      }
+
       if (tiers.length === 0) {
         // Misconfigured vehicle_size/scope service — fall back to flat price.
         // Matches pre-Layer-3d behavior (which silently returned flat_price).
@@ -308,6 +401,8 @@ export function resolvePrice(
     }
 
     case 'per_unit': {
+      // tierIntent IGNORED: per_unit services carry no service_pricing
+      // rows; price comes from `service.per_unit_price`.
       const pricing = syntheticPricing(
         service,
         'per_unit',
@@ -324,6 +419,23 @@ export function resolvePrice(
     }
 
     case 'specialty': {
+      // Issue 38 D43: explicit tier intent dominates the inferred
+      // `specialtyTier`. When both are supplied and tierIntent matches a
+      // tier, tierIntent wins. When tierIntent is supplied but does NOT
+      // match, return null — do NOT silently fall back to specialtyTier.
+      // Explicit caller intent dominates inferred vehicle metadata.
+      if (tierIntent) {
+        const tier = tiers.find((t) => t.tier_name === tierIntent);
+        if (!tier) return null;
+        const r = resolveServicePriceWithSale(tier, null, saleWindow);
+        return {
+          price: r.standardPrice,
+          salePrice: r.isOnSale ? r.effectivePrice : null,
+          tierName: tier.tier_name,
+          isOnSale: r.isOnSale,
+        };
+      }
+
       if (tiers.length === 0) {
         return {
           price: service.flat_price ?? 0,
@@ -349,9 +461,10 @@ export function resolvePrice(
     }
 
     case 'custom': {
-      // Custom services are operator-assessed — `custom_starting_price` is
-      // a reference value. No sale logic applies (caller can override at
-      // quote-item time if needed).
+      // tierIntent IGNORED: custom services are operator-assessed and
+      // carry no tiers. `custom_starting_price` is a reference value.
+      // No sale logic applies (caller can override at quote-item time
+      // if needed).
       return {
         price: service.custom_starting_price ?? 0,
         salePrice: null,
@@ -361,7 +474,9 @@ export function resolvePrice(
     }
 
     default: {
-      // Unknown pricing_model — match pre-Layer-3d fallthrough conservatively.
+      // Unknown pricing_model — match pre-Layer-3d fallthrough
+      // conservatively. tierIntent IGNORED: we don't know how to
+      // interpret tier identity for an unknown model.
       if (tiers.length > 0) {
         const r = resolveServicePriceWithSale(tiers[0], sized, saleWindow);
         return {
