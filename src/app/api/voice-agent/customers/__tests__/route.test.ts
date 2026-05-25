@@ -588,3 +588,152 @@ describe('POST /api/voice-agent/customers — response shape', () => {
     expect(body.updated_fields).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 35 root-cause fix (2026-05-24) — success responses carry
+// `instructions_for_agent`. Three context-aware branches: was_created=true,
+// existing+updated_fields, and no-op. The directive nudges the LLM into
+// producing a customer-facing reply on the next iteration, closing the
+// chunks=0 noReply=true pathway. Mirrors the proven D36 was_duplicate
+// pattern from send-quote-sms. Rule 17 in the system prompt governs
+// silent-follow handling.
+// ---------------------------------------------------------------------------
+
+describe('POST /api/voice-agent/customers — Issue 35 instructions_for_agent on success', () => {
+  it('was_created=true → instructions mention record created + ask for missing details', async () => {
+    customerState.existing = null;
+    const res = await POST(
+      buildRequest({ first_name: 'Sarah', phone: '+14245551234' }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_created).toBe(true);
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.instructions_for_agent).toMatch(/customer record created/i);
+    expect(body.instructions_for_agent).toMatch(
+      /acknowledges what they just shared/i,
+    );
+    expect(body.instructions_for_agent).toMatch(/Do NOT mention this internal action/);
+  });
+
+  it('was_created=false + updated_fields non-empty → instructions list the updated fields', async () => {
+    customerState.existing = { ...FRESH_CUSTOMER_ROW, email: null };
+    const res = await POST(
+      buildRequest({
+        first_name: 'Nayeem',
+        email: 'nayeem@example.com',
+        phone: '+14245551234',
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_created).toBe(false);
+    expect(body.updated_fields).toContain('email');
+    expect(body.instructions_for_agent).toMatch(/customer record updated/i);
+    expect(body.instructions_for_agent).toMatch(/email/);
+    expect(body.instructions_for_agent).toMatch(/Do NOT mention this internal action/);
+  });
+
+  it('was_created=false + updated_fields empty → instructions reflect the no-op branch', async () => {
+    customerState.existing = { ...FRESH_CUSTOMER_ROW };
+    const res = await POST(
+      buildRequest({ first_name: 'Nayeem', phone: '+14245551234' }),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_created).toBe(false);
+    expect(body.updated_fields).toEqual([]);
+    expect(body.instructions_for_agent).toMatch(/No new customer data to persist/i);
+    expect(body.instructions_for_agent).toMatch(
+      /Continue the conversation naturally/i,
+    );
+    expect(body.instructions_for_agent).toMatch(/Do NOT mention this internal action/);
+  });
+
+  it('instructions_for_agent is ALWAYS present on success responses (all branches)', async () => {
+    // Branch 1 — CREATE
+    customerState.existing = null;
+    let res = await POST(
+      buildRequest({ first_name: 'Sarah', phone: '+14245551234' }),
+    );
+    let body = await res.json();
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.instructions_for_agent.length).toBeGreaterThan(0);
+
+    // Branch 2 — UPDATE with new field
+    customerState.existing = { ...FRESH_CUSTOMER_ROW, email: null };
+    res = await POST(
+      buildRequest({
+        first_name: 'Nayeem',
+        email: 'new@example.com',
+        phone: '+14245551234',
+      }),
+    );
+    body = await res.json();
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.instructions_for_agent.length).toBeGreaterThan(0);
+
+    // Branch 3 — UPDATE no-op
+    customerState.existing = { ...FRESH_CUSTOMER_ROW };
+    res = await POST(
+      buildRequest({ first_name: 'Nayeem', phone: '+14245551234' }),
+    );
+    body = await res.json();
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.instructions_for_agent.length).toBeGreaterThan(0);
+  });
+
+  it('error responses (validation 400, INSERT failure 500) carry instructions_for_agent — unchanged by Issue 35', async () => {
+    // 400 — missing first_name. Pre-Issue-35 contract: error responses
+    // already carried instructions_for_agent. Verify Issue 35 did not
+    // remove or alter this.
+    let res = await POST(buildRequest({ phone: '+14245551234' }));
+    expect(res.status).toBe(400);
+    let body = await res.json();
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.do_not_share_with_customer).toBe(true);
+
+    // 500 — INSERT failure. Same — error path preserves do_not_share_with_customer.
+    customerState.insertResult = null;
+    customerState.insertError = { message: 'duplicate phone' };
+    res = await POST(
+      buildRequest({ first_name: 'Nayeem', phone: '+14245551234' }),
+    );
+    expect(res.status).toBe(500);
+    body = await res.json();
+    expect(typeof body.instructions_for_agent).toBe('string');
+    expect(body.do_not_share_with_customer).toBe(true);
+  });
+
+  it('success response preserves all pre-Issue-35 fields (success, customer_id, was_created, updated_fields, conversation_linked)', async () => {
+    customerState.existing = null;
+    conversationState.updatedRows = [{ id: 'conv-1' }];
+    const res = await POST(
+      buildRequest({
+        first_name: 'Sarah',
+        phone: '+14245551234',
+        conversation_id: 'conv-1',
+      }),
+    );
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      customer_id: 'customer-new-id',
+      was_created: true,
+      conversation_linked: true,
+    });
+    expect(Array.isArray(body.updated_fields)).toBe(true);
+    // Issue 35 added one new field — verify it doesn't break the shape
+    expect(typeof body.instructions_for_agent).toBe('string');
+  });
+
+  it('instructions text in non-error branches does NOT include "do_not_share_with_customer" (that field is error-only)', async () => {
+    customerState.existing = null;
+    const res = await POST(
+      buildRequest({ first_name: 'Sarah', phone: '+14245551234' }),
+    );
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    expect(body.do_not_share_with_customer).toBeUndefined();
+  });
+});

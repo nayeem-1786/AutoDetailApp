@@ -68,6 +68,17 @@ const MAX_TOKENS = 1024;
 const ITERATION_CAP_NUDGE =
   'Tool budget exhausted. Provide a final response to the customer using only what you already know.';
 
+/**
+ * Issue 35 backstop nudge — pushed when an iter ends with stop_reason=
+ * end_turn but produces empty text content AFTER at least one tool was
+ * dispatched (iter > 1). The model gets one more chance with `tools`
+ * omitted; the tool-layer signal (upsert_customer's
+ * instructions_for_agent) is the primary fix, this is the safety net.
+ * See docs/dev/ISSUE_35_RUNNER_DIAGNOSTIC.md.
+ */
+const NO_REPLY_NUDGE =
+  '(System: the previous turn ended without a customer-facing reply. Produce a customer-facing message now that acknowledges what the customer just shared and continues the conversation naturally. Do not mention this nudge or any internal system actions.)';
+
 export interface RunAgentInput {
   inboundMessageBody: string;
   conversationId: string;
@@ -332,6 +343,53 @@ export async function runSmsAiV2Agent(
 
       if (response.stop_reason === 'end_turn') {
         const finalText = extractText(response.content);
+
+        // Issue 35 backstop: when iter ends with end_turn + empty text
+        // AFTER at least one tool dispatch (iter > 1), retry once with
+        // a user nudge and tools omitted. The primary fix is the tool-
+        // layer instructions_for_agent signal (e.g. upsert_customer's
+        // success directive); this catches the long tail when the
+        // model ignores the directive. Single retry only — never loops.
+        if (finalText.trim().length === 0 && iter > 1) {
+          console.log(
+            `[SmsAiV2 runner] noReply detected conv=${conversationId} iterations=${iter} retrying with nudge`,
+          );
+
+          // Push the model's (empty) end_turn turn to maintain the
+          // alternating user/assistant message contract, then push the
+          // nudge as a user turn. The retry call omits `tools` so the
+          // model is forced to produce text (or end_turn again).
+          messages.push({ role: 'assistant', content: response.content });
+          messages.push({ role: 'user', content: NO_REPLY_NUDGE });
+
+          const retryStart = Date.now();
+          const retryResponse: Message = await client.messages.create({
+            model: MODELS.SONNET,
+            max_tokens: MAX_TOKENS,
+            system: systemBlocks,
+            messages,
+          });
+          const retryLatency = Date.now() - retryStart;
+          const retryText = extractText(retryResponse.content);
+
+          console.log(
+            `[SmsAiV2 runner] noReply retry conv=${conversationId} stop=${retryResponse.stop_reason} chunks=${retryText.trim().length > 0 ? 1 : 0} latency=${retryLatency}ms`,
+          );
+          console.log(
+            `[SmsAiV2 runner] done conv=${conversationId} iterations=${iter} stop=end_turn tool_calls_total=${toolCalls.length} noReply_retried=true`,
+          );
+
+          return {
+            // If retry produced text, use it. If retry STILL produced
+            // empty, fall back to the original (empty) finalText —
+            // the dispatcher's noReply=true log path handles it.
+            assistantText: retryText.length > 0 ? retryText : finalText,
+            iterations: iter,
+            stopReason: 'end_turn',
+            toolCalls,
+          };
+        }
+
         console.log(
           `[SmsAiV2 runner] done conv=${conversationId} iterations=${iter} stop=end_turn tool_calls_total=${toolCalls.length}`,
         );

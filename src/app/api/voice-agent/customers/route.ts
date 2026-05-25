@@ -167,6 +167,40 @@ function isEmptyString(value: string | null | undefined): boolean {
   return value === null || value === undefined || value.trim() === '';
 }
 
+/**
+ * Issue 35 root-cause fix: builds the `instructions_for_agent` directive
+ * for upsert_customer's success branches. The directive nudges the LLM
+ * to produce a customer-facing reply on the next iteration, closing
+ * the empty-content pathway documented in
+ * `docs/dev/ISSUE_35_RUNNER_DIAGNOSTIC.md`.
+ *
+ * Three branches:
+ * 1. New customer record created (`wasCreated=true`)
+ * 2. Existing customer updated with new field(s) (`updatedFields` non-empty)
+ * 3. No-op (record already had all the data)
+ *
+ * The directive is silent-follow per Rule 17 — the LLM follows it
+ * conversationally without revealing the underlying tool action.
+ */
+function buildUpsertSuccessInstructions(
+  wasCreated: boolean,
+  updatedFields: string[],
+): string {
+  if (wasCreated) {
+    return (
+      'Customer record created. Now produce a customer-facing reply that acknowledges what they just shared (their name and any other info) and continues the conversation naturally — ask for any missing details needed for a quote, or move to the next discovery step. Do NOT mention this internal action or that a record was created.'
+    );
+  }
+  if (updatedFields.length > 0) {
+    return (
+      `Customer record updated with new field(s): ${updatedFields.join(', ')}. Now produce a customer-facing reply that acknowledges what they just shared and continues the conversation naturally. Do NOT mention this internal action or that fields were updated.`
+    );
+  }
+  return (
+    'No new customer data to persist. Continue the conversation naturally based on the most recent customer message. Do NOT mention this internal action.'
+  );
+}
+
 interface UpsertCustomerBody {
   // Required
   first_name?: unknown;
@@ -420,12 +454,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Issue 35 root-cause fix: success responses carry instructions_for_agent
+    // so the LLM has explicit guidance to produce a customer-facing reply
+    // on the next iteration. Without this, the model interprets the
+    // data-only success body as "the response" and ends the turn with
+    // empty content (PM2 logs: chunks=0 noReply=true). Mirrors the proven
+    // D36 was_duplicate:true pattern from send-quote-sms. Rule 17 in the
+    // system prompt governs silent-follow handling of this field.
+    const instructionsForAgent = buildUpsertSuccessInstructions(
+      wasCreated,
+      updatedFields,
+    );
+
     const responseData = {
       success: true as const,
       customer_id: customerId,
       was_created: wasCreated,
       updated_fields: updatedFields,
       conversation_linked: conversationLinked,
+      instructions_for_agent: instructionsForAgent,
     };
     perf.done(responseData);
     return NextResponse.json(responseData);

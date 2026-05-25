@@ -1145,7 +1145,16 @@ Add an explicit rule near the top of the system prompt mandating that EVERY cust
 
 See D38.
 
-**Status:** Resolved 2026-05-24 via Workstream J Session 5 (this commit) — new Critical rule 2 in system prompt mandating customer-facing reply on every turn. Rule explicitly names tool calls (`upsert_customer`, `classify_vehicle`, `get_services`, `send_quote_sms`, `notify_staff`) as internal actions that are NOT replies. Includes WRONG (silent after tool) vs RIGHT (tool + conversational reply) examples using the Issue 35 trigger scenario ("I'm Sarah with a 2020 Camry"). Coexistence with Rule 16 (`instructions_for_agent` silent guidance) verified via inline cross-reference. Coexistence with D37 (upsert_customer invocation discipline) verified — D37 governs WHEN to call, D38 governs that reply text accompanies the call. 8 prompt tests added pinning the new rule + coexistence invariants. Runner unchanged — fix is prompt-only per D38 rationale (LLM produces text reliably when prompt requires it).
+**Status (revised 2026-05-24 — D38 prompt rule alone INSUFFICIENT empirically):** Workstream J Session 5 shipped D38 (Critical rule 2 — "Every customer turn requires a customer-facing reply") + 8 prompt tests. Post-deploy live test from `+13107564789` immediately reproduced the silent-agent pattern despite the new rule — the LLM's mid-turn "should I respond?" decision is influenced more strongly by tool_result content shape than by high-level rules. Read-only diagnostic (`docs/dev/ISSUE_35_RUNNER_DIAGNOSTIC.md`, branch `audit/issue-35-runner-behavior`, commit `80c5f53a`) identified the structural cause: `upsert_customer`'s data-only success body pulls the model into `end_turn` with empty content.
+
+**Resolved 2026-05-24 (root cause + backstop)** via session #68 (branch `feat/issue-35-runner-noreply-fix`). Three-layer defense now in place:
+1. **D38 prompt rule** (Critical rule 2) — defense in depth, retained.
+2. **Tool-layer signal (Approach C, root cause):** `upsert_customer` success response now carries `instructions_for_agent` with three context-aware branches (was_created=true / field update / no-op). Reuses the proven D36 `was_duplicate:true` pattern; Rule 17 governs silent-follow handling. Endpoint helper `buildUpsertSuccessInstructions(wasCreated, updatedFields)` at `src/app/api/voice-agent/customers/route.ts`.
+3. **Runner-layer backstop (Approach A):** `agent-runner.ts` detects empty `end_turn` after at least one tool dispatch and retries ONCE with `NO_REPLY_NUDGE` user turn + `tools` omitted. Single retry only — never loops. Mirrors the `ITERATION_CAP_NUDGE` precedent verbatim.
+
+Tests: +15 net (7 endpoint covering all three success branches + error preservation + shape pin; 8 runner covering trigger conditions, single-retry invariant, tools-omitted, log shape). Combined working tree: 2090/2090 pass.
+
+Coexistence preserved: Rule 17 (`instructions_for_agent` silent guidance) UNCHANGED in wording. D37 (upsert_customer invocation discipline) UNCHANGED. D38 prompt rule UNCHANGED. Exotic/classic escalation language UNCHANGED at all sites.
 
 ---
 
