@@ -6,6 +6,159 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(sms-ai-v2): Issue 35 root-cause fix — upsert_customer instructions_for_agent + runner noReply retry
+
+Branch `feat/issue-35-runner-noreply-fix`. Hot-on-the-heels follow-up to Session 5's
+D38 prompt rule (commit `851c5d8d`) — live production test from
+`+13107564789` immediately reproduced the failure pattern despite the new
+prompt rule: agent dispatched `upsert_customer` as sole tool call, iter=2
+ended `stop=end_turn tool_calls=0 chunks=0 noReply=true`, customer
+received silence and typed "Hello?" to wake the agent. D38 prompt rule
+alone proved insufficient — the model's "should I respond?" decision
+happens AFTER receiving the tool_result content, where a data-only
+success body pulls the model into ending the turn with empty content.
+
+Read-only diagnostic (commit `80c5f53a`, `docs/dev/ISSUE_35_RUNNER_DIAGNOSTIC.md`)
+identified the structural cause and recommended a two-layer fix:
+- **Approach C (root cause):** make `upsert_customer`'s success
+  response carry `instructions_for_agent`. Reuses the proven D36
+  `was_duplicate:true` pattern that already produces reliable
+  customer-facing replies.
+- **Approach A (backstop):** runner-level noReply retry. Single
+  retry with text-only nudge when iter ends `end_turn` + empty text
+  after at least one tool was dispatched.
+
+This session ships both.
+
+**Endpoint (`src/app/api/voice-agent/customers/route.ts`):**
+- New helper `buildUpsertSuccessInstructions(wasCreated, updatedFields)`
+  produces context-aware `instructions_for_agent` text across three
+  branches:
+  1. **`was_created=true`** — "Customer record created. Now produce
+     a customer-facing reply that acknowledges what they just shared
+     (their name and any other info) and continues the conversation
+     naturally — ask for any missing details needed for a quote, or
+     move to the next discovery step. Do NOT mention this internal
+     action or that a record was created."
+  2. **`was_created=false` + `updated_fields` non-empty** — "Customer
+     record updated with new field(s): {list}. Now produce a
+     customer-facing reply that acknowledges what they just shared
+     and continues the conversation naturally. Do NOT mention this
+     internal action or that fields were updated."
+  3. **`was_created=false` + `updated_fields=[]`** (no-op call) — "No
+     new customer data to persist. Continue the conversation naturally
+     based on the most recent customer message. Do NOT mention this
+     internal action."
+- Success response now includes
+  `instructions_for_agent: instructionsForAgent` as the last field.
+  All pre-existing fields (`success`, `customer_id`, `was_created`,
+  `updated_fields`, `conversation_linked`) preserved.
+- Error responses unchanged — they already carried
+  `instructions_for_agent` + `do_not_share_with_customer` per
+  Workstream J Session 3 / Rule 17 contract.
+
+**Runner (`src/lib/sms-ai/agent-runner.ts`):**
+- New constant `NO_REPLY_NUDGE` near the existing `ITERATION_CAP_NUDGE`
+  (lines 68-69 area). Text: "(System: the previous turn ended without
+  a customer-facing reply. Produce a customer-facing message now that
+  acknowledges what the customer just shared and continues the
+  conversation naturally. Do not mention this nudge or any internal
+  system actions.)"
+- Modified the `end_turn` branch of the main loop. When iter ends with
+  `stop_reason=end_turn` AND `extractText(content).trim().length === 0`
+  AND `iter > 1` (at least one tool was dispatched), the runner:
+  1. Logs `[SmsAiV2 runner] noReply detected conv=… iterations=… retrying with nudge`
+  2. Pushes the model's empty `end_turn` assistant turn (to maintain
+     alternating user/assistant message contract) followed by
+     `NO_REPLY_NUDGE` as a user turn.
+  3. Calls `client.messages.create` ONCE more with `tools` OMITTED
+     (text-only mode). System prompt and conversation history
+     preserved.
+  4. Logs `[SmsAiV2 runner] noReply retry conv=… stop=… chunks=… latency=…ms`
+     and `[SmsAiV2 runner] done conv=… noReply_retried=true`.
+  5. Returns the retry's text if non-empty; otherwise falls back to
+     the original empty text so the dispatcher's
+     `chunks=0 noReply=true` log still surfaces the rare
+     double-empty case for ops visibility.
+- **SINGLE retry only.** Never loops. Pattern mirrors the existing
+  `ITERATION_CAP_NUDGE` shape verbatim.
+
+**Tests +15 net new:**
+- `src/app/api/voice-agent/customers/__tests__/route.test.ts`: 7 new
+  tests under "Issue 35 instructions_for_agent on success" —
+  was_created=true branch text, was_created=false + updated_fields
+  branch text (mentions updated field), no-op branch text, presence
+  across all 3 success branches, error responses unchanged + still
+  carry `do_not_share_with_customer`, success shape preserves
+  pre-Issue-35 fields, success has NO `do_not_share_with_customer`.
+- `src/lib/sms-ai/__tests__/agent-runner.test.ts`: 8 new tests under
+  "Issue 35 noReply backstop retry" — happy path unchanged (non-empty
+  text), no retry at iter=1, retry triggers on empty content + tool
+  dispatched, retry triggers on whitespace-only text, retry call
+  omits `tools` (text-only), SINGLE retry only (double-empty returns
+  empty), retry appends empty assistant + nudge user turn in correct
+  shape, logs both detection + retry outcome with `noReply_retried=true`.
+
+**Hard rules respected:**
+- NO changes to D38 prompt rule (Critical rule 2) — kept as defense
+  in depth alongside the new tool-layer signal.
+- NO changes to Rule 17 (`instructions_for_agent` silent guidance) —
+  the new field flows through the existing Rule 17 handling.
+- NO changes to `tool-dispatcher.ts` — `voiceAgentFetch` already
+  passes JSON response bodies verbatim to the LLM.
+- NO changes to `tools.ts` (upsert_customer tool schema unchanged).
+- NO changes to `customer-context.ts`, `feature-flag.ts`,
+  `background-dispatch.ts`.
+- NO changes to combo-resolver.ts or any quote-creation route.
+- NO new tools, NO new fields beyond the additive
+  `instructions_for_agent` on upsert_customer success.
+- NO changes to upsert_customer error response shape.
+- Runner retry runs EXACTLY ONCE (verified by test). No chained
+  retries, no infinite loops.
+- Exotic/classic escalation language unchanged at all sites.
+
+**Gates green:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → 2090/2090 pass (was 2075 — +15 net new)
+- `npm run build` → 789 pages clean
+
+**Three-layer defense (D38 + endpoint + runner):**
+
+After this session, the empty-reply pathway is closed at three layers:
+1. **System prompt (D38, Session 5):** Critical rule 2 — "Every
+   customer turn requires a customer-facing reply." Defense in depth.
+2. **Tool response (this session):** upsert_customer success carries
+   `instructions_for_agent` directive. The model is explicitly nudged
+   in the immediate context window — strongest cognitive pull. Reuses
+   proven D36 pattern.
+3. **Runner (this session):** noReply retry backstop. If the directive
+   is somehow ignored, the runner retries once with a text-only nudge
+   before returning empty.
+
+**Verification scenario for operator (post-deploy):**
+
+From the allowlisted phone, send: "Hi, I'm Sarah with a 2020 Camry"
+1. Expect PM2 logs:
+   - `iter=1 stop=tool_use tool_calls=1` (upsert_customer)
+   - `tool=upsert_customer latency=… error=false`
+   - `iter=2 stop=end_turn tool_calls=0 latency=…ms`
+   - `[SmsAiV2 background] … chunks>=1 noReply=false`
+2. Expect the customer to receive a real reply like "Thanks Sarah!
+   Is the Camry a sedan? What color, and what service would you
+   like — interior, exterior, or both?" — NOT silence.
+3. If the directive is somehow ignored and iter=2 still produces
+   empty text, the runner's backstop fires; PM2 shows the retry
+   path:
+   - `[SmsAiV2 runner] noReply detected conv=… iterations=2 retrying with nudge`
+   - `[SmsAiV2 runner] noReply retry conv=… stop=end_turn chunks=1 latency=…ms`
+   - `[SmsAiV2 runner] done conv=… noReply_retried=true`
+   - Customer still receives a reply — the backstop worked.
+
+**Deploy required:** YES via `deploy-smartdetails` post-merge.
+
+---
+
 ## 2026-05-24 — feat(sms-ai-v2): Issue 35 + D38 — mandatory customer-facing reply on every turn (Workstream J Session 5)
 
 Branch `feat/issue-35-mandatory-customer-reply`. Targeted hotfix for the SMS agent

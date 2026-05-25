@@ -710,3 +710,193 @@ describe('runSmsAiV2Agent — approve_addon / decline_addon end-to-end', () => {
     expect(result.assistantText).toContain('which one');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue 35 backstop — noReply retry. When iter ends with stop_reason=end_turn
+// and extractText is empty after at least one tool was dispatched (iter > 1),
+// the runner retries ONCE with the system NO_REPLY_NUDGE and tools omitted.
+// Single retry only; never loops. See docs/dev/ISSUE_35_RUNNER_DIAGNOSTIC.md.
+// ---------------------------------------------------------------------------
+
+/** Build an `end_turn` Message with the given content array verbatim. */
+function endTurnRaw(content: unknown[]) {
+  return {
+    id: 'msg_end_raw',
+    type: 'message',
+    role: 'assistant',
+    model: 'claude-sonnet-4-6',
+    content,
+    stop_reason: 'end_turn',
+    stop_sequence: null,
+    usage: { input_tokens: 1, output_tokens: 0 },
+  };
+}
+
+describe('runSmsAiV2Agent — Issue 35 noReply backstop retry', () => {
+  it('NO retry when stop_reason=end_turn and text is non-empty (happy path unchanged)', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_x', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnMessage('Thanks Sarah! What service?'));
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true,"customer_id":"cust-1"}',
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+
+    expect(messagesCreateMock).toHaveBeenCalledTimes(2);
+    expect(result.assistantText).toBe('Thanks Sarah! What service?');
+    expect(result.iterations).toBe(2);
+    expect(result.stopReason).toBe('end_turn');
+  });
+
+  it('NO retry when iter=1 ends with empty content (no tools were dispatched)', async () => {
+    // Empty content array on iter 1 — no tool was called. Per spec the
+    // retry only triggers when iter > 1, so this should pass through.
+    messagesCreateMock.mockResolvedValueOnce(endTurnRaw([]));
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+
+    expect(messagesCreateMock).toHaveBeenCalledTimes(1);
+    expect(result.iterations).toBe(1);
+    expect(result.assistantText).toBe('');
+    expect(result.stopReason).toBe('end_turn');
+  });
+
+  it('RETRIES once when iter=2 ends with empty content after a tool dispatch', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_y', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnRaw([]))
+      .mockResolvedValueOnce(
+        endTurnMessage('Thanks Sarah! What can I do for you?'),
+      );
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true,"customer_id":"cust-1"}',
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+
+    // 2 loop calls + 1 retry = 3 SDK calls
+    expect(messagesCreateMock).toHaveBeenCalledTimes(3);
+    expect(result.assistantText).toBe('Thanks Sarah! What can I do for you?');
+    expect(result.iterations).toBe(2);
+    expect(result.stopReason).toBe('end_turn');
+  });
+
+  it('RETRIES once when iter=2 returns whitespace-only text after a tool dispatch', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_z', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnMessage('   '))
+      .mockResolvedValueOnce(endTurnMessage('Got it Sarah — talk soon.'));
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true}',
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+
+    expect(messagesCreateMock).toHaveBeenCalledTimes(3);
+    expect(result.assistantText).toBe('Got it Sarah — talk soon.');
+  });
+
+  it('retry call omits the `tools` parameter (text-only mode)', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_w', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnRaw([]))
+      .mockResolvedValueOnce(endTurnMessage('Hi Sarah! What service today?'));
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true}',
+      isError: false,
+    });
+
+    await runSmsAiV2Agent(BASE_INPUT);
+
+    // Call 0 (iter 1): tools present
+    expect(messagesCreateMock.mock.calls[0][0]).toHaveProperty('tools');
+    // Call 1 (iter 2): tools present (loop call)
+    expect(messagesCreateMock.mock.calls[1][0]).toHaveProperty('tools');
+    // Call 2 (retry): tools MUST be omitted
+    expect(messagesCreateMock.mock.calls[2][0]).not.toHaveProperty('tools');
+  });
+
+  it('SINGLE retry only — retry produces empty too → returns the original empty result', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_v', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnRaw([])) // iter 2 empty
+      .mockResolvedValueOnce(endTurnRaw([])); // retry ALSO empty
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true}',
+      isError: false,
+    });
+
+    const result = await runSmsAiV2Agent(BASE_INPUT);
+
+    // Exactly 3 SDK calls — no chained retry.
+    expect(messagesCreateMock).toHaveBeenCalledTimes(3);
+    expect(result.assistantText).toBe('');
+    expect(result.iterations).toBe(2);
+    expect(result.stopReason).toBe('end_turn');
+  });
+
+  it('retry appends the empty assistant response AND the user nudge before the retry call', async () => {
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_u', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnRaw([]))
+      .mockResolvedValueOnce(endTurnMessage('Hi Sarah! What service?'));
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true}',
+      isError: false,
+    });
+
+    await runSmsAiV2Agent(BASE_INPUT);
+
+    // The retry call's messages array should end with the empty assistant
+    // turn followed by the system nudge as a user turn. The original
+    // inbound and the tool round-trip turns precede them.
+    const retryMessages = messagesCreateMock.mock.calls[2][0].messages;
+    expect(retryMessages.length).toBeGreaterThanOrEqual(4);
+    const last = retryMessages[retryMessages.length - 1];
+    expect(last.role).toBe('user');
+    expect(typeof last.content).toBe('string');
+    expect(last.content).toMatch(/previous turn ended without a customer-facing reply/);
+    const prev = retryMessages[retryMessages.length - 2];
+    expect(prev.role).toBe('assistant');
+    // The empty assistant response — content array from the SDK (empty here)
+    expect(Array.isArray(prev.content)).toBe(true);
+  });
+
+  it('logs the noReply detection AND retry outcome', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    messagesCreateMock
+      .mockResolvedValueOnce(
+        toolUseMessage('toolu_t', 'upsert_customer', { first_name: 'Sarah' }),
+      )
+      .mockResolvedValueOnce(endTurnRaw([]))
+      .mockResolvedValueOnce(endTurnMessage('Hi Sarah!'));
+    dispatchToolMock.mockResolvedValue({
+      content: '{"success":true}',
+      isError: false,
+    });
+
+    await runSmsAiV2Agent(BASE_INPUT);
+
+    const messages = logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(messages).toMatch(/noReply detected conv=conv-123 iterations=2 retrying with nudge/);
+    expect(messages).toMatch(/noReply retry conv=conv-123 stop=end_turn chunks=1/);
+    expect(messages).toMatch(/noReply_retried=true/);
+    logSpy.mockRestore();
+  });
+});
