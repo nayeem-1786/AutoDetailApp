@@ -41,30 +41,113 @@ export interface ResolvedService {
   service_pricing: ServicePricing[];
 }
 
-/** Case-insensitive service lookup with pricing tiers */
+/**
+ * Single select clause reused by both the exact-match query and the
+ * fallback fetch-all query. Extracted in D42 (Issue 37) when the
+ * resolver gained prefix-match fallback tiers; keeping it as a single
+ * source of truth so a schema column add only touches one place.
+ */
+const SERVICE_SELECT_QUERY = `
+  id, name, pricing_model, flat_price, per_unit_price, custom_starting_price,
+  sale_price, sale_starts_at, sale_ends_at,
+  service_pricing(
+    id, service_id, tier_name, tier_label, price, sale_price, display_order,
+    is_vehicle_size_aware,
+    vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price,
+    vehicle_size_exotic_price, vehicle_size_classic_price,
+    max_qty, qty_label, created_at
+  )
+`;
+
+/**
+ * Case-insensitive service lookup with pricing tiers. Three-tier fallback
+ * resolves the common agent-verbalization pattern where the LLM appends
+ * a tier label to the service name (e.g., "Hot Shampoo Extraction Complete"
+ * → "Hot Shampoo Extraction"). See D42 (Issue 37, 2026-05-24) for the
+ * empirical case and decision details.
+ *
+ * Tier 1 — exact case-insensitive match via `.ilike(name)`. Fastest path,
+ * unchanged from pre-D42 behavior; all existing callers see identical
+ * results when their service name matches the catalog exactly.
+ *
+ * Tier 2 — prefix match where the QUERY starts with a catalog name plus
+ * a separator (space / comma / hyphen). Closes the Issue 37 case:
+ * "Hot Shampoo Extraction Complete" → "Hot Shampoo Extraction". Requires
+ * the separator so "Express" doesn't false-match against "Express Wash".
+ * Longest catalog name wins to prefer specificity (e.g., "Express Wash
+ * Premium Complete" matches "Express Wash Premium" over "Express Wash").
+ *
+ * Tier 3 — reverse prefix where a CATALOG name starts with the query
+ * plus a separator. Bonus safety for short/incomplete agent names like
+ * "Hot Shampoo" → "Hot Shampoo Extraction". Unique match only — ambiguous
+ * matches (e.g., "Hot Shampoo" when both "Hot Shampoo Extraction" and
+ * "Hot Shampoo Spot Treatment" exist) return null + warn.
+ *
+ * Returns null when no tier matches (caller convention: warn + skip).
+ */
 export async function resolveServiceByName(
   admin: SupabaseClient,
   name: string
 ): Promise<ResolvedService | null> {
-  const { data } = await admin
+  const normalizedName = name.trim();
+  if (!normalizedName) return null;
+
+  // Tier 1 — exact case-insensitive match. Single-row path; ignores
+  // error so zero-rows returns null (preserves pre-D42 contract).
+  const { data: exactMatch } = await admin
     .from('services')
-    .select(`
-      id, name, pricing_model, flat_price, per_unit_price, custom_starting_price,
-      sale_price, sale_starts_at, sale_ends_at,
-      service_pricing(
-        id, service_id, tier_name, tier_label, price, sale_price, display_order,
-        is_vehicle_size_aware,
-        vehicle_size_sedan_price, vehicle_size_truck_suv_price, vehicle_size_suv_van_price,
-        vehicle_size_exotic_price, vehicle_size_classic_price,
-        max_qty, qty_label, created_at
-      )
-    `)
-    .ilike('name', name)
+    .select(SERVICE_SELECT_QUERY)
+    .ilike('name', normalizedName)
     .eq('is_active', true)
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  return data as ResolvedService | null;
+  if (exactMatch) return exactMatch as unknown as ResolvedService;
+
+  // Tier 2/3 — fetch all active services for client-side prefix matching.
+  // Catalog size is ~30 services per CLAUDE.md (~18KB cached at the voice
+  // endpoint level); the cost of fetching is small and only paid when
+  // the exact-match path missed.
+  const { data: allServices } = await admin
+    .from('services')
+    .select(SERVICE_SELECT_QUERY)
+    .eq('is_active', true);
+
+  if (!allServices || allServices.length === 0) return null;
+
+  const lowerQuery = normalizedName.toLowerCase();
+  const SEPARATORS = [' ', ',', '-'];
+
+  // Tier 2 — query starts with catalog name + separator. Longest wins
+  // (prefers the most specific catalog match when multiple are prefixes).
+  const prefixMatches = (allServices as unknown as ResolvedService[]).filter((s) => {
+    const serviceName = s.name.toLowerCase();
+    if (lowerQuery === serviceName) return true;
+    return SEPARATORS.some((sep) => lowerQuery.startsWith(serviceName + sep));
+  });
+  if (prefixMatches.length > 0) {
+    prefixMatches.sort((a, b) => b.name.length - a.name.length);
+    return prefixMatches[0];
+  }
+
+  // Tier 3 — catalog name starts with query + separator. Unique match
+  // only; ambiguous matches return null + warn so the caller falls
+  // through to its skip-and-warn branch rather than guessing.
+  const reversePrefixMatches = (allServices as unknown as ResolvedService[]).filter((s) => {
+    const serviceName = s.name.toLowerCase();
+    return SEPARATORS.some((sep) => serviceName.startsWith(lowerQuery + sep));
+  });
+  if (reversePrefixMatches.length === 1) {
+    return reversePrefixMatches[0];
+  }
+  if (reversePrefixMatches.length > 1) {
+    console.warn(
+      `[resolveServiceByName] Ambiguous reverse-prefix match for "${normalizedName}": ${reversePrefixMatches.map((s) => s.name).join(', ')}`
+    );
+    return null;
+  }
+
+  return null;
 }
 
 export interface ResolvedPrice {

@@ -6,6 +6,92 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — fix(services): Issue 37 D42 — prefix-match fallback in resolveServiceByName
+
+Branch `feat/issue-37-resolver-prefix-fallback`. Surfaced immediately
+after D41 verification: agent correctly quoted $450 for the 2018
+Suburban Hot Shampoo Extraction Complete, customer said "Sure, send
+it" → `send_quote_sms` failed with
+`"[SendQuoteSMS] Service not found: 'Hot Shampoo Extraction Complete'"`
+and the agent fell back to `notify_staff` (preserving customer
+experience but breaking the automated SMS quote flow).
+
+**Root cause:** the agent verbalizes "Hot Shampoo Extraction Complete"
+to the customer (service name + tier label per D41's resolved-price
+display), then passes the same string to `send_quote_sms`. The
+resolver at `src/lib/services/service-resolver.ts:45` used
+`.ilike('name', q)` — case-insensitive but exact-string-match — so
+the tier-suffixed query missed the canonical
+`"Hot Shampoo Extraction"`.
+
+**Fix:** extend `resolveServiceByName` with two fallback tiers after
+the existing exact-match path. `resolvePrice` already auto-selects
+the correct size-aware tier once the service is resolved (D41), so
+the "Complete" suffix becomes harmless context.
+
+- **Tier 1** — exact case-insensitive `.ilike()` match (unchanged;
+  all existing callers see byte-identical behavior on canonical
+  names).
+- **Tier 2** — query starts with catalog name + separator (` `, `,`,
+  or `-`). Longest catalog match wins for specificity. Closes
+  Issue 37: `"Hot Shampoo Extraction Complete"` →
+  `"Hot Shampoo Extraction"`. Separator requirement blocks substring
+  false positives (`"Express"` alone won't match `"Express Wash"`
+  via Tier 2).
+- **Tier 3** — catalog name starts with query + separator. Unique
+  match only; ambiguous matches return `null` + log a warning so the
+  caller falls through to its existing skip-and-warn branch instead
+  of guessing.
+
+`SERVICE_SELECT_QUERY` extracted as a module-level const to keep the
+Tier 1 and Tier 2/3 queries DRY.
+
+**Callers** (all unchanged, all benefit from the new fallback):
+- `src/app/api/voice-agent/send-quote-sms/route.ts:196`
+- `src/app/api/webhooks/twilio/inbound/route.ts:802`
+- `src/lib/services/voice-post-call.ts:514`
+
+All three treat `null` as skip-and-warn, so the previous-nulls-now-
+resolved cases are pure improvements with zero regression risk.
+
+**Why not change the `send_quote_sms` tool schema (Option B):**
+Considered restructuring `services` to an array of `{name, tier}`
+objects. Rejected — bigger contract change, fights the LLM's natural
+single-string verbalization pattern. Option A solves the bug at the
+right architectural layer.
+
+**Preserved unchanged:**
+- D41 (size-aware main-tier resolution) — production-verified working.
+- D40 (dispatcher `RuntimeContext.size_class` injection).
+- D39 (prompt + schema strengthening) — defense in depth.
+- `resolvePrice` (canonical tier auto-selection).
+- `send_quote_sms` tool schema, route handler, dispatcher.
+- `tools.ts`, prompt content, vehicle-classify endpoint, canonical
+  pricing engine, addon enrichment.
+- No new tools, no endpoints, no migrations, no schema changes.
+
+**Tests:** +14 in `src/lib/services/__tests__/service-resolver.test.ts`
+— Tier 1 (3: exact / case-insensitive / whitespace-trim), Tier 2 (6:
+Issue-37 case / case-insensitive / multi-word suffix / longest wins /
+separator-types / substring-guard via "Express" alone), Tier 3 (2:
+unique / ambiguous-warns), edge cases (3: no match / empty / whitespace-
+only). 41/41 resolver tests pass (27 existing `resolvePrice` + 14
+new D42). Full suite: 2238/2238.
+
+**Verification:** typecheck 0 errors, lint 0 errors / 97 warnings
+(unchanged baseline), production build clean.
+
+**Manual verification scenario:** post-deploy, from allowlisted phone:
+1. "Hi, I'm Nayeem with a 2018 Suburban, need Hot Shampoo Extraction
+   Complete" → $450 quoted → "Sure, send it" → expect `send_quote_sms`
+   succeeds (not falls back to `notify_staff`). Public quote page
+   renders Hot Shampoo Extraction at $450 with "Complete" tier label.
+2. Same flow with 2016 Honda Accord → $325 quoted, quote sends.
+3. PM2 logs: no `"Service not found"` warnings for tier-suffixed
+   service names.
+
+---
+
 ## 2026-05-24 — fix(voice-agent): Issue 36 D41 — pass sizeClass to resolveServicePriceWithSale at main-tier sites
 
 Branch `feat/issue-36-final-endpoint-fix`. Closes Issue 36 empirically

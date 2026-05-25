@@ -1188,7 +1188,32 @@ See D39 for full decision details.
 
 **Verification result (2026-05-24 — post-D40 production test):** D40 did NOT close the issue empirically. Same $300/$450 fidelity gap reproduced. PM2 logs verified the dispatcher was injecting `size_class=suv_3row_van` into the get_services URL correctly — but the endpoint silently dropped the value at the main-tier resolution path. Root cause located by diagnostic audit (`docs/dev/ISSUE_36_LAYER_2_PHASE_B_DIAGNOSTIC.md`, branch `audit/issue-36-layer-2-phase-b-diagnostic`, commit `f682dc2e`): two `null` arguments passed to `resolveServicePriceWithSale` at `services/route.ts:268` + `:325` short-circuited the canonical pricing engine's size-aware column dispatch.
 
-**Status as of D41 (2026-05-24 — Resolved):** Endpoint fix shipped via Workstream J Session 9 (branch `feat/issue-36-final-endpoint-fix`). Two-character change at the two bug sites — `null` → `sizeClass`. Lines 283 + 299 (flat / per_unit synthetic) stay as `null` correctly. Tests: +11 in `services/__tests__/route.test.ts` covering all 5 size classes + no-size_class fallback + invalid-size_class fallback + non-size-aware tier preservation + multi-tier shape + raw-columns-not-exposed regression + default-fallthrough mirror. 22/22 endpoint tests pass. D40 confirmed load-bearing (delivers size_class to endpoint reliably regardless of LLM compliance); D39 confirmed defense-in-depth (harmless prompt guidance). D38 (Rule 2), Rule 18 (instructions_for_agent), Critical Rule 4 (exotic/classic), agent-runner construction, dispatcher, prompt content, `tools.ts`, canonical engine, addon enrichment — all UNCHANGED. See D41 for full decision details. Post-deploy verification: pending operator test (Suburban + Accord + Tacoma scenarios per D41 acceptance criteria).
+**Status as of D41 (2026-05-24 — Resolved):** Endpoint fix shipped via Workstream J Session 9 (branch `feat/issue-36-final-endpoint-fix`). Two-character change at the two bug sites — `null` → `sizeClass`. Lines 283 + 299 (flat / per_unit synthetic) stay as `null` correctly. Tests: +11 in `services/__tests__/route.test.ts` covering all 5 size classes + no-size_class fallback + invalid-size_class fallback + non-size-aware tier preservation + multi-tier shape + raw-columns-not-exposed regression + default-fallthrough mirror. 22/22 endpoint tests pass. D40 confirmed load-bearing (delivers size_class to endpoint reliably regardless of LLM compliance); D39 confirmed defense-in-depth (harmless prompt guidance). D38 (Rule 2), Rule 18 (instructions_for_agent), Critical Rule 4 (exotic/classic), agent-runner construction, dispatcher, prompt content, `tools.ts`, canonical engine, addon enrichment — all UNCHANGED. See D41 for full decision details. Post-deploy verification confirmed (2026-05-24 23:25 PT): agent correctly quoted $450 for 2018 Suburban Hot Shampoo Extraction Complete.
+
+#### Issue 37 — `send_quote_sms` resolver fails on tier-suffixed service names
+
+**Severity:** P1 — automated quote-send flow breaks for any scope-tiered service when the agent appends the tier label to the service name in the `send_quote_sms` call.
+**Observed:** 2026-05-24 23:25 PT (immediately after D41 verification)
+**Channel:** SMS-AI v2 / `send_quote_sms` tool call → `resolveServiceByName`
+**Root cause class:** resolver doesn't handle agent's natural verbalization pattern; `.ilike()` is exact-match-only
+
+**Evidence:**
+
+Conversation: 2018 Suburban → agent quoted "Hot Shampoo Extraction Complete is $450" → customer "Sure, send it" → `send_quote_sms` called with `services: "Hot Shampoo Extraction Complete"`. The resolver at `src/lib/services/service-resolver.ts:45` used `.ilike('name', 'Hot Shampoo Extraction Complete')` — case-insensitive but exact-string-match. The catalog has the service stored as `"Hot Shampoo Extraction"` (with `"complete"` as a tier name in `service_pricing`). PM2 logs showed:
+
+```
+[SendQuoteSMS] Service not found: "Hot Shampoo Extraction Complete"
+```
+
+`quoteItems` accumulated zero items → endpoint returned 400 → agent gracefully fell back to `notify_staff` with reason `custom_quote` and full context ($450 price, `suv_3row_van` tier, customer name + phone). Customer experience preserved at the handoff level; automated SMS quote flow broke.
+
+**Hypothesis (Issue 37 root cause):**
+
+The agent's verbalization pattern is structural — it tells the customer the full "service name + tier label" phrasing (matching how D41 surfaces the resolved price) and then passes the same string to `send_quote_sms`. No prompt rule can reliably train the LLM to strip the tier on every quote-send (D38/D39 lesson). The resolver should handle the agent's natural pattern.
+
+**Fix approach:** D42 — three-tier resolver fallback (exact → query-starts-with-catalog-name → catalog-name-starts-with-query). See D42 for full decision details.
+
+**Status:** Resolved 2026-05-24 via Workstream J Session 10 (branch `feat/issue-37-resolver-prefix-fallback`). `resolveServiceByName` extended with Tier 2 (longest catalog prefix wins, separator required) + Tier 3 (unique reverse-prefix only; ambiguous returns null + warn). Tier 1 (exact match) byte-for-byte unchanged so existing callers regress to zero. Tests: +14. `SERVICE_SELECT_QUERY` extracted as module-level const. All 3 callers (`send-quote-sms`, twilio inbound, `voice-post-call`) inherit the new behavior automatically since each treats `null` as skip-and-warn. Post-deploy verification: pending operator test (Suburban + Accord scenarios per D42 acceptance criteria).
 
 ---
 
@@ -1981,6 +2006,44 @@ Three prior sessions (D39, D40) failed to close Issue 36 because the fix kept ta
 - Multi-tier display unchanged for non-size-aware tiers (`floor_mats` $75, `per_row` $125, `carpet_mats` $175 — all literal).
 
 **Implementation:** Workstream J Session 9 — branch `feat/issue-36-final-endpoint-fix` (2026-05-24, this commit). 11 new tests in `services/__tests__/route.test.ts` (Q-0084 Suburban scenario + sedan/truck_suv_2row/exotic/classic resolutions + no-size_class fallback + invalid-size_class fallback + non-size-aware tier preservation + multi-tier emission shape + raw-columns-not-exposed regression guard + default-fallthrough fix verification). 11 existing endpoint tests still pass. No changes to: prompt content (D39 preserved), `tools.ts` (D39 schema descriptions preserved), `vehicle-classify` endpoint, dispatcher (D40 preserved), agent-runner construction, any quote-creation route, the canonical engine, or addon enrichment logic.
+
+**D42 — Prefix-match fallback in `resolveServiceByName` (operator-locked 2026-05-24, post Issue 37 evidence).**
+
+After D41 closed Issue 36 (size-aware pricing fidelity — agent correctly quoted $450 for the 2018 Suburban), production test surfaced Issue 37: `send_quote_sms` failed with `"[SendQuoteSMS] Service not found: 'Hot Shampoo Extraction Complete'"` because the agent appended the tier label "Complete" to the service name when calling the tool. The resolver used `.ilike()` which is case-insensitive but exact (no wildcards), so `"Hot Shampoo Extraction Complete"` didn't match the canonical `"Hot Shampoo Extraction"`. The agent gracefully fell back to `notify_staff` with full context ($450 price + tier label), preserving the customer experience at the handoff level, but the automated SMS quote flow broke.
+
+The agent's verbalization pattern is structural — it tells the customer "Hot Shampoo Extraction Complete is $450" and then calls `send_quote_sms` with the same phrasing. No prompt rule can reliably train the LLM to strip the tier on every quote send (the D38/D39 lesson again: invocation-discipline rules cannot be enforced via prompt wording alone when the LLM has a natural compositional pattern).
+
+**Decision (operator-locked):** add prefix-match fallback to `resolveServiceByName`. Three tiers:
+
+1. **Tier 1 — exact case-insensitive match** via `.ilike(name)`. Current behavior, unchanged. All existing callers (`send-quote-sms/route.ts:196`, `webhooks/twilio/inbound/route.ts:802`, `voice-post-call.ts:514`) see identical results when the agent passes a canonical name.
+2. **Tier 2 — prefix match** where the QUERY starts with a catalog name plus a separator (` `, `,`, `-`). Longest catalog match wins to prefer specificity. Closes Issue 37: `"Hot Shampoo Extraction Complete"` → `"Hot Shampoo Extraction"`. Separator requirement blocks substring false positives (e.g., `"Express"` alone doesn't match `"Express Wash"` via Tier 2).
+3. **Tier 3 — reverse-prefix** where a CATALOG name starts with the query plus a separator. Unique match only — ambiguous matches return `null` and log a warning so the caller falls through to its existing skip-and-warn branch rather than guessing. Bonus safety for incomplete service names.
+
+`resolvePrice` already auto-selects the correct tier for `scope`-priced services (picks the `is_vehicle_size_aware=true` tier in column-pattern A) once the service is resolved, so no change needed there. The agent's "Complete" suffix is harmless context — once the service is resolved, the right tier is selected automatically by the engine (D41).
+
+**Why not restructure the `send_quote_sms` tool schema (Option B):**
+
+Considered changing the `services` parameter to an array of `{name, tier}` objects. Rejected because:
+- Bigger schema change touching multiple call sites (`send-quote-sms` + `tool-dispatcher` + tests + prompt examples).
+- The agent's natural pattern is single-string verbalization; forcing structured input fights the LLM's compositional habit.
+- Option A (resolver fix) closes the bug at the right architectural layer (canonical resolver) without touching the tool contract.
+- If Option A fails empirically, Option B remains available as the next escalation.
+
+**Coexistence with prior decisions:**
+
+- **D41** (size-aware main-tier pricing): unchanged. Once the service is resolved (now reliably via D42), `resolvePrice` correctly returns $450 for `suv_3row_van`.
+- **D40** (dispatcher injection): unchanged. The `RuntimeContext.size_class` flow is orthogonal to name resolution.
+- **D39** (prompt + schema strengthening): unchanged. Stays as defense in depth.
+- **Other callers** (twilio inbound + voice-post-call): inherit the new fallback automatically. Both treat `null` as skip-and-warn, so the previous-nulls-now-resolved cases are pure improvements.
+
+**Acceptance criteria:**
+
+- Production test: 2018 Suburban → "Hot Shampoo Extraction Complete" → "Sure, send it" → `send_quote_sms` succeeds (no longer falls back to `notify_staff` for this scenario).
+- Existing tests for `resolveServiceByName` all pass unchanged (Tier 1 unchanged).
+- Public quote page renders the Hot Shampoo Extraction line at $450 unit price with the "Complete" tier label (tier auto-selected by `resolvePrice`).
+- PM2 logs: no `Service not found` warnings on `send_quote_sms` for tier-suffixed service names.
+
+**Implementation:** Workstream J Session 10 — branch `feat/issue-37-resolver-prefix-fallback` (2026-05-24, this commit). 14 new tests in `service-resolver.test.ts` (Tier 1 exact/case-insensitive/whitespace + Tier 2 Issue-37 case/case-insensitive/multi-word/longest-wins/separator-types/substring-guard + Tier 3 unique-match/ambiguous-warns + no-match/empty-string/whitespace-only). `SERVICE_SELECT_QUERY` extracted as module-level const for DRY-ness across Tier 1 + Tier 2/3 queries. No changes to: prompt content, `tools.ts`, dispatcher, send-quote-sms route handler, twilio inbound handler, voice-post-call handler, `resolvePrice`, canonical pricing engine, addon enrichment, any endpoint, or migrations.
 
 ### Coverage targets
 
