@@ -6,6 +6,110 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — fix(voice-agent): Issue 36 D41 — pass sizeClass to resolveServicePriceWithSale at main-tier sites
+
+Branch `feat/issue-36-final-endpoint-fix`. Closes Issue 36 empirically
+after the diagnostic audit (Workstream J Session 9, post-Session 8
+which shipped D40 but didn't close the issue).
+
+**Root cause (per `docs/dev/ISSUE_36_LAYER_2_PHASE_B_DIAGNOSTIC.md`):**
+Two call sites in `src/app/api/voice-agent/services/route.ts` passed
+`null` to the canonical pricing helper `resolveServicePriceWithSale`
+instead of the parsed `sizeClass` variable, silently disabling
+size-aware resolution for main service tiers even when `size_class`
+arrived at the endpoint via D40's dispatcher injection.
+
+**Fix:**
+
+```diff
+# src/app/api/voice-agent/services/route.ts:268 (vehicle_size/scope/specialty branch)
+- const r = resolveServicePriceWithSale(p, null, saleWindow);
++ const r = resolveServicePriceWithSale(p, sizeClass, saleWindow);
+
+# src/app/api/voice-agent/services/route.ts:325 (default fallthrough)
+- const r = resolveServicePriceWithSale(p, null, saleWindow);
++ const r = resolveServicePriceWithSale(p, sizeClass, saleWindow);
+```
+
+Lines 283 (flat synthetic) and 299 (per_unit synthetic) **stay as
+`null`** — those pricing models are not size-aware by definition; the
+helper would correctly no-op anyway.
+
+**Why the other 3 prior sessions failed:**
+
+- **D39** (prompt + schema strengthening): couldn't help — the raw
+  `vehicle_size_*_price` columns are never exposed to the LLM, so
+  the agent had no fallback even with perfect prompt compliance.
+- **D40** (dispatcher injection): correctly delivered
+  `size_class=suv_3row_van` to the endpoint, but the endpoint silently
+  ignored it for main tiers.
+- **Pet Hair false positive** (original Layer 2 work): Pet Hair is an
+  addon with `pricing_model='flat'`, exercising the addon-enrichment
+  loop where `sizeClass` IS passed (and short-circuiting on `'flat'`
+  before the size-aware branch even runs). It never tested the broken
+  main-tier path.
+
+The audit-first approach finally caught it.
+
+**Blast radius:** 1 service today (Hot Shampoo Extraction "complete"
+tier — verified via DB query: only `service_pricing` row with
+`is_vehicle_size_aware=true` in the catalog). General fix benefits
+any future size-aware tier without further code changes.
+
+**Cross-codebase:** 10+ other consumers of
+`resolveServicePriceWithSale` (POS context/components, booking
+`_pricing.ts`, canonical `service-resolver.ts`) already pass
+`size_class` correctly. The voice-agent endpoint was the sole
+outlier.
+
+**Tests:** +11 in `src/app/api/voice-agent/services/__tests__/route.test.ts`:
+- Q-0084 scenario: Suburban → `$450` for "complete"
+- Sedan (Accord): `$325`
+- Truck/SUV (Tacoma): `$375`
+- Exotic / Classic: `$350` each (escalation lives in Critical Rule 4
+  at the prompt layer, not the endpoint)
+- No `size_class` query param: `$300` fallback (backward compat)
+- Invalid `size_class`: `$300` fallback
+- Non-size-aware tiers (`floor_mats` / `per_row` / `carpet_mats`)
+  unchanged at `$75` / `$125` / `$175`
+- Multi-tier emission shape preserved (4 tiers in `display_order`)
+- Raw `vehicle_size_*_price` columns NOT exposed to LLM (regression
+  guard on response contract)
+- Default switch fallthrough also receives `sizeClass` (future-proof)
+
+22/22 endpoint tests pass (11 existing + 11 new).
+
+**Preserved unchanged:**
+- D39 prompt rules (Critical Rule 6 + strengthened subsection + recall
+  directive)
+- D39 schema descriptions in `tools.ts`
+- D40 dispatcher injection (`tool-dispatcher.ts`)
+- D38 (mandatory customer-facing reply, Critical Rule 2)
+- Rule 18 (`instructions_for_agent`)
+- Critical Rule 4 (exotic/classic escalation)
+- Canonical pricing engine (`picker-engine.ts`)
+- Agent-runner, addon enrichment, vehicle-classify endpoint, any
+  quote-creation route
+- No new tools, no migrations, no schema changes
+
+**Verification:** typecheck 0 errors, lint 0 errors / 97 warnings
+(unchanged baseline), full suite passes, build clean.
+
+**Manual verification scenario:** post-deploy, from allowlisted phone,
+send each of:
+1. "Hi, I'm Nayeem with a 2018 Suburban, need Hot Shampoo Extraction
+   Complete." → expect agent quotes **$450**.
+2. "Hi, I'm Nayeem with a 2016 Honda Accord. Need Hot Shampoo
+   Extraction Complete." → expect **$325**.
+3. "I have a 2019 Toyota Tacoma. How much for Hot Shampoo Extraction
+   Complete?" → expect **$375**.
+
+PM2 logs: `get_services` response payload size VARIES across the
+three vehicle classifications (size-aware fields populate different
+values, not the constant 21909-byte pre-D41 payload).
+
+---
+
 ## 2026-05-24 — feat(sms-ai-v2): Issue 36 D40 — architectural size_class injection via RuntimeContext
 
 Branch `feat/issue-36-architectural-size-class-injection`. Closes

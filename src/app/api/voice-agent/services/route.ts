@@ -265,7 +265,16 @@ export async function GET(request: NextRequest) {
         case 'scope':
         case 'specialty':
           pricing = tiers.map((p) => {
-            const r = resolveServicePriceWithSale(p, null, saleWindow);
+            // Issue 36 D41 (2026-05-24): pass `sizeClass` so size-aware
+            // tiers resolve to their per-size column value (e.g., Hot
+            // Shampoo Extraction "complete" returns $450 for
+            // suv_3row_van, not the $300 fallback). Pre-D41 this passed
+            // `null`, silently disabling size-aware resolution for main
+            // tiers even when size_class arrived at the endpoint.
+            // Non-size-aware tiers (is_vehicle_size_aware=false) are
+            // unaffected — engine short-circuits to pricing.price.
+            // Audit: docs/dev/ISSUE_36_LAYER_2_PHASE_B_DIAGNOSTIC.md.
+            const r = resolveServicePriceWithSale(p, sizeClass, saleWindow);
             return {
               tier_name: p.tier_name,
               price: r.standardPrice,
@@ -321,8 +330,11 @@ export async function GET(request: NextRequest) {
           break;
 
         default:
+          // Issue 36 D41 (2026-05-24): mirrors the explicit case above so
+          // any future pricing_model that lands without a switch case
+          // update inherits the correct size-aware behavior.
           pricing = tiers.map((p) => {
-            const r = resolveServicePriceWithSale(p, null, saleWindow);
+            const r = resolveServicePriceWithSale(p, sizeClass, saleWindow);
             return {
               tier_name: p.tier_name,
               price: r.standardPrice,
