@@ -10,6 +10,7 @@ import { formatCurrency, formatDate, formatDateTime, formatPhone } from '@/lib/u
 import { QUOTE_STATUS_LABELS, QUOTE_STATUS_BADGE_VARIANT } from '@/lib/utils/constants';
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
+import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
 
 interface QuoteSlideOverProps {
   quoteId: string | null;
@@ -135,12 +136,34 @@ export function QuoteSlideOver({ quoteId, open, onClose }: QuoteSlideOverProps) 
                     const rowKey = item.is_mobile_fee
                       ? `mobile-fee-${idx}`
                       : (quote.items?.[idx]?.id ?? `item-${idx}`);
+                    // Issue 33 follow-up UX (operator Q2): compact badge
+                    // treatment for the high-density slide-over. The
+                    // detail page carries the full strikethrough viz.
+                    const original = item.is_mobile_fee ? null : quote.items?.[idx];
+                    const pricingInfo = original
+                      ? getLineItemPricingInfo({
+                          unit_price: original.unit_price,
+                          standard_price: original.standard_price ?? null,
+                          pricing_type:
+                            (original.pricing_type as
+                              | 'standard'
+                              | 'sale'
+                              | 'combo'
+                              | null) ?? null,
+                          quantity: original.quantity,
+                        })
+                      : null;
                     return (
                       <div key={rowKey} className="flex items-start justify-between">
                         <div>
                           <p className="text-sm text-gray-900">{item.name}</p>
                           {item.tier_name && (
                             <p className="text-xs text-gray-500">({item.tier_name})</p>
+                          )}
+                          {pricingInfo?.hasDiscount && (
+                            <p className="text-xs text-green-600">
+                              {pricingInfo.label} −{formatCurrency(pricingInfo.totalSavings)}
+                            </p>
                           )}
                         </div>
                         <p className="text-sm font-medium tabular-nums text-gray-900">

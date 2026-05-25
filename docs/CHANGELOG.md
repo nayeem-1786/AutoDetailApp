@@ -6,6 +6,136 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(rendering): combo/sale discount visualization across all 10 surfaces + savings footers
+
+Branch `feat/combo-sale-discount-render`. Issue 33 follow-up UX — close the
+Q-0085 fidelity gap (public quote page silently showing discounted
+`unit_price` with no original-price visualization) and prevent future
+drift across 6 quote surfaces + 4 receipt surfaces by consolidating the
+discount predicate into a single shared formatter helper.
+
+**New helper** — `src/lib/quotes/line-item-pricing.ts`:
+- `getLineItemPricingInfo({ unit_price, standard_price, pricing_type, quantity? })`
+  returns `{ hasDiscount, label, standardPrice, savingsPerUnit, totalSavings }`.
+  Predicate verbatim from the 4 receipt surfaces' pre-extraction inline
+  check (`pricing_type ∈ {combo, sale} && standard_price > unit_price`).
+- `sumLineItemSavings(items)` — convenience aggregate for the "You saved
+  $X" / "Total saved today: $X" totals rows. Returns 0 when no items
+  qualify so the row is hidden.
+- Money math: dollars (Option A locked per operator Q4 — matches the
+  4 receipt surfaces today; migrates with the quotes family when
+  Money-Unify hits).
+
+**4 receipt surfaces refactored (zero behavior change):**
+- `src/app/(public)/receipt/[token]/page.tsx` — replaced inline
+  predicate with helper call. The text + colors are identical.
+- `src/app/pos/lib/receipt-template.ts` (thermal text + thermal HTML
+  branches) — same refactor, twice.
+- `src/app/api/pos/receipts/email/route.ts` — same refactor on the
+  plain-text fallback. The HTML body already calls the thermal HTML
+  branch above.
+
+**6 quote surfaces newly gained discount UI:**
+
+| Surface | Visual treatment | Savings totals row |
+|---|---|---|
+| Public quote page (`/quote/[token]`) — THE Q-0085 fix | Full strikethrough + accent discounted price + per-line "Save $Y" | "You saved $X" above Total |
+| Quote PDF (`/api/quotes/[id]/pdf`) | Single-line "Combo: $125.00 -> $100.00 (Save $25.00)" sub-text per item | "You saved: -$X" above Total |
+| Admin quote detail (`/admin/quotes/[id]`) | Full strikethrough viz to match customer view | "You saved" above Total |
+| Admin slide-over (`/admin/quotes/components/quote-slide-over.tsx`) | Compact badge "Combo −$25" per Q2 | None (preview-only per Q2) |
+| POS quote detail (`/pos/components/quotes/quote-detail.tsx`) | Full strikethrough + per-line sub-text | "You saved" above modifier rows + Total |
+| POS quote-item-row (`/pos/components/quotes/quote-item-row.tsx`) | Compact strikethrough on totalPrice column | None (per-row component) |
+
+**PDF SELECT widened:** `quote_items(item_name, tier_name, quantity,
+unit_price, total_price, standard_price, pricing_type)` — previously
+omitted the latter two columns. Local `QuoteItem` interface widened to
+match.
+
+**POS quote-detail QuoteData.items type widened** to include
+`standard_price: number | null` and `pricing_type: 'standard' | 'sale'
+| 'combo' | null`. The POS quotes GET endpoint already returns these
+columns via `SELECT *`; only the type was incomplete.
+
+**PDF visual: ASCII arrow "->" not Unicode "→"** — PDFKit's default
+Helvetica font does not embed the Unicode arrow glyph; ASCII is
+byte-clean across all PDF readers.
+
+**Public receipt page gains a "Total saved today: $X" footer** above
+the Total row (operator Q3 — only on the public receipt page; the
+thermal text/HTML and email plain-text don't get this footer to keep
+their layouts unchanged).
+
+**Operator-locked decisions honored:**
+- Q1 — "You saved" sentence-case wording (locked over "Total Savings"
+  / "Bundle Discount" alternatives).
+- Q2 — Full strikethrough on admin detail page; compact badge on
+  slide-over. The detail page is the at-a-glance scan target;
+  slide-over is preview-only.
+- Q3 — "Total saved today: $X" on public receipt page only.
+- Q4 — Dollars math throughout. Helper does NOT import refund-math /
+  toCents. Future Money-Unify migration will adapt.
+- Q5 — Single-line ASCII arrow in PDF.
+
+**Tests — +49 net new:**
+- `src/lib/quotes/__tests__/line-item-pricing.test.ts` (NEW, 15 tests)
+  — pure helper coverage: no-discount paths (standard, null
+  pricing_type, null standard_price, equal prices, anomalous less-than),
+  combo discount with quantity multiplier, sale discount, defaults,
+  sumLineItemSavings aggregation across mixed item arrays.
+- `src/lib/quotes/__tests__/line-item-pricing-adoption.test.ts`
+  (NEW, 34 tests) — surface adoption invariants pinned via
+  source-file inspection: helper import in all 10 surfaces; inline
+  predicate removed from all 4 receipt surfaces; quote page no longer
+  filters on `pricing_type === 'sale'`; PDF SELECT includes new
+  columns; PDF local type widened; "You saved" wording present
+  across 4 quote surfaces with totals rows; "Total saved today"
+  on public receipt; Q-0085 reproduction via the sum helper
+  (Express Interior $85 anchor + Pet Hair $100 combo addon → $25
+  savings).
+
+**Hard rules respected:**
+- NO changes to combo-resolver.ts or any quote-creation route (Issue
+  33 territory).
+- NO database schema changes, NO migrations.
+- NO tool schema changes, NO prompt changes.
+- NO SMS body composition changes (`quote_sms_midcall` template
+  unchanged).
+- NO new colors outside the existing design system (green-500 /
+  green-600 / amber-400 used throughout, matching the existing
+  receipt surfaces).
+- 4 receipt surface refactors verified byte-identical to pre-extraction
+  output via the helper's input/output contract tests (Group H in
+  adoption tests).
+- "You saved $0" never renders — every totals/footer row is gated on
+  `totalSavings > 0`.
+
+**Gates green:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → 2139/2139 pass (was 2090 — +49 net new)
+- `npm run build` → 789 pages clean
+
+**Verification scenario (operator post-deploy):**
+
+Visit `/quote/{Q-0085-token}`. Expect:
+- Pet Hair & Dander Removal row:
+  - Unit Price column shows `~~$125.00~~` (strikethrough, muted) above
+    `$100.00` (green accent).
+  - Total column shows `$100.00` with green "Save $25.00" sub-line.
+- Express Interior Clean row: no discount UI (no combo on the anchor
+  itself).
+- Above the Total row: green "You saved $25.00".
+- Total: $185.00 (unchanged — the discount was already in the data).
+
+For any walk-up customer who completes a sale with combo/sale items,
+the public receipt page now shows the "Total saved today: $X" footer
+above the Total — alongside the existing per-line "Combo: Reg $X |
+Saved $Y!" sub-text.
+
+**Deploy required:** YES via `deploy-smartdetails` post-merge.
+
+---
+
 ## 2026-05-24 — feat(sms-ai-v2): Issue 35 root-cause fix — upsert_customer instructions_for_agent + runner noReply retry
 
 Branch `feat/issue-35-runner-noreply-fix`. Hot-on-the-heels follow-up to Session 5's

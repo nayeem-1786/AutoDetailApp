@@ -11,6 +11,7 @@ import {
   RECEIPT_VOCAB,
 } from '@/lib/data/receipt-composer';
 import { toCents } from '@/lib/utils/refund-math';
+import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
 
 interface ReceiptItem {
   id: string;
@@ -613,13 +614,18 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
       });
     }
 
-    // Sale/combo savings sub-text
-    if (item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price) {
-      const savings = item.standard_price - item.unit_price;
-      const label = item.pricing_type === 'combo' ? 'Combo' : 'Sale';
+    // Sale/combo savings sub-text — shared formatter (Issue 33 follow-up UX).
+    const pricingInfoText = getLineItemPricingInfo({
+      unit_price: item.unit_price,
+      standard_price: item.standard_price ?? null,
+      pricing_type:
+        (item.pricing_type as 'standard' | 'sale' | 'combo' | null) ?? null,
+      quantity: item.quantity,
+    });
+    if (pricingInfoText.hasDiscount) {
       lines.push({
         type: 'text',
-        text: `  ${label}: Reg $${item.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!`,
+        text: `  ${pricingInfoText.label}: Reg $${(pricingInfoText.standardPrice as number).toFixed(2)} | Saved $${pricingInfoText.savingsPerUnit.toFixed(2)}!`,
       });
     }
 
@@ -1075,12 +1081,17 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
       </tr>`;
       }
 
-      // Sale/combo savings sub-text
-      if (item.pricing_type && item.pricing_type !== 'standard' && item.standard_price != null && item.standard_price > item.unit_price) {
-        const savings = item.standard_price - item.unit_price;
-        const label = item.pricing_type === 'combo' ? 'Combo' : 'Sale';
+      // Sale/combo savings sub-text — shared formatter (Issue 33 follow-up UX).
+      const pricingInfoHtml = getLineItemPricingInfo({
+        unit_price: item.unit_price,
+        standard_price: item.standard_price ?? null,
+        pricing_type:
+          (item.pricing_type as 'standard' | 'sale' | 'combo' | null) ?? null,
+        quantity: item.quantity,
+      });
+      if (pricingInfoHtml.hasDiscount) {
         rows += `<tr>
-          <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#16a34a;">${label}: Reg $${item.standard_price.toFixed(2)} | Saved $${savings.toFixed(2)}!</td>
+          <td colspan="3" style="padding:0 0 4px 12px;font-size:11px;color:#16a34a;">${pricingInfoHtml.label}: Reg $${(pricingInfoHtml.standardPrice as number).toFixed(2)} | Saved $${pricingInfoHtml.savingsPerUnit.toFixed(2)}!</td>
         </tr>`;
       }
 

@@ -6,6 +6,10 @@ import { getBusinessInfo, type BusinessInfo } from '@/lib/data/business';
 import { formatCurrency, formatPhone } from '@/lib/utils/format';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
+import {
+  getLineItemPricingInfo,
+  sumLineItemSavings,
+} from '@/lib/quotes/line-item-pricing';
 
 // --- Types -----------------------------------------------------------
 
@@ -15,6 +19,10 @@ interface QuoteItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  // Issue 33 follow-up UX: combo/sale fields surfaced into PDF render.
+  // SELECT below widened to pull these columns.
+  standard_price: number | null;
+  pricing_type: 'standard' | 'sale' | 'combo' | null;
 }
 
 interface QuoteData {
@@ -256,6 +264,20 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
     const displayItems = composeLineItems(quote, quote.items);
 
     displayItems.forEach((item, index) => {
+      // Issue 33 follow-up UX: pull pricing info from the original quote_items
+      // row (mobile-fee synthetic rows have no original entry).
+      const original = item.is_mobile_fee ? null : quote.items[index] ?? null;
+      const pricingInfo = original
+        ? getLineItemPricingInfo({
+            unit_price: original.unit_price,
+            standard_price: original.standard_price ?? null,
+            pricing_type: original.pricing_type ?? null,
+            quantity: original.quantity,
+          })
+        : null;
+      // Reserve extra vertical space for the discount sub-line.
+      const rowHeight = pricingInfo?.hasDiscount ? 32 : 20;
+
       // Check if we need a new page
       if (y > doc.page.height - 150) {
         doc.addPage();
@@ -264,7 +286,7 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
 
       // Alternate row shading
       if (index % 2 === 0) {
-        doc.rect(marginLeft, y, contentWidth, 20).fill(lightGray);
+        doc.rect(marginLeft, y, contentWidth, rowHeight).fill(lightGray);
       }
 
       doc.fillColor(darkText);
@@ -298,7 +320,20 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
         align: 'right',
       });
 
-      y += 20;
+      // Issue 33 follow-up UX (operator Q5): single-line discount sub-text
+      // beneath the item name when combo / sale applies. Use ASCII arrow
+      // "->" — PDFKit's default Helvetica font does not embed the Unicode
+      // arrow glyph, and rendering would either drop the glyph or require
+      // bundling an additional font. ASCII is byte-clean across all PDF
+      // readers.
+      if (pricingInfo?.hasDiscount) {
+        const discountText = `${pricingInfo.label}: $${(pricingInfo.standardPrice as number).toFixed(2)} -> $${item.unit_price.toFixed(2)} (Save $${pricingInfo.savingsPerUnit.toFixed(2)})`;
+        doc.fillColor('#16a34a').fontSize(8);
+        doc.text(discountText, colItem + 8, y + 18);
+        doc.fillColor(darkText).fontSize(9);
+      }
+
+      y += rowHeight;
     });
 
     // Bottom border of table
@@ -331,6 +366,27 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
       width: 70,
       align: 'right',
     });
+
+    // Issue 33 follow-up UX (operator Q1): "You saved $X" totals row.
+    // Hidden when no combo/sale savings apply across the line items.
+    const totalLineSavings = sumLineItemSavings(
+      quote.items.map((i) => ({
+        unit_price: i.unit_price,
+        standard_price: i.standard_price ?? null,
+        pricing_type: i.pricing_type ?? null,
+        quantity: i.quantity,
+      })),
+    );
+    if (totalLineSavings > 0) {
+      y += 16;
+      doc.font('Helvetica').fontSize(10).fillColor('#16a34a');
+      doc.text('You saved:', totalsLabelX, y, { width: 100, align: 'right' });
+      doc.text(`-${formatCurrency(totalLineSavings)}`, totalsValueX, y, {
+        width: 70,
+        align: 'right',
+      });
+      doc.fillColor(darkText);
+    }
 
     // Item 15g Layer 15g-v: modifier rows between Tax and TOTAL. Conditional
     // per modifier; mirrors the operator UI's <QuoteTotals> ordering. The
@@ -467,7 +523,7 @@ export async function GET(
         manual_discount_type, manual_discount_value, manual_discount_label,
         customer:customers(first_name, last_name, phone, email),
         vehicle:vehicles(year, make, model, color),
-        items:quote_items(item_name, tier_name, quantity, unit_price, total_price)
+        items:quote_items(item_name, tier_name, quantity, unit_price, total_price, standard_price, pricing_type)
       `
       )
       .eq('id', id)
