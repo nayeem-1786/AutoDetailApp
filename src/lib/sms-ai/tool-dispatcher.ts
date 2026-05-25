@@ -118,6 +118,32 @@ export interface RuntimeContext {
   phone: string;
   /** Conversation UUID for the in-flight inbound. Reserved for future use. */
   conversationId: string;
+  /**
+   * Vehicle size_class captured from the most recent classify_vehicle
+   * response within this agent run. Auto-injected into get_services
+   * calls if the LLM doesn't explicitly pass it (LLM value, if any,
+   * always wins).
+   *
+   * D40 (2026-05-24, post-Issue 36 + D39): architectural enforcement
+   * of the size-aware pricing flow. D39's prompt+schema strengthening
+   * (Critical Rule 6 + imperative description + recall directive)
+   * proved empirically insufficient — PM2 logs verified 6 get_services
+   * calls in the post-D39 test conversation all returned the identical
+   * 21909-byte size-unaware payload, confirming size_class was never
+   * passed despite the prompt rules. This injection mirrors the
+   * phone-injection pattern (Issue 26 precedent at 6 sites in this
+   * file).
+   *
+   * Undefined when no classify_vehicle call has occurred yet in this
+   * agent run, OR when the most recent classify_vehicle returned
+   * without a string size_class (defensive type guard).
+   *
+   * Reset between agent runs along with phone — the runner's
+   * `__resetForAgentRun({ phone, conversationId })` call passes a
+   * fresh context object that does NOT carry size_class, so each
+   * inbound starts with this field undefined.
+   */
+  size_class?: string | null;
 }
 
 let _runtimeContext: RuntimeContext | null = null;
@@ -317,13 +343,29 @@ async function callLookupCustomer(_input: Record<string, unknown>, key: string):
 }
 
 async function callGetServices(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
-  // Issue 33 Layer 2: forward optional `size_class` so the endpoint can
+  // Issue 33 Layer 2: forward `size_class` so the endpoint can
   // resolve standalone prices + savings for size-aware addons. The
   // endpoint silently ignores invalid values, so we don't need to
   // validate here.
-  const sizeClass = typeof input.size_class === 'string' ? input.size_class : undefined;
+  //
+  // D40 (2026-05-24): if the LLM didn't explicitly pass size_class,
+  // inject it from RuntimeContext (captured during the most recent
+  // classify_vehicle response). LLM-passed value, if any, always
+  // takes precedence — same precedence ordering as a CLI flag
+  // overriding a default.
+  //
+  // This is the architectural fix for Issue 36. D39's prompt+schema
+  // strengthening proved empirically insufficient (PM2-verified: 6
+  // get_services calls post-D39 returned the same 21909-byte
+  // size-unaware payload). Mirrors the phone-injection pattern.
+  const llmProvidedSizeClass = typeof input.size_class === 'string'
+    ? input.size_class
+    : undefined;
+  const contextSizeClass = _runtimeContext?.size_class ?? undefined;
+  const effectiveSizeClass = llmProvidedSizeClass ?? contextSizeClass;
+
   return voiceAgentFetch(
-    `/api/voice-agent/services${qs({ size_class: sizeClass })}`,
+    `/api/voice-agent/services${qs({ size_class: effectiveSizeClass })}`,
     { method: 'GET' },
     TOOL_TIMEOUT_MS.get_services,
     key,
@@ -333,7 +375,7 @@ async function callGetServices(input: Record<string, unknown>, key: string): Pro
 async function callClassifyVehicle(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {
   const make = typeof input.make === 'string' ? input.make : '';
   if (!make) return errResult('classify_vehicle: missing required input "make"');
-  return voiceAgentFetch(
+  const result = await voiceAgentFetch(
     `/api/voice-agent/vehicle-classify${qs({
       make,
       model: typeof input.model === 'string' ? input.model : undefined,
@@ -344,6 +386,34 @@ async function callClassifyVehicle(input: Record<string, unknown>, key: string):
     TOOL_TIMEOUT_MS.classify_vehicle,
     key,
   );
+
+  // D40 (2026-05-24): capture size_class from the successful response
+  // into RuntimeContext for automatic injection on subsequent
+  // get_services calls. Mirrors the phone-injection pattern.
+  //
+  // The LLM-facing response is unchanged — it still receives the full
+  // JSON payload including size_class. The capture is a side-effect.
+  //
+  // Defensive: only capture on success (isError=false); only when
+  // size_class is a non-empty string (the API returns it at the top
+  // level — see vehicle-classify/route.ts:82). Multiple
+  // classify_vehicle calls in a single agent run overwrite the
+  // captured value (most-recent-wins, matches what the LLM sees).
+  if (!result.isError && _runtimeContext && typeof result.content === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(result.content);
+      const sizeClass = (parsed as { size_class?: unknown } | null)?.size_class;
+      if (typeof sizeClass === 'string' && sizeClass.length > 0) {
+        _runtimeContext.size_class = sizeClass;
+      }
+    } catch {
+      // Defensive: if response shape changes or parsing fails, do not
+      // crash the agent run. Skip the capture; the LLM still gets the
+      // unchanged response.
+    }
+  }
+
+  return result;
 }
 
 async function callCheckAvailability(input: Record<string, unknown>, key: string): Promise<DispatchToolResult> {

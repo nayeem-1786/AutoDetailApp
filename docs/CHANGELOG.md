@@ -6,6 +6,88 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(sms-ai-v2): Issue 36 D40 — architectural size_class injection via RuntimeContext
+
+Branch `feat/issue-36-architectural-size-class-injection`. Closes
+Issue 36 architecturally after D39's prompt+schema strengthening
+(2026-05-24 21:00 PT) failed to change agent behavior empirically.
+
+**Post-D39 verification (2026-05-24 21:49 PT):** Same $300/$450
+fidelity gap reproduced on the same 2018 Suburban / Hot Shampoo
+Extraction Complete test. PM2 logs verified the agent made 3
+`classify_vehicle` calls AND 2 `get_services` calls — both
+`get_services` calls returned the identical 21909-byte size-unaware
+payload, proving `size_class` was NEVER passed despite D39's
+Critical Rule 6, strengthened subsection, recall directive, and
+schema imperative. D39 had ZERO observable effect on agent behavior.
+Matches the D38 lesson: invocation-discipline rules cannot be
+reliably enforced via prompt wording alone when the parameter is
+structurally omissible.
+
+**Fix:** mirror the phone-injection pattern (Issue 26 precedent, 6
+sites in `tool-dispatcher.ts`). No new mechanisms.
+
+- **`RuntimeContext`** extended with `size_class?: string | null`
+  (`src/lib/sms-ai/tool-dispatcher.ts:116-148`).
+- **`callClassifyVehicle`** (`tool-dispatcher.ts:355-396`) now
+  captures the response's `size_class` into `_runtimeContext.size_class`
+  on successful classify calls. Defensive type guard: non-string
+  values (null / number / missing field) do not update the context.
+  The LLM-facing response is unchanged — full JSON including
+  `size_class` flows through verbatim. Capture is a side-effect.
+- **`callGetServices`** (`tool-dispatcher.ts:319-350`) now checks
+  LLM input first; if no `size_class`, injects from
+  `_runtimeContext.size_class`. LLM-passed value always wins
+  (override capable — same precedence as a CLI flag overriding a
+  default).
+- **Reset** behavior unchanged: `__resetForAgentRun({ phone,
+  conversationId })` passes a fresh context object that does NOT
+  carry `size_class`, so each inbound starts fresh.
+
+**Preserved:**
+- D39 prompt rules (Critical Rule 6 + strengthened "Passing
+  size_class" subsection + Recall directive) UNCHANGED — kept as
+  defense in depth.
+- D39 schema descriptions in `tools.ts` UNCHANGED — "REQUIRED
+  whenever" + $300/$450 example + "call once per size_class context"
+  all stay.
+- D38 (mandatory customer-facing reply, Critical Rule 2) UNCHANGED.
+- Rule 18 (`instructions_for_agent`, was Rule 17 pre-D39 renumber)
+  UNCHANGED.
+- Critical Rule 4 (exotic/classic escalation) UNCHANGED.
+- Agent-runner construction (`agent-runner.ts:272` passes
+  `{ phone, conversationId }`) UNCHANGED — the new field is
+  optional, so omitting it is type-safe.
+- `vehicle-classify` endpoint UNCHANGED — response shape verified
+  to expose `size_class` at the top level.
+- `services` endpoint UNCHANGED — already correctly resolves
+  size-aware pricing when `size_class` provided.
+- No new tools, no migrations, no quote-creation route changes.
+
+**Tests:** +12 net in `tool-dispatcher.test.ts` — capture-on-success
++ injection + LLM-override + first-call-no-context-no-crash + 3
+defensive guards (no size_class field / size_class=null / non-string
+type) + error-response-no-update + multiple-classifies-most-recent-wins
++ reset-between-runs + LLM-response-unchanged + no-context-no-crash.
+72/72 dispatcher tests pass. Full suite: 2213/2213 pass.
+
+**Verification:** typecheck 0 errors, lint 0 errors / 97 warnings
+(unchanged baseline), production build clean.
+
+**Manual verification scenario:** from allowlisted phone, send:
+"Hi, I'm Nayeem with a 2018 Suburban, need Hot Shampoo Extraction
+Complete". Expected behavior after this deploy:
+- Agent calls `classify_vehicle` → response includes
+  `size_class: 'suv_3row_van'`.
+- Agent calls `get_services` (with or without `size_class` in
+  input) — dispatcher URL contains
+  `?size_class=suv_3row_van`.
+- Agent quotes **$450** (not $300).
+- PM2 logs: `get_services` payload size differs from 21909 (size-aware
+  fields populated).
+
+---
+
 ## 2026-05-24 — feat(sms-ai-v2): Issue 36 + D39 — strengthen size_class imperative (prompt + schema)
 
 Branch `feat/issue-36-size-class-imperative`. Closes Issue 36 — a

@@ -1180,7 +1180,11 @@ The existing prompt rule from Session B was informational rather than imperative
 
 See D39 for full decision details.
 
-**Status:** Resolved 2026-05-24 via Workstream J Session 7 (branch `feat/issue-36-size-class-imperative`). New Critical Rule 6 mandates `size_class` after `classify_vehicle`; existing "Passing size_class" subsection strengthened with imperative wording + recall directive; tool schema description + `size_class` parameter description rewritten to remove "OPTIONAL" framing and surface empirical consequences. Tests: +20 (10 system-prompt covering Rule 6 + strengthened subsection + recall + D38/Rule 18/Rule 4 coexistence; 7 tools covering ALWAYS-pass / $300-$450 / call-once update / recall mandate / REQUIRED-whenever / schema-optional preservation / exotic-classic). Coexistence preserved: D38 mandatory-reply rule UNCHANGED; Rule 18 (was Rule 17, instructions_for_agent) UNCHANGED in substance (renumbered only); exotic/classic escalation language UNCHANGED at all 4 sites. If D39 proves insufficient in production, the architectural fix (dispatcher-injected `size_class` from `RuntimeContext`) becomes the next step.
+**Status as of D39 (2026-05-24 21:00 PT):** Prompt + schema strengthened via Workstream J Session 7 (branch `feat/issue-36-size-class-imperative`). New Critical Rule 6 mandates `size_class` after `classify_vehicle`; existing "Passing size_class" subsection strengthened with imperative wording + recall directive; tool schema description + `size_class` parameter description rewritten to remove "OPTIONAL" framing and surface empirical consequences. Tests: +20.
+
+**Verification result (2026-05-24 21:49 PT):** D39 did NOT close the issue. Same $300/$450 fidelity gap reproduced on a 2018 Suburban quote for Hot Shampoo Extraction Complete. PM2 logs verified 3 `classify_vehicle` calls + 2 `get_services` calls; both `get_services` calls returned the identical 21909-byte size-unaware payload — confirming `size_class` was never passed despite the new Critical Rule 6 + strengthened subsection + recall directive + schema imperative. D39 had ZERO observable effect on agent behavior. This matches the D38 lesson: invocation-discipline rules cannot be reliably enforced via prompt wording alone when the parameter is structurally omissible.
+
+**Status as of D40 (2026-05-24 22:00 PT):** Resolved via Workstream J Session 8 (branch `feat/issue-36-architectural-size-class-injection`). Architectural fix mirrors the phone-injection pattern (Issue 26 precedent, 6 sites in `tool-dispatcher.ts`): `RuntimeContext` extended with `size_class?: string | null`; `callClassifyVehicle` captures the response's `size_class` into context on successful classify calls (defensive type guard — non-string values do not update); `callGetServices` injects from context if LLM didn't pass `size_class` (LLM-passed value always wins). D39 prompt rules + schema descriptions preserved as defense in depth. Tests: +12. Coexistence preserved: D38 mandatory-reply rule UNCHANGED; Rule 18 (`instructions_for_agent`) UNCHANGED; exotic/classic escalation language UNCHANGED at all 4 sites; agent-runner construction UNCHANGED; vehicle-classify + services endpoints UNCHANGED. See D40 for full decision details. Post-deploy verification: pending operator test.
 
 ---
 
@@ -1900,6 +1904,43 @@ D39's insertion at position 6 renumbers prior Rules 6-17 → 7-18. References "p
 **If D39 proves insufficient in production:** the architectural fix becomes the next step — dispatcher reads `classify_vehicle` response into `RuntimeContext.size_class`, then automatically injects it into subsequent `get_services` calls (mirrors the phone-injection pattern from Issue 26).
 
 **Implementation:** Workstream J Session 7 — branch `feat/issue-36-size-class-imperative` (2026-05-24, this commit). 20 new tests across `system-prompt.test.ts` (10) + `tools.test.ts` (7) + renumber updates (3).
+
+**D40 — Architectural injection of `size_class` via `RuntimeContext` (operator-locked 2026-05-24, post Issue 36 + D39 empirical evidence).**
+
+D39 shipped prompt + schema strengthening for `size_class` passing. Post-deploy production test (2026-05-24 21:49 PT): customer told $300 for Hot Shampoo Extraction Complete on a 2018 Suburban; quote correctly resolved to $450. Same $150 fidelity gap as Issue 36 originally reported. PM2 logs verified the agent made 3 `classify_vehicle` calls AND 2 `get_services` calls — both `get_services` calls returned the identical 21909-byte size-unaware payload, confirming `size_class` was NEVER passed despite D39's Critical Rule 6, strengthened subsection, recall directive, and schema imperative.
+
+D39 had ZERO observable effect on agent behavior. This matches the D38 lesson: invocation discipline requirements cannot be reliably enforced via prompt rules alone when the parameter is structurally omissible.
+
+**Decision (operator-locked):**
+
+1. Extend `RuntimeContext` in `tool-dispatcher.ts` with optional `size_class` field.
+2. `callClassifyVehicle` captures the response's `size_class` into the context on successful classify calls. Defensive type checking; non-string values (null / number / array / missing) do not update the context.
+3. `callGetServices` checks LLM input first; if no `size_class` provided by LLM, injects from `_runtimeContext.size_class`.
+4. LLM-provided `size_class` always wins (override capable — matches the precedence ordering of a CLI flag overriding a default).
+5. Reset behavior: `__resetForAgentRun({ phone, conversationId })` clears `size_class` along with all other context fields (single mechanism — the runner passes a fresh context object that does not carry `size_class`).
+6. D39 prompt rules + schema strengthening REMAIN as defense in depth — even though they don't work alone, having them in place doesn't hurt and may guide the LLM to pass `size_class` explicitly in edge cases (e.g., walk-in POS-driven flows that bypass `classify_vehicle` but still want size-aware quoting).
+
+**Why this pattern:**
+
+- Mirrors the existing phone-injection pattern at 6 sites in `tool-dispatcher.ts` (Issue 26 precedent: `lookup_customer`, `create_appointment`, `send_info_sms`, `send_quote_sms`, `upsert_customer`, `notify_staff`).
+- Battle-tested architecture; no novel mechanisms introduced.
+- LLM still receives unchanged `classify_vehicle` response (no visible behavior change from the agent's perspective — the full JSON including `size_class` flows through to the agent verbatim; capture is a side-effect).
+- Reset semantics match existing context fields.
+
+**Exotic/classic interaction:**
+
+- `classify_vehicle` returns `size_class='exotic'` or `'classic'` for those vehicles.
+- Critical Rule 4 directs the agent to escalate via `notify_staff` BEFORE calling `get_services` for these vehicles.
+- IF the agent does call `get_services` anyway (LLM non-compliance), the injected `size_class='exotic'/'classic'` will reach the endpoint; the endpoint's existing logic handles this case (per Layer 2 from Sessions A/B). Critical Rule 4 + Critical Rule 6's reinforcement remain the escalation path.
+- No special-casing required in the dispatcher; existing rules handle the flow.
+
+**Acceptance criteria:**
+
+- Production test: 2018 Suburban → agent quotes $450 (not $300) for Hot Shampoo Extraction Complete.
+- PM2 logs: `get_services` calls following `classify_vehicle` show `size_class=suv_3row_van` in the request URL.
+- Payload size varies across vehicle sizes (not the constant 21909 bytes anymore).
+
+**Implementation:** Workstream J Session 8 — branch `feat/issue-36-architectural-size-class-injection` (2026-05-24, this commit). 12 new tests in `tool-dispatcher.test.ts` (capture-on-success + injection + LLM-override + first-call-no-context + 4 defensive-guards + multiple-calls-most-recent-wins + reset + LLM-response-unchanged + no-context-no-crash). No changes to: prompt content (D39 preserved as defense in depth), `tools.ts` (D39 schema descriptions preserved), `vehicle-classify` endpoint, `services` endpoint, agent-runner construction site, or any quote-creation route.
 
 ### Coverage targets
 
