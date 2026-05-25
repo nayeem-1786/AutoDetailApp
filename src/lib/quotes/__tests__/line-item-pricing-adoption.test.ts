@@ -33,6 +33,7 @@ import { join } from 'path';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
+  computePreDiscountSubtotal,
 } from '../line-item-pricing';
 
 const repoRoot = join(__dirname, '..', '..', '..', '..');
@@ -346,5 +347,64 @@ describe('line-item-pricing — sumLineItemSavings cross-surface contract', () =
       { unit_price: 50, standard_price: null, pricing_type: 'standard', quantity: 1 }, // 0
     ]);
     expect(total).toBe(65);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────
+// Group J — pre-discount subtotal pattern (post-Q-0084 math fix)
+// ───────────────────────────────────────────────────────────────
+
+describe('line-item-pricing — pre-discount subtotal adoption', () => {
+  const surfaces: Array<{ name: string; path: string }> = [
+    { name: 'public quote page', path: 'src/app/(public)/quote/[token]/page.tsx' },
+    { name: 'quote PDF route', path: 'src/app/api/quotes/[id]/pdf/route.ts' },
+    { name: 'admin quote detail', path: 'src/app/admin/quotes/[id]/page.tsx' },
+    { name: 'POS quote detail', path: 'src/app/pos/components/quotes/quote-detail.tsx' },
+  ];
+
+  for (const surface of surfaces) {
+    it(`${surface.name} imports computePreDiscountSubtotal`, () => {
+      const src = readSrc(surface.path);
+      expect(src).toContain('computePreDiscountSubtotal');
+    });
+
+    it(`${surface.name} no longer renders raw quote.subtotal in the subtotal row`, () => {
+      const src = readSrc(surface.path);
+      // The raw `formatCurrency(quote.subtotal)` pattern is the pre-fix
+      // shape. After the math fix, all 4 surfaces compute pre-discount
+      // and render that. (`tx.subtotal` on the receipt page is out of
+      // scope for this session.)
+      expect(src).not.toMatch(/formatCurrency\(quote\.subtotal\)/);
+    });
+  }
+
+  it('Q-0084 math invariant: subtotal $385 - savings $25 = total $360', () => {
+    const items = [
+      { unit_price: 85, standard_price: null, pricing_type: 'standard' as const, quantity: 1 },
+      { unit_price: 100, standard_price: 125, pricing_type: 'combo' as const, quantity: 1 },
+      { unit_price: 175, standard_price: null, pricing_type: 'standard' as const, quantity: 1 },
+    ];
+    const subtotal = computePreDiscountSubtotal(items);
+    const savings = sumLineItemSavings(items);
+    const customerPaysTotal = items.reduce(
+      (sum, i) => sum + i.unit_price * (i.quantity ?? 1),
+      0,
+    );
+    expect(subtotal).toBe(385);
+    expect(savings).toBe(25);
+    expect(customerPaysTotal).toBe(360);
+    expect(subtotal - savings).toBe(customerPaysTotal);
+  });
+
+  it('no-discount quote: pre-discount subtotal equals customer-pays total', () => {
+    const items = [
+      { unit_price: 85, standard_price: null, pricing_type: 'standard' as const, quantity: 1 },
+      { unit_price: 175, standard_price: null, pricing_type: 'standard' as const, quantity: 1 },
+    ];
+    const subtotal = computePreDiscountSubtotal(items);
+    const savings = sumLineItemSavings(items);
+    expect(savings).toBe(0);
+    expect(subtotal).toBe(260);
+    expect(subtotal - savings).toBe(260);
   });
 });

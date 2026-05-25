@@ -23,6 +23,7 @@ import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
+  computePreDiscountSubtotal,
 } from '@/lib/quotes/line-item-pricing';
 import {
   deriveCommPillState,
@@ -584,10 +585,23 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
 
             {/* Totals */}
             <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1">
-              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                <span>Subtotal</span>
-                <span className="tabular-nums">{formatCurrency(quote.subtotal)}</span>
-              </div>
+              {(() => {
+                // Pre-discount subtotal pattern (post-Q-0084 math fix).
+                const preDiscountSubtotal = computePreDiscountSubtotal(
+                  (quote.items || []).map((i) => ({
+                    unit_price: i.unit_price,
+                    standard_price: i.standard_price ?? null,
+                    pricing_type: i.pricing_type ?? null,
+                    quantity: i.quantity,
+                  })),
+                );
+                return (
+                  <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                    <span>Subtotal</span>
+                    <span className="tabular-nums">{formatCurrency(preDiscountSubtotal)}</span>
+                  </div>
+                );
+              })()}
               {quote.tax_amount > 0 && (
                 <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                   <span>Tax</span>

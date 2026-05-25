@@ -103,3 +103,35 @@ export function sumLineItemSavings(
   }
   return total;
 }
+
+/**
+ * Pre-discount subtotal — sum of what the line items WOULD have cost
+ * before combo/sale discounts. For each item:
+ *  - If a discount applies (per `getLineItemPricingInfo.hasDiscount`),
+ *    contribute `standard_price * quantity`.
+ *  - Otherwise contribute `unit_price * quantity`.
+ *
+ * Used by quote and receipt totals blocks so the customer-facing math
+ * reconciles: `subtotal − savings === total`. Empirical motivation:
+ * Q-0084 shipped a subtotal that already had the combo applied, making
+ * the "You saved -$25" row appear like a second deduction. Customer
+ * eye-math broke. Switching to retail-convention pre-discount subtotal
+ * fixes the visible math.
+ *
+ * Returns dollars (matches `getLineItemPricingInfo` convention).
+ */
+export function computePreDiscountSubtotal(
+  items: ReadonlyArray<LineItemPricingInput>,
+): number {
+  let subtotal = 0;
+  for (const item of items) {
+    const info = getLineItemPricingInfo(item);
+    const quantity = item.quantity ?? 1;
+    const effectiveUnitPrice =
+      info.hasDiscount && info.standardPrice !== null
+        ? info.standardPrice
+        : item.unit_price;
+    subtotal += effectiveUnitPrice * quantity;
+  }
+  return subtotal;
+}

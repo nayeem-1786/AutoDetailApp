@@ -11,6 +11,7 @@ import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
+  computePreDiscountSubtotal,
 } from '@/lib/quotes/line-item-pricing';
 
 type QuoteWithRelations = Quote & {
@@ -303,10 +304,30 @@ export default async function PublicQuotePage({ params }: PageProps) {
         {/* Totals */}
         <div className="border-t border-site-border bg-brand-dark px-6 py-4">
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-site-text-muted">Subtotal</span>
-              <span className="font-medium text-site-text">{formatCurrency(quote.subtotal)}</span>
-            </div>
+            {(() => {
+              // Pre-discount subtotal pattern (post-Q-0084 math fix):
+              // subtotal shows pre-discount sum so `subtotal − savings === total`
+              // reconciles to the customer's eye-math.
+              const preDiscountSubtotal = computePreDiscountSubtotal(
+                (quote.items || []).map((item) => ({
+                  unit_price: item.unit_price,
+                  standard_price: item.standard_price ?? null,
+                  pricing_type:
+                    (item.pricing_type as
+                      | 'standard'
+                      | 'sale'
+                      | 'combo'
+                      | null) ?? null,
+                  quantity: item.quantity,
+                })),
+              );
+              return (
+                <div className="flex justify-between text-sm">
+                  <span className="text-site-text-muted">Subtotal</span>
+                  <span className="font-medium text-site-text">{formatCurrency(preDiscountSubtotal)}</span>
+                </div>
+              );
+            })()}
             {quote.tax_amount > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-site-text-muted">Tax</span>
