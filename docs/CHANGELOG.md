@@ -6,6 +6,31 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-25 — docs: backfill ROADMAP-13-ITEMS.md session ledger for sessions #73–79 (Issue 36–38 arc)
+
+Doc-only catch-up. Backfilled `docs/dev/ROADMAP-13-ITEMS.md` session ledger
+with 7 rows (#73–79) for the SMS-AI v2 Issue 36→38 cascade + Q-0084
+follow-up work that landed 2026-05-24 evening → 2026-05-25 but was not
+captured at session end as the pace accelerated during the Issue 36 cascade:
+#73 quote source tracking (`ea42962b` — surfaced from git log; not in the
+original catch-up inventory, slots in chronologically ahead of D39 and shifts
+the rest +1), #74 D39 (`20a94b0a`) + #75 D40 (`76d9b58e`) (two insufficient
+Issue-36 `size_class` attempts), #76 Issue 36 Layer 2 Phase B diagnostic
+(`f682dc2e`, read-only — located the endpoint main-tier root cause), #77 D41
+(`a59e41b4` — THE Issue 36 fix), #78 D42 (`270bde7e` — 3-tier prefix-match
+resolver fallback, closes Issue 37), #79 Issue 38 tier-intent audit
+(`3a9b06fe`, read-only — recommends B1, fix deferred to Sessions A/B/C).
+Also bumped the document version v3.8 → v3.9, refreshed the "Last session
+updated" line, added a prompt-fidelity-track status note under Out-of-Scope
+Workstream A, and rewrote the Suggested Next Move section. Sources: this
+CHANGELOG (authoritative per-session entries) + `SMS_AI_V2_PROMPT_OBSERVATIONS.md`
+Sections 2/7 + git log across all branches (audit sessions #76/#79 live on
+un-merged `audit/*` branches, given ledger rows with their branch commit hash
+per existing precedent). No source code, no migrations, no test changes —
+`git diff --name-only` shows only `docs/dev/ROADMAP-13-ITEMS.md` and this file.
+
+---
+
 ## 2026-05-24 — fix(services): Issue 37 D42 — prefix-match fallback in resolveServiceByName
 
 Branch `feat/issue-37-resolver-prefix-fallback`. Surfaced immediately
