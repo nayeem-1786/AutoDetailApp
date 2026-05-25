@@ -192,6 +192,65 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     expect(sizeClassProp.description).toContain('notify_staff');
   });
 
+  // -------------------------------------------------------------------------
+  // Workstream J Session 7 — D39 + Issue 36 (2026-05-24): size_class imperative
+  // strengthening on get_services tool description + size_class parameter.
+  // -------------------------------------------------------------------------
+
+  it('D39: get_services description contains "ALWAYS pass `size_class`" imperative', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    expect(tool.description).toContain('ALWAYS pass `size_class`');
+  });
+
+  it('D39: get_services description cites the $300/$450 empirical failure', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    expect(tool.description).toContain('$300');
+    expect(tool.description).toContain('$450');
+    expect(tool.description.toLowerCase()).toContain('customer trust');
+  });
+
+  it('D39: get_services description updates "call once" guidance to size_class-aware version', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    // The pre-D39 "call once per conversation and reuse" guidance prevented
+    // recall after classify_vehicle. D39 broadens to "call once per size_class
+    // context (typically once or twice per conversation)".
+    expect(tool.description).toContain('call once per size_class context');
+    expect(tool.description).toContain('RECALL with size_class after classify_vehicle');
+    // Stale wording must be gone
+    expect(tool.description).not.toContain('call once per conversation and reuse');
+  });
+
+  it('D39: get_services description declares the cached-response recall mandate', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    expect(tool.description).toContain('MUST recall it with size_class');
+  });
+
+  it('D39: size_class parameter description uses "REQUIRED whenever" imperative (not "OPTIONAL")', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    const sizeClassProp = tool.input_schema.properties.size_class as { description?: string };
+    expect(sizeClassProp.description).toContain('REQUIRED whenever');
+    // Pre-D39 "OPTIONAL." prefix is gone.
+    expect(sizeClassProp.description).not.toMatch(/^OPTIONAL\./);
+  });
+
+  it('D39: size_class parameter still appears in input_schema and is NOT in required[] (must stay schema-optional for the first-call-before-classify case)', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    // size_class is still a property of the schema
+    expect(tool.input_schema.properties.size_class).toBeDefined();
+    // But explicitly NOT in required[] — imperative lives in the description,
+    // not in JSON schema enforcement (so the agent can make the first
+    // discovery call before classify_vehicle has returned).
+    expect(tool.input_schema.required ?? []).not.toContain('size_class');
+  });
+
+  it('D39: size_class parameter description preserves the exotic/classic escalation precedence note', () => {
+    const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+    const sizeClassProp = tool.input_schema.properties.size_class as { description?: string };
+    expect(sizeClassProp.description).toContain('exotic and classic');
+    expect(sizeClassProp.description).toContain('notify_staff');
+    expect(sizeClassProp.description).toContain('escalation rule takes precedence');
+  });
+
   it('SmsAiV2Tool type matches the readonly array entries structurally', () => {
     const sample: SmsAiV2Tool = SMS_AI_V2_TOOLS[0];
     expect(sample.name).toBeDefined();

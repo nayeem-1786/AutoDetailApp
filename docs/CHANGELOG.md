@@ -6,6 +6,83 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(sms-ai-v2): Issue 36 + D39 — strengthen size_class imperative (prompt + schema)
+
+Branch `feat/issue-36-size-class-imperative`. Closes Issue 36 — a
+larger-than-Issue-33 customer-facing fidelity gap surfaced from
+production testing.
+
+**Real-world failure:** customer told $300 for Hot Shampoo Extraction
+Complete on a 2018 Suburban; actual quote charged $450 — a $150 gap.
+Root cause: 6 `get_services` calls in the test conversation, all with
+identical 21909-byte payload, meaning `size_class` was never passed.
+The dispatcher + endpoint (Sessions A/B Layer 2) correctly handle
+`size_class` when provided; the LLM just wasn't including it.
+
+**Fix scope:** prompt + tool schema only. No dispatcher / endpoint /
+new tools.
+
+- **New Critical Rule 6** in `src/lib/sms-ai/system-prompt.ts:103-117`
+  mandates `size_class` on `get_services` after `classify_vehicle`,
+  with the $300/$450 empirical evidence, the mandatory pattern (3
+  steps), the recall directive, and the exotic/classic-takes-precedence
+  cross-reference (Critical Rule 4).
+- **Existing "Passing size_class" subsection** strengthened with
+  imperative wording ("you MUST pass that same `size_class`"); added a
+  new "Recall directive (cached `get_services` response)" subsection;
+  cross-reference to Critical Rule 6 (`system-prompt.ts:198-264`).
+- **Tool schema description for `get_services`** rewritten
+  (`src/lib/sms-ai/tools.ts:82-83`) — removed "OPTIONAL" framing,
+  added "ALWAYS pass `size_class`", added the $300/$450 example,
+  added the "MUST recall" mandate, and updated "call once per
+  conversation" → "call once per size_class context".
+- **`size_class` parameter description** rewritten
+  (`tools.ts:91`) — "REQUIRED whenever the customer's vehicle has been
+  classified via classify_vehicle" replaces "OPTIONAL. The customer's
+  vehicle size class...". `size_class` remains schema-OPTIONAL (not
+  in `required[]`) so the first informational call before
+  `classify_vehicle` is still allowed.
+- **Renumber:** new rule inserted at position 6 shifted prior Rules
+  6-17 → 7-18. References updated: "per Rule 17" → "per Rule 18",
+  "Critical rule 16" → "Critical rule 17" (2 sites).
+
+**Tests:** +20 net (10 system-prompt covering new Rule 6 placement
++ Suburban evidence + classify_vehicle trigger + recall directive +
+exotic/classic precedence + strengthened subsection + Q-0084 example
++ Recall subsection + Critical Rule 4 cite + D38/Rule 18 preservation
++ exotic 4-site preservation; 7 tools covering ALWAYS-pass / $300-$450
+/ call-once update / recall mandate / REQUIRED-whenever / schema-optional
+preservation / exotic-classic). Three existing tests updated for
+renumber. Combined: 160 / 160 pass in the sms-ai test suite.
+
+**Preserved:**
+- D38 (mandatory customer-facing reply, Critical Rule 2) UNCHANGED in
+  wording.
+- Rule 18 (was Rule 17, `instructions_for_agent` silent guidance)
+  UNCHANGED in substance — only the rule number shifted.
+- Critical Rule 4 (exotic/classic escalation) UNCHANGED, explicitly
+  reinforced inside Critical Rule 6.
+- Dispatcher (`tool-dispatcher.ts:320-326`) UNCHANGED — already
+  correctly forwards `size_class` when present.
+- Endpoint (`services/route.ts`) UNCHANGED — already correctly
+  resolves size-aware pricing when `size_class` provided.
+
+**Verification:** typecheck 0 errors, lint 0 errors / 97 warnings
+(unchanged baseline), 2201 / 2201 tests pass, production build clean.
+
+**Manual verification scenario:** from allowlisted phone, send a fresh
+SMS to trigger a quote for Hot Shampoo Extraction Complete on a
+3-row SUV (e.g., Suburban). Verify the agent calls `get_services`
+WITH `size_class: 'suv_3row_van'`. Verify the agent quotes $450 (not
+$300). Verify PM2 logs show different payload sizes between the
+no-size_class call (if any) and the with-size_class call.
+
+If D39 proves insufficient in production, the architectural fallback
+is dispatcher-injected `size_class` from `RuntimeContext` (mirrors
+the phone-injection pattern from Issue 26).
+
+---
+
 ## 2026-05-24 — feat(quotes): source tracking — new column + helper + 5 path adoptions + 4 render surfaces
 
 Branch `feat/quote-source-tracking`. Implements the audit at
