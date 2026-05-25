@@ -6,6 +6,110 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — audit: Issue 39 — `{services}` chip composition for multi-tier same-service quotes
+
+Branch `audit/issue-39-services-chip-composition`. Read-only
+diagnostic audit. No source code changed.
+
+**Surfaced 2026-05-25 ~14:25 PT** (operator test from
+`+13107564789`, immediately after Issue 38 D43 Session C shipped):
+2018 Suburban customer asked for seat cleaning, agent quoted
+floor_mats + per_row × 2 = $325, customer confirmed → `send_quote_sms`
+correctly created 2 quote_items per Pattern X. But the SMS preview
+rendered `"Here's your quote from Smart Details Auto Spa for Hot
+Shampoo Extraction, Hot Shampoo Extraction: https://…"` — duplicated
+service name. Underlying quote data correct; bug is purely in the
+`{services}` chip composition.
+
+**Architecturally same class as Issue 36 / 38** but at a different
+seam: every consumer of the `{services}` chip composes it as
+`items.map(i => i.item_name).join(', ')` — no view of `tier_name` /
+`tier_label` / `qty_label`. Multi-tier same-service rows produce
+duplicated tokens.
+
+**Audit deliverable:** `docs/dev/ISSUE_39_SERVICES_CHIP_AUDIT.md`.
+
+**Recommendation (Issue 39 fix scope):** ship a shared formatter at
+`src/lib/quotes/services-summary.ts` (mirrors Session 71's
+`line-item-pricing.ts` extraction pattern), adopted at the 6
+`{services}`-chip call sites. Helper produces byte-identical output
+for non-multi-tier cases; new behavior only for the Issue 39 trigger.
+
+**Multi-tier rendering rule (per operator-locked decisions 1-6,
+verified empirically against the catalog):**
+
+- `Hot Shampoo Extraction (2 Rows + Floor Mats)` — qty>1 uses
+  `qty_label` pluralized; qty=1 uses `tier_label`; higher
+  `total_price` first.
+- `Hot Shampoo Extraction (Carpet & Mats)` — scope-priced single
+  tier qty=1 keeps parens (tier_label is informative context).
+- `Express Interior Clean` — vehicle_size / specialty single-tier
+  qty=1 omits parens (customer already knows their vehicle).
+- `Hot Shampoo Extraction (2 Rows + Floor Mats), Ceramic Shield` —
+  mixed quote renders each service per its own rule.
+
+**tier_label vs qty_label (deferred operator question, resolved
+empirically):** Option X — qty=1 uses `tier_label`; qty>1 uses
+`${qty} ${pluralize(qty_label)}`. Only `Hot Shampoo Extraction.per_row`
+has `qty_label='row'` + `max_qty=3` in the DB; every other tier has
+NULL qty_label. Simple `+s` pluralization (`"row" → "Rows"`); no
+irregulars in the current catalog.
+
+**Higher-priced ordering source:** sort by `total_price DESC`
+(= `unit_price × quantity`), tie-break by `display_order ASC`.
+`display_order` is editorial cheapest-first, opposite of operator's
+"higher-priced first" intent; price-derived sort matches the
+operator example.
+
+**Blast radius:** today, **1 multi-tier same-service quote** (the
+empirical Q-0084 retest from 2026-05-25 14:28 PT). Hot Shampoo
+Extraction is the SOLE multi-tier-same-service catalog surface
+(`pricing_model='scope'`, mixed tiers). Every `vehicle_size` and
+`specialty` service has exactly one tier per quote_item. **6
+chip consumers all currently use the naive
+`.map(i => i.item_name).join(', ')` pattern.**
+
+**Issue 40 finding (separate concern, P3):** two
+`service_pricing.tier_label` values carry operator-internal suffixes
+that read poorly in SMS prose:
+
+- `Hot Shampoo Extraction.floor_mats.tier_label = "Floor Mats Only"`
+  → recommended: `"Floor Mats"`.
+- `Hot Shampoo Extraction.carpet_mats.tier_label = "Carpet & Mats Package"`
+  → recommended: `"Carpet & Mats"`.
+
+Operator edits via Admin UI (per CLAUDE.md Rule 14); no code change,
+no migration. Audit recommends operator make the 2 edits AFTER
+Issue 39 ships and verifies.
+
+**Issue 41 finding (cross-cutting, P2, Target 9):** 5 visual surfaces
+render `quote_items.tier_name` as raw snake_case slugs ("per_row",
+"floor_mats", etc.) instead of joined `service_pricing.tier_label`:
+public quote page (`(public)/quote/[token]/page.tsx:268-269`), admin
+slide-over (`quote-slide-over.tsx:161-162`), POS quote detail
+(`quote-detail.tsx:557-558`), quote PDF (`pdf/route.ts:304`), public
+receipt (`receipt/[token]/page.tsx:236-238`). **Customer-visible
+TODAY on Q-0084's quote link.** Recommended Issue 41 follow-on adopts
+the same helper across all 5 surfaces — NOT bundled with Issue 39
+(per brief's "ship the helper + fix SMS chip first" guidance).
+
+**Recommended fix scope (Issue 39):** ~1 session (60-90 min). +1
+helper file (~80 LOC) + 6 call-site adoptions + ~20 tests (14 unit
++ 6 adoption). Backward compatible — only multi-tier same-service
+cases change output; non-Issue-39 cases byte-identical.
+
+**Operator questions surfacing from the audit: ZERO.** All 7
+operator-locked decisions resolve empirically. One optional
+refinement flagged: whether `vehicle_size` / `specialty` single-tier
+qty=1 should ALSO surface tier in parens (audit recommends NO).
+
+**Deferred to implementation (Issue 39):**
+- D44 will be locked at implementation session start (the
+  `Option X` qty>1 vs qty=1 rendering rule, plus the Target 5
+  condition-(c) disambiguation for single-tier scope services).
+
+---
+
 ## 2026-05-25 — feat(voice-agent): Issue 38 D43 — wire `tiers` + `quantities` through send-quote-sms route + idempotency triple (Session C)
 
 Branch `feat/issue-38-route-integration`. Session C — the final session of

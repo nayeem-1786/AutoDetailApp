@@ -1244,6 +1244,74 @@ All three are backward-compatible — both new params are optional, legacy calle
 
 **Status:** RESOLVED in code via the 3-session D43 implementation — **Session A** (resolver `options.tierName`, #80 `0236ed4e`, merged): adds the fail-loud tier seam to `resolvePrice`. **Session B** (tool schema + prompt, #81 `6af46905`, merged): adds optional `tiers` + `quantities` CSV params to `send_quote_sms` + Critical Rule 7. **Session C** (route integration, #82, branch `feat/issue-38-route-integration`, awaiting operator merge): parses the parallel `tiers`/`quantities` CSVs, passes per-item `tierName` into `resolvePrice`, hard-rejects unknown tiers and `quantity > max_qty` with `instructions_for_agent`, writes the real `quantity` to the quote_item (Pattern X — `total_price = quantity × unit_price`), and extends the D36 idempotency guard to compare `(service_id, tier_name, quantity)` triples. All gates green (tsc 0, lint 0/97, `npm test` 2290/2290, build 789 pages). Both new params stay optional, so legacy callers (`twilio/inbound/route.ts`, `voice-post-call.ts`) keep auto-pick + quantity=1. **Empirical confirmation pending** the operator's A+B+C merge + `deploy-smartdetails` deploy: the Suburban Hot Shampoo "Per Row × 2" reproduction must render the quote link at **$250** (not $450) with `quote_items` row `('per_row', 2, 125, 250)`.
 
+#### Issue 39 — `{services}` SMS chip composition duplicates service name on multi-tier same-service quotes (P2)
+
+**Severity:** P2 — customer-facing cosmetic gap in the SMS preview shown to the customer before they tap the quote link. Underlying quote data (subtotal, line items, total) is CORRECT. The customer can still pay the correct amount; the SMS prose just reads `"Hot Shampoo Extraction, Hot Shampoo Extraction"` instead of `"Hot Shampoo Extraction (2 Rows + Floor Mats)"`.
+**Observed:** 2026-05-25 ~14:25-14:28 PT — immediately after Issue 38 D43 Session C shipped (which is what enabled multi-tier same-service quotes in the first place).
+**Channel:** SMS template rendering pipeline → `quote_sms_midcall` slug → `{services}` chip → `send-quote-sms/route.ts:532` composition.
+**Root cause class:** chip composition reads `quote_items[].item_name` only; `item_name` carries the PARENT service name, so two `quote_items` for the same parent service (floor_mats + per_row in the empirical case) emit duplicated tokens. The composition has no view of `tier_name` / `tier_label` / `qty_label` to disambiguate.
+
+**Evidence (Q-0084 retest after Issue 38 D43):**
+
+Conversation 2026-05-25 ~14:25 PT — 2018 Suburban (`size_class=suv_3row_van`). Agent ran `classify_vehicle` → `get_services({size_class: 'suv_3row_van'})` → verbalized 4 Hot Shampoo Extraction tiers. Customer said "floor mats and 2 rows", agent computed "Floor Mats × 1 = $75; Per Row × 2 = $250; total $325", customer said "Sure send it". Agent called `send_quote_sms({services: "Hot Shampoo Extraction,Hot Shampoo Extraction", tiers: "floor_mats,per_row", quantities: "1,2"})` per the new D43 contract. Route resolved 2 quote_items correctly (Pattern X). **Subtotal $325 correct. But the SMS preview rendered:**
+
+```
+GM - Here's your quote from Smart Details Auto Spa for Hot Shampoo Extraction, Hot Shampoo Extraction: https://…
+```
+
+Customer sees the duplicated service name + has no view that 2 rows + floor mats were both included. Lower-severity than Q-0084's $200 pricing gap, but still trust-damaging — the customer's mental model expects "Per Row × 2 + Floor Mats", the SMS shows "service × 2 (duplicated)".
+
+**Hypothesis (Issue 39 root cause):**
+
+The chip composition pattern is identical across 6 call sites in the codebase: each does `items.map(i => i.item_name).join(', ')`. No shared helper. The pattern was correct PRE-D43 because every quote had at most one quote_item per service (the resolver auto-picked one tier deterministically). D43 enables multi-tier same-service quote_items, which broke the assumption that `item_name` is sufficient for chip composition.
+
+**Fix approach:** **Option A (shared helper)** — `src/lib/quotes/services-summary.ts` exporting `formatServicesSummary(items)`, adopted at all 6 chip-composing call sites. Mirrors Session 71's `line-item-pricing.ts` extraction pattern (which closed Q-0085's combo-pricing-render gap by extracting a shared formatter). Helper produces byte-identical output for non-multi-tier cases. Full audit at `docs/dev/ISSUE_39_SERVICES_CHIP_AUDIT.md` (audit session #83, branch `audit/issue-39-services-chip-composition`).
+
+**Multi-tier rendering rule (operator-locked, all 7 decisions verified empirically against the live catalog):**
+
+- qty>1 → `${qty} ${pluralize(qty_label)}` (e.g. "2 Rows"); qty=1 → `tier_label` (e.g. "Per Seat Row" / "Carpet & Mats"; falls back to title-cased `tier_name` when `tier_label` is null).
+- Order tiers within parens by `total_price DESC` (= `unit_price × quantity`), tie-break by `display_order ASC`. Verified against operator example: `Hot Shampoo Extraction (2 Rows + Floor Mats)` requires `$250 > $75` ordering, which `total_price DESC` gives.
+- Parens emitted when (a) >1 quote_item for the service, (b) any qty>1, OR (c) `pricing_model='scope'` with informative tier_label.
+- `vehicle_size` / `specialty` single-tier qty=1 OMITS parens (operator decision 6).
+
+**tier_label vs qty_label (deferred operator question, RESOLVED empirically):** Option X — qty=1 reads `tier_label`, qty>1 reads `${qty} ${pluralize(qty_label)}`. Live DB query confirmed ONLY `Hot Shampoo Extraction.per_row` carries `qty_label='row'` + `max_qty=3`; every other tier has NULL qty_label. Simple `+s` pluralization sufficient.
+
+**Blast radius today:** **1 multi-tier same-service quote** (the Q-0084 retest). Hot Shampoo Extraction is the SOLE multi-tier-same-service surface in the live catalog (`pricing_model='scope'`, 4 tiers, mixed size-aware); the other 15 multi-tier services are `vehicle_size` (8) or `specialty` (7), each picking exactly one tier per quote_item. **6 chip consumers** all currently use the naive `.map(i => i.item_name).join(', ')` pattern.
+
+**Coexistence with prior decisions:**
+
+- **D43 (Issue 38)** unchanged. The underlying quote data is correct — the Issue 39 fix touches only the rendering layer.
+- **D42 (Issue 37 — resolver prefix-match)** unchanged. The agent's `services` parameter still works at quote-creation time.
+- **The Critical-Rule numbering** introduced by Session B (Rule 7 + renumber 8-19) is unchanged. No new prompt rule is needed for Issue 39 — the chip composition is a server-side render concern, not an LLM-discipline concern.
+
+**Acceptance criteria:**
+
+- New `formatServicesSummary` helper adopted at all 6 chip-composing call sites; tests pin byte-identical output for the 2 non-changing cases (single service single tier, multiple different services).
+- Q-0084 retest (post-fix, post-deploy): SMS preview reads `"Here's your quote from Smart Details Auto Spa for Hot Shampoo Extraction (2 Rows + Floor Mats): https://…"`.
+- All 5 `{services}`-bearing `sms_templates` (`quote_sms_midcall`, `booking_confirmed`, `booking_staff_notify`, `quote_accepted_staff_notify`, `appointment_cancelled`) tested against multi-tier same-service fixtures.
+
+**Status:** OPEN — audit complete, implementation deferred to a focused session. D44 will be locked at implementation session start (Option X qty rule + Target 5 condition-(c) for single-tier scope services).
+
+#### Issue 40 — `tier_label` data: "Floor Mats Only" + "Carpet & Mats Package" read verbose in SMS parens (P3)
+
+**Severity:** P3 — operator-internal label suffixes leak into customer-facing SMS prose post-Issue-39-fix. Cosmetic; no pricing gap.
+**Observed:** 2026-05-26 — surfaced by the Issue 39 audit (`docs/dev/ISSUE_39_SERVICES_CHIP_AUDIT.md`, Target 2). Operator example for Issue 39 was `Hot Shampoo Extraction (Carpet & Mats)`, not `(Carpet & Mats Package)`; live DB carries the "Package" suffix.
+**Channel:** Admin > Services > Pricing > Tier Labels (Hot Shampoo Extraction service).
+**Root cause class:** data only — `service_pricing.tier_label` values were authored for the admin/pricing UI context where they read cleanly; the Issue 39 helper now surfaces them in a parenthetical SMS context where the "Only" / "Package" suffixes become awkward.
+
+**Affected rows:**
+
+- `Hot Shampoo Extraction.floor_mats.tier_label = "Floor Mats Only"` → recommended: `"Floor Mats"`.
+- `Hot Shampoo Extraction.carpet_mats.tier_label = "Carpet & Mats Package"` → recommended: `"Carpet & Mats"`.
+
+All other multi-tier services' `tier_label` values read cleanly as-is in the parenthetical context (verified against the full 16-service inventory in the Issue 39 audit Target 2). No other rows need changes.
+
+**Fix approach:** operator edits the 2 rows via Admin > Services > [Hot Shampoo Extraction] > Pricing UI (per CLAUDE.md Rule 14 — service category and pricing management is done through admin, not migrations). No code change, no migration, no test change. Operator should make the 2 edits AFTER Issue 39 ships and verifies (the helper output will be functionally correct pre-edit, just verbose — `"Hot Shampoo Extraction (2 Rows + Floor Mats Only)"`).
+
+**Coexistence with Issue 39:** the helper reads `tier_label` verbatim; the Issue 40 edits are pure data refinement with no code dependency. Issue 39 ships → operator verifies → operator makes the 2 admin edits → next SMS reads with the cleaner labels.
+
+**Status:** OPEN — captured in audit Section 10, deferred to operator admin edit post-Issue-39.
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
