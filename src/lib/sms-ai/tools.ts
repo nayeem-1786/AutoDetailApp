@@ -228,13 +228,23 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
   {
     name: 'send_quote_sms',
     description:
-      'Create a quote AND text the customer a link to it. Use this when the customer has agreed to specific services and pricing. Server resolves comma-separated service names to catalog entries (sale-aware) and creates a real Quote record. Only call this when the customer has explicitly confirmed the services and asked to be texted a quote — otherwise use get_services to present pricing in your own reply text.',
+      'Create a quote AND text the customer a link to it. Use this when the customer has agreed to specific services and pricing. Server resolves comma-separated service names to catalog entries (sale-aware) and creates a real Quote record. Only call this when the customer has explicitly confirmed the services and asked to be texted a quote — otherwise use get_services to present pricing in your own reply text.\n\nMulti-tier services (Issue 38 D43): when a service has multiple tiers (e.g., Hot Shampoo Extraction\'s floor_mats / per_row / carpet_mats / complete) AND the customer chose a specific tier that is NOT fully determined by size_class, you MUST pass `tiers` with that tier_name in the same position as the service. Pass `quantities` when the customer chose more than one unit (e.g., "Per Row × 2"). Failing to pass these for tiered services causes the quote to default to a tier the customer was not told about (e.g., agent quotes "$250 per_row × 2", quote document charges $450 complete-tier — same fidelity-gap class as the Issue 36 size_class failure).',
     input_schema: {
       type: 'object',
       properties: {
         phone: { type: 'string', description: 'Recipient phone, any format.' },
         customer_name: { type: 'string', description: 'Customer name, if known.' },
-        services: { type: 'string', description: 'Comma-separated service names matching the catalog (e.g. "Express Exterior Wash, Tire Shine").' },
+        services: { type: 'string', description: 'Comma-separated service names matching the catalog (e.g. "Express Exterior Wash, Tire Shine"). Positional anchor for the parallel `tiers` and `quantities` arrays — position N in those refers to the service at position N here.' },
+        tiers: {
+          type: 'string',
+          description:
+            'OPTIONAL. Comma-separated tier_name values parallel to `services`. Use when the customer chose a specific tier within a multi-tier service (e.g., `per_row` for Hot Shampoo Extraction, `touring_bagger` for Complete Motorcycle Detail). Each token corresponds to the same position in the services list. Use an empty token (e.g. "per_row,,floor_mats") for services that have only one tier OR where the tier is fully determined by size_class (most vehicle_size services like Signature Complete Detail). Tier names come from the `tier_name` field in the get_services response — pass them VERBATIM, do not rename, abbreviate, translate, or guess. If a tier_name does not match a tier on the chosen service, the server rejects the call with an instructions_for_agent directive so you can clarify with the customer and retry.',
+        },
+        quantities: {
+          type: 'string',
+          description:
+            'OPTIONAL. Comma-separated positive integers parallel to `services` and `tiers`. Use when quoting multiple units of a tier (e.g., "Per Row × 2 rows" → `2`). Defaults to 1 per service when omitted or when a position holds an empty token. Each tier has a `max_qty` configured in the catalog — exceeding it will be rejected with instructions_for_agent so you can confirm the count with the customer and resend.',
+        },
         vehicle_year: { type: 'integer', description: 'Vehicle model year.' },
         vehicle_make: { type: 'string', description: 'Vehicle make.' },
         vehicle_model: { type: 'string', description: 'Vehicle model.' },

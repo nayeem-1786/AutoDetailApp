@@ -170,7 +170,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 18 numbered rules (D39 size_class imperative rule added 2026-05-24 as Rule 6)', () => {
+  it('Critical rules section contains exactly 19 numbered rules (D43 multi-tier tier-intent rule added 2026-05-25 as Rule 7)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
@@ -178,7 +178,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(18);
+    expect(numbered.length).toBe(19);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -379,11 +379,12 @@ describe('buildV2SystemPrompt — Issue 13 (4-hour fresh-conversation threshold,
 });
 
 describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard guardrail, D15)', () => {
-  it('Critical rule 16 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39)', () => {
+  it('Critical rule 17 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    // Rule 16 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert)
-    // then 15→16 by D39 (Issue 36 size_class Rule 6 insert).
-    expect(out).toMatch(/16\.\s+\*\*Tool-grounded add-ons only/);
+    // Rule 17 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert),
+    // 15→16 by D39 (Issue 36 size_class Rule 6 insert), then 16→17 by D43
+    // (Issue 38 tier-intent Rule 7 insert).
+    expect(out).toMatch(/17\.\s+\*\*Tool-grounded add-ons only/);
     expect(out).toContain('NEVER invent add-ons');
     expect(out).toContain('addon_suggestions');
   });
@@ -549,9 +550,9 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
     expect(out).toContain('NEVER say "within a\nfew hours"');
   });
 
-  it('Critical rule 17 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39)', () => {
+  it('Critical rule 18 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/17\.\s+\*\*Quote first, never book directly/);
+    expect(out).toMatch(/18\.\s+\*\*Quote first, never book directly/);
     expect(out).toContain('NEVER call `create_appointment` directly');
   });
 });
@@ -666,7 +667,7 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 
-  it('Critical rule 18 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert)', () => {
+  it('Critical rule 19 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Session 4 broadened "Tool errors" → "Tool responses" so the same rule
     // covers both isError:true error paths AND isError:false success paths
@@ -674,7 +675,9 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     // Session 5 (D38, Issue 35) renumbered this from Rule 16 → Rule 17 after
     // inserting the mandatory-reply rule as Rule 2. Session 7 (D39, Issue 36)
     // renumbered 17 → 18 after inserting the size_class imperative as Rule 6.
-    expect(out).toMatch(/18\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // Session B (D43, Issue 38) renumbered 18 → 19 after inserting the
+    // multi-tier tiers+quantities imperative as Rule 7.
+    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('Never share tool error messages');
     // Explicit Session 4 additions — confirm both success+error wording and
@@ -800,9 +803,9 @@ describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)'
     expect(out).not.toContain('JUST called `get_services`');
   });
 
-  it('preserves Rule 18 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39)', () => {
+  it('preserves Rule 19 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/18\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
   });
@@ -918,19 +921,21 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(out).toContain('Silence is never the right answer to a customer message');
   });
 
-  it('mandatory-reply rule includes coexistence cross-reference to Rule 18 (instructions_for_agent)', () => {
+  it('mandatory-reply rule includes coexistence cross-reference to Rule 19 (instructions_for_agent)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // D38 must explicitly call out that following instructions_for_agent
     // still satisfies the reply requirement (both rules satisfied).
-    // Reference updated 17 → 18 by D39 (size_class rule insert at position 6).
-    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 18\)/);
+    // Reference updated 17 → 18 by D39 (size_class rule insert at position 6),
+    // then 18 → 19 by D43 (tier-intent rule insert at position 7).
+    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 19\)/);
   });
 
-  it('Rule 18 (was Rule 17) wording for instructions_for_agent is preserved unchanged in substance', () => {
+  it('Rule 19 (was Rule 17 pre-D39; was Rule 18 pre-D43) wording for instructions_for_agent is preserved unchanged in substance', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Substantive wording must be intact — only the rule NUMBER changed
-    // from 17 → 18 because D39 added a new Rule 6 (size_class imperative).
-    expect(out).toMatch(/18\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // from 17 → 18 because D39 added a new Rule 6 (size_class imperative),
+    // then from 18 → 19 because D43 added a new Rule 7 (tier intent).
+    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
@@ -1102,9 +1107,9 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(out).toContain('INTERNAL ACTIONS');
   });
 
-  it('Rule 18 (instructions_for_agent, was Rule 17 pre-D39) wording is preserved unchanged by D39', () => {
+  it('Rule 19 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43) wording is preserved unchanged by D39+D43', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/18\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('was_duplicate');
   });
@@ -1127,5 +1132,168 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(subsection).toContain('custom_quote');
     // Site 4: Escalation guide
     expect(out).toContain('specialty vehicle (exotic/classic/RV/boat/aircraft)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session B (D43 + Issue 38, 2026-05-25): multi-tier tier-intent imperative
+// on send_quote_sms. Inserted as Critical rule 7 (renumbers prior Rules 7-18
+// → 8-19). Parallel pattern to Rule 6 (size_class) for the tier dimension.
+// Closes the Q-0084 fidelity gap (agent verbalized "$250 Per Row × 2",
+// quote charged $450 complete-tier).
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send_quote_sms)', () => {
+  it('declares Critical rule 7 with the CRITICAL — Multi-tier services headline', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Rule 7 specifically — inserted by D43 between Rule 6 (size_class) and
+    // the prior Rule 7 (now Rule 8 — appointment confirmation).
+    expect(out).toMatch(
+      /7\.\s+\*\*CRITICAL — Multi-tier services: pass `tiers` \(and `quantities` when relevant\) to `send_quote_sms`\.\*\*/,
+    );
+  });
+
+  it('new Critical Rule 7 appears WITHIN the # Critical rules section (top-tier placement, between size_class and appointment confirmation)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    expect(criticalIdx).toBeGreaterThan(-1);
+    // Must come AFTER Rule 6 (size_class) — pedagogical pairing
+    const rule6Idx = out.indexOf('6. **CRITICAL — ALWAYS pass `size_class`', criticalIdx);
+    const rule7Idx = out.indexOf('7. **CRITICAL — Multi-tier services', criticalIdx);
+    const rule8Idx = out.indexOf('8. **Never confirm an appointment', criticalIdx);
+    expect(rule6Idx).toBeGreaterThan(-1);
+    expect(rule7Idx).toBeGreaterThan(rule6Idx);
+    expect(rule8Idx).toBeGreaterThan(rule7Idx);
+    // Must come BEFORE the next top-level header
+    const nextH1 = out.indexOf('\n# ', criticalIdx + '# Critical rules'.length);
+    expect(nextH1).toBeGreaterThan(rule7Idx);
+  });
+
+  it('new Critical Rule 7 references the empirical Q-0084 Hot Shampoo Per-Row failure', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    // Empirical evidence pin so future edits can't weaken to abstract language.
+    expect(rule7Body).toContain('2018 Suburban');
+    expect(rule7Body).toContain('Hot Shampoo Extraction');
+    expect(rule7Body).toContain('Per Row × 2');
+    expect(rule7Body).toContain('$250');
+    expect(rule7Body).toContain('$450');
+    expect(rule7Body).toContain('Q-0084');
+  });
+
+  it('new Critical Rule 7 names both Hot Shampoo Extraction tiers and Complete Motorcycle Detail tiers verbatim', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    // Hot Shampoo's 4 tier_names
+    expect(rule7Body).toContain('floor_mats');
+    expect(rule7Body).toContain('per_row');
+    expect(rule7Body).toContain('carpet_mats');
+    expect(rule7Body).toContain('complete');
+    // Complete Motorcycle Detail's 2 tier_names (latent vulnerability)
+    expect(rule7Body).toContain('Complete Motorcycle Detail');
+    expect(rule7Body).toContain('standard_cruiser');
+    expect(rule7Body).toContain('touring_bagger');
+  });
+
+  it('new Critical Rule 7 pins tier_name source as get_services with VERBATIM imperative', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    expect(rule7Body).toContain('tier_name');
+    expect(rule7Body).toContain('get_services');
+    expect(rule7Body).toContain('VERBATIM');
+  });
+
+  it('new Critical Rule 7 declares parallel-array contract and empty-token / omit semantics', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    expect(rule7Body).toContain('Parallel arrays');
+    expect(rule7Body).toContain('positional');
+    expect(rule7Body.toLowerCase()).toContain('empty token');
+    // Auto-pick contract pinned for size_class-determined tiers
+    expect(rule7Body.toLowerCase()).toContain('auto-pick');
+  });
+
+  it('new Critical Rule 7 declares max_qty rejection path with instructions_for_agent recovery', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    expect(rule7Body).toContain('max_qty');
+    expect(rule7Body).toContain('instructions_for_agent');
+    // Rule 19 cross-reference for the recovery path
+    expect(rule7Body).toMatch(/Rule 19/);
+  });
+
+  it('new Critical Rule 7 contains BOTH the WRONG ❌ and RIGHT ✅ exemplar pair', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    expect(rule7Body).toContain('❌ WRONG');
+    expect(rule7Body).toContain('✅ RIGHT');
+    // The correct invocation shape exemplified
+    expect(rule7Body).toContain('tiers: "per_row"');
+    expect(rule7Body).toContain('quantities: "2"');
+  });
+
+  it('new Critical Rule 7 explicitly cross-references Critical Rule 6 (architectural parallel)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const nextH1 = out.indexOf('\n# ', criticalIdx);
+    const section = out.slice(criticalIdx, nextH1);
+    const rule7Idx = section.indexOf('7. **CRITICAL — Multi-tier services');
+    const rule7End = section.indexOf('\n8. ', rule7Idx);
+    const rule7Body = section.slice(rule7Idx, rule7End);
+    // Architectural parallel to Rule 6 (size_class) — keeps the two rules
+    // loosely coupled so any future renumber catches if either drifts.
+    expect(rule7Body).toContain('Critical Rule 6');
+    expect(rule7Body.toLowerCase()).toContain('parallel');
+  });
+
+  it('D43 preserves Critical Rule 6 (size_class) wording unchanged', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Rule 6's headline must remain at Rule 6 (D43 inserted at Rule 7, NOT
+    // before Rule 6). The size_class empirical evidence must remain intact.
+    expect(out).toMatch(/6\.\s+\*\*CRITICAL — ALWAYS pass `size_class` to `get_services` after `classify_vehicle`\.\*\*/);
+    expect(out).toContain('Hot Shampoo Extraction Complete');
+    expect(out).toContain('$150 fidelity gap');
+  });
+
+  it('D43 preserves the tool-usage-guide cross-reference (now points to Rule 18 after renumber)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The "see Booking flow + Critical rule N" cross-refs in both the
+    // Tool usage guide bullet and the "For NEW conversations" step 5
+    // shifted from Rule 17 → Rule 18 by D43 (the quote-first rule moved).
+    expect(out).toContain('see "Booking flow" + Critical rule 18');
+    expect(out).toContain('see "Booking flow" below + Critical rule 18');
+    // Stale Rule 17 cross-refs must NOT remain
+    expect(out).not.toContain('see "Booking flow" + Critical rule 17');
+    expect(out).not.toContain('see "Booking flow" below + Critical rule 17');
   });
 });

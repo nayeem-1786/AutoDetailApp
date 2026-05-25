@@ -1215,6 +1215,35 @@ The agent's verbalization pattern is structural — it tells the customer the fu
 
 **Status:** Resolved 2026-05-24 via Workstream J Session 10 (branch `feat/issue-37-resolver-prefix-fallback`). `resolveServiceByName` extended with Tier 2 (longest catalog prefix wins, separator required) + Tier 3 (unique reverse-prefix only; ambiguous returns null + warn). Tier 1 (exact match) byte-for-byte unchanged so existing callers regress to zero. Tests: +14. `SERVICE_SELECT_QUERY` extracted as module-level const. All 3 callers (`send-quote-sms`, twilio inbound, `voice-post-call`) inherit the new behavior automatically since each treats `null` as skip-and-warn. Post-deploy verification: pending operator test (Suburban + Accord scenarios per D42 acceptance criteria).
 
+#### Issue 38 — `send_quote_sms` tool schema cannot convey agent-verbalized tier intent or quantity (P1)
+
+**Severity:** P1 — customer-facing pricing fidelity gap on any multi-tier service whose tier identity is NOT fully determined by `size_class`. Confirmed live on Hot Shampoo Extraction (4 tiers, 1 size-aware mixed in); latent on Complete Motorcycle Detail (2 specialty tiers, always quotes `standard_cruiser`).
+**Observed:** 2026-05-25 00:14 PT — immediately after D42 (Issue 37) shipped, on the very next production test in the same Suburban scenario.
+**Channel:** SMS-AI v2 / `send_quote_sms` tool call → `resolveServiceByName` → `resolvePrice`
+**Root cause class:** tool schema lacks a per-item `tier` parameter; the `resolvePrice` precedence (`sizeAwareTier > matchingTier > tiers[0]`) deterministically picks the size-aware tier whenever one exists in the row set, even when the agent quoted a different tier. Quantity is hardcoded to `1` at every call site despite `service_pricing.max_qty` being configured (e.g., `per_row` has `max_qty=3, qty_label='row'` precisely to support multi-row quoting).
+
+**Evidence (Q-0084):**
+
+Conversation 2026-05-25 00:14 PT — 2018 Suburban (`size_class=suv_3row_van`). Agent ran `classify_vehicle` → `get_services({size_class: 'suv_3row_van'})` (D40+D41 working correctly) → verbalized all 4 Hot Shampoo Extraction tiers: `floor_mats $75`, `per_row $125`, `carpet_mats $175`, `complete $450`. Customer said "2 rows", agent computed "Per Row × 2 = $250", customer said "Sure send it". Agent called `send_quote_sms({services: "Hot Shampoo Extraction"})` (no tier, no quantity affordance in the schema). `resolveServiceByName` returned the service, `resolvePrice(service, 'suv_3row_van')` hit the `scope` branch at `service-resolver.ts:295-299` — `sizeAwareTier` (the `complete` tier) won over the agent's intent — returned `{price: 450, tierName: 'complete'}` with `quantity: 1` hardcoded at `send-quote-sms/route.ts:205`. **Q-0084 written at $450; customer was told $250.** $200 customer-facing fidelity gap.
+
+**Hypothesis (Issue 38 root cause):**
+
+Architecturally the same class as Issue 36 (`size_class` dimension) but one dimension deeper: the **tier dimension within a multi-tier service** that the SMS-AI tool schema cannot convey. The LLM has the canonical `tier_name` string in its working context (`get_services` emits it at `services/route.ts:267-283`) but has no parameter to pass it back through. No prompt rule alone can close the gap — the schema must grow the seam (the D38/D39 lesson again).
+
+**Fix approach:** **B1 (CSV `tiers` + `quantities` strings)** — chosen over B2 (UUIDs) on 3 grounds: (1) `quote_items.tier_name` (TEXT, no UUID FK) and `bookingSubmitSchema.tier_name` (string) are already string-based — B1 mirrors precedent; (2) the LLM already has `tier_name` strings in context but `service_pricing.id` UUIDs are dropped from the catalog response — B2 would require extending the catalog endpoint; (3) strings survive prompt-cache resets and are human-debuggable in PM2 logs. Full B1 vs B2 audit at `docs/dev/ISSUE_38_TIER_INTENT_AUDIT.md` (640 lines, audit session #79, branch `audit/issue-38-tier-intent-gap`, commit `3a9b06fe`).
+
+**Three-session implementation:** to land safely without one giant blast-radius commit, the fix is split into three parallel-ish sessions:
+
+- **Session A** — `src/lib/services/service-resolver.ts`: add `tierName?: string | null` to `ResolvePriceOptions`, honor it in `scope` / `vehicle_size` / `specialty` branches, fail loud (return null) on missing tier. Branch `feat/issue-38-resolver-tier-option`.
+- **Session B (THIS SESSION)** — `src/lib/sms-ai/tools.ts` + `src/lib/sms-ai/system-prompt.ts`: add optional `tiers` + `quantities` CSV params to the `send_quote_sms` tool schema; add Critical Rule 7 (parallel to Rule 6 for size_class) enforcing the agent pass them for multi-tier services; renumber Rules 7-18 → 8-19; update all cross-refs. Branch `feat/issue-38-tool-schema-and-prompt`.
+- **Session C** — `src/app/api/voice-agent/send-quote-sms/route.ts`: parse `tiers` + `quantities` CSVs into per-item arrays, call `resolvePrice(service, sizeClass, {tierName})` per item, validate `quantity <= service_pricing.max_qty`, reject misspelled tier with 400 + `instructions_for_agent` so the agent recovers conversationally. Branch TBD.
+
+All three are backward-compatible — both new params are optional, legacy callers (`twilio/inbound/route.ts:807`, `voice-post-call.ts:519`) keep current `auto-pick + quantity=1` behavior. Operator merges A + B + C together before deploy.
+
+**Q-0084 disposition (per audit recommendation):** leave the existing $450 quote as-is (the customer received the link; voiding it now creates more confusion than the $200 gap). Operator may follow up directly with the customer if they push back. Consistent with the Q3 precedent from the quote-source-tracking session.
+
+**Status:** Resolved (split across Sessions A + B + C; Session B = this session — adds the tool schema + prompt rule. Sessions A + C land in parallel/follow-up sessions per the audit's recommended split). Full closure tracked when all three branches merge.
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
@@ -2044,6 +2073,58 @@ Considered changing the `services` parameter to an array of `{name, tier}` objec
 - PM2 logs: no `Service not found` warnings on `send_quote_sms` for tier-suffixed service names.
 
 **Implementation:** Workstream J Session 10 — branch `feat/issue-37-resolver-prefix-fallback` (2026-05-24, this commit). 14 new tests in `service-resolver.test.ts` (Tier 1 exact/case-insensitive/whitespace + Tier 2 Issue-37 case/case-insensitive/multi-word/longest-wins/separator-types/substring-guard + Tier 3 unique-match/ambiguous-warns + no-match/empty-string/whitespace-only). `SERVICE_SELECT_QUERY` extracted as module-level const for DRY-ness across Tier 1 + Tier 2/3 queries. No changes to: prompt content, `tools.ts`, dispatcher, send-quote-sms route handler, twilio inbound handler, voice-post-call handler, `resolvePrice`, canonical pricing engine, addon enrichment, any endpoint, or migrations.
+
+**D43 — Multi-tier tier intent: extend `send_quote_sms` tool schema with `tiers` + `quantities` CSV strings + Critical Rule 7 (operator-locked 2026-05-25, post Issue 38 audit).**
+
+After D41 + D42 closed the size_class and tier-suffixed name fidelity gaps for Hot Shampoo Extraction, the very next production test surfaced Issue 38 (Q-0084): the agent verbalized "Per Row × 2 = $250" on a 2018 Suburban, customer confirmed, `send_quote_sms` wrote Q-0084 at **$450** because `resolvePrice` auto-picked the `complete` size-aware tier (`sizeAwareTier > matchingTier > tiers[0]` precedence at `service-resolver.ts:295-299`). One dimension deeper than Issue 36: the tier dimension within a multi-tier service that the SMS-AI tool schema cannot convey. Audit at `docs/dev/ISSUE_38_TIER_INTENT_AUDIT.md` (commit `3a9b06fe`) recommended **B1 (CSV `tiers` + `quantities` strings)** over B2 (UUIDs); the operator locked B1.
+
+**Decision (operator-locked):**
+
+1. **Tool schema (`src/lib/sms-ai/tools.ts`):** `send_quote_sms` gains two optional string params:
+   - `tiers` — comma-separated `tier_name` values parallel to `services` (same positional contract). Empty token at position N = "auto-pick for this service" (legacy behavior). Tier names come from the `tier_name` field of `get_services` and MUST be passed VERBATIM.
+   - `quantities` — comma-separated positive integers parallel to `services` and `tiers`. Default 1 per service. Bounded by `service_pricing.max_qty` per tier (e.g., `per_row` has `max_qty=3`); exceeding it rejects with `instructions_for_agent` so the agent can clarify with the customer and resend.
+   Both params optional → byte-identical behavior for any caller that omits them. The `services` param's description gains a positional-anchor note so the LLM understands the parallel-array contract.
+
+2. **System prompt (`src/lib/sms-ai/system-prompt.ts`):** new **Critical Rule 7** parallel to Rule 6 (size_class). Headline: "CRITICAL — Multi-tier services: pass `tiers` (and `quantities` when relevant) to `send_quote_sms`". Body pins:
+   - The Q-0084 empirical example ($250 verbalized → $450 charged on Hot Shampoo Extraction Per Row × 2).
+   - The 4 Hot Shampoo Extraction tier_names (`floor_mats` / `per_row` / `carpet_mats` / `complete`) and the 2 Complete Motorcycle Detail tier_names (`standard_cruiser` / `touring_bagger`).
+   - The auto-pick / empty-token / omit semantics for size_class-determined tiers (most `vehicle_size` services).
+   - `tier_name` source pinned to `get_services` with VERBATIM imperative.
+   - `max_qty` rejection path with cross-reference to Rule 19 (`instructions_for_agent` silent guidance).
+   - WRONG ❌ / RIGHT ✅ example pair.
+   - Architectural-parallel cross-reference to Rule 6 (size_class).
+   Critical Rules 7-18 renumber to 8-19. Internal cross-refs updated (`(per Rule 18)` → `(per Rule 19)`, `Critical rule 17` → `Critical rule 18`).
+
+3. **Route handler validation (DEFERRED to Session C):** the `send-quote-sms` route handler must parse `tiers` and `quantities` CSV strings into per-item arrays, pass `{tierName}` into `resolvePrice` per item, validate `quantity <= service_pricing.max_qty` for the chosen tier, and reject mismatches (misspelled tier, oversize quantity) with 400 + `instructions_for_agent` so the agent recovers conversationally. **Out of scope for Session B** — Session B only ships the tool-schema seam and the prompt rule; the route handler change lands in Session C.
+
+4. **Resolver-side seam (DEFERRED to Session A):** `resolvePrice` must accept an optional `tierName` in `ResolvePriceOptions` and honor it for `scope` / `vehicle_size` / `specialty` branches, returning `null` (fail-loud) when the tier doesn't match. **Out of scope for Session B** — Session A delivers this change on `feat/issue-38-resolver-tier-option`.
+
+**Why not B2 (UUIDs):**
+
+Considered exposing `service_pricing.id` UUIDs through `get_services` and accepting them via the tool schema. Rejected on three independent grounds documented in the audit:
+- `quote_items.tier_name` is TEXT (no UUID FK), `bookingSubmitSchema.tier_name` is string — B1 mirrors precedent, B2 introduces a new tier-identity pattern with no in-codebase precedent.
+- LLM already has `tier_name` strings in context from `get_services` but does NOT see `service_pricing.id`; B2 requires extending the catalog response surface.
+- String round-tripping survives prompt-cache resets and is human-debuggable in PM2 logs; UUIDs are opaque.
+
+**Coexistence with prior decisions:**
+
+- **D42** (resolver prefix fallback): unchanged. The agent's "Complete" suffix is still harmlessly resolved by Tier 2 of the resolver fallback; D43's `tiers` param is a SECOND signal that disambiguates the intended tier even when the resolver could find the service.
+- **D41** (size-aware main-tier pricing): unchanged. Once the agent passes `tiers: "per_row"`, the resolver picks the `per_row` row (non-size-aware) and `resolveServicePriceWithSale` returns its standalone price; size-resolved `complete`-tier pricing remains available when the agent passes `tiers: "complete"` (or omits the param and the size-aware-first precedence picks it).
+- **D40** (dispatcher size_class injection): unchanged. Orthogonal to tier intent.
+- **D39** (size_class prompt + schema imperative): unchanged. Rule 7 (D43) is the structural parallel — same "agent must pass an intent the resolver can't infer" pattern but for tier rather than size_class.
+- **D38** (mandatory customer-facing reply): unchanged. Rule 2 stays at position 2. The runner noReply backstop covers the case where the agent gets a 400 from the new tier validation and still must reply.
+- **Other callers** (`twilio/inbound/route.ts:807`, `voice-post-call.ts:519`): inherit the resolver's new `options.tierName` capability automatically once Session A ships, but pass `undefined` for now (no tier-intent source from inbound SMS / call transcripts). Behavior unchanged for them — they keep current auto-pick + quantity=1 path.
+
+**Acceptance criteria (full Issue 38 closure when Sessions A + B + C all merge):**
+
+- Production test: 2018 Suburban → "2 rows" → agent verbalizes "Per Row × 2 = $250" → agent calls `send_quote_sms({services: "Hot Shampoo Extraction", tiers: "per_row", quantities: "2"})` → quote document renders $250 (NOT $450).
+- Latent test: Touring/Bagger motorcycle → agent verbalizes the Touring tier price → agent calls `send_quote_sms({services: "Complete Motorcycle Detail", tiers: "touring_bagger"})` → quote uses Touring/Bagger price (NOT `standard_cruiser`).
+- Backward compat: any send_quote_sms call that omits `tiers` / `quantities` produces byte-identical pre-D43 behavior (auto-pick + quantity=1).
+- Misspelled tier: agent passes `tiers: "peer_row"` → route returns 400 + `instructions_for_agent` directing agent to clarify with customer; no quote written.
+- Oversize quantity: agent passes `quantities: "5"` against a tier with `max_qty=3` → route returns 400 + `instructions_for_agent`; no quote written.
+- PM2 logs: any per-tier rejection surfaces `instructions_for_agent` so the agent recovers conversationally per Rule 19.
+
+**Implementation (Session B — this session):** branch `feat/issue-38-tool-schema-and-prompt`. `src/lib/sms-ai/tools.ts` (+14 lines: `tiers` + `quantities` properties; `services` description gains positional-anchor note; top-level description cites the Q-0084 fidelity gap and the Issue 36 architectural parallel). `src/lib/sms-ai/system-prompt.ts` (+53 lines net: new Critical Rule 7 with empirical Q-0084 example, parallel-array contract, max_qty / Rule 19 cross-ref, WRONG/RIGHT pair; Rules 7-18 renumbered 8-19; internal cross-refs `Rule 18` → `Rule 19` and `Critical rule 17` → `Critical rule 18` updated). **Tests +18 new + ~13 renumber updates:** `tools.test.ts` gains a `Issue 38 D43` describe block (8 cases: tiers presence + optional + parallel-array contract + verbatim source pin + quantities default/max_qty/instructions_for_agent + Q-0084 / Issue 36 reference pins + services param positional note + property count +2). `system-prompt.test.ts` gains a `D43 / Issue 38` describe block (10 cases: rule headline pin + placement-between-rules-6-and-8 + Q-0084 empirical pin + 4 Hot Shampoo + 2 Motorcycle tier_names + tier_name VERBATIM source + parallel-array + max_qty/Rule 19 + WRONG/RIGHT + Critical Rule 6 cross-ref + D43 doesn't disturb Rule 6 + cross-ref renumber to Rule 18). Existing rule-count test bumped 18→19; existing renumber-pinned tests for old Rule 16 / 17 / 18 bumped to 17 / 18 / 19. **No changes to:** `src/lib/services/**` (Session A), `src/app/api/voice-agent/**` (Session C), any other route handler, the runner, the dispatcher, the customer-context bundle, the agent's prompt cache shape, or any DB migration. **Gates green:** tsc 0 errors, lint 0 errors / 97 warnings (baseline unchanged), `npm test` 2258/2258 pass (was 2240; +18 net new). **Deploy: NO** — Session B alone has no observable production behavior change (the new tool params are advertised to the LLM but Session C's route validation is required before they have any pricing effect). Operator merges A + B + C together before deploy.
 
 ### Coverage targets
 
