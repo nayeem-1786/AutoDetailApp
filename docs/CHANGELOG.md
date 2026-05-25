@@ -6,6 +6,85 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(rendering): pre-discount subtotal math so customer eye-math reconciles
+
+Branch `feat/pre-discount-subtotal-math`. Post-render-session math correction.
+Q-0084 shipped a rendered subtotal that already had combo discounts applied,
+making the visible "You saved -$25.00" row appear to be a SECOND deduction.
+Customer eye-math couldn't reconcile: subtotal=$360, you saved=-$25, total=$360.
+Switching to standard retail convention: subtotal = sum of pre-discount prices,
+You saved = total savings (with minus sign), Total = customer-pays amount.
+Eye-math now checks: `subtotal − savings === total`.
+
+**Helper extension** (`src/lib/quotes/line-item-pricing.ts`):
+- New export `computePreDiscountSubtotal(items)` — reuses
+  `getLineItemPricingInfo` to determine which items have discounts.
+  For discounted items contributes `standard_price × quantity`; for
+  standard items contributes `unit_price × quantity`. Dollars (Option
+  A — matches existing helper convention; no cents wrapping).
+
+**4 quote surfaces updated to pre-discount subtotal:**
+- `src/app/(public)/quote/[token]/page.tsx` — the Q-0084 customer-facing
+  surface. Subtotal now shows pre-discount sum.
+- `src/app/api/quotes/[id]/pdf/route.ts` — PDF render uses helper.
+- `src/app/admin/quotes/[id]/page.tsx` — admin detail page.
+- `src/app/pos/components/quotes/quote-detail.tsx` — POS quote detail.
+
+**Out-of-scope for this session (receipt-side):**
+The 4 receipt surfaces (public receipt page, thermal text, thermal HTML,
+email plain-text) render `tx.subtotal` from the DB — a post-discount
+value that interacts with the tax/coupon/loyalty/tip rows below it.
+Migrating the receipt subtotal to pre-discount requires deeper
+restructuring of those flows (the existing "Total saved today: $X"
+footer from the prior session already surfaces the savings for
+receipts; the math reconciles via the explicit
+Subtotal + Tax + Tip − Coupon − Loyalty = Total pattern). Deferred to
+a follow-up if operator wants receipt-side consistency.
+
+**Tests +23 net new:**
+- `line-item-pricing.test.ts` — 13 new helper tests covering all
+  branches of the new function, plus the load-bearing invariant
+  `subtotal − savings === total` for the Q-0084 scenario and a mixed
+  combo + sale + standard scenario.
+- `line-item-pricing-adoption.test.ts` — 10 new tests: per-surface
+  import pin (4 surfaces × `computePreDiscountSubtotal`), per-surface
+  removal pin (4 surfaces × no longer renders
+  `formatCurrency(quote.subtotal)`), plus the Q-0084 math invariant
+  + no-discount equivalence pinned at the helper level.
+
+**Hard rules respected:**
+- NO changes to `getLineItemPricingInfo` or `sumLineItemSavings` (the
+  existing helpers work correctly).
+- NO changes to per-line rendering (strikethrough + accent on Pet Hair
+  row stays exactly as it is).
+- NO changes to quote-creation logic. Data is correct; only display
+  changes.
+- NO changes to combo-resolver, pricing engine, DB schema, agent
+  prompt, or tool schemas.
+- "You saved" formatting unchanged (still negative with minus sign).
+- Dollars math throughout (no cents conversion).
+
+**Gates green:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (unchanged baseline)
+- `npm test` → 2162/2162 pass (was 2139 — +23 net new)
+- `npm run build` → 789 pages clean
+
+**Verification scenario (operator post-deploy):**
+
+Revisit `/quote/{Q-0084-token}`. Expect:
+- Subtotal: $385.00 (was $360 — now shows pre-discount sum)
+- You saved: -$25.00 (unchanged)
+- Total: $360.00 (unchanged — customer-pays amount)
+- Math: $385 − $25 = $360 ✓
+
+For a no-discount quote (all standard pricing), Subtotal === Total and
+the "You saved" row is hidden (gated on `totalSavings > 0`).
+
+**Deploy required:** YES via `deploy-smartdetails` post-merge.
+
+---
+
 ## 2026-05-24 — feat(rendering): combo/sale discount visualization across all 10 surfaces + savings footers
 
 Branch `feat/combo-sale-discount-render`. Issue 33 follow-up UX — close the

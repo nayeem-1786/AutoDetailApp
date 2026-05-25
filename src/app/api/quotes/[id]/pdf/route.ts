@@ -9,6 +9,7 @@ import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
+  computePreDiscountSubtotal,
 } from '@/lib/quotes/line-item-pricing';
 
 // --- Types -----------------------------------------------------------
@@ -354,8 +355,17 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
 
     doc.font('Helvetica').fontSize(10).fillColor(darkText);
 
+    // Pre-discount subtotal pattern (post-Q-0084 math fix).
+    const preDiscountSubtotal = computePreDiscountSubtotal(
+      quote.items.map((i) => ({
+        unit_price: i.unit_price,
+        standard_price: i.standard_price ?? null,
+        pricing_type: i.pricing_type ?? null,
+        quantity: i.quantity,
+      })),
+    );
     doc.text('Subtotal:', totalsLabelX, y, { width: 100, align: 'right' });
-    doc.text(formatCurrency(quote.subtotal), totalsValueX, y, {
+    doc.text(formatCurrency(preDiscountSubtotal), totalsValueX, y, {
       width: 70,
       align: 'right',
     });

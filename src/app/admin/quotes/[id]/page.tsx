@@ -17,6 +17,7 @@ import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
+  computePreDiscountSubtotal,
 } from '@/lib/quotes/line-item-pricing';
 import { usePermission } from '@/lib/hooks/use-permission';
 import {
@@ -440,10 +441,28 @@ export default function QuoteDetailPage() {
           </div>
 
           <div className="mt-4 space-y-2 border-t border-gray-200 pt-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium">{formatCurrency(quote.subtotal)}</span>
-            </div>
+            {(() => {
+              // Pre-discount subtotal pattern (post-Q-0084 math fix).
+              const preDiscountSubtotal = computePreDiscountSubtotal(
+                (quote.items || []).map((i) => ({
+                  unit_price: i.unit_price,
+                  standard_price: i.standard_price ?? null,
+                  pricing_type:
+                    (i.pricing_type as
+                      | 'standard'
+                      | 'sale'
+                      | 'combo'
+                      | null) ?? null,
+                  quantity: i.quantity,
+                })),
+              );
+              return (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Subtotal</span>
+                  <span className="font-medium">{formatCurrency(preDiscountSubtotal)}</span>
+                </div>
+              );
+            })()}
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Tax</span>
               <span className="font-medium">{formatCurrency(quote.tax_amount)}</span>
