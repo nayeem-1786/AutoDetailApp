@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { resolvePrice, type ResolvedService } from '../service-resolver';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { resolvePrice, resolveServiceByName, type ResolvedService } from '../service-resolver';
 import type { ServicePricing } from '@/lib/supabase/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Item 15f Layer 3d — service-resolver tests.
@@ -418,5 +419,200 @@ describe('resolvePrice — size class edge cases', () => {
       ],
     });
     expect(resolvePrice(svc, 'spaceship').price).toBe(425);
+  });
+});
+
+// ───────────────────────────────────────────────────────────────
+// D42 (2026-05-24) — Issue 37: prefix-match fallback. The voice
+// agent verbalizes "Hot Shampoo Extraction Complete" to the customer
+// (service name + tier label) and then passes the same string to
+// send_quote_sms. Pre-D42 the resolver used .ilike() (case-insensitive
+// exact match), so the call missed and the quote-send flow degraded
+// to notify_staff. D42 adds two fallback tiers after the exact-match
+// path; Tier 1 behavior is unchanged.
+// ───────────────────────────────────────────────────────────────
+
+interface MockServiceRow {
+  id: string;
+  name: string;
+  pricing_model: string;
+  flat_price: number | null;
+  per_unit_price: number | null;
+  custom_starting_price: number | null;
+  sale_price: number | null;
+  sale_starts_at: string | null;
+  sale_ends_at: string | null;
+  service_pricing: ServicePricing[];
+}
+
+function makeRow(name: string, id = `svc-${name.toLowerCase().replace(/\s+/g, '-')}`): MockServiceRow {
+  return {
+    id,
+    name,
+    pricing_model: 'flat',
+    flat_price: 100,
+    per_unit_price: null,
+    custom_starting_price: null,
+    sale_price: null,
+    sale_starts_at: null,
+    sale_ends_at: null,
+    service_pricing: [],
+  };
+}
+
+/**
+ * Build a minimal Supabase-shaped mock that records the query chain
+ * and dispatches to in-memory state. The resolver issues two distinct
+ * shapes:
+ *   - Tier 1: .from('services').select(...).ilike('name', q).eq('is_active', true).limit(1).maybeSingle()
+ *   - Tier 2/3 fallback: .from('services').select(...).eq('is_active', true) (no ilike, no limit)
+ *
+ * The mock decides based on whether `.ilike()` was called: with → run
+ * the case-insensitive exact match against `services`; without → return
+ * all `services` as the fallback fetch.
+ */
+function makeAdminMock(services: MockServiceRow[]): SupabaseClient {
+  const factory = (state: { ilikeName: string | null }) => {
+    const builder = {
+      _table: 'services',
+      select() { return builder; },
+      ilike(col: string, value: string) {
+        if (col === 'name') state.ilikeName = value;
+        return builder;
+      },
+      eq() { return builder; },
+      in() { return builder; },
+      limit() { return builder; },
+      maybeSingle: async () => {
+        if (state.ilikeName == null) return { data: null, error: null };
+        const q = state.ilikeName.toLowerCase();
+        const hit = services.find((s) => s.name.toLowerCase() === q);
+        return { data: hit ?? null, error: hit ? null : { message: 'no rows' } };
+      },
+      // Tier 2/3 fallback path resolves the promise without .maybeSingle().
+      // The resolver awaits the builder directly after `.eq('is_active', true)`.
+      then(resolve: (v: { data: MockServiceRow[]; error: null }) => void) {
+        resolve({ data: state.ilikeName == null ? services : [], error: null });
+      },
+    };
+    return builder;
+  };
+
+  return {
+    from(_table: string) {
+      const state = { ilikeName: null as string | null };
+      return factory(state);
+    },
+  } as unknown as SupabaseClient;
+}
+
+describe('resolveServiceByName — D42 prefix-match fallback (Issue 37)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('Tier 1 — exact case-sensitive match', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, 'Hot Shampoo Extraction');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 1 — case-insensitive exact match', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, 'hot shampoo extraction');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 1 — trims surrounding whitespace before match', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, '  Hot Shampoo Extraction  ');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 2 — tier-suffixed agent verbalization (the Issue 37 case)', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, 'Hot Shampoo Extraction Complete');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 2 — case-insensitive tier suffix', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, 'hot shampoo extraction complete');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 2 — multi-word tier suffix ("Complete Interior")', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, 'Hot Shampoo Extraction Complete Interior');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 2 — longest catalog match wins among prefix candidates', async () => {
+    const admin = makeAdminMock([
+      makeRow('Express Wash'),
+      makeRow('Express Wash Premium'),
+    ]);
+    const out = await resolveServiceByName(admin, 'Express Wash Premium Complete');
+    expect(out?.name).toBe('Express Wash Premium');
+  });
+
+  it('Tier 2 — separator requirement blocks substring false positive ("Express" does not match "Express Wash")', async () => {
+    const admin = makeAdminMock([makeRow('Express Wash')]);
+    // "Express" alone has no separator after it in the query, so it
+    // must NOT match "Express Wash" via Tier 2. Tier 3 (reverse-prefix)
+    // catches it instead since "Express Wash" starts with "Express " — but only
+    // if Tier 3 is unique. In this fixture, the single match resolves successfully.
+    const out = await resolveServiceByName(admin, 'Express');
+    expect(out?.name).toBe('Express Wash');
+  });
+
+  it('Tier 2 — separator types: comma + hyphen', async () => {
+    const admin = makeAdminMock([makeRow('Engine Bay Detail')]);
+    const commaOut = await resolveServiceByName(admin, 'Engine Bay Detail,Standard');
+    expect(commaOut?.name).toBe('Engine Bay Detail');
+    const hyphenOut = await resolveServiceByName(admin, 'Engine Bay Detail-Premium');
+    expect(hyphenOut?.name).toBe('Engine Bay Detail');
+  });
+
+  it('Tier 3 — partial query matches unique catalog name', async () => {
+    const admin = makeAdminMock([
+      makeRow('Hot Shampoo Extraction'),
+      makeRow('Engine Bay Detail'),
+    ]);
+    const out = await resolveServiceByName(admin, 'Hot Shampoo');
+    expect(out?.name).toBe('Hot Shampoo Extraction');
+  });
+
+  it('Tier 3 — ambiguous match returns null + warns (does not guess)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const admin = makeAdminMock([
+      makeRow('Hot Shampoo Extraction'),
+      makeRow('Hot Shampoo Spot Treatment'),
+    ]);
+    const out = await resolveServiceByName(admin, 'Hot Shampoo');
+    expect(out).toBeNull();
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const msg = warnSpy.mock.calls[0][0] as string;
+    expect(msg).toContain('Ambiguous reverse-prefix match');
+    expect(msg).toContain('Hot Shampoo Extraction');
+    expect(msg).toContain('Hot Shampoo Spot Treatment');
+  });
+
+  it('No match at any tier returns null', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, 'Nonexistent Service');
+    expect(out).toBeNull();
+  });
+
+  it('Empty string returns null without querying', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, '');
+    expect(out).toBeNull();
+  });
+
+  it('Whitespace-only string returns null without querying', async () => {
+    const admin = makeAdminMock([makeRow('Hot Shampoo Extraction')]);
+    const out = await resolveServiceByName(admin, '   \t  ');
+    expect(out).toBeNull();
   });
 });
