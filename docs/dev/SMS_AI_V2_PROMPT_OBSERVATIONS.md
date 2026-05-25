@@ -1244,6 +1244,57 @@ All three are backward-compatible — both new params are optional, legacy calle
 
 **Status:** RESOLVED in code via the 3-session D43 implementation — **Session A** (resolver `options.tierName`, #80 `0236ed4e`, merged): adds the fail-loud tier seam to `resolvePrice`. **Session B** (tool schema + prompt, #81 `6af46905`, merged): adds optional `tiers` + `quantities` CSV params to `send_quote_sms` + Critical Rule 7. **Session C** (route integration, #82, branch `feat/issue-38-route-integration`, awaiting operator merge): parses the parallel `tiers`/`quantities` CSVs, passes per-item `tierName` into `resolvePrice`, hard-rejects unknown tiers and `quantity > max_qty` with `instructions_for_agent`, writes the real `quantity` to the quote_item (Pattern X — `total_price = quantity × unit_price`), and extends the D36 idempotency guard to compare `(service_id, tier_name, quantity)` triples. All gates green (tsc 0, lint 0/97, `npm test` 2290/2290, build 789 pages). Both new params stay optional, so legacy callers (`twilio/inbound/route.ts`, `voice-post-call.ts`) keep auto-pick + quantity=1. **Empirical confirmation pending** the operator's A+B+C merge + `deploy-smartdetails` deploy: the Suburban Hot Shampoo "Per Row × 2" reproduction must render the quote link at **$250** (not $450) with `quote_items` row `('per_row', 2, 125, 250)`.
 
+#### Issue 41 — Visual surfaces render `tier_name` as raw snake_case slug across 15 customer- and operator-facing renderings (P2)
+
+**Severity:** P2 — customer-facing cosmetic gap on multiple rendering layers (quote link, receipt page, pay page, PDF, appointment confirm email, thermal print, etc.). Underlying quote/transaction DATA is correct. The customer can still pay the correct amount; the visible per-line label just reads `"per_row"` or `"floor_mats"` instead of the operator-curated `"Per Seat Row"` or pluralized `"2 Rows"`.
+**Observed:** 2026-05-26 — surfaced by Issue 39's audit Target 9 (5 surfaces named). Issue 41 audit (`docs/dev/ISSUE_41_TIER_VISUAL_SURFACES_AUDIT.md`, branch `audit/issue-41-tier-visual-surfaces`, this commit) inventories **15 surfaces total** — Issue 39's 5 + 10 NEW (receipt-template thermal + HTML serving 3 of 4 receipt consumers in 1 file; admin + POS appointment-confirmation notify routes × 2-3 contexts each; public pay page; admin quote DETAIL page; POS transaction detail).
+**Channel:** Web HTML, PDF, Email HTML, Email plain text, Thermal print. Customer- AND operator-facing.
+**Root cause class:** identical to Issue 39's at a different layer. Every visual surface inlines `{item.tier_name && <span>… {item.tier_name}</span>}` (or the moral equivalent for PDF/text/thermal) and renders the snake_case slug verbatim. No surface JOINS `service_pricing.tier_label` / `qty_label` / `display_order` — the operator-curated human-readable presentation data exists on `service_pricing` but is invisible to every visual surface today.
+
+**Evidence (Q-0084 customer view, post-D43-deploy):**
+
+Q-0084 has 2 quote_items: `(Hot Shampoo Extraction, floor_mats, qty=1, $75)` + `(Hot Shampoo Extraction, per_row, qty=2, unit=$125, total=$250)`. The quote link renders:
+
+```
+Hot Shampoo Extraction              $75.00
+  floor_mats                        ← raw slug
+Hot Shampoo Extraction              $250.00
+  per_row                           ← raw slug
+                       Subtotal:   $325.00
+```
+
+Every visual surface above (15 sites) renders this same raw-slug pattern.
+
+**Hypothesis (Issue 41 root cause):**
+
+Same root-cause class as Issue 39 — the rendering layer reads only the data column written at quote-creation time (`tier_name`) and has no view of the operator-curated `tier_label`/`qty_label` from `service_pricing`. The widespread inlining of the pattern across 15 surfaces (with no shared helper) means a single bug class repeats at every site. No prompt change can fix this — it's purely a server-side / client-side rendering concern.
+
+**Fix approach:** **Option U (two-layer helper split)** per Issue 41 audit Target 7. New `src/lib/quotes/tier-display.ts` exports `renderTierToken(item) → string | null` (low-level token renderer with `tier_label || titleCase(tier_name)` fallback for qty=1, `${qty} ${pluralize(qty_label)}` for qty>1). Issue 39's `services-summary.ts` (the chip helper from Issue 39's recommendation) consumes `renderTierToken` internally for its parenthetical content. The 15 visual surfaces adopt `renderTierToken` directly, wrapping the returned token in surface-appropriate presentation (em-dash, parens, sub-line, monospace ` - `, PDF column, etc.). Mirrors Session 71's `line-item-pricing.ts` precedent (shared logic helper, per-surface rendering autonomous).
+
+**Combined Issue 39 + Issue 41 scope: SPLIT into 2 sequenced sessions** per memory #8 threshold (~300 LOC or >3 files = split; combined ~1000 LOC / ~18 files). Sequenced (not parallel) per the parallel-session worktree-fragility memory.
+
+- **Session 1 (D45):** create `tier-display.ts` + `services-summary.ts` + adopt at 6 chip-composing routes (Issue 39 scope) + Q-0084 verification. ~90-120 min, ~34 tests, ~500-650 LOC.
+- **Session 2 (D46):** adopt `renderTierToken` at 15 visual surfaces (Issue 41 scope). ~90-120 min, ~25-30 tests, ~250-350 LOC. Fires AFTER Session 1 merges.
+
+**Blast radius today:** customer-visible on every Q-0084-class multi-tier quote across all 15 surfaces. Operator-facing on admin/POS quote and transaction views.
+
+**Coexistence with prior decisions:**
+
+- **D43 (Issue 38)** unchanged. The underlying quote data is correct — Issue 41's fix touches only the rendering layer.
+- **Issue 39** parent decision: helper architecture and rendering rules already audit-locked. Issue 41 is a natural cross-cutting follow-on consuming the same low-level token renderer.
+- **Issue 40** data refinement: operator decides whether to make the 2 admin edits ("Floor Mats Only" → "Floor Mats" / "Carpet & Mats Package" → "Carpet & Mats") BEFORE or AFTER Session 1. Audit recommends AFTER Session 1, BEFORE Session 2 so verification screenshots show clean labels at each stage.
+- **Memory #15** (4 receipt surfaces): 3 of 4 share `receipt-template.ts` (2 edit sites in 1 file cover all 3); 4th surface (SMS receipt via `buildSummaryLine`) verified to render no tier_name and needs no change. Rule satisfied by audit-time inspection.
+
+**Acceptance criteria (full Issue 41 closure):**
+
+- All 15 visual surfaces adopt `renderTierToken`; per-surface adoption pin tests grep the import in each Target-1 file.
+- Q-0084 quote link `/quote/<token>` renders "Per Seat Row" / "Floor Mats Only" (or post-Issue-40 cleaner labels) instead of raw slugs.
+- Same visible improvement on public receipt page, public pay page, admin slide-over, admin quote detail, POS quote detail, POS transaction detail, quote PDF, appointment confirm email HTML, and appointment confirm email plain text.
+- Thermal receipt prints "Hot Shampoo Extraction - Per Seat Row" (32-char wrap if needed) instead of raw slug.
+- Helper returns `null` for `vehicle_size` / `specialty` single-tier qty=1 quotes (operator decision 6 carried forward from Issue 39 — uniform "no parens for non-scope single-tier" rule).
+
+**Status:** OPEN — audit complete (this commit, `docs/dev/ISSUE_41_TIER_VISUAL_SURFACES_AUDIT.md`). Implementation deferred to Session 1 (D45) + Session 2 (D46). Sub-surface Issue 42-class capture (public pay page) absorbed into Issue 41's helper rollout — no separate ticket needed.
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)

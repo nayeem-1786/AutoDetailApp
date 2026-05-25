@@ -6,6 +6,86 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — audit: Issue 41 — visual surface tier rendering across all consumers
+
+Branch `audit/issue-41-tier-visual-surfaces`. Companion to the
+already-shipped Issue 39 chip-composition audit. Read-only diagnostic
+mapping every surface that renders `quote_items.tier_name` (or the
+parallel `appointment_services.tier_name` /
+`transaction_items.tier_name` columns) to humans across the codebase.
+
+**Deliverable:** `docs/dev/ISSUE_41_TIER_VISUAL_SURFACES_AUDIT.md`
+(~700 lines, 10 targets + TL;DR + risk matrix + empirical
+reproduction).
+
+**Headline finding:** **15 visual surfaces render `tier_name` as a
+raw snake_case slug to humans today.** Issue 39's audit Target 9
+named 5 of them; this audit identifies 10 NEW: receipt-template
+(thermal + HTML, serving 3 of 4 receipt consumers in 1 file),
+appointment-confirmation notify routes (admin + POS variants × 2-3
+contexts each), public pay page (Issue 42-class checkout-stage
+surface), admin quote DETAIL page (distinct from the slide-over),
+and POS transaction detail. The customer-facing failure is uniform:
+viewers see `"per_row"`, `"floor_mats"`, `"touring_bagger"`, etc.
+instead of operator-curated `tier_label` ("Per Seat Row") or
+pluralized `qty_label` ("2 Rows").
+
+**Recommended architecture:** **Option U (two-layer helper split)** —
+new low-level `src/lib/quotes/tier-display.ts` exporting
+`renderTierToken(item) → string | null`. Issue 39's chip helper
+(`services-summary.ts`) consumes it internally for parenthetical
+content; the 15 visual surfaces consume it directly, wrapping the
+token in surface-appropriate presentation (em-dash, parens, sub-line,
+monospace ` - `, PDF column, etc.). Mirrors Session 71's
+`line-item-pricing.ts` precedent (predicate + label helper separate
+from per-surface rendering).
+
+**Combined implementation scope: SPLIT into 2 sequenced sessions**
+(memory threshold #8: ~300 LOC or >3 files = split; combined estimate
+crosses both at ~1000 LOC / ~18 files). Session 1 (D45) = helpers +
+Issue 39 chip adoption (~90-120 min, ~34 tests). Session 2 (D46) =
+Issue 41 visual surface adoption (~90-120 min, ~25-30 tests). Sequenced
+not parallel — Session 2 depends on Session 1's helper API and the
+parallel-session-worktree-fragility memory documents that the
+coordination cost of true parallel runs exceeds the wall-clock
+savings.
+
+**Memory #15 (4 receipt surfaces) honored:** of the 4 POS receipt
+surfaces (Print/Copier, SMS, Email HTML, Receipt thermal), 3 share
+`receipt-template.ts` (1 file, 2 render sites cover all 3
+tier-rendering consumers). The 4th — SMS receipt via
+`buildSummaryLine()` — explicitly inspected and verified to render
+NO tier_name; no edit needed. Memory #15 satisfied by the audit-time
+no-change finding.
+
+**Issue 42 surfaced (no separate ticket — captured as Issue 41
+sub-surface):** the public **pay page**
+(`src/app/(public)/pay/[token]/page.tsx:290-291`) renders
+`appointment_services.tier_name` raw. Customer-facing
+checkout-stage surface that wasn't in any prior audit. Adoption
+covered by Issue 41's helper rollout in Session 2.
+
+**Pre-flight verification list:** D43 fully merged ✓ (commit
+`8f01f3a7`). Issue 39 audit present ✓. No competing parallel session
+touching `src/lib/quotes/` (verify immediately before Session 1
+fires). For Session 2: Session 1 (D45) merged with green gates +
+Issue 40 operator data edit decision made (recommended:
+data-edits-first so verification screenshots show clean labels).
+
+**Hard rules respected:** No source code changed. No migrations. No
+test changes. Only new files: this audit deliverable + this
+CHANGELOG entry + ROADMAP ledger row + SMS_AI_V2_PROMPT_OBSERVATIONS
+Issue 41 capture. Worktree-isolated commit (per
+feedback-parallel-doc-sessions-use-worktree memory).
+
+**Operator decisions still pending (both small, neither blocks
+implementation):** (1) Issue 40 data edits before or after Session 1
+ships? Default: AFTER. (2) `vehicle_size` / `specialty` single-tier
+qty=1 quotes — surface tier in helper output? Default: NO (matches
+Issue 39 operator decision 6).
+
+---
+
 ## 2026-05-25 — feat(voice-agent): Issue 38 D43 — wire `tiers` + `quantities` through send-quote-sms route + idempotency triple (Session C)
 
 Branch `feat/issue-38-route-integration`. Session C — the final session of
