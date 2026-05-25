@@ -80,7 +80,7 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
   {
     name: 'get_services',
     description:
-      'Return the full active service catalog with current pricing tiers, add-on suggestions, and prerequisites. Call this BEFORE quoting any service — never guess prices from memory. Response is large (~18KB); call once per conversation and reuse.\n\nWhen you have called classify_vehicle and know the customer\'s vehicle size class, pass `size_class` so addon_suggestions[].standard_price and .savings populate for size-aware addons. Without size_class, addons whose pricing depends on vehicle size return standard_price=null and savings=null.',
+      'Return the full active service catalog with current pricing tiers, add-on suggestions, and prerequisites. Call this BEFORE quoting any service — never guess prices from memory. Response is large (~18KB); call once per size_class context (typically once or twice per conversation: once if size_class unknown, then RECALL with size_class after classify_vehicle returns).\n\nCRITICAL: ALWAYS pass `size_class` when calling this after classify_vehicle. Many services (e.g., Hot Shampoo Extraction Complete) have prices that vary by vehicle size — sedan vs SUV vs 3-row van. Without size_class, the response returns the fallback `price` field which may be substantially DIFFERENT from the actual quote price (real-world failure: customer told $300, quote charged $450, customer trust damaged). With size_class, both the correct standard_price AND savings figures populate for size-aware services and addons.\n\nIf you called this BEFORE classify_vehicle returned, you MUST recall it with size_class once size_class is known. Do not rely on the cached non-size-aware response for quoting.',
     input_schema: {
       type: 'object',
       properties: {
@@ -88,7 +88,7 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
           type: 'string',
           enum: ['sedan', 'truck_suv_2row', 'suv_3row_van', 'exotic', 'classic'],
           description:
-            'OPTIONAL. The customer\'s vehicle size class (from classify_vehicle response). Enables accurate savings figures for size-aware addons. Note: exotic and classic vehicles still require escalation via notify_staff per existing rules — do NOT use this parameter to bypass the custom-quote escalation flow.',
+            'REQUIRED whenever the customer\'s vehicle has been classified via classify_vehicle. Without it, size-aware service prices (Hot Shampoo Extraction Complete, etc.) return the fallback `price` field — which may differ substantially from the actual quote price. With it, both standard_price AND savings populate correctly. Available values match VehicleSizeClass: sedan, truck_suv_2row, suv_3row_van, exotic, classic.\n\nFor exotic and classic vehicles: still escalate via notify_staff per the exotic/classic Critical Rule — do NOT use this parameter to bypass the custom-quote escalation flow. The escalation rule takes precedence.',
         },
       },
     },

@@ -1156,6 +1156,32 @@ Tests: +15 net (7 endpoint covering all three success branches + error preservat
 
 Coexistence preserved: Rule 17 (`instructions_for_agent` silent guidance) UNCHANGED in wording. D37 (upsert_customer invocation discipline) UNCHANGED. D38 prompt rule UNCHANGED. Exotic/classic escalation language UNCHANGED at all sites.
 
+#### Issue 36 — Agent not passing size_class to get_services, causing customer-facing fidelity gap on size-aware services
+
+**Severity:** P1 — customer-facing fidelity gap, larger than Issue 33 ($150 vs $25)
+**Observed:** 2026-05-24 (production test with 2018 Suburban)
+**Channel:** SMS-AI v2 / get_services tool call
+**Root cause class:** insufficient prompt imperative
+
+**Evidence:**
+
+Customer: "Hi, I'm Nayeem with a 2018 Suburban, need Hot Shampoo Extraction Complete Interior"
+
+Agent stated: "$300" (Hot Shampoo Extraction Complete)
+Actual quote: "$450" (`vehicle_size_suv_van_price` for `suv_3row_van`)
+
+PM2 logs show 6 `get_services` calls in the conversation, all with identical 21909-byte payload — meaning `size_class` was never passed. The dispatcher (`tool-dispatcher.ts:320-326`) correctly forwards `size_class` when present in LLM input; the LLM simply wasn't including it.
+
+**Hypothesis (Issue 36 root cause):**
+
+The existing prompt rule from Session B was informational rather than imperative. The tool schema framed `size_class` as "OPTIONAL" without consequences. The "call once and reuse" guidance prevented recall after `classify_vehicle` returned.
+
+**Fix approach: D39 — strengthen prompt + schema (Session 7).**
+
+See D39 for full decision details.
+
+**Status:** Resolved 2026-05-24 via Workstream J Session 7 (branch `feat/issue-36-size-class-imperative`). New Critical Rule 6 mandates `size_class` after `classify_vehicle`; existing "Passing size_class" subsection strengthened with imperative wording + recall directive; tool schema description + `size_class` parameter description rewritten to remove "OPTIONAL" framing and surface empirical consequences. Tests: +20 (10 system-prompt covering Rule 6 + strengthened subsection + recall + D38/Rule 18/Rule 4 coexistence; 7 tools covering ALWAYS-pass / $300-$450 / call-once update / recall mandate / REQUIRED-whenever / schema-optional preservation / exotic-classic). Coexistence preserved: D38 mandatory-reply rule UNCHANGED; Rule 18 (was Rule 17, instructions_for_agent) UNCHANGED in substance (renumbered only); exotic/classic escalation language UNCHANGED at all 4 sites. If D39 proves insufficient in production, the architectural fix (dispatcher-injected `size_class` from `RuntimeContext`) becomes the next step.
+
 ---
 
 ## Section 3 — Critical bugs surfaced during testing (non-prompt)
@@ -1835,6 +1861,45 @@ This rule applies universally across all turns, including conditions where other
 - **D37 (upsert_customer invocation discipline):** D37 says "call upsert_customer when you learn new info." D38 says "always reply conversationally on customer turns." Both can be satisfied: when the agent learns new info, call the tool AND reply conversationally.
 
 **Implementation:** Workstream J Session 5 (2026-05-24, this commit).
+
+**D39 — Strengthen `size_class` passing via imperative prompt + schema wording (operator-locked 2026-05-24, post Issue 36 evidence).**
+
+D33-D38 closed Issues 31-35. Issue 36 surfaced from production testing: the `size_class` parameter on `get_services` was implemented correctly at the dispatcher and endpoint levels (Sessions A/B), but the LLM was not consistently passing it. Result: customer told $300 for a service that the quote actually charged at $450 — a $150 customer-facing fidelity gap (larger than Issue 33's original $25 gap).
+
+Root cause: the existing prompt wording was informational ("when you have called classify_vehicle, pass `size_class`") rather than imperative. The tool schema description framed the parameter as "OPTIONAL" without conveying consequences. The "call once per conversation" guidance prevented the LLM from recalling `get_services` after `classify_vehicle` returned.
+
+**Decision (operator-locked):**
+
+1. Add a new Critical Rule near the top of the system prompt (inserted as **Critical Rule 6**, after Rule 5 "Classify before quoting" — natural pedagogical pair) mandating `size_class` on `get_services` after `classify_vehicle`, with empirical consequences of failing to do so.
+2. Strengthen the existing "Passing size_class" subsection with imperative wording matching the new Critical Rule.
+3. Add an explicit Recall directive subsection for the cached-response scenario.
+4. Strengthen the tool schema `description` to remove "OPTIONAL" framing and convey real consequences (the $300/$450 customer-trust failure).
+5. Update the "call once and reuse" guidance to acknowledge `size_class` may require a recall ("call once per size_class context").
+
+**Rationale for prompt+schema only (not architectural):**
+
+- The architecture is correct (dispatcher forwards `size_class`, endpoint uses it for size-aware resolution).
+- The LLM is capable of passing `size_class` — evidenced by other tools that have similar parameters and are reliably called.
+- Prompt+schema strengthening matches what worked for D34/D37 (similar invocation-discipline rules).
+- Architectural fix (dispatcher-injected `size_class` from `RuntimeContext`) is a possible future improvement if D39 proves insufficient.
+
+**Why size_class must remain schema-OPTIONAL (not `required[]`):**
+
+If `size_class` were made schema-required, the LLM couldn't make the first informational `get_services` call before classifying the vehicle, breaking the discovery flow. The imperative lives in the prompt + description, not in JSON schema enforcement — the agent CAN call without `size_class` for first-discovery, but MUST recall with `size_class` after `classify_vehicle` returns.
+
+**Renumber side-effect:**
+
+D39's insertion at position 6 renumbers prior Rules 6-17 → 7-18. References "per Rule 17" → "per Rule 18" updated. "Critical rule 16" → "Critical rule 17" in two callsites updated. All test fixtures updated accordingly. The exotic/classic escalation rule (Critical Rule 4) is untouched and remains the highest-precedence specialty-vehicle rule.
+
+**Coexistence with prior rules:**
+
+- **D38 (mandatory customer-facing reply)** UNCHANGED in wording. Both rules can be satisfied simultaneously: the agent calls `get_services` with `size_class` (D39) AND produces customer-facing text (D38).
+- **Rule 18 (was Rule 17, `instructions_for_agent`)** UNCHANGED in substance — only the rule NUMBER shifted from 17 → 18.
+- **Critical Rule 4 (exotic/classic escalation)** UNCHANGED and explicitly reinforced inside the new Critical Rule 6 (the "do NOT use `size_class='exotic'` to bypass escalation" reminder).
+
+**If D39 proves insufficient in production:** the architectural fix becomes the next step — dispatcher reads `classify_vehicle` response into `RuntimeContext.size_class`, then automatically injects it into subsequent `get_services` calls (mirrors the phone-injection pattern from Issue 26).
+
+**Implementation:** Workstream J Session 7 — branch `feat/issue-36-size-class-imperative` (2026-05-24, this commit). 20 new tests across `system-prompt.test.ts` (10) + `tools.test.ts` (7) + renumber updates (3).
 
 ### Coverage targets
 
