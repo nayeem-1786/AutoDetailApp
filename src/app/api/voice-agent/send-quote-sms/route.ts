@@ -13,6 +13,33 @@ import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 /**
+ * Issue 38 D43 — stable idempotency comparison key for a quote's line items.
+ *
+ * The D36 60-second guard previously compared only the sorted set of
+ * `service_id`s. With tier + quantity now part of the quote contract, two
+ * quotes for the same services but DIFFERENT tiers or quantities are
+ * meaningfully distinct (the agent legitimately re-quoted at a different
+ * tier/count) and must NOT collapse into one. This key therefore compares the
+ * `(service_id, tier_name, quantity)` TRIPLE per item.
+ *
+ * Backward compatibility: a legacy item with a null `tier_name` collapses to
+ * `''` and a missing `quantity` collapses to `1` — exactly the shape of the
+ * rows pre-D43 callers wrote — so the guard still fires for legacy
+ * "no tiers/quantities" re-sends. A `|` separates the triple fields; the
+ * value domains (UUID `service_id`, snake_case `tier_name`, integer
+ * `quantity`) never contain a `|`, so fields cannot bleed across boundaries.
+ */
+function buildItemTripleKey(
+  items: Array<{ service_id: string | null; tier_name?: string | null; quantity?: number | null }>,
+): string {
+  const triples = items
+    .filter((it) => typeof it.service_id === 'string' && it.service_id.length > 0)
+    .map((it) => `${it.service_id}|${it.tier_name ?? ''}|${it.quantity ?? 1}`)
+    .sort();
+  return JSON.stringify(triples);
+}
+
+/**
  * POST /api/voice-agent/send-quote-sms
  * Mid-call tool — sends the customer an SMS with a quote link.
  * Called by the ElevenLabs agent when the customer asks to be texted pricing.
@@ -32,6 +59,8 @@ export async function POST(request: NextRequest) {
       phone,
       customer_name,
       services,
+      tiers,
+      quantities,
       vehicle_year,
       vehicle_make,
       vehicle_model,
@@ -40,6 +69,8 @@ export async function POST(request: NextRequest) {
       phone: string;
       customer_name?: string;
       services: string; // comma-separated
+      tiers?: string; // Issue 38 D43 — comma-separated tier_name values parallel to services
+      quantities?: string; // Issue 38 D43 — comma-separated positive integers parallel to services
       vehicle_year?: number;
       vehicle_make?: string;
       vehicle_model?: string;
@@ -64,6 +95,44 @@ export async function POST(request: NextRequest) {
     const serviceNames = services.split(',').map((s: string) => s.trim()).filter(Boolean);
     if (serviceNames.length === 0) {
       return NextResponse.json({ error: 'No valid services provided' }, { status: 400 });
+    }
+
+    // Issue 38 D43 — parse the optional parallel `tiers` + `quantities` CSVs.
+    // Both are positional: token N corresponds to serviceNames[N]. An empty
+    // tier token = "auto-pick" (legacy precedence); an empty/missing quantity
+    // token defaults to 1. Arrays are padded to serviceNames.length so the
+    // per-service loop can index them safely. Both params are optional, so a
+    // caller that omits them gets byte-identical pre-D43 behavior.
+    const tierTokens = (typeof tiers === 'string' ? tiers : '')
+      .split(',')
+      .map((s) => s.trim());
+    const quantityTokens = (typeof quantities === 'string' ? quantities : '')
+      .split(',')
+      .map((s) => s.trim());
+    while (tierTokens.length < serviceNames.length) tierTokens.push('');
+    while (quantityTokens.length < serviceNames.length) quantityTokens.push('');
+
+    // Validate quantities up front: each must be a positive integer. An empty
+    // token defaults to 1. Reject zero, negatives, non-integers, and
+    // non-canonical forms ("01", "2.0") so the agent's intent is unambiguous.
+    // Hard reject with instructions_for_agent (no silent clamp) per the
+    // operator-locked Issue 38 decision.
+    const parsedQuantities: Array<number | null> = quantityTokens.map((q) => {
+      const trimmed = q === '' ? '1' : q;
+      const n = parseInt(trimmed, 10);
+      if (!Number.isInteger(n) || n < 1 || String(n) !== trimmed) return null;
+      return n;
+    });
+    if (parsedQuantities.some((q) => q === null)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid quantity',
+          instructions_for_agent:
+            'One or more quantities in your send_quote_sms call were not positive integers. Pass quantities as comma-separated positive integers parallel to services (e.g., quantities="2"). The default is 1 — only pass quantities when more than one unit was discussed with the customer. Do NOT inform the customer about this error — fix the call and retry.',
+          do_not_share_with_customer: true,
+        },
+        { status: 400 },
+      );
     }
 
     // Find or create customer.
@@ -192,17 +261,77 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     t = perf.now();
-    for (const serviceName of serviceNames) {
+    for (let i = 0; i < serviceNames.length; i++) {
+      const serviceName = serviceNames[i];
       const service = await resolveServiceByName(admin, serviceName);
       if (!service) {
         console.warn(`[SendQuoteSMS] Service not found: "${serviceName}"`);
         continue;
       }
-      const { price, salePrice, tierName, isOnSale } = resolvePrice(service, sizeClass);
+
+      // Issue 38 D43 — explicit tier intent (empty token = auto-pick) and
+      // per-item quantity (validated as a positive integer above).
+      const requestedTier = tierTokens[i] || '';
+      const quantity = parsedQuantities[i] ?? 1;
+
+      // When the agent supplied a tier_name, opt into the resolver's
+      // fail-loud overload: a non-matching tier returns null (typo /
+      // hallucination / deleted tier) so we reject and let the agent
+      // re-check the tier from get_services. When no tier is supplied, the
+      // legacy auto-pick precedence runs and never returns null.
+      const resolved = requestedTier
+        ? resolvePrice(service, sizeClass, { tierName: requestedTier })
+        : resolvePrice(service, sizeClass);
+
+      if (resolved === null) {
+        const availableTiers = (service.service_pricing ?? [])
+          .map((tp) => tp.tier_name)
+          .filter(Boolean)
+          .join(', ');
+        console.warn(
+          `[SendQuoteSMS] Tier not found: "${requestedTier}" on "${service.name}" (available: ${availableTiers || 'none'})`,
+        );
+        return NextResponse.json(
+          {
+            error: 'Tier not found',
+            instructions_for_agent: `The tier "${requestedTier}" was not found on service "${service.name}". Available tiers: ${availableTiers || '(none configured)'}. Re-check the tier_name from get_services (pass it verbatim) and retry. Do NOT inform the customer about this — silently retry with the correct tier.`,
+            do_not_share_with_customer: true,
+          },
+          { status: 400 },
+        );
+      }
+
+      const { price, salePrice, tierName, isOnSale } = resolved;
+
+      // Issue 38 D43 — quantity bound check. Only meaningful when the resolved
+      // tier exists in service_pricing AND carries a max_qty (e.g. per_row has
+      // max_qty=3). flat/per_unit/custom resolve with a null tierName and have
+      // no service_pricing row to bound against, so their quantity passes
+      // through honored.
+      if (quantity > 1 && tierName) {
+        const chosenTier = (service.service_pricing ?? []).find(
+          (tp) => tp.tier_name === tierName,
+        );
+        if (chosenTier && chosenTier.max_qty != null && quantity > chosenTier.max_qty) {
+          const qtyLabel = chosenTier.qty_label || 'unit';
+          console.warn(
+            `[SendQuoteSMS] Quantity ${quantity} exceeds max_qty ${chosenTier.max_qty} for tier "${tierName}" on "${service.name}"`,
+          );
+          return NextResponse.json(
+            {
+              error: 'Quantity exceeds maximum',
+              instructions_for_agent: `The tier "${tierName}" on "${service.name}" supports a maximum of ${chosenTier.max_qty} ${qtyLabel}(s). You attempted to quote ${quantity}. Clarify the count with the customer (most vehicles have ${chosenTier.max_qty} or fewer) and retry. Do NOT inform the customer about this error — clarify naturally.`,
+              do_not_share_with_customer: true,
+            },
+            { status: 400 },
+          );
+        }
+      }
+
       quoteItems.push({
         service_id: service.id,
         item_name: service.name,
-        quantity: 1,
+        quantity,
         unit_price: isOnSale ? salePrice! : price,
         tier_name: tierName,
         standard_price: isOnSale ? price : null,
@@ -226,9 +355,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 60-second idempotency guard (Workstream J Session 4 — D36, Issue 31).
-    // Same customer + same vehicle + same service set within 60 seconds
-    // returns the existing quote instead of creating a duplicate. Catches the
+    // 60-second idempotency guard (Workstream J Session 4 — D36, Issue 31;
+    // extended for tier+quantity in Issue 38 D43 Session C).
+    // Same customer + same vehicle + same (service_id, tier_name, quantity)
+    // set within 60 seconds returns the existing quote instead of creating a
+    // duplicate. Catches the
     // intermittent double-send from LLM confabulation observed in Test 1
     // (2026-05-23) without overreaching into multi-day duplicate detection
     // (Issue 30 / Workstream I scope).
@@ -243,12 +374,18 @@ export async function POST(request: NextRequest) {
     // through to normal create flow. A dedup-check failure must not block a
     // legitimate quote.
     try {
-      const candidateServiceIds = quoteItems
-        .map((qi) => qi.service_id)
-        .filter((id): id is string => typeof id === 'string' && id.length > 0)
-        .sort();
+      // Issue 38 D43 — compare the (service_id, tier_name, quantity) TRIPLE
+      // per item, not just the service_id set. Two quotes for the same
+      // services at different tiers/quantities are legitimately distinct and
+      // must NOT collapse into one dedup hit. buildItemTripleKey collapses
+      // legacy null-tier / quantity-1 rows to the pre-D43 shape so dedup
+      // still fires for legacy "no tiers/quantities" re-sends.
+      const candidateKey = buildItemTripleKey(quoteItems);
+      const candidateHasItems = quoteItems.some(
+        (qi) => typeof qi.service_id === 'string' && qi.service_id.length > 0,
+      );
 
-      if (candidateServiceIds.length > 0) {
+      if (candidateHasItems) {
         t = perf.now();
         const dedupQuery = admin
           .from('quotes')
@@ -257,7 +394,7 @@ export async function POST(request: NextRequest) {
             quote_number,
             access_token,
             created_at,
-            quote_items ( service_id )
+            quote_items ( service_id, tier_name, quantity )
           `)
           .eq('customer_id', customerId)
           .in('status', ['sent', 'viewed'])
@@ -281,21 +418,12 @@ export async function POST(request: NextRequest) {
           quote_number: string;
           access_token: string | null;
           created_at: string;
-          quote_items: Array<{ service_id: string | null }> | null;
+          quote_items: Array<{ service_id: string | null; tier_name: string | null; quantity: number | null }> | null;
         }>;
 
         let duplicateQuote: (typeof recentQuotes)[number] | null = null;
         for (const existing of recentQuotes) {
-          const existingServiceIds = (existing.quote_items ?? [])
-            .map((qi) => qi.service_id)
-            .filter((id): id is string => typeof id === 'string' && id.length > 0)
-            .sort();
-          if (
-            existingServiceIds.length === candidateServiceIds.length &&
-            existingServiceIds.every(
-              (id, i) => id === candidateServiceIds[i],
-            )
-          ) {
+          if (buildItemTripleKey(existing.quote_items ?? []) === candidateKey) {
             duplicateQuote = existing;
             break;
           }

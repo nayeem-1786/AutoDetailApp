@@ -59,7 +59,16 @@ interface SeededQuoteRow {
   quote_number: string;
   access_token: string | null;
   created_at: string;
-  quote_items: Array<{ service_id: string | null }> | null;
+  // Issue 38 D43 — the guard now compares (service_id, tier_name, quantity)
+  // triples. tier_name/quantity are optional here so legacy seeds (which only
+  // set service_id) still typecheck; the route's buildItemTripleKey collapses
+  // a missing tier_name to '' and a missing quantity to 1 (matching the real
+  // pre-D43 row shape).
+  quote_items: Array<{
+    service_id: string | null;
+    tier_name?: string | null;
+    quantity?: number | null;
+  }> | null;
 }
 const quotesIdempotencyState: {
   recentQuotes: SeededQuoteRow[];
@@ -498,7 +507,10 @@ describe('POST /api/voice-agent/send-quote-sms — 60s idempotency guard', () =>
         quote_number: 'Q-0084',
         access_token: 'tok-existing',
         created_at: new Date(Date.now() - 30_000).toISOString(),
-        quote_items: [{ service_id: 'service-signature-id' }],
+        // tier_name + quantity reflect what the route now SELECTs and what the
+        // real DB stored (this describe block's resolvePriceMock returns
+        // tierName='sedan'); the triple must match the candidate to HIT.
+        quote_items: [{ service_id: 'service-signature-id', tier_name: 'sedan', quantity: 1 }],
       },
     ];
 
@@ -672,7 +684,9 @@ describe('POST /api/voice-agent/send-quote-sms — 60s idempotency guard', () =>
         quote_number: 'Q-0099',
         access_token: 'tok-dup',
         created_at: new Date(Date.now() - 15_000).toISOString(),
-        quote_items: [{ service_id: 'service-signature-id' }],
+        // tier_name + quantity match the candidate triple (sedan / 1) so the
+        // guard registers a HIT under the Issue 38 D43 triple comparison.
+        quote_items: [{ service_id: 'service-signature-id', tier_name: 'sedan', quantity: 1 }],
       },
     ];
 
@@ -875,5 +889,478 @@ describe('POST /api/voice-agent/send-quote-sms — combo pricing application (Is
 
     expect(res.status).toBe(200);
     expect(applyCombosToQuoteItemsMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 38 D43 — tier + quantity handling (Session C route integration)
+//
+// Closes the Q-0084 fidelity gap: agent verbalized "Per Row × 2 = $250" but
+// the quote shipped at $450 (the size-aware `complete` tier auto-picked by
+// resolvePrice). Session A added resolvePrice's `options.tierName`; Session B
+// added the `tiers` + `quantities` tool-schema params + Critical Rule 7; this
+// session (C) wires them through the route: parse the parallel CSVs, pass
+// tierName into resolvePrice, enforce max_qty, propagate quantity to the
+// quote_item, and extend the D36 idempotency guard to compare
+// (service_id, tier_name, quantity) triples.
+//
+// resolvePrice is mocked here (its own behavior is pinned by Session A's
+// service-resolver tests). These tests pin the ROUTE contract: what it passes
+// to resolvePrice, how it reacts to a null return (unknown tier), how it
+// enforces max_qty from service.service_pricing, and what it writes to the
+// quote_item.
+// ---------------------------------------------------------------------------
+
+const HOT_SHAMPOO_ID = 'service-hot-shampoo-id';
+const HOT_SHAMPOO = {
+  id: HOT_SHAMPOO_ID,
+  name: 'Hot Shampoo Extraction',
+  pricing_model: 'scope',
+  // Only the fields the ROUTE reads directly matter here (tier_name for the
+  // available-tiers error list, max_qty + qty_label for the bound check).
+  // resolvePrice is mocked, so price columns are irrelevant.
+  service_pricing: [
+    { tier_name: 'floor_mats', max_qty: null, qty_label: null },
+    { tier_name: 'per_row', max_qty: 3, qty_label: 'row' },
+    { tier_name: 'carpet_mats', max_qty: null, qty_label: null },
+    { tier_name: 'complete', max_qty: null, qty_label: null },
+  ],
+};
+
+const MOTORCYCLE_ID = 'service-motorcycle-id';
+const MOTORCYCLE = {
+  id: MOTORCYCLE_ID,
+  name: 'Complete Motorcycle Detail',
+  pricing_model: 'specialty',
+  service_pricing: [
+    { tier_name: 'standard_cruiser', max_qty: null, qty_label: null },
+    { tier_name: 'touring_bagger', max_qty: null, qty_label: null },
+  ],
+};
+
+describe('POST /api/voice-agent/send-quote-sms — Issue 38 D43 tier + quantity handling', () => {
+  beforeEach(() => {
+    // Default vehicle: 2018 Suburban → suv_3row_van (the empirical Q-0084 case).
+    findOrCreateVehicleMock.mockResolvedValue({
+      id: 'v-suburban',
+      created: false,
+      vehicle_category: 'automobile',
+      size_class: 'suv_3row_van',
+      specialty_tier: null,
+    });
+  });
+
+  // --- Happy paths (6) ---
+
+  it('Hot Shampoo + tiers="per_row" + quantities="2" → quote_item per_row × 2 @ $125 = $250', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 125,
+      salePrice: null,
+      tierName: 'per_row',
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: '2',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    // Route opts into the fail-loud overload by passing the tier intent.
+    expect(resolvePriceMock).toHaveBeenCalledWith(HOT_SHAMPOO, 'suv_3row_van', {
+      tierName: 'per_row',
+    });
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      service_id: HOT_SHAMPOO_ID,
+      tier_name: 'per_row',
+      quantity: 2,
+      unit_price: 125,
+    });
+    // total_price is computed downstream in createQuote (quantity * unit_price).
+    expect(items[0].quantity * items[0].unit_price).toBe(250);
+  });
+
+  it('Hot Shampoo + tiers="complete" (no quantities) → quote_item complete × 1 @ $450', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 450,
+      salePrice: null,
+      tierName: 'complete',
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'complete',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(resolvePriceMock).toHaveBeenCalledWith(HOT_SHAMPOO, 'suv_3row_van', {
+      tierName: 'complete',
+    });
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items[0]).toMatchObject({ tier_name: 'complete', quantity: 1, unit_price: 450 });
+  });
+
+  it('Complete Motorcycle Detail + tiers="touring_bagger" → touring_bagger (not the default standard_cruiser)', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(MOTORCYCLE);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 350,
+      salePrice: null,
+      tierName: 'touring_bagger',
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Complete Motorcycle Detail',
+        tiers: 'touring_bagger',
+        vehicle_year: 2022,
+        vehicle_make: 'Harley-Davidson',
+        vehicle_model: 'Street Glide',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(resolvePriceMock).toHaveBeenCalledWith(MOTORCYCLE, expect.any(String), {
+      tierName: 'touring_bagger',
+    });
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items[0].tier_name).toBe('touring_bagger');
+    expect(items[0].tier_name).not.toBe('standard_cruiser');
+  });
+
+  it('two services, only second has tier intent: tiers=",per_row" + quantities="1,2" → first auto-picks, second per_row × 2', async () => {
+    resolveServiceByNameMock
+      .mockResolvedValueOnce(EXPRESS_INTERIOR)
+      .mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock
+      .mockReturnValueOnce({ price: 85, salePrice: null, tierName: 'sedan', isOnSale: false })
+      .mockReturnValueOnce({ price: 125, salePrice: null, tierName: 'per_row', isOnSale: false });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Express Interior Clean, Hot Shampoo Extraction',
+        tiers: ',per_row',
+        quantities: '1,2',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    // First service: empty tier token → legacy auto-pick (2-arg call, no options).
+    expect(resolvePriceMock).toHaveBeenNthCalledWith(1, EXPRESS_INTERIOR, 'suv_3row_van');
+    // Second service: explicit tier intent (3-arg call).
+    expect(resolvePriceMock).toHaveBeenNthCalledWith(2, HOT_SHAMPOO, 'suv_3row_van', {
+      tierName: 'per_row',
+    });
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({ service_id: EXPRESS_INTERIOR_ID, tier_name: 'sedan', quantity: 1 });
+    expect(items[1]).toMatchObject({ service_id: HOT_SHAMPOO_ID, tier_name: 'per_row', quantity: 2, unit_price: 125 });
+  });
+
+  it('quantities omitted entirely → defaults to 1 (legacy regression: byte-identical pre-D43)', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 125,
+      salePrice: null,
+      tierName: 'per_row',
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items[0].quantity).toBe(1);
+  });
+
+  it('tiers omitted entirely → auto-pick per item (legacy regression: 2-arg resolvePrice, never null)', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 450,
+      salePrice: null,
+      tierName: 'complete',
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    // No tier token → legacy 2-arg call (no options object).
+    expect(resolvePriceMock).toHaveBeenCalledWith(HOT_SHAMPOO, 'suv_3row_van');
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items[0]).toMatchObject({ tier_name: 'complete', quantity: 1 });
+  });
+
+  // --- Error paths (5) ---
+
+  it('unknown tier_name → 400 + instructions_for_agent listing available tiers + do_not_share_with_customer', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    // Session A's resolver returns null when the named tier doesn't exist.
+    resolvePriceMock.mockReturnValueOnce(null);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'bogus_tier',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Tier not found');
+    expect(body.instructions_for_agent).toContain('bogus_tier');
+    expect(body.instructions_for_agent).toContain('Hot Shampoo Extraction');
+    // Available tiers from service_pricing are surfaced verbatim for recovery.
+    expect(body.instructions_for_agent).toMatch(/floor_mats/);
+    expect(body.instructions_for_agent).toMatch(/per_row/);
+    expect(body.instructions_for_agent).toMatch(/complete/);
+    expect(body.do_not_share_with_customer).toBe(true);
+    expect(createQuoteMock).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('quantity > max_qty (per_row × 4, max_qty=3) → 400 + instructions citing max + qty_label', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 125,
+      salePrice: null,
+      tierName: 'per_row',
+      isOnSale: false,
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: '4',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Quantity exceeds maximum');
+    expect(body.instructions_for_agent).toContain('3'); // max_qty
+    expect(body.instructions_for_agent).toContain('row'); // qty_label
+    expect(body.instructions_for_agent).toContain('per_row');
+    expect(body.do_not_share_with_customer).toBe(true);
+    expect(createQuoteMock).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('non-integer quantity ("two") → 400 + instructions_for_agent (rejected before resolution)', async () => {
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: 'two',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid quantity');
+    expect(body.do_not_share_with_customer).toBe(true);
+    expect(createQuoteMock).not.toHaveBeenCalled();
+  });
+
+  it('negative quantity ("-1") → 400 + instructions_for_agent', async () => {
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: '-1',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid quantity');
+    expect(createQuoteMock).not.toHaveBeenCalled();
+  });
+
+  it('quantity = 0 → 400 + instructions_for_agent', async () => {
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: '0',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('Invalid quantity');
+    expect(createQuoteMock).not.toHaveBeenCalled();
+  });
+
+  // --- Idempotency guard (2) ---
+
+  it('idempotency HIT — same service + tier + quantity within 60s → was_duplicate, no createQuote', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 125,
+      salePrice: null,
+      tierName: 'per_row',
+      isOnSale: false,
+    });
+    quotesIdempotencyState.recentQuotes = [
+      {
+        id: 'q-hot-existing',
+        quote_number: 'Q-0084',
+        access_token: 'tok-hot',
+        created_at: new Date(Date.now() - 20_000).toISOString(),
+        quote_items: [{ service_id: HOT_SHAMPOO_ID, tier_name: 'per_row', quantity: 2 }],
+      },
+    ];
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: '2',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBe(true);
+    expect(body.quote_number).toBe('Q-0084');
+    expect(createQuoteMock).not.toHaveBeenCalled();
+  });
+
+  it('idempotency MISS — same service but DIFFERENT tier within 60s → new quote at the different tier', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 125,
+      salePrice: null,
+      tierName: 'per_row',
+      isOnSale: false,
+    });
+    // Existing quote was the `complete` tier ($450); the new request is
+    // `per_row` × 2 ($250). Triples differ → NOT a duplicate.
+    quotesIdempotencyState.recentQuotes = [
+      {
+        id: 'q-hot-complete',
+        quote_number: 'Q-0083',
+        access_token: 'tok-complete',
+        created_at: new Date(Date.now() - 20_000).toISOString(),
+        quote_items: [{ service_id: HOT_SHAMPOO_ID, tier_name: 'complete', quantity: 1 }],
+      },
+    ];
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Hot Shampoo Extraction',
+        tiers: 'per_row',
+        quantities: '2',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.was_duplicate).toBeUndefined();
+    expect(body.quote_number).toBe('Q-9999');
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+  });
+
+  // --- Boundary (1) ---
+
+  it('quantities="2" for a flat-priced service (no tiers, no max_qty) → quantity=2 honored, total = unit_price × 2', async () => {
+    resolveServiceByNameMock.mockResolvedValueOnce(PET_HAIR);
+    resolvePriceMock.mockReturnValueOnce({
+      price: 50,
+      salePrice: null,
+      tierName: null,
+      isOnSale: false,
+    });
+
+    const res = await POST(
+      buildRequest({
+        phone: '+14245551234',
+        services: 'Pet Hair & Dander Removal',
+        quantities: '2',
+        vehicle_year: 2018,
+        vehicle_make: 'Chevy',
+        vehicle_model: 'Suburban',
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    // No tier token → auto-pick (2-arg call); flat resolves with tierName=null,
+    // so the max_qty bound check is skipped and quantity passes through.
+    expect(resolvePriceMock).toHaveBeenCalledWith(PET_HAIR, 'suv_3row_van');
+    const items = createQuoteMock.mock.calls[0][1].items;
+    expect(items[0]).toMatchObject({ service_id: PET_HAIR_ID, tier_name: null, quantity: 2, unit_price: 50 });
+    expect(items[0].quantity * items[0].unit_price).toBe(100);
   });
 });
