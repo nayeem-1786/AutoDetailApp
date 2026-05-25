@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const result = await createQuote(supabase, parsed.data, posEmployee.employee_id);
+    const result = await createQuote(supabase, parsed.data, 'pos', posEmployee.employee_id);
     const createdQuote = result.quote as { id?: string; quote_number?: string } | null;
 
     logAudit({

@@ -11,6 +11,7 @@ import { QUOTE_STATUS_LABELS, QUOTE_STATUS_BADGE_VARIANT } from '@/lib/utils/con
 import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
+import { buildQuoteNotesDisplay } from '@/lib/quotes/source-labels';
 
 interface QuoteSlideOverProps {
   quoteId: string | null;
@@ -221,12 +222,16 @@ export function QuoteSlideOver({ quoteId, open, onClose }: QuoteSlideOverProps) 
                 </span>
               </div>
             </div>
-            {quote.notes && (
-              <div className="mt-3 border-t border-gray-200 pt-3">
-                <p className="text-xs font-semibold uppercase text-gray-500 mb-1">Notes</p>
-                <p className="text-sm text-gray-600">{quote.notes}</p>
-              </div>
-            )}
+            {(() => {
+              const notesDisplay = buildQuoteNotesDisplay(quote.source, quote.notes);
+              if (!notesDisplay) return null;
+              return (
+                <div className="mt-3 border-t border-gray-200 pt-3">
+                  <p className="text-xs font-semibold uppercase text-gray-500 mb-1">Notes</p>
+                  <p className="text-sm text-gray-600">{notesDisplay}</p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Footer: Open in POS */}

@@ -620,9 +620,8 @@ async function autoGenerateQuote(
       customer_id: custId,
       vehicle_id: vehicleId,
       items: quoteItems,
-      notes: 'Auto-generated after phone call',
       valid_until: validUntil,
-    });
+    }, 'voice_agent');
 
     const quoteRecord = quote as { id: string; quote_number: string; access_token: string };
 

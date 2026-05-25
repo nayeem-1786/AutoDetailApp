@@ -249,6 +249,7 @@ const body = await request.json();
         customer_id: customerId,
         vehicle_id: vehicleId,
         status,
+        source: 'voice_agent',
         subtotal,
         tax_amount: 0,
         total_amount: subtotal,

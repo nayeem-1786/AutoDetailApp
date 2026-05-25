@@ -156,7 +156,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       ...BASE_INSERT_INPUT,
       coupon_code: 'SAVE25',
       coupon_discount: 25,
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
 
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.coupon_code).toBe('SAVE25');
@@ -169,7 +169,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       ...BASE_INSERT_INPUT,
       loyalty_points_to_redeem: 100,
       loyalty_discount: 5,
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
 
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.loyalty_points_to_redeem).toBe(100);
@@ -183,7 +183,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       manual_discount_type: 'dollar',
       manual_discount_value: 30,
       manual_discount_label: 'First-time customer',
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
 
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.manual_discount_type).toBe('dollar');
@@ -198,7 +198,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       manual_discount_type: 'dollar',
       manual_discount_value: null,
       manual_discount_label: 'Stale label',
-    } as unknown as Parameters<typeof createQuote>[1]);
+    } as unknown as Parameters<typeof createQuote>[1], 'admin');
 
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.manual_discount_type).toBeNull();
@@ -213,7 +213,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
       manual_discount_type: 'percent',
       manual_discount_value: 0,
       manual_discount_label: 'Zero',
-    } as unknown as Parameters<typeof createQuote>[1]);
+    } as unknown as Parameters<typeof createQuote>[1], 'admin');
 
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.manual_discount_value).toBeNull();
@@ -228,7 +228,7 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
         manual_discount_type: 'percent',
         manual_discount_value: 150,
         manual_discount_label: 'Over the line',
-      } as unknown as Parameters<typeof createQuote>[1])
+      } as unknown as Parameters<typeof createQuote>[1], 'admin')
     ).rejects.toThrow('Percent manual discount cannot exceed 100');
   });
 
@@ -236,7 +236,8 @@ describe('createQuote — Item 15g Layer 15g-ii modifier persistence', () => {
     const supabase = makeSupabase({ inserts });
     await createQuote(
       supabase as unknown as Parameters<typeof createQuote>[0],
-      BASE_INSERT_INPUT as Parameters<typeof createQuote>[1]
+      BASE_INSERT_INPUT as Parameters<typeof createQuote>[1],
+      'admin'
     );
 
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
@@ -401,7 +402,8 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
     const supabase = makeSupabase({ inserts });
     await createQuote(
       supabase as unknown as Parameters<typeof createQuote>[0],
-      BASE_INSERT_INPUT as Parameters<typeof createQuote>[1]
+      BASE_INSERT_INPUT as Parameters<typeof createQuote>[1],
+      'admin'
     );
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.subtotal).toBe(NO_MOD_TOTAL);
@@ -414,7 +416,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
       ...BASE_INSERT_INPUT,
       coupon_code: 'SAVE25',
       coupon_discount: 25,
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.total_amount).toBe(175); // 200 - 25
   });
@@ -425,7 +427,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
       ...BASE_INSERT_INPUT,
       loyalty_points_to_redeem: 100,
       loyalty_discount: 5,
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.total_amount).toBe(195); // 200 - 5
   });
@@ -437,7 +439,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
       manual_discount_type: 'dollar',
       manual_discount_value: 30,
       manual_discount_label: 'First-time customer',
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.total_amount).toBe(170); // 200 - 30
   });
@@ -450,7 +452,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
       manual_discount_type: 'percent',
       manual_discount_value: 10,
       manual_discount_label: 'Loyalty member',
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.total_amount).toBe(180); // 200 - 20
   });
@@ -467,7 +469,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
       manual_discount_type: 'dollar',
       manual_discount_value: 15,
       manual_discount_label: 'Cashier override',
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.total_amount).toBe(155); // 200 - 45
   });
@@ -481,7 +483,7 @@ describe('createQuote — Item 15g Layer 15g-v total_amount = net', () => {
       manual_discount_type: 'dollar',
       manual_discount_value: 500, // > subtotal; resolveManualDiscountAmount clamps to 200
       manual_discount_label: 'Over-discount',
-    } as Parameters<typeof createQuote>[1]);
+    } as Parameters<typeof createQuote>[1], 'admin');
     const quoteInsert = inserts.find((i) => i.table === 'quotes')!;
     expect(quoteInsert.row.total_amount).toBe(0); // 200 - 200, clamped
   });

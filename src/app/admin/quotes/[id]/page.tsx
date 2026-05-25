@@ -24,6 +24,7 @@ import {
   deriveCommPillState,
   type CommPillTone,
 } from '@/lib/quotes/derive-comm-pill';
+import { buildQuoteNotesDisplay } from '@/lib/quotes/source-labels';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -530,12 +531,16 @@ export default function QuoteDetailPage() {
               </div>
             )}
           </div>
-          {quote.notes && (
-            <div>
-              <span className="text-sm text-gray-500">Notes:</span>
-              <p className="mt-1 text-sm text-gray-700">{quote.notes}</p>
-            </div>
-          )}
+          {(() => {
+            const notesDisplay = buildQuoteNotesDisplay(quote.source, quote.notes);
+            if (!notesDisplay) return null;
+            return (
+              <div>
+                <span className="text-sm text-gray-500">Notes:</span>
+                <p className="mt-1 text-sm text-gray-700">{notesDisplay}</p>
+              </div>
+            );
+          })()}
 
           {/* Last Contacted (read-only, no send button) */}
           <div className="border-t border-gray-200 pt-4">

@@ -308,6 +308,10 @@ export type Database = {
           internal_notes: string | null
           is_mobile: boolean
           job_notes: string | null
+          loyalty_discount: number
+          loyalty_points_redeemed: number
+          manual_discount_label: string | null
+          manual_discount_value: number | null
           mobile_address: string | null
           mobile_surcharge: number | null
           mobile_zone_id: string | null
@@ -347,6 +351,10 @@ export type Database = {
           internal_notes?: string | null
           is_mobile?: boolean
           job_notes?: string | null
+          loyalty_discount?: number
+          loyalty_points_redeemed?: number
+          manual_discount_label?: string | null
+          manual_discount_value?: number | null
           mobile_address?: string | null
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
@@ -386,6 +394,10 @@ export type Database = {
           internal_notes?: string | null
           is_mobile?: boolean
           job_notes?: string | null
+          loyalty_discount?: number
+          loyalty_points_redeemed?: number
+          manual_discount_label?: string | null
+          manual_discount_value?: number | null
           mobile_address?: string | null
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
@@ -4307,6 +4319,7 @@ export type Database = {
           access_token: string | null
           converted_appointment_id: string | null
           coupon_code: string | null
+          coupon_discount: number | null
           created_at: string
           created_by: string | null
           customer_id: string | null
@@ -4315,6 +4328,11 @@ export type Database = {
           id: string
           is_mobile: boolean
           last_activity_at: string | null
+          loyalty_discount: number | null
+          loyalty_points_to_redeem: number | null
+          manual_discount_label: string | null
+          manual_discount_type: string | null
+          manual_discount_value: number | null
           mobile_address: string | null
           mobile_surcharge: number | null
           mobile_zone_id: string | null
@@ -4322,6 +4340,7 @@ export type Database = {
           notes: string | null
           quote_number: string
           sent_at: string | null
+          source: Database["public"]["Enums"]["quote_source"] | null
           status: Database["public"]["Enums"]["quote_status"]
           subtotal: number
           tax_amount: number
@@ -4336,6 +4355,7 @@ export type Database = {
           access_token?: string | null
           converted_appointment_id?: string | null
           coupon_code?: string | null
+          coupon_discount?: number | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -4344,6 +4364,11 @@ export type Database = {
           id?: string
           is_mobile?: boolean
           last_activity_at?: string | null
+          loyalty_discount?: number | null
+          loyalty_points_to_redeem?: number | null
+          manual_discount_label?: string | null
+          manual_discount_type?: string | null
+          manual_discount_value?: number | null
           mobile_address?: string | null
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
@@ -4351,6 +4376,7 @@ export type Database = {
           notes?: string | null
           quote_number: string
           sent_at?: string | null
+          source?: Database["public"]["Enums"]["quote_source"] | null
           status?: Database["public"]["Enums"]["quote_status"]
           subtotal?: number
           tax_amount?: number
@@ -4365,6 +4391,7 @@ export type Database = {
           access_token?: string | null
           converted_appointment_id?: string | null
           coupon_code?: string | null
+          coupon_discount?: number | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
@@ -4373,6 +4400,11 @@ export type Database = {
           id?: string
           is_mobile?: boolean
           last_activity_at?: string | null
+          loyalty_discount?: number | null
+          loyalty_points_to_redeem?: number | null
+          manual_discount_label?: string | null
+          manual_discount_type?: string | null
+          manual_discount_value?: number | null
           mobile_address?: string | null
           mobile_surcharge?: number | null
           mobile_zone_id?: string | null
@@ -4380,6 +4412,7 @@ export type Database = {
           notes?: string | null
           quote_number?: string
           sent_at?: string | null
+          source?: Database["public"]["Enums"]["quote_source"] | null
           status?: Database["public"]["Enums"]["quote_status"]
           subtotal?: number
           tax_amount?: number
@@ -6739,6 +6772,13 @@ export type Database = {
         | "specialty"
         | "flat"
         | "custom"
+      quote_source:
+        | "sms_agent"
+        | "voice_agent"
+        | "pos"
+        | "admin"
+        | "online_booking"
+        | "twilio_legacy"
       quote_status:
         | "draft"
         | "sent"
@@ -6950,6 +6990,14 @@ export const Constants = {
         "specialty",
         "flat",
         "custom",
+      ],
+      quote_source: [
+        "sms_agent",
+        "voice_agent",
+        "pos",
+        "admin",
+        "online_booking",
+        "twilio_legacy",
       ],
       quote_status: [
         "draft",

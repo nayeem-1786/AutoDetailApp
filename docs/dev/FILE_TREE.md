@@ -1030,6 +1030,8 @@ src/lib/quotes/quote-service.ts                          # Layer 15g-v: extracte
 src/lib/quotes/send-service.ts                           # Layer 15g-v: templated email path passes composite `quote_modifier_block` + 6 individual modifier vars; HTML+text fallback renders modifier rows above Total
 src/lib/quotes/manual-discount.ts                        # Layer 15g-v: extracted pure resolver (`resolveManualDiscountAmount`) so client-bundle consumers reach it without dragging convert-side deps
 src/lib/quotes/modifier-display.ts                       # Layer 15g-v: shared `resolveQuoteModifierRows(quote)` consumed by all 5 receipt surfaces (public landing, email HTML, email text, PDF, POS quote-detail)
+src/lib/quotes/source-labels.ts                          # Phase Quote-Source-1: `getQuoteSourceLabel` + `buildQuoteNotesDisplay` — channel-of-origin labels (sms_agent / voice_agent / pos / admin / online_booking / twilio_legacy) shared by all 4 quote-notes render surfaces
+src/lib/quotes/__tests__/source-labels.test.ts          # 19 tests — Phase Quote-Source-1: every enum value mapping + NULL fallback + combined-display truth table
 src/lib/quotes/__tests__/convert-service.test.ts        # 15 tests — pins Layer 15g-i coupon_code propagation (3) + Layer 15g-ii full modifier propagation (8) + Layer 15g-v writer-trust contract (4: coupon-only / loyalty-only / Q-0067-combined / defense-in-depth clamp)
 src/lib/quotes/__tests__/quote-service.modifiers.test.ts  # 25 tests — Layer 15g-ii modifier persistence (13) + Layer 15g-v writer-side total_amount = net formula (12: createQuote single-modifier × 4 / combined / over-discount clamp; updateQuote recompute triggers + non-financial PATCH skip + full-replacement deterministic math)
 src/lib/quotes/__tests__/modifier-display.test.ts        # 19 tests — Layer 15g-v shared helper: empty / coupon w+wo discount / loyalty w+wo points / manual label fallback / percent resolution / dollar clamp / partial collapse / ordering / Supabase NUMERIC-as-string coercion
@@ -1041,6 +1043,7 @@ src/lib/quotes/__tests__/send-service.test.ts            # Extended in Layer 15g
 ### Migrations
 ```
 supabase/migrations/20260517052147_quote_sent_template_modifier_block.sql   # Layer 15g-v: update seeded `quote_sent` email template body to render {quote_modifier_block} between Tax and Total; widen variables list with 7 new modifier-related variables. Guarded by `is_customized = false` to preserve operator-customized templates.
+supabase/migrations/20260525030037_add_quote_source.sql                     # Phase Quote-Source-1: CREATE TYPE quote_source ENUM (6 values) + ALTER TABLE quotes ADD COLUMN source quote_source NULL. No backfill — historical rows render notes verbatim via NULL-source fallback.
 ```
 
 ### Search

@@ -10,6 +10,7 @@ import {
 } from '@/lib/utils/resolve-mobile-fields';
 import { resolveManualDiscountAmount } from './manual-discount';
 import type { CreateQuoteInput, UpdateQuoteInput } from '@/lib/utils/validation';
+import type { QuoteSource } from './source-labels';
 
 // ---------------------------------------------------------------------------
 // Shared select strings
@@ -123,6 +124,7 @@ interface CreateQuoteResult {
 export async function createQuote(
   supabase: SupabaseClient,
   data: CreateQuoteInput,
+  source: QuoteSource,
   createdBy?: string | null
 ): Promise<CreateQuoteResult> {
   const quoteNumber = await generateQuoteNumber(supabase);
@@ -162,6 +164,7 @@ export async function createQuote(
     customer_id: data.customer_id,
     vehicle_id: data.vehicle_id || null,
     status: data.status || 'draft',
+    source,
     subtotal,
     tax_amount: taxAmount,
     total_amount: totalAmount,

@@ -667,6 +667,17 @@ export interface Quote {
   customer_id: string;
   vehicle_id: string | null;
   status: QuoteStatus;
+  /** Phase Quote-Source-1 — channel of origin. NULL on quotes created
+   *  before the column existed; render path falls back to displaying
+   *  notes verbatim. See src/lib/quotes/source-labels.ts. */
+  source:
+    | 'sms_agent'
+    | 'voice_agent'
+    | 'pos'
+    | 'admin'
+    | 'online_booking'
+    | 'twilio_legacy'
+    | null;
   subtotal: number;
   tax_amount: number;
   total_amount: number;
