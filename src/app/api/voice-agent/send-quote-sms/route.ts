@@ -370,9 +370,8 @@ export async function POST(request: NextRequest) {
       customer_id: customerId,
       vehicle_id: vehicleId,
       items: quoteItems,
-      notes: 'Generated during phone call',
       valid_until: validUntil,
-    });
+    }, 'sms_agent');
     perf.mark('query:createQuote', t);
 
     const quoteRecord = quote as { id: string; quote_number: string; access_token: string };

@@ -30,7 +30,6 @@ import { runV2AgentInBackground } from '@/lib/sms-ai/background-dispatch';
 import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createQuote } from '@/lib/quotes/quote-service';
 import { createShortLink } from '@/lib/utils/short-link';
-import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { resolveServiceByName, resolvePrice } from '@/lib/services/service-resolver';
 import { applyCombosToQuoteItems } from '@/lib/services/combo-resolver';
 import crypto from 'crypto';
@@ -842,9 +841,8 @@ export async function POST(request: NextRequest) {
               customer_id: quoteCustomerId,
               vehicle_id: vehicleId || undefined,
               items: quoteItems,
-              notes: `Auto-generated via SMS for ${cleanVehicleDescription({ year: quoteData.vehicle_year, make: quoteData.vehicle_make, model: quoteData.vehicle_model })}`.trim(),
               valid_until: validUntil,
-            });
+            }, 'twilio_legacy');
 
             // Update quote from draft → sent
             const quoteRecord = quote as { id: string; access_token: string };

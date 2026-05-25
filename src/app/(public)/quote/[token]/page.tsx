@@ -13,6 +13,7 @@ import {
   sumLineItemSavings,
   computePreDiscountSubtotal,
 } from '@/lib/quotes/line-item-pricing';
+import { buildQuoteNotesDisplay } from '@/lib/quotes/source-labels';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -384,13 +385,17 @@ export default async function PublicQuotePage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Notes */}
-      {quote.notes && (
-        <div className="mb-6 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
-          <h3 className="text-sm font-medium text-site-text-secondary">Notes</h3>
-          <p className="mt-1 text-sm text-site-text-muted whitespace-pre-wrap">{quote.notes}</p>
-        </div>
-      )}
+      {/* Notes — combined source label + operator notes (Phase Quote-Source-1) */}
+      {(() => {
+        const notesDisplay = buildQuoteNotesDisplay(quote.source, quote.notes);
+        if (!notesDisplay) return null;
+        return (
+          <div className="mb-6 rounded-lg border border-site-border bg-brand-dark px-6 py-4 shadow-sm">
+            <h3 className="text-sm font-medium text-site-text-secondary">Notes</h3>
+            <p className="mt-1 text-sm text-site-text-muted whitespace-pre-wrap">{notesDisplay}</p>
+          </div>
+        );
+      })()}
 
       {/* Accept Button */}
       {canAccept && (

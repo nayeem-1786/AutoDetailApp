@@ -29,6 +29,10 @@ import {
   deriveCommPillState,
   type CommPillTone,
 } from '@/lib/quotes/derive-comm-pill';
+import {
+  buildQuoteNotesDisplay,
+  type QuoteSource,
+} from '@/lib/quotes/source-labels';
 import { useRouter } from 'next/navigation';
 import { formatPhone } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
@@ -60,6 +64,9 @@ interface QuoteData {
   tax_amount: number;
   total_amount: number;
   notes: string | null;
+  // Phase Quote-Source-1 — channel of origin; drives the auto-label
+  // in the Notes section. NULL on pre-migration quotes.
+  source: QuoteSource | null;
   valid_until: string | null;
   created_at: string;
   sent_at: string | null;
@@ -673,12 +680,16 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
               <span className="text-gray-900 dark:text-gray-100">{formatQuoteDateTime(quote.updated_at)}</span>
             </div>
 
-            {quote.notes && (
-              <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
-                <p className="text-xs text-gray-500 dark:text-gray-400">Notes</p>
-                <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{quote.notes}</p>
-              </div>
-            )}
+            {(() => {
+              const notesDisplay = buildQuoteNotesDisplay(quote.source, quote.notes);
+              if (!notesDisplay) return null;
+              return (
+                <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Notes</p>
+                  <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{notesDisplay}</p>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Communication History */}

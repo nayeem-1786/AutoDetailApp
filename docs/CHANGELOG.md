@@ -6,6 +6,85 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-24 — feat(quotes): source tracking — new column + helper + 5 path adoptions + 4 render surfaces
+
+Branch `feat/quote-source-tracking`. Implements the audit at
+`docs/dev/QUOTE_SOURCE_TRACKING_AUDIT.md` (`audit/quote-source-tracking`
+branch). Q-0084 root-cause fix: removes the hardcoded
+`notes: 'Generated during phone call'` from the SMS-AI v2 path and
+2 other agent paths; the channel label now derives from the new
+`quotes.source` ENUM column and renders separately from the
+operator-editable `notes` free-text.
+
+**Migration** (`supabase/migrations/20260525030037_add_quote_source.sql`):
+- `CREATE TYPE quote_source AS ENUM (sms_agent, voice_agent, pos,
+  admin, online_booking, twilio_legacy)`. `online_booking` reserved
+  — no consumer today.
+- `ALTER TABLE quotes ADD COLUMN source quote_source NULL`. No
+  backfill (locked Q3): historical rows render notes verbatim.
+- `database.types.ts` regenerated; `DB_SCHEMA.md` regenerated.
+
+**Helper** (`src/lib/quotes/source-labels.ts`, new):
+- `getQuoteSourceLabel(source)` — enum → human-readable label.
+- `buildQuoteNotesDisplay(source, notes)` — combined display
+  (`"${label}. ${notes}"`, label-only, notes-only, or empty).
+  Trims whitespace-only notes.
+- 19 unit tests (`__tests__/source-labels.test.ts`) — every enum
+  value + full truth table including legacy-NULL fallback +
+  Q-0084-style historical mislabel preservation.
+
+**`createQuote` extension** (`src/lib/quotes/quote-service.ts`):
+- New required 3rd positional arg `source: QuoteSource`. Breaks
+  call-site signature deliberately so the type checker surfaces
+  every uncovered path.
+- `source` added to insert payload between `status` and `subtotal`.
+- 14 call sites in `quote-service.modifiers.test.ts` updated (25
+  tests still pass).
+
+**6 quote-creation paths** set source:
+- `src/app/api/pos/quotes/route.ts:57` → `'pos'`
+- `src/app/api/quotes/route.ts:49` → `'admin'`
+- `src/app/api/voice-agent/send-quote-sms/route.ts:369` →
+  `'sms_agent'`. **Hardcoded `notes: 'Generated during phone call'`
+  REMOVED** (Q-0084 root-cause fix).
+- `src/app/api/voice-agent/quotes/route.ts:247` (direct INSERT
+  bypass) → `'voice_agent'`. Notes-column stays operator-supplied
+  via the agent tool arg.
+- `src/app/api/webhooks/twilio/inbound/route.ts:841` →
+  `'twilio_legacy'`. Hardcoded `notes: 'Auto-generated via SMS
+  for <vehicle>'` REMOVED (OQ-2 locked decision). Stale
+  `cleanVehicleDescription` import removed.
+- `src/lib/services/voice-post-call.ts:619` → `'voice_agent'`.
+  Hardcoded `notes: 'Auto-generated after phone call'` REMOVED.
+
+**4 render surfaces** use `buildQuoteNotesDisplay`:
+- `src/app/(public)/quote/[token]/page.tsx:388` (customer-facing —
+  the Q-0084 surface).
+- `src/app/admin/quotes/[id]/page.tsx:533` (admin detail).
+- `src/app/admin/quotes/components/quote-slide-over.tsx:224`
+  (admin slide-over).
+- `src/app/pos/components/quotes/quote-detail.tsx:676` (POS view).
+- `Quote` type in `src/lib/supabase/types.ts:669` widened with
+  `source` field; `QuoteData` type in POS quote-detail widened to
+  match.
+
+**Decisions preserved per audit:**
+- `convert-service.ts:145` UNCHANGED — copies `quote.notes` alone
+  (operator free-text only post-fix) to `appointments.job_notes`
+  (OQ-1).
+- POS notes textarea (`quote-ticket-panel.tsx:1042`) UNCHANGED —
+  operator never sees or edits the source label.
+- POS quotes with no operator notes show "Created at the shop"
+  (uniform labeling, OQ-3).
+- `QUOTE_DETAIL_SELECT` uses `*` so the new column flows through
+  automatically.
+
+**Verification:** typecheck 0 errors, lint 0 errors / 97 warnings
+(unchanged baseline), 2181 tests pass (129 files), production build
+clean.
+
+---
+
 ## 2026-05-24 — feat(rendering): pre-discount subtotal math so customer eye-math reconciles
 
 Branch `feat/pre-discount-subtotal-math`. Post-render-session math correction.

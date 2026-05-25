@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createAdminClient();
-    const result = await createQuote(supabase, parsed.data);
+    const result = await createQuote(supabase, parsed.data, 'admin');
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
