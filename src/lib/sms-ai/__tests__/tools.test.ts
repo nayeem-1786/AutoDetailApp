@@ -323,4 +323,124 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     const tool = SMS_AI_V2_TOOLS.find((t) => t.name === 'upsert_customer')!;
     expect(tool.description.toLowerCase()).toContain('idempotent');
   });
+
+  // -------------------------------------------------------------------------
+  // Issue 38 D43 (2026-05-25) — send_quote_sms tiers + quantities params.
+  // Closes the tier-intent communication gap surfaced by Q-0084
+  // (agent verbalized "$250 Per Row × 2", quote charged $450 complete-tier).
+  // -------------------------------------------------------------------------
+
+  describe('Issue 38 D43 — send_quote_sms tiers + quantities', () => {
+    const sendQuote = () => SMS_AI_V2_TOOLS.find((t) => t.name === 'send_quote_sms')!;
+
+    it('schema includes `tiers` as an optional string property', () => {
+      const tool = sendQuote();
+      const tiersProp = tool.input_schema.properties.tiers as
+        | { type?: string; description?: string }
+        | undefined;
+      expect(tiersProp).toBeDefined();
+      expect(tiersProp!.type).toBe('string');
+      expect(tool.input_schema.required ?? []).not.toContain('tiers');
+    });
+
+    it('schema includes `quantities` as an optional string property', () => {
+      const tool = sendQuote();
+      const qtyProp = tool.input_schema.properties.quantities as
+        | { type?: string; description?: string }
+        | undefined;
+      expect(qtyProp).toBeDefined();
+      expect(qtyProp!.type).toBe('string');
+      expect(tool.input_schema.required ?? []).not.toContain('quantities');
+    });
+
+    it('required[] is unchanged from pre-D43 (still exactly ["phone", "services"])', () => {
+      const tool = sendQuote();
+      expect([...(tool.input_schema.required ?? [])].sort()).toEqual(
+        ['phone', 'services'].sort(),
+      );
+    });
+
+    it('tiers description explains the parallel-array contract and verbatim tier_name source', () => {
+      const tool = sendQuote();
+      const tiersProp = tool.input_schema.properties.tiers as { description?: string };
+      expect(tiersProp.description).toBeDefined();
+      // Parallel-array contract pinned
+      expect(tiersProp.description).toMatch(/parallel to `services`/);
+      // tier_name source pinned to get_services VERBATIM
+      expect(tiersProp.description).toContain('get_services');
+      expect(tiersProp.description).toContain('VERBATIM');
+      // Empirical tier-name examples pinned so prose can't drift away from them
+      expect(tiersProp.description).toContain('per_row');
+      expect(tiersProp.description).toContain('touring_bagger');
+      // Empty-token + auto-pick contract pinned
+      expect(tiersProp.description!.toLowerCase()).toContain('empty token');
+    });
+
+    it('quantities description documents default=1, max_qty rejection, and parallel-array contract', () => {
+      const tool = sendQuote();
+      const qtyProp = tool.input_schema.properties.quantities as { description?: string };
+      expect(qtyProp.description).toBeDefined();
+      expect(qtyProp.description).toMatch(/parallel to/);
+      expect(qtyProp.description!.toLowerCase()).toContain('default');
+      expect(qtyProp.description).toContain('max_qty');
+      expect(qtyProp.description).toContain('instructions_for_agent');
+    });
+
+    it('send_quote_sms top-level description cites the Q-0084-class fidelity gap and Issue 36 parallel', () => {
+      const tool = sendQuote();
+      // Pin the empirical reference so future prose edits cannot weaken the
+      // imperative back to abstract guidance.
+      expect(tool.description).toContain('Issue 38');
+      expect(tool.description).toContain('$250');
+      expect(tool.description).toContain('$450');
+      expect(tool.description).toContain('Issue 36');
+      // Tiered-services imperative pinned
+      expect(tool.description.toLowerCase()).toContain('multi-tier');
+      expect(tool.description).toContain('MUST pass');
+    });
+
+    it('legacy `services` parameter still present, still string-typed, with parallel-array note added', () => {
+      const tool = sendQuote();
+      const servicesProp = tool.input_schema.properties.services as {
+        type?: string;
+        description?: string;
+      };
+      expect(servicesProp).toBeDefined();
+      expect(servicesProp.type).toBe('string');
+      // Existing exemplar preserved so any in-flight calls keep matching prose
+      expect(servicesProp.description).toContain('Express Exterior Wash, Tire Shine');
+      // New positional-anchor note added so the LLM understands the contract
+      expect(servicesProp.description!.toLowerCase()).toContain('positional');
+    });
+
+    it('property count grows by exactly 2 (tiers + quantities) versus pre-D43 send_quote_sms schema', () => {
+      const tool = sendQuote();
+      const propNames = Object.keys(tool.input_schema.properties).sort();
+      // Pre-D43 send_quote_sms schema: phone, customer_name, services,
+      // vehicle_year, vehicle_make, vehicle_model, vehicle_color (7 props).
+      // D43 adds tiers + quantities → 9.
+      expect(propNames).toEqual(
+        [
+          'customer_name',
+          'phone',
+          'quantities',
+          'services',
+          'tiers',
+          'vehicle_color',
+          'vehicle_make',
+          'vehicle_model',
+          'vehicle_year',
+        ].sort(),
+      );
+      expect(propNames.length).toBe(9);
+    });
+
+    it('D43 changes do not regress the explicit-confirmation gate or the side-effecting designation', () => {
+      // Cross-check that the existing "Only call when ... explicitly confirmed"
+      // gate from the side-effecting-tools test still passes after the
+      // description was expanded for multi-tier guidance.
+      const tool = sendQuote();
+      expect(tool.description.toLowerCase()).toMatch(/only call this when.+explicitly confirmed/);
+    });
+  });
 });

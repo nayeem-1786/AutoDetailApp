@@ -6,6 +6,134 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-25 — feat(sms-ai): Issue 38 D43 — `send_quote_sms` tool schema gains `tiers` + `quantities` + Critical Rule 7 (Session B)
+
+Branch `feat/issue-38-tool-schema-and-prompt`. Session B of the parallel
+implementation plan that closes Issue 38 (Session A = `resolvePrice`
+resolver-side `options.tierName`; **Session B = tool schema + system prompt
+(this session)**; Session C = `send-quote-sms` route-handler validation
+that consumes both). The audit at
+`docs/dev/ISSUE_38_TIER_INTENT_AUDIT.md` recommended this three-session
+split; all three branches merge together before deploy.
+
+**Customer-facing failure being closed (Q-0084):** 2018 Suburban, Hot
+Shampoo Extraction — agent verbalized "Per Row × 2 = $250", customer
+confirmed, `send_quote_sms` wrote Q-0084 at **$450** because
+`resolvePrice` auto-picked the `complete` size-aware tier. The agent's
+verbalized tier intent never reached the resolver because the tool
+schema had no parameter to convey it. Architecturally one dimension
+deeper than Issue 36 (`size_class`) — same "agent must pass an intent
+the resolver can't infer" pattern, but for tier instead of size_class.
+
+**Scope of Session B (this session):** tool schema + system prompt
+ONLY. No `src/lib/services/**` changes (Session A's territory). No
+`src/app/api/voice-agent/**` changes (Session C's territory). No
+migrations. No new tools.
+
+**What changed:**
+
+- **`src/lib/sms-ai/tools.ts` (+14 net lines)** — `send_quote_sms`
+  schema gains two optional string properties:
+  - `tiers` — comma-separated `tier_name` values parallel to
+    `services` (positional contract). Empty token at position N =
+    "auto-pick for this service" (legacy behavior). Tier names come
+    from the `tier_name` field of `get_services` and MUST be passed
+    VERBATIM.
+  - `quantities` — comma-separated positive integers parallel to
+    `services` and `tiers`. Default 1 per service. Bounded by
+    `service_pricing.max_qty` per tier (e.g., `per_row` has
+    `max_qty=3`); exceeding it rejects with `instructions_for_agent`
+    so the agent recovers conversationally per Rule 19.
+  Both params optional — every legacy caller continues to work
+  byte-identically. The `services` description gains a
+  positional-anchor note so the LLM understands the parallel-array
+  contract. Top-level `send_quote_sms` description gains the Q-0084
+  empirical reference + Issue 36 architectural-parallel framing.
+
+- **`src/lib/sms-ai/system-prompt.ts` (+53 net lines)** — new
+  **Critical Rule 7** parallel to Rule 6 (size_class). Headline:
+  "CRITICAL — Multi-tier services: pass `tiers` (and `quantities`
+  when relevant) to `send_quote_sms`". Body pins the Q-0084
+  empirical example, the 4 Hot Shampoo Extraction tier_names
+  (`floor_mats` / `per_row` / `carpet_mats` / `complete`), the 2
+  Complete Motorcycle Detail tier_names (`standard_cruiser` /
+  `touring_bagger` — latent vulnerability), the auto-pick / empty-
+  token / omit semantics for size_class-determined `vehicle_size`
+  services, tier_name VERBATIM source pinned to `get_services`,
+  `max_qty` rejection + Rule 19 cross-reference, WRONG ❌ / RIGHT
+  ✅ exemplar pair, and the architectural-parallel cross-reference
+  to Critical Rule 6. Critical Rules 7-18 renumbered to 8-19.
+  Internal cross-refs updated: `(per Rule 18)` → `(per Rule 19)`
+  in Rule 2's body; `Critical rule 17` → `Critical rule 18` in the
+  Tool usage guide and "For NEW conversations" step 5.
+
+**Tests +18 net new + ~13 renumber updates:**
+
+- `src/lib/sms-ai/__tests__/tools.test.ts` — new "Issue 38 D43 —
+  send_quote_sms tiers + quantities" describe block (8 cases:
+  `tiers` presence + optional; `quantities` presence + optional;
+  required[] still `["phone", "services"]`; tiers description
+  parallel-array + VERBATIM + per_row + touring_bagger + empty
+  token; quantities description default + max_qty +
+  instructions_for_agent + parallel; top-level description Q-0084
+  / $250 / $450 / Issue 36 references + MUST pass; `services`
+  description positional-anchor note; property count grows by
+  exactly 2 (9 total); side-effecting "Only call this when …
+  explicitly confirmed" gate preserved through the description
+  expansion).
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts` — new "D43 /
+  Issue 38 (multi-tier tier intent on send_quote_sms)" describe
+  block (10 cases: Rule 7 headline pin; placement between Rule 6
+  and Rule 8; Q-0084 empirical references — 2018 Suburban / Hot
+  Shampoo Extraction / Per Row × 2 / $250 / $450 / Q-0084; 4 Hot
+  Shampoo + 2 Motorcycle tier_names verbatim; tier_name + get_services
+  + VERBATIM; parallel-array contract + positional + empty token +
+  auto-pick; max_qty + instructions_for_agent + Rule 19 cross-ref;
+  WRONG ❌ + RIGHT ✅ exemplar with `tiers: "per_row"` and
+  `quantities: "2"`; Critical Rule 6 cross-reference; D43 leaves
+  Rule 6 size_class wording unchanged; tool-usage-guide cross-ref
+  renumbered to Rule 18).
+- Existing rule-count assertion bumped 18→19. Existing renumber-pinned
+  assertions for the old Rule 16 (tool-grounded add-ons) / 17
+  (quote-first) / 18 (instructions_for_agent) bumped to 17 / 18 / 19
+  with explanatory "was Rule X pre-D43" comments. Existing
+  mandatory-reply rule cross-reference assertion updated from
+  `Rule 18` → `Rule 19`.
+
+**Hard rules respected:** NO changes to `src/lib/services/**` (Session
+A's territory). NO changes to `src/app/api/voice-agent/**` (Session
+C's territory). NO new tools (only extending the existing
+`send_quote_sms` schema). NO migrations. NO new files beyond test
+extensions and doc updates. Both new tool params are OPTIONAL —
+backward compatible. Critical Rules 1-6 wording preserved unchanged
+in substance. Critical Rule 2 (mandatory-reply) substance unchanged
+— only the cross-ref number updated. Critical Rules 8-19 substance
+unchanged — only renumbered.
+
+**Gates green:** tsc 0 errors, lint 0 errors / 97 warnings (baseline
+unchanged), `npm test` **2258/2258** pass (was 2240; +18 net new),
+targeted `sms-ai/__tests__/tools.test.ts` + `system-prompt.test.ts`
+180/180 pass.
+
+**Deploy: NO** — Session B alone has no observable production
+behavior change. The new tool params are advertised to the LLM, but
+without Session A's resolver `options.tierName` and Session C's
+route-handler validation, the route ignores the new params (the
+schema is permissive — `services` is still the only required field,
+and the route currently doesn't parse `tiers` or `quantities`).
+Operator merges A + B + C together before deploy.
+
+**Verification scenario (post-A+B+C deploy):** from allowlisted
+phone, run the Q-0084 reproduction — 2018 Suburban → "seat cleaning"
+→ "2 rows" → expect agent to verbalize "Per Row × 2 = $250" then
+call `send_quote_sms({services: "Hot Shampoo Extraction", tiers:
+"per_row", quantities: "2"})` → quote document renders **$250**
+(NOT $450). PM2 log line for the send_quote_sms iteration shows
+the new params; quote table row has `tier_name='per_row'`,
+`quantity=2`, `unit_price=125`, `total_price=250`.
+
+---
+
 ## 2026-05-24 — fix(services): Issue 37 D42 — prefix-match fallback in resolveServiceByName
 
 Branch `feat/issue-37-resolver-prefix-fallback`. Surfaced immediately
