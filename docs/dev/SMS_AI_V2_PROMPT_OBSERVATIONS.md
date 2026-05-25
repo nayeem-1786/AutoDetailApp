@@ -1184,7 +1184,11 @@ See D39 for full decision details.
 
 **Verification result (2026-05-24 21:49 PT):** D39 did NOT close the issue. Same $300/$450 fidelity gap reproduced on a 2018 Suburban quote for Hot Shampoo Extraction Complete. PM2 logs verified 3 `classify_vehicle` calls + 2 `get_services` calls; both `get_services` calls returned the identical 21909-byte size-unaware payload — confirming `size_class` was never passed despite the new Critical Rule 6 + strengthened subsection + recall directive + schema imperative. D39 had ZERO observable effect on agent behavior. This matches the D38 lesson: invocation-discipline rules cannot be reliably enforced via prompt wording alone when the parameter is structurally omissible.
 
-**Status as of D40 (2026-05-24 22:00 PT):** Resolved via Workstream J Session 8 (branch `feat/issue-36-architectural-size-class-injection`). Architectural fix mirrors the phone-injection pattern (Issue 26 precedent, 6 sites in `tool-dispatcher.ts`): `RuntimeContext` extended with `size_class?: string | null`; `callClassifyVehicle` captures the response's `size_class` into context on successful classify calls (defensive type guard — non-string values do not update); `callGetServices` injects from context if LLM didn't pass `size_class` (LLM-passed value always wins). D39 prompt rules + schema descriptions preserved as defense in depth. Tests: +12. Coexistence preserved: D38 mandatory-reply rule UNCHANGED; Rule 18 (`instructions_for_agent`) UNCHANGED; exotic/classic escalation language UNCHANGED at all 4 sites; agent-runner construction UNCHANGED; vehicle-classify + services endpoints UNCHANGED. See D40 for full decision details. Post-deploy verification: pending operator test.
+**Status as of D40 (2026-05-24 22:00 PT):** Dispatcher injection layer shipped via Workstream J Session 8 (branch `feat/issue-36-architectural-size-class-injection`). Mirrors the phone-injection pattern (Issue 26 precedent, 6 sites in `tool-dispatcher.ts`): `RuntimeContext` extended with `size_class?: string | null`; `callClassifyVehicle` captures the response's `size_class` into context on successful classify calls; `callGetServices` injects from context if LLM didn't pass `size_class`. Tests: +12.
+
+**Verification result (2026-05-24 — post-D40 production test):** D40 did NOT close the issue empirically. Same $300/$450 fidelity gap reproduced. PM2 logs verified the dispatcher was injecting `size_class=suv_3row_van` into the get_services URL correctly — but the endpoint silently dropped the value at the main-tier resolution path. Root cause located by diagnostic audit (`docs/dev/ISSUE_36_LAYER_2_PHASE_B_DIAGNOSTIC.md`, branch `audit/issue-36-layer-2-phase-b-diagnostic`, commit `f682dc2e`): two `null` arguments passed to `resolveServicePriceWithSale` at `services/route.ts:268` + `:325` short-circuited the canonical pricing engine's size-aware column dispatch.
+
+**Status as of D41 (2026-05-24 — Resolved):** Endpoint fix shipped via Workstream J Session 9 (branch `feat/issue-36-final-endpoint-fix`). Two-character change at the two bug sites — `null` → `sizeClass`. Lines 283 + 299 (flat / per_unit synthetic) stay as `null` correctly. Tests: +11 in `services/__tests__/route.test.ts` covering all 5 size classes + no-size_class fallback + invalid-size_class fallback + non-size-aware tier preservation + multi-tier shape + raw-columns-not-exposed regression + default-fallthrough mirror. 22/22 endpoint tests pass. D40 confirmed load-bearing (delivers size_class to endpoint reliably regardless of LLM compliance); D39 confirmed defense-in-depth (harmless prompt guidance). D38 (Rule 2), Rule 18 (instructions_for_agent), Critical Rule 4 (exotic/classic), agent-runner construction, dispatcher, prompt content, `tools.ts`, canonical engine, addon enrichment — all UNCHANGED. See D41 for full decision details. Post-deploy verification: pending operator test (Suburban + Accord + Tacoma scenarios per D41 acceptance criteria).
 
 ---
 
@@ -1941,6 +1945,42 @@ D39 had ZERO observable effect on agent behavior. This matches the D38 lesson: i
 - Payload size varies across vehicle sizes (not the constant 21909 bytes anymore).
 
 **Implementation:** Workstream J Session 8 — branch `feat/issue-36-architectural-size-class-injection` (2026-05-24, this commit). 12 new tests in `tool-dispatcher.test.ts` (capture-on-success + injection + LLM-override + first-call-no-context + 4 defensive-guards + multiple-calls-most-recent-wins + reset + LLM-response-unchanged + no-context-no-crash). No changes to: prompt content (D39 preserved as defense in depth), `tools.ts` (D39 schema descriptions preserved), `vehicle-classify` endpoint, `services` endpoint, agent-runner construction site, or any quote-creation route.
+
+**D41 — Pass `sizeClass` to `resolveServicePriceWithSale` at main-tier resolution sites (operator-locked 2026-05-24, post diagnostic audit).**
+
+D40 architectural injection (`RuntimeContext.size_class`) shipped and correctly delivered `size_class` to the `get_services` endpoint. But the endpoint silently dropped the value at the main-tier resolution path: two call sites passed `null` to the canonical pricing helper `resolveServicePriceWithSale` instead of the parsed `sizeClass` variable. Result: even with `size_class` arriving at the endpoint, the main service tiers (e.g., Hot Shampoo Extraction "Complete") returned the legacy `pricing.price` ($300) instead of resolving to the size-aware `vehicle_size_suv_van_price` ($450).
+
+The audit at `docs/dev/ISSUE_36_LAYER_2_PHASE_B_DIAGNOSTIC.md` confirmed via five independent evidence lines:
+- Code inspection at lines 268 and 325 passing `null`
+- Engine semantics requiring `sizeClass` to dispatch to size-aware columns (`picker-engine.ts:41-43`)
+- DB state: 1 service today with `is_vehicle_size_aware=true` tier (Hot Shampoo Extraction "complete")
+- Response shape: raw size columns stripped from LLM-facing output (`services/route.ts:269-273`)
+- Cross-codebase: 10+ other call sites correctly pass `size_class`; voice-agent endpoint sole outlier
+
+**Decision (operator-locked):**
+
+1. Change line 268 from `resolveServicePriceWithSale(p, null, saleWindow)` to `resolveServicePriceWithSale(p, sizeClass, saleWindow)` (scope/vehicle_size/specialty branch).
+2. Change line 325 the same way (default fallthrough branch — future-proofs against schema additions).
+3. Lines 283 and 299 STAY as `null` — those are the `flat` and `per_unit` synthetic-pricing paths which are not size-aware by definition.
+4. Tier emission shape: Option A (per-tier with `sizeClass`; preserve multi-tier emission). The helper handles per-tier resolution correctly; non-size-aware tiers stay at literal price, size-aware tiers get resolved.
+5. D40 (dispatcher injection) STAYS as load-bearing infrastructure that delivers `size_class` to the endpoint reliably regardless of LLM compliance.
+6. D39 (prompt + schema strengthening) STAYS as defense in depth.
+
+**Why the audit-first approach was right:**
+
+Three prior sessions (D39, D40) failed to close Issue 36 because the fix kept targeting layers that weren't the actual bug. The Pet Hair extrapolation was the original error — Pet Hair is an addon with `pricing_model='flat'`, exercising a completely different code path than the main-tier resolution that was actually broken. Until the audit forced empirical verification, the bug location was guessed.
+
+**Lesson locked:** when a fix doesn't close the issue empirically, audit the actual code path the bug travels through before drafting another fix. Don't trust prior session summaries to imply end-to-end correctness — verify the data flow.
+
+**Acceptance criteria:**
+
+- 2018 Suburban → agent quotes $450 (not $300) for Hot Shampoo Extraction Complete.
+- 2016 Honda Accord → agent quotes $325.
+- 2019 Toyota Tacoma → agent quotes $375.
+- PM2 logs: `get_services` payload size VARIES across vehicle classifications (size-aware fields populate different values).
+- Multi-tier display unchanged for non-size-aware tiers (`floor_mats` $75, `per_row` $125, `carpet_mats` $175 — all literal).
+
+**Implementation:** Workstream J Session 9 — branch `feat/issue-36-final-endpoint-fix` (2026-05-24, this commit). 11 new tests in `services/__tests__/route.test.ts` (Q-0084 Suburban scenario + sedan/truck_suv_2row/exotic/classic resolutions + no-size_class fallback + invalid-size_class fallback + non-size-aware tier preservation + multi-tier emission shape + raw-columns-not-exposed regression guard + default-fallthrough fix verification). 11 existing endpoint tests still pass. No changes to: prompt content (D39 preserved), `tools.ts` (D39 schema descriptions preserved), `vehicle-classify` endpoint, dispatcher (D40 preserved), agent-runner construction, any quote-creation route, the canonical engine, or addon enrichment logic.
 
 ### Coverage targets
 

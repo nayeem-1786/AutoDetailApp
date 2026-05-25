@@ -430,3 +430,229 @@ describe('GET /api/voice-agent/services — non-size-aware addons unaffected by 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// D41 (2026-05-24) — Issue 36 final endpoint fix. Pre-D41 the main-tier
+// resolution at services/route.ts:268 + 325 passed `null` to
+// resolveServicePriceWithSale, silently disabling size-aware resolution
+// for the main `services[i].pricing[]` array even when size_class
+// arrived at the endpoint (via D40 dispatcher injection). D41 changes
+// both sites to pass `sizeClass`. Hot Shampoo Extraction "complete"
+// tier is the empirical Q-0084-class scenario — pricing_model='scope'
+// with one is_vehicle_size_aware=true tier (price=300 fallback,
+// vehicle_size_suv_van_price=450 for a 2018 Suburban).
+//
+// Pre-D41 the existing test corpus only exercised the addon_suggestions
+// enrichment path; the anchor fixture is hard-coded pricing_model='flat'
+// so no test covered the broken main-tier path. These tests close that
+// coverage gap.
+// ---------------------------------------------------------------------------
+
+// Mirrors the real Hot Shampoo Extraction DB shape: pricing_model='scope'
+// with 4 tiers, only the "complete" tier size-aware. Per-size values
+// match the production data (DB query confirmed 2026-05-24).
+function makeHotShampooService(): CannedServiceRow {
+  return {
+    id: 'svc-hot-shampoo',
+    name: 'Hot Shampoo Extraction',
+    description: 'Deep carpet cleaning',
+    classification: 'both',
+    pricing_model: 'scope',
+    flat_price: null,
+    sale_price: null,
+    sale_starts_at: null,
+    sale_ends_at: null,
+    per_unit_price: null,
+    per_unit_label: null,
+    per_unit_max: null,
+    custom_starting_price: null,
+    base_duration_minutes: 90,
+    mobile_eligible: true,
+    vehicle_compatibility: [],
+    special_requirements: null,
+    service_categories: { name: 'Interior' },
+    service_pricing: [
+      {
+        id: 'sp-floor-mats',
+        service_id: 'svc-hot-shampoo',
+        tier_name: 'floor_mats',
+        tier_label: 'Floor Mats Only',
+        price: 75,
+        sale_price: null,
+        display_order: 0,
+        is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
+        max_qty: null,
+        qty_label: null,
+        created_at: '',
+      },
+      {
+        id: 'sp-per-row',
+        service_id: 'svc-hot-shampoo',
+        tier_name: 'per_row',
+        tier_label: 'Per Seat Row',
+        price: 125,
+        sale_price: null,
+        display_order: 1,
+        is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
+        max_qty: null,
+        qty_label: null,
+        created_at: '',
+      },
+      {
+        id: 'sp-carpet-mats',
+        service_id: 'svc-hot-shampoo',
+        tier_name: 'carpet_mats',
+        tier_label: 'Carpet & Mats Package',
+        price: 175,
+        sale_price: null,
+        display_order: 2,
+        is_vehicle_size_aware: false,
+        vehicle_size_sedan_price: null,
+        vehicle_size_truck_suv_price: null,
+        vehicle_size_suv_van_price: null,
+        vehicle_size_exotic_price: null,
+        vehicle_size_classic_price: null,
+        max_qty: null,
+        qty_label: null,
+        created_at: '',
+      },
+      {
+        id: 'sp-complete',
+        service_id: 'svc-hot-shampoo',
+        tier_name: 'complete',
+        tier_label: 'Complete Interior',
+        price: 300,
+        sale_price: null,
+        display_order: 3,
+        is_vehicle_size_aware: true,
+        vehicle_size_sedan_price: 325,
+        vehicle_size_truck_suv_price: 375,
+        vehicle_size_suv_van_price: 450,
+        vehicle_size_exotic_price: 350,
+        vehicle_size_classic_price: 350,
+        max_qty: null,
+        qty_label: null,
+        created_at: '',
+      },
+    ],
+  };
+}
+
+function pricingByTier(
+  body: { services: Array<{ pricing: Array<{ tier_name: string; price: number | null }> }> },
+  serviceIdx: number,
+): Map<string, number | null> {
+  const map = new Map<string, number | null>();
+  for (const t of body.services[serviceIdx].pricing) map.set(t.tier_name, t.price);
+  return map;
+}
+
+describe('D41: size-aware main-tier resolution (Issue 36 final fix)', () => {
+  beforeEach(() => {
+    dbState.services = [makeHotShampooService()];
+    dbState.addons = [];
+  });
+
+  it('Q-0084 scenario — Hot Shampoo "complete" tier with size_class=suv_3row_van returns $450 (was $300 pre-D41)', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    const tiers = pricingByTier(body, 0);
+    expect(tiers.get('complete')).toBe(450);
+  });
+
+  it('Sedan classification (Honda Accord) — Hot Shampoo "complete" returns $325', async () => {
+    const res = await GET(buildRequest({ size_class: 'sedan' }));
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(325);
+  });
+
+  it('Truck/SUV classification (Tacoma) — Hot Shampoo "complete" returns $375', async () => {
+    const res = await GET(buildRequest({ size_class: 'truck_suv_2row' }));
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(375);
+  });
+
+  it('Exotic classification — Hot Shampoo "complete" returns $350 (escalation enforcement is prompt-level via Critical Rule 4, not endpoint)', async () => {
+    const res = await GET(buildRequest({ size_class: 'exotic' }));
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(350);
+  });
+
+  it('Classic classification — Hot Shampoo "complete" returns $350', async () => {
+    const res = await GET(buildRequest({ size_class: 'classic' }));
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(350);
+  });
+
+  it('No size_class query param — Hot Shampoo "complete" returns $300 fallback (backward compat for legacy callers)', async () => {
+    const res = await GET(buildRequest());
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(300);
+  });
+
+  it('Invalid size_class — Hot Shampoo "complete" returns $300 fallback (validation matches addon-path behavior)', async () => {
+    const res = await GET(buildRequest({ size_class: 'foo' }));
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(300);
+  });
+
+  it('Non-size-aware tiers (floor_mats / per_row / carpet_mats) unchanged regardless of size_class', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    const tiers = pricingByTier(body, 0);
+    // Per-tier engine check: is_vehicle_size_aware=false → short-circuit to pricing.price.
+    expect(tiers.get('floor_mats')).toBe(75);
+    expect(tiers.get('per_row')).toBe(125);
+    expect(tiers.get('carpet_mats')).toBe(175);
+  });
+
+  it('Multi-tier mixed service emits all 4 tiers in display_order; only complete tier resolves to size-aware price', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    expect(body.services[0].pricing).toHaveLength(4);
+    expect(body.services[0].pricing.map((t: { tier_name: string }) => t.tier_name)).toEqual([
+      'floor_mats',
+      'per_row',
+      'carpet_mats',
+      'complete',
+    ]);
+    expect(body.services[0].pricing.map((t: { price: number }) => t.price)).toEqual([
+      75, 125, 175, 450,
+    ]);
+  });
+
+  it('Raw vehicle_size_*_price columns are NOT exposed to the LLM (response shape unchanged by D41)', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    const completeTier = body.services[0].pricing.find((t: { tier_name: string }) => t.tier_name === 'complete');
+    expect(completeTier).toBeDefined();
+    // Endpoint MUST only emit { tier_name, price, sale_price? } —
+    // raw size columns stripped (otherwise the LLM would couple to schema).
+    expect(completeTier).not.toHaveProperty('vehicle_size_sedan_price');
+    expect(completeTier).not.toHaveProperty('vehicle_size_suv_van_price');
+    expect(completeTier).not.toHaveProperty('is_vehicle_size_aware');
+  });
+
+  it('Default switch fallthrough also receives sizeClass (line 325 fix mirrors line 268 — future-proof)', async () => {
+    // Synthesize a service with an unknown pricing_model so the switch
+    // falls through to the default branch. The default branch resolves
+    // tiers identically to the scope/vehicle_size/specialty case.
+    const futureService = { ...makeHotShampooService(), id: 'svc-future', pricing_model: 'future_unknown_model' };
+    dbState.services = [futureService];
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    expect(pricingByTier(body, 0).get('complete')).toBe(450);
+  });
+});
+
