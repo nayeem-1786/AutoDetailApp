@@ -1000,3 +1000,168 @@ describe('dispatchTool — structured-error passthrough (Workstream J Session 3)
     expect(parsed.instructions_for_agent).toContain('already sent within the last hour');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Workstream J Session 8 — D40 + Issue 36 (2026-05-24): architectural
+// size_class injection. classify_vehicle captures size_class into
+// RuntimeContext; get_services injects from context if LLM didn't pass it.
+// Mirrors the phone-injection pattern. D39's prompt+schema strengthening
+// stays as defense in depth (this layer doesn't depend on it).
+// ---------------------------------------------------------------------------
+
+describe('dispatchTool — D40 size_class capture + injection (Issue 36 architectural fix)', () => {
+  it('classify_vehicle captures size_class from successful response into RuntimeContext', async () => {
+    // Mock vehicle-classify returning the full response shape (matching
+    // src/app/api/voice-agent/vehicle-classify/route.ts:76-87).
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        make: 'Chevrolet',
+        model: 'Suburban',
+        year: 2018,
+        size_class: 'suv_3row_van',
+        vehicle_category: 'automobile',
+        tier_name: 'Oversized',
+      }),
+    );
+    await dispatchTool({
+      name: 'classify_vehicle',
+      input: { make: 'Chevrolet', model: 'Suburban', year: 2018 },
+    });
+    // Capture must have updated context — verify by making a
+    // subsequent get_services call and checking the URL.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe(
+      'http://localhost:3000/api/voice-agent/services?size_class=suv_3row_van',
+    );
+  });
+
+  it('get_services injects size_class from context when LLM does not pass it', async () => {
+    // Seed context via classify_vehicle.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'sedan' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'Honda', model: 'Accord' } });
+    // get_services with no LLM input — context value wins.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe(
+      'http://localhost:3000/api/voice-agent/services?size_class=sedan',
+    );
+  });
+
+  it('get_services LLM-passed size_class OVERRIDES context value (LLM wins)', async () => {
+    // Seed context with sedan.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'sedan' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'Honda' } });
+    // LLM passes truck_suv_2row — must win over the sedan in context.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({
+      name: 'get_services',
+      input: { size_class: 'truck_suv_2row' },
+    });
+    expect(fetchCalls[1].url).toBe(
+      'http://localhost:3000/api/voice-agent/services?size_class=truck_suv_2row',
+    );
+  });
+
+  it('get_services with no LLM input AND no context size_class → omits param (first-call-before-classify scenario)', async () => {
+    // No classify_vehicle has run yet; context.size_class is undefined.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    // URL must be bare — no size_class param.
+    expect(fetchCalls[0].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
+  it('classify_vehicle response WITHOUT size_class field does not corrupt context', async () => {
+    // Defensive: mock a response that omits size_class (e.g., API
+    // shape change or partial classification). Context must remain
+    // undefined and subsequent get_services must omit the param.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { make: 'Honda' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'Honda' } });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
+  it('classify_vehicle response with size_class=null does not corrupt context', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: null }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'X' } });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
+  it('classify_vehicle response with non-string size_class (number/array) does not corrupt context', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 123 }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'X' } });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
+  it('classify_vehicle ERROR response does not update context', async () => {
+    // 500 from the endpoint — voiceAgentFetch returns isError=true.
+    fetchMock.mockResolvedValueOnce(jsonResponse(500, { error: 'boom' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'X' } });
+    // Now get_services — context should be untouched.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
+  it('multiple classify_vehicle calls — most recent size_class wins', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'sedan' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'Honda' } });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'suv_3row_van' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'Chevrolet' } });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    // Third URL (after the two classify calls) — most recent suv_3row_van wins
+    expect(fetchCalls[2].url).toBe(
+      'http://localhost:3000/api/voice-agent/services?size_class=suv_3row_van',
+    );
+  });
+
+  it('__resetForAgentRun clears captured size_class (next agent run starts fresh)', async () => {
+    // Agent run 1: classify sets size_class.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'sedan' }));
+    await dispatchTool({ name: 'classify_vehicle', input: { make: 'Honda' } });
+    // Reset for agent run 2.
+    __resetForAgentRun({ phone: DEFAULT_TEST_PHONE, conversationId: 'new-conv' });
+    // Run 2: get_services with no LLM input — must NOT carry sedan from run 1.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+
+  it('classify_vehicle response to LLM is unchanged (capture is a side-effect only)', async () => {
+    const payload = {
+      make: 'Honda',
+      model: 'Accord',
+      size_class: 'sedan',
+      tier_name: 'Sedan',
+    };
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, payload));
+    const result = await dispatchTool({
+      name: 'classify_vehicle',
+      input: { make: 'Honda', model: 'Accord' },
+    });
+    // LLM sees the full unchanged payload.
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content)).toEqual(payload);
+  });
+
+  it('classify_vehicle capture is no-op when runtime context is unset (defensive)', async () => {
+    // Edge case: someone called the dispatcher directly without
+    // __resetForAgentRun(). classify_vehicle should still succeed
+    // (it has no phone dependency) and the capture should silently
+    // skip rather than crash on null context.
+    __resetForAgentRun(); // explicit clear
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { size_class: 'sedan' }));
+    const r = await dispatchTool({ name: 'classify_vehicle', input: { make: 'Honda' } });
+    expect(r.isError).toBe(false);
+    // Subsequent get_services call — no context to read from.
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
+    await dispatchTool({ name: 'get_services', input: {} });
+    expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+});
