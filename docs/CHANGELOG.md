@@ -6,6 +6,90 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-25 — audit: Issue 38 tier intent communication gap
+
+Branch `audit/issue-38-tier-intent-gap`. Read-only diagnostic audit. No
+source code changed.
+
+**Surfaced 2026-05-25 00:14 PT** (production test, immediately after the
+Issue-37 D42 fallback shipped): 2018 Suburban customer asked for Hot
+Shampoo Extraction. Agent verbalized all 4 tiers, customer said "2
+rows", agent computed Per Row × 2 = $250, customer confirmed → agent
+called `send_quote_sms({ services: "Hot Shampoo Extraction", … })` →
+route created Q-0084 at $450 (the `complete` size-aware tier was
+auto-selected by `resolvePrice` because `sizeAwareTier` wins over
+agent intent). Customer was told $250, billed $450 — $200 customer-
+facing fidelity gap.
+
+**Architecturally same class as Issue 36** (size_class dimension,
+closed via D40+D41). Issue 38 is the **tier dimension within a multi-
+tier service** that the SMS-AI tool schema cannot convey.
+
+**Audit deliverable:** `docs/dev/ISSUE_38_TIER_INTENT_AUDIT.md`.
+
+**Recommendation (B1 vs B2):** **B1 — add `tiers` + `quantities`
+optional CSV string parameters to `send_quote_sms`.** B2
+(`service_pricing_id` UUIDs) rejected on 3 independent grounds: (1)
+`quote_items.tier_name` (TEXT, no UUID FK) and `bookingSubmitSchema.
+tier_name` (string, optional, nullable) are both string-based — B1
+mirrors precedent; (2) the LLM has `tier_name` strings in context from
+`get_services` but does NOT see `service_pricing.id` UUIDs (catalog
+endpoint drops them at `services/route.ts:267-283`); (3) string round-
+tripping survives prompt-cache resets and is human-debuggable in PM2
+logs.
+
+**Root cause:** `resolvePrice` at `service-resolver.ts:295-299` hard-
+codes the precedence `sizeAwareTier > matchingTier > tiers[0]` for
+`scope`/`vehicle_size` branches and `tiers[0]` for `specialty` when no
+`options.specialtyTier` is supplied. No call site supplies tier intent
+because the tool schema and the function signature lack the seam.
+
+**Blast radius (active):** 1 confirmed (Hot Shampoo Extraction, scope,
+mixed size-aware + non-size-aware tiers) + 1 latent (Complete
+Motorcycle Detail, specialty — always quotes `standard_cruiser`
+regardless of bike type). `vehicle_size` services are NOT vulnerable
+(row-per-size pattern, `tier_name === sizeClass` deterministic).
+
+**Three call sites** with identical Issue-38 vulnerability:
+- `src/app/api/voice-agent/send-quote-sms/route.ts:201`
+- `src/app/api/webhooks/twilio/inbound/route.ts:807`
+- `src/lib/services/voice-post-call.ts:519`
+
+**Recommended fix scope:** ~1 focused session (90-120 min). Files:
+`src/lib/sms-ai/tools.ts` (schema), `src/lib/sms-ai/system-prompt.ts`
+(Critical Rule N parallel to Rule 6), `src/app/api/voice-agent/send-
+quote-sms/route.ts` (parse parallel CSVs, build per-item args), and
+`src/lib/services/service-resolver.ts` (extend `ResolvePriceOptions`
+with `tierName?: string | null`; honor it for scope/specialty/
+vehicle_size branches). Twilio inbound + voice-post-call paths inherit
+the new option opaquely (no callers populate it today, so behavior is
+unchanged). Tests: +12 to +18 across the three modules. Backward
+compatible — both new params are optional; existing invocations get
+byte-identical behavior.
+
+**Operator questions surfaced:**
+- Q-0084 disposition (audit recommends: leave; do not void).
+- `quantities` exceeding `service_pricing.max_qty` — hard reject vs
+  silent clamp (audit recommends: hard reject + `instructions_for_
+  agent`).
+- Tier-name typo handling — reject vs auto-fall-through (audit
+  recommends: reject with `instructions_for_agent`).
+- System-prompt: dedicated Critical Rule vs embedded subsection (audit
+  recommends: dedicated, parallel to Rule 6).
+- Multi-quantity surfacing in `quote_sms_midcall` SMS body — out of
+  scope (defer to prompt-tuning pass).
+
+**Out of scope for the recommended fix:**
+- `create_appointment` direct-booking branch has a parallel tier-
+  intent gap; mitigated by Critical Rule 17. File as follow-up.
+- Twilio inbound auto-quote and voice-post-call finalize keep their
+  current auto-pick behavior. Future work: extract tier intent from
+  inbound text / call transcripts.
+- POS reducer's Pattern Y representation for multi-row tiers is
+  harmless and unchanged.
+
+---
+
 ## 2026-05-24 — fix(services): Issue 37 D42 — prefix-match fallback in resolveServiceByName
 
 Branch `feat/issue-37-resolver-prefix-fallback`. Surfaced immediately
