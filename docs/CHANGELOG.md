@@ -6,6 +6,187 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — feat(quotes): D45 — tier-display + services-summary helpers + Issue 39 chip adoption
+
+Branch `feat/d45-tier-display-and-services-summary`. Session 1 of the
+two-session D45/D46 split recommended by the Issue 41 audit
+(`docs/dev/ISSUE_41_TIER_VISUAL_SURFACES_AUDIT.md` Target 8). Session 2
+(D46) adopts the low-level `renderTierToken` helper at 15 per-line
+visual rendering surfaces AFTER this session merges + operator completes
+the Issue 40 admin edits.
+
+**Closes Issue 39** (SMS chip composition duplicates service name on
+multi-tier same-service quotes — observed 2026-05-25 ~14:25 PT
+immediately after D43 Session C shipped, when the agent's
+"floor mats and 2 rows" Q-0084-class quote rendered as
+`"Hot Shampoo Extraction, Hot Shampoo Extraction"` in the SMS preview
+because every consumer composed via the naive
+`items.map(i => i.item_name).join(', ')` pattern).
+
+**Architecture (Option U from Issue 41 audit Target 7):** two-layer
+helper split — low-level token renderer reused by both the chip
+composer (this session) and the 15 per-line visual surfaces (D46 next
+session). Mirrors Session 71's `line-item-pricing.ts` precedent
+(shared logic, per-surface rendering autonomous).
+
+**What changed:**
+
+- **`src/lib/quotes/tier-display.ts` (new, ~120 LOC)** —
+  `renderTierToken(item) → string | null`. Pure, surface-agnostic.
+  Per operator-locked decisions:
+  - qty=1 → tier_label (with titleCase(tier_name) fallback when
+    tier_label is null/empty).
+  - qty>1 with qty_label → `${qty} ${pluralize(qty_label)}` with
+    first-letter capitalization (e.g., "2 Rows").
+  - qty>1 without qty_label → defensive `${qty} × ${tier_label}`
+    fallback + `console.warn` (unreachable in production today per
+    D43 max_qty validation, but protects against future admin-UI
+    misconfiguration).
+  - tier_name === 'default' → returns null (sentinel for synthesized
+    flat/per_unit/custom rows).
+  - tier_name null/empty → returns null.
+  - Pluralization: simple English `+s` with `+es` for s/x/z/ch/sh
+    endings. No npm dependency.
+
+- **`src/lib/quotes/services-summary.ts` (new, ~270 LOC)** —
+  `formatServicesSummary(items) → string` (the Issue 39 fix) +
+  `enrichItemsWithTierMeta(admin, items)` (batched-fetch helper for
+  adoption sites that don't already have `service_pricing` /
+  `services.pricing_model` in scope). Per operator-locked decisions:
+  - Group by service_id, preserve first-encounter order.
+  - Multi-tier same-service → `Service Name (token + token + …)`,
+    ordered by `total_price DESC` (= `unit_price × quantity`),
+    tie-break `display_order ASC`.
+  - Single tier qty=1 in `scope` pricing model → keep parens
+    (informative tier_label — `"Hot Shampoo Extraction (Carpet & Mats)"`).
+  - Single tier qty=1 in `vehicle_size` / `specialty` →
+    NO parens (customer knows their vehicle/specialty).
+  - Single tier qty>1 → keep parens with pluralized qty_label.
+
+- **Adopted at 4 chip-composing call sites (covering 5 chip consumers):**
+  - `src/app/api/voice-agent/send-quote-sms/route.ts` — uses local
+    `tierMetaByItem` map populated during the resolution loop (no
+    extra DB round-trip; `service.service_pricing` is already loaded
+    by `resolveServiceByName`).
+  - `src/app/api/quotes/[id]/accept/route.ts` — uses
+    `enrichItemsWithTierMeta` to load tier meta from `quote.items`
+    (the SELECT only fetched `quote_items(*)`).
+  - `src/app/api/pos/jobs/[id]/cancel/route.ts` — SELECT widened to
+    include `service_id` + `tier_name` + `price_at_booking`; uses
+    `enrichItemsWithTierMeta`. Note: `appointment_services` has no
+    `quantity` column today — multi-quantity quote_items flatten to
+    one row per tier with implicit qty=1, so the cancel chip renders
+    `(Per Seat Row)` rather than `(2 Rows)` for the per_row case.
+    Carrying quantity through to `appointment_services` is a
+    separate schema change, out of scope for D45.
+  - `src/lib/quotes/convert-service.ts` — uses
+    `enrichItemsWithTierMeta`; cascades automatically to
+    `src/app/api/voice-agent/appointments/route.ts:311` via the
+    `result.serviceNames` return value (no direct edit needed there).
+
+- **`book/route.ts` adoption DEFERRED** per session brief allowance.
+  The booking widget (`booking-wizard.tsx`) structurally cannot
+  produce multi-tier same-service quotes today — its submit shape is
+  one primary `service_id` + an array of DISTINCT addon
+  `service_id`s. Adoption would be purely preventive with zero
+  observable behavior change. A sentinel pin test in
+  `services-summary-adoption.test.ts` records the deferral; if a
+  future booking redesign enables multi-tier same-service input, the
+  pin flips and adoption becomes mandatory.
+
+**Tests +43 net new:**
+
+- `src/lib/quotes/__tests__/tier-display.test.ts` — 14 unit cases
+  (qty=1 tier_label + fallback + 'default' / null sentinels;
+  qty>1 with qty_label pluralization across s/x/z/ch/sh endings;
+  defensive fallback + warn for qty>1 without qty_label; titleCase
+  fallback across multiple snake_case slugs).
+- `src/lib/quotes/__tests__/services-summary.test.ts` — 18 unit cases
+  covering operator-locked empirical scenarios (Hot Shampoo
+  floor_mats×1 + per_row×2 → ordered "2 Rows + Floor Mats Only";
+  carpet_mats×1 → keeps parens; mixed quote with Ceramic Shield;
+  pricing-model parens rule for scope vs vehicle_size vs specialty;
+  multi-tier ordering by total_price DESC + display_order tie-break;
+  edge cases — empty array, null service_id, no pricing_model,
+  scope + flat mix; regression — pre-D43 fixtures byte-identical;
+  Sarah Camry / Q-0084 reproduction).
+- `src/lib/quotes/__tests__/services-summary-adoption.test.ts` —
+  9 adoption pin cases (import present at 4 adopted sites;
+  inline-join pattern removed at 4 sites; book/route.ts deferral
+  sentinel; voice-agent/appointments inherits via convertQuote and
+  does NOT need a direct import).
+
+**Hard rules respected:**
+
+- NO source code in `src/lib/services/**` (resolver territory).
+- NO changes to D43 implementation (resolver `options.tierName`,
+  `tools.ts` schema, `system-prompt.ts`, Critical Rule 7).
+- NO database migrations.
+- NO `tier_label` data edits (Issue 40 is operator admin clicks
+  AFTER this session merges).
+- NO new SMS templates — `{services}` chip syntax unchanged.
+- NO refactoring of `line-item-pricing.ts` or `modifier-display.ts`.
+- Memory #15 (4 receipt surfaces) NOT touched — D46 scope.
+- Visual surfaces (15 inventoried by Issue 41 audit) NOT touched —
+  D46 scope.
+
+**Gates green:**
+
+- `npx tsc --noEmit` 0 errors
+- `npm run lint` 0 errors / 97 warnings (baseline unchanged)
+- `npm test src/lib/quotes/__tests__/` 219/219 (was 176 pre-D45)
+- `npm test` full suite **2333/2333** (was 2290; +43 net new)
+- `npm run build` compiled successfully (10.0s)
+
+**Deploy: YES** via `deploy-smartdetails` post-merge. SMS chip
+rendering improvement is observable on the next multi-tier
+same-service SMS quote (immediate post-deploy verification path
+below).
+
+**Operator manual verification (post-deploy, ~5 min):**
+
+1. SMS from allowlisted phone: `"2018 Suburban, seat cleaning"`.
+2. Agent enumerates 4 tiers (floor_mats $75, per_row $125,
+   carpet_mats $175, complete $450).
+3. `"floor mats and 2 rows"` → agent computes
+   `"Per Row × 2 + Floor Mats = $325"`.
+4. `"Sure send it"` → agent calls `send_quote_sms({tiers: "floor_mats,per_row", quantities: "1,2"})`.
+5. **SMS preview MUST read:**
+   `"Here's your quote from Smart Details Auto Spa for Hot Shampoo Extraction (2 Rows + Floor Mats Only): https://..."`
+   (the verbose `"Floor Mats Only"` is expected pre-Issue-40; cleans
+   up to `"Floor Mats"` after the operator makes the 2 admin tier
+   label edits between this merge and D46 fire).
+6. Quote link still works, subtotal still $325, quote_items still
+   correct (no behavior change to the underlying data — Issue 39 is
+   purely the rendering layer).
+
+**What this fix does NOT solve (out of scope, queued for D46):**
+
+- The 15 per-line visual rendering surfaces inventoried by Issue 41
+  audit still render `tier_name` as a raw snake_case slug:
+  public quote page (`(public)/quote/[token]/page.tsx:268-269`),
+  admin slide-over, admin quote detail page, POS quote detail,
+  quote PDF, public receipt page, public pay page, POS transaction
+  detail, appointment confirm email HTML + plain text (admin + POS
+  variants × 2-3 contexts each), and receipt-template thermal +
+  HTML (1 file × 2 sites covering 3 of 4 receipt consumers per
+  memory #15). D46 ships the cross-cutting visual adoption using
+  the same `renderTierToken` helper landed here.
+
+- Operator Issue 40 admin edits (`Floor Mats Only` → `Floor Mats`,
+  `Carpet & Mats Package` → `Carpet & Mats`) recommended BEFORE D46
+  fires so visual verification screenshots show clean labels at
+  each stage.
+
+**Next session preconditions (D46 pre-flight):**
+
+- D45 merged to main with green gates (this commit).
+- Operator completes Issue 40 admin edits (2 clicks, ~30 seconds).
+- No competing parallel session touching `src/lib/quotes/` or any
+  of the 15 visual surfaces (verify immediately before fire).
+
+---
+
 ## 2026-05-25 — feat(voice-agent): Issue 38 D43 — wire `tiers` + `quantities` through send-quote-sms route + idempotency triple (Session C)
 
 Branch `feat/issue-38-route-integration`. Session C — the final session of

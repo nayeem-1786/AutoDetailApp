@@ -7,6 +7,10 @@ import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import {
+  enrichItemsWithTierMeta,
+  formatServicesSummary,
+} from '@/lib/quotes/services-summary';
 
 const CANCELLABLE_EARLY = ['scheduled', 'intake'];
 const CANCELLABLE_LATE = ['in_progress', 'pending_approval'];
@@ -173,12 +177,27 @@ export async function POST(
         } | null;
 
         if (customer) {
-          // Fetch appointment details for notification
+          // Fetch appointment details for notification.
+          // D45 (Issue 39): SELECT widened to include service_id +
+          // tier_name + price_at_booking so the cancellation chip can
+          // compose via formatServicesSummary instead of the naive
+          // service-name-only join. Multi-tier same-service appointments
+          // (post-D43) now render via the helper.
+          //
+          // Note: appointment_services has no `quantity` column today —
+          // multi-quantity quote_items flatten to one appointment_service
+          // row per tier with implicit qty=1. The cancel chip therefore
+          // renders "(Per Seat Row)" rather than "(2 Rows)" for the
+          // pluralized per_row case — accurate to what's stored even if
+          // not byte-equivalent to the original quote's SMS preview.
+          // Carrying quantity through to appointment_services is its own
+          // schema change, out of scope for D45.
           const { data: appointment } = await supabase
             .from('appointments')
             .select(`
               scheduled_date, scheduled_start_time,
               services:appointment_services(
+                service_id, tier_name, price_at_booking,
                 service:services!appointment_services_service_id_fkey(name)
               )
             `)
@@ -206,12 +225,29 @@ export async function POST(
 
             const services = (
               appointment.services as unknown as {
+                service_id: string | null;
+                tier_name: string | null;
+                price_at_booking: number | string;
                 service: { name: string } | null;
               }[]
             ) ?? [];
-            const serviceNames = services
-              .map((s) => s.service?.name || 'Service')
-              .join(', ');
+            // D45 (Issue 39): compose via formatServicesSummary instead
+            // of the naive name-only join. enrichItemsWithTierMeta loads
+            // tier_label / qty_label / pricing_model in two batched
+            // queries (warn-only on failure so cancellation notification
+            // stays best-effort).
+            const enrichedServices = await enrichItemsWithTierMeta(
+              supabase,
+              services.map((s) => ({
+                service_id: s.service_id,
+                item_name: s.service?.name || 'Service',
+                tier_name: s.tier_name,
+                quantity: 1, // appointment_services has no quantity column today
+                unit_price: Number(s.price_at_booking),
+                total_price: Number(s.price_at_booking),
+              })),
+            );
+            const serviceNames = formatServicesSummary(enrichedServices);
 
             const shouldSms =
               notify_method === 'sms' || notify_method === 'both';

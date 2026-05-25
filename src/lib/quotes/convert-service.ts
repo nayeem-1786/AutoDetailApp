@@ -3,6 +3,10 @@ import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-deta
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { resolveManualDiscountAmount } from './manual-discount';
+import {
+  enrichItemsWithTierMeta,
+  formatServicesSummary,
+} from './services-summary';
 import type { ConvertQuoteInput } from '@/lib/utils/validation';
 
 // Item 15g Layer 15g-v — re-export for backward compatibility. The function
@@ -198,10 +202,37 @@ export async function convertQuote(
     console.error('Error updating quote status:', updateErr.message);
   }
 
-  // Build service names from quote items for caller use (SMS, logging)
-  const serviceNames = serviceItems
-    .map((item: { item_name?: string; service_id: string }) => item.item_name || 'Service')
-    .join(', ');
+  // Build service names from quote items for caller use (SMS, logging).
+  // D45 (Issue 39): compose via formatServicesSummary so multi-tier
+  // same-service quotes (post-D43 contract) render as e.g.
+  // "Hot Shampoo Extraction (2 Rows + Floor Mats)" rather than
+  // "Hot Shampoo Extraction, Hot Shampoo Extraction" in every
+  // downstream SMS/email that consumes `result.serviceNames`
+  // (`voice-agent/appointments/route.ts:311` cascades from here).
+  // The quote_items SELECT above (`*`) already carries
+  // service_id / item_name / tier_name / quantity / unit_price /
+  // total_price; enrichItemsWithTierMeta loads tier_label /
+  // qty_label / pricing_model in two batched queries (warn-only on
+  // failure so conversion stays best-effort).
+  const enrichedSummary = await enrichItemsWithTierMeta(
+    supabase,
+    serviceItems.map((item: {
+      service_id: string;
+      item_name?: string;
+      tier_name?: string | null;
+      quantity?: number;
+      unit_price: number | string;
+      total_price?: number | string | null;
+    }) => ({
+      service_id: item.service_id,
+      item_name: item.item_name || 'Service',
+      tier_name: item.tier_name ?? null,
+      quantity: item.quantity ?? 1,
+      unit_price: Number(item.unit_price),
+      total_price: item.total_price,
+    })),
+  );
+  const serviceNames = formatServicesSummary(enrichedSummary);
 
   // Fire webhook for appointment confirmation
   fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
