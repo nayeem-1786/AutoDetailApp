@@ -497,6 +497,30 @@ async function callSendQuoteSms(input: Record<string, unknown>, key: string): Pr
   if (!_runtimeContext?.phone) {
     return errResult('send_quote_sms: internal — runtime phone not set');
   }
+  // Issue 45 D49 (2026-05-27): observability log for auto-send trigger
+  // detection. Informational only — does NOT gate dispatch. Captures
+  // what the LLM thinks counts as "configuration finalized" per Critical
+  // Rule 17 preconditions. Post-deploy, operator greps PM2 logs for
+  // `[SmsAiV2.send_quote_sms.auto_send_trigger]` to monitor:
+  //   1. How often auto-send fires per conversation
+  //   2. Whether services/tiers/quantities are threaded correctly
+  //   3. False-fire candidates (audit Pattern 1/3/4/6/7 misclassifications)
+  // RuntimeContext shape (`phone`, `conversationId`, `size_class`) does NOT
+  // include last in/outbound messages — extending it would require runner
+  // refactor (out of D49 scope). The tool args + conversation_id are
+  // sufficient for post-deploy false-fire monitoring; cross-reference
+  // against the persisted message history via conversationId for full
+  // context.
+  console.log(`[SmsAiV2.send_quote_sms.auto_send_trigger]`, {
+    conversationId: _runtimeContext.conversationId,
+    servicesCount: typeof input.services === 'string'
+      ? input.services.split(',').filter((s) => s.trim().length > 0).length
+      : 0,
+    services: typeof input.services === 'string' ? input.services : null,
+    tiers: typeof input.tiers === 'string' ? input.tiers : null,
+    quantities: typeof input.quantities === 'string' ? input.quantities : null,
+    sizeClass: _runtimeContext.size_class ?? null,
+  });
   // Issue 46 refinement (2026-05-26): tag the request with the originating
   // agent path so the route can branch `notificationType` between
   // `sms_agent_quote_sent` (this dispatcher) and `voice_quote_sent` (the
