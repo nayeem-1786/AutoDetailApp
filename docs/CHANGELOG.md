@@ -6,6 +6,154 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — fix(admin): Issue 46 refinement — channel-aware notificationType branching for SMS vs Voice agent
+
+Branch `fix/issue-46-agent-quote-sent-label` (extends the prior Issue
+46 fix at commit `9a6fb0a6` with producer-side branching). Refines
+the operator-internal Admin Messages log to render channel-specific
+labels for quote-sent notifications:
+
+- `voice_quote_sent` → **"Voice Agent Quote Sent"** (ElevenLabs
+  voice-agent webhook path)
+- `sms_agent_quote_sent` (NEW) → **"SMS Agent Quote Sent"**
+  (SMS-AI v2 dispatcher path)
+
+The first Issue 46 iteration (commit `9a6fb0a6`, already merged at
+`dcd9a761`) collapsed both paths to a single channel-NEUTRAL
+"Agent Quote Sent" label. Operator subsequently chose channel-AWARE
+so each agent path is identifiable at a glance.
+
+**Producer-side changes (2 new commits on the same branch):**
+
+- `src/lib/sms-ai/tool-dispatcher.ts` (`callSendQuoteSms` ~line 500)
+  — `injectedBody` now always stamps `source: 'sms_agent' as const`
+  alongside the runtime phone injection. SMS-AI v2 is the only
+  caller through this path; tagging is deterministic. `as const`
+  narrows the TS type so accidental drift surfaces at compile time.
+
+- `src/app/api/voice-agent/send-quote-sms/route.ts` (lines 62-82 +
+  608) — request-body destructure adds optional
+  `source?: 'sms_agent' | 'voice_agent'`. The `notificationType`
+  assignment at line 608 branches:
+  ```ts
+  notificationType: source === 'sms_agent'
+    ? 'sms_agent_quote_sent'
+    : 'voice_quote_sent',
+  ```
+  Defensive: undefined, null, or any unrecognized string defaults
+  to `'voice_quote_sent'` — preserves backward-compat with the
+  ElevenLabs voice webhook caller, which does not pass `source`.
+
+- `src/app/admin/messaging/components/message-bubble.tsx`
+  `NOTIFICATION_LABEL_OVERRIDES` map extended to 2 entries; JSDoc
+  rewritten to document the producer-side branching architecture +
+  the channel-neutral → channel-aware refinement history.
+
+**Hard rules honored:**
+
+- NO changes to `src/lib/services/voice-post-call.ts:676` — this is
+  genuinely the voice post-call confirmation path; `voice_quote_sent`
+  is accurate there.
+- NO changes to `src/lib/sms/dedup.ts` — dedup logic continues to
+  filter by exact `notificationType` value. The new value
+  `sms_agent_quote_sent` does NOT collide with `voice_quote_sent`,
+  which is the desired behavior (SMS agent quotes + voice agent
+  quotes are distinct events that should dedup independently).
+- NO migrations.
+- NO changes to D45/D46/D47 work.
+- Customer-facing SMS body UNCHANGED — neither value appears in any
+  SMS body, only in the Admin Messages log UI.
+- External callers (ElevenLabs voice webhook) do NOT need to be
+  modified — they don't pass `source` and the route's default of
+  `'voice_quote_sent'` is correct for them.
+- Existing commit `9a6fb0a6` preserved — extended with new commits,
+  no force-push history rewrite.
+
+**Tests +9 net new (2387 → 2396):**
+
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts`:
+  - Updated 1 existing `send_quote_sms` body-equality test to
+    account for the new `source: 'sms_agent'` field
+    (`toEqual({...input, source: 'sms_agent'})`).
+  - New describe block `dispatchTool — Issue 46 refinement` (4
+    tests): always-injects-`sms_agent`; overrides any LLM-provided
+    `source` value (LLM cannot self-attribute to another agent);
+    coexists with runtime-phone injection (both fields stamped);
+    scope-limited to `send_quote_sms` (other tools like
+    `upsert_customer` do NOT get a `source` field).
+
+- `src/app/api/voice-agent/send-quote-sms/__tests__/route.test.ts`:
+  - Wrapped existing top-level `renderSmsTemplate` mock literal in
+    `vi.fn()` so describe blocks can override `isActive` per-test.
+    No behavior change for existing tests (default still returns
+    `isActive: false`).
+  - New describe block `Issue 46 refinement (channel-aware
+    notificationType)` (5 tests with `beforeEach` setting up Hot
+    Shampoo Q-0087 fixture + isActive:true template): each test
+    builds a request body with a different `source` value and
+    asserts the captured `sendSms` call's `notificationType` matches
+    the expected branch (`source='sms_agent'` → sms_agent_quote_sent;
+    `source='voice_agent'` → voice_quote_sent;
+    `source=undefined` → voice_quote_sent default;
+    `source='unknown'` → voice_quote_sent defensive fallback;
+    `source=null` → voice_quote_sent).
+
+**Gates:** tsc 0 errors, lint 0 errors / 97 warnings (baseline
+unchanged), `npm test` **2396/2396** (was 2387; +9 net new),
+`npm run build` compiled successfully in 12.0s (788 dynamic pages).
+
+**Files touched (6 = 3 src + 2 tests + 3 docs minus 2 already-modified-by-prior-commit = 6 net in this commit):**
+- `src/lib/sms-ai/tool-dispatcher.ts` (callSendQuoteSms source
+  injection)
+- `src/app/api/voice-agent/send-quote-sms/route.ts` (body
+  destructure widening + notificationType ternary)
+- `src/app/admin/messaging/components/message-bubble.tsx`
+  (override map extended + JSDoc rewrite)
+- `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` (1 updated
+  body-equality + new Issue 46 describe block)
+- `src/app/api/voice-agent/send-quote-sms/__tests__/route.test.ts`
+  (vi.fn wrap + new Issue 46 describe block)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/ROADMAP-13-ITEMS.md` (ledger row)
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` (Section 2 Issue 46
+  status updated from "Resolved via UI label override map" →
+  channel-aware via producer-side branching + extended override
+  map)
+
+**Deploy: YES** via `deploy-smartdetails` post-merge — observable
+on next SMS-AI v2 quote (label reads "SMS Agent Quote Sent") AND
+next voice-agent-originated quote (label reads "Voice Agent Quote
+Sent"). Pre-refinement quotes in the historical log will continue
+to render via the override map for whichever notificationType
+their metadata carried.
+
+**Manual verification (operator runs post-deploy):**
+
+1. Send a NEW SMS test quote (standard Suburban + Hot Shampoo test)
+   → Admin Messages log entry reads **"SMS Agent Quote Sent"**.
+2. Trigger a voice-agent test (if available) → Admin Messages log
+   entry reads **"Voice Agent Quote Sent"**.
+3. Find pre-refinement SMS quotes (Q-0090 / Q-0091 from today's
+   testing — these were sent through the SMS-AI v2 path with the
+   `voice_quote_sent` notificationType because the producer-side
+   tagging hadn't shipped yet) → label correctly reads "Voice Agent
+   Quote Sent" (consistent with their stored metadata, which is the
+   right historical reading).
+4. New SMS quotes sent AFTER deploy will carry the new
+   `sms_agent_quote_sent` notificationType and render "SMS Agent
+   Quote Sent" — the historical / future split is intentional and
+   correct.
+5. Regression check: non-quote system SMS (appointment
+   confirmation, job complete) → labels unchanged.
+
+**Customer impact:** zero. Label is operator-internal Admin UI
+only; SMS bodies never contained these strings.
+
+**DO NOT merge — operator merges after verifying tests + reading
+the diff.**
+
+---
+
 ## 2026-05-26 — fix(admin): Issue 46 — rename "Voice Quote Sent" label to "Agent Quote Sent"
 
 Branch `fix/issue-46-agent-quote-sent-label`. Single-file UI cosmetic

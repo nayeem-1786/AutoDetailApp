@@ -497,7 +497,15 @@ async function callSendQuoteSms(input: Record<string, unknown>, key: string): Pr
   if (!_runtimeContext?.phone) {
     return errResult('send_quote_sms: internal — runtime phone not set');
   }
-  const injectedBody = { ...input, phone: _runtimeContext.phone };
+  // Issue 46 refinement (2026-05-26): tag the request with the originating
+  // agent path so the route can branch `notificationType` between
+  // `sms_agent_quote_sent` (this dispatcher) and `voice_quote_sent` (the
+  // ElevenLabs voice-agent webhook caller, which doesn't pass `source`).
+  // Visible operator-side only — Admin Messages log labels each path
+  // distinctly via the override map in `message-bubble.tsx`. The voice
+  // webhook caller doesn't need to be modified — the route defaults to
+  // 'voice_quote_sent' when `source` is missing or invalid.
+  const injectedBody = { ...input, phone: _runtimeContext.phone, source: 'sms_agent' as const };
   return voiceAgentFetch(
     `/api/voice-agent/send-quote-sms`,
     {
