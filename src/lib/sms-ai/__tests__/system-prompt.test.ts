@@ -170,7 +170,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 21 numbered rules (D47 scope-pricing-discipline rules added 2026-05-26 as Rules 8 + 9; was 19 pre-D47)', () => {
+  it('Critical rules section contains exactly 22 numbered rules (D49 auto-send rule added 2026-05-27 as Rule 17; was 21 pre-D49 / 19 pre-D47 / 17 pre-D43)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
@@ -178,7 +178,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(21);
+    expect(numbered.length).toBe(22);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -379,14 +379,14 @@ describe('buildV2SystemPrompt — Issue 13 (4-hour fresh-conversation threshold,
 });
 
 describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard guardrail, D15)', () => {
-  it('Critical rule 19 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43; was Rule 17 pre-D47)', () => {
+  it('Critical rule 20 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43; was Rule 17 pre-D47; was Rule 19 pre-D49)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    // Rule 19 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert),
+    // Rule 20 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert),
     // 15→16 by D39 (Issue 36 size_class Rule 6 insert), 16→17 by D43
-    // (Issue 38 tier-intent Rule 7 insert), then 17→19 by D47 (Issues
+    // (Issue 38 tier-intent Rule 7 insert), 17→19 by D47 (Issues
     // 43/44 inserted Rules 8 + 9 — price-lookup-never-recall + scope-tier
-    // enumeration).
-    expect(out).toMatch(/19\.\s+\*\*Tool-grounded add-ons only/);
+    // enumeration), then 19→20 by D49 (Issue 45 inserted Rule 17 — auto-send).
+    expect(out).toMatch(/20\.\s+\*\*Tool-grounded add-ons only/);
     expect(out).toContain('NEVER invent add-ons');
     expect(out).toContain('addon_suggestions');
   });
@@ -527,12 +527,23 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
   it('forbids direct create_appointment call in the booking flow', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     expect(out).toContain('DO NOT call `create_appointment` in this flow');
-    expect(out).toContain('You DO NOT book the appointment\ndirectly');
+    // D49 reflowed the opening paragraph; the "You DO NOT book the
+    // appointment directly" anti-direct-booking sentence is preserved
+    // (now on a single line instead of wrapping mid-word).
+    expect(out).toContain('You DO NOT book the appointment directly');
   });
 
-  it('includes the canonical post-quote handoff line', () => {
+  it('includes the canonical post-quote handoff line (D49 auto-send phrasing)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toContain('Sent the quote to your phone — tap the link to review and accept.\n   Our team will call to confirm scheduling.');
+    // D49 (Issue 45, 2026-05-27): the canonical post-quote handoff line is
+    // now the auto-send reply "Sending the quote now — check your texts!"
+    // (tool-result-agnostic per Critical Rule 17 + Issue 27 safety). The
+    // pre-D49 past-tense "Sent the quote to your phone..." was replaced
+    // because optimistic claims of success risk Issue 27-class fabrication
+    // if the tool fails.
+    expect(out).toContain('Sending the quote now — check your texts!');
+    // Old past-tense canonical phrase is GONE
+    expect(out).not.toContain('Sent the quote to your phone — tap the link to review and accept');
   });
 
   it('distinguishes business-hours statements (OK) from specific-slot availability claims (NEVER)', () => {
@@ -552,9 +563,9 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
     expect(out).toContain('NEVER say "within a\nfew hours"');
   });
 
-  it('Critical rule 20 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43; was Rule 18 pre-D47)', () => {
+  it('Critical rule 21 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43; was Rule 18 pre-D47; was Rule 20 pre-D49)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/20\.\s+\*\*Quote first, never book directly/);
+    expect(out).toMatch(/21\.\s+\*\*Quote first, never book directly/);
     expect(out).toContain('NEVER call `create_appointment` directly');
   });
 });
@@ -669,7 +680,7 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 
-  it('Critical rule 21 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert; was Rule 19 pre-D47 scope-pricing inserts)', () => {
+  it('Critical rule 22 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert; was Rule 19 pre-D47 scope-pricing inserts; was Rule 21 pre-D49 auto-send insert)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Session 4 broadened "Tool errors" → "Tool responses" so the same rule
     // covers both isError:true error paths AND isError:false success paths
@@ -680,8 +691,9 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     // Session B (D43, Issue 38) renumbered 18 → 19 after inserting the
     // multi-tier tiers+quantities imperative as Rule 7. D47 (Issues 43/44)
     // renumbered 19 → 21 after inserting the price-lookup-never-recall +
-    // scope-tier enumeration imperatives as Rules 8 + 9.
-    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // scope-tier enumeration imperatives as Rules 8 + 9. D49 (Issue 45)
+    // renumbered 21 → 22 after inserting the auto-send imperative as Rule 17.
+    expect(out).toMatch(/22\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('Never share tool error messages');
     // Explicit Session 4 additions — confirm both success+error wording and
@@ -807,9 +819,9 @@ describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)'
     expect(out).not.toContain('JUST called `get_services`');
   });
 
-  it('preserves Rule 21 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43; 19→21 by D47)', () => {
+  it('preserves Rule 22 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43; 19→21 by D47; 21→22 by D49)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/22\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
   });
@@ -925,23 +937,25 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(out).toContain('Silence is never the right answer to a customer message');
   });
 
-  it('mandatory-reply rule includes coexistence cross-reference to Rule 21 (instructions_for_agent)', () => {
+  it('mandatory-reply rule includes coexistence cross-reference to Rule 22 (instructions_for_agent)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // D38 must explicitly call out that following instructions_for_agent
     // still satisfies the reply requirement (both rules satisfied).
     // Reference updated 17 → 18 by D39 (size_class rule insert at position 6),
-    // 18 → 19 by D43 (tier-intent rule insert at position 7), then 19 → 21
-    // by D47 (price-lookup + scope-tier inserts at positions 8 + 9).
-    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 21\)/);
+    // 18 → 19 by D43 (tier-intent rule insert at position 7), 19 → 21
+    // by D47 (price-lookup + scope-tier inserts at positions 8 + 9), then
+    // 21 → 22 by D49 (auto-send insert at position 17).
+    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 22\)/);
   });
 
-  it('Rule 21 (was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47) wording for instructions_for_agent is preserved unchanged in substance', () => {
+  it('Rule 22 (was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47; was Rule 21 pre-D49) wording for instructions_for_agent is preserved unchanged in substance', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Substantive wording must be intact — only the rule NUMBER changed
     // from 17 → 18 because D39 added a new Rule 6 (size_class imperative),
-    // 18 → 19 because D43 added a new Rule 7 (tier intent), then 19 → 21
-    // because D47 inserted Rules 8 + 9 (price-lookup + scope-tier).
-    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // 18 → 19 because D43 added a new Rule 7 (tier intent), 19 → 21
+    // because D47 inserted Rules 8 + 9 (price-lookup + scope-tier), then
+    // 21 → 22 because D49 inserted Rule 17 (auto-send).
+    expect(out).toMatch(/22\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
@@ -1113,9 +1127,9 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(out).toContain('INTERNAL ACTIONS');
   });
 
-  it('Rule 21 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47) wording is preserved unchanged by D39+D43+D47', () => {
+  it('Rule 22 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47; was Rule 21 pre-D49) wording is preserved unchanged by D39+D43+D47+D49', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/22\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('was_duplicate');
   });
@@ -1251,9 +1265,10 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     const rule7Body = section.slice(rule7Idx, rule7End);
     expect(rule7Body).toContain('max_qty');
     expect(rule7Body).toContain('instructions_for_agent');
-    // Rule 21 cross-reference for the recovery path (was Rule 19 pre-D47
-    // — D47 inserted Rules 8 + 9 so instructions_for_agent shifted 19 → 21)
-    expect(rule7Body).toMatch(/Rule 21/);
+    // Rule 22 cross-reference for the recovery path (was Rule 19 pre-D47
+    // — D47 inserted Rules 8 + 9 so instructions_for_agent shifted 19 → 21;
+    // D49 inserted Rule 17 auto-send so 21 → 22).
+    expect(rule7Body).toMatch(/Rule 22/);
   });
 
   it('new Critical Rule 7 contains BOTH the WRONG ❌ and RIGHT ✅ exemplar pair', () => {
@@ -1294,20 +1309,23 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(out).toContain('$150 fidelity gap');
   });
 
-  it('D47 preserves the tool-usage-guide cross-reference (now points to Rule 20 after D47 renumber)', () => {
+  it('D49 preserves the tool-usage-guide cross-reference (now points to Rule 21 after D49 renumber)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // The "see Booking flow + Critical rule N" cross-refs in both the
     // Tool usage guide bullet and the "For NEW conversations" step 5
     // shifted from Rule 17 → Rule 18 by D43 (the quote-first rule
-    // moved), then 18 → 20 by D47 (Rules 8 + 9 inserted for Issues
-    // 43/44 — price-lookup + scope-tier).
-    expect(out).toContain('see "Booking flow" + Critical rule 20');
-    expect(out).toContain('see "Booking flow" below + Critical rule 20');
-    // Stale Rule 17 + Rule 18 cross-refs must NOT remain
+    // moved), 18 → 20 by D47 (Rules 8 + 9 inserted for Issues
+    // 43/44 — price-lookup + scope-tier), then 20 → 21 by D49 (Rule 17
+    // inserted for Issue 45 — auto-send).
+    expect(out).toContain('see "Booking flow" + Critical rule 21');
+    expect(out).toContain('see "Booking flow" below + Critical rule 21');
+    // Stale Rule 17 + Rule 18 + Rule 20 cross-refs must NOT remain
     expect(out).not.toContain('see "Booking flow" + Critical rule 17');
     expect(out).not.toContain('see "Booking flow" below + Critical rule 17');
     expect(out).not.toContain('see "Booking flow" + Critical rule 18');
     expect(out).not.toContain('see "Booking flow" below + Critical rule 18');
+    expect(out).not.toContain('see "Booking flow" + Critical rule 20');
+    expect(out).not.toContain('see "Booking flow" below + Critical rule 20');
   });
 });
 
@@ -1441,13 +1459,197 @@ describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing
     expect(rule9Body).toContain('Complete-package short-circuit');
   });
 
-  it('Rule 9 cross-references Critical Rule 19 (architectural parallel — within-service vs cross-service enumeration)', () => {
+  it('Rule 9 cross-references Critical Rule 20 (architectural parallel — within-service vs cross-service enumeration; renumbered 19 → 20 by D49 auto-send insert at Rule 17)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
     const rule10Idx = out.indexOf('10. **Never confirm an appointment');
     const rule9Body = out.slice(rule9Idx, rule10Idx);
-    expect(rule9Body).toContain('Critical Rule 19');
+    expect(rule9Body).toContain('Critical Rule 20');
     expect(rule9Body.toLowerCase()).toContain('parallel');
     expect(rule9Body).toContain('addon_suggestions');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D49 — Issue 45 — Auto-send for send_quote_sms when configuration is
+// finalized (Critical Rule 17 insert; renumbers 17-21 → 18-22).
+// Operator-locked decisions: Option A (proactive auto-send), reply phrasing
+// "Sending the quote now — check your texts!", friction step deleted
+// entirely, 7-pattern matrix matches operator intent, observability log
+// added in tool-dispatcher.ts.
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send when configuration is finalized)', () => {
+  it('declares Critical Rule 17 with the CRITICAL — Auto-send quotes headline', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/17\.\s+\*\*CRITICAL — Auto-send quotes when configuration is finalized\.\*\*/);
+  });
+
+  it('Rule 17 appears WITHIN the # Critical rules section, immediately after Rule 16 (Don\'t double-act) and before Rule 18 (Never pitch mobile)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    expect(criticalIdx).toBeGreaterThan(-1);
+    const rule16Idx = out.indexOf("16. **Don't double-act", criticalIdx);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send', criticalIdx);
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service', criticalIdx);
+    expect(rule16Idx).toBeGreaterThan(-1);
+    expect(rule17Idx).toBeGreaterThan(rule16Idx);
+    expect(rule18Idx).toBeGreaterThan(rule17Idx);
+    // Must come BEFORE the next top-level header
+    const nextH1 = out.indexOf('\n# ', criticalIdx + '# Critical rules'.length);
+    expect(nextH1).toBeGreaterThan(rule17Idx);
+  });
+
+  it('Rule 17 declares all THREE auto-send preconditions (commit signal + total stated + no mid-flux)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    // Precondition 1: commit signal
+    expect(rule17Body).toContain('Commit signal');
+    expect(rule17Body).toContain('send it');
+    // Precondition 2: total stated in prior turn
+    expect(rule17Body).toContain('Total stated in your immediately-prior turn');
+    // Precondition 3: no mid-flux signals
+    expect(rule17Body).toContain('No mid-flux signals');
+    expect(rule17Body).toContain('change-request');
+    expect(rule17Body).toContain('negation');
+  });
+
+  it('Rule 17 specifies the exact auto-send reply phrasing "Sending the quote now — check your texts!"', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('Sending the quote now — check your texts!');
+    // Past-tense "Quote sent!" is explicitly forbidden per Issue 27 safety
+    expect(rule17Body).toContain('Do NOT use past-tense');
+    expect(rule17Body).toContain('tool-result-agnostic');
+  });
+
+  it('Rule 17 contains the Pattern 3 example (conditional commitment with trailing change-request → recompute then auto-fire)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    // Pattern 3 canonical example from audit Target 9
+    expect(rule17Body).toContain('Pattern 3');
+    expect(rule17Body).toContain('Yes send it, but actually can you add an exterior wash first?');
+    expect(rule17Body).toContain('Express Exterior Wash adds $110');
+    expect(rule17Body).toContain('$360');
+    // The rule must explicitly direct "recompute first, then auto-fire on next turn"
+    expect(rule17Body).toContain('recompute');
+  });
+
+  it('Rule 17 contains the Issue 27 safety clause (post-failure correction, no fabrication)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('Issue 27 safety');
+    expect(rule17Body).toContain('is_error: true');
+    expect(rule17Body).toContain('that send failed');
+    expect(rule17Body).toContain('Do NOT fabricate success');
+  });
+
+  it('Rule 17 explicitly forbids the "Want me to send a quote?" question (friction step deletion)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    // Two explicit anti-friction mentions per the rule body
+    expect(rule17Body).toContain('You do NOT ask "Want me to send a quote?"');
+    expect(rule17Body).toContain('You NEVER ask "Want me to send a quote?"');
+    expect(rule17Body).toContain('that friction step is deleted');
+  });
+
+  it('Rule 17 cross-references Rule 16 (architectural parallel — Rule 16 governs firing rate, Rule 17 governs trigger timing)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('Architectural parallel');
+    expect(rule17Body).toContain('Rule 16');
+  });
+
+  it('Rule 2 ✅ RIGHT example uses the new Rule 17 auto-send phrasing ("Sending the quote now — check your texts!"); past-tense "Quote sent!" removed', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Locate Rule 2 body
+    const rule2Idx = out.indexOf('2. **Every customer turn requires a customer-facing reply');
+    const rule3Idx = out.indexOf('3. **One primary service per quote');
+    const rule2Body = out.slice(rule2Idx, rule3Idx);
+    // New auto-send phrasing present
+    expect(rule2Body).toContain('Sending the quote now — check your texts!');
+    // Past-tense optimistic phrasing removed
+    expect(rule2Body).not.toContain('Quote sent! Tap the link to review and accept. Our team will follow up to confirm scheduling. Anything else?');
+    // The customer-input example updated from "Sure, send the quote" to a
+    // more natural variant
+    expect(rule2Body).toContain('Cool, send it');
+  });
+
+  it('Tool usage guide trigger references Critical Rule 17 (configuration-finalized framing) instead of customer-agreed framing', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The tool-usage-guide bullet's framing now keys on Rule 17 preconditions
+    expect(out).toContain("Customer's configuration is finalized (commit signal + total stated in your prior turn + no mid-flux signals — per Critical Rule 17)?");
+    // Old "Customer agreed on a service" framing removed
+    expect(out).not.toContain("Customer agreed on a service (any \"yes book it\" / \"let's do it\" / \"sounds good\" agreement after price)?");
+  });
+
+  it('Booking flow Step 1 references Critical Rule 17 preconditions (and explicitly forbids the friction question)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const bookingIdx = out.indexOf('## Booking flow — quote first, scheduling second');
+    expect(bookingIdx).toBeGreaterThan(-1);
+    const nextH2 = out.indexOf('\n## ', bookingIdx + '## Booking flow — quote first, scheduling second'.length);
+    const bookingSection = out.slice(bookingIdx, nextH2 > -1 ? nextH2 : undefined);
+    expect(bookingSection).toContain('Critical Rule 17');
+    expect(bookingSection).toContain('You do NOT ask "Want me to send a quote?"');
+    // Old friction-trigger framing removed
+    expect(bookingSection).not.toContain('Customer agrees to service ("Yes book it" / "Sounds good" / "Let\'s\n   do it"). You have the price, vehicle, color, name in context.');
+  });
+
+  it('Quote-send intent recognition paragraph preserved (still documents commit phrasings) AND adds Rule 17 framing', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Original explicit-phrase examples preserved
+    expect(out).toContain('send me the quote');
+    expect(out).toContain('me puedes mandar un quote');
+    expect(out).toContain("Don't require the literal word \"quote\" — recognize the intent");
+    // New Rule 17 framing sentence added
+    expect(out).toContain('count as a commit signal for the Critical Rule 17 auto-send trigger');
+    expect(out).toContain('implicit commitment');
+    expect(out).toContain('total stated in your prior turn AND no mid-flux');
+  });
+
+  it('No "Want me to send a quote?" question anywhere except inside Rule 17 (which FORBIDS it) and Booking flow Step 1 (which references the prohibition)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Locate every match
+    const matches = [...out.matchAll(/Want me to send a quote\?/g)];
+    // Every match must be inside a forbidding context — count is small
+    // (3 occurrences: 2 inside Rule 17 + 1 inside Booking flow Step 1)
+    expect(matches.length).toBe(3);
+    // Each match must be wrapped by "NOT ask" / "NEVER ask" / "forbidden"
+    // language to confirm it's a prohibition, not a prescription
+    for (const match of matches) {
+      const idx = match.index ?? 0;
+      const context = out.slice(Math.max(0, idx - 60), idx + 30);
+      const forbids =
+        /NOT ask|NEVER ask|forbidden|forbidden by|deleted from/i.test(context);
+      expect(forbids).toBe(true);
+    }
+  });
+
+  it('Total Critical Rules count is now 22 (was 21 pre-D49)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    expect(criticalIdx).toBeGreaterThan(-1);
+    const nextH1 = out.indexOf('\n# ', criticalIdx + '# Critical rules'.length);
+    const criticalSection = out.slice(criticalIdx, nextH1);
+    // Count numbered rules — each begins with `\n\d+\. \*\*`
+    const ruleMatches = [...criticalSection.matchAll(/\n(\d+)\.\s\*\*/g)];
+    expect(ruleMatches.length).toBe(22);
+    // Rules numbered 1..22 contiguously
+    const numbers = ruleMatches.map((m) => Number(m[1]));
+    for (let i = 0; i < numbers.length; i += 1) {
+      expect(numbers[i]).toBe(i + 1);
+    }
   });
 });

@@ -74,14 +74,21 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     }
   });
 
-  it('side-effecting tools carry an explicit "Only call when ... confirmed" gate in their description', () => {
+  it('side-effecting tools (other than send_quote_sms) carry an explicit "Only call when ... confirmed" gate in their description', () => {
     // Audit §1 — tools 5, 6, 9, 10 have write/send side effects. Their
     // descriptions must include a confirmation gate to protect against
     // premature model action.
+    //
+    // D49 (Issue 45, 2026-05-27): send_quote_sms is intentionally EXCLUDED
+    // from this gate — Critical Rule 17 (auto-send) changed its trigger
+    // from "explicitly confirmed" (customer-spoken affirmation) to
+    // "configuration is finalized" (commit signal + total stated + no
+    // mid-flux). The "AND asked to be texted a quote" clause that
+    // produced the Issue 45 friction was deleted. A separate D49 test
+    // below pins the new framing.
     const sideEffectTools: SmsAiV2ToolName[] = [
       'create_appointment',
       'send_info_sms',
-      'send_quote_sms',
     ];
     for (const name of sideEffectTools) {
       const tool = SMS_AI_V2_TOOLS.find((t) => t.name === name)!;
@@ -435,13 +442,78 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
       expect(propNames.length).toBe(9);
     });
 
-    it('D43 changes do not regress the explicit-confirmation gate or the side-effecting designation', () => {
-      // Cross-check that the existing "Only call when ... explicitly confirmed"
-      // gate from the side-effecting-tools test still passes after the
-      // description was expanded for multi-tier guidance.
+    it('D43 changes do not regress the side-effecting designation (gate phrasing updated by D49 to configuration-finalized framing)', () => {
+      // Pre-D49, this pin asserted /only call this when.+explicitly confirmed/.
+      // D49 (Issue 45, 2026-05-27) intentionally changed send_quote_sms's
+      // trigger framing from customer-elicited permission to configuration-
+      // finalization (Critical Rule 17 auto-send). The "AND asked to be
+      // texted a quote" clause that produced the Issue 45 friction was
+      // deleted. The description still gates the call (auto-fire only when
+      // Rule 17's three preconditions hold) — the framing just no longer
+      // matches the legacy /explicitly confirmed/ regex.
       const tool = sendQuote();
-      expect(tool.description.toLowerCase()).toMatch(/only call this when.+explicitly confirmed/);
+      // New D49 gate: Rule 17 reference + configuration-finalized framing
+      expect(tool.description).toContain('Critical Rule 17');
+      expect(tool.description).toContain('committed to a finalized configuration');
+      // Old gate phrasing explicitly REMOVED
+      expect(tool.description).not.toContain('asked to be texted a quote');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D49 — Issue 45 — send_quote_sms description retighten for auto-send
+// (Critical Rule 17 reference + friction-clause deletion). Belt + suspenders
+// for system-prompt Rule 17 (auto-send when configuration is finalized).
+// ---------------------------------------------------------------------------
+
+describe('SMS_AI_V2_TOOLS — D49 / Issue 45 (send_quote_sms auto-send framing)', () => {
+  function sendQuote() {
+    return SMS_AI_V2_TOOLS.find((t) => t.name === 'send_quote_sms')!;
+  }
+
+  it('send_quote_sms description references Critical Rule 17 auto-send preconditions', () => {
+    const tool = sendQuote();
+    expect(tool.description).toContain('Critical Rule 17');
+    expect(tool.description).toContain('auto-send preconditions');
+  });
+
+  it('send_quote_sms description enumerates the three preconditions (commit signal + total stated + no mid-flux)', () => {
+    const tool = sendQuote();
+    expect(tool.description).toContain('commit signal');
+    expect(tool.description).toContain('total stated in your prior turn');
+    expect(tool.description).toContain('no mid-flux signals');
+  });
+
+  it('send_quote_sms description explicitly forbids the "Want me to send a quote?" friction question', () => {
+    const tool = sendQuote();
+    expect(tool.description).toContain('NEVER ask "Want me to send a quote?"');
+    expect(tool.description).toContain('Rule 17 forbids it');
+  });
+
+  it('send_quote_sms description specifies the auto-send reply phrasing + Issue 27 safety rationale', () => {
+    const tool = sendQuote();
+    expect(tool.description).toContain('Sending the quote now — check your texts!');
+    expect(tool.description).toContain('tool-result-agnostic');
+    expect(tool.description).toContain('Issue 27');
+  });
+
+  it('send_quote_sms description NO LONGER contains the "AND asked to be texted a quote" clause (the strongest Issue 45 friction cue)', () => {
+    const tool = sendQuote();
+    // The exact removed clause — per audit Appendix A cue #6
+    expect(tool.description).not.toContain('asked to be texted a quote');
+    // Also verify the legacy "Only call this when... explicitly confirmed"
+    // framing no longer appears for send_quote_sms specifically
+    expect(tool.description.toLowerCase()).not.toMatch(/only call this when.+explicitly confirmed/);
+  });
+
+  it('D43 multi-tier guidance (Issue 38) preserved by D49 — D49 only changed the WHEN-TO-CALL framing, not the multi-tier MUST-pass-tiers-and-quantities clause', () => {
+    const tool = sendQuote();
+    // D43 imperative pins from earlier test block must still pass
+    expect(tool.description).toContain('Multi-tier services (Issue 38 D43)');
+    expect(tool.description).toContain('MUST pass `tiers`');
+    expect(tool.description).toContain('$250');
+    expect(tool.description).toContain('$450');
   });
 });
 

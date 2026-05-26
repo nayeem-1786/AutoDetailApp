@@ -6,6 +6,58 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-27 — feat(sms-ai): D49 — Option A proactive auto-send for send_quote_sms (CLOSES Issue 45)
+
+Branch `fix/issue-45-auto-send-confirmation`. Implementation session for the Issue 45 audit (`docs/dev/ISSUE_45_AUTO_SEND_AUDIT.md`, audit branch merged at `d5efe521`). Single combined session per audit Target 10. **Closes Issue 45** — eliminates the redundant "Want me to send a quote?" friction step that added 30-90 seconds of funnel latency per quote-send flow with 0% actionable customer signal at the friction step (4 Q-tests measured, 100% pass-through rate).
+
+**Operator-locked decisions implemented (all 7):**
+1. **Option:** Option A — Proactive auto-send (LLM-judged "configuration finalized")
+2. **Reply phrasing:** "Sending the quote now — check your texts!" (tool-result-agnostic per Issue 27 safety)
+3. **Friction step:** DELETED entirely — agent NEVER asks "Want me to send a quote?"
+4. **7-pattern matrix:** rule wording encodes all predicted behaviors from audit Target 9
+5. **Observability:** YES — `[SmsAiV2.send_quote_sms.auto_send_trigger]` log line added at `tool-dispatcher.ts:500-518`
+6. **Rule slot:** Critical Rule 17 (immediately after Rule 16 "Don't double-act"; renumber 17-21 → 18-22)
+7. **Three preconditions required:** commit signal in customer's most recent message + total stated in agent's immediately-prior turn + no mid-flux/change-request/question/negation signals
+
+**System-prompt changes (`src/lib/sms-ai/system-prompt.ts`):**
+- **New Critical Rule 17** ("CRITICAL — Auto-send quotes when configuration is finalized") at lines 221-255 (~35 LOC). Encodes the 3 preconditions, the auto-send reply phrasing, the Pattern 3 conditional-commitment example (recompute then auto-fire on next turn), the Issue 27 post-failure correction clause, and the explicit "NEVER ask 'Want me to send a quote?'" prohibition (mentioned twice for emphasis).
+- **Rule 2 ✅ RIGHT example updated** (`:82-89`): customer input "Cool, send it" (was "Sure, send the quote"); agent reply "Sending the quote now — check your texts!" (was "Quote sent! Tap the link to review and accept..."). Past-tense optimistic phrasing removed per Issue 27 safety.
+- **Renumber 17-21 → 18-22**: old Rule 17 "Never pitch mobile service" → new Rule 18; old Rule 18 "After notify_staff, hand off" → 19; old Rule 19 "Tool-grounded add-ons only" → 20; old Rule 20 "Quote first, never book directly" → 21 (also reworded trigger to reference Rule 17 preconditions); old Rule 21 "Tool responses with instructions_for_agent" → 22.
+- **5 inline cross-references updated** per audit Target 8: `:93` (Rule 2 → Rule 22), `:132` (Rule 7 → Rule 22), `:205` (Rule 9 → Rule 20), `:322` (tool usage guide → Critical rule 21), `:395` (Discovery Step 5 → Critical rule 21).
+- **Tool usage guide trigger reworded** (`:322`): "Customer's configuration is finalized (commit signal + total stated in your prior turn + no mid-flux signals — per Critical Rule 17)?" (was "Customer agreed on a service (any 'yes book it' / 'let's do it' / 'sounds good' agreement after price)?").
+- **Quote-send intent recognition paragraph framed** (`:327`): added sentence noting the explicit phrases are EXAMPLES (implicit commitment qualifies too) + reminder that commit signal alone is not sufficient (Rule 17 also requires total stated + no mid-flux). Original English + Spanish phrase lists preserved.
+- **Discovery Step 5 reworded** (`:395`): "When the customer's configuration is finalized (per Critical Rule 17 auto-send preconditions): call send_quote_sms... Pair with the Rule 17 auto-send reply..." (was "When ready to book: call send_quote_sms..."). Cross-ref now points to Critical rule 21.
+- **Booking flow Steps 1-3 reworded** (`:528-555`): Step 1 now references Critical Rule 17 preconditions + explicitly forbids the friction question; Step 2 calls out the same-turn pairing with auto-send reply; Step 3 narrates the tool-result-agnostic phrasing rationale. Old "Sent the quote to your phone — tap the link" canonical handoff line removed.
+
+**Tool description retighten (`src/lib/sms-ai/tools.ts:231`):** send_quote_sms description rewritten. The Issue 45 trigger clause "AND **asked to be texted a quote**" (the strongest of the 6 latent cues per audit Appendix A) is DELETED. New "WHEN TO CALL (Issue 45 / D49, 2026-05-27)" paragraph references Critical Rule 17 preconditions, explicitly forbids "Want me to send a quote?", and pins the auto-send reply phrasing + Issue 27 safety rationale. D43 multi-tier guidance paragraph preserved unchanged.
+
+**Observability log (`src/lib/sms-ai/tool-dispatcher.ts:500-518`):** new `console.log('[SmsAiV2.send_quote_sms.auto_send_trigger]', {...})` line at the start of `callSendQuoteSms`. Captures `conversationId`, `servicesCount`, `services`, `tiers`, `quantities`, `sizeClass`. Informational ONLY — does NOT gate dispatch. Enables post-deploy operator visibility into: (a) auto-send firing frequency per conversation, (b) tier/quantity threading correctness, (c) false-fire candidates (audit Patterns 1/3/4/6/7 misclassifications). RuntimeContext shape unchanged — extending to include last in/outbound messages would require runner refactor, out of D49 scope. Operator cross-references against persisted message history via conversationId for full context.
+
+**Tests +20 net new:** 2427 total (was 2407).
+- 15 new D49 tests in `src/lib/sms-ai/__tests__/system-prompt.test.ts` (new Rule 17 headline + placement + 3 preconditions + reply phrasing + Pattern 3 example + Issue 27 safety + friction-question deletion + Rule 16 architectural-parallel cross-ref + Rule 2 example update + tool usage guide reword + Booking flow Step 1 reword + Quote-send intent recognition reframe + "Want me to send a quote?" only-in-forbidding-contexts + total rule count = 22)
+- 6 new D49 tests in `src/lib/sms-ai/__tests__/tools.test.ts` (description Rule 17 reference + 3-precondition enumeration + friction-question forbidden + auto-send reply phrasing + "AND asked to be texted a quote" clause removed + D43 multi-tier guidance preserved)
+- 3 pre-existing tests updated to reflect D49 changes (Critical Rules count 21 → 22; Booking flow line-wrap; canonical handoff line rewording)
+- 8 pre-existing renumber-pin tests updated (Rule 21 → 22 references in 5 sites; Rule 19 → 20 cross-ref; Rule 20 → 21 trigger; Booking flow cross-ref pin)
+- 2 pre-existing tests adjusted (side-effecting-tools gate loop excludes send_quote_sms; D43 regression-safety pin updated to D49 framing)
+
+**D45/D46/D47/D48 surfaces UNAFFECTED:** helper files byte-identical (`tier-display.ts`, `attach-tier-meta.ts`, `services-summary.ts`); 15 D46 visual surfaces byte-identical; D47 Critical Rules 8 + 9 + `get_services` response shape byte-identical; D48 schema + 4 customer-facing surfaces byte-identical; Issue 46 channel-aware label `NOTIFICATION_LABEL_OVERRIDES` byte-identical; `src/lib/services/` resolver untouched; no endpoint changes; no new tool definitions; no migrations.
+
+**Other-tool regression check passed:** auto-send rule scope-limited to `send_quote_sms` only. `create_appointment` (Rule 10 + Rule 21 + tool description "Only call this when... explicitly confirmed"), `send_info_sms` (tool description "Only call this when... explicitly confirmed"), `approve_addon` / `decline_addon` (tool descriptions "Only call this when... explicitly confirmed/declined") — all unchanged. The side-effecting-tools gate loop in tools.test.ts was updated to exclude send_quote_sms (now uses configuration-finalized framing); the other 2 tools (create_appointment, send_info_sms) retain the strict "Only call when explicitly confirmed" gate pin.
+
+**D36 + D43 idempotency guards preserved:** auto-send double-fire scenarios fully covered by existing 60-sec guard + `(service_id, tier_name, quantity)` triple-key in `send-quote-sms/route.ts:402-518`. NO guard tuning needed. Per audit Target 6, 4 cases analyzed; all produce zero customer harm.
+
+**Friction-step deletion verified:** `grep -nE "Want me to (send|text)" src/lib/sms-ai/system-prompt.ts src/lib/sms-ai/tools.ts` returns 4 matches, all inside forbidding contexts (2 in Rule 17 body, 1 in Booking flow Step 1 reference to the prohibition, 1 in tools.ts description forbidding it). Zero prescriptive matches remain.
+
+**Gates green:** `npx tsc --noEmit` 0 errors, `npm run lint` 0 errors / 97 warnings (baseline unchanged), `npm test` **2427/2427** (was 2407 pre-D49; +20 net new), `npm run build` compiled successfully in 12.0s (788 dynamic pages).
+
+**Deploy: YES** via `deploy-smartdetails` post-merge — observable immediately on next quote-send conversation. Customer SMS body content UNCHANGED (quote link arrives the same way); only the agent's pre-tool acknowledgment changes from "Want me to send a quote?" → [customer "Yeah"] → "Quote sent! ..." (4-message flow) to "Sending the quote now — check your texts!" (1-message flow, ~30-90 sec funnel reduction).
+
+**Operator manual verification (7 scenarios per audit Target 11):** (1) golden auto-send (commit + total + no mid-flux); (2) mid-flux do-NOT-fire (Pattern 3 — commit + change-request in same message); (3) mid-conversation correction don't-fire; (4) customer-question don't-fire; (5) customer cancellation don't-fire; (6) multi-service finalization auto-fire; (7) implicit commitment auto-fire ("Cool, I'll take it"). All 7 pass → Issue 45 closed empirically.
+
+**DO NOT merge — operator merges after verifying tests + reading the diff.** Issue 45 was the last open SMS-AI prompt-discipline P2; Issues 42, 43, 44, 46 all closed in prior sessions.
+
+---
+
 ## 2026-05-27 — audit: Issue 45 — auto-send vs. "Want me to send a quote?" confirmation step (SMS-AI agent prompt discipline)
 
 Read-only diagnostic audit on branch `audit/issue-45-auto-send-confirmation`. No `src/` changes, no migrations, no test changes. Deliverable: `docs/dev/ISSUE_45_AUTO_SEND_AUDIT.md` (12 targets + TL;DR + 7-pattern adversarial matrix + side-by-side 3-option comparison + risk matrix + 4 operator decisions).
