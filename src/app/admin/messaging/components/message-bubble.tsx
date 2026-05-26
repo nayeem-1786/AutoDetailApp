@@ -20,6 +20,29 @@ function formatDuration(seconds: number): string {
 }
 
 /**
+ * Override map for notification type labels (Issue 46, 2026-05-26). Used
+ * when the generic snake_case → Title Case transform produces a misleading
+ * label.
+ *
+ * `voice_quote_sent` is the notificationType set by both the voice agent
+ * (`src/lib/services/voice-post-call.ts:676`) and the SMS-AI v2 agent
+ * (`src/app/api/voice-agent/send-quote-sms/route.ts:608`, which serves
+ * both channels via the same route). The generic transform produces
+ * `"Voice Quote Sent"` which is misleading for SMS-channel conversations.
+ * `"Agent Quote Sent"` is channel-neutral and accurate for both origin
+ * paths.
+ *
+ * The notificationType value itself is preserved unchanged in
+ * `messages.metadata` for dedup + audit consistency — only the display
+ * label in this Admin Messages log changes.
+ *
+ * Add new overrides here when generic title-casing produces wrong labels.
+ */
+const NOTIFICATION_LABEL_OVERRIDES: Record<string, string> = {
+  voice_quote_sent: 'Agent Quote Sent',
+};
+
+/**
  * Notification bar: voice channel messages and system events (both voice and SMS).
  * Centered, no bubble, small gray text. System SMS shows notification type label.
  */
@@ -27,9 +50,13 @@ function NotificationBar({ message }: { message: Message }) {
   const isVoice = message.channel === 'voice';
   const isSystemSms = message.sender_type === 'system' && message.channel === 'sms';
 
-  // Notification type label from metadata (e.g., "job_complete" → "Job Complete")
+  // Notification type label from metadata (e.g., "job_complete" → "Job Complete").
+  // Issue 46: override map takes precedence; falls through to generic
+  // snake_case → Title Case for unmapped types (job_complete,
+  // appointment_confirmed, receipt_sent, etc.).
   const notifLabel = isSystemSms && message.metadata?.notificationType
-    ? message.metadata.notificationType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+    ? NOTIFICATION_LABEL_OVERRIDES[message.metadata.notificationType as string]
+        ?? message.metadata.notificationType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
     : null;
 
   // Strip the "Phone call (X:XX)\n" prefix from body when we render duration separately
