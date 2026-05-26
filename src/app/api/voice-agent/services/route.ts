@@ -275,8 +275,20 @@ export async function GET(request: NextRequest) {
             // unaffected — engine short-circuits to pricing.price.
             // Audit: docs/dev/ISSUE_36_LAYER_2_PHASE_B_DIAGNOSTIC.md.
             const r = resolveServicePriceWithSale(p, sizeClass, saleWindow);
+            // D47 (Issue 44, 2026-05-26): emit operator-curated
+            // tier_label + qty_label + max_qty so the agent can
+            // enumerate scope-pricing tiers with human-readable copy
+            // ("Per Row" / "Floor Mats") instead of raw snake_case
+            // slugs ("per_row" / "floor_mats"). Additive — existing
+            // tier_name/price/sale_price fields preserved for
+            // backward compat. The SELECT at line 65-70 already
+            // loads these columns; pre-D47 they were silently
+            // dropped at the response-format step.
             return {
               tier_name: p.tier_name,
+              tier_label: p.tier_label,
+              qty_label: p.qty_label,
+              max_qty: p.max_qty,
               price: r.standardPrice,
               ...(r.isOnSale ? { sale_price: r.effectivePrice } : {}),
             };
@@ -333,10 +345,16 @@ export async function GET(request: NextRequest) {
           // Issue 36 D41 (2026-05-24): mirrors the explicit case above so
           // any future pricing_model that lands without a switch case
           // update inherits the correct size-aware behavior.
+          // D47 (Issue 44, 2026-05-26): mirrors the tier_label/qty_label/
+          // max_qty emission from the explicit case above so future
+          // pricing_models also surface enumeration metadata.
           pricing = tiers.map((p) => {
             const r = resolveServicePriceWithSale(p, sizeClass, saleWindow);
             return {
               tier_name: p.tier_name,
+              tier_label: p.tier_label,
+              qty_label: p.qty_label,
+              max_qty: p.max_qty,
               price: r.standardPrice,
               ...(r.isOnSale ? { sale_price: r.effectivePrice } : {}),
             };
