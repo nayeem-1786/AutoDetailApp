@@ -22,24 +22,38 @@ function formatDuration(seconds: number): string {
 /**
  * Override map for notification type labels (Issue 46, 2026-05-26). Used
  * when the generic snake_case → Title Case transform produces a misleading
- * label.
+ * or imprecise label.
  *
- * `voice_quote_sent` is the notificationType set by both the voice agent
- * (`src/lib/services/voice-post-call.ts:676`) and the SMS-AI v2 agent
- * (`src/app/api/voice-agent/send-quote-sms/route.ts:608`, which serves
- * both channels via the same route). The generic transform produces
- * `"Voice Quote Sent"` which is misleading for SMS-channel conversations.
- * `"Agent Quote Sent"` is channel-neutral and accurate for both origin
- * paths.
+ * The `send_quote_sms` route at
+ * `src/app/api/voice-agent/send-quote-sms/route.ts` is invoked by two
+ * distinct agent paths:
  *
- * The notificationType value itself is preserved unchanged in
- * `messages.metadata` for dedup + audit consistency — only the display
- * label in this Admin Messages log changes.
+ *   1. SMS-AI v2 agent — `src/lib/sms-ai/tool-dispatcher.ts`
+ *      `callSendQuoteSms` passes `source: 'sms_agent'` in the request
+ *      body. Route branches notificationType → `'sms_agent_quote_sent'`.
+ *
+ *   2. ElevenLabs voice-agent webhook — does NOT pass `source`. Route
+ *      defaults notificationType → `'voice_quote_sent'`. The voice
+ *      post-call confirmation path at
+ *      `src/lib/services/voice-post-call.ts:676` is genuinely voice-only
+ *      and also writes `'voice_quote_sent'` directly.
+ *
+ * The two notificationType values are STABLE machine identifiers
+ * persisted in `messages.metadata` for dedup (`src/lib/sms/dedup.ts`)
+ * and audit consistency. Only the operator-facing Admin Messages log
+ * labels change here — customer-facing SMS bodies never contained these
+ * strings.
+ *
+ * Initial Issue 46 fix (commit 9a6fb0a6) was a channel-NEUTRAL
+ * `"Agent Quote Sent"` label. This refinement (2026-05-26) makes the
+ * labels channel-AWARE so operators can distinguish at a glance which
+ * agent path triggered a quote.
  *
  * Add new overrides here when generic title-casing produces wrong labels.
  */
 const NOTIFICATION_LABEL_OVERRIDES: Record<string, string> = {
-  voice_quote_sent: 'Agent Quote Sent',
+  voice_quote_sent: 'Voice Agent Quote Sent',
+  sms_agent_quote_sent: 'SMS Agent Quote Sent',
 };
 
 /**

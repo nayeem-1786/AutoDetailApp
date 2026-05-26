@@ -192,8 +192,11 @@ vi.mock('@/lib/data/business', () => ({
   getBusinessInfo: async () => ({ name: 'TestBiz' }),
 }));
 vi.mock('@/lib/sms/render-sms-template', () => ({
-  // isActive=false makes the route skip Twilio without touching it
-  renderSmsTemplate: async () => ({ isActive: false, body: null }),
+  // isActive=false makes the route skip Twilio without touching it.
+  // Wrapped in vi.fn() so individual describe blocks can override
+  // (e.g., Issue 46 refinement block forces isActive:true to reach
+  // the sendSms call and inspect notificationType).
+  renderSmsTemplate: vi.fn(async () => ({ isActive: false, body: null })),
 }));
 
 // Import the route AFTER all mocks are wired
@@ -1362,5 +1365,118 @@ describe('POST /api/voice-agent/send-quote-sms — Issue 38 D43 tier + quantity 
     const items = createQuoteMock.mock.calls[0][1].items;
     expect(items[0]).toMatchObject({ service_id: PET_HAIR_ID, tier_name: null, quantity: 2, unit_price: 50 });
     expect(items[0].quantity * items[0].unit_price).toBe(100);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 46 refinement (2026-05-26) — channel-aware notificationType
+// branching. Route reads optional `source` from request body and branches
+// the `notificationType` passed to sendSms between:
+//   - source === 'sms_agent'      →  'sms_agent_quote_sent' (NEW)
+//   - otherwise (or missing/invalid) →  'voice_quote_sent' (backward-compat
+//                                       default for the ElevenLabs voice
+//                                       webhook caller, which doesn't pass
+//                                       the field).
+// The two values are STABLE machine identifiers persisted in
+// messages.metadata for dedup (src/lib/sms/dedup.ts) and audit; only the
+// operator-facing Admin Messages log labels differ (rendered via
+// NOTIFICATION_LABEL_OVERRIDES in
+// src/app/admin/messaging/components/message-bubble.tsx).
+// ---------------------------------------------------------------------------
+
+describe('POST /api/voice-agent/send-quote-sms — Issue 46 refinement (channel-aware notificationType)', () => {
+  // Import the mocked modules so we can inspect / override per-test.
+  // Both were mocked at the top of the file; importing here resolves
+  // to the mocked instances under Vitest's mock hoisting.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let sendSmsMock: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let renderSmsTemplateMock: any;
+
+  beforeEach(async () => {
+    // Wire mocks dynamically so the imports resolve to the hoisted mocks.
+    const smsMod = await import('@/lib/utils/sms');
+    const renderMod = await import('@/lib/sms/render-sms-template');
+    sendSmsMock = smsMod.sendSms as unknown as ReturnType<typeof vi.fn>;
+    renderSmsTemplateMock = renderMod.renderSmsTemplate as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    sendSmsMock.mockReset();
+    sendSmsMock.mockImplementation(async () => undefined);
+    // Force the template to be ACTIVE so the route reaches the sendSms
+    // call (default mock returns isActive:false → skips sendSms).
+    renderSmsTemplateMock.mockImplementation(async () => ({
+      isActive: true,
+      body: 'Quote ready: https://short/link',
+    }));
+
+    // Standard fixture: 2018 Suburban + Hot Shampoo Extraction (matches
+    // Q-0087, the empirical case from the Issues 43 + 44 + 46 arc).
+    findOrCreateVehicleMock.mockResolvedValue({
+      id: 'v-suburban',
+      created: false,
+      vehicle_category: 'automobile',
+      size_class: 'suv_3row_van',
+      specialty_tier: null,
+    });
+    resolveServiceByNameMock.mockResolvedValue(HOT_SHAMPOO);
+    resolvePriceMock.mockReturnValue({
+      price: 125,
+      salePrice: null,
+      tierName: 'per_row',
+      isOnSale: false,
+    });
+  });
+
+  function bodyWithSource(source?: unknown) {
+    const base: Record<string, unknown> = {
+      phone: '+14245551234',
+      services: 'Hot Shampoo Extraction',
+      tiers: 'per_row',
+      quantities: '2',
+      vehicle_year: 2018,
+      vehicle_make: 'Chevy',
+      vehicle_model: 'Suburban',
+    };
+    if (source !== undefined) base.source = source;
+    return base;
+  }
+
+  function getNotificationTypeFromSendSms(): string | undefined {
+    expect(sendSmsMock).toHaveBeenCalledTimes(1);
+    const opts = sendSmsMock.mock.calls[0][2] as
+      | { notificationType?: string }
+      | undefined;
+    return opts?.notificationType;
+  }
+
+  it('source === "sms_agent" → notificationType: "sms_agent_quote_sent"', async () => {
+    const res = await POST(buildRequest(bodyWithSource('sms_agent')));
+    expect(res.status).toBe(200);
+    expect(getNotificationTypeFromSendSms()).toBe('sms_agent_quote_sent');
+  });
+
+  it('source === "voice_agent" → notificationType: "voice_quote_sent" (explicit value)', async () => {
+    const res = await POST(buildRequest(bodyWithSource('voice_agent')));
+    expect(res.status).toBe(200);
+    expect(getNotificationTypeFromSendSms()).toBe('voice_quote_sent');
+  });
+
+  it('source missing (ElevenLabs voice webhook backward-compat) → defaults to "voice_quote_sent"', async () => {
+    const res = await POST(buildRequest(bodyWithSource(undefined)));
+    expect(res.status).toBe(200);
+    expect(getNotificationTypeFromSendSms()).toBe('voice_quote_sent');
+  });
+
+  it('source is an unrecognized string ("unknown") → defaults to "voice_quote_sent" (defensive fallback)', async () => {
+    const res = await POST(buildRequest(bodyWithSource('unknown')));
+    expect(res.status).toBe(200);
+    expect(getNotificationTypeFromSendSms()).toBe('voice_quote_sent');
+  });
+
+  it('source is null → defaults to "voice_quote_sent"', async () => {
+    const res = await POST(buildRequest(bodyWithSource(null)));
+    expect(res.status).toBe(200);
+    expect(getNotificationTypeFromSendSms()).toBe('voice_quote_sent');
   });
 });

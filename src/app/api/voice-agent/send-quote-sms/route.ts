@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       vehicle_make,
       vehicle_model,
       vehicle_color,
+      source,
     } = body as {
       phone: string;
       customer_name?: string;
@@ -79,6 +80,13 @@ export async function POST(request: NextRequest) {
       vehicle_make?: string;
       vehicle_model?: string;
       vehicle_color?: string;
+      // Issue 46 refinement (2026-05-26) — originating agent path. Set
+      // to 'sms_agent' by the SMS-AI v2 dispatcher
+      // (src/lib/sms-ai/tool-dispatcher.ts callSendQuoteSms); omitted by
+      // the ElevenLabs voice-agent webhook caller, in which case the
+      // route defaults to 'voice_quote_sent' for backward-compat with
+      // pre-refinement audit history.
+      source?: 'sms_agent' | 'voice_agent';
     };
 
     if (!phone) {
@@ -605,7 +613,15 @@ export async function POST(request: NextRequest) {
       await sendSms(normalizedPhone, tpl.body, {
         logToConversation: true,
         customerId: customerId || undefined,
-        notificationType: 'voice_quote_sent',
+        // Issue 46 refinement: channel-aware notificationType. SMS-AI v2
+        // dispatcher passes source='sms_agent'; ElevenLabs voice webhook
+        // omits source (or passes 'voice_agent' explicitly) → defaults to
+        // 'voice_quote_sent'. Both values are STABLE machine identifiers
+        // persisted in messages.metadata for dedup (src/lib/sms/dedup.ts)
+        // + audit. The Admin Messages log renders each via
+        // NOTIFICATION_LABEL_OVERRIDES in
+        // src/app/admin/messaging/components/message-bubble.tsx.
+        notificationType: source === 'sms_agent' ? 'sms_agent_quote_sent' : 'voice_quote_sent',
         contextId: quoteRecord.id,
       });
     } else {

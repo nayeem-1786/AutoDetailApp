@@ -245,7 +245,7 @@ describe('dispatchTool — routing per tool', () => {
     );
   });
 
-  it('send_quote_sms → POST /api/voice-agent/send-quote-sms with JSON body', async () => {
+  it('send_quote_sms → POST /api/voice-agent/send-quote-sms with JSON body (includes source: "sms_agent" per Issue 46 refinement)', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { quote_number: 'Q-0123' }));
     const input = {
       phone: '+14245551234',
@@ -254,7 +254,15 @@ describe('dispatchTool — routing per tool', () => {
     };
     await dispatchTool({ name: 'send_quote_sms', input });
     expect(fetchCalls[0].url).toBe('http://localhost:3000/api/voice-agent/send-quote-sms');
-    expect(JSON.parse(fetchCalls[0].init?.body as string)).toEqual(input);
+    // Issue 46 refinement (2026-05-26): dispatcher always tags the
+    // request with source='sms_agent' so the route can branch
+    // notificationType between sms_agent_quote_sent (this path) and
+    // voice_quote_sent (the ElevenLabs webhook caller, which omits
+    // `source` and falls through to the route's default).
+    expect(JSON.parse(fetchCalls[0].init?.body as string)).toEqual({
+      ...input,
+      source: 'sms_agent',
+    });
   });
 
   it('notify_staff → in-process helper (no fetch call)', async () => {
@@ -1163,5 +1171,64 @@ describe('dispatchTool — D40 size_class capture + injection (Issue 36 architec
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { services: [] }));
     await dispatchTool({ name: 'get_services', input: {} });
     expect(fetchCalls[1].url).toBe('http://localhost:3000/api/voice-agent/services');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue 46 refinement (2026-05-26) — `source: 'sms_agent'` injection at
+// callSendQuoteSms so the /api/voice-agent/send-quote-sms route can
+// branch notificationType between sms_agent_quote_sent (this dispatcher)
+// and voice_quote_sent (ElevenLabs voice webhook, which doesn't pass
+// `source` and falls through to the route's default).
+// ---------------------------------------------------------------------------
+
+describe('dispatchTool — Issue 46 refinement (source: "sms_agent" injection)', () => {
+  it('send_quote_sms — always injects source: "sms_agent" in the request body', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { quote_number: 'Q-9001' }));
+    await dispatchTool({
+      name: 'send_quote_sms',
+      input: { services: 'Hot Shampoo Extraction', tiers: 'per_row', quantities: '2' },
+    });
+    expect(fetchCalls).toHaveLength(1);
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.source).toBe('sms_agent');
+  });
+
+  it('send_quote_sms — source injection overrides any LLM-provided source value (defensive — LLM cannot self-attribute to another agent)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { quote_number: 'Q-9002' }));
+    await dispatchTool({
+      name: 'send_quote_sms',
+      input: {
+        services: 'Express Wax',
+        // Hostile / mistaken LLM input attempting to claim a different
+        // source. Dispatcher must always overwrite to 'sms_agent' since
+        // THIS is the SMS-AI v2 dispatcher path by construction.
+        source: 'voice_agent',
+      },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.source).toBe('sms_agent');
+  });
+
+  it('send_quote_sms — source field coexists with runtime-phone injection (both stamped on every request)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { quote_number: 'Q-9003' }));
+    await dispatchTool({
+      name: 'send_quote_sms',
+      input: { services: 'Tire Shine' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body.phone).toBe(DEFAULT_TEST_PHONE);
+    expect(body.source).toBe('sms_agent');
+    expect(body.services).toBe('Tire Shine');
+  });
+
+  it('source injection is scoped to send_quote_sms — other tools do NOT receive source field', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: 'cust1', isNew: false }));
+    await dispatchTool({
+      name: 'upsert_customer',
+      input: { first_name: 'Sarah' },
+    });
+    const body = JSON.parse(fetchCalls[0].init?.body as string);
+    expect(body).not.toHaveProperty('source');
   });
 });
