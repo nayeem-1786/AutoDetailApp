@@ -6,6 +6,142 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — audit: Issues 43 + 44 — SMS-AI agent prompt discipline (price fidelity + scope-tier discovery)
+
+Branch `audit/issues-43-44-agent-prompt-discipline`. Read-only
+diagnostic audit. NO source code, NO migrations, NO test changes.
+Deliverable: `docs/dev/ISSUES_43_44_AGENT_PROMPT_AUDIT.md` (~10
+targets + TL;DR + 6 verification scenarios + risk matrix).
+
+**Why combined:** Issues 43 (agent quotes wrong price first, self-
+corrects same-conversation) and 44 (scope-tier discovery + Complete-
+anchor gap) share root cause class — agent prompt discipline for
+scope-pricing services. Both surfaced during the same Q-0087
+conversation (2026-05-25 ~17:46-17:48 PT) and both fix at the
+system-prompt + tool-description layer.
+
+**Findings (Issue 43):**
+
+- Source-side architectural reasoning ranks hypothesis (a) — LLM
+  confabulation from earlier conversation context — at HIGH
+  confidence (~90%). Hypotheses (b) wrong size_class and (b2) LLM
+  passes wrong size_class are LOW/VERY LOW because D40 (`tool-
+  dispatcher.ts:345-372`) auto-injects size_class from
+  RuntimeContext captured during the most recent classify_vehicle.
+  Hypothesis (c) — skipped get_services for second service — is
+  MEDIUM but the response's per-tier `pricing` array structure
+  makes a "lookup from cached response" the natural correct path;
+  the failure mode is the agent recalling from prose memory instead
+  of indexing into the cached array.
+- **PM2 evidence BLOCKED** — SSH to production (`root@154.53.60.26`)
+  was denied by the Claude Code auto-mode classifier as a
+  production-read action requiring explicit user approval naming
+  the prod target. Audit proceeded with source-side analysis;
+  operator must either (i) grant SSH approval and re-run extraction,
+  (ii) paste log excerpts, or (iii) accept the source-side ranking
+  and proceed to implementation. The audit's recommended fix
+  (Option C — belt-and-suspenders prompt rule + tool description
+  tightening) is robust to all 3 hypotheses being correct, so
+  option (iii) is the lowest-friction path.
+
+**Findings (Issue 44):**
+
+- Source-side analysis CONFIRMS the gap is structural — system-
+  prompt.ts has zero Critical Rules governing scope-pricing tier
+  enumeration or upsell anchoring (current Rules 1-19 cover pricing
+  fidelity but not enumeration policy).
+- **NEW STRUCTURAL FINDING:** the `get_services` response shape at
+  `services/route.ts:277-282` emits only `tier_name` (snake_case
+  slug) + `price` per tier. The operator-curated `tier_label`
+  ("Per Seat Row" / "Floor Mats Only"), `qty_label` ("row"), and
+  `max_qty` are JOINED in the SELECT at `services/route.ts:65-70`
+  but DROPPED at the response-format step. The agent therefore has
+  no human-readable label to read off — it must title-case the slug
+  or refer to it raw. This explains the empirical agent prose
+  ("Per Row tier") and doesn't block the operator-locked Issue 44
+  fix (Option E — prompt rule), but is captured for awareness.
+
+**Recommended fix architecture (combined):**
+
+- **Issue 43 — Option C (system-prompt Critical Rule + tool
+  description tightening).** New Critical Rule 8 = "Price lookup,
+  never price recall" — instructs the agent to INDEX into the most
+  recent get_services response's cached pricing array for any new
+  service mentioned mid-conversation, never recall from prose
+  memory or training-data baseline. Plus `get_services` tool
+  description gets a "Lookup, never recall" paragraph reinforcing
+  the same pattern at the tool layer (belt + suspenders matches the
+  D38→D39→D40 lesson that prompt rules alone fail under structural
+  pressure).
+- **Issue 44 — Option E (system-prompt Critical Rule alone).** New
+  Critical Rule 9 = "Scope-pricing services: enumerate tiers + probe
+  + anchor on Complete" — operator-locked disclosure / probe / anchor
+  behaviors encoded as REQUIRED MUST-do prose. Edge cases (direct
+  price query, exploratory phrasing, operator-bypass, multi-service
+  interleaving, mid-conversation vehicle pivot, Complete-package
+  short-circuit) all explicitly addressed in the rule body. Option F
+  (tool-response shape change) deferred as fallback if Option E
+  drifts post-deploy.
+
+**Critical Rules numbering plan:** current 19 rules → 21 rules.
+New Rules 8 + 9 slot between existing Rules 7 and 8 (post-D43 tier
+passing and pre-appointment-confirmation), keeping the pricing-
+discipline cluster (Rules 1, 5, 6, 7, 8) contiguous. Old Rules 8-19
+renumber to 10-21. Inline cross-references at `system-prompt.ts:93`
+(Rule 19 → 21), `:132` (Rule 19 → 21), `:221` (Rule 18 → 20) need
+mechanical updates; Rules 4 + 6 cross-refs unchanged because slots
+4 and 6 stay put.
+
+**Implementation scope estimate (single session, 90-120 min):**
+~150 LOC across 4 files (`system-prompt.ts`, `tools.ts`, plus 2
+test files for rule-count + new-rule pins). +10-15 tests net new.
+Single session recommended — both fixes touch the same file +
+share renumbering pressure that must be atomic. Combined size well
+under memory #8 threshold (~300 LOC / >3 files).
+
+**Operator decisions still needed:**
+1. PM2 evidence path — grant SSH approval, paste excerpts, or
+   accept source-side ranking.
+2. Rule 9 "anything else inside?" probe — exact wording vs. natural
+   phrasing guide. Audit recommends natural phrasing with 2-3 example
+   phrasings; LLM picks contextually.
+3. Rule 9 Complete-anchor "best value" framing — literal vs.
+   flexible. Audit recommends flexible (with intent: position
+   Complete as obvious choice for multi-area needs).
+4. Issue 45 (auto-send) bundling — audit recommends keeping
+   separate; different conversation point + different intervention.
+
+**Conversation-pattern coverage (Target 8):** all 6 adversarial
+patterns (direct price query, exploratory phrasing, operator-bypass,
+multi-service interleaving, mid-conversation vehicle pivot,
+Complete-package short-circuit) predicted to work under proposed
+Rules 8 + 9. Token budget pressure flagged as MEDIUM risk for Rule 9
+(enumeration replies approach 320-char SMS ceiling); auto-split
+handles. No regression risk for non-scope services (Rule 9 gated on
+`pricing_model="scope"`).
+
+**Hard rules honored:** NO `src/` changes, NO migrations, NO test
+changes. Only new files: this audit deliverable + 3 standard doc
+updates. Every source-side finding cites `file:line`. PM2-evidence
+gap flagged explicitly with 3 unblock options. Operator-locked
+Issue 44 decisions preserved as REQUIRED behaviors; not re-
+litigated.
+
+**Files touched (4 doc-only):**
+- `docs/dev/ISSUES_43_44_AGENT_PROMPT_AUDIT.md` (new, ~580 lines)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/ROADMAP-13-ITEMS.md` (ledger row)
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` (Section 2 status
+  updates for Issues 43 + 44 → AUDITED; Section 7 captures pending
+  D-decision slot)
+
+**Deploy: NO** — audit is read-only diagnostic. Implementation
+session (next D-numbered, presumably D47) will deploy the prompt +
+tool-description changes. **DO NOT merge — operator merges after
+review.**
+
+---
+
 ## 2026-05-26 — docs: capture Issues 42-46 from D45/D46 empirical verification arc; mark Issues 39-41 resolved
 
 Branch `docs/capture-issues-42-46`. Documentation-only session.
