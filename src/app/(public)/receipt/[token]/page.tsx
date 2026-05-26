@@ -18,6 +18,7 @@ import {
   getLineItemPricingInfo,
   sumLineItemSavings,
 } from '@/lib/quotes/line-item-pricing';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 
 // Phase 1A: replicate the renderer-side first-with-remainder derivation so
 // the JSX payment loop can construct labels via the composer helper without
@@ -234,9 +235,21 @@ export default async function PublicReceiptPage({ params }: PageProps) {
                     <td className="px-6 py-4">
                       <div className={`font-medium ${isFullyRefunded ? 'line-through text-site-text-muted' : 'text-site-text'}`}>
                         {item.item_name}
-                        {item.tier_name && item.tier_name !== 'default' && (
-                          <span className="text-site-text-muted font-normal"> — {item.tier_name}</span>
-                        )}
+                        {(() => {
+                          // D46 (Issue 41): unified tier token. tier_label
+                          // / qty_label arrive on item via
+                          // fetchReceiptTransaction → attachTierMetaToItems.
+                          // Em-dash sub-line wrapper preserved.
+                          const tierToken = renderTierToken({
+                            tier_name: item.tier_name ?? null,
+                            tier_label: item.tier_label,
+                            qty_label: item.qty_label,
+                            quantity: item.quantity,
+                          });
+                          return tierToken ? (
+                            <span className="text-site-text-muted font-normal"> — {tierToken}</span>
+                          ) : null;
+                        })()}
                       </div>
                       {pricingInfo.hasDiscount && (
                         <div className="text-xs text-green-500 mt-0.5">

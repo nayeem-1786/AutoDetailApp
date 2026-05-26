@@ -9,6 +9,7 @@ import { usePosPermission } from '../../context/pos-permission-context';
 import { TRANSACTION_STATUS_LABELS } from '@/lib/utils/constants';
 import { formatCurrency, formatDateTime, formatPhone } from '@/lib/utils/format';
 import { formatCardBrand } from '@/lib/utils/card-brand';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 import {
   parseRefundSources,
   enrichRefundSources,
@@ -269,12 +270,22 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {transaction.items.map((item) => (
+              {transaction.items.map((item) => {
+                // D46 (Issue 41): unified tier token. tier_label / qty_label
+                // attached by /api/pos/transactions/[id] route via
+                // attachTierMetaToItems. Parens-inline wrapper preserved.
+                const tierToken = renderTierToken({
+                  tier_name: item.tier_name,
+                  tier_label: item.tier_label,
+                  qty_label: item.qty_label,
+                  quantity: item.quantity,
+                });
+                return (
                 <tr key={item.id}>
                   <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">
                     <span>{item.item_name}</span>
-                    {item.tier_name && (
-                      <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({item.tier_name})</span>
+                    {tierToken && (
+                      <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">({tierToken})</span>
                     )}
                     {item.vehicle_size_class && (
                       <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">
@@ -295,7 +306,8 @@ export function TransactionDetail({ transactionId, onBack }: TransactionDetailPr
                     {item.is_taxable ? formatCurrency(item.tax_amount) : '---'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

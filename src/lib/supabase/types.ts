@@ -434,6 +434,13 @@ export interface TransactionItem {
   vehicle_size_class: VehicleSizeClass | null;
   notes: string | null;
   created_at: string;
+  /** D46 (Issue 41): operator-curated tier presentation fields merged in
+   *  by the POS transaction GET endpoint (and receipt-data.ts) via
+   *  attachTierMetaToItems. Joined from
+   *  `service_pricing(tier_label, qty_label)`. Visual surfaces render
+   *  these via `renderTierToken`. */
+  tier_label?: string | null;
+  qty_label?: string | null;
 }
 
 export interface Payment {
@@ -730,6 +737,13 @@ export interface QuoteItem {
   pricing_type: string | null;
   notes: string | null;
   created_at: string;
+  /** D46 (Issue 41): operator-curated tier presentation fields merged in
+   *  by `attachTierMetaToItems` (called from `getQuoteById` and equivalent
+   *  fetch paths). Not stored on `quote_items` — joined from
+   *  `service_pricing(tier_label, qty_label)`. Visual surfaces consume
+   *  these via `renderTierToken({tier_name, tier_label, qty_label, quantity})`. */
+  tier_label?: string | null;
+  qty_label?: string | null;
 }
 
 export type WaitlistStatus = 'waiting' | 'notified' | 'booked' | 'expired' | 'cancelled';

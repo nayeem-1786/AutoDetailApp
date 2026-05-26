@@ -13,6 +13,7 @@ import {
   enrichRefundSources,
   type RefundSource,
 } from '@/lib/data/refund-sources';
+import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
 import QRCode from 'qrcode';
 import bwipjs from 'bwip-js';
 
@@ -380,6 +381,20 @@ async function mapTransactionRow(
       ledgerRow?.points_balance == null ? null : Number(ledgerRow.points_balance);
   }
 
+  // 8f. D46 (Issue 41): merge service_pricing.tier_label / qty_label onto
+  // each transaction_item so all 3 receipt rendering surfaces (thermal
+  // generateReceiptLines, HTML generateReceiptHtml, public receipt page
+  // React render) display operator-curated tier labels via
+  // renderTierToken. Memory #15: 1 enrichment here covers 3 of the 4
+  // receipt surfaces; the 4th (SMS receipt buildSummaryLine) renders
+  // no tier_name and needs no enrichment.
+  const enrichedItems = Array.isArray(raw.items) && raw.items.length > 0
+    ? await attachTierMetaToItems(
+        supabase,
+        raw.items as Array<{ service_id?: string | null; tier_name?: string | null }>,
+      )
+    : (raw.items ?? []);
+
   // 9. Map database transaction to ReceiptTransaction interface
   const tx: ReceiptTransaction = {
     status: raw.status,
@@ -397,7 +412,7 @@ async function mapTransactionRow(
     customer: raw.customer,
     employee: raw.employee ?? (isDeposit ? { first_name: 'Online', last_name: 'Booking' } : null),
     vehicle: raw.vehicle,
-    items: raw.items ?? [],
+    items: enrichedItems,
     payments: renderedPayments,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     refunds: refundsWithSources as any,

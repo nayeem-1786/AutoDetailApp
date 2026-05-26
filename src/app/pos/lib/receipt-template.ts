@@ -12,6 +12,7 @@ import {
 } from '@/lib/data/receipt-composer';
 import { toCents } from '@/lib/utils/refund-math';
 import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 
 interface ReceiptItem {
   id: string;
@@ -25,6 +26,11 @@ interface ReceiptItem {
   pricing_type?: string | null;
   prerequisite_note?: string | null;
   tier_name?: string | null;
+  /** D46 (Issue 41): operator-curated tier presentation fields attached
+   *  by receipt-data.ts mapTransactionRow via attachTierMetaToItems.
+   *  Consumed by renderTierToken at the rendering sites. */
+  tier_label?: string | null;
+  qty_label?: string | null;
 }
 
 interface ReceiptRefundItem {
@@ -596,8 +602,18 @@ export function generateReceiptLines(tx: ReceiptTransaction, config?: MergedRece
   for (const item of tx.items) {
     const price = `$${item.total_price.toFixed(2)}`;
     const txCol = item.tax_amount > 0 ? ' TX' : '   ';
-    const displayName = item.tier_name && item.tier_name !== 'default'
-      ? `${item.item_name} - ${item.tier_name}`
+    // D46 (Issue 41): unified tier token via renderTierToken — replaces
+    // raw tier_name slug rendering with the operator-curated tier_label
+    // (or pluralized qty_label for qty>1). Wrapper format (`name - tier`)
+    // preserved; 32-char wrap handled by existing wrapTextToWidth logic.
+    const tierToken = renderTierToken({
+      tier_name: item.tier_name ?? null,
+      tier_label: item.tier_label,
+      qty_label: item.qty_label,
+      quantity: item.quantity,
+    });
+    const displayName = tierToken
+      ? `${item.item_name} - ${tierToken}`
       : item.item_name;
     if (item.quantity > 1) {
       lines.push({ type: 'columns', left: displayName, right: '' });
@@ -1060,8 +1076,18 @@ export function generateReceiptHtml(tx: ReceiptTransaction, config?: MergedRecei
   const itemRows = tx.items
     .map((item) => {
       const txCell = item.tax_amount > 0 ? 'TX' : '';
-      const htmlDisplayName = item.tier_name && item.tier_name !== 'default'
-        ? `${esc(item.item_name)} - ${esc(item.tier_name)}`
+      // D46 (Issue 41): same renderTierToken adoption as thermal path
+      // above. HTML wrapper (`esc(name) - esc(tier)`) preserved; tier
+      // labels are operator-managed ASCII so esc() is still applied
+      // defensively for any future Unicode entries.
+      const tierToken = renderTierToken({
+        tier_name: item.tier_name ?? null,
+        tier_label: item.tier_label,
+        qty_label: item.qty_label,
+        quantity: item.quantity,
+      });
+      const htmlDisplayName = tierToken
+        ? `${esc(item.item_name)} - ${esc(tierToken)}`
         : esc(item.item_name);
       let rows = '';
       if (item.quantity > 1) {

@@ -6,6 +6,229 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — feat(quotes): D46 — adopt renderTierToken at 15 visual surfaces (Issue 41 closure)
+
+Branch `feat/d46-tier-display-visual-surfaces`. Session 2 of the
+two-session D45/D46 split recommended by the Issue 41 audit
+(`docs/dev/ISSUE_41_TIER_VISUAL_SURFACES_AUDIT.md`). Builds on D45's
+helpers — modifies NO D45 code (`tier-display.ts` and
+`services-summary.ts` stay byte-identical per session brief Hard Rule).
+
+**Closes Issue 41** (per-line tier rendering across 15 visual surfaces
+exposed raw `tier_name` snake_case slugs — "per_row", "floor_mats",
+"touring_bagger" — to customers + operators instead of operator-curated
+`tier_label` / pluralized `qty_label`). Pre-D46 Q-0087 quote link
+rendered `"per_row"` and `"floor_mats"` as sub-text under each Hot
+Shampoo line; post-D46 it renders `"2 Rows"` and `"Floor Mats"` (the
+operator-curated labels). Identical visible improvement on receipt page,
+pay page, PDF, appointment confirmation emails, POS surfaces, and admin
+surfaces.
+
+**Architecture (new file — Option U adapter for visual surfaces):**
+
+- **`src/lib/quotes/attach-tier-meta.ts` (new, ~125 LOC)** — sibling
+  helper to D45's `enrichItemsWithTierMeta` (in `services-summary.ts`).
+  Both share the batched-fetch shape (one `service_pricing` IN query
+  keyed on the set of `service_id`s in input items) but differ in
+  return shape: `enrichItemsWithTierMeta` reshapes into
+  `ServicesSummaryItem[]` for the chip composer, dropping
+  surface-specific fields; `attachTierMetaToItems` MERGES `tier_label`
+  + `qty_label` onto the input shape preserving every other field.
+  The 15 visual surfaces need the merge variant because they render
+  rich rows (id for React keys, notes, pricing_type for sale/combo
+  badges, tax_amount for receipt columns) and want tier metadata
+  layered on top, not a reshape. Constant DB roundtrip count regardless
+  of item count. Hot-path skip for empty items / all-null service_id.
+  Non-blocking error handling matches `enrichItemsWithTierMeta`.
+
+**Surfaces adopted (15 modifications + 1 verified-no-change per Memory
+#15):**
+
+| # | Surface | File | Wrapper preserved | Fetch pattern |
+|---|---|---|---|---|
+| 1 | Receipt thermal (generateReceiptLines) | `src/app/pos/lib/receipt-template.ts:599-617` | `name - tier` mono | Pattern 2 (attachTierMetaToItems via `receipt-data.mapTransactionRow`) |
+| 2 | Receipt HTML (generateReceiptHtml) | `src/app/pos/lib/receipt-template.ts:1063-1088` | `esc(name) - esc(tier)` HTML | Pattern 2 (same enrichment point as #1) |
+| 3 | Public receipt page | `src/app/(public)/receipt/[token]/page.tsx:236-258` | em-dash sub-line | Pattern 2 (consumes `fetchReceiptTransaction` → enriched) |
+| — | SMS receipt (`buildSummaryLine`) | `src/lib/sms/composites.ts` | **No change** — verified renders no tier_name today; sentinel pin test in `visual-surface-adoption.test.ts` flips if anyone adds tier rendering | (Memory #15 4th surface; documented no-change) |
+| 5-7 | Admin appointment notify (template HTML + plain-text fallback + HTML fallback) | `src/app/api/appointments/[id]/notify/route.ts` | parens after service name in 3 sites | Pattern 2 (attachTierMetaToItems called once at fetch; local `tierTokenFor` helper reused at 3 render sites) |
+| 8-9 | POS appointment notify (template HTML + plain-text fallback) | `src/app/api/pos/appointments/[id]/notify/route.ts` | parens after service name in 2 sites | Pattern 2 (same as 5-7) |
+| 10 | Public quote page | `src/app/(public)/quote/[token]/page.tsx:268-285` | muted sub-line | Pattern 2 (attachTierMetaToItems in `getQuote(token)`) |
+| 11 | Public pay page | `src/app/(public)/pay/[token]/page.tsx:286-302` | em-dash inline | Pattern 2 — SELECT widened to include `service_id`; attachTierMetaToItems called after fetch. Issue 42 data limitation: `appointment_services` has no `quantity` column so per_row×N quotes flatten to qty=1 — renders `"Per Row"` not `"2 Rows"`. **DO NOT FIX in D46** — captured as separate schema concern. |
+| 12 | Admin quote slide-over | `src/app/admin/quotes/components/quote-slide-over.tsx:157-176` | parens after item name | Pattern 1 (consumes `/api/quotes/[id]` → `getQuoteById` → enriched server-side) |
+| 13 | Admin quote detail page | `src/app/admin/quotes/[id]/page.tsx:78-110, 402-417` | sub-line under item_name | Pattern 3 (own fetch path via browser supabase client; attachTierMetaToItems called inline at `loadQuote`) |
+| 14 | POS quote detail | `src/app/pos/components/quotes/quote-detail.tsx:557-573` | muted sub-line | Pattern 1 (consumes `/api/pos/quotes/[id]` → `getQuoteById` → enriched server-side) |
+| 15 | POS transaction detail | `src/app/pos/components/transactions/transaction-detail.tsx:272-285` | parens inline muted | Pattern 2 (attachTierMetaToItems in `/api/pos/transactions/[id]` route) |
+| 16 | Quote PDF | `src/app/api/quotes/[id]/pdf/route.ts:303-313, 555-570` | dedicated PDF Tier column | Pattern 3 — SELECT widened to include `service_id`; attachTierMetaToItems called after fetch; ASCII-safe per Session 71 PDF rule |
+
+**Enrichment plumbing** (shared paths that enrich once and serve
+multiple surfaces):
+
+- **`src/lib/quotes/quote-service.ts` `getQuoteById`** now calls
+  `attachTierMetaToItems` after the `QUOTE_DETAIL_SELECT` fetch. Single
+  enrichment serves surfaces #12 (admin slide-over) + #14 (POS quote
+  detail) + any future consumer of the central `getQuoteById` path.
+  Best-effort: failures inside the helper are logged and items pass
+  through unchanged so quote detail remains viewable.
+
+- **`src/lib/data/receipt-data.ts` `mapTransactionRow`** now calls
+  `attachTierMetaToItems` before mapping `raw.items` into the
+  `ReceiptTransaction.items` array. Single enrichment serves all 3
+  receipt rendering surfaces (#1 thermal, #2 HTML, #3 public receipt
+  page) because `fetchReceiptTransaction` is the shared entry point for
+  POS receipt printing + email + the public web view. **Memory #15
+  honored: 1 enrichment site + 1 receipt-template.ts modification
+  covers 3 of 4 receipt consumers; the 4th (SMS receipt buildSummaryLine)
+  renders no tier_name and needs no change (sentinel pin test
+  enforces).**
+
+- **`src/lib/utils/compose-line-items.ts`** — widened `RawLineItem` +
+  `DisplayLineItem` interfaces to optionally carry `tier_label` +
+  `qty_label`. The composer passes them through onto each
+  `DisplayLineItem` so surfaces that route through `composeLineItems`
+  (public quote page, admin slide-over, POS quote detail, quote PDF)
+  receive enriched display items automatically without per-surface
+  unwrapping. Tier-rendering surfaces call
+  `renderTierToken({tier_name, tier_label, qty_label, quantity})` from
+  the resulting `DisplayLineItem`.
+
+- **`src/lib/supabase/types.ts`** — added optional `tier_label` +
+  `qty_label` to `QuoteItem` and `TransactionItem` so adopting surfaces
+  read the merged-in fields without type-cast escape hatches.
+
+**Tests +28 net new:**
+
+- `src/lib/quotes/__tests__/visual-surface-adoption.test.ts` (16
+  adoption pins): each visual surface imports `renderTierToken` from
+  `@/lib/quotes/tier-display`; raw `tier_name` slug rendering patterns
+  removed from each file (em-dash, parens, sub-line, monospace, PDF
+  column variants); enrichment plumbing pins on
+  `quote-service.getQuoteById` and `receipt-data.mapTransactionRow`;
+  Memory #15 sentinel verifies `buildSummaryLine` in `composites.ts`
+  still renders no tier_name (verified-no-change); D45 helpers remain
+  byte-identical (exports intact).
+
+- `src/lib/quotes/__tests__/attach-tier-meta.test.ts` (12 unit +
+  integration cases): merges `tier_label`/`qty_label` onto matching
+  items via composite `(service_id, tier_name)` key; null `service_id`
+  and null `tier_name` pass through with null meta; empty-items hot
+  path skips DB; all-null-service_id items skip DB; query failure is
+  non-blocking; full pipeline (attach → renderTierToken) produces
+  `"Floor Mats"` (qty=1) and `"2 Rows"` (qty=2) for the Q-0087 Hot
+  Shampoo fixture; backward compat — tier_name=`'default'` sentinel +
+  null tier_name both return null (identical to pre-D46 conditional
+  render); title-case fallback for missing tier_label (legacy data
+  resilience).
+
+**Issue 42 captured + deliberately NOT fixed:** `appointment_services`
+table has no `quantity` column today (schema gap). When a per_row × 2
+quote converts to an appointment, both rows flatten to qty=1 in
+`appointment_services`. D46 visual surfaces reading appointment data
+(notify routes #5-9, public pay page #11) therefore render `"Per Row"`
+not `"2 Rows"` for these cases — correct given the data shape. Fixing
+this requires adding `quantity` to `appointment_services` and threading
+it through `convertQuote` + every appointment fetch path — separate
+schema change session. D46's renderer pin tests assert current behavior
+so the fix can be sequenced independently.
+
+**Per-surface backward compatibility:** every surface's pre-D46
+rendering for non-tiered services (flat/per_unit/custom services where
+`tier_name` is null or `tier_name === 'default'`) produces byte-
+identical output post-D46. `renderTierToken` returns `null` for both
+sentinels; surfaces' conditional render (`{tierToken && <span>…</span>}`)
+hides the sub-element identically to pre-D46's `{item.tier_name &&
+<span>…</span>}` guard. Empty parens, stray characters, and dangling
+em-dashes do NOT appear. Verified by:
+- The mobile-fee synthetic row appended by `composeLineItems`
+  (`tier_name: null`) renders nothing.
+- The Express Interior Clean fixture path (single-tier
+  `vehicle_size` / no `tier_name`) renders no sub-text.
+- Specialty service paths (motorcycle/RV/boat/aircraft) unchanged
+  because their tier rendering already used `tier_label || tier_name`
+  fallback at the operator UI layer (untouched by D46).
+
+**Hard rules honored:**
+- NO changes to D45 helpers (`tier-display.ts` + `services-summary.ts`
+  byte-identical — adoption pin test asserts).
+- NO changes to `src/lib/services/**` (resolver territory) or D43
+  implementation (resolver `options.tierName`, `tools.ts` schema,
+  `system-prompt.ts` Critical Rule 7).
+- NO database migrations.
+- NO `tier_label` data edits (Issue 40 = operator admin clicks,
+  separate workflow).
+- NO attempt to fix Issue 42 (appointment_services quantity schema gap
+  is its own concern).
+- NO new SMS templates, no new tools, no new system-prompt rules.
+- Per-surface wrappers PRESERVED — D46 changed only the TOKEN source,
+  not em-dash/parens/sub-line/monospace/PDF-column presentation.
+- Memory #15 (4 receipt surfaces) HONORED via 1 enrichment site +
+  1 file modification covering 3 of 4 consumers, with SMS receipt
+  verified-no-change + sentinel pin.
+
+**Gates green:** tsc 0 errors, lint 0 errors / 97 warnings (baseline
+unchanged), targeted suite 28/28 (new), `npm test` **2361/2361** (was
+2333; +28 net new), `npm run build` compiled successfully in 10.0s
+(788 dynamic pages). **Deploy: YES** via `deploy-smartdetails`
+post-merge.
+
+**Operator manual verification (Q-0087 reproduction):**
+1. `/quote/<Q-0087-token>` — per-line tier reads "Per Row" / "Floor
+   Mats" (post-Issue-40) or "Per Seat Row" / "Floor Mats Only"
+   (pre-Issue-40). No raw slugs.
+2. Generate quote PDF — Tier column same clean labels.
+3. Admin slide-over for Q-0087 — "(Per Row)" / "(Floor Mats)" not
+   "(per_row)" / "(floor_mats)".
+4. Admin quote detail page — same clean labels in sub-line.
+5. POS quote detail — same clean labels in muted sub-line.
+6. Convert Q-0087 to appointment — confirmation email subject + body
+   render clean labels (qty=1 in both rows per Issue 42 data
+   limitation; visible improvement still real).
+7. Pay form for the converted appointment — em-dash sub-text renders
+   clean labels (qty=1 per Issue 42).
+8. Process payment → thermal receipt — `Hot Shampoo Extraction - Per
+   Row` / `- Floor Mats` (32-char wrap handled by existing
+   `wrapTextToWidth`).
+9. Email/Print/Customer HTML receipt — same clean labels with `-`
+   separator.
+10. POS transaction detail — `(Per Row)` / `(Floor Mats)` parens
+    inline.
+11. SMS chip from D45 still works: `"Hot Shampoo Extraction (2 Rows +
+    Floor Mats)"` (verified unchanged).
+
+**Regression checks:**
+- Non-tiered Express Interior Clean — quote page / receipt / PDF
+  render no tier sub-line (no empty parens, no stray characters).
+- Specialty service (motorcycle/RV/boat/aircraft) — tier rendering
+  unchanged where applicable.
+- Mobile-fee synthetic row — renders no tier sub-line (composer
+  appends `tier_name: null`).
+
+**Files touched (16 modified + 2 new + 2 test files = 20):**
+- New: `src/lib/quotes/attach-tier-meta.ts`,
+  `src/lib/quotes/__tests__/attach-tier-meta.test.ts`,
+  `src/lib/quotes/__tests__/visual-surface-adoption.test.ts`
+- Modified: `src/lib/quotes/quote-service.ts`,
+  `src/lib/data/receipt-data.ts`, `src/lib/utils/compose-line-items.ts`,
+  `src/lib/supabase/types.ts`,
+  `src/app/pos/lib/receipt-template.ts`,
+  `src/app/(public)/receipt/[token]/page.tsx`,
+  `src/app/(public)/quote/[token]/page.tsx`,
+  `src/app/(public)/pay/[token]/page.tsx`,
+  `src/app/admin/quotes/components/quote-slide-over.tsx`,
+  `src/app/admin/quotes/[id]/page.tsx`,
+  `src/app/pos/components/quotes/quote-detail.tsx`,
+  `src/app/pos/components/transactions/transaction-detail.tsx`,
+  `src/app/api/quotes/[id]/pdf/route.ts`,
+  `src/app/api/appointments/[id]/notify/route.ts`,
+  `src/app/api/pos/appointments/[id]/notify/route.ts`,
+  `src/app/api/pos/transactions/[id]/route.ts`
+- Docs: this entry, `docs/dev/ROADMAP-13-ITEMS.md` ledger row,
+  `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` Section 2 + 7.
+
+**DO NOT merge — operator merges after verifying tests + reading the
+diff.**
+
+---
+
 ## 2026-05-26 — feat(quotes): D45 — tier-display + services-summary helpers + Issue 39 chip adoption
 
 Branch `feat/d45-tier-display-and-services-summary`. Session 1 of the

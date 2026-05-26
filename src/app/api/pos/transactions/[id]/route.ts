@@ -6,6 +6,7 @@ import { requirePermission } from '@/lib/auth/require-permission';
 import { fetchReceiptConfig } from '@/lib/data/receipt-config';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { notifyTransactionVoided } from '@/lib/email/send-void-notification';
+import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
 
 /**
  * Authenticate request via POS HMAC token or admin session.
@@ -62,6 +63,19 @@ export async function GET(
         { error: 'Transaction not found' },
         { status: 404 }
       );
+    }
+
+    // D46 (Issue 41): merge service_pricing.tier_label / qty_label onto
+    // each transaction_item so the POS transaction-detail UI renders
+    // operator-curated tier labels via renderTierToken.
+    const t = transaction as {
+      items?: Array<Record<string, unknown> & {
+        service_id?: string | null;
+        tier_name?: string | null;
+      }>;
+    };
+    if (Array.isArray(t.items) && t.items.length > 0) {
+      t.items = await attachTierMetaToItems(supabase, t.items);
     }
 
     // Fetch receipt config so callers can render branded receipts

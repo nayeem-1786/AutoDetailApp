@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
 import {
   getLineItemPricingInfo,
@@ -117,6 +118,10 @@ interface QuoteData {
     // strikethrough viz and "You saved" totals row can render.
     standard_price: number | null;
     pricing_type: 'standard' | 'sale' | 'combo' | null;
+    // D46 (Issue 41): operator-curated tier presentation fields merged
+    // in by getQuoteById → attachTierMetaToItems on the API server.
+    tier_label?: string | null;
+    qty_label?: string | null;
   }[];
 }
 
@@ -554,9 +559,21 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
                   <div key={rowKey} className="flex items-center justify-between px-4 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{item.name}</p>
-                      {item.tier_name && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">{item.tier_name}</p>
-                      )}
+                      {(() => {
+                        // D46 (Issue 41): unified tier rendering. tier_label
+                        // / qty_label arrive on item via composeLineItems'
+                        // widened DisplayLineItem (raw input enriched by
+                        // getQuoteById → attachTierMetaToItems server-side).
+                        const tierToken = renderTierToken({
+                          tier_name: item.tier_name ?? null,
+                          tier_label: item.tier_label,
+                          qty_label: item.qty_label,
+                          quantity: item.quantity,
+                        });
+                        return tierToken ? (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{tierToken}</p>
+                        ) : null;
+                      })()}
                       {pricingInfo?.hasDiscount && (
                         <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
                           {pricingInfo.label}: Reg{' '}

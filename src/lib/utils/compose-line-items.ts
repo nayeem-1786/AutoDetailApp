@@ -23,6 +23,12 @@ export interface DisplayLineItem {
   unit_price: number;
   total_price: number;
   tier_name?: string | null;
+  /** D46 (Issue 41): operator-curated tier presentation fields propagated
+   *  from the raw item when present. Visual surfaces call
+   *  `renderTierToken(item)` from `@/lib/quotes/tier-display` to render
+   *  them; null/undefined falls back to title-cased `tier_name`. */
+  tier_label?: string | null;
+  qty_label?: string | null;
   /**
    * True iff this row is the synthetic mobile-fee row appended by the
    * composer. False/undefined on every row that came from the raw items.
@@ -64,6 +70,14 @@ export interface RawLineItem {
   total_price?: number | string | null;
   price?: number | string | null;
   tier_name?: string | null;
+  /** D46 (Issue 41): pre-attached operator-curated tier presentation
+   *  fields. Surfaces that route through `attachTierMetaToItems` (or
+   *  widen their SELECT with a `service_pricing` join) populate these;
+   *  the composer propagates them onto `DisplayLineItem`. Surfaces that
+   *  do not enrich leave both null and existing rendering falls back to
+   *  `renderTierToken`'s title-case branch. */
+  tier_label?: string | null;
+  qty_label?: string | null;
   is_mobile_fee?: boolean | null;
 }
 
@@ -99,6 +113,8 @@ export function composeLineItems(
       unit_price: unit,
       total_price: total,
       tier_name: raw.tier_name ?? null,
+      tier_label: raw.tier_label ?? null,
+      qty_label: raw.qty_label ?? null,
     };
     if (raw.is_mobile_fee === true) {
       item.is_mobile_fee = true;

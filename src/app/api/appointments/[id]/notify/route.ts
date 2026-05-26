@@ -7,6 +7,8 @@ import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 
 export async function POST(
   request: NextRequest,
@@ -29,6 +31,7 @@ export async function POST(
         vehicle:vehicles(id, year, make, model),
         employee:employees(id, first_name, last_name, phone),
         services:appointment_services(
+          service_id,
           price_at_booking,
           tier_name,
           service:services(name)
@@ -62,11 +65,27 @@ export async function POST(
       id: string; first_name: string; last_name: string; phone: string | null;
     } | null;
 
-    const services = (appointment.services as {
+    // D46 (Issue 41): widen the inner select to include service_id, then
+    // batch-fetch service_pricing.tier_label / qty_label so the three
+    // template/fallback render sites below can route through
+    // renderTierToken instead of inlining the raw snake_case slug.
+    const rawServices = (appointment.services as {
+      service_id: string | null;
       price_at_booking: number;
       tier_name: string | null;
       service: { name: string } | null;
     }[]) ?? [];
+    const services = await attachTierMetaToItems(supabase, rawServices);
+
+    // Reusable tier-token renderer for the 3 render sites below. Helper
+    // returns null for no-tier rows; surfaces wrap conditionally per
+    // their established presentation (parens after service name).
+    const tierTokenFor = (s: (typeof services)[number]): string | null =>
+      renderTierToken({
+        tier_name: s.tier_name,
+        tier_label: s.tier_label,
+        qty_label: s.qty_label,
+      });
 
     const dateStr = new Date(appointment.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -92,10 +111,13 @@ export async function POST(
       } else {
         // Pre-render services table for template variable
         const serviceRowsHtml = services
-          .map((s) => `<tr>
-            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${s.tier_name ? ` <span style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
+          .map((s) => {
+            const tt = tierTokenFor(s);
+            return `<tr>
+            <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${tt ? ` <span style="color: #6b7280;">(${tt})</span>` : ''}</td>
             <td style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(s.price_at_booking)}</td>
-          </tr>`)
+          </tr>`;
+          })
           .join('');
 
         const servicesTableHtml = services.length > 0
@@ -134,7 +156,10 @@ export async function POST(
         } else {
         // Hardcoded HTML fallback — kept for uncustomized system template
         const serviceLines = services
-          .map((s) => `  ${s.service?.name || 'Service'}${s.tier_name ? ` (${s.tier_name})` : ''} — ${formatCurrency(s.price_at_booking)}`)
+          .map((s) => {
+            const tt = tierTokenFor(s);
+            return `  ${s.service?.name || 'Service'}${tt ? ` (${tt})` : ''} — ${formatCurrency(s.price_at_booking)}`;
+          })
           .join('\n');
 
         const textBody = `Appointment Confirmation from ${business.name}
@@ -156,10 +181,13 @@ If you need to reschedule or have questions, please call us at ${business.phone}
 Thank you for choosing ${business.name}!`;
 
         const serviceRowsHtml = services
-          .map((s) => `<tr>
-            <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${s.tier_name ? ` <span class="email-text-muted" style="color: #6b7280;">(${s.tier_name})</span>` : ''}</td>
+          .map((s) => {
+            const tt = tierTokenFor(s);
+            return `<tr>
+            <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; color: #374151;">${s.service?.name || 'Service'}${tt ? ` <span class="email-text-muted" style="color: #6b7280;">(${tt})</span>` : ''}</td>
             <td class="email-td" style="padding: 10px 16px; border-bottom: 1px solid #e5e7eb; text-align: right; color: #374151;">${formatCurrency(s.price_at_booking)}</td>
-          </tr>`)
+          </tr>`;
+          })
           .join('');
 
         const htmlBody = `<!DOCTYPE html>
