@@ -6,6 +6,92 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — fix(admin): Issue 46 — rename "Voice Quote Sent" label to "Agent Quote Sent"
+
+Branch `fix/issue-46-agent-quote-sent-label`. Single-file UI cosmetic
+fix. Renames the auto-derived label shown in the Admin Messages log
+for system SMS with `notificationType: 'voice_quote_sent'` from
+`"Voice Quote Sent"` (misleading — implies a voice call) to
+`"Agent Quote Sent"` (channel-neutral — accurate for both voice and
+SMS origination paths since they share the `send-quote-sms` route).
+
+**Closes Issue 46** (P4 operator-internal cosmetic gap — the
+`"Voice Quote Sent"` label appeared in the Admin Messages log for
+SMS-channel conversations because the generic snake_case → Title
+Case transform converted the literal `voice_quote_sent`
+notificationType slug verbatim).
+
+**Architecture (UI override map):**
+
+- New `NOTIFICATION_LABEL_OVERRIDES` constant at the top of
+  `src/app/admin/messaging/components/message-bubble.tsx`. Currently
+  one entry: `voice_quote_sent → "Agent Quote Sent"`.
+- `NotificationBar` component's `notifLabel` computation prepends an
+  override lookup with `??` nullish-coalescing fallback to the
+  existing generic snake_case → Title Case transform. Unmapped
+  notificationTypes (`job_complete`, `appointment_confirmed`,
+  `receipt_sent`, etc.) keep their current auto-derived labels —
+  zero regression for the ~15 other notification types in use.
+
+**Why source-data rename was NOT chosen:** the `voice_quote_sent`
+string is a stable machine identifier persisted in `messages.metadata`
+and used by dedup logic (`src/lib/sms/dedup.ts` reads notificationType
+for cross-period collapse). Renaming the source value at
+`src/app/api/voice-agent/send-quote-sms/route.ts:608` and
+`src/lib/services/voice-post-call.ts:676` would break dedup for any
+in-flight or cross-period checks. UI override at the display layer
+keeps the source value byte-identical.
+
+**Tests:** none added. The fix is a 1-line label-source swap with a
+preserved fallback path. Per the prompt's operator-discretion clause
+for ~15-line UI fixes with no existing test infrastructure
+(`src/app/admin/messaging/components/__tests__/` does not exist),
+creating a new test setup is out of scope. Manual verification
+operator-runs post-deploy (see below).
+
+**Hard rules honored:**
+- NO changes to producer files (`send-quote-sms/route.ts:608` and
+  `voice-post-call.ts:676` notificationType values byte-identical).
+- NO changes to `src/lib/sms/dedup.ts`.
+- NO migrations.
+- NO new SMS templates, no new tools, no new system-prompt rules.
+- NO changes to D45/D46/D47 work.
+- Customer-facing SMS body UNCHANGED — `"Voice Quote Sent"` never
+  appeared in any SMS body, only in the Admin Messages log UI.
+- Generic transform fallback preserved literally character-for-
+  character so existing notification types render unchanged.
+
+**Gates:** tsc 0 errors, lint 0 errors / 97 warnings (baseline
+unchanged), `npm test` **2387/2387** (no test delta), `npm run build`
+compiled successfully in 13.0s (788 dynamic pages).
+
+**Files touched (4 = 1 src + 3 docs):**
+- `src/app/admin/messaging/components/message-bubble.tsx` (override
+  map + 1-line notifLabel swap)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/ROADMAP-13-ITEMS.md` (ledger row)
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` (Section 2 Issue 46
+  status → Resolved)
+
+**Manual verification (operator runs post-deploy):**
+1. Deploy via `deploy-smartdetails`.
+2. Admin → Messaging → open any recent quote-sent SMS (Q-0087,
+   Q-0090, Q-0091, or any quote from today's testing).
+3. Verify the system-SMS label badge reads `"Agent Quote Sent"`
+   (NOT `"Voice Quote Sent"`).
+4. Regression check: find a non-quote system SMS (appointment
+   confirmation, job complete) — labels for those should be
+   unchanged (`"Appointment Confirmed"`, `"Job Complete"`).
+
+Both pass → Issue 46 closed empirically.
+
+**Customer impact:** zero. Label is operator-internal Admin UI only.
+
+**DO NOT merge — operator merges after verifying tests + reading
+the diff.**
+
+---
+
 ## 2026-05-26 — feat(sms-ai): D47 — Critical Rules 8 + 9 + tool-shape + description for scope-pricing discipline (Issues 43 + 44)
 
 Branch `feat/d47-scope-pricing-prompt-discipline`. Implements the
