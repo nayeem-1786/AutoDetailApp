@@ -6,6 +6,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-27 — audit: Issue 45 — auto-send vs. "Want me to send a quote?" confirmation step (SMS-AI agent prompt discipline)
+
+Read-only diagnostic audit on branch `audit/issue-45-auto-send-confirmation`. No `src/` changes, no migrations, no test changes. Deliverable: `docs/dev/ISSUE_45_AUTO_SEND_AUDIT.md` (12 targets + TL;DR + 7-pattern adversarial matrix + side-by-side 3-option comparison + risk matrix + 4 operator decisions).
+
+**Root cause confirmed via source-side reading:** the system prompt does NOT explicitly require asking "Want me to send a quote?" anywhere. The friction step is emergent from 5 latent cues that all key the `send_quote_sms` trigger on customer-spoken affirmations (Critical Rule 2 ✅ RIGHT example at `system-prompt.ts:82-89`, Critical Rule 20 at `:227`, tool usage guide at `:286`, Quote-send intent recognition at `:291`, Booking flow Step 1 at `:501`) plus a sixth tool-level cue at `tools.ts:231` ("Only call this when the customer has explicitly confirmed... AND **asked to be texted a quote**"). All 6 cumulatively teach the LLM to wait for an explicit customer ask, which the LLM elicits via "Want me to send a quote?" The prompt is silent on the ask; the friction is a safety-via-confirmation instinct closing the loop.
+
+**Empirical evidence (4 captured Q-tests):** Q-0086/Q-0087/Q-0090/Q-0091 (2026-05-25 evening) all followed the identical pattern with 100% customer-confirm rate ("Yeah" reply within 1 turn) and zero actionable signal at the friction step. 30-90 seconds of added funnel latency per quote-send, with worst-case unbounded if customer doesn't return to reply. Sample-size caveat captured.
+
+**3 grounded fix architectures (Target 7 side-by-side):**
+- **Option A — Proactive auto-send.** Critical Rule + `tools.ts` description retighten (drop "AND asked to be texted a quote"). Maximum funnel improvement; LLM judges "configuration finalized." Audit's structural leaning (NON-BINDING).
+- **Option B — Word-list-gated auto-send.** Explicit commit phrase list (English + Spanish, mirroring existing `:291` paragraph) + total-stated precondition. Conservative; no LLM judgment of finalization.
+- **Option C — Soft-send rephrase.** Announce-first-act-second pattern; tool fires by default, customer can interrupt within reply window. Minimum behavioral change.
+
+**Critical Rules numbering:** recommended insert at slot 17 (immediately after Rule 16 "Don't double-act"), renumbering 17-21 → 18-22. Side-effect-discipline cluster (Rules 10, 16, 20) stays contiguous with the new rule. 5 inline cross-references identified for mechanical update (`system-prompt.ts:93`, `:132`, `:205`, `:286`, `:359`).
+
+**D36 + D43 idempotency interaction:** auto-send's double-fire scenarios are fully covered by existing 60-sec guard + `(service_id, tier_name, quantity)` triple-key. NO guard tuning needed. Customer-adds-service mid-flow correctly produces a distinct quote per D43 triple-key. Watch-item flagged: quote supersession (Q-N marking when Q-N+1 lands) is pre-existing behavior, out of Issue 45 scope.
+
+**Other-tool regression check (Target 4):** auto-send rule MUST name `send_quote_sms` explicitly; generic "auto-fire side-effecting tools" wording would accidentally cascade to `send_info_sms` (spam risk) and `create_appointment` (operator-locked friction). The other 4 side-effecting tools' "Only call when explicitly confirmed" pattern is intentional and unchanged.
+
+**Customer-facing reply timing (Target 5):** runner architecture (`agent-runner.ts:326-414`) already supports tool fire + text reply in the same agent turn. NO runner change needed. Option A/B/C all use this pattern. Recommended reply phrasing: tool-result-agnostic ("Sending the quote now — check your texts!") to mitigate Issue 27 regression risk (hallucinated success after tool failure).
+
+**7-pattern adversarial coverage (Target 9):** all 3 options predicted to handle Patterns 1 (exploratory query), 3 (conditional commitment with trailing change-request), 4 (mid-correction), 6 (customer-question), 7 (cancellation) as NO auto-send. Patterns 2 (implicit commitment) and 5 (multi-service finalization) diverge per option strategy. Pattern 3 is the highest-risk wording fidelity item — rule MUST require absence of mid-flux signal as precondition.
+
+**Implementation scope:** single session, ~60-90 minutes, ~120-260 LOC, +4-12 tests. Files: `src/lib/sms-ai/system-prompt.ts` + `src/lib/sms-ai/tools.ts` (Option A only) + corresponding test files. NO migrations. NO endpoint changes. NO new tools. NO D45/D46/D47/D48 surface impacts.
+
+**Operator decisions still needed (4 well-framed):** (1) pick A / B / C; (2) auto-send reply phrasing; (3) preserve fallback "Want me to send?" or delete entirely; (4) sanity-check 7-pattern matrix predictions. Audit gives evidence-grounded leanings on each.
+
+**Hard rules honored:** NO `src/` changes, NO migrations, NO test changes, only new files = audit deliverable + 3 doc updates, every finding cites `file:line`, audit surfaces 3 options without picking a winner, D38/D43/D45/D46/D47/D48 architecture preserved, audit honors operator's stated intent ("Auto-send quotes when configuration is finalized") without adding scope creep.
+
+**Gates:** none — doc-only audit. `git diff --name-only` shows exactly 4 doc files (`docs/dev/ISSUE_45_AUTO_SEND_AUDIT.md`, `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`).
+
+**Deploy: NO** — implementation session (D49, presumably) will deploy the prompt + tool-description changes once Decisions #1-3 are locked.
+
+**DO NOT merge — operator reviews + locks decisions before D49 fires.** Issue 45 implementation can fire after operator decision-lock.
+
+---
+
 ## 2026-05-26 — feat(quotes): D48 — `appointment_services.quantity` schema + conversion flow (Issue 42 closure)
 
 Branch `fix/issue-42-appointment-services-quantity`. Closes Issue 42 per `docs/dev/ISSUE_42_APPOINTMENT_QUANTITY_AUDIT.md` — implements the audit's recommended schema change, conversion-flow propagation, and 4-surface SELECT widening in a single combined session.
