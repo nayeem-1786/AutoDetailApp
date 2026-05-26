@@ -6,6 +6,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — audit: Issue 42 — `appointment_services.quantity` schema gap
+
+Read-only diagnostic audit on branch `audit/issue-42-appointment-services-quantity`. No `src/` changes, no migrations, no test changes. Deliverable: `docs/dev/ISSUE_42_APPOINTMENT_QUANTITY_AUDIT.md` (12 targets + TL;DR + 6 verification scenarios + risk matrix + implementation pre-flight checklist).
+
+**Root cause confirmed via schema inspection:** `appointment_services` was created on 2026-02-01 (`20260201000015_create_appointments.sql:31-38`) with 6 columns and no `quantity`, while sibling line-item tables `quote_items` (`DB_SCHEMA.md:2057`) and `transaction_items` (`DB_SCHEMA.md:2906`) both carry `quantity INTEGER NOT NULL DEFAULT 1`. The conversion site at `src/lib/quotes/convert-service.ts:170-184` already has `quote_items.quantity` in scope (line 230 reads `item.quantity ?? 1` for the chip summary) but discards it at the INSERT.
+
+**Inventory:** 32 READ consumer sites (4 customer-facing requiring SELECT widening + 28 unaffected — additive column is backward-compat), 7 WRITE producer sites (1 carries upstream quantity from quote_items — the canonical `convert-service.ts`; 5 always represent qty=1 single-unit additions; 1 is delete-only). Schema dependencies: 0 triggers, 2 FKs out (CASCADE to appointments, RESTRICT to services), 0 FKs in, 2 indexes (neither references quantity), 4 RLS policies (none column-aware), 0 views. D45/D46 helpers `attachTierMetaToItems` + `renderTierToken` are already shape-agnostic and quantity-aware — no helper changes needed.
+
+**Recommended migration:** `ALTER TABLE appointment_services ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0)` + COMMENT. Operator-locked backfill strategy: `DEFAULT 1` only (no retroactive `UPDATE` from `quote_items.quantity`). Rare historical multi-quantity appointments (0-5 rows estimated) accepted as qty=1, manually correctable via Admin UI if needed.
+
+**Conversion-flow code change:** 2 lines at `convert-service.ts:170-184` (add `quantity?: number` to inline type + `quantity: item.quantity ?? 1` to INSERT payload). Plus 4 surface SELECT widenings: admin notify route + POS notify route + public pay page + POS jobs cancel chip (replaces existing hardcoded `quantity: 1` with `s.quantity ?? 1`). Once schema flows through, all 4 D46 surfaces upgrade automatically to render `"2 Rows"` instead of `"Per Row"` for multi-quantity appointments.
+
+**Implementation scope:** 1 migration + 5 src file edits + 2 generated artifact regens (`database.types.ts` + `DB_SCHEMA.md`) + 8-12 tests. Single session feasible (~90-120 min). Zero blocking operator decisions (3 minor decisions surfaced for default-accept: no index on quantity, audit-drafted COMMENT, no admin/POS edit-modal quantity field for now).
+
+**Hard rules honored:** NO `src/` changes, NO migrations, NO test changes, NO new files except audit deliverable + 3 doc updates, every finding cites file:line, operator-locked Option (a) backfill preserved.
+
+**Gates:** none — doc-only audit. `git diff --name-only` shows exactly 4 doc files (`docs/dev/ISSUE_42_APPOINTMENT_QUANTITY_AUDIT.md`, `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`).
+
+**Deploy: NO** — implementation session will deploy the schema + conversion-flow + 4 surface updates.
+
+**DO NOT merge — operator merges after review.** Issue 42 implementation can fire as the next session.
+
+---
+
 ## 2026-05-26 — fix(admin): Issue 46 refinement — channel-aware notificationType branching for SMS vs Voice agent
 
 Branch `fix/issue-46-agent-quote-sent-label` (extends the prior Issue
