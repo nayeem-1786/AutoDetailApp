@@ -40,6 +40,7 @@ export async function POST(
           service_id,
           price_at_booking,
           tier_name,
+          quantity,
           service:services(name)
         )
       `)
@@ -79,6 +80,7 @@ export async function POST(
       service_id: string | null;
       price_at_booking: number;
       tier_name: string | null;
+      quantity: number;
       service: { name: string } | null;
     }[]) ?? [];
     const services = await attachTierMetaToItems(supabase, rawServices);
@@ -88,6 +90,7 @@ export async function POST(
         tier_name: s.tier_name,
         tier_label: s.tier_label,
         qty_label: s.qty_label,
+        quantity: s.quantity,
       });
 
     const customerName = `${customer.first_name} ${customer.last_name}`;

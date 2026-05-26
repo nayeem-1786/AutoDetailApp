@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       ad_creatives: {
@@ -254,6 +229,7 @@ export type Database = {
           created_at: string
           id: string
           price_at_booking: number
+          quantity: number
           service_id: string
           tier_name: string | null
         }
@@ -262,6 +238,7 @@ export type Database = {
           created_at?: string
           id?: string
           price_at_booking: number
+          quantity?: number
           service_id: string
           tier_name?: string | null
         }
@@ -270,6 +247,7 @@ export type Database = {
           created_at?: string
           id?: string
           price_at_booking?: number
+          quantity?: number
           service_id?: string
           tier_name?: string | null
         }
@@ -6933,9 +6911,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       appointment_channel: ["online", "phone", "walk_in", "portal"],

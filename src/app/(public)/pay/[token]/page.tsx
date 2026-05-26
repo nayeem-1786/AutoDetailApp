@@ -38,15 +38,10 @@ interface AppointmentRecord {
   } | null;
   appointment_services: Array<{
     id: string;
-    /** D46 (Issue 41): widened SELECT pulls service_id so attachTierMetaToItems
-     *  can look up matching service_pricing.tier_label / qty_label.
-     *  appointment_services has no quantity column today (Issue 42 schema
-     *  gap); renderTierToken receives quantity=1 implicitly and emits the
-     *  qty=1 branch tier_label. Per-row multi-quantity tier display
-     *  cannot be reconstructed from the appointment row alone. */
     service_id: string;
     price_at_booking: number;
     tier_name: string | null;
+    quantity: number;
     tier_label?: string | null;
     qty_label?: string | null;
     service: { name: string } | null;
@@ -77,7 +72,7 @@ async function getAppointmentByToken(
       customer:customers(first_name, last_name, email, phone),
       vehicle:vehicles(year, make, model, color),
       appointment_services(
-        id, service_id, price_at_booking, tier_name,
+        id, service_id, price_at_booking, tier_name, quantity,
         service:services(name)
       )
       `
@@ -305,14 +300,11 @@ export default async function PublicPayPage({ params, searchParams }: PageProps)
             </p>
             <ul className="space-y-2">
               {appointment.appointment_services.map((line) => {
-                // D46 (Issue 41): unified tier token. appointment_services
-                // has no quantity column today (Issue 42); renderTierToken
-                // sees quantity=1 implicitly and emits the qty=1 branch
-                // (tier_label). Em-dash inline wrapper preserved.
                 const tierToken = renderTierToken({
                   tier_name: line.tier_name,
                   tier_label: line.tier_label,
                   qty_label: line.qty_label,
+                  quantity: line.quantity,
                 });
                 return (
                 <li key={line.id} className="flex justify-between text-sm">

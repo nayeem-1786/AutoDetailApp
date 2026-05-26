@@ -198,3 +198,73 @@ describe('D46 helper layer — attachTierMetaToItems contract', () => {
     expect(servicesSummary).toMatch(/export\s+async\s+function\s+enrichItemsWithTierMeta/);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// D48 (Issue 42) adoption pins — verify the 4 appointment-derived
+// customer-facing surfaces enumerated in
+// `docs/dev/ISSUE_42_APPOINTMENT_QUANTITY_AUDIT.md` Target 7 widen their
+// `appointment_services` SELECT to pull `quantity` AND thread it into
+// the tier renderer so per_row × N quotes upgrade from the qty=1 branch
+// (`"Per Row"`) to the qty>1 branch (`"2 Rows"`) automatically.
+//
+// The grep patterns are conservative: they assert the quantity column
+// appears in each SELECT and the value reaches `renderTierToken` (or
+// `enrichItemsWithTierMeta` for the cancel chip).
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('D48 (Issue 42) adoption pins — 4 surfaces propagate appointment_services.quantity', () => {
+  it('admin appointment notify route includes quantity in SELECT + renderTierToken arg', () => {
+    const src = read('src/app/api/appointments/[id]/notify/route.ts');
+    // SELECT widens to include the column.
+    expect(src).toMatch(/services:appointment_services\([^)]*\bquantity\b/);
+    // renderTierToken call receives quantity.
+    expect(src).toMatch(/quantity:\s*s\.quantity/);
+  });
+
+  it('POS appointment notify route includes quantity in SELECT + renderTierToken arg', () => {
+    const src = read('src/app/api/pos/appointments/[id]/notify/route.ts');
+    expect(src).toMatch(/services:appointment_services\([^)]*\bquantity\b/);
+    expect(src).toMatch(/quantity:\s*s\.quantity/);
+  });
+
+  it('public pay page includes quantity in SELECT + renderTierToken arg + AppointmentRecord type', () => {
+    const src = read('src/app/(public)/pay/[token]/page.tsx');
+    // SELECT widens.
+    expect(src).toMatch(/appointment_services\([^)]*\bquantity\b/);
+    // renderTierToken call receives quantity.
+    expect(src).toMatch(/quantity:\s*line\.quantity/);
+    // AppointmentRecord type extends to include quantity.
+    expect(src).toMatch(/\bquantity:\s*number;/);
+  });
+
+  it('POS jobs cancel chip includes quantity in SELECT + threads through enrichItemsWithTierMeta', () => {
+    const src = read('src/app/api/pos/jobs/[id]/cancel/route.ts');
+    // SELECT widens.
+    expect(src).toMatch(/appointment_services\([^)]*\bquantity\b/);
+    // No more hardcoded `quantity: 1` literal.
+    expect(src).not.toMatch(/quantity:\s*1,\s*\/\/ appointment_services has no quantity/);
+    // enrichItemsWithTierMeta receives s.quantity ?? 1.
+    expect(src).toMatch(/quantity:\s*s\.quantity\s*\?\?\s*1/);
+  });
+
+  it('stale "Issue 42 deferred" inline comments are deleted at all 3 sites', () => {
+    // Comment hygiene: the audit's Target 7 calls for deletion (not
+    // amendment) of the deferred-explanation comments at 3 surfaces.
+    const cancelSrc = read('src/app/api/pos/jobs/[id]/cancel/route.ts');
+    expect(cancelSrc).not.toMatch(/appointment_services has no.*quantity.*column/i);
+    expect(cancelSrc).not.toMatch(/out of scope for D45/i);
+
+    const paySrc = read('src/app/(public)/pay/[token]/page.tsx');
+    expect(paySrc).not.toMatch(/Issue 42 schema\s*gap/i);
+    expect(paySrc).not.toMatch(/no quantity column today/i);
+  });
+});
+
+describe('D48 (Issue 42) — convert-service.ts INSERT shape carries quantity', () => {
+  it('convert-service.ts INSERT payload includes `quantity: item.quantity ?? 1`', () => {
+    const src = read('src/lib/quotes/convert-service.ts');
+    // The 2-line edit per audit Target 7: type extension + INSERT field.
+    expect(src).toMatch(/quantity\?:\s*number;/);
+    expect(src).toMatch(/quantity:\s*item\.quantity\s*\?\?\s*1/);
+  });
+});
