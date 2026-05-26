@@ -6,6 +6,10 @@ import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import {
+  enrichItemsWithTierMeta,
+  formatServicesSummary,
+} from '@/lib/quotes/services-summary';
 
 export async function POST(
   request: NextRequest,
@@ -117,8 +121,34 @@ export async function POST(
     try {
       const biz = await getBusinessInfo();
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-      const items = (quote.items as Array<{ item_name: string }>) ?? [];
-      const serviceList = items.map((i) => i.item_name).join(', ') || 'Services';
+      // D45 (Issue 39): compose services chip via the shared helper so
+      // multi-tier same-service quotes render as e.g.
+      // "Hot Shampoo Extraction (2 Rows + Floor Mats)" instead of
+      // "Hot Shampoo Extraction, Hot Shampoo Extraction".
+      // `quote.items` is the raw quote_items SELECT (no service_pricing
+      // join); enrichItemsWithTierMeta loads tier_label / qty_label /
+      // pricing_model in two batched queries (warn-only on failure so
+      // staff notification stays best-effort).
+      const rawItems = (quote.items as Array<{
+        service_id: string | null;
+        item_name: string;
+        tier_name: string | null;
+        quantity: number;
+        unit_price: number | string;
+        total_price?: number | string | null;
+      }>) ?? [];
+      const enrichedItems = await enrichItemsWithTierMeta(
+        supabase,
+        rawItems.map((i) => ({
+          service_id: i.service_id,
+          item_name: i.item_name,
+          tier_name: i.tier_name,
+          quantity: i.quantity,
+          unit_price: Number(i.unit_price),
+          total_price: i.total_price,
+        })),
+      );
+      const serviceList = formatServicesSummary(enrichedItems) || 'Services';
       const customerName = customer
         ? `${customer.first_name} ${customer.last_name}`.trim()
         : 'Customer';

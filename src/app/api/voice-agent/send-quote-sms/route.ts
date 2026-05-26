@@ -11,6 +11,10 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import {
+  formatServicesSummary,
+  type ServicesSummaryItem,
+} from '@/lib/quotes/services-summary';
 
 /**
  * Issue 38 D43 — stable idempotency comparison key for a quote's line items.
@@ -249,7 +253,7 @@ export async function POST(request: NextRequest) {
     // a silent universal default.
     const sizeClass = vehicleSizeClass ?? 'sedan';
 
-    // Resolve services to quote items (sale-aware via resolvePrice)
+    // Resolve services to quote items (sale-aware via resolvePrice).
     let quoteItems: Array<{
       service_id: string;
       item_name: string;
@@ -259,6 +263,25 @@ export async function POST(request: NextRequest) {
       standard_price: number | null;
       pricing_type: 'standard' | 'sale' | 'combo' | null;
     }> = [];
+
+    // D45 (Issue 39): per-(service_id, tier_name) display meta captured
+    // during the resolution loop and used to enrich items for the
+    // post-create chip composer. Kept as a parallel map so the
+    // `quoteItems` shape passed into `createQuote` /
+    // `applyCombosToQuoteItems` stays unchanged (those callees ignore
+    // unknown fields at runtime but TS would lose them through
+    // ResolvedQuoteItem[]'s return type). `resolveServiceByName` already
+    // loads `services.pricing_model` and the full `service_pricing` rows
+    // so no extra DB round-trip is needed at this site.
+    type TierMeta = {
+      service_pricing_model: string | null;
+      tier_label: string | null;
+      qty_label: string | null;
+      display_order: number | null;
+    };
+    const tierMetaByItem = new Map<string, TierMeta>();
+    const tierMetaKey = (serviceId: string, tierName: string | null) =>
+      `${serviceId}::${tierName ?? ''}`;
 
     t = perf.now();
     for (let i = 0; i < serviceNames.length; i++) {
@@ -327,6 +350,19 @@ export async function POST(request: NextRequest) {
           );
         }
       }
+
+      // D45 — capture chosen tier's display meta in the parallel map
+      // for the post-create chip composer. service.service_pricing was
+      // loaded by resolveServiceByName.
+      const chosenTierRow = tierName
+        ? (service.service_pricing ?? []).find((tp) => tp.tier_name === tierName)
+        : null;
+      tierMetaByItem.set(tierMetaKey(service.id, tierName), {
+        service_pricing_model: service.pricing_model ?? null,
+        tier_label: chosenTierRow?.tier_label ?? null,
+        qty_label: chosenTierRow?.qty_label ?? null,
+        display_order: chosenTierRow?.display_order ?? null,
+      });
 
       quoteItems.push({
         service_id: service.id,
@@ -529,7 +565,34 @@ export async function POST(request: NextRequest) {
     // `quote_sms_midcall`. `services` is a composite-style chip — caller
     // pre-builds the comma-joined string and passes verbatim. Engine treats
     // as opaque. business_name auto-injected.
-    const serviceList = quoteItems.map((i) => i.item_name).join(', ');
+    //
+    // D45 (Issue 39): formatServicesSummary replaces the naive
+    // `items.map(i => i.item_name).join(', ')` pattern so multi-tier
+    // same-service quotes (post-D43 contract) render as e.g.
+    // "Hot Shampoo Extraction (2 Rows + Floor Mats)" instead of
+    // "Hot Shampoo Extraction, Hot Shampoo Extraction". For
+    // non-multi-tier single-service or multi-distinct-service quotes
+    // the helper is byte-identical to the prior naive join (per
+    // services-summary unit tests). Per-tier display meta was captured
+    // in `tierMetaByItem` during the resolution loop above; combo
+    // application may have rewritten unit_price but never touches
+    // service_id / tier_name / quantity, so the same key still hits.
+    const summaryItems: ServicesSummaryItem[] = quoteItems.map((i) => {
+      const meta = tierMetaByItem.get(tierMetaKey(i.service_id, i.tier_name));
+      return {
+        service_id: i.service_id,
+        service_name: i.item_name,
+        service_pricing_model: meta?.service_pricing_model ?? null,
+        tier_name: i.tier_name,
+        tier_label: meta?.tier_label ?? null,
+        qty_label: meta?.qty_label ?? null,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+        total_price: i.unit_price * i.quantity,
+        display_order: meta?.display_order ?? undefined,
+      };
+    });
+    const serviceList = formatServicesSummary(summaryItems);
     const fallback = `Here's your quote from ${biz.name} for ${serviceList}: ${linkUrl}`;
 
     const tpl = await renderSmsTemplate('quote_sms_midcall', {
