@@ -8,6 +8,8 @@ import { AcceptQuoteButton } from './accept-button';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { resolveQuoteModifierRows } from '@/lib/quotes/modifier-display';
+import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 import {
   getLineItemPricingInfo,
   sumLineItemSavings,
@@ -42,6 +44,17 @@ async function getQuote(token: string): Promise<QuoteWithRelations | null> {
     .single();
 
   if (error || !data) return null;
+
+  // D46 (Issue 41): merge service_pricing.tier_label / qty_label onto
+  // each quote_item so the per-line tier sub-text reads operator-curated
+  // labels ("Per Row" / "Floor Mats") instead of raw slugs ("per_row" /
+  // "floor_mats"). One batched query per page render.
+  if (Array.isArray(data.items) && data.items.length > 0) {
+    data.items = (await attachTierMetaToItems(
+      supabase,
+      data.items as Array<QuoteItem>,
+    )) as QuoteItem[];
+  }
 
   // Don't mark deleted quotes as viewed — return data as-is for friendly messaging
   if (data.deleted_at) return data as QuoteWithRelations;
@@ -265,9 +278,21 @@ export default async function PublicQuotePage({ params }: PageProps) {
                   <tr key={rowKey} className="border-b border-site-border">
                     <td className="px-6 py-4">
                       <div className="font-medium text-site-text">{displayItem.name}</div>
-                      {displayItem.tier_name && (
-                        <div className="text-xs text-site-text-muted">{displayItem.tier_name}</div>
-                      )}
+                      {(() => {
+                        // D46 (Issue 41): tier rendered via the unified
+                        // helper. Returns null for no-tier items
+                        // (synthetic mobile-fee row, flat-priced services,
+                        // 'default' sentinel) — surface renders nothing.
+                        const tierToken = renderTierToken({
+                          tier_name: displayItem.tier_name ?? null,
+                          tier_label: displayItem.tier_label,
+                          qty_label: displayItem.qty_label,
+                          quantity: displayItem.quantity,
+                        });
+                        return tierToken ? (
+                          <div className="text-xs text-site-text-muted">{tierToken}</div>
+                        ) : null;
+                      })()}
                       {original?.notes && (
                         <div className="mt-1 text-xs text-site-text-dim">{original.notes}</div>
                       )}

@@ -25,6 +25,8 @@ import {
   type CommPillTone,
 } from '@/lib/quotes/derive-comm-pill';
 import { buildQuoteNotesDisplay } from '@/lib/quotes/source-labels';
+import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 
 type QuoteWithRelations = Quote & {
   customer?: Customer | null;
@@ -96,6 +98,13 @@ export default function QuoteDetailPage() {
     }
 
     const q = data as QuoteWithRelations;
+    // D46 (Issue 41): merge service_pricing.tier_label / qty_label onto
+    // each quote_item so the per-line tier sub-text renders operator-
+    // curated labels. Browser supabase client has RLS read on
+    // service_pricing for authenticated admins.
+    if (Array.isArray(q.items) && q.items.length > 0) {
+      q.items = await attachTierMetaToItems(supabase, q.items);
+    }
     setQuote(q);
 
     // Load communication history + JOIN sms_delivery_log via twilio_sid so
@@ -402,9 +411,18 @@ export default function QuoteDetailPage() {
                     <tr key={item.id} className="border-b border-gray-100">
                       <td className="py-3">
                         <div className="font-medium text-gray-900">{item.item_name}</div>
-                        {item.tier_name && (
-                          <div className="text-xs text-gray-500">{item.tier_name}</div>
-                        )}
+                        {(() => {
+                          // D46 (Issue 41): unified tier rendering.
+                          const tierToken = renderTierToken({
+                            tier_name: item.tier_name,
+                            tier_label: item.tier_label,
+                            qty_label: item.qty_label,
+                            quantity: item.quantity,
+                          });
+                          return tierToken ? (
+                            <div className="text-xs text-gray-500">{tierToken}</div>
+                          ) : null;
+                        })()}
                         {pricingInfo.hasDiscount && (
                           <div className="text-xs text-green-600 mt-0.5">
                             {pricingInfo.label}: Reg{' '}

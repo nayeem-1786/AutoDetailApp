@@ -12,6 +12,7 @@ import type { Quote, QuoteItem, Customer, Vehicle } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
 import { getLineItemPricingInfo } from '@/lib/quotes/line-item-pricing';
 import { buildQuoteNotesDisplay } from '@/lib/quotes/source-labels';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 
 interface QuoteSlideOverProps {
   quoteId: string | null;
@@ -158,9 +159,19 @@ export function QuoteSlideOver({ quoteId, open, onClose }: QuoteSlideOverProps) 
                       <div key={rowKey} className="flex items-start justify-between">
                         <div>
                           <p className="text-sm text-gray-900">{item.name}</p>
-                          {item.tier_name && (
-                            <p className="text-xs text-gray-500">({item.tier_name})</p>
-                          )}
+                          {(() => {
+                            // D46 (Issue 41): unified tier token rendering.
+                            // Wrapper (parens, muted) preserved.
+                            const tierToken = renderTierToken({
+                              tier_name: item.tier_name ?? null,
+                              tier_label: item.tier_label,
+                              qty_label: item.qty_label,
+                              quantity: item.quantity,
+                            });
+                            return tierToken ? (
+                              <p className="text-xs text-gray-500">({tierToken})</p>
+                            ) : null;
+                          })()}
                           {pricingInfo?.hasDiscount && (
                             <p className="text-xs text-green-600">
                               {pricingInfo.label} −{formatCurrency(pricingInfo.totalSavings)}

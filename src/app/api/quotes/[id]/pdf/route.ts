@@ -11,6 +11,8 @@ import {
   sumLineItemSavings,
   computePreDiscountSubtotal,
 } from '@/lib/quotes/line-item-pricing';
+import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
+import { renderTierToken } from '@/lib/quotes/tier-display';
 
 // --- Types -----------------------------------------------------------
 
@@ -24,6 +26,12 @@ interface QuoteItem {
   // SELECT below widened to pull these columns.
   standard_price: number | null;
   pricing_type: 'standard' | 'sale' | 'combo' | null;
+  // D46 (Issue 41): tier_label / qty_label attached by
+  // attachTierMetaToItems after the SELECT. service_id added to the
+  // SELECT to feed the batched lookup.
+  service_id?: string | null;
+  tier_label?: string | null;
+  qty_label?: string | null;
 }
 
 interface QuoteData {
@@ -300,8 +308,16 @@ function generatePdf(quote: QuoteData, business: BusinessInfo): Promise<Buffer> 
           : item.name;
       doc.text(itemName, colItem + 8, y + 5);
 
-      // Tier
-      doc.text(item.tier_name || '-', colTier, y + 5);
+      // Tier — D46 (Issue 41): unified token from renderTierToken so the
+      // PDF Tier column shows "Per Row" / "Floor Mats" instead of the
+      // raw snake_case slug. ASCII-clean per Session 71 PDF rule.
+      const tierToken = renderTierToken({
+        tier_name: item.tier_name ?? null,
+        tier_label: item.tier_label,
+        qty_label: item.qty_label,
+        quantity: item.quantity,
+      });
+      doc.text(tierToken || '-', colTier, y + 5);
 
       // Quantity
       doc.text(String(item.quantity), colQty, y + 5, {
@@ -533,7 +549,7 @@ export async function GET(
         manual_discount_type, manual_discount_value, manual_discount_label,
         customer:customers(first_name, last_name, phone, email),
         vehicle:vehicles(year, make, model, color),
-        items:quote_items(item_name, tier_name, quantity, unit_price, total_price, standard_price, pricing_type)
+        items:quote_items(service_id, item_name, tier_name, quantity, unit_price, total_price, standard_price, pricing_type)
       `
       )
       .eq('id', id)
@@ -549,6 +565,24 @@ export async function GET(
       return NextResponse.json(
         { error: 'Invalid access token' },
         { status: 403 }
+      );
+    }
+
+    // D46 (Issue 41): merge service_pricing.tier_label / qty_label onto
+    // each quote_item so the PDF Tier column reads operator-curated
+    // labels instead of raw slugs. PDFKit Helvetica needs ASCII; the
+    // operator catalog stores ASCII English tier_labels so no escape
+    // step is needed (Session 71 ASCII rule satisfied).
+    const quoteWithItems = quote as {
+      items?: Array<Record<string, unknown> & {
+        service_id?: string | null;
+        tier_name?: string | null;
+      }>;
+    };
+    if (Array.isArray(quoteWithItems.items) && quoteWithItems.items.length > 0) {
+      quoteWithItems.items = await attachTierMetaToItems(
+        supabase,
+        quoteWithItems.items,
       );
     }
 

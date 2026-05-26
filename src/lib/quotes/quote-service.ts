@@ -11,6 +11,7 @@ import {
 import { resolveManualDiscountAmount } from './manual-discount';
 import type { CreateQuoteInput, UpdateQuoteInput } from '@/lib/utils/validation';
 import type { QuoteSource } from './source-labels';
+import { attachTierMetaToItems } from './attach-tier-meta';
 
 // ---------------------------------------------------------------------------
 // Shared select strings
@@ -251,6 +252,22 @@ export async function getQuoteById(
 
   if (error || !quote) {
     return null;
+  }
+
+  // D46 (Issue 41): merge service_pricing.tier_label / qty_label onto each
+  // quote_item so the admin + POS quote detail surfaces, slide-over, and
+  // any other consumer of `getQuoteById` can render `renderTierToken`
+  // without inlining a batched lookup at each call site. Best-effort —
+  // failures inside the helper are logged and items pass through
+  // unchanged so quote detail remains viewable.
+  const q = quote as {
+    items?: Array<Record<string, unknown> & {
+      service_id?: string | null;
+      tier_name?: string | null;
+    }>;
+  };
+  if (Array.isArray(q.items) && q.items.length > 0) {
+    q.items = await attachTierMetaToItems(supabase, q.items);
   }
 
   return quote;
