@@ -509,3 +509,185 @@ describe('convertQuote — Item 15g Layer 15g-v writer-trust contract', () => {
     expect(apptInsert.row.total_amount).toBe(0);
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// D48 (Issue 42) regression — pins per-row quantity propagation through
+// Quote → Appointment on conversion. Before D48, `appointment_services`
+// had no `quantity` column and `convert-service.ts:170-184` silently
+// flattened multi-quantity `quote_items` to qty=1 rows. The schema
+// migration (20260526182120) added the column with DEFAULT 1; convert
+// now copies `item.quantity ?? 1` into the INSERT payload so per_row × N
+// quotes preserve their qty signal end-to-end.
+//
+// Coverage:
+//   1. per_row × 2 quote → appointment_services row with quantity=2
+//   2. Single-quantity tiered quote → row with quantity=1 (regression)
+//   3. Non-tiered service → row with quantity=1 (regression — pricing_model
+//      doesn't affect quantity)
+//   4. Multi-item quote (mix of qty=1 and qty>1) → row-per-row preservation
+//   5. Item missing the optional `quantity` field → defaults to 1
+//      (defensive; DB DEFAULT also handles, but the code path is `?? 1`)
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('convertQuote — D48 (Issue 42) appointment_services.quantity propagation', () => {
+  let inserts: InsertRecord[];
+
+  beforeEach(() => {
+    inserts = [];
+  });
+
+  it('per_row × 2 quote → appointment_services row with quantity=2', async () => {
+    const quote = {
+      ...BASE_QUOTE,
+      items: [
+        {
+          service_id: 'svc-hot-shampoo',
+          unit_price: 60,
+          tier_name: 'row',
+          quantity: 2,
+        },
+      ],
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+
+    const svcInsert = inserts.find((i) => i.table === 'appointment_services');
+    expect(svcInsert).toBeDefined();
+    expect(svcInsert!.row.service_id).toBe('svc-hot-shampoo');
+    expect(svcInsert!.row.tier_name).toBe('row');
+    expect(svcInsert!.row.price_at_booking).toBe(60);
+    expect(svcInsert!.row.quantity).toBe(2);
+  });
+
+  it('single-quantity tiered quote → appointment_services row with quantity=1', async () => {
+    const quote = {
+      ...BASE_QUOTE,
+      items: [
+        {
+          service_id: 'svc-hot-shampoo',
+          unit_price: 80,
+          tier_name: 'floor_mats',
+          quantity: 1,
+        },
+      ],
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+
+    const svcInsert = inserts.find((i) => i.table === 'appointment_services');
+    expect(svcInsert).toBeDefined();
+    expect(svcInsert!.row.tier_name).toBe('floor_mats');
+    expect(svcInsert!.row.quantity).toBe(1);
+  });
+
+  it('non-tiered service (tier_name=null) → appointment_services row with quantity=1', async () => {
+    // pricing_model doesn't affect quantity — flat/per_unit/custom services
+    // still write quantity per the quote_item, defaulting to 1.
+    const quote = {
+      ...BASE_QUOTE,
+      items: [
+        {
+          service_id: 'svc-express-wash',
+          unit_price: 35,
+          tier_name: null,
+          quantity: 1,
+        },
+      ],
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+
+    const svcInsert = inserts.find((i) => i.table === 'appointment_services');
+    expect(svcInsert).toBeDefined();
+    expect(svcInsert!.row.tier_name).toBeNull();
+    expect(svcInsert!.row.quantity).toBe(1);
+  });
+
+  it('multi-item quote with mixed quantities preserves row-by-row qty', async () => {
+    const quote = {
+      ...BASE_QUOTE,
+      items: [
+        {
+          service_id: 'svc-hot-shampoo',
+          unit_price: 60,
+          tier_name: 'row',
+          quantity: 2,
+        },
+        {
+          service_id: 'svc-express-wash',
+          unit_price: 35,
+          tier_name: null,
+          quantity: 1,
+        },
+        {
+          service_id: 'svc-ceramic',
+          unit_price: 300,
+          tier_name: 'sedan',
+          quantity: 1,
+        },
+      ],
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+
+    const svcInserts = inserts.filter((i) => i.table === 'appointment_services');
+    expect(svcInserts).toHaveLength(3);
+
+    const hotShampoo = svcInserts.find((i) => i.row.service_id === 'svc-hot-shampoo')!;
+    expect(hotShampoo.row.quantity).toBe(2);
+    expect(hotShampoo.row.tier_name).toBe('row');
+
+    const expressWash = svcInserts.find((i) => i.row.service_id === 'svc-express-wash')!;
+    expect(expressWash.row.quantity).toBe(1);
+
+    const ceramic = svcInserts.find((i) => i.row.service_id === 'svc-ceramic')!;
+    expect(ceramic.row.quantity).toBe(1);
+  });
+
+  it('item missing the quantity field defaults to 1 (defensive)', async () => {
+    // The DB column has DEFAULT 1; the code path uses `item.quantity ?? 1`
+    // as defense-in-depth so the INSERT payload is always explicit.
+    const quote = {
+      ...BASE_QUOTE,
+      items: [
+        {
+          service_id: 'svc-flat',
+          unit_price: 50,
+          tier_name: null,
+          // quantity intentionally omitted
+        },
+      ],
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT
+    );
+
+    const svcInsert = inserts.find((i) => i.table === 'appointment_services');
+    expect(svcInsert).toBeDefined();
+    expect(svcInsert!.row.quantity).toBe(1);
+  });
+});

@@ -183,21 +183,12 @@ export async function POST(
           // compose via formatServicesSummary instead of the naive
           // service-name-only join. Multi-tier same-service appointments
           // (post-D43) now render via the helper.
-          //
-          // Note: appointment_services has no `quantity` column today —
-          // multi-quantity quote_items flatten to one appointment_service
-          // row per tier with implicit qty=1. The cancel chip therefore
-          // renders "(Per Seat Row)" rather than "(2 Rows)" for the
-          // pluralized per_row case — accurate to what's stored even if
-          // not byte-equivalent to the original quote's SMS preview.
-          // Carrying quantity through to appointment_services is its own
-          // schema change, out of scope for D45.
           const { data: appointment } = await supabase
             .from('appointments')
             .select(`
               scheduled_date, scheduled_start_time,
               services:appointment_services(
-                service_id, tier_name, price_at_booking,
+                service_id, tier_name, price_at_booking, quantity,
                 service:services!appointment_services_service_id_fkey(name)
               )
             `)
@@ -228,6 +219,7 @@ export async function POST(
                 service_id: string | null;
                 tier_name: string | null;
                 price_at_booking: number | string;
+                quantity: number;
                 service: { name: string } | null;
               }[]
             ) ?? [];
@@ -242,9 +234,9 @@ export async function POST(
                 service_id: s.service_id,
                 item_name: s.service?.name || 'Service',
                 tier_name: s.tier_name,
-                quantity: 1, // appointment_services has no quantity column today
+                quantity: s.quantity ?? 1,
                 unit_price: Number(s.price_at_booking),
-                total_price: Number(s.price_at_booking),
+                total_price: Number(s.price_at_booking) * (s.quantity ?? 1),
               })),
             );
             const serviceNames = formatServicesSummary(enrichedServices);

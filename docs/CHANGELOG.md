@@ -6,6 +6,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — feat(quotes): D48 — `appointment_services.quantity` schema + conversion flow (Issue 42 closure)
+
+Branch `fix/issue-42-appointment-services-quantity`. Closes Issue 42 per `docs/dev/ISSUE_42_APPOINTMENT_QUANTITY_AUDIT.md` — implements the audit's recommended schema change, conversion-flow propagation, and 4-surface SELECT widening in a single combined session.
+
+**Schema change (1 migration):** `supabase/migrations/20260526182120_appointment_services_add_quantity.sql` runs `ALTER TABLE appointment_services ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0)` plus a `COMMENT ON COLUMN`. Operator-locked backfill: `DEFAULT 1` only, no retroactive `UPDATE` from `quote_items.quantity`. The handful of historical multi-quantity appointments (0-5 estimated) accept qty=1 in display; manual Admin UI correction available if needed. Postgres fast-path ALTER on a small table (sub-second). No new indexes (no query filters on quantity), no RLS changes (policies are column-agnostic).
+
+**Conversion-flow code change (1 file, 2 lines):** `src/lib/quotes/convert-service.ts:170-184` — added `quantity?: number` to the inline INSERT type and `quantity: item.quantity ?? 1` to the INSERT payload. `quote_items.quantity` was already in scope at the conversion site (line 230 already reads `item.quantity ?? 1` for the `enrichItemsWithTierMeta` summary call) — the INSERT just discarded it before D48.
+
+**Customer-facing surface SELECT widening (4 files):**
+- `src/app/api/appointments/[id]/notify/route.ts` — added `quantity` to the `appointment_services` SELECT + threaded `quantity: s.quantity` into `renderTierToken`
+- `src/app/api/pos/appointments/[id]/notify/route.ts` — same shape as admin notify
+- `src/app/(public)/pay/[token]/page.tsx` — added `quantity` to SELECT + extended `AppointmentRecord` type with `quantity: number` + threaded `quantity: line.quantity` into `renderTierToken`
+- `src/app/api/pos/jobs/[id]/cancel/route.ts` — added `quantity` to SELECT + replaced the previously hardcoded `quantity: 1` literal with `s.quantity ?? 1` in the `enrichItemsWithTierMeta` adapter
+
+**Generated artifact regens (2 files):** `src/lib/supabase/database.types.ts` (now exposes `quantity: number` on `appointment_services.Row` and `quantity?: number` on Insert/Update) + `docs/dev/DB_SCHEMA.md` (regenerated via `npx tsx scripts/regen-db-schema.ts`; appointment_services section now lists the quantity column + check constraint).
+
+**Stale comment hygiene (3 sites):** Per audit Target 7, deleted (not amended) the now-misleading "Issue 42 deferred / appointment_services has no quantity column today" inline comments at:
+- `src/app/(public)/pay/[token]/page.tsx` (AppointmentRecord type block)
+- `src/app/(public)/pay/[token]/page.tsx` (renderTierToken call block)
+- `src/app/api/pos/jobs/[id]/cancel/route.ts` (above the appointment SELECT in the notification path)
+
+Reason for deletion vs. amendment: the comments documented why the surface couldn't render qty>1 correctly. The schema fix eliminates the reason; git history preserves the historical context. Comments-in-code are for the current state.
+
+**Tests (+11 net new):** 2407 total (was 2396).
+- 5 new conversion-flow tests in `src/lib/quotes/__tests__/convert-service.test.ts` — per_row × 2 → quantity=2, single-quantity tiered → quantity=1, non-tiered (tier_name=null) → quantity=1, mixed-quantity multi-item preservation, missing quantity field defaults to 1
+- 6 new D48 adoption pins in `src/lib/quotes/__tests__/visual-surface-adoption.test.ts` — 4-surface SELECT/renderTierToken pins, stale-comment-deleted pin, convert-service INSERT shape pin
+
+**Customer-facing impact:** D46 surfaces upgrade from `"(Per Row)"` to `"(2 Rows)"` rendering for new multi-quantity quote-derived appointments. Existing single-quantity appointments unaffected (qty=1 branch unchanged). Public pay page em-dash presentation (`"— 2 Rows"`) preserved per D46 contract. POS cancellation chip upgrades from `"(Per Seat Row)"` to `"(2 Rows)"`. All upgrades flow automatically via the existing D45 `renderTierToken` qty>1 branch — no helper changes.
+
+**D45/D46/D47 surfaces unaffected:** Helper files (`tier-display.ts`, `attach-tier-meta.ts`, `services-summary.ts`) untouched. 11 non-appointment-derived D46 surfaces (admin slide-over, POS quote detail, admin quote detail, POS transaction detail, quote PDF, public quote page, public receipt page, thermal receipt, HTML receipt, etc.) byte-identical. SMS AI v2 system prompt Critical Rules 1-21 byte-identical. `src/lib/services/` resolver untouched. Other 6 `appointment_services` producer sites (booking widget, POS walk-in, voice agent direct, customer self-edit, service-edit cascade) untouched — they continue to write qty=1 via DB DEFAULT (audit confirmed none carry qty>1 upstream).
+
+**Operator verification gate (6 scenarios per audit Target 11):** golden path (per_row × 2 → "2 Rows"), single-quantity regression, scope tier qty=1 regression, public pay page em-dash, POS cancellation chip, no regression on D45 quote-stage rendering. Run BEFORE merging to main.
+
+**Gates:** typecheck 0 errors, lint 97 warnings (baseline unchanged), 2407/2407 tests pass, build clean (788 pages, 10.0s compile).
+
+**Deploy: YES** — operator merges after the 6-scenario empirical verification.
+
+**DO NOT merge — operator merges.**
+
+---
+
 ## 2026-05-26 — audit: Issue 42 — `appointment_services.quantity` schema gap
 
 Read-only diagnostic audit on branch `audit/issue-42-appointment-services-quantity`. No `src/` changes, no migrations, no test changes. Deliverable: `docs/dev/ISSUE_42_APPOINTMENT_QUANTITY_AUDIT.md` (12 targets + TL;DR + 6 verification scenarios + risk matrix + implementation pre-flight checklist).

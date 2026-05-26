@@ -172,11 +172,13 @@ export async function convertQuote(
       service_id: string;
       unit_price: number;
       tier_name: string | null;
+      quantity?: number;
     }) => ({
       appointment_id: appointment.id,
       service_id: item.service_id,
       price_at_booking: item.unit_price,
       tier_name: item.tier_name || null,
+      quantity: item.quantity ?? 1,
     }));
 
     const { error: svcErr } = await supabase
