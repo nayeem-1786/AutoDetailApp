@@ -170,7 +170,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     expect(out).toContain('# What you cannot do');
   });
 
-  it('Critical rules section contains exactly 19 numbered rules (D43 multi-tier tier-intent rule added 2026-05-25 as Rule 7)', () => {
+  it('Critical rules section contains exactly 21 numbered rules (D47 scope-pricing-discipline rules added 2026-05-26 as Rules 8 + 9; was 19 pre-D47)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx, 'expected # Critical rules header to exist').toBeGreaterThan(-1);
@@ -178,7 +178,7 @@ describe('buildV2SystemPrompt — expanded sections (fixup)', () => {
     const nextHeaderIdx = afterHeader.search(/\n# /);
     const section = nextHeaderIdx === -1 ? afterHeader : afterHeader.slice(0, nextHeaderIdx);
     const numbered = section.match(/^\d+\./gm) ?? [];
-    expect(numbered.length).toBe(19);
+    expect(numbered.length).toBe(21);
   });
 
   it('{CUSTOMER_CONTEXT} placeholder appears exactly once', () => {
@@ -379,12 +379,14 @@ describe('buildV2SystemPrompt — Issue 13 (4-hour fresh-conversation threshold,
 });
 
 describe('buildV2SystemPrompt — Issue 14 (bundle-pricing hallucination hard guardrail, D15)', () => {
-  it('Critical rule 17 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43)', () => {
+  it('Critical rule 19 declares tool-grounded add-ons only (was Rule 14 pre-D38; was Rule 15 pre-D39; was Rule 16 pre-D43; was Rule 17 pre-D47)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    // Rule 17 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert),
-    // 15→16 by D39 (Issue 36 size_class Rule 6 insert), then 16→17 by D43
-    // (Issue 38 tier-intent Rule 7 insert).
-    expect(out).toMatch(/17\.\s+\*\*Tool-grounded add-ons only/);
+    // Rule 19 specifically — shifted 14→15 by D38 (Issue 35 Rule 2 insert),
+    // 15→16 by D39 (Issue 36 size_class Rule 6 insert), 16→17 by D43
+    // (Issue 38 tier-intent Rule 7 insert), then 17→19 by D47 (Issues
+    // 43/44 inserted Rules 8 + 9 — price-lookup-never-recall + scope-tier
+    // enumeration).
+    expect(out).toMatch(/19\.\s+\*\*Tool-grounded add-ons only/);
     expect(out).toContain('NEVER invent add-ons');
     expect(out).toContain('addon_suggestions');
   });
@@ -550,9 +552,9 @@ describe('buildV2SystemPrompt — Issue 23 + D19 (quote-first booking, no availa
     expect(out).toContain('NEVER say "within a\nfew hours"');
   });
 
-  it('Critical rule 18 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43)', () => {
+  it('Critical rule 20 declares quote-first / never-book-directly (was Rule 15 pre-D38; was Rule 16 pre-D39; was Rule 17 pre-D43; was Rule 18 pre-D47)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/18\.\s+\*\*Quote first, never book directly/);
+    expect(out).toMatch(/20\.\s+\*\*Quote first, never book directly/);
     expect(out).toContain('NEVER call `create_appointment` directly');
   });
 });
@@ -667,7 +669,7 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     expect(ctSection).not.toContain('If `send_quote_sms` tool accepts a `customer_type` parameter');
   });
 
-  it('Critical rule 19 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert)', () => {
+  it('Critical rule 21 declares instructions_for_agent silent-follow handling (was Rule 16 pre-D38; was Rule 17 pre-D39 size_class insert; was Rule 18 pre-D43 tier-intent insert; was Rule 19 pre-D47 scope-pricing inserts)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Session 4 broadened "Tool errors" → "Tool responses" so the same rule
     // covers both isError:true error paths AND isError:false success paths
@@ -676,8 +678,10 @@ describe('buildV2SystemPrompt — Workstream J Session 3 (upsert_customer)', () 
     // inserting the mandatory-reply rule as Rule 2. Session 7 (D39, Issue 36)
     // renumbered 17 → 18 after inserting the size_class imperative as Rule 6.
     // Session B (D43, Issue 38) renumbered 18 → 19 after inserting the
-    // multi-tier tiers+quantities imperative as Rule 7.
-    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // multi-tier tiers+quantities imperative as Rule 7. D47 (Issues 43/44)
+    // renumbered 19 → 21 after inserting the price-lookup-never-recall +
+    // scope-tier enumeration imperatives as Rules 8 + 9.
+    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('Never share tool error messages');
     // Explicit Session 4 additions — confirm both success+error wording and
@@ -803,9 +807,9 @@ describe('buildV2SystemPrompt — Issue 33 Layer 2 (size_class on get_services)'
     expect(out).not.toContain('JUST called `get_services`');
   });
 
-  it('preserves Rule 19 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43)', () => {
+  it('preserves Rule 21 (instructions_for_agent silent-follow) — untouched by Layer 2 (renumbered 16→17 by D38; 17→18 by D39; 18→19 by D43; 19→21 by D47)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
   });
@@ -921,21 +925,23 @@ describe('buildV2SystemPrompt — D38 / Issue 35 (mandatory customer-facing repl
     expect(out).toContain('Silence is never the right answer to a customer message');
   });
 
-  it('mandatory-reply rule includes coexistence cross-reference to Rule 19 (instructions_for_agent)', () => {
+  it('mandatory-reply rule includes coexistence cross-reference to Rule 21 (instructions_for_agent)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // D38 must explicitly call out that following instructions_for_agent
     // still satisfies the reply requirement (both rules satisfied).
     // Reference updated 17 → 18 by D39 (size_class rule insert at position 6),
-    // then 18 → 19 by D43 (tier-intent rule insert at position 7).
-    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 19\)/);
+    // 18 → 19 by D43 (tier-intent rule insert at position 7), then 19 → 21
+    // by D47 (price-lookup + scope-tier inserts at positions 8 + 9).
+    expect(out).toMatch(/When a tool response contains `instructions_for_agent`, follow it \(per Rule 21\)/);
   });
 
-  it('Rule 19 (was Rule 17 pre-D39; was Rule 18 pre-D43) wording for instructions_for_agent is preserved unchanged in substance', () => {
+  it('Rule 21 (was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47) wording for instructions_for_agent is preserved unchanged in substance', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // Substantive wording must be intact — only the rule NUMBER changed
     // from 17 → 18 because D39 added a new Rule 6 (size_class imperative),
-    // then from 18 → 19 because D43 added a new Rule 7 (tier intent).
-    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    // 18 → 19 because D43 added a new Rule 7 (tier intent), then 19 → 21
+    // because D47 inserted Rules 8 + 9 (price-lookup + scope-tier).
+    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('success OR error');
     expect(out).toContain('was_duplicate');
@@ -1107,9 +1113,9 @@ describe('buildV2SystemPrompt — D39 / Issue 36 (size_class imperative on get_s
     expect(out).toContain('INTERNAL ACTIONS');
   });
 
-  it('Rule 19 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43) wording is preserved unchanged by D39+D43', () => {
+  it('Rule 21 (instructions_for_agent, was Rule 17 pre-D39; was Rule 18 pre-D43; was Rule 19 pre-D47) wording is preserved unchanged by D39+D43+D47', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
-    expect(out).toMatch(/19\.\s+\*\*Tool responses with `instructions_for_agent`/);
+    expect(out).toMatch(/21\.\s+\*\*Tool responses with `instructions_for_agent`/);
     expect(out).toContain('follow those instructions silently');
     expect(out).toContain('was_duplicate');
   });
@@ -1153,17 +1159,19 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     );
   });
 
-  it('new Critical Rule 7 appears WITHIN the # Critical rules section (top-tier placement, between size_class and appointment confirmation)', () => {
+  it('new Critical Rule 7 appears WITHIN the # Critical rules section (top-tier placement, between size_class and appointment confirmation — appointment confirmation moved from Rule 8 → Rule 10 by D47)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     const criticalIdx = out.indexOf('# Critical rules');
     expect(criticalIdx).toBeGreaterThan(-1);
     // Must come AFTER Rule 6 (size_class) — pedagogical pairing
     const rule6Idx = out.indexOf('6. **CRITICAL — ALWAYS pass `size_class`', criticalIdx);
     const rule7Idx = out.indexOf('7. **CRITICAL — Multi-tier services', criticalIdx);
-    const rule8Idx = out.indexOf('8. **Never confirm an appointment', criticalIdx);
+    // Appointment-confirmation rule moved from Rule 8 → Rule 10 by D47
+    // (Rules 8 + 9 inserted for Issues 43 + 44 — price-lookup + scope-tier).
+    const appointmentIdx = out.indexOf('10. **Never confirm an appointment', criticalIdx);
     expect(rule6Idx).toBeGreaterThan(-1);
     expect(rule7Idx).toBeGreaterThan(rule6Idx);
-    expect(rule8Idx).toBeGreaterThan(rule7Idx);
+    expect(appointmentIdx).toBeGreaterThan(rule7Idx);
     // Must come BEFORE the next top-level header
     const nextH1 = out.indexOf('\n# ', criticalIdx + '# Critical rules'.length);
     expect(nextH1).toBeGreaterThan(rule7Idx);
@@ -1243,8 +1251,9 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     const rule7Body = section.slice(rule7Idx, rule7End);
     expect(rule7Body).toContain('max_qty');
     expect(rule7Body).toContain('instructions_for_agent');
-    // Rule 19 cross-reference for the recovery path
-    expect(rule7Body).toMatch(/Rule 19/);
+    // Rule 21 cross-reference for the recovery path (was Rule 19 pre-D47
+    // — D47 inserted Rules 8 + 9 so instructions_for_agent shifted 19 → 21)
+    expect(rule7Body).toMatch(/Rule 21/);
   });
 
   it('new Critical Rule 7 contains BOTH the WRONG ❌ and RIGHT ✅ exemplar pair', () => {
@@ -1285,15 +1294,160 @@ describe('buildV2SystemPrompt — D43 / Issue 38 (multi-tier tier intent on send
     expect(out).toContain('$150 fidelity gap');
   });
 
-  it('D43 preserves the tool-usage-guide cross-reference (now points to Rule 18 after renumber)', () => {
+  it('D47 preserves the tool-usage-guide cross-reference (now points to Rule 20 after D47 renumber)', () => {
     const out = buildV2SystemPrompt(SAMPLE_INPUTS);
     // The "see Booking flow + Critical rule N" cross-refs in both the
     // Tool usage guide bullet and the "For NEW conversations" step 5
-    // shifted from Rule 17 → Rule 18 by D43 (the quote-first rule moved).
-    expect(out).toContain('see "Booking flow" + Critical rule 18');
-    expect(out).toContain('see "Booking flow" below + Critical rule 18');
-    // Stale Rule 17 cross-refs must NOT remain
+    // shifted from Rule 17 → Rule 18 by D43 (the quote-first rule
+    // moved), then 18 → 20 by D47 (Rules 8 + 9 inserted for Issues
+    // 43/44 — price-lookup + scope-tier).
+    expect(out).toContain('see "Booking flow" + Critical rule 20');
+    expect(out).toContain('see "Booking flow" below + Critical rule 20');
+    // Stale Rule 17 + Rule 18 cross-refs must NOT remain
     expect(out).not.toContain('see "Booking flow" + Critical rule 17');
     expect(out).not.toContain('see "Booking flow" below + Critical rule 17');
+    expect(out).not.toContain('see "Booking flow" + Critical rule 18');
+    expect(out).not.toContain('see "Booking flow" below + Critical rule 18');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D47 — Issues 43 + 44 — Scope-pricing agent prompt discipline (2026-05-26).
+// Critical Rule 8 = Price lookup, never price recall. Critical Rule 9 =
+// Scope-pricing services enumerate tiers + probe + anchor on Complete.
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — D47 / Issue 43 (Critical Rule 8: price lookup, never price recall)', () => {
+  it('declares Critical Rule 8 with the CRITICAL — Price lookup headline', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/8\.\s+\*\*CRITICAL — Price lookup, never price recall\.\*\*/);
+  });
+
+  it('Rule 8 appears WITHIN the # Critical rules section, between Rule 7 and Rule 9 (pricing-discipline cluster contiguous)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const criticalIdx = out.indexOf('# Critical rules');
+    const rule7Idx = out.indexOf('7. **CRITICAL — Multi-tier services', criticalIdx);
+    const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup', criticalIdx);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services', criticalIdx);
+    expect(rule7Idx).toBeGreaterThan(-1);
+    expect(rule8Idx).toBeGreaterThan(rule7Idx);
+    expect(rule9Idx).toBeGreaterThan(rule8Idx);
+  });
+
+  it('Rule 8 cites the Q-0087 empirical evidence (Express Exterior Wash $85 → $110 self-correction)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule8Body = out.slice(rule8Idx, rule9Idx);
+    expect(rule8Body).toContain('Q-0087');
+    expect(rule8Body).toContain('Express Exterior Wash');
+    expect(rule8Body).toContain('$85');
+    expect(rule8Body).toContain('$110');
+  });
+
+  it('Rule 8 prescribes the LOOKUP-from-cached-response pattern + RECALL when stale', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule8Body = out.slice(rule8Idx, rule9Idx);
+    expect(rule8Body).toContain('INDEX');
+    expect(rule8Body).toContain('cached');
+    expect(rule8Body).toContain('RECALL');
+  });
+
+  it('Rule 8 includes the WRONG ❌ / RIGHT ✅ exemplar pair for the recall trap', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule8Body = out.slice(rule8Idx, rule9Idx);
+    expect(rule8Body).toContain('❌ WRONG');
+    expect(rule8Body).toContain('✅ RIGHT');
+  });
+
+  it('Rule 8 cross-references Rules 1, 6, 7 architecturally', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule8Body = out.slice(rule8Idx, rule9Idx);
+    expect(rule8Body).toMatch(/Rules 1, 6, 7|Rule 1|Rule 6|Rule 7/);
+    expect(rule8Body.toLowerCase()).toContain('parallel');
+  });
+});
+
+describe('buildV2SystemPrompt — D47 / Issue 44 (Critical Rule 9: scope-pricing services enumerate tiers + probe + anchor)', () => {
+  it('declares Critical Rule 9 with the CRITICAL — Scope-pricing services headline', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    expect(out).toMatch(/9\.\s+\*\*CRITICAL — Scope-pricing services: enumerate tiers \+ probe \+ anchor on Complete\.\*\*/);
+  });
+
+  it('Rule 9 appears WITHIN the # Critical rules section, between Rule 8 and Rule 10 (new appointment-confirmation slot)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule8Idx = out.indexOf('8. **CRITICAL — Price lookup');
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    expect(rule9Idx).toBeGreaterThan(rule8Idx);
+    expect(rule10Idx).toBeGreaterThan(rule9Idx);
+  });
+
+  it('Rule 9 mandates use of tier_label (not raw snake_case tier_name slugs) in agent prose', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    const rule9Body = out.slice(rule9Idx, rule10Idx);
+    expect(rule9Body).toContain('tier_label');
+    expect(rule9Body).toMatch(/never raw snake_case|NEVER raw snake_case/);
+  });
+
+  it('Rule 9 lists ≥3 probe-phrasing examples so the agent can vary natural language', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    const rule9Body = out.slice(rule9Idx, rule10Idx);
+    expect(rule9Body).toContain('anything else inside?');
+    expect(rule9Body).toContain('any other concerns inside?');
+    expect(rule9Body).toContain('while we\'re at it, anything else?');
+  });
+
+  it('Rule 9 prescribes the Complete-anchor in flexible (not literal "best value") wording', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    const rule9Body = out.slice(rule9Idx, rule10Idx);
+    // At least one of the operator-locked flexible-anchor phrasings must appear.
+    expect(rule9Body).toMatch(/If you want everything covered|The whole interior|The all-in option/);
+  });
+
+  it('Rule 9 cites the Q-0087 empirical evidence (Hot Shampoo per_row mention without sibling enumeration)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    const rule9Body = out.slice(rule9Idx, rule10Idx);
+    expect(rule9Body).toContain('Q-0087');
+    expect(rule9Body).toContain('Hot Shampoo Extraction');
+    expect(rule9Body).toContain('Per Row');
+    expect(rule9Body).toContain('Floor Mats');
+  });
+
+  it('Rule 9 covers all 6 audit-Target-8 edge cases (direct / exploratory / operator-bypass / multi-service / vehicle pivot / Complete short-circuit)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    const rule9Body = out.slice(rule9Idx, rule10Idx);
+    expect(rule9Body).toContain('Direct price query');
+    expect(rule9Body).toContain('Exploratory phrasing');
+    expect(rule9Body).toContain('Operator-bypass');
+    expect(rule9Body).toContain('Multi-service interleaving');
+    expect(rule9Body).toContain('Mid-conversation vehicle pivot');
+    expect(rule9Body).toContain('Complete-package short-circuit');
+  });
+
+  it('Rule 9 cross-references Critical Rule 19 (architectural parallel — within-service vs cross-service enumeration)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule9Idx = out.indexOf('9. **CRITICAL — Scope-pricing services');
+    const rule10Idx = out.indexOf('10. **Never confirm an appointment');
+    const rule9Body = out.slice(rule9Idx, rule10Idx);
+    expect(rule9Body).toContain('Critical Rule 19');
+    expect(rule9Body.toLowerCase()).toContain('parallel');
+    expect(rule9Body).toContain('addon_suggestions');
   });
 });

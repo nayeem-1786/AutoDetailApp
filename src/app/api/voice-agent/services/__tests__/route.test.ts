@@ -632,13 +632,16 @@ describe('D41: size-aware main-tier resolution (Issue 36 final fix)', () => {
     ]);
   });
 
-  it('Raw vehicle_size_*_price columns are NOT exposed to the LLM (response shape unchanged by D41)', async () => {
+  it('Raw vehicle_size_*_price columns are NOT exposed to the LLM (response shape unchanged by D41; D47 added human-readable enumeration fields but kept raw size columns hidden)', async () => {
     const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
     const body = await res.json();
     const completeTier = body.services[0].pricing.find((t: { tier_name: string }) => t.tier_name === 'complete');
     expect(completeTier).toBeDefined();
-    // Endpoint MUST only emit { tier_name, price, sale_price? } —
-    // raw size columns stripped (otherwise the LLM would couple to schema).
+    // Endpoint emits { tier_name, tier_label, qty_label, max_qty, price,
+    // sale_price? } as of D47 (added tier_label/qty_label/max_qty for
+    // Issue 44 scope-tier enumeration). Raw size columns + the
+    // is_vehicle_size_aware schema flag remain stripped (otherwise the
+    // LLM would couple to schema).
     expect(completeTier).not.toHaveProperty('vehicle_size_sedan_price');
     expect(completeTier).not.toHaveProperty('vehicle_size_suv_van_price');
     expect(completeTier).not.toHaveProperty('is_vehicle_size_aware');
@@ -653,6 +656,84 @@ describe('D41: size-aware main-tier resolution (Issue 36 final fix)', () => {
     const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
     const body = await res.json();
     expect(pricingByTier(body, 0).get('complete')).toBe(450);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D47 — Issue 44 — response shape now emits tier_label / qty_label /
+// max_qty per tier so the SMS agent (Critical Rule 9) can enumerate
+// scope-pricing tiers with operator-curated human-readable labels
+// instead of raw snake_case slugs. Additive — existing tier_name + price
+// + sale_price fields preserved (backward-compat for D41 + earlier
+// tests above).
+// ---------------------------------------------------------------------------
+
+describe('D47: per-tier response includes tier_label / qty_label / max_qty (Issue 44 enumeration metadata)', () => {
+  beforeEach(() => {
+    dbState.services = [makeHotShampooService()];
+  });
+
+  it('Hot Shampoo Extraction scope tiers all carry tier_label from service_pricing fixture', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    const byTier = new Map(
+      body.services[0].pricing.map((t: { tier_name: string; tier_label: string | null }) => [
+        t.tier_name,
+        t.tier_label,
+      ]),
+    );
+    expect(byTier.get('floor_mats')).toBe('Floor Mats Only');
+    expect(byTier.get('per_row')).toBe('Per Seat Row');
+    expect(byTier.get('carpet_mats')).toBe('Carpet & Mats Package');
+    expect(byTier.get('complete')).toBe('Complete Interior');
+  });
+
+  it('per-tier response shape includes qty_label field (null when not configured)', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    for (const tier of body.services[0].pricing) {
+      expect(tier).toHaveProperty('qty_label');
+    }
+  });
+
+  it('per-tier response shape includes max_qty field (null when not configured)', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    for (const tier of body.services[0].pricing) {
+      expect(tier).toHaveProperty('max_qty');
+    }
+  });
+
+  it('D47 is ADDITIVE — existing tier_name / price / sale_price fields still present', async () => {
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    const completeTier = body.services[0].pricing.find(
+      (t: { tier_name: string }) => t.tier_name === 'complete',
+    );
+    // Pre-D47 contract preserved.
+    expect(completeTier).toHaveProperty('tier_name', 'complete');
+    expect(completeTier).toHaveProperty('price', 450);
+    // D47 additions present alongside.
+    expect(completeTier).toHaveProperty('tier_label', 'Complete Interior');
+    expect(completeTier).toHaveProperty('qty_label');
+    expect(completeTier).toHaveProperty('max_qty');
+  });
+
+  it('D47 default-fallthrough branch mirrors the explicit case (tier_label/qty_label/max_qty also emitted for future pricing_models)', async () => {
+    const futureService = {
+      ...makeHotShampooService(),
+      id: 'svc-future',
+      pricing_model: 'future_unknown_model',
+    };
+    dbState.services = [futureService];
+    const res = await GET(buildRequest({ size_class: 'suv_3row_van' }));
+    const body = await res.json();
+    const complete = body.services[0].pricing.find(
+      (t: { tier_name: string }) => t.tier_name === 'complete',
+    );
+    expect(complete).toHaveProperty('tier_label', 'Complete Interior');
+    expect(complete).toHaveProperty('qty_label');
+    expect(complete).toHaveProperty('max_qty');
   });
 });
 

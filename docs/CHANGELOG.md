@@ -6,6 +6,220 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — feat(sms-ai): D47 — Critical Rules 8 + 9 + tool-shape + description for scope-pricing discipline (Issues 43 + 44)
+
+Branch `feat/d47-scope-pricing-prompt-discipline`. Implements the
+recommendations from `docs/dev/ISSUES_43_44_AGENT_PROMPT_AUDIT.md`
+(audit branch `a02e93d4` merged earlier today). Combined single
+session covering both Issues 43 (price-fidelity self-correction)
+and 44 (scope-tier discovery + Complete-anchor gap) per audit
+Target 9. Operator-locked decisions from the audit honored:
+source-side hypothesis ranking accepted (no pre-deploy PM2
+extraction), natural phrasing for probe + Complete-anchor, all 6
+edge cases explicit in Rule 9.
+
+**Closes Issue 43** (agent quotes wrong price first then self-
+corrects mid-conversation — Q-0087 "$85 → $110" Express Exterior
+Wash failure). **Closes Issue 44** (agent fixates on customer-
+mentioned scope tier without enumerating siblings or anchoring on
+Complete — Q-0087 "seats cleaned" → per_row only, no floor_mats /
+carpet_mats / complete mention).
+
+**Architecture (3 layers, belt + suspenders):**
+
+1. **NEW Critical Rule 8 — "CRITICAL — Price lookup, never price
+   recall"** in `src/lib/sms-ai/system-prompt.ts`. Instructs the
+   agent to INDEX into the most recent `get_services` response's
+   cached `pricing` array for any new service mentioned mid-
+   conversation, NEVER recall from prose memory or training-data
+   baseline. RECALL `get_services` (with `size_class`) when the
+   cache is stale for that service. Cites the Q-0087 empirical
+   failure. WRONG ❌ / RIGHT ✅ exemplar pair. Architectural
+   parallel to Critical Rules 1, 6, 7.
+
+2. **NEW Critical Rule 9 — "CRITICAL — Scope-pricing services:
+   enumerate tiers + probe + anchor on Complete"** in
+   `system-prompt.ts`. Gated on `pricing_model: "scope"` (only Hot
+   Shampoo Extraction today; future scope services inherit
+   automatically). 4 mandatory behaviors: (a) disclose first-
+   mentioned tier price using operator-curated `tier_label` (never
+   raw snake_case slug), (b) briefly acknowledge sibling tiers
+   exist, (c) probe with natural phrasing (3 example variants:
+   "anything else inside?", "any other concerns inside?", "while
+   we're at it, anything else?"), (d) anchor on Complete with
+   flexible wording (NOT literal "best value" — 3 example phrasings
+   provided: "If you want everything covered, the Complete is $X",
+   "The whole interior at $X covers floors, mats, and all rows",
+   "The all-in option at $X might be the way to go"). All 6
+   operator-locked edge cases covered explicitly: direct price
+   query / exploratory phrasing / operator-bypass / multi-service
+   interleaving / mid-conversation vehicle pivot / Complete-package
+   short-circuit. Architectural parallel to Rule 19 (cross-service
+   add-on enumeration).
+
+3. **`get_services` response shape widened** in
+   `src/app/api/voice-agent/services/route.ts`. Pre-D47 the
+   response emitted only `{tier_name, price, sale_price?}` per
+   tier — operator-curated `tier_label` / `qty_label` / `max_qty`
+   were JOINED in the SELECT at lines 65-70 but DROPPED at the
+   response-format step (per audit's NEW STRUCTURAL FINDING).
+   D47 emits all 3 enrichment fields for `vehicle_size` / `scope`
+   / `specialty` / default-fallthrough branches. Additive change —
+   pre-D47 consumers see no breakage. Flat / per_unit / custom
+   branches unchanged (synthesized rows; no meaningful tier_label
+   for those models). Per CLAUDE.md "additive only" hard rule.
+
+4. **`get_services` tool description tightening** in
+   `src/lib/sms-ai/tools.ts`. Two new paragraphs added (belt +
+   suspenders with Rule 8 + Rule 9):
+   - "LOOKUP, NEVER RECALL" reminding the agent to INDEX into the
+     cached response instead of recalling prices; cites the Q-0087
+     failure; "for multi-service quotes, don't blend prices across
+     services from memory".
+   - "SCOPE-PRICING TIERS" announcing the new per-tier metadata
+     fields (`tier_label` / `qty_label` / `max_qty`) and
+     mandating their use in agent prose ("NEVER raw snake_case
+     `tier_name` slugs").
+
+**Critical Rules numbering** (per audit Target 7 + Hard Rule):
+- Pre-D47: Rules 1-19
+- New Rules 8 + 9 inserted between Rule 7 (D43 tier passing) and
+  the old Rule 8 (appointment confirmation), keeping the pricing-
+  discipline cluster contiguous: 1, 5, 6, 7, 8, 9.
+- Old Rules 8-19 renumbered to 10-21.
+- Inline cross-references updated:
+  - `system-prompt.ts:93` (two refs): Rule 19 → Rule 21
+  - `system-prompt.ts:132`: Rule 19 → Rule 21
+  - `system-prompt.ts:205`: Rule 17 → Rule 19 (architectural
+    parallel callout in new Rule 9 body — automatically correct
+    since Rule 19 = add-ons rule post-renumber)
+  - `system-prompt.ts:286`: "Critical rule 18" → "Critical rule 20"
+    (replace_all touched both occurrences in `system-prompt.ts`)
+  - `system-prompt.ts:359`: "Critical rule 18" → "Critical rule 20"
+- Cross-refs to Rules 1, 4, 5, 6, 7 unchanged — those slots stable.
+
+**D45 + D46 helpers untouched** (`tier-display.ts`,
+`services-summary.ts`, `attach-tier-meta.ts` all byte-identical).
+D46's 15 visual-surface adoptions untouched. D43's tier+quantity
+behavior (now Rule 7, semantically unchanged) untouched.
+
+**Tests +26 net new** (was 2361, now 2387):
+
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts`:
+  - Bump rule-count assertion 19 → 21.
+  - Update 6 renumber-pin tests (Rule 17 → 19; Rule 18 → 20;
+    Rule 19 → 21; and the cross-reference pins that match those
+    renumbered slots).
+  - **New describe block for Rule 8** (6 tests): headline match,
+    placement between Rule 7 and Rule 9, Q-0087 evidence cited,
+    LOOKUP / INDEX / RECALL pattern present, WRONG ❌ / RIGHT ✅
+    exemplar, Rules 1/6/7 cross-references.
+  - **New describe block for Rule 9** (7 tests): headline match,
+    placement between Rule 8 and Rule 10, tier_label usage
+    mandate (NEVER raw slugs), ≥3 probe-phrasing examples,
+    flexible Complete-anchor wording, Q-0087 evidence cited,
+    all 6 edge cases present, Rule 19 architectural parallel.
+- `src/lib/sms-ai/__tests__/tools.test.ts`:
+  - **New describe block for D47 / Issue 43** (4 tests):
+    "LOOKUP, NEVER RECALL" headline, Q-0087 reference,
+    INDEX + RECALL pattern, "don't blend prices across services".
+  - **New describe block for D47 / Issue 44** (3 tests): new
+    metadata fields announced (tier_label / qty_label / max_qty),
+    "NEVER raw snake_case" mandate with example slugs,
+    `pricing_model: "scope"` identification cue.
+- `src/app/api/voice-agent/services/__tests__/route.test.ts`:
+  - Update D41 "raw size columns hidden" test comment to note
+    D47's additive fields.
+  - **New describe block for D47** (5 tests with beforeEach
+    seeding Hot Shampoo fixture): tier_label preserved per tier,
+    qty_label property present, max_qty property present,
+    backward-compat (pre-D47 fields still present), default-
+    fallthrough branch mirrors the explicit case.
+
+**Hard rules honored:**
+- NO `src/` changes outside system-prompt.ts + tools.ts +
+  services/route.ts (3 source files).
+- NO migrations.
+- NO new D-numbered rules outside 8 + 9.
+- NO changes to D43 tier+quantity Rule (now Rule 10, semantically
+  identical to pre-D47 Rule 7's behavior — D43's renumber-tracking
+  test history extended to reflect the shift).
+- NO new tools, NO new SMS templates.
+- Tool response shape change ADDITIVE only — `tier_name` / `price`
+  / `sale_price` fields all preserved.
+- Issue 45 (auto-send) NOT in scope — no auto-send rule added.
+- Issue 46 (Voice Quote Sent label) NOT in scope — no
+  `sms_templates` row touched.
+- Every cross-reference in `system-prompt.ts` re-verified via
+  re-grep before commit, not just the 3 the audit found
+  (`grep -nE "[Rr]ule [0-9]+" src/lib/sms-ai/system-prompt.ts`
+  shows all 12 numbered-rule cross-refs aligned).
+
+**Gates green:** tsc 0 errors, lint 0 errors / 97 warnings
+(baseline unchanged), targeted D47 suite 26/26 (new), `npm test`
+**2387/2387** (was 2361; +26 net new), `npm run build` compiled
+successfully in 12.0s (788 dynamic pages).
+
+**Deploy: YES** via `deploy-smartdetails` post-merge —
+observable on next scope-pricing service mention (Hot Shampoo
+Extraction) AND on next multi-service conversation.
+
+**Manual verification (post-deploy — operator runs from
+allowlisted phone `+13107564789`):**
+
+The audit's Target 10 specified 6 test conversations. Re-run them
+all:
+
+1. **Q-0087 reproduction (Issues 43 + 44 combined):** seats →
+   exterior wash → send quote. Expect: agent enumerates scope
+   tiers + probes + anchors Complete on turn 1; quotes correct
+   Express Exterior Wash size_class price on turn 2 with NO
+   self-correction; PM2 shows TWO get_services calls (or one
+   reused-from-cache lookup) NOT one cached call followed by a
+   confabulated price.
+
+2. **Direct price query** ("How much for seats?"): Rule 9 fires,
+   discloses Per Row + acknowledges siblings + probes + anchors
+   Complete in ≤320 chars.
+
+3. **Operator-bypass** ("I just want per row 2 rows, no upsell"):
+   agent COMPLIES, skips probe + anchor.
+
+4. **Complete short-circuit** ("give me the complete interior"):
+   agent quotes Complete tier directly, skips sibling enumeration.
+
+5. **Vehicle pivot** (Suburban → Tesla Model 3 mid-conversation):
+   agent re-classifies + re-quotes with sedan size_class.
+
+6. **Regression: vehicle_size service** (Express Exterior Wash on
+   a Suburban): agent gives the size-matched price, does NOT apply
+   Rule 9 enumeration to non-scope services.
+
+If all 6 scenarios pass → Issues 43 + 44 closed empirically.
+
+**Files touched (6 = 3 src + 3 tests + 3 docs in this commit):**
+- `src/app/api/voice-agent/services/route.ts` (response shape
+  widened, 4 case branches)
+- `src/lib/sms-ai/system-prompt.ts` (Rules 8 + 9 added, old 8-19
+  renumbered to 10-21, inline cross-refs updated)
+- `src/lib/sms-ai/tools.ts` (get_services description tightened)
+- `src/lib/sms-ai/__tests__/system-prompt.test.ts` (rule-count
+  + renumber pins + 13 new Rule-8/9 pins)
+- `src/lib/sms-ai/__tests__/tools.test.ts` (7 new D47 tool-
+  description pins)
+- `src/app/api/voice-agent/services/__tests__/route.test.ts`
+  (D41 comment update + 5 new D47 response-shape pins)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/ROADMAP-13-ITEMS.md` (ledger row)
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` (Section 2 statuses
+  + Section 7 D47 locked decision)
+
+**DO NOT merge — operator merges after verifying tests + reading
+the diff.** Issue 45 + Issue 46 remain OPEN for separate future
+sessions.
+
+---
+
 ## 2026-05-26 — audit: Issues 43 + 44 — SMS-AI agent prompt discipline (price fidelity + scope-tier discovery)
 
 Branch `audit/issues-43-44-agent-prompt-discipline`. Read-only

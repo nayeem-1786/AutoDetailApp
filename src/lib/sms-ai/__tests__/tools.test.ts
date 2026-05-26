@@ -444,3 +444,65 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// D47 — Issues 43 + 44 — get_services tool description tightening
+// (2026-05-26). Belt + suspenders for system-prompt Rule 8 (price lookup
+// never recall) + system-prompt Rule 9 (scope-pricing tier enumeration).
+// ---------------------------------------------------------------------------
+
+describe('SMS_AI_V2_TOOLS — D47 / Issue 43 (get_services "Lookup, never recall" guidance)', () => {
+  function getServices() {
+    return SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+  }
+
+  it('get_services description contains the "LOOKUP, NEVER RECALL" headline', () => {
+    const tool = getServices();
+    expect(tool.description).toContain('LOOKUP, NEVER RECALL');
+  });
+
+  it('get_services description references the Q-0087 empirical failure for grounding', () => {
+    const tool = getServices();
+    expect(tool.description).toContain('Q-0087');
+    expect(tool.description).toContain('$85');
+    expect(tool.description).toContain('$110');
+  });
+
+  it('get_services description prescribes INDEX-into-cached-array pattern + RECALL-when-stale', () => {
+    const tool = getServices();
+    expect(tool.description).toContain('INDEX into');
+    expect(tool.description).toContain('RECALL');
+  });
+
+  it('get_services description discourages cross-service price-blending from memory', () => {
+    const tool = getServices();
+    expect(tool.description).toMatch(/multi-service quotes/i);
+    expect(tool.description).toMatch(/don't blend prices across services from memory/i);
+  });
+});
+
+describe('SMS_AI_V2_TOOLS — D47 / Issue 44 (get_services SCOPE-PRICING TIERS metadata note)', () => {
+  function getServices() {
+    return SMS_AI_V2_TOOLS.find((t) => t.name === 'get_services')!;
+  }
+
+  it('get_services description announces the new per-tier metadata fields (tier_label, qty_label, max_qty)', () => {
+    const tool = getServices();
+    expect(tool.description).toContain('tier_label');
+    expect(tool.description).toContain('qty_label');
+    expect(tool.description).toContain('max_qty');
+  });
+
+  it('get_services description instructs the agent to use tier_label (NEVER raw snake_case tier_name slugs)', () => {
+    const tool = getServices();
+    expect(tool.description).toContain('NEVER raw snake_case');
+    expect(tool.description).toContain('"per_row"');
+    expect(tool.description).toContain('"floor_mats"');
+  });
+
+  it('get_services description identifies scope-pricing services explicitly (`pricing_model: "scope"`)', () => {
+    const tool = getServices();
+    expect(tool.description).toContain('pricing_model: "scope"');
+    expect(tool.description).toContain('Hot Shampoo Extraction');
+  });
+});
