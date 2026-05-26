@@ -6,6 +6,107 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-26 — docs: capture Issues 42-46 from D45/D46 empirical verification arc; mark Issues 39-41 resolved
+
+Branch `docs/capture-issues-42-46`. Documentation-only session.
+NO source code, NO migrations, NO test changes. Closes the
+documentation gap left by the D45 + D46 verification arc — five new
+issues surfaced during empirical Q-0086/Q-0087/Q-test conversations
+on 2026-05-25 evening, captured here so the upcoming Issues 43 + 44
+audit (separate session) has authoritative ground truth to cite.
+
+**Issues marked CLOSED in `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`
+Section 2** (status field updated from "Empirical confirmation
+pending" to confirmed-closed with the 2026-05-25 Q-0087
+reproduction outcome):
+
+- **Issue 39** (`{services}` chip duplication on multi-tier
+  same-service quotes) — resolved 2026-05-26 via D45 (`0ad3e89d`).
+  Empirically verified — SMS preview rendered the post-D45 chip
+  `"Hot Shampoo Extraction (2 Rows + Floor Mats Only)"` immediately
+  post-D45-deploy, then `"... (2 Rows + Floor Mats)"` after Issue 40
+  admin tier-label edits.
+- **Issue 40** (operator-curated `tier_label` values for Hot Shampoo
+  Extraction read marketing-verbose) — new capture in Section 2,
+  resolved 2026-05-25 evening via two admin clicks (`floor_mats`:
+  "Floor Mats Only" → "Floor Mats"; `carpet_mats`: "Carpet & Mats
+  Package" → "Carpet & Mats"). No code change; operator data only.
+- **Issue 41** (15 visual surfaces expose raw `tier_name` slugs) —
+  resolved 2026-05-26 via D46 (`1a6aea73`). Empirically verified —
+  Q-0087 quote page / PDF / admin slide-over / admin quote detail
+  all render "Per Row" / "Floor Mats" clean labels; raw slugs absent.
+
+**New issues captured in Section 2** (all in DEFERRED status awaiting
+their own audit/implementation sessions):
+
+- **Issue 42** — `appointment_services` table has no `quantity`
+  column; per_row × N quote_items flatten to qty=1 after conversion
+  (P3). Surfaced during D46 implementation when widening the public
+  pay page SELECT. Fix scope: migration (ALTER TABLE) + update
+  `convertQuoteToAppointment` + backfill existing rows. Operator
+  decision needed on backfill strategy (uniform qty=1 vs. recover
+  from quote_items where convertible).
+
+- **Issue 43** — Agent quotes incorrect price first, self-corrects
+  same-conversation (P2). Empirical: 2026-05-25 ~17:48 PT Q-0087
+  conversation — agent stated "Express Exterior Wash — $85" then
+  next-turn corrected to "$110 (not $85 — let me correct that)".
+  Final quote landed at correct $435 ($325 + $110). Three root-cause
+  hypotheses (LLM confabulation / wrong size_class in `get_services`
+  / `get_services` not called for the second service in a
+  multi-service flow); audit must confirm via PM2 logs.
+
+- **Issue 44** — Scope-tier discovery gap; agent fixates on
+  customer-mentioned tier without enumerating siblings or anchoring
+  on Complete (P2). Empirical: 2026-05-25 ~17:46 PT Q-0087 — agent
+  presented per_row for "seats cleaned" without surfacing floor_mats
+  ($75) / carpet_mats ($175) / complete ($450) siblings. Customer
+  manually asked about floor mats later, exposing the gap. Operator-
+  locked decisions (disclosure / probe / anchor) recorded for audit
+  to honor without re-litigation. Shares root-cause class with Issue
+  43 — both audited together in the next session.
+
+- **Issue 45** — Agent asks "Want me to send a quote?" as redundant
+  confirmation step before sending (P2). Empirical: 2026-05-25
+  ~17:48 PT and ~20:04 PT across Q-0086/Q-0087/multiple Q-tests.
+  Operator proposal: auto-send when configuration finalized. Open
+  decisions on auto-send vs. soft-send pattern, "configuration
+  finalized" detection heuristic, supersession + idempotency-triple
+  (D43) interaction.
+
+- **Issue 46** — `"Voice Quote Sent"` hardcoded prefix in SMS
+  quote-preview template renders on SMS-originated quotes too (P3).
+  Confirmed NOT in source code via grep; lives in `sms_templates`
+  table row. Three fix approaches (admin UI edit / channel-aware
+  template variants / drop the prefix entirely); audit will
+  recommend.
+
+**Files touched (3, doc-only):**
+- `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` — Section 2 updates:
+  Issue 39 status → confirmed-closed; Issue 41 status →
+  confirmed-closed; new Issue 40 capture (between 39 and 41); new
+  Issues 42-46 captures (after Issue 41).
+- `docs/CHANGELOG.md` — this entry.
+- `docs/dev/ROADMAP-13-ITEMS.md` — session ledger row.
+
+**Hard rules honored:** NO source code, NO migrations, NO test
+changes, NO new `src/` files, preserved existing
+SMS_AI_V2_PROMPT_OBSERVATIONS.md format/structure (only
+appended/updated).
+
+**Gates:** none — doc-only session, `npm test` / `npm run build`
+not re-run (no code changes). `git diff --name-only` shows exactly
+the 3 doc files modified, no `src/` paths.
+
+**Next session:** Issues 43 + 44 audit (`audit/issues-43-44-agent-
+prompt-discipline` branch) can now fire — its pre-flight check
+(`grep "Issue 43|Issue 44" docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md`)
+will succeed against this commit's captures.
+
+**DO NOT merge — operator merges after review.**
+
+---
+
 ## 2026-05-26 — feat(quotes): D46 — adopt renderTierToken at 15 visual surfaces (Issue 41 closure)
 
 Branch `feat/d46-tier-display-visual-surfaces`. Session 2 of the
