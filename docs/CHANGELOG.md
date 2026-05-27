@@ -6,6 +6,19 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## ROADMAP bump v3.9 → v4.0 (2026-05-27)
+
+Doc-only session bumping `docs/dev/ROADMAP-13-ITEMS.md` to reflect the SMS-AI v2
+prompt-fidelity arc closure across Issues 39-46 (sessions #85-96, 2026-05-26 →
+2026-05-27). New captures: Issue 47 (soft-friction monitoring), misleading
+docstring at `system-prompt.ts:12` (doc fix follow-up). Total items roll-up
+updated: 9 done + 1 closed + 1 deferred + 10 not-started across 13-item table
++ Workstream A SMS AI v2 (Layers 5-6 + admin UI wiring follow-on).
+
+Files: `docs/dev/ROADMAP-13-ITEMS.md`
+
+---
+
 ## 2026-05-27 — feat(sms-ai): D50 — Issue 45 follow-up — universal prohibition of "Want me to send a quote?" friction question
 
 Branch `fix/issue-45-friction-question-universal-prohibition`. Small surgical fix following D49 empirical verification. D49's auto-send rule (Critical Rule 17) shipped clean architecture + clean tests, but operator's 2026-05-27 verification (Scenario 1) revealed that the friction question re-emerged at **discovery-phase** — D49's prohibition was scoped only to the moment when the three auto-send preconditions weren't met, leaving a discovery-phase loophole that the LLM filled with the friction question after an add-on pitch.
