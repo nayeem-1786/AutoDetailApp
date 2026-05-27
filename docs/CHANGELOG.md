@@ -6,6 +6,53 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Item 15e (new framing) — POS Jobs Unified Operations View (2026-05-27)
+
+Read-only diagnostic audit. NO `src/` changes, NO migrations, NO test changes.
+Deliverable: `docs/dev/ITEM_15E_POS_JOBS_UNIFIED_OPERATIONS_AUDIT.md` (Phase 0
+retire-vs-complete evaluation + Targets 1–12 + risk matrix). Second audit for
+Item 15e, written under the reframed scope (unify appointments + walk-ins +
+jobs under POS Jobs; retire the POS Appointments tab). References the preserved
+capability inventory at `ITEM_15E_ADMIN_APPOINTMENT_CAPABILITY_REFERENCE.md`
+rather than re-deriving it.
+
+**Pivotal finding:** the unification is ~70–80% already built. POS Jobs is
+already the day-of surface for booked appointments AND walk-ins — every job is
+1:1-linked to an `appointments` row (`jobs.appointment_id`), walk-ins are
+synthetic `channel='walk_in'` appointments (`api/pos/jobs/route.ts:383-415`),
+booked appointments auto-materialize into jobs (`populate/route.ts:40-55`), the
+Jobs queue already merges both with an origin badge (`job-queue.tsx:654-665`),
+and `job-detail.tsx` (1968 lines) already exposes status/mobile/modifier/
+payment-mismatch/notes/customer-vehicle/reassign/payment-link/cancel/change-time.
+The real problem is **duplication**: POS registers both `/pos/jobs` and
+`/pos/appointments` as sibling tabs (`bottom-nav.tsx:196-206`), and the
+Appointments list has no channel filter (`api/pos/appointments/route.ts:83`) so
+every walk-in + every populated booked appointment double-surfaces.
+
+**Recommendations (leans, operator locks in Target 12):** RETIRE + ABSORB
+(Phase 0); re-home the forward-looking multi-day schedule as a Jobs "Upcoming"
+scope (the one real gap); lifecycle-segmented view model + origin badge/filter;
+ONE polymorphic detail surface = extend `job-detail.tsx` (NOT a new
+`<PosAppointmentDetailDialog>` — that reference-audit recommendation is now
+obsolete); service-edit stays on the canonical POS ticket flow (Item 15f Layer
+8e); WK Sessions 2–4 run in PARALLEL (surfaces adjacent, not identical — WK's
+orphans are receipt transactions, not job walk-ins which already carry
+customer_id); soft-deprecate the tab (flag → banner → redirect → remove), no
+data migration needed. **Biggest delta from the reference audit:** most of its
+"NEW work" (the `update-appointment.ts` extraction, the new dialog, helper
+mounting) is already done inside job-detail or re-scoped away — POS drives
+`job.status`, not `appointment.status`. 5-phase plan, ~9–14h CC if retire wins;
+~13 operator decisions surfaced. Central technical risk: premature job
+materialization when navigating Jobs to future dates — Phase 1 must gate
+`populate` to today/active.
+
+Files:
+- docs/dev/ITEM_15E_POS_JOBS_UNIFIED_OPERATIONS_AUDIT.md (new audit deliverable)
+- docs/dev/ROADMAP-13-ITEMS.md (ledger #100; Item 15e stays 🔍 auditing)
+- docs/CHANGELOG.md
+
+---
+
 ## Item 15e reframing prep (2026-05-27)
 
 Doc-only session reframing Item 15e per operator direction within minutes of
