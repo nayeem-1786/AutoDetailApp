@@ -6,6 +6,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2B — mount admin dialog in POS Jobs Schedule scope + status pill (2026-05-27)
+
+Completes Phase 2 (the wiring half). Replaces Phase 1B's placeholder toast with
+the full verification workflow: tap a Schedule card → fetch the appointment +
+bookable staff → mount the reused admin `AppointmentDetailDialog` (parameterized
+in 2A) with POS context props → save via the Phase-2A POS PATCH (fires webhooks
+server-side) → close + refetch the Schedule list. **Single production file
+(`job-queue.tsx`); flag-gated; admin behavior unchanged.**
+
+**`src/app/pos/jobs/components/job-queue.tsx`:**
+- Imports the reused dialog (`@/app/admin/appointments/components/appointment-detail-dialog`)
+  + the POS `CancelAppointmentDialog` (Item 15b).
+- New state: `selectedAppointmentId` / `selectedAppointment` (typed
+  `AppointmentWithRelations`) / `detailEmployees` / `loadingAppointment` /
+  `cancelTarget` (typed `PosAppointment`). The GET payload is structurally a
+  `PosAppointment` (nested `service` nullable) which the dialog reads via
+  optional chaining — the shapes interoperate without unsafe casts.
+- Three `usePosPermission` gates (`appointments.reschedule` / `.cancel` /
+  `.add_notes`) — existing keys, no new keys. Server PATCH re-checks each.
+- `handleScheduleCardTap` (mirrors `change-time-button.tsx`): parallel
+  `posFetch` of `GET /api/pos/appointments/[id]` + `/api/pos/staff/available`.
+- `handleSaveAppointment` → `PATCH /api/pos/appointments/[id]` via `posFetch`;
+  on success closes + `fetchSchedule()`. `handleCancelAppointment` → closes
+  detail dialog, opens POS cancel dialog.
+- `ScheduleScopeList`: `onTapPlaceholder` → `onSelectAppointment(id)`; tapped
+  card shows a busy/disabled affordance during load; **appointment-status pill**
+  (`getAppointmentStatusPillClasses` — POS-local, dark-aware) keyed on
+  `entry.status` (pending = amber, confirmed = blue, in_progress = indigo),
+  label from `APPOINTMENT_STATUS_LABELS`.
+- Mounts `<AppointmentDetailDialog … mobileModalMode="pos" modifierVariant="pos"
+  onEditInPos={no-op} />` + `<CancelAppointmentDialog />`.
+
+**`STATUS_DOT_COLORS` NOT lifted** (Phase 2B decision): admin uses text-less
+calendar dots; POS uses labelled pills — different visual treatments, kept
+decoupled. `STATUS_DOT_COLORS` stays admin-only.
+
+**Flag-gated:** when `pos_jobs_unified_schedule` is OFF, `effectiveScope` pins
+to Today, the scope toggle never renders, Schedule scope is unreachable, and no
+dialog can mount — byte-identical to pre-2B.
+
+**Tests** (`job-queue-schedule-scope.test.tsx`, +8): tap fetch, dialog mount +
+POS props, fetch-fail (no mount + toast), onSave PATCH, save-success
+close+refetch, save-fail keep-open+toast, onCancel opens cancel dialog, status
+pill per status. The Phase 1B critical invariant (Schedule scope never triggers
+populate) still passes — re-asserted inside the 2B mount test too.
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test`
+2489/2489 (2481 + 8); build clean (admin dialog compiles into the POS bundle).
+No migrations. **Phase 2 complete.** Phase 3 (next): retire the POS Appointments
+tab + nav redirect.
+
+---
+
 ## Item 15e Phase 2A — shared lift + dialog parameterization + POS PATCH endpoint (2026-05-27)
 
 Foundation half of Phase 2 (Memory #8 split). Makes the admin
