@@ -6,6 +6,77 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## 2026-05-27 — feat(sms-ai): D50 — Issue 45 follow-up — universal prohibition of "Want me to send a quote?" friction question
+
+Branch `fix/issue-45-friction-question-universal-prohibition`. Small surgical fix following D49 empirical verification. D49's auto-send rule (Critical Rule 17) shipped clean architecture + clean tests, but operator's 2026-05-27 verification (Scenario 1) revealed that the friction question re-emerged at **discovery-phase** — D49's prohibition was scoped only to the moment when the three auto-send preconditions weren't met, leaving a discovery-phase loophole that the LLM filled with the friction question after an add-on pitch.
+
+**Empirical evidence (operator's D49 verification, 2026-05-27):**
+```
+Customer: "How much to wash Exterior on my 2018 Suburban"
+Agent: "Express Exterior Wash for your 2018 Suburban is $110. Includes...
+        Engine Bay Detail bundles in for $125 ($50 off) if you want that added.
+        Want me to send you a quote?"
+```
+The agent presented pricing + add-on (correct), then immediately asked the friction question (incorrect). D49's Rule 17 prohibition only kicked in when preconditions weren't met during the close-phase trigger evaluation — it didn't prohibit the question itself at any conversational position.
+
+**Operator's prompt-discipline principle (newly captured):** *When fixing emergent LLM behaviors, define the prohibition at the universal level (NEVER do X anywhere) — not the contextual level (NEVER do X at this specific moment). LLMs find loopholes in contextual prohibitions.* D49 → D50 is the canonical case study. Captured in `docs/dev/SMS_AI_V2_PROMPT_OBSERVATIONS.md` Section 1 as a standing rule for future prompt-discipline issues.
+
+**D50 changes (3 src files):**
+
+1. **Rule 17 tightened with universal prohibition clause** (`src/lib/sms-ai/system-prompt.ts:253-270`). Replaced the existing single-sentence "You NEVER ask 'Want me to send a quote?'..." with an expanded block:
+   - Universal scope clause: "in ANY conversational position — not at discovery-phase, not at close-phase, not after an add-on pitch, not anywhere"
+   - Two-path framing: **Preconditions met** → auto-fire; **Preconditions NOT met** → continue discovery WITHOUT eliciting permission
+   - Explicit anti-pattern: customer commitment "will arrive naturally as they engage" — agent doesn't need to ASK for it
+   - **❌ WRONG discovery-phase example** verbatim from operator's 2026-05-27 verification (Express Exterior Wash on Suburban → friction question after add-on)
+   - **✅ RIGHT counterpart** showing the correct pattern (present pricing + add-on, no permission ask)
+
+2. **Rule 20 add-on example refactored** (`src/lib/sms-ai/system-prompt.ts:356`). Engine Bay Detail example phrasing changed from "if you want." → "if you'd like to add it." per Refactor A. The trailing "if you want" was a pattern-matchable hook the LLM filled with a follow-up permission-ask ("Want me to send you a quote?"). Inline operator-facing parenthetical explains the rationale and cross-references Critical Rule 17. Refactor B (drop conditional language entirely) reserved as escalation option if D50 deploy still shows regression.
+
+3. **Latent permission-asking cue audit** (per operator's session brief Step 3). Grepped for `if you want|if you'd like|would you like me|want me to|should I` across `system-prompt.ts`. Findings:
+   - **`:335` Rule 20 "if you want"** — REFACTORED to "if you'd like to add it" (item 2 above).
+   - **`:596` Last name capture "What name should I put on the quote?"** — PRESERVED. Asks for INFORMATION (the last name), not for permission to act. Acceptable phrasing.
+   - **No other matches.** "if you'd like", "would you like me", "want me to", "should I" patterns absent elsewhere in the prompt.
+
+**Friction-question deletion verified (post-D50):** `grep -nE "Want me to (send|text)"` returns 6 matches across `system-prompt.ts` (5) + `tools.ts` (1). All 6 are in forbidding contexts:
+- `system-prompt.ts:221` — Rule 17 first prohibition (preserved from D49)
+- `system-prompt.ts:253` — Rule 17 universal clause (NEW per D50)
+- `system-prompt.ts:266` — Rule 17 ❌ WRONG example (NEW per D50, pedagogical exemplar)
+- `system-prompt.ts:356` — Rule 20 refactor explanation (NEW per D50, cross-refs Rule 17)
+- `system-prompt.ts:561` — Booking flow Step 1 (preserved from D49)
+- `tools.ts:231` — send_quote_sms description (preserved from D49)
+
+Zero prescriptive matches anywhere.
+
+**Tests +8 net new:** 2435/2435 pass (was 2427 pre-D50).
+- 7 new D50 tests in `src/lib/sms-ai/__tests__/system-prompt.test.ts` (universal clause language pin + two-path framing pin + ❌ WRONG example pin + ✅ RIGHT example pin + "commitment will arrive naturally" pin + Rule 20 example refactor pin + friction-question variant-form forbidding-context invariant)
+- 1 new canonical-form invariant test (preserves D49's count=3 for `/Want me to send a quote\?/g` post-D50; explicitly documents why D50's additions use the variant form "send you a quote?" and don't bump the canonical count)
+- 1 pre-existing D49 test substring assertion relaxed ('that friction step is deleted' → 'friction step is deleted') — D50 capitalized "The" at sentence start, the substring without the article remains the stable invariant.
+
+**D45/D46/D47/D48/D49 surfaces UNAFFECTED:**
+- Helper files byte-identical (`tier-display.ts`, `attach-tier-meta.ts`, `services-summary.ts`)
+- 15 D46 visual surfaces byte-identical
+- D47 Critical Rules 8 + 9 + `get_services` response shape byte-identical
+- D48 schema + 4 customer-facing surfaces byte-identical
+- D49 Critical Rule 17 THREE PRECONDITIONS unchanged (only the prohibition clause tightens to universal scope)
+- D49 Pattern 3 example + Issue 27 safety + Rule 16 cross-ref + Rule 17 architectural parallel preserved
+- `NOTIFICATION_LABEL_OVERRIDES` byte-identical
+- No renumbering — Rule 17 stays at 17; all 22 Critical Rules unchanged in numbering
+- No new tools, no endpoint changes, no observability log changes, no admin UI changes, no migrations
+
+**Gates green:** `npx tsc --noEmit` 0 errors, `npm run lint` 0 errors / 97 warnings (baseline unchanged), `npm test` **2435/2435** (was 2427 pre-D50; +8 net new), `npm run build` compiled successfully in 15.0s (788 dynamic pages).
+
+**Deploy: YES** via `deploy-smartdetails` post-merge — observable on next discovery-phase conversation. Customer SMS body content UNCHANGED (quote link arrives the same way). Only the agent's discovery-phase conversational behavior changes: no more friction question after pricing + add-on presentation.
+
+**Operator manual verification (2 scenarios per session brief):**
+- **Scenario A — discovery-phase friction-question SHOULD NOT fire:** customer asks "How much for Express Exterior Wash on my 2018 Suburban?" → agent replies with pricing + add-on phrased as "if you'd like to add it" → agent ends turn WITHOUT asking "Want me to send a quote?". Both forms ("send a quote" and "send you a quote") must be absent.
+- **Scenario B — close-phase auto-send STILL works:** customer follows up "Cool, send it" → agent auto-fires send_quote_sms with "Sending the quote now — check your texts!" reply. PM2 shows `[SmsAiV2.send_quote_sms.auto_send_trigger]`. Quote SMS arrives.
+
+Both scenarios must pass for D50 to be considered successful. If Scenario A still shows the friction question post-deploy, escalate to Refactor B (drop conditional language from Rule 20 example entirely) in a follow-up session.
+
+**DO NOT merge — operator merges after verifying tests + reading the diff.** Issue 45 is now closed via the D49+D50 sequence: D49 shipped the architectural auto-send pattern; D50 closed the discovery-phase loophole via universal-scope prohibition.
+
+---
+
 ## 2026-05-27 — feat(sms-ai): D49 — Option A proactive auto-send for send_quote_sms (CLOSES Issue 45)
 
 Branch `fix/issue-45-auto-send-confirmation`. Implementation session for the Issue 45 audit (`docs/dev/ISSUE_45_AUTO_SEND_AUDIT.md`, audit branch merged at `d5efe521`). Single combined session per audit Target 10. **Closes Issue 45** — eliminates the redundant "Want me to send a quote?" friction step that added 30-90 seconds of funnel latency per quote-send flow with 0% actionable customer signal at the friction step (4 Q-tests measured, 100% pass-through rate).

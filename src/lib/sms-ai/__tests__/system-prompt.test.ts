@@ -1560,7 +1560,10 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     // Two explicit anti-friction mentions per the rule body
     expect(rule17Body).toContain('You do NOT ask "Want me to send a quote?"');
     expect(rule17Body).toContain('You NEVER ask "Want me to send a quote?"');
-    expect(rule17Body).toContain('that friction step is deleted');
+    // D50 (2026-05-27) expanded the prohibition with capitalized "The friction
+    // step is deleted from the agent's repertoire entirely" — the substring
+    // 'friction step is deleted' remains the stable invariant.
+    expect(rule17Body).toContain('friction step is deleted');
   });
 
   it('Rule 17 cross-references Rule 16 (architectural parallel — Rule 16 governs firing rate, Rule 17 governs trigger timing)', () => {
@@ -1650,6 +1653,135 @@ describe('buildV2SystemPrompt — D49 / Issue 45 (Critical Rule 17: auto-send wh
     const numbers = ruleMatches.map((m) => Number(m[1]));
     for (let i = 0; i < numbers.length; i += 1) {
       expect(numbers[i]).toBe(i + 1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D50 — Issue 45 follow-up — universal prohibition of "Want me to send a
+// quote?" friction question (2026-05-27, post-D49 empirical verification).
+// D49 forbade the friction question only when the three auto-send
+// preconditions weren't met. Operator's Scenario 1 verification showed the
+// LLM emitting "Want me to send you a quote?" at discovery-phase after an
+// add-on pitch — a loophole in D49's contextual prohibition. D50 escalates
+// to universal-scope prohibition + ❌ WRONG / ✅ RIGHT discovery-phase
+// examples + Rule 20 add-on example refactor ("if you want" → "if you'd
+// like to add it") to remove the pattern-matchable hook.
+// ---------------------------------------------------------------------------
+
+describe('buildV2SystemPrompt — D50 / Issue 45 follow-up (universal prohibition of friction question)', () => {
+  it('Rule 17 contains the universal-scope prohibition clause ("in ANY conversational position")', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('in ANY conversational position');
+    expect(rule17Body).toContain('not at discovery-phase, not at close-phase, not after an add-on pitch, not anywhere');
+    expect(rule17Body).toContain('The friction step is deleted from the agent\'s repertoire entirely');
+  });
+
+  it('Rule 17 contains the two-path framing (Preconditions met / Preconditions NOT met)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('**Preconditions met:**');
+    expect(rule17Body).toContain('**Preconditions NOT met:**');
+    // The "met" path fires auto-send + reply
+    expect(rule17Body).toContain('auto-fire `send_quote_sms`');
+    // The "NOT met" path continues discovery; explicit "do NOT elicit permission"
+    expect(rule17Body).toContain('Do NOT elicit permission to send a quote');
+  });
+
+  it('Rule 17 contains the ❌ WRONG discovery-phase friction-question anti-pattern (operator\'s 2026-05-27 D49 verification reproduction)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    // Empirical evidence anchor — the literal customer message from Scenario 1
+    expect(rule17Body).toContain('How much for Express Exterior Wash on my 2018 Suburban?');
+    // The literal friction question variant the LLM emitted at discovery-phase
+    expect(rule17Body).toContain('Want me to send you a quote?');
+    // ❌ WRONG label present
+    expect(rule17Body).toContain('❌ WRONG — friction question at discovery-phase');
+    // Outcome explanation pinned
+    expect(rule17Body).toContain('wastes a turn');
+  });
+
+  it('Rule 17 contains the ✅ RIGHT discovery-phase counterpart (present pricing + add-on, no permission ask)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('✅ RIGHT — present pricing + add-on, no permission ask');
+    // The corrected reply phrasing — uses "if you'd like to add it" (D50 Rule 20 alignment)
+    expect(rule17Body).toContain('Engine Bay Detail bundles in for $125 ($50 off) if you\'d like to add it');
+    // Outcome explanation: customer commits naturally on next turn
+    expect(rule17Body).toContain('agent auto-fires when commitment arrives');
+  });
+
+  it('Rule 17 explicitly states the customer commitment "will arrive naturally as they engage" (no permission-elicitation needed)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    const rule17Idx = out.indexOf('17. **CRITICAL — Auto-send');
+    const rule18Idx = out.indexOf('18. **Never pitch mobile service');
+    const rule17Body = out.slice(rule17Idx, rule18Idx);
+    expect(rule17Body).toContain('will arrive naturally as they engage');
+    expect(rule17Body).toContain("You don't need to ASK for it");
+  });
+
+  it('Rule 20 add-on example refactored: "if you want" → "if you\'d like to add it" (D50 Refactor A; removes pattern-matchable permission-ask hook)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // Locate the "When configured, surface proactively" bullet within
+    // # Add-ons and bundle quoting
+    const addonIdx = out.indexOf('# Add-ons and bundle quoting');
+    const nextSection = out.indexOf('\n# ', addonIdx + '# Add-ons and bundle quoting'.length);
+    const addonSection = out.slice(addonIdx, nextSection > -1 ? nextSection : undefined);
+    // New phrasing
+    expect(addonSection).toContain('Engine Bay Detail bundles in for $140 ($35 off) if you\'d like to add it');
+    // Old phrasing (the open-ended "if you want" trailing) GONE
+    expect(addonSection).not.toContain('Engine Bay Detail bundles in for $140 ($35 off) if you want.');
+    // Inline operator-facing explanation references Rule 17 (cross-link)
+    expect(addonSection).toContain('Critical Rule 17 forbids');
+  });
+
+  it('Friction question variant "Want me to send you a quote?" appears ONLY in forbidding contexts (Rule 17 ❌ WRONG example + Rule 20 refactor explanation)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // The "send you a quote" variant (with explicit "you") — distinct from
+    // the canonical "send a quote" form covered by the D49 pin
+    const matches = [...out.matchAll(/Want me to send you a quote\?/g)];
+    // 2 occurrences expected: ❌ WRONG example in Rule 17 + Rule 20 refactor explanation
+    expect(matches.length).toBe(2);
+    for (const match of matches) {
+      const idx = match.index ?? 0;
+      // Wide window — Rule 20's forbid-marker ("Critical Rule 17 forbids")
+      // appears AFTER the friction-question variant within ~30 chars; the
+      // Rule 17 ❌ WRONG label appears BEFORE within ~300 chars (heading +
+      // intro line + example body up to the friction question).
+      const context = out.slice(Math.max(0, idx - 500), idx + 200);
+      // Each match must be wrapped by forbidding/exemplar context
+      const forbids =
+        /❌ WRONG|forbids|permission-ask|forbidden/i.test(context);
+      expect(forbids).toBe(true);
+    }
+  });
+
+  it('Canonical friction question "Want me to send a quote?" still appears in only-forbidding contexts after D50 (D49 invariant preserved; count = 3 unchanged: Rule 17 first prohibition + Rule 17 universal clause + Booking flow Step 1)', () => {
+    const out = buildV2SystemPrompt(SAMPLE_INPUTS);
+    // D49 pinned count=3 for the canonical form. D50 added a SECOND
+    // sentence to Rule 17 (universal clause) that re-uses the canonical
+    // form, AND added a ❌ WRONG example that uses the variant "send you
+    // a quote?" form. Net effect on canonical /Want me to send a quote\?/g:
+    // line 221 (Rule 17 first prohibition) + line 253 (universal clause)
+    // + Booking flow Step 1 = 3 matches. Unchanged from D49.
+    const matches = [...out.matchAll(/Want me to send a quote\?/g)];
+    expect(matches.length).toBe(3);
+    // Forbidding-context invariant preserved per D49
+    for (const match of matches) {
+      const idx = match.index ?? 0;
+      const context = out.slice(Math.max(0, idx - 80), idx + 30);
+      const forbids =
+        /NOT ask|NEVER ask|forbidden|forbidden by|deleted from/i.test(context);
+      expect(forbids).toBe(true);
     }
   });
 });
