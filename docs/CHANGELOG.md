@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Audit Item 15e — POS Appointments Modal capability parity with Admin (2026-05-27)
+
+Read-only diagnostic audit. NO `src/` changes, NO migrations, NO test changes.
+Deliverable: `docs/dev/ITEM_15E_POS_APPOINTMENTS_MODAL_PARITY_AUDIT.md`
+(11 targets + TL;DR + 27-row capability parity matrix + 3-phased implementation
+plan + 11 operator decisions). **Key findings:** Admin Appointment Detail
+Dialog exposes 17 mutable + 9 readonly capabilities; POS Appointments view
+exposes 5 (date/start/end/detailer/cancel). Parity gap = 13 ADD rows + 1
+conditional. Architectural recommendation: **Pattern C** — both surfaces route
+through shared library function for every cascade-aware operation (mirrors
+Item 15f Phase 1 Layer 8a `service-edit.ts` extraction pattern). 5 helpers
+already shared (`<EditMobileModal>`, `<ModifierSummary>`, `<PaymentMismatchBanner>`,
+`composeLineItems`, `formatChannelLabel`); new work needed: extract admin
+PATCH body at `/api/appointments/[id]/route.ts:11-187` into
+`src/lib/appointments/update-appointment.ts` + add POS sibling endpoint.
+**16th D46/D48 visual surface flagged:** 3 POS endpoint `appointment_services(…)`
+SELECTs need `quantity` widening for new detail modal to render
+`renderTierToken` correctly (fold-in proposed as part of Phase A).
+**Item 15e original acceptance criteria reconciliation:** Q5 of original
+roadmap called for `useServicePicker` hook integration; this conflicts with
+Item 15a/15f Layer 8e closure which deleted bespoke modals in favor of POS
+edit-via-deep-link. Audit recommends Option A (deep-link "Edit Services in
+Sale" button) — preserves canonical-engine principle. **Implementation scope:**
+3 phased sessions, ~6-9 hours CC. **Operator decisions surfaced (11):** modal
+scope lock, notify-on-status-change policy, manual Send Confirmation
+defer-to-separate-audit, service-edit affordance choice, D48 fold-in timing,
+STATUS_TRANSITIONS lift, channel-label cleanup, Item 15d revival call, POS
+Jobs Card regression check, status permission key, iPad responsive layout.
+**Hard rules honored:** no `src/`, no migrations, no test changes, every
+finding cites `file:line`, audit produces options for Target 11 (NOT a
+pre-picked plan), no admin-side capability recommendations (one-direction).
+**Gates:** none — doc-only. **Deploy: NO.** **DO NOT merge — operator
+reviews + locks decisions before implementation fires.**
+
+Files: `docs/dev/ITEM_15E_POS_APPOINTMENTS_MODAL_PARITY_AUDIT.md`
+
+---
+
 ## ROADMAP bump v3.9 → v4.0 (2026-05-27)
 
 Doc-only session bumping `docs/dev/ROADMAP-13-ITEMS.md` to reflect the SMS-AI v2
