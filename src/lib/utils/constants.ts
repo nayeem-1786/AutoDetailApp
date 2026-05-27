@@ -272,6 +272,9 @@ export const FEATURE_FLAGS = {
   ANNOUNCEMENT_TICKERS: 'announcement_tickers',
   AD_PLACEMENTS: 'ad_placements',
   SEASONAL_THEMES: 'seasonal_themes',
+  // Item 15e retire arc — gates the POS Jobs Today/Schedule scope toggle.
+  // Default OFF until the unified-operations rollout (Phase 3+).
+  POS_JOBS_UNIFIED_SCHEDULE: 'pos_jobs_unified_schedule',
 } as const;
 
 // Messaging
