@@ -319,3 +319,89 @@ describe('executeUnMaterialize', () => {
     expect(state.jobDeleted).toBe(false);
   });
 });
+
+function callDry() {
+  return executeUnMaterialize(mockSupabase, 'apt-1', {
+    dryRun: true,
+    actor,
+    source: 'pos',
+    ipAddress: '127.0.0.1',
+  });
+}
+
+describe('executeUnMaterialize — dryRun preview (Phase 2C-β)', () => {
+  it('returns 200 + enumeration WITHOUT mutating anything (scheduled job)', async () => {
+    state.photoCount = 3;
+    state.addonCount = 1;
+    const r = await callDry();
+    expect(r.ok).toBe(true);
+    expect(r.httpStatus).toBe(200);
+    expect(r.data?.photoCount).toBe(3);
+    expect(r.data?.addonCount).toBe(1);
+    expect(r.data?.confirmRequired).toBe(false);
+    // No mutation, no audit.
+    expect(state.jobDeleted).toBe(false);
+    expect(state.apptUpdatePayload).toBeNull();
+    expect(state.storageRemoved).toBeNull();
+    expect(auditCalls).toHaveLength(0);
+  });
+
+  it('returns 200 + confirmRequired=true for in_progress (still no mutation)', async () => {
+    state.job!.status = 'in_progress';
+    const r = await callDry();
+    expect(r.ok).toBe(true);
+    expect(r.httpStatus).toBe(200);
+    expect(r.data?.confirmRequired).toBe(true);
+    expect(state.jobDeleted).toBe(false);
+  });
+
+  it('dryRun still surfaces transaction_linked (409) so the modal can block', async () => {
+    state.job!.transaction_id = 'txn-1';
+    const r = await callDry();
+    expect(r.httpStatus).toBe(409);
+    expect(r.error).toBe('transaction_linked');
+  });
+
+  it('dryRun still surfaces terminal (409)', async () => {
+    state.job!.status = 'completed';
+    const r = await callDry();
+    expect(r.httpStatus).toBe(409);
+    expect(r.error).toBe('terminal');
+  });
+});
+
+describe('Item 15e Phase 2C — Re-materialization invariant (un-materialize → populate)', () => {
+  // Mirrors populate/route.ts:65 — populate materializes ONLY these statuses.
+  const POPULATE_STATUSES = ['confirmed', 'in_progress'];
+
+  it('after un-materialize, a populate pass finds NO candidate and re-creates nothing', async () => {
+    // Materialized state: confirmed appointment + scheduled job.
+    state.appointment = { id: 'apt-1', status: 'confirmed' };
+    state.job = {
+      id: 'job-1',
+      status: 'scheduled',
+      transaction_id: null,
+      timer_seconds: 0,
+      intake_notes: null,
+    };
+
+    const r = await call();
+    expect(r.ok).toBe(true);
+    expect(state.jobDeleted).toBe(true);
+    expect(state.appointment.status).toBe('pending');
+
+    // Populate selects only confirmed/in_progress appointments. After
+    // un-materialize the appointment is 'pending' → NOT a candidate → the job
+    // cannot be re-created on the next Today-scope populate pass.
+    const isPopulateCandidate = POPULATE_STATUSES.includes(state.appointment.status);
+    expect(isPopulateCandidate).toBe(false);
+  });
+
+  it('the revert is committed BEFORE the delete, so no window exists where a materializable appointment lacks its job', async () => {
+    await call();
+    const apptIdx = state.opOrder.indexOf('appt_update');
+    const delIdx = state.opOrder.indexOf('job_delete');
+    expect(apptIdx).toBeGreaterThanOrEqual(0);
+    expect(delIdx).toBeGreaterThan(apptIdx);
+  });
+});

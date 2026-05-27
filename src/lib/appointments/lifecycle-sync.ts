@@ -168,6 +168,13 @@ export interface UnMaterializeOptions {
   /** Required for jobs at/above the confirm threshold. Must equal exactly
    *  "DELETE" (case-sensitive) for the operation to proceed. */
   confirmString?: string;
+  /** Phase 2C-β: when true, run the guards + collect the data enumeration but
+   *  perform NO mutation (no appointment revert, no job delete, no Storage
+   *  cleanup, no audit). The un-materialize confirmation modal calls this first
+   *  to preview exactly what will be deleted, then re-POSTs without `dryRun` to
+   *  execute. Guards still fire (a transaction-linked/terminal job surfaces its
+   *  409 here too), so the modal can show a block immediately. */
+  dryRun?: boolean;
   actor: UnMaterializeActor;
   source: 'admin' | 'pos';
   ipAddress: string | null;
@@ -267,6 +274,15 @@ export async function executeUnMaterialize(
       hasIntakeNotes: typeof job.intake_notes === 'string' && job.intake_notes.trim().length > 0,
       confirmRequired,
     };
+
+    // Dry-run preview (Phase 2C-β): the confirmation modal calls this first to
+    // render the exact deletion enumeration. Guards above (not_found /
+    // transaction_linked / terminal) have already returned, so a blocked job
+    // surfaces its error even in dry-run. Mutate nothing; the modal then
+    // re-POSTs without `dryRun` (and with confirmString) to execute.
+    if (options.dryRun) {
+      return { ok: true, httpStatus: 200, data };
+    }
 
     // 4. Type-to-confirm guard for at/above-threshold jobs.
     if (confirmRequired && options.confirmString !== 'DELETE') {

@@ -93,6 +93,11 @@ describe('POST /api/pos/appointments/[id]/unmaterialize', () => {
     expect((state.execArgs?.options.actor as Record<string, unknown>).userId).toBe('auth-1');
   });
 
+  it('forwards dryRun:true to the executor (modal preview)', async () => {
+    await POST(makeReq({ dryRun: true }), { params });
+    expect(state.execArgs?.options.dryRun).toBe(true);
+  });
+
   it('passes through 409 transaction_linked', async () => {
     state.execResult = { ok: false, httpStatus: 409, error: 'transaction_linked' };
     const res = await POST(makeReq(), { params });
