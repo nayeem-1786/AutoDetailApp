@@ -6,6 +6,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2 — AppointmentDetailDialog reuse verification audit (2026-05-27)
+
+Read-only feasibility audit answering *if and how* the admin
+`AppointmentDetailDialog` can be reused in the POS Jobs **Schedule** scope
+(Phase 2, "reuse admin dialog" lean locked by operator). No source/migration/test
+changes — one audit doc + 3 standard doc updates.
+
+**Verdict: `reuse-with-moderate-adjustments`.** The component is genuinely
+reusable: its save/cancel are prop callbacks (`onSave`/`onCancel`), so it is
+already decoupled from the admin write API, and only **one** of its 20 imports is
+admin-coupled (`../types` for `STATUS_TRANSITIONS` + `AppointmentWithRelations`).
+
+Key findings:
+- **PATCH auth incompatibility.** `/api/appointments/[id]` authenticates via
+  cookie-based Supabase session (`getEmployeeFromSession` → `auth.getUser()`),
+  which a POS request (HMAC `X-POS-Session` token) never satisfies → 401. The
+  admin route cannot be reused for POS; broadening it is not recommended.
+- **Missing POS endpoint = the only real server work.** POS has `reschedule`
+  (date/time/employee), `cancel`, `services`, `mobile-service`, `load`, etc., but
+  **no status-change and no notes endpoint** — the admin dialog's primary control
+  (Status dropdown) + notes have no POS backing. Recommend one combined
+  `PATCH /api/pos/appointments/[id]` with `authenticatePosRequest` + per-field
+  `checkPosPermission`.
+- **No role-defaults migration needed.** `appointments.update_status`/`add_notes`/
+  `reschedule` already grant the correct matrix to POS roles; `checkPosPermission`
+  reads the same `permissions` table.
+- **Phase 1B already compatible.** Schedule scope renders its own flat list that
+  *overrides* the List/Timeline `viewMode` toggle (toggle isn't even shown in
+  Schedule scope) — Phase 2 needs no Timeline support for Schedule rows.
+- **Adaptation surface (mechanical):** parameterize 3 hardcoded admin assumptions
+  ("Edit in POS" `router.push(returnTo=/admin/appointments)`, `EditMobileModal
+  mode="admin"`, `ModifierSummary variant="admin"`); add `dark:` variants to the
+  light-only dialog body (Rule #10 — no-op in admin, so no admin regression); lift
+  the one shared type with an admin re-export (low blast radius).
+- **Working template exists:** `pos/jobs/components/change-time-button.tsx`
+  already fetches a full `PosAppointment` from `GET /api/pos/appointments/[id]` and
+  mounts a reused dialog inside the Jobs surface.
+- **Pending visual distinction:** `PosScheduleEntry.status` is already present — no
+  endpoint widening; add a status pill keyed on `entry.status`.
+- **Honest fallback:** the slim POS dialogs (`reschedule-appointment-dialog.tsx` +
+  `cancel-appointment-dialog.tsx`) are already POS-wired/dark/in-Jobs — less work
+  but narrower (reschedule + cancel only, no status/notes).
+
+Estimate ~3–4.5h (likely its own session per Memory #8). Full findings:
+`docs/dev/ITEM_15E_PHASE_2_REUSE_VERIFICATION.md`. **Not merged** — operator +
+Claude lock the Phase 2 implementation plan from these findings.
+
+---
+
 ## Item 15e Phase 1B — client wiring: Today/Schedule scope toggle + populate gate (2026-05-27)
 
 Client-side completion of Item 15e Phase 1 (the retire arc's foundation), built
