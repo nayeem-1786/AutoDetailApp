@@ -1466,6 +1466,12 @@ Roadmap Item 15e Phase 2A (shared lift for dual-context AppointmentDetailDialog)
 - `src/lib/appointments/status-transitions.ts` — `STATUS_TRANSITIONS` (valid next-states per appointment status). Lifted from admin `appointments/types.ts`; re-exported there for backward compat. Enforced server-side by both the admin and POS PATCH routes.
 - `src/lib/appointments/types.ts` — `AppointmentService` + `AppointmentWithRelations` (shared joined shape). Lifted from admin `appointments/types.ts`; re-exported there (5 admin importers unchanged). Structurally equivalent to POS `PosAppointment`; convergence deferred.
 
+Roadmap Item 15e Phase 2C-α (un-materialize server foundation) additions:
+- `src/lib/appointments/lifecycle-sync.ts` — canonical appointment↔job lifecycle-sync seam. Phase 2C implements only the `delete_job` (un-materialize) action; Item 15h extends with the rest. Exports `jobStatusForAppointmentStatus` (forward mapping), `isEarlierState` (forward-axis rank for the 2C-β admin Save intercept), and `executeUnMaterialize` (executor: guards transaction_linked/terminal/confirm_required, reverts appointment→pending FIRST then deletes the job for the re-materialization invariant, best-effort Storage cleanup of job_photos, audit; NO webhooks).
+- `src/lib/appointments/__tests__/lifecycle-sync.test.ts` — 20 cases: forward-mapping (incl. walk-in pairing), isEarlierState, executor guards/ordering/storage/audit + the CRITICAL re-materialization-invariant ordering test.
+- `src/app/api/pos/appointments/[id]/unmaterialize/route.ts` — POST POS un-materialize (HMAC + checkPosPermission('appointments.cancel')); thin wrapper over executeUnMaterialize. + `__tests__/unmaterialize.test.ts` (6).
+- `src/app/api/appointments/[id]/unmaterialize/route.ts` — POST admin un-materialize (getEmployeeFromSession + requirePermission('appointments.cancel')); same executor, cookie-auth surface. + `__tests__/unmaterialize.test.ts` (5).
+
 Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job) additions:
 - `src/lib/appointments/edit-services.ts` — Pure helpers (Zod body schema, `buildJobServicesJsonb()`, `computeTotalsForServiceEdit()`).
 - `src/lib/appointments/__tests__/edit-services.test.ts`
