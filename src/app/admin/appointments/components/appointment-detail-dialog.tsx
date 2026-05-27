@@ -29,8 +29,11 @@ import {
 } from '@/components/jobs/edit-mobile-modal';
 import { PaymentMismatchBanner } from '@/components/jobs/payment-mismatch-banner';
 import { ModifierSummary } from '@/components/appointments/modifier-summary';
-import { STATUS_TRANSITIONS } from '../types';
-import type { AppointmentWithRelations } from '../types';
+// Item 15e Phase 2A — STATUS_TRANSITIONS + AppointmentWithRelations were
+// lifted to shared lib so this dialog can be reused dual-context (admin + POS
+// Schedule scope). Admin behavior is unchanged; the data is identical.
+import { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
+import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
 
@@ -59,6 +62,18 @@ interface AppointmentDetailDialogProps {
   canReschedule: boolean;
   canCancel: boolean;
   canAddNotes?: boolean;
+  // Item 15e Phase 2A — context-mode props. Default to admin behavior so the
+  // admin surface is byte-identical; POS callers (Phase 2B) override them.
+  //   mobileModalMode — forwarded to <EditMobileModal> (switches its auth
+  //     surface: posFetch + POS mobile-zones endpoint vs admin fetch).
+  //   modifierVariant — forwarded to <ModifierSummary> (dark-aware pos styling).
+  //   onEditInPos — overrides the "Edit in POS" button behavior. When provided,
+  //     it is called instead of the admin router.push deep-link. When the prop
+  //     is explicitly set (even to a no-op) the default admin deep-link is not
+  //     used; pass a no-op to suppress the deep-link in a POS context.
+  mobileModalMode?: 'admin' | 'pos';
+  modifierVariant?: 'admin' | 'pos';
+  onEditInPos?: () => void;
 }
 
 export function AppointmentDetailDialog({
@@ -71,6 +86,9 @@ export function AppointmentDetailDialog({
   canReschedule,
   canCancel,
   canAddNotes = true,
+  mobileModalMode = 'admin',
+  modifierVariant = 'admin',
+  onEditInPos,
 }: AppointmentDetailDialogProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -207,13 +225,15 @@ export function AppointmentDetailDialog({
           <button
             type="button"
             onClick={() =>
-              router.push(
-                `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(
-                  '/admin/appointments'
-                )}`
-              )
+              onEditInPos
+                ? onEditInPos()
+                : router.push(
+                    `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(
+                      '/admin/appointments'
+                    )}`
+                  )
             }
-            className="absolute right-12 top-4 flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+            className="absolute right-12 top-4 flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             <MonitorSmartphone className="h-4 w-4" />
             <span>Edit in POS</span>
@@ -228,29 +248,29 @@ export function AppointmentDetailDialog({
         {/* Read-only info */}
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div>
-            <dt className="text-xs font-medium text-gray-500">Customer</dt>
-            <dd className="text-gray-900">
+            <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Customer</dt>
+            <dd className="text-gray-900 dark:text-gray-100">
               {appointment.customer.first_name} {appointment.customer.last_name}
             </dd>
             {appointment.customer.phone && (
-              <dd className="text-xs text-gray-500">{formatPhone(appointment.customer.phone)}</dd>
+              <dd className="text-xs text-gray-500 dark:text-gray-400">{formatPhone(appointment.customer.phone)}</dd>
             )}
             {appointment.customer.email && (
-              <dd className="text-xs text-gray-500">{appointment.customer.email}</dd>
+              <dd className="text-xs text-gray-500 dark:text-gray-400">{appointment.customer.email}</dd>
             )}
           </div>
 
           <div>
-            <dt className="text-xs font-medium text-gray-500">Booked By</dt>
-            <dd className="text-gray-900">
+            <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Booked By</dt>
+            <dd className="text-gray-900 dark:text-gray-100">
               {CHANNEL_LABELS[appointment.channel] || appointment.channel}
             </dd>
           </div>
 
           {appointment.vehicle && (
             <div>
-              <dt className="text-xs font-medium text-gray-500">Vehicle</dt>
-              <dd className="flex items-center gap-2 text-gray-900">
+              <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Vehicle</dt>
+              <dd className="flex items-center gap-2 text-gray-900 dark:text-gray-100">
                 <span>
                   {cleanVehicleDescription({ year: appointment.vehicle.year, make: appointment.vehicle.make, model: appointment.vehicle.model })}
                   {sanitizeVehicleField(appointment.vehicle.color) ? ` — ${appointment.vehicle.color}` : ''}
@@ -260,16 +280,16 @@ export function AppointmentDetailDialog({
           )}
 
           <div>
-            <dt className="text-xs font-medium text-gray-500">Total</dt>
-            <dd className="text-gray-900 font-medium">{formatCurrency(displayedTotal)}</dd>
+            <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Total</dt>
+            <dd className="text-gray-900 dark:text-gray-100 font-medium">{formatCurrency(displayedTotal)}</dd>
           </div>
 
           {appointment.deposit_amount != null && appointment.deposit_amount > 0 && (
             <div>
-              <dt className="text-xs font-medium text-gray-500">Deposit Collected</dt>
-              <dd className="text-green-700 font-medium">
+              <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Deposit Collected</dt>
+              <dd className="text-green-700 dark:text-green-400 font-medium">
                 {formatCurrency(appointment.deposit_amount)}
-                <span className="text-xs text-gray-500 font-normal ml-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
                   (Balance: {formatCurrency(displayedTotal - appointment.deposit_amount)})
                 </span>
               </dd>
@@ -288,7 +308,7 @@ export function AppointmentDetailDialog({
             that one promoted button. */}
         <div className="mt-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-gray-500">Services</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Services</p>
           </div>
           <div className="mt-1 space-y-0.5">
             {composeLineItems(
@@ -305,8 +325,8 @@ export function AppointmentDetailDialog({
                 : (services[idx]?.id ?? `svc-${idx}`);
               return (
                 <div key={rowKey} className="flex justify-between text-sm">
-                  <span className="text-gray-900">{item.name}</span>
-                  <span className="text-gray-500">{formatCurrency(item.total_price)}</span>
+                  <span className="text-gray-900 dark:text-gray-100">{item.name}</span>
+                  <span className="text-gray-500 dark:text-gray-400">{formatCurrency(item.total_price)}</span>
                 </div>
               );
             })}
@@ -323,7 +343,7 @@ export function AppointmentDetailDialog({
             loyalty_discount={appointment.loyalty_discount}
             manual_discount_value={appointment.manual_discount_value}
             manual_discount_label={appointment.manual_discount_label}
-            variant="admin"
+            variant={modifierVariant}
           />
         </div>
 
@@ -333,9 +353,9 @@ export function AppointmentDetailDialog({
             `appointments.add_notes` permission still gates the edit
             server-side (mirrors the Phase 1.6 endpoint pattern). */}
         {(mobileOverride?.is_mobile ?? appointment.is_mobile) && (
-          <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2">
+          <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
                 <MapPin className="h-3.5 w-3.5" />
                 <span>Mobile Service</span>
               </div>
@@ -344,23 +364,23 @@ export function AppointmentDetailDialog({
                   type="button"
                   onClick={() => setEditingMobile('edit')}
                   aria-label="Edit mobile service"
-                  className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                  className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
               )}
             </div>
-            <div className="mt-1 space-y-0.5 text-sm text-gray-900">
+            <div className="mt-1 space-y-0.5 text-sm text-gray-900 dark:text-gray-100">
               <p>
-                <span className="text-gray-500">Zone: </span>
+                <span className="text-gray-500 dark:text-gray-400">Zone: </span>
                 {(mobileOverride?.mobile_zone_name_snapshot ??
                   appointment.mobile_zone_name_snapshot) || (
-                  <span className="italic text-gray-400">Not set</span>
+                  <span className="italic text-gray-400 dark:text-gray-500">Not set</span>
                 )}
                 {Number(
                   mobileOverride?.mobile_surcharge ?? appointment.mobile_surcharge ?? 0
                 ) > 0 && (
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 dark:text-gray-400">
                     {' '}— {formatCurrency(
                       Number(
                         mobileOverride?.mobile_surcharge ??
@@ -372,10 +392,10 @@ export function AppointmentDetailDialog({
                 )}
               </p>
               <p>
-                <span className="text-gray-500">Address: </span>
+                <span className="text-gray-500 dark:text-gray-400">Address: </span>
                 {(mobileOverride?.mobile_address ??
                   appointment.mobile_address) || (
-                  <span className="italic text-gray-400">
+                  <span className="italic text-gray-400 dark:text-gray-500">
                     No address on file
                   </span>
                 )}
@@ -393,16 +413,16 @@ export function AppointmentDetailDialog({
           <button
             type="button"
             onClick={() => setEditingMobile('enable')}
-            className="mt-3 flex w-full items-center justify-between rounded-md border border-dashed border-gray-300 bg-gray-50 p-2 text-left hover:bg-gray-100"
+            className="mt-3 flex w-full items-center justify-between rounded-md border border-dashed border-gray-300 bg-gray-50 p-2 text-left hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-700"
           >
-            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
               <MapPin className="h-3.5 w-3.5" />
               <span>Mobile Service</span>
-              <span className="ml-2 text-gray-400">
+              <span className="ml-2 text-gray-400 dark:text-gray-500">
                 — not currently a mobile job
               </span>
             </div>
-            <span className="text-xs font-medium text-blue-600">+ Enable</span>
+            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">+ Enable</span>
           </button>
         )}
 
@@ -419,17 +439,17 @@ export function AppointmentDetailDialog({
 
         {/* Cancellation info */}
         {appointment.status === 'cancelled' && appointment.cancellation_reason && (
-          <div className="mt-2 rounded-md bg-red-50 p-2 text-sm">
-            <p className="text-xs font-medium text-red-600">Cancellation Reason</p>
-            <p className="text-red-900">{appointment.cancellation_reason}</p>
+          <div className="mt-2 rounded-md bg-red-50 p-2 text-sm dark:bg-red-950">
+            <p className="text-xs font-medium text-red-600 dark:text-red-400">Cancellation Reason</p>
+            <p className="text-red-900 dark:text-red-200">{appointment.cancellation_reason}</p>
             {appointment.cancellation_fee != null && appointment.cancellation_fee > 0 && (
-              <p className="text-xs text-red-500">Fee: {formatCurrency(appointment.cancellation_fee)}</p>
+              <p className="text-xs text-red-500 dark:text-red-400">Fee: {formatCurrency(appointment.cancellation_fee)}</p>
             )}
           </div>
         )}
 
         {/* Editable fields */}
-        <form id="detail-edit-form" onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3 border-t border-gray-200 pt-4">
+        <form id="detail-edit-form" onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
           <div className={canReschedule ? 'grid grid-cols-2 gap-3' : ''}>
             <FormField label="Status" error={errors.status?.message} htmlFor="detail-status">
               <Select id="detail-status" {...register('status')}>
@@ -484,7 +504,7 @@ export function AppointmentDetailDialog({
               {...register('job_notes')}
               rows={2}
               disabled={!canAddNotes}
-              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50"
+              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-800"
             />
           </FormField>
 
@@ -494,7 +514,7 @@ export function AppointmentDetailDialog({
               {...register('internal_notes')}
               rows={2}
               disabled={!canAddNotes}
-              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50"
+              className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-800"
             />
           </FormField>
         </form>
@@ -531,7 +551,7 @@ export function AppointmentDetailDialog({
       {editingMobile && (
         <EditMobileModal
           open
-          mode="admin"
+          mode={mobileModalMode}
           appointmentId={appointment.id}
           initial={
             editingMobile === 'enable'
