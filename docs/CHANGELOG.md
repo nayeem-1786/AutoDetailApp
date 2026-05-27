@@ -6,6 +6,62 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2C-α — un-materialize server foundation (lifecycle-sync seam) (2026-05-27)
+
+Server half of Phase 2C (split per Memory #8 — full 2C spans 6-7 production
+files). Ships the canonical `lifecycle-sync.ts` seam + two un-materialize
+endpoints. **Purely additive — zero existing production files touched; the
+endpoints are inert until 2C-β wires the UI** (same pattern as 2A's inert PATCH).
+
+**`src/lib/appointments/lifecycle-sync.ts` (NEW — the seam Item 15h extends):**
+- `jobStatusForAppointmentStatus(newApptStatus, currentJobStatus, hasJob)` —
+  forward mapping; Phase 2C implements only the `delete_job` (un-materialize)
+  case (`→ pending` with an existing job); everything else returns `none`
+  (Item 15h fills in `materialize` / `set_job_status` + the reverse mapping).
+- `isEarlierState(newStatus, currentStatus)` — ranks the forward appointment axis
+  (pending<confirmed<in_progress<completed); `cancelled`/`no_show` unranked (own
+  flows). Used by the 2C-β admin Save intercept.
+- `executeUnMaterialize(supabase, appointmentId, opts)` — the canonical executor.
+  Guards: `not_found` (404), `transaction_linked` (409, `jobs.transaction_id` set),
+  `terminal` (409, completed/closed/cancelled jobs), `confirm_required` (422 WITH
+  the data enumeration — photos/addons/timer/intake — when `job.status` is
+  in_progress/pending_approval and `confirmString !== "DELETE"`, case-sensitive).
+  **Re-materialization invariant via ordering, not a migration:** UPDATE the
+  appointment to `pending` FIRST, then DELETE the job. Supabase JS has no
+  multi-statement transaction, but this order means the only unsafe state
+  (materializable appointment + absent job) never exists; a failed DELETE leaves
+  the benign, recoverable `pending`+job state. (Satisfies Decision 10's "sequenced
+  such that re-materialization cannot occur" without an RPC/migration.) CASCADE
+  removes `job_photos`/`job_addons` rows; Storage objects (main + `_thumb`) are
+  deleted best-effort (failures logged, never roll back the DB). Audit row written
+  (`action:'delete'`, `entityType:'job'`, `details.reason:'un_materialize'`,
+  `previous_job_status`); **no webhooks fire** (Decision 5 — silent revert).
+
+**Endpoints (thin wrappers over the executor — the audit's two-surface auth split):**
+- `POST /api/pos/appointments/[id]/unmaterialize` — HMAC `authenticatePosRequest`
+  + `checkPosPermission('appointments.cancel')`.
+- `POST /api/appointments/[id]/unmaterialize` — `getEmployeeFromSession` +
+  `requirePermission('appointments.cancel')`.
+- Both pass through the executor's `httpStatus`/`error`/`data` (401/403/404/409/422/200).
+- **No new permission key** (Decision 2). Note: runtime `appointments.cancel` is
+  granted to all four roles (audit finding), so cashier+detailer can un-materialize.
+
+**Tests (+31):** `lifecycle-sync.test.ts` (20 — forward-mapping cases incl. walk-in
+pairing; `isEarlierState`; executor guards/ordering/storage/audit incl. the
+**CRITICAL re-materialization-invariant ordering test**); POS endpoint (6) + admin
+endpoint (5) wiring tests.
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test`
+2520/2520 (2489 + 31); build clean (both routes compiled). No migrations.
+
+**Phase 2C-β (next, deferred per Memory #8):** UI — shared
+`un-materialize-confirmation-dialog.tsx`, admin dialog Save intercept (via
+`isEarlierState` + a `has_active_job` flag), POS job-detail "Revert to Pending"
+button, and the end-to-end populate-rerun invariant test. Then Item 15h = full
+bidirectional sync.
+
+---
+
 ## Item 15e Phase 2 follow-up — status sync gap + un-materialize audit (2026-05-27)
 
 Read-only diagnostic audit (`docs/dev/ITEM_15E_PHASE_2_STATUS_SYNC_AUDIT.md`)
