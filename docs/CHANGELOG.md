@@ -6,6 +6,44 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2 follow-up — status sync gap + un-materialize audit (2026-05-27)
+
+Read-only diagnostic audit (`docs/dev/ITEM_15E_PHASE_2_STATUS_SYNC_AUDIT.md`)
+explaining why editing `appointment.status` does NOT propagate to `jobs.status`
+(surfaced in Phase 2B testing), and scoping the operator's two needs:
+un-materialize a job on `confirmed → pending` reversion, and bidirectional
+status sync. No source/migration/test changes — 1 audit doc + 3 doc updates.
+
+Key findings:
+- **The gap is systemic, not a one-off.** A live-DB scan (service-role REST) of
+  all 7 non-terminal jobs found **6 diverge** from a 1:1 status mapping, including
+  a live **`cancelled → scheduled`** (cancelled appointment, still-active job) and
+  three `completed → scheduled/intake`. Only one pairing (`confirmed → scheduled`)
+  is the correct freshly-materialized state.
+- **Exactly one sync edge exists today:** POS job-cancel → `appointment.status='cancelled'`
+  (`api/pos/jobs/[id]/cancel/route.ts:145-154`). Nothing else syncs — appointment
+  status edits never touch jobs (the gap); job complete/start-work/intake/PATCH
+  never touch appointments; even admin appt-cancel does NOT cancel the linked job.
+- **The two enums are not 1:1** (`AppointmentStatus` 6 vs `JobStatus` 7) — mapping
+  is directional and lossy, so a field-copy sync is wrong.
+- **Option B (hard delete) is safe with two obligations:** `job_photos`/`job_addons`
+  CASCADE-delete but **Storage objects orphan** and a linked **transaction**
+  (`jobs.transaction_id` SET NULL out) survives unlinked → un-materialize must
+  delete Storage explicitly and **block when `transaction_id` is set**.
+- **Re-materialization invariant:** `populate` materializes `confirmed`/`in_progress`
+  appointments and dedups on `jobs.appointment_id` (UNIQUE), so un-materialize MUST
+  revert `appointment.status='pending'` in the same op or the job is recreated.
+- **Runtime permission ≠ seed:** `appointments.cancel` is granted to ALL FOUR roles
+  at runtime (cashier + detailer), not admin-only as seeded — so reusing it lets
+  detailer hard-delete jobs (operator decision).
+
+Recommended: **Path C (phased)** — ship narrow un-materialize now (Phase 2C, via a
+thin `lifecycle-sync.ts` seam) and track full bidirectional sync as a new item
+(Item 15h). 10 open operator decisions enumerated. **DO NOT merge — operator +
+Claude lock the path before implementation.**
+
+---
+
 ## Item 15e Phase 2B — mount admin dialog in POS Jobs Schedule scope + status pill (2026-05-27)
 
 Completes Phase 2 (the wiring half). Replaces Phase 1B's placeholder toast with
