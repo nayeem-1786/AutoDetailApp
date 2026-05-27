@@ -425,8 +425,11 @@ src/app/api/pos/jobs/[id]/reschedule/route.ts
 src/app/api/pos/jobs/[id]/route.ts
 src/app/api/pos/jobs/[id]/start-work/route.ts
 src/app/api/pos/jobs/[id]/timer/route.ts
-src/app/api/pos/jobs/populate/route.ts
+src/app/api/pos/jobs/populate/route.ts                          # POST — auto-materialize today's confirmed/in_progress appointments into jobs. Item 15e Phase 1A: future-date gate (never materializes scheduled_date > today)
+src/app/api/pos/jobs/populate/__tests__/route.test.ts           # 8 tests — Item 15e Phase 1A populate gate: future date → zero DB touch / zero upsert; today/past → materializes; defensive log
 src/app/api/pos/jobs/route.ts
+src/app/api/pos/jobs/schedule/route.ts                          # GET — Item 15e Phase 1A Schedule scope: future appointments (tomorrow→+30d), pure read, ZERO jobs writes, excludes materialized
+src/app/api/pos/jobs/schedule/__tests__/route.test.ts           # 12 tests — Item 15e Phase 1A schedule endpoint: future-only floor, status/materialized exclusion, channel filter, CRITICAL zero-jobs-writes invariant
 src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts  # 6 tests — pins Item 15g Layer 15g-iv Scenario C: walk-in synthetic appointment persists 7-field modifier snapshot, percent → dollar resolution, over-discount clamp; + Item 15f Phase 1 Layer 8e — `scheduled_*_time` minute-precision shape
 src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
@@ -824,6 +827,7 @@ src/app/pos/page.tsx                     — POS main workspace
 src/app/pos/login/page.tsx               — POS PIN login
 src/app/pos/end-of-day/page.tsx          — End-of-day cash count & reconciliation
 src/app/pos/jobs/page.tsx                — Jobs management
+src/app/pos/jobs/components/schedule-types.ts  — Item 15e Phase 1A: PosScheduleEntry type (future-appointment shape for the Jobs Schedule scope; scope:'schedule' discriminator vs JobListItem)
 src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx  # 3 tests — pins Item 15g Layer 15g-i handleCheckout dispatch (RESTORE_TICKET coupon=null → SET_COUPON via /api/pos/coupons/validate) + idempotency
 src/app/pos/appointments/page.tsx        — Appointments view (Roadmap Item 12 — POS footer reschedule surface)
 src/app/pos/offline/page.tsx             — Offline fallback page

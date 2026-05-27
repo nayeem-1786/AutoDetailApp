@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
-import { pstStartOfDayLiteral } from '@/lib/utils/pst-date';
+import { pstStartOfDayLiteral, getTodayPst } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 
 /**
@@ -27,14 +27,24 @@ export async function POST(request: NextRequest) {
       // No body or invalid JSON — use today
     }
 
+    const today = getTodayPst();
     const targetDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
       ? dateParam
-      : new Intl.DateTimeFormat('en-CA', {
-          timeZone: 'America/Los_Angeles',
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }).format(new Date());
+      : today;
+
+    // Item 15e Phase 1A — populate gate (load-bearing invariant of the retire arc).
+    // Populate materializes jobs for TODAY's (or past) work only. A FUTURE-dated
+    // appointment must NEVER become a job row early — whether from navigating the
+    // POS Jobs queue to a future date or a stray future 'confirmed' booking. The
+    // Schedule scope (GET /api/pos/jobs/schedule) reads those appointments without
+    // materializing them. See docs/dev/ITEM_15E_POS_JOBS_UNIFIED_OPERATIONS_AUDIT.md
+    // (Risk matrix: premature job materialization — HIGH severity).
+    if (targetDate > today) {
+      console.log(`[populate] skipped — future date ${targetDate}`);
+      return NextResponse.json({
+        data: { created: 0, jobs: [], skipped: 'future_date' },
+      });
+    }
 
     // Get target date's confirmed appointments
     const { data: appointments, error: aptError } = await supabase
