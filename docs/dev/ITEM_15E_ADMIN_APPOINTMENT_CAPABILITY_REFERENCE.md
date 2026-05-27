@@ -1,3 +1,48 @@
+> **REFRAMED 2026-05-27 (post-merge of audit `1927d4b2`).** Originally drafted
+> as "POS Appointments Modal Parity Audit" framing — landed on main 2026-05-27
+> as part of the SMS-AI v2 audit-and-validate arc's final session. Operator
+> review surfaced a scope reframe within minutes of merge: POS Appointments
+> tab is being retired in favor of POS Jobs as the unified day-of operations
+> surface, absorbing the original Item 15d intent.
+>
+> This document is preserved (renamed from
+> `ITEM_15E_POS_APPOINTMENTS_MODAL_PARITY_AUDIT.md`) as the **Admin Appointment
+> capability reference inventory** (Target 1) + reuse pattern map (Target 3)
+> + D45/D46/D48 interaction analysis (Target 5) + Workstream K walk-in
+> baseline (Target 8). The new audit at
+> `docs/dev/ITEM_15E_POS_JOBS_UNIFIED_OPERATIONS_AUDIT.md` (landing in the
+> session after this reframing prep) will reference these sections.
+>
+> **Sections still valid (use as reference):**
+> - **Target 1:** Admin Appointment Dialog capability inventory (17 mutable +
+>   9 readonly = 26 capabilities at
+>   `src/app/admin/appointments/components/appointment-detail-dialog.tsx`)
+> - **Target 3:** Shared infrastructure patterns + reuse recommendations
+>   (Pattern C architecture; 5 helpers already shared:
+>   `<EditMobileModal>`, `<ModifierSummary>`, `<PaymentMismatchBanner>`,
+>   `composeLineItems`, `formatChannelLabel`; 1 extraction needed at
+>   `/api/appointments/[id]/route.ts:11-187` → new
+>   `src/lib/appointments/update-appointment.ts`)
+> - **Target 5:** D45/D46/D47/D48 interactions (16th visual surface flagged
+>   — 3 POS appointment endpoints need `quantity` SELECT widening)
+> - **Target 8:** Workstream K walk-in identity interaction (Admin channel-
+>   label drift noted; POS has zero channel awareness today)
+>
+> **Sections OBSOLETED by reframing (do NOT use as reference):**
+> - **Target 2:** POS Appointments View current state — factually accurate for
+>   current code, but the gap analysis assumed POS Appointments tab persists.
+>   New audit reframes against POS Jobs unification.
+> - **Target 6:** Item 15c interaction — assumed POS Appointments tab persists
+> - **Target 7:** Item 15d implication — Item 15d is being ABSORBED into 15e,
+>   not downstream
+> - **Target 9:** Implementation scope estimate (3 phases / 6-9 hours) —
+>   obsolete; new audit produces phased plan against unification scope
+> - **Target 10:** Verification plan — obsolete (different phases)
+> - **Target 11:** Open operator decisions (11 decisions) — obsolete; new
+>   audit reformulates the decision set against unification direction
+
+---
+
 # Item 15e — POS Appointments Modal Capability Parity Audit (2026-05-27)
 
 > Read-only diagnostic audit. NO source code changes, NO migrations, NO test
