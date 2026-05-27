@@ -15,9 +15,14 @@ import type { JobStatus } from '@/lib/supabase/types';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { JobTimeline } from './job-timeline';
 import { List, CalendarDays } from 'lucide-react';
+import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
+import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { toast } from 'sonner';
+import type { PosScheduleEntry } from './schedule-types';
 
 type FilterType = 'mine' | 'all' | 'unassigned';
 type ViewMode = 'list' | 'timeline';
+type ScopeMode = 'today' | 'schedule';
 
 export interface JobListItem {
   id: string;
@@ -204,6 +209,32 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     setViewMode(mode);
     localStorage.setItem('pos-jobs-view', mode);
   }, []);
+
+  // ─── Item 15e Phase 1B — Today / Schedule scope ───────────────────────────
+  // Gated behind the pos_jobs_unified_schedule flag. When the flag is OFF,
+  // effectiveScope is pinned to 'today' so behavior is byte-identical to
+  // pre-15e: the toggle never renders and the Schedule code paths never run.
+  const { enabled: scheduleScopeEnabled } = useFeatureFlag(FEATURE_FLAGS.POS_JOBS_UNIFIED_SCHEDULE);
+  const [scope, setScope] = useState<ScopeMode>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('pos-jobs-scope') as ScopeMode) || 'today';
+    }
+    return 'today';
+  });
+  const effectiveScope: ScopeMode = scheduleScopeEnabled ? scope : 'today';
+  const handleScopeChange = useCallback((s: ScopeMode) => {
+    setScope(s);
+    localStorage.setItem('pos-jobs-scope', s);
+  }, []);
+  // Mirror effectiveScope into a ref so the populate guard (defense layer 3)
+  // reads the latest scope without `scope` entering populate's dep array
+  // (avoids stale-closure churn on the dedup set).
+  const scopeRef = useRef<ScopeMode>(effectiveScope);
+  useEffect(() => { scopeRef.current = effectiveScope; }, [effectiveScope]);
+
+  const [scheduleEntries, setScheduleEntries] = useState<PosScheduleEntry[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [populating, setPopulating] = useState(false);
@@ -268,6 +299,9 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
   // Silent poll — no loading spinner, with change detection
   const pollJobs = useCallback(async () => {
+    // Phase 1B: the Schedule scope does not poll the jobs list (defense in
+    // depth — also gated at the interval/visibility effects).
+    if (scopeRef.current !== 'today') return;
     if (document.visibilityState !== 'visible') return;
     if (timelineInteracting) return;
 
@@ -337,10 +371,11 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
   // Polling interval
   useEffect(() => {
+    if (effectiveScope !== 'today') return; // Schedule scope is not live-polled.
     const interval = diff < 0 ? POLL_MS_PAST : POLL_MS_ACTIVE;
     const id = setInterval(pollJobs, interval);
     return () => clearInterval(id);
-  }, [pollJobs, diff]);
+  }, [pollJobs, diff, effectiveScope]);
 
   // Fetch immediately when tab becomes visible
   useEffect(() => {
@@ -354,6 +389,12 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   }, [pollJobs, timelineInteracting]);
 
   const populateFromAppointments = useCallback(async (date: string) => {
+    // GATE C (Item 15e Phase 1B, defense in depth): never materialize jobs in
+    // Schedule scope, even if invoked outside the gated init effect. This is
+    // the function-level half of the load-bearing populate gate — see the
+    // audit Risk matrix + the invariant tests in
+    // __tests__/job-queue-schedule-scope.test.tsx.
+    if (scopeRef.current !== 'today') return;
     if (populatedDates.current.has(date)) return;
     populatedDates.current.add(date);
     setPopulating(true);
@@ -376,14 +417,40 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     }
   }, [fetchJobs]);
 
-  // Init: populate + fetch on mount and when date/filter changes
+  // Schedule scope data source (Item 15e Phase 1B). Reads upcoming
+  // appointments from the dedicated endpoint — a PURE READ that never
+  // materializes jobs. Window: tomorrow → tomorrow+30d (PST).
+  const fetchSchedule = useCallback(async () => {
+    setScheduleLoading(true);
+    try {
+      const from = addDays(getTodayPst(), 1);
+      const to = addDays(from, 30);
+      const res = await posFetch(`/api/pos/jobs/schedule?from=${from}&to=${to}`);
+      if (res.ok) {
+        const { data } = await res.json();
+        setScheduleEntries(data ?? []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch schedule:', err);
+    } finally {
+      setScheduleLoading(false);
+    }
+  }, []);
+
+  // Init: populate + fetch on mount and when date / scope changes
   useEffect(() => {
     async function init() {
+      // GATE A (Item 15e Phase 1B): the Schedule scope NEVER triggers populate.
+      // It reads upcoming appointments via the dedicated endpoint instead.
+      if (effectiveScope === 'schedule') {
+        await fetchSchedule();
+        return;
+      }
       await populateFromAppointments(selectedDate);
       await fetchJobs(selectedDate);
     }
     init();
-  }, [selectedDate, populateFromAppointments, fetchJobs]);
+  }, [selectedDate, effectiveScope, populateFromAppointments, fetchJobs, fetchSchedule]);
 
   // Sort by status priority
   const sortedJobs = useMemo(() =>
@@ -408,6 +475,12 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
+              // GATE B (Item 15e Phase 1B): Refresh in Schedule scope re-fetches
+              // the read-only endpoint — it must NOT trigger populate.
+              if (effectiveScope === 'schedule') {
+                fetchSchedule();
+                return;
+              }
               populatedDates.current.delete(selectedDate);
               populateFromAppointments(selectedDate);
               fetchJobs(selectedDate);
@@ -430,6 +503,41 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         </div>
       </div>
 
+      {/* Scope toggle (Item 15e Phase 1B — flag-gated; mirrors the view-mode toggle) */}
+      {scheduleScopeEnabled && (
+        <div className="flex items-center justify-center gap-1 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-1.5">
+          <button
+            onClick={() => handleScopeChange('today')}
+            className={cn(
+              'flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium transition-colors',
+              effectiveScope === 'today'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            )}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Today
+          </button>
+          <button
+            onClick={() => handleScopeChange('schedule')}
+            className={cn(
+              'flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium transition-colors',
+              effectiveScope === 'schedule'
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+            )}
+          >
+            <Calendar className="h-3.5 w-3.5" />
+            Schedule
+          </button>
+        </div>
+      )}
+
+      {/* Today-scope chrome — date nav, summary, filters, view toggle. Hidden in
+          Schedule scope (which shows a 30-day range, not a single day). When the
+          flag is OFF, effectiveScope is always 'today' so this renders unchanged. */}
+      {effectiveScope === 'today' && (
+      <>
       {/* Date Navigation */}
       <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2">
         <button
@@ -557,9 +665,17 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           Timeline
         </button>
       </div>
+      </>
+      )}
 
       {/* Content area */}
-      {viewMode === 'timeline' ? (
+      {effectiveScope === 'schedule' ? (
+        <ScheduleScopeList
+          entries={scheduleEntries}
+          loading={scheduleLoading}
+          onTapPlaceholder={() => toast.info('Upcoming appointment detail — coming in Phase 2')}
+        />
+      ) : viewMode === 'timeline' ? (
         <JobTimeline
           jobs={sortedJobs}
           loading={loading}
@@ -749,6 +865,97 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         )}
       </div>
       )}
+    </div>
+  );
+}
+
+// ─── Item 15e Phase 1B — Schedule scope list ─────────────────────────────────
+// Renders upcoming appointments (PosScheduleEntry) in the same card visual
+// language as the Today job list. READ-ONLY in Phase 1 — a tap shows a
+// placeholder toast; reschedule / cancel / detail arrive in Phase 2. No job-
+// specific chrome (timer, photos, addons, checkout) since these are not yet
+// materialized jobs.
+
+interface ScheduleScopeListProps {
+  entries: PosScheduleEntry[];
+  loading: boolean;
+  onTapPlaceholder: () => void;
+}
+
+function ScheduleScopeList({ entries, loading, onTapPlaceholder }: ScheduleScopeListProps) {
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center bg-gray-50 dark:bg-gray-800 py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-500 border-t-transparent" />
+      </div>
+    );
+  }
+  if (entries.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center bg-gray-50 dark:bg-gray-800 py-16 text-gray-500 dark:text-gray-400">
+        <Calendar className="mb-3 h-10 w-10 text-gray-300 dark:text-gray-500" />
+        <p className="text-sm font-medium">No upcoming appointments</p>
+        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">The next 30 days are clear.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-4">
+      <div className="space-y-2">
+        {entries.map((entry) => {
+          const serviceNames = entry.appointment_services
+            .map((s) => s.service?.name)
+            .filter(Boolean)
+            .join(', ');
+          const serviceTotal = Number(entry.total_amount ?? 0);
+          const time = formatTime12h(entry.scheduled_start_time);
+          const dateLabel = new Date(entry.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+          });
+          return (
+            <div
+              key={entry.id}
+              role="button"
+              tabIndex={0}
+              onClick={onTapPlaceholder}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTapPlaceholder(); } }}
+              className="w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-all hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800"
+            >
+              <div className="flex items-start justify-between">
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {entry.customer
+                      ? `${entry.customer.first_name} ${entry.customer.last_name}`
+                      : 'Unknown Customer'}
+                  </span>
+                  <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{formatVehicle(entry.vehicle)}</p>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <p className="min-w-0 flex-1 truncate text-xs text-gray-400 dark:text-gray-500">
+                      {serviceNames || 'No services'}
+                    </p>
+                    {serviceTotal > 0 && (
+                      <span className="shrink-0 text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {formatCurrency(serviceTotal)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="ml-3 flex flex-col items-end gap-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">
+                    <Calendar className="h-3 w-3" />
+                    Schedule
+                  </span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {dateLabel}{time ? ` · ${time}` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

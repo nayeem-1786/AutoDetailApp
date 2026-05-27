@@ -6,6 +6,61 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 1B — client wiring: Today/Schedule scope toggle + populate gate (2026-05-27)
+
+Client-side completion of Item 15e Phase 1 (the retire arc's foundation), built
+on the merged Phase 1A server foundation. Wires the 1A Schedule endpoint into
+the POS Jobs queue behind a feature flag and lands the **client-side
+load-bearing invariant: Schedule scope NEVER triggers populate.**
+
+- **Feature flag** `pos_jobs_unified_schedule` — key added to `FEATURE_FLAGS`
+  (`src/lib/utils/constants.ts`); seeded **disabled** via migration
+  `20260527000000_pos_jobs_unified_schedule_flag.sql` (`ON CONFLICT DO NOTHING`,
+  mirrors the qbo_enabled seed). Flag OFF ⇒ `effectiveScope` is pinned to
+  `'today'`, so behavior is byte-identical to pre-1B (toggle never renders,
+  Schedule code paths never run). This is the rollback path.
+- **Today / Schedule scope toggle** in `job-queue.tsx` — mirrors the existing
+  view-mode toggle UI; `scope` persisted to `localStorage` (`pos-jobs-scope`);
+  rendered only when the flag is enabled. Schedule scope hides date navigation,
+  the daily summary, filter pills, and the view-mode toggle (Today-only chrome).
+- **Three defense layers on the populate gate**, all conditional on
+  `scope === 'today'`: (A) the `init()` useEffect — Schedule scope calls
+  `fetchSchedule()` and returns, never `populateFromAppointments`; (B) the
+  Refresh button — Schedule scope re-fetches the endpoint, no populate;
+  (C) a function-level guard at the top of `populateFromAppointments`
+  (`scopeRef.current !== 'today'` → early return) so it refuses to materialize
+  even if invoked outside the gated effect. `pollJobs` + its interval are also
+  gated (Schedule scope is not live-polled). `scopeRef` avoids adding `scope`
+  to the populate callback's deps (no stale-closure churn on the dedup set).
+- **Schedule list** — a read-only `ScheduleScopeList` renders `PosScheduleEntry`
+  rows in the same card visual language (customer, vehicle, services, total) with
+  a "Schedule" badge + date/time, and NO job-specific chrome. A tap shows a
+  placeholder toast ("Upcoming appointment detail — coming in Phase 2"); no
+  state mutation. Reschedule/cancel/detail are Phase 2.
+
+Tests: +9 (`job-queue-schedule-scope.test.tsx`) — 6 in the load-bearing
+invariant block (Schedule mount/toggle/refresh never populate; Schedule→Today
+DOES populate; date nav hidden in Schedule; flag-OFF safety net pins Today) + 3
+scope-toggle UI tests. The block carries the CRITICAL-INVARIANT header comment.
+
+Gates: tsc 0 errors; lint 0 errors / 97 warnings (baseline unchanged); `npm test`
+**2464/2464** (2455 + 9); build clean. NO schema migration (flag is a data seed).
+Untouched: admin appointment dialog, POS Appointments tab UI,
+`GET /api/pos/appointments`, walk-in creation, `job-detail.tsx`, D43–D50,
+D45–D48 helpers, no new permission keys. **Phase 1 (1A + 1B) is now complete.**
+Deploy: NO — DO NOT merge until operator verifies tests + diff + manual
+verification (flag OFF regression; flag ON Today/Schedule). Phase 2 = Schedule
+reschedule/cancel + lazy-materialize + appointment-edit extraction.
+
+Files:
+- src/app/pos/jobs/components/job-queue.tsx (MOD — scope toggle, 3 gates, Schedule list)
+- src/lib/utils/constants.ts (MOD — flag key)
+- supabase/migrations/20260527000000_pos_jobs_unified_schedule_flag.sql (NEW — flag seed, disabled)
+- src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx (NEW — 9 tests)
+- docs/dev/ROADMAP-13-ITEMS.md (ledger #102), docs/dev/FILE_TREE.md, docs/CHANGELOG.md
+
+---
+
 ## Item 15e Phase 1A — Schedule scope endpoint + populate gate (2026-05-27)
 
 Server foundation for the POS Jobs unified day-of surface (Item 15e retire arc,
