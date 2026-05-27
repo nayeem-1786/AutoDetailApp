@@ -6,6 +6,27 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e reframing prep (2026-05-27)
+
+Doc-only session reframing Item 15e per operator direction within minutes of
+the original audit merging to main (`1927d4b2`). Existing POS Appointments
+Modal Parity audit renamed to Admin Appointment capability reference inventory
+(preserves valuable research — Admin 26-capability inventory, shared-helper
+map, D48 16th-surface catch, Workstream K walk-in baseline). ROADMAP updated:
+Item 15e becomes "POS Jobs Unified Operations View" (absorbs Item 15d); Item
+15d marked 🔀 absorbed. New audit on POS Jobs unification + retire-vs-complete
+evaluation for POS Appointments tab lands in the next session.
+
+Files:
+- docs/dev/ITEM_15E_POS_APPOINTMENTS_MODAL_PARITY_AUDIT.md →
+  docs/dev/ITEM_15E_ADMIN_APPOINTMENT_CAPABILITY_REFERENCE.md
+  (renamed via `git mv`; preamble note prepended documenting preserved vs
+  obsoleted sections)
+- docs/dev/ROADMAP-13-ITEMS.md (Item 15e + 15d scope + roll-up + ledger #99)
+- docs/CHANGELOG.md
+
+---
+
 ## Audit Item 15e — POS Appointments Modal capability parity with Admin (2026-05-27)
 
 Read-only diagnostic audit. NO `src/` changes, NO migrations, NO test changes.
