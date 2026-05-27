@@ -6,6 +6,63 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 1A — Schedule scope endpoint + populate gate (2026-05-27)
+
+Server foundation for the POS Jobs unified day-of surface (Item 15e retire arc,
+Phase 1 of 5). **Split from the planned Phase 1** per Memory #8: the full phase
+came to 5 production files / ~345 lines (>3 files / >300 lines), so the operator
+approved doing 1A (server) now and 1B (client wiring) next session.
+
+What 1A delivers — the load-bearing populate gate, in two layers tested here:
+
+- **New `GET /api/pos/jobs/schedule`** (`src/app/api/pos/jobs/schedule/route.ts`):
+  a PURE-READ endpoint returning future appointments (default tomorrow→+30d;
+  a hard floor clamps any `from ≤ today` up to tomorrow), excluding
+  cancelled/no_show/completed and excluding appointments that already have a
+  materialized job (two-step appointments→jobs dedup, mirroring populate). The
+  `appointment_services` SELECT includes `quantity` proactively (D48) so Phase 2
+  needs no widening. Permission `appointments.view_today` (no new keys). Makes
+  ZERO writes to the `jobs` table — surfacing a future appointment never
+  materializes a job.
+- **Populate gate** (`src/app/api/pos/jobs/populate/route.ts`): short-circuits
+  BEFORE any DB query when `targetDate > getTodayPst()`, logs
+  `[populate] skipped — future date {date}`, and returns
+  `{created:0, skipped:'future_date'}`. The inline today-default was DRYed to
+  `getTodayPst()` so the gate and default share one source of truth (no behavior
+  change). Past/today still populate as before.
+- **New type `PosScheduleEntry`** (`src/app/pos/jobs/components/schedule-types.ts`)
+  with a `scope:'schedule'` discriminator, co-located with `job-queue.tsx` /
+  `JobListItem` (the brief's `pos/components/jobs/` path does not exist).
+
+Tests: +20 (12 schedule endpoint + 8 populate gate), both files carry the
+CRITICAL-INVARIANT header comment. The server-side half of the populate gate is
+fully covered: a future-dated populate makes zero DB calls and zero upserts;
+today/past still materializes.
+
+NOT in 1A (Phase 1B, next session): the `job-queue.tsx` Today/Schedule scope
+toggle, the `pos_jobs_unified_schedule` feature flag, and the client-side
+load-bearing invariant test. The new endpoint is inert until 1B calls it, so
+flag-OFF behavior is unchanged. (Also corrected the brief's populate-trigger
+line ref: the primary trigger is the `init()` useEffect at `job-queue.tsx:380-386`,
+not the Refresh button at `:411-413` — 1B gates both.)
+
+Gates: tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test`
+2455/2455 (2435 + 20); build clean. No migrations. Untouched: admin appointment
+dialog, POS Appointments tab UI, GET `/api/pos/appointments`, walk-in creation,
+`job-detail.tsx`, D43–D50, D45–D48 helpers. Deploy: NO — DO NOT merge until
+operator verifies; Phase 1B branches off merged 1A.
+
+Files:
+- src/app/api/pos/jobs/schedule/route.ts (NEW)
+- src/app/api/pos/jobs/schedule/__tests__/route.test.ts (NEW)
+- src/app/pos/jobs/components/schedule-types.ts (NEW)
+- src/app/api/pos/jobs/populate/route.ts (MOD — future-date gate)
+- src/app/api/pos/jobs/populate/__tests__/route.test.ts (NEW)
+- docs/dev/ROADMAP-13-ITEMS.md (ledger #101)
+- docs/CHANGELOG.md
+
+---
+
 ## Audit Item 15e (new framing) — POS Jobs Unified Operations View (2026-05-27)
 
 Read-only diagnostic audit. NO `src/` changes, NO migrations, NO test changes.
