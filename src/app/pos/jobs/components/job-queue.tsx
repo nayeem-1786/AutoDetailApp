@@ -16,9 +16,20 @@ import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehic
 import { JobTimeline } from './job-timeline';
 import { List, CalendarDays } from 'lucide-react';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
-import { FEATURE_FLAGS } from '@/lib/utils/constants';
+import { FEATURE_FLAGS, APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import { toast } from 'sonner';
 import type { PosScheduleEntry } from './schedule-types';
+// Item 15e Phase 2B — reuse the dual-context-safe admin dialog (parameterized
+// in Phase 2A) inside the POS Jobs Schedule scope. The dialog is the same
+// component admin mounts; POS passes the context props (mobileModalMode="pos",
+// modifierVariant="pos", onEditInPos no-op). Cancel hands off to the existing
+// POS cancel dialog (Item 15b). See docs/dev/ITEM_15E_PHASE_2_REUSE_VERIFICATION.md.
+import { AppointmentDetailDialog } from '@/app/admin/appointments/components/appointment-detail-dialog';
+import { CancelAppointmentDialog } from '../../components/appointments/cancel-appointment-dialog';
+import type { PosAppointment } from '../../components/appointments/types';
+import type { AppointmentWithRelations } from '@/lib/appointments/types';
+import type { AppointmentUpdateInput } from '@/lib/utils/validation';
+import type { Employee, AppointmentStatus } from '@/lib/supabase/types';
 
 type FilterType = 'mine' | 'all' | 'unassigned';
 type ViewMode = 'list' | 'timeline';
@@ -138,6 +149,25 @@ function getAddonBadge(addons: { id: string; status: string }[] | null): { label
   return null;
 }
 
+// Item 15e Phase 2B — pending/status pill for Schedule cards. POS-local
+// (deliberately NOT sharing admin's STATUS_DOT_COLORS — admin uses small
+// text-less calendar dots; POS uses labelled pills, a different visual
+// treatment). Dark-aware per Rule #10. Pill text comes from
+// APPOINTMENT_STATUS_LABELS.
+function getAppointmentStatusPillClasses(status: AppointmentStatus): string {
+  const base = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium';
+  switch (status) {
+    case 'pending':
+      return `${base} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300`;
+    case 'confirmed':
+      return `${base} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300`;
+    case 'in_progress':
+      return `${base} bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300`;
+    default:
+      return `${base} bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200`;
+  }
+}
+
 // ─── Date helpers ───────────────────────────────────────────────
 
 function getTodayPst(): string {
@@ -189,6 +219,12 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const searchParams = useSearchParams();
   const { employee } = usePosAuth();
   const { granted: canCreateWalkIn } = usePosPermission('pos.jobs.manage');
+  // Item 15e Phase 2B — per-field gates for the Schedule-scope detail dialog.
+  // Same keys admin uses; no new permission keys. The server PATCH (Phase 2A)
+  // re-checks each independently, so these gates are UX-only.
+  const { granted: canReschedule } = usePosPermission('appointments.reschedule');
+  const { granted: canCancel } = usePosPermission('appointments.cancel');
+  const { granted: canAddNotes } = usePosPermission('appointments.add_notes');
   const isBookable = employee?.bookable_for_appointments ?? false;
 
   // Date from URL or today
@@ -234,6 +270,21 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
   const [scheduleEntries, setScheduleEntries] = useState<PosScheduleEntry[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
+
+  // ─── Item 15e Phase 2B — Schedule-scope appointment detail dialog ──────────
+  // Tapping a Schedule card fetches the full appointment + bookable staff, then
+  // mounts the reused admin AppointmentDetailDialog. Cancel hands off to the
+  // POS CancelAppointmentDialog. `selectedAppointment` is typed as the admin
+  // AppointmentWithRelations the dialog expects; the GET payload is structurally
+  // a PosAppointment (only the nested `service` is nullable), which the dialog
+  // reads via optional chaining — so the shapes interoperate safely.
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithRelations | null>(null);
+  const [detailEmployees, setDetailEmployees] = useState<
+    Array<Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'>>
+  >([]);
+  const [loadingAppointment, setLoadingAppointment] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<PosAppointment | null>(null);
 
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -436,6 +487,89 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       setScheduleLoading(false);
     }
   }, []);
+
+  // ─── Item 15e Phase 2B — Schedule card tap → fetch → mount dialog ──────────
+  // Mirrors the change-time-button.tsx template (Rule 11 reuse): parallel-fetch
+  // the full appointment + bookable staff, then mount the reused dialog. All
+  // fetches go through posFetch (401 → session-expiry redirect).
+  const handleScheduleCardTap = useCallback(async (id: string) => {
+    setSelectedAppointmentId(id);
+    setLoadingAppointment(true);
+    try {
+      const [apptRes, staffRes] = await Promise.all([
+        posFetch(`/api/pos/appointments/${id}`),
+        posFetch('/api/pos/staff/available'),
+      ]);
+      if (!apptRes.ok) {
+        const err = await apptRes.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to load appointment');
+        setSelectedAppointmentId(null);
+        return;
+      }
+      const { data } = await apptRes.json();
+      setSelectedAppointment(data);
+      if (staffRes.ok) {
+        const { data: staffData } = await staffRes.json();
+        setDetailEmployees(staffData ?? []);
+      } else {
+        setDetailEmployees([]);
+      }
+    } catch (err) {
+      console.error('Failed to load appointment:', err);
+      toast.error('Failed to load appointment');
+      setSelectedAppointmentId(null);
+    } finally {
+      setLoadingAppointment(false);
+    }
+  }, []);
+
+  const closeDetailDialog = useCallback(() => {
+    setSelectedAppointmentId(null);
+    setSelectedAppointment(null);
+    setDetailEmployees([]);
+  }, []);
+
+  // onSave → the combined POS PATCH (Phase 2A). Returns true on success so the
+  // dialog closes itself; the webhook firing happens server-side. On success we
+  // also refetch the Schedule list so the card reflects the new status/time.
+  const handleSaveAppointment = useCallback(
+    async (id: string, data: AppointmentUpdateInput): Promise<boolean> => {
+      try {
+        const res = await posFetch(`/api/pos/appointments/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          toast.error(err.error || 'Failed to save appointment');
+          return false;
+        }
+        closeDetailDialog();
+        await fetchSchedule();
+        toast.success('Appointment updated');
+        return true;
+      } catch (err) {
+        console.error('Failed to save appointment:', err);
+        toast.error('Failed to save appointment');
+        return false;
+      }
+    },
+    [fetchSchedule, closeDetailDialog]
+  );
+
+  // onCancel → close the detail dialog, open the POS cancel dialog. The dialog
+  // passes back the appointment it was mounted with (AppointmentWithRelations);
+  // it is assignable to PosAppointment (the cancel dialog's prop type).
+  const handleCancelAppointment = useCallback(
+    (appointment: AppointmentWithRelations) => {
+      setSelectedAppointmentId(null);
+      setSelectedAppointment(null);
+      setDetailEmployees([]);
+      setCancelTarget(appointment);
+    },
+    []
+  );
 
   // Init: populate + fetch on mount and when date / scope changes
   useEffect(() => {
@@ -673,7 +807,8 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         <ScheduleScopeList
           entries={scheduleEntries}
           loading={scheduleLoading}
-          onTapPlaceholder={() => toast.info('Upcoming appointment detail — coming in Phase 2')}
+          onSelectAppointment={handleScheduleCardTap}
+          busyAppointmentId={loadingAppointment ? selectedAppointmentId : null}
         />
       ) : viewMode === 'timeline' ? (
         <JobTimeline
@@ -865,24 +1000,65 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         )}
       </div>
       )}
+      {/* Item 15e Phase 2B — Schedule-scope detail dialog. The reused admin
+          AppointmentDetailDialog with POS context props. Only reachable in
+          Schedule scope (flag-gated); admin behavior is unaffected because the
+          admin parent never passes these props. */}
+      {selectedAppointment && (
+        <AppointmentDetailDialog
+          open={selectedAppointmentId !== null}
+          onOpenChange={(open) => {
+            if (!open) closeDetailDialog();
+          }}
+          appointment={selectedAppointment}
+          employees={detailEmployees}
+          onSave={handleSaveAppointment}
+          onCancel={handleCancelAppointment}
+          canReschedule={canReschedule}
+          canCancel={canCancel}
+          canAddNotes={canAddNotes}
+          mobileModalMode="pos"
+          modifierVariant="pos"
+          onEditInPos={() => {
+            /* no-op: already in POS — suppresses the admin deep-link button */
+          }}
+        />
+      )}
+
+      {/* Item 15e Phase 2B — POS cancel dialog (Item 15b), opened from the
+          detail dialog's onCancel handoff. */}
+      {cancelTarget && (
+        <CancelAppointmentDialog
+          open
+          appointment={cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          onCancelled={async () => {
+            setCancelTarget(null);
+            await fetchSchedule();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// ─── Item 15e Phase 1B — Schedule scope list ─────────────────────────────────
+// ─── Item 15e Phase 1B / 2B — Schedule scope list ────────────────────────────
 // Renders upcoming appointments (PosScheduleEntry) in the same card visual
-// language as the Today job list. READ-ONLY in Phase 1 — a tap shows a
-// placeholder toast; reschedule / cancel / detail arrive in Phase 2. No job-
-// specific chrome (timer, photos, addons, checkout) since these are not yet
-// materialized jobs.
+// language as the Today job list. Phase 2B: a tap fetches the full appointment
+// and opens the reused detail dialog (was a placeholder toast in Phase 1B).
+// Each card carries an appointment-status pill. No job-specific chrome (timer,
+// photos, addons, checkout) since these are not yet materialized jobs.
 
 interface ScheduleScopeListProps {
   entries: PosScheduleEntry[];
   loading: boolean;
-  onTapPlaceholder: () => void;
+  onSelectAppointment: (id: string) => void;
+  // Item 15e Phase 2B — the appointment currently being fetched (tap → load),
+  // so its card can show a loading affordance. null when idle.
+  busyAppointmentId: string | null;
 }
 
-function ScheduleScopeList({ entries, loading, onTapPlaceholder }: ScheduleScopeListProps) {
+function ScheduleScopeList({ entries, loading, onSelectAppointment, busyAppointmentId }: ScheduleScopeListProps) {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center bg-gray-50 dark:bg-gray-800 py-12">
@@ -914,14 +1090,19 @@ function ScheduleScopeList({ entries, loading, onTapPlaceholder }: ScheduleScope
             month: 'short',
             day: 'numeric',
           });
+          const isBusy = busyAppointmentId === entry.id;
           return (
             <div
               key={entry.id}
               role="button"
               tabIndex={0}
-              onClick={onTapPlaceholder}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTapPlaceholder(); } }}
-              className="w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-all hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800"
+              aria-busy={isBusy}
+              onClick={() => onSelectAppointment(entry.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectAppointment(entry.id); } }}
+              className={cn(
+                'w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-all hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800',
+                isBusy && 'opacity-60 pointer-events-none'
+              )}
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
@@ -943,6 +1124,10 @@ function ScheduleScopeList({ entries, loading, onTapPlaceholder }: ScheduleScope
                   </div>
                 </div>
                 <div className="ml-3 flex flex-col items-end gap-1">
+                  {/* Item 15e Phase 2B — appointment-status pill (pending = amber, etc.) */}
+                  <span className={getAppointmentStatusPillClasses(entry.status)}>
+                    {APPOINTMENT_STATUS_LABELS[entry.status] ?? entry.status}
+                  </span>
                   <span className="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">
                     <Calendar className="h-3 w-3" />
                     Schedule
