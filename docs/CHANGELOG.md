@@ -6,6 +6,48 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2A — shared lift + dialog parameterization + POS PATCH endpoint (2026-05-27)
+
+Foundation half of Phase 2 (Memory #8 split). Makes the admin
+`AppointmentDetailDialog` dual-context-safe and builds its POS backing route, so
+Phase 2B can mount it in the POS Jobs **Schedule** scope. **Admin behavior is
+byte-identical; the new POS endpoint is inert until 2B wires it.**
+
+**Shared type lift** (low blast radius — re-export keeps all admin importers untouched):
+- NEW `src/lib/appointments/status-transitions.ts` — `STATUS_TRANSITIONS` lifted from
+  admin `appointments/types.ts`.
+- NEW `src/lib/appointments/types.ts` — `AppointmentService` + `AppointmentWithRelations`
+  lifted (structurally equivalent to POS `PosAppointment`; convergence deferred).
+- `src/app/admin/appointments/types.ts` now re-exports the three; admin-only
+  `STATUS_DOT_COLORS` stays put (not needed by POS until 2B decides on the pending pill).
+- The 5 admin importers of `AppointmentWithRelations` need zero edits (verified via tsc).
+
+**Dialog parameterization** (`appointment-detail-dialog.tsx`):
+- 3 new optional props, all defaulting to admin behavior: `mobileModalMode` (→
+  `EditMobileModal` auth surface), `modifierVariant` (→ `ModifierSummary` styling),
+  and `onEditInPos` (overrides the admin `router.push(returnTo=/admin/appointments)`
+  deep-link).
+- Full `dark:` variant pass across the ~370-line light-only body, matching existing
+  POS gray-scale conventions. `dark:` is a no-op outside `.dark`, so admin cannot regress.
+
+**New combined POS endpoint** — `PATCH /api/pos/appointments/[id]` (appended beside the
+existing Item-15c GET):
+- HMAC `authenticatePosRequest` + per-field `checkPosPermission`
+  (`appointments.reschedule` / `.update_status` / `.add_notes`).
+- Webhooks FIRE on `appointment_confirmed` / `appointment_completed` /
+  `appointment_rescheduled` (Phase 2 Decision 2 — NOT suppressed, unlike the narrower
+  POS reschedule/cancel endpoints).
+- `STATUS_TRANSITIONS` enforced server-side (Decision 3 — e.g. `completed`→`pending`
+  rejected); overlap check + jobs.assigned_staff_id sync + full joined `PosAppointment`
+  response mirror the POS reschedule endpoint. No new permission keys, no migration.
+- +17 tests (`__tests__/patch.test.ts`).
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test` 2481/2481
+(2464 + 17); build clean. No migrations. **Phase 2B (next):** mount + wire the dialog
+into the POS Schedule scope + Schedule status pill.
+
+---
+
 ## Item 15e Phase 2 — AppointmentDetailDialog reuse verification audit (2026-05-27)
 
 Read-only feasibility audit answering *if and how* the admin

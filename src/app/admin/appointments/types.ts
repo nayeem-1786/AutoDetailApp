@@ -1,34 +1,19 @@
-import type { Appointment, AppointmentStatus, Customer, Vehicle, Employee } from '@/lib/supabase/types';
+import type { AppointmentStatus } from '@/lib/supabase/types';
 
-export interface AppointmentService {
-  id: string;
-  service_id: string;
-  price_at_booking: number;
-  tier_name: string | null;
-  service: {
-    id: string;
-    name: string;
-  };
-}
+// Item 15e Phase 2A — STATUS_TRANSITIONS, AppointmentService, and
+// AppointmentWithRelations were lifted to src/lib/appointments/ so the POS
+// Schedule-scope reuse of the admin Appointment detail dialog can share one
+// canonical source. Re-exported here for backward compatibility: the 5 admin
+// files that import these names from this module need no edits.
+export { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
+export type {
+  AppointmentService,
+  AppointmentWithRelations,
+} from '@/lib/appointments/types';
 
-export interface AppointmentWithRelations extends Appointment {
-  customer: Pick<Customer, 'id' | 'first_name' | 'last_name' | 'phone' | 'email'>;
-  vehicle: Pick<Vehicle, 'id' | 'year' | 'make' | 'model' | 'color' | 'size_class'> | null;
-  employee: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'> | null;
-  appointment_services: AppointmentService[];
-}
-
-// Valid next-states for each appointment status
-export const STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  pending: ['confirmed', 'cancelled', 'no_show'],
-  confirmed: ['in_progress', 'cancelled', 'no_show'],
-  in_progress: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-  no_show: [],
-};
-
-// Colors for calendar dots
+// Colors for calendar dots — admin-only (consumed by appointment-calendar.tsx).
+// Intentionally NOT lifted in Phase 2A; Phase 2B decides whether the POS
+// Schedule pending-pill needs to share this taxonomy.
 export const STATUS_DOT_COLORS: Record<AppointmentStatus, string> = {
   pending: 'bg-yellow-400',
   confirmed: 'bg-blue-400',

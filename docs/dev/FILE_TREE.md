@@ -385,8 +385,9 @@ src/app/api/migration/vehicles/route.ts
 ```
 src/app/api/pos/appointments/route.ts                         # GET list (date range, default today+tomorrow) — Roadmap Item 12
 src/app/api/pos/appointments/__tests__/list.test.ts
-src/app/api/pos/appointments/[id]/route.ts                     # GET single appointment (Roadmap Item 15c — Jobs card Change Time)
+src/app/api/pos/appointments/[id]/route.ts                     # GET single appointment (Item 15c) + PATCH combined edit (Item 15e Phase 2A — HMAC + per-field perms + STATUS_TRANSITIONS enforced + webhooks fire; backs the reused admin dialog in POS Schedule scope)
 src/app/api/pos/appointments/[id]/__tests__/get.test.ts
+src/app/api/pos/appointments/[id]/__tests__/patch.test.ts      # Item 15e Phase 2A — 17 cases: auth/per-field perms/transition validation/overlap/webhook firing/response shape
 src/app/api/pos/appointments/[id]/cancel/route.ts              # POST cancel — POS-specific, notify_customer flag default false (Roadmap Item 15b)
 src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts
 src/app/api/pos/appointments/[id]/load/route.ts                # Item 15f Phase 1 Layer 8b — GET TicketState-shaped payload for POS deep-link drain (`/pos?source=appointment&id=...`). Sibling of jobs/checkout-items. Gates on pos.jobs.manage (matches PUT cascade); refuses completed/cancelled status (matches save guard).
@@ -1460,6 +1461,10 @@ Roadmap Item 15c ("Change Time" affordance on Jobs Card) additions:
 - `src/app/pos/jobs/components/change-time-button.tsx`
 - `src/app/pos/jobs/components/__tests__/change-time-button.test.tsx`
 - `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` — Item 15e Phase 1B. 9 tests: 6 load-bearing invariant (Schedule scope never triggers populate on mount/toggle/refresh; Schedule→Today DOES populate; date-nav hidden in Schedule; flag-OFF pins Today) + 3 scope-toggle UI tests.
+
+Roadmap Item 15e Phase 2A (shared lift for dual-context AppointmentDetailDialog) additions:
+- `src/lib/appointments/status-transitions.ts` — `STATUS_TRANSITIONS` (valid next-states per appointment status). Lifted from admin `appointments/types.ts`; re-exported there for backward compat. Enforced server-side by both the admin and POS PATCH routes.
+- `src/lib/appointments/types.ts` — `AppointmentService` + `AppointmentWithRelations` (shared joined shape). Lifted from admin `appointments/types.ts`; re-exported there (5 admin importers unchanged). Structurally equivalent to POS `PosAppointment`; convergence deferred.
 
 Roadmap Item 15a (Edit Services on Admin Appointment Dialog with cascade to job) additions:
 - `src/lib/appointments/edit-services.ts` — Pure helpers (Zod body schema, `buildJobServicesJsonb()`, `computeTotalsForServiceEdit()`).
