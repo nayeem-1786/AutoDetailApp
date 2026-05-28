@@ -157,6 +157,7 @@ export const vendorSchema = z.object({
 // Service schemas
 export const serviceCreateSchema = z.object({
   name: requiredString,
+  slug: slugSchema.optional(),
   description: optionalString,
   category_id: z.string().uuid().optional().nullable(),
   pricing_model: z.enum(['vehicle_size', 'scope', 'per_unit', 'specialty', 'flat', 'custom']),

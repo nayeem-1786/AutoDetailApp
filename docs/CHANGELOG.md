@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #111 — Catalog C1 (Create Service slug) + S3 error-surfacing helper (2026-05-27)
+
+Fixes the Critical "Failed to create service" bug from `docs/dev/CATALOG_CRUD_WIRING_AUDIT.md`.
+Architecture LOCKED: browser-client + RLS (no admin-API migration). **Scoped down
+per Memory #8 + context budget:** ships C1 (the Critical fix) + the S3 helper applied
+to the create-service catch (the exact block that masked C1); the broader S3 sweep
+across `services/[id]`, `products/new`, `products/[id]` is deferred to **#111b**.
+
+**C1 — Create Service slug** (root cause: `services.slug` is `UNIQUE NOT NULL`, no
+default/trigger; the create form never set it → 23502 NOT-NULL violation, hidden by
+a generic toast). Mirrors the proven `products/new` flow:
+- `serviceCreateSchema` gains `slug: slugSchema.optional()` (`lib/utils/validation.ts`).
+- `services/new/page.tsx`: `slug` default + name→slug auto-generate `useEffect`
+  (overridable via an editable "URL Slug" input that sets `slugManuallyEdited`),
+  a uniqueness pre-check before insert (specific error on collision), and `slug`
+  in the insert payload. (M5 TOCTOU race left as-is, matching product behavior.)
+
+**S3 — error-surfacing helper** (NEW `lib/utils/supabase-error.ts`):
+`describeSupabaseError(err, fallback)` maps named constraints (sale-price check,
+slug-unique) + SQLSTATE classes (23502 NOT-NULL w/ column name, 23505 unique,
+23514 check, 23503 FK) to operator-friendly text, falling back to the raw message
+then the caller's string. Generalizes the one-off message check at
+`categories/page.tsx:252`. Applied to the `services/new` catch this session;
+remaining catalog catch sites in #111b.
+
+**Tests (+11):** `supabase-error.test.ts` — 8 helper cases (each SQLSTATE class,
+named-constraint precedence, raw-message + fallback) + 3 `serviceCreateSchema` slug
+cases (valid / optional / rejects invalid).
+
+**Gates:** tsc 0; lint 0 errors / 97 warnings (baseline); `npm test` 2565/2565
+(2554 + 11); build clean. No migrations, no new permission keys.
+
+**#111b (deferred S3 sweep):** apply `describeSupabaseError` to `services/[id]`
+save-details + save-pricing, `products/new`, `products/[id]` update (+ optionally
+`services/page` activate/deactivate). Then Session #112 = slug-on-rename (S1) +
+sale-price CHECK trap (S2).
+
+---
+
 ## Session #110 — Item 15e Phase 2C-β-2 corrective: Supabase 1:1 cardinality shape in has_active_job (2026-05-27)
 
 Production-blocking fix. Phase 2C-β-2 (session #109) introduced `has_active_job`

@@ -1149,6 +1149,7 @@ src/lib/utils/compose-line-items.ts                     # Phase Mobile-1.7: disp
 src/lib/utils/format-address.ts
 src/lib/utils/format-channel.ts
 src/lib/utils/format.ts
+src/lib/utils/supabase-error.ts     # Session #111 (Catalog S3): describeSupabaseError(err, fallback) — maps named constraints + SQLSTATE (23502/23505/23514/23503) to operator-friendly text, else raw message, else fallback. Used by catalog mutation catch blocks to surface real Postgres errors (started services/new; sweep continues in #111b). Tests: __tests__/supabase-error.test.ts.
 src/lib/utils/google-place-id.ts                                # Normalizer + validator for Google Place ID (handles double-encoded JSONB reads, URL paste, quote-stripping)
 src/lib/utils/idempotency.ts
 src/lib/utils/issue-types.ts
