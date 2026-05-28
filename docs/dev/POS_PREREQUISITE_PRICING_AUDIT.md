@@ -2,6 +2,16 @@
 
 > Read-only diagnostic audit. No source/migration/test changes were made.
 > Branch: `audit/pos-prerequisite-autoadd-size-aware-pricing`
+>
+> **✅ RESOLVED — Session #113 (2026-05-28)**, branch
+> `fix/pos-prerequisite-size-aware-pricing-canonical-tier-selector`. The fix
+> extracted the canonical `selectPricingTierForVehicle()` into
+> `src/lib/services/picker-engine.ts` and routed all 6 tier-selection sites
+> (the 2 buggy prerequisite paths + the 4 previously-correct add paths)
+> through it. The "Recommended fix" (D1 DRY refactor) and "Open question" #2
+> (D2: no-match → block-with-warning on prerequisite sites, fall-through to
+> manual picker on normal sites) were both implemented as locked. See the
+> "Recommended fix" and "Open questions" sections below — answers inlined.
 
 ## Context
 
@@ -325,19 +335,25 @@ similarly-named service — present in catalog, row-based): sedan $85,
 truck_suv_2row $100, suv_3row_van $120, exotic $160, classic $180. (Listed
 for completeness; not actually a prerequisite of Paint Correction Prep.)
 
-## Open questions for operator
+## Open questions for operator — RESOLVED (Session #113)
 
-1. **Fix scope:** Minimal 2-line fix, or the DRY refactor that also
-   de-duplicates the four tier-selection copies behind a canonical
-   `selectPricingTierForVehicle()` engine helper? (Recommend the DRY version
-   — it's the Rule-11/Rule-22 path and prevents the next copy from drifting.)
-2. **No-match fallback:** When a vehicle's `size_class` has no matching tier
-   row (data gap, e.g. an `exotic` vehicle but the prereq has no `exotic`
-   tier), should the prereq auto-add fall back to `[0]`, fall back to the
-   highest tier, or **block** with a warning (consistent with how the normal
-   add falls through to the manual picker)? The normal path opens the picker;
-   an auto-add can't, so a defined fallback is needed.
-3. **Existing tickets/quotes:** Any open quotes/tickets already built with the
-   mis-priced prerequisite line should be re-priced manually — the fix is
-   forward-only (it changes selection at add time; it does not retro-correct
-   persisted line items).
+1. **Fix scope → D1: DRY refactor (chosen).** Extracted
+   `selectPricingTierForVehicle()` into `src/lib/services/picker-engine.ts`
+   and routed all six tier-selection sites through it: the 2 prerequisite
+   paths (`catalog-browser.tsx`, `quote-builder.tsx`) plus the 4 previously
+   correct paths (`routeServiceTap`, `catalog-browser` ×2 — direct + unchecked,
+   `register-tab.tsx`). One selector, no more copies to drift.
+2. **No-match fallback → D2: split by caller (chosen).** The selector returns
+   `null` on no-match. **Prerequisite** sites block with a warning toast
+   (`Cannot auto-add "<name>": no price configured for this vehicle size. Add
+   it manually.`) and add **neither** the prerequisite nor the dependent
+   add-on (the prereq is required-same-ticket — un-priceable means the add-on
+   can't proceed). **Normal-add** sites preserve their existing behavior:
+   `null` falls through to the manual picker dialog.
+3. **Existing tickets/quotes:** Unchanged — the fix is forward-only (it
+   changes tier selection at add time; it does not retro-correct persisted
+   line items). Re-price any open mis-priced quotes/tickets manually.
+
+**Manual verification (operator):** add "Paint Correction Prep" to a Suburban
+(`suv_3row_van`) POS ticket → the auto-added "Express Exterior Wash"
+prerequisite should read **$110**, not $75.

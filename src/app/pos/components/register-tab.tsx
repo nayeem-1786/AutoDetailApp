@@ -13,12 +13,10 @@ import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { PinPad } from './pin-pad';
 import { resolveServicePriceWithSale } from '../utils/pricing';
+import { selectPricingTierForVehicle } from '@/lib/services/picker-engine';
 import { getTileColors, TYPE_ICONS } from '@/lib/pos/tile-colors';
-import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 import type { FavoriteItem, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
-
-const VEHICLE_SIZE_CLASSES = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 /** Resolve sale-aware price for toast messages */
 function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {
@@ -144,28 +142,17 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           return;
         }
 
-        // Vehicle prequalification: auto-add when vehicle is set
-        if (vehicleSizeClass) {
-          // Case 1: Tiers represent vehicle sizes (sedan/truck/SUV) — match by tier_name
-          const isVehicleSizeTiers = pricing.length > 1
-            && pricing.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
-          if (isVehicleSizeTiers) {
-            const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
-            if (matchingTier) {
-              const price = getToastPrice(service, matchingTier, vehicleSizeClass);
-              dispatch({ type: 'ADD_SERVICE', service, pricing: matchingTier, vehicleSizeClass });
-              toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
-              return;
-            }
-          }
-
-          // Case 2: Single tier that IS vehicle-size-aware — resolve price by vehicle size
-          if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
-            dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass });
-            const price = getToastPrice(service, pricing[0], vehicleSizeClass);
-            toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
-            return;
-          }
+        // Vehicle prequalification: auto-add the size-matched tier when one
+        // resolves (canonical selection — CLAUDE.md Rule 22). Covers both
+        // row-based size tiers (match by tier_name) and a single
+        // vehicle-size-aware row (resolver reads the column). The single
+        // non-size-aware + flat branches above already returned.
+        const tier = selectPricingTierForVehicle(pricing, vehicleSizeClass);
+        if (tier) {
+          const price = getToastPrice(service, tier, vehicleSizeClass);
+          dispatch({ type: 'ADD_SERVICE', service, pricing: tier, vehicleSizeClass });
+          toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+          return;
         }
 
         // Fallback: open picker for multi-tier non-vehicle or no vehicle set

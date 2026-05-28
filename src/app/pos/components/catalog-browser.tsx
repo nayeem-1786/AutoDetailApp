@@ -17,12 +17,10 @@ import { ServiceDetailDialog } from './service-detail-dialog';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { CustomPriceDialog } from '@/lib/services/custom-price-dialog';
 import { resolveServicePriceWithSale } from '../utils/pricing';
+import { selectPricingTierForVehicle } from '@/lib/services/picker-engine';
 import { categoryToCompatibilityKey, VEHICLE_CATEGORY_LABELS, type VehicleCategory } from '@/lib/utils/vehicle-categories';
-import { VEHICLE_SIZE_CLASS_KEYS } from '@/lib/utils/constants';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-
-const VEHICLE_SIZE_CLASSES = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 /** Resolve sale-aware price for toast messages */
 function getToastPrice(service: CatalogService, tier: ServicePricing, vsc: VehicleSizeClass | null): number {
@@ -272,11 +270,22 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       return;
     }
 
-    // Add the prerequisite service first (skip its own prereq check), tagged with the dependent service's ID
+    // Add the prerequisite service first (skip its own prereq check), tagged with the dependent service's ID.
+    // Select the tier for THIS vehicle's size_class via the canonical engine —
+    // NOT prereqPricing[0] (always the sedan/first tier), which mispriced
+    // size-aware prerequisites (Suburban charged $75 instead of $110; see
+    // docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md).
     const prereqPricing = prereqService.pricing ?? [];
     const prereqExtra = { prerequisiteForServiceId: originalService.id };
     if (prereqPricing.length > 0) {
-      const tier = prereqPricing[0];
+      const tier = selectPricingTierForVehicle(prereqPricing, vehicleSizeClass);
+      if (!tier) {
+        // No tier matches this vehicle size (data gap). The prerequisite is
+        // required-same-ticket, so if it can't be priced we block the whole
+        // add — neither the prerequisite nor the dependent add-on is added.
+        toast.error(`Cannot auto-add "${prereqService.name}": no price configured for this vehicle size. Add it manually.`);
+        return;
+      }
       if (onAddService) {
         onAddService(prereqService, tier, vehicleSizeClass);
       } else if (dispatch) {
@@ -417,23 +426,15 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       return;
     }
 
-    // Vehicle prequalification: auto-add when vehicle is set
-    if (vehicleSizeClass) {
-      const isVehicleSizeTiers = pricing.length > 1
-        && pricing.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
-      if (isVehicleSizeTiers) {
-        const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
-        if (matchingTier) {
-          const price = getToastPrice(service, matchingTier, vehicleSizeClass);
-          quickAdd(service, matchingTier, vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
-          return;
-        }
-      }
-      if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
-        const price = getToastPrice(service, pricing[0], vehicleSizeClass);
-        quickAdd(service, pricing[0], vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
-        return;
-      }
+    // Vehicle prequalification: auto-add the size-matched tier when one
+    // resolves (canonical selection — CLAUDE.md Rule 22). The single
+    // non-size-aware + flat branches above already returned, so a non-null
+    // tier here is always a size-aware / size-tier match (price toast).
+    const tier = selectPricingTierForVehicle(pricing, vehicleSizeClass);
+    if (tier) {
+      const price = getToastPrice(service, tier, vehicleSizeClass);
+      quickAdd(service, tier, vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
+      return;
     }
 
     // Fallback: open picker
@@ -511,21 +512,12 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
       quickAdd(service, syntheticPricing, vehicleSizeClass);
       return;
     }
-    if (vehicleSizeClass) {
-      const isVehicleSizeTiers = pricing.length > 1 && pricing.every((t) => VEHICLE_SIZE_CLASSES.has(t.tier_name));
-      if (isVehicleSizeTiers) {
-        const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
-        if (matchingTier) {
-          const price = getToastPrice(service, matchingTier, vehicleSizeClass);
-          quickAdd(service, matchingTier, vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
-          return;
-        }
-      }
-      if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
-        const price = getToastPrice(service, pricing[0], vehicleSizeClass);
-        quickAdd(service, pricing[0], vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
-        return;
-      }
+    // Vehicle prequalification: same canonical selection as handleTapServiceDirect.
+    const tier = selectPricingTierForVehicle(pricing, vehicleSizeClass);
+    if (tier) {
+      const price = getToastPrice(service, tier, vehicleSizeClass);
+      quickAdd(service, tier, vehicleSizeClass, `Added ${service.name} — $${price.toFixed(2)}`);
+      return;
     }
     setPickerService(service);
   }
