@@ -6,6 +6,47 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #115 — Audit: POS prereq-enforcement regression + add-on gating + create-service tier persistence (2026-05-28)
+
+Read-only diagnostic. **No source/migration/test changes.** Live read-only SELECTs only.
+Branch `audit/pos-prereq-enforcement-regression-and-addon-gating`; isolated `git worktree`.
+Deliverable: `docs/dev/POS_PREREQ_ENFORCEMENT_AND_GATING_AUDIT.md`.
+
+Three issues surfaced the morning of 2026-05-28, same day #114 deployed. **Verdict: #114
+caused none of them** — all three are pre-existing gaps the operator exercised by creating
+and testing a brand-new `addon_only` service ("Paint Correction Prep", which carries
+`required_same_ticket` prerequisites). #114's diff is a behavior-preserving tier-selection
+refactor (`selectPricingTierForVehicle()`); it did not touch prereq detection, add-on gating,
+or the create flow.
+
+- **Issue 1 (tiers — real create-flow gap):** Live DB shows Paint Correction Prep
+  (`vehicle_size`) with exactly 3 tiers — sedan $160 / truck_suv_2row $190 / suv_3row_van
+  $220 — and **no exotic/classic**. Root cause: `new/page.tsx:231-237` hard-codes 3 tier
+  inserts for the `vehicle_size` model; exotic/classic are only writable via the `scope` model
+  or the **Edit** page. The data persisted exactly what the form can write. Create/Edit
+  inconsistency, not corruption, not #114.
+- **Issue 2 (add-on gating — never built):** No `classification`/`addon_only` handling exists
+  in any POS add path (grep finds it only in test fixtures). Nothing blocks an `addon_only`
+  service from being added solo, on any screen. Missing feature, not a regression.
+- **Issue 3 (prereq enforcement — not a #114 regression):** Every **catalog-browser** add path
+  still funnels through `addServiceChecked → checkPrerequisites`, and `ServiceDetailDialog`
+  calls the check (`:199-200`) — all unchanged by #114. But **`register-tab.tsx` has zero
+  prereq handling in any path** (favorites quick-add + its picker `dispatch ADD_SERVICE`
+  directly), true before and after #114; and the client **fails open** on endpoint error
+  (`use-prerequisite-check.ts:77-78, 109-110`). Leading hypothesis: the add/test was done via
+  a register-tab favorite tile, which checks neither prerequisites nor classification — which
+  explains Issues 2 and 3 on one tap. The detection endpoint + hook are untouched by #114 and
+  don't import the changed `picker-engine`.
+
+**Shared cause (T4):** Issues 2 + 3 share the register-tab direct-`dispatch` no-validation path
+(if that was the repro); Issue 1 is independent (admin create flow). **Recommendation (T5):
+FIX-FORWARD** — #114 caused none of these; a revert reintroduces the wanted Suburban $75→$110
+pricing fix and fixes nothing. Surgical fixes: route register-tab adds through a shared
+prereq-checking add helper; add an add-on-only gate at add-time; extend the `vehicle_size`
+create form to exotic/classic; stop the client failing open silently. **Test gap (T6):** #114's
+15 tests cover prereq PRICING, never prereq DETECTION / register-tab / gating — and there was
+never a "does the warning fire" test per add path. No fixes applied; operator + Claude decide.
+
 ## Session #114 — Fix: POS prerequisite size-aware pricing via canonical `selectPricingTierForVehicle()` (2026-05-28)
 
 Fixes the Critical pricing bug from `docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md`
