@@ -10,6 +10,19 @@ Operator-reported failure: in **Admin → Services → Add New**, filling the fo
 
 Evidence was gathered three ways: (1) reading the UI/API/validation source on a clean `origin/main` worktree, (2) reading `docs/dev/DB_SCHEMA.md`, and (3) **live read-only SQL** against the production Supabase project via `supabase db query --linked` (SELECT only — no writes).
 
+## Resolution status
+
+- **C1 (Create Service slug) — ✅ RESOLVED (Session #111).** `serviceCreateSchema`
+  gained `slug: slugSchema.optional()`; `services/new/page.tsx` now auto-generates an
+  overridable slug from the name, pre-checks uniqueness, and includes `slug` in the
+  insert payload (mirrors `products/new`). Operator manual create-service verification pending.
+- **S3 (generic-toast error masking) — 🟡 PARTIAL (Session #111).** Shared helper
+  `src/lib/utils/supabase-error.ts` (`describeSupabaseError`) created and applied to the
+  `services/new` catch (the block that hid C1). Remaining catalog catch sites
+  (`services/[id]`, `products/new`, `products/[id]`) deferred to **#111b**.
+- **S1 (slug-on-rename), S2 (sale-price CHECK trap) — ⏳ Session #112.** M5 (racy slug
+  pre-check) intentionally left as-is (matches product behavior).
+
 ## TL;DR
 
 **Root cause of "Failed to create service" — confirmed and deterministic.** The Add-New-Service form writes directly to the database through the **browser Supabase client** (`createClient()`) and its insert payload **never sets `slug`**. The `services.slug` column is `UNIQUE, NOT NULL` with no default and no slug-generating trigger (only an `updated_at` trigger exists — live-verified). So **every** insert is rejected by Postgres with a NOT-NULL violation. The form's `catch` block then masks the real error behind a generic `toast.error('Failed to create service')`. This is a structural omission across three layers: the Zod schema (`serviceCreateSchema`) defines no `slug` field, the form has no slug input or auto-generate effect, and the insert payload has no `slug` key. The sibling **product** create form does all three correctly, which is why product creation works and service creation does not. **It is not RLS, not permissions, not a 500 from a missing endpoint** — those were each checked and ruled out against the live database.

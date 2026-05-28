@@ -6,6 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { createClient } from '@/lib/supabase/client';
 import { serviceCreateSchema, type ServiceCreateInput } from '@/lib/utils/validation';
+import { describeSupabaseError } from '@/lib/utils/supabase-error';
 import type { ServiceCategory, PricingModel, VehicleType } from '@/lib/supabase/types';
 import { PRICING_MODEL_LABELS, CLASSIFICATION_LABELS, VEHICLE_TYPE_LABELS } from '@/lib/utils/constants';
 import { PageHeader } from '@/components/ui/page-header';
@@ -66,6 +67,7 @@ export default function NewServicePage() {
     resolver: formResolver(serviceCreateSchema),
     defaultValues: {
       name: '',
+      slug: '',
       description: '',
       category_id: null,
       pricing_model: 'vehicle_size',
@@ -89,6 +91,24 @@ export default function NewServicePage() {
 
   const selectedPricingModel = watch('pricing_model');
   const vehicleCompatibility = watch('vehicle_compatibility') || [];
+  const watchName = watch('name');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  // Catalog C1 (Session #111): auto-generate slug from name unless the operator
+  // overrides it. `services.slug` is UNIQUE NOT NULL with no default/trigger, so
+  // a missing slug = NOT-NULL violation on insert (the root-cause of "Failed to
+  // create service"). Mirrors the proven products/new flow.
+  useEffect(() => {
+    if (!slugManuallyEdited && watchName) {
+      const generated = watchName
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      setValue('slug', generated);
+    }
+  }, [watchName, slugManuallyEdited, setValue]);
 
   useEffect(() => {
     async function loadCategories() {
@@ -144,9 +164,32 @@ export default function NewServicePage() {
   async function onSubmit(formData: ServiceCreateInput) {
     setSaving(true);
     try {
+      // Catalog C1 (Session #111): derive slug (fallback-slugify the name in case
+      // the field was cleared) and pre-check uniqueness before insert. Mirrors
+      // products/new. M5 (TOCTOU race) is a known minor — same behavior as
+      // product create; not over-engineered here.
+      const slug = formData.slug || formData.name
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      const { data: existing } = await supabase
+        .from('services')
+        .select('id')
+        .eq('slug', slug)
+        .maybeSingle();
+      if (existing) {
+        toast.error(`The slug "${slug}" is already in use. Please choose a different one.`);
+        setSaving(false);
+        return;
+      }
+
       // Build the service insert payload
       const servicePayload: Record<string, unknown> = {
         name: formData.name,
+        slug,
         description: formData.description || null,
         category_id: formData.category_id || null,
         pricing_model: formData.pricing_model,
@@ -248,8 +291,10 @@ export default function NewServicePage() {
       toast.success('Service created successfully');
       router.push('/admin/catalog/services');
     } catch (err) {
+      // Catalog S3 (Session #111): surface the real Postgres error (a generic
+      // toast here is exactly what hid the C1 missing-slug NOT-NULL violation).
       console.error('Failed to create service:', err);
-      toast.error('Failed to create service');
+      toast.error(describeSupabaseError(err, 'Failed to create service'));
     } finally {
       setSaving(false);
     }
@@ -296,6 +341,21 @@ export default function NewServicePage() {
               <CardContent className="space-y-4">
                 <FormField label="Service Name" required error={errors.name?.message}>
                   <Input {...register('name')} placeholder="e.g., Full Detail, Paint Correction" />
+                </FormField>
+
+                <FormField
+                  label="URL Slug"
+                  error={errors.slug?.message}
+                  description="Auto-generated from the name; edit to override. Used in the public service URL."
+                >
+                  <Input
+                    {...register('slug')}
+                    onChange={(e) => {
+                      setSlugManuallyEdited(true);
+                      register('slug').onChange(e);
+                    }}
+                    placeholder="full-detail"
+                  />
                 </FormField>
 
                 <FormField label="Description" error={errors.description?.message}>
