@@ -6,6 +6,33 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #112 — Audit: POS prerequisite auto-add ignores size-aware pricing (2026-05-28)
+
+Read-only diagnostic audit. **No source/migration/test changes.** Deliverable:
+`docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md`.
+
+**Bug confirmed:** When a POS add-on with a prerequisite is selected, the auto-added
+prerequisite is priced at the **smallest** tier, not the ticket vehicle's size-aware
+tier. Root cause: the prerequisite injection hard-picks `prereqPricing[0]`
+(`catalog-browser.tsx:279` for the ticket, identical `quote-builder.tsx:383` for the
+quote builder). `[0]` ordered by `display_order` is always the **sedan** row, and
+row-based `vehicle_size` tiers carry `is_vehicle_size_aware = false`, so the canonical
+resolver returns that row's flat `.price` and the correctly-passed `size_class` is
+ignored.
+
+**Divergence:** the normal-add path correctly selects
+`pricing.find((t) => t.tier_name === vehicleSizeClass)` (`catalog-browser.tsx:425`,
+`register-tab.tsx:153`, `picker-engine.ts:217`) — the prerequisite path is the only
+one that skips this.
+
+**Findings:** `size_class` is already in scope at both injection points (easy fix, no
+threading). Booking wizard has no prerequisite logic → unaffected. Live-data check
+confirms the larger-vehicle tier rows exist (Express Exterior Wash sedan $75 →
+suv_3row_van $110) — bug is 100% code, not data, and reproduces the operator's exact
+numbers. **Recommended fix:** extract a canonical `selectPricingTierForVehicle()` into
+`picker-engine.ts` and route the two prerequisite sites (plus the three existing
+duplicates) through it. NOT merged — operator + Claude to scope the fix.
+
 ## Session #111 — Catalog C1 (Create Service slug) + S3 error-surfacing helper (2026-05-27)
 
 Fixes the Critical "Failed to create service" bug from `docs/dev/CATALOG_CRUD_WIRING_AUDIT.md`.
