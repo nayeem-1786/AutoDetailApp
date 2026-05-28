@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #116 — Audit: POS Sale-vs-Quotes prerequisite + add-on gating parity (2026-05-28)
+
+Read-only diagnostic. **No source/migration/test changes; no DB.** Isolated `git worktree`.
+Branch `audit/pos-sale-vs-quotes-prereq-gating-parity`. Deliverable:
+`docs/dev/POS_SALE_VS_QUOTES_PARITY_AUDIT.md`. **Merged to main this session** (current
+workflow — CC owns the merge).
+
+Pins the exact Sale-vs-Quotes mechanism difference so the working pattern can be ported.
+**Key finding (corrects the prior audit's overgeneralization that "quote paths dispatch
+ADD_SERVICE directly"):** Quotes are **not** missing the prerequisite check — `quote-builder.tsx`
+calls `checkPrerequisites` in all its add paths and has since 2026-03-14 (`4afe5ed94`/`99ba7d2c5`).
+The real defect is **context, not absence**: the quote **browse** view delegates to
+`<CatalogBrowser>`, whose internal check is hardwired to the **Sale-ticket** context
+(`catalog-browser.tsx:76-80`, `useTicket()`), not the quote's. The quote **search/picker** paths
+use correct quote context (`quote-builder.tsx:221-225`, `:314/:340/:354`). So the browse path
+validates against the wrong customer/vehicle/line-items — which can over-fire (empty Sale
+ticket) and, crucially, silently **under-fire** ("doesn't fire") when a concurrently-open Sale
+ticket already contains the prerequisite (reads as "satisfied"). Reducers are pure (only store
+`prerequisiteNote`); enforcement lives at the component call sites.
+
+Three surfaces, three states: **Sale/catalog-browser** checks with correct context ✓;
+**Sale/register-tab favorites** has zero check ✗ (prior audit, re-verified); **Quotes
+search/picker** check with correct context ✓; **Quotes browse** checks with the wrong
+(Sale-ticket) context ⚠. The hook (`use-prerequisite-check.ts:28-32`) is fully surface-agnostic
+(takes context as options) — the only gap is `<CatalogBrowser>` hardcoding `useTicket()` with no
+override (it already overrides vehicle *size* for pricing, just not the prereq context).
+Add-on-only gating remains absent on every surface (prior audit).
+
+**Recommendation:** one shared *add-with-validation* helper that takes the surface's context
+explicitly and runs add-on-only gate → prereq check → dispatch; route Sale (`catalog-browser`),
+Quotes (both views), and `register-tab` through it. Fixes the quote-browse wrong-context bug,
+the register-tab no-check gap, and adds gating everywhere — one helper, both checks, three
+surfaces (Rule 11/22). Blast radius ~3 components + 1 hook; reducers/endpoint/hook untouched;
+Sale path must stay behavior-identical (the reference). Tests to add: per-surface "warning
+fires for unmet `required_same_ticket`" (incl. Quotes-browse + quote-context), per-surface
+"add-on-only blocked solo," and a Sale-path parity guard. 3 open operator questions (chief:
+confirm the exact quote repro — search vs browse, and whether a Sale ticket was open). No fixes
+applied; fix is a separate session.
+
 ## Session #115 — Audit: POS prereq-enforcement regression + add-on gating + create-service tier persistence (2026-05-28)
 
 Read-only diagnostic. **No source/migration/test changes.** Live read-only SELECTs only.
