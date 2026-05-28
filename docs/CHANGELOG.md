@@ -6,6 +6,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #110 — Item 15e Phase 2C-β-2 corrective: Supabase 1:1 cardinality shape in has_active_job (2026-05-27)
+
+Production-blocking fix. Phase 2C-β-2 (session #109) introduced `has_active_job`
+derivation that assumed `appointment.jobs` is always an array. Because
+`jobs.appointment_id` has a UNIQUE constraint (migration `20260329000002`),
+PostgREST infers **1:1 cardinality** and returns the embedded `jobs` relation as
+a **single object `{id, status}` (or null), NOT an array**. The `as Array<...>`
+cast compiled but didn't reshape at runtime → `.some()` threw
+`(intermediate value).some is not a function`, crashing **admin Customers +
+Appointments** on load.
+
+**Fix (both surfaces — shape-defensive normalization):**
+- `src/app/admin/appointments/has-active-job.ts` (**NEW**) — `withHasActiveJob`
+  extracted out of `page.tsx` (Next.js page files can't carry arbitrary named
+  exports — that broke the build), now uses `asRelationArray(v)` =
+  `Array.isArray(v) ? v : v ? [v] : []`. `page.tsx` imports it.
+- `src/app/api/pos/appointments/[id]/route.ts` GET — same normalization before `.some()`.
+
+**Sibling-occurrence audit (mandatory):** searched `jobs:jobs!appointment_id`,
+`jobs ?? []`, `.jobs?.some`, `row.jobs`. The only buggy sites were the 3
+Phase-2C-β-2 derivations (admin ×2 via the shared mapper, POS ×1). Cleared
+`transaction-detail.tsx:128` (`transaction.jobs ?? []`) — `jobs.transaction_id`
+has **no** UNIQUE constraint, so that embed is genuinely 1:many → array → correct.
+
+**Tests (+10):** POS `get.test.ts` +3 (single-object scheduled→true,
+single-object completed→false, null→false); new `__tests__/with-has-active-job.test.ts`
++7 (single-object/null/undefined/array shapes + raw-relation stripping). These
+close the gap the #109 tests missed (they only mocked array shapes).
+
+**CLAUDE.md:** added a "Supabase relation cardinality" Key Pattern documenting
+that UNIQUE-FK embeds return a single object, with the normalize-before-iterate rule.
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test`
+2554/2554 (2544 + 10); build clean. No migrations, no new permission keys.
+
+---
+
 ## Item 15e Phase 2C-β-2 — admin intercept + POS revert button + has_active_job (Item 15e CLOSED) (2026-05-27)
 
 Completes Phase 2C and **closes Item 15e**. Wires the shared
