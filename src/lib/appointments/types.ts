@@ -34,4 +34,11 @@ export interface AppointmentWithRelations extends Appointment {
   vehicle: Pick<Vehicle, 'id' | 'year' | 'make' | 'model' | 'color' | 'size_class'> | null;
   employee: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'> | null;
   appointment_services: AppointmentService[];
+  // Item 15e Phase 2C-β-2: populated by the single-appointment GET endpoints
+  // (admin + POS). True when a non-terminal job exists for this appointment
+  // (`jobs.status` NOT IN 'completed', 'closed', 'cancelled'). The admin dialog
+  // Save intercept reads this to decide whether reverting the status to an
+  // earlier state should un-materialize the job. `undefined` = not populated
+  // (don't intercept); `false` = no active job (don't intercept); `true` = intercept.
+  has_active_job?: boolean;
 }

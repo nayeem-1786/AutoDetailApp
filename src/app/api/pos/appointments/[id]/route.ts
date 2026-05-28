@@ -55,7 +55,8 @@ export async function GET(
         customer:customers!customer_id(id, first_name, last_name, phone, email),
         vehicle:vehicles!vehicle_id(id, year, make, model, color, size_class),
         employee:employees!employee_id(id, first_name, last_name, role),
-        appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
+        appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name)),
+        jobs:jobs!appointment_id(id, status)
       `)
       .eq('id', id)
       .single();
@@ -67,7 +68,17 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ data });
+    // Item 15e Phase 2C-β-2: derive `has_active_job` (true if a non-terminal job
+    // exists) and strip the raw `jobs` array from the response. Mirrors the
+    // canonical terminal set in lifecycle-sync.ts (TERMINAL_JOB_STATUSES).
+    const { jobs, ...appointment } = data as Record<string, unknown> & {
+      jobs?: Array<{ status: string }> | null;
+    };
+    const hasActiveJob = (jobs ?? []).some(
+      (j) => !['completed', 'closed', 'cancelled'].includes(j.status)
+    );
+
+    return NextResponse.json({ data: { ...appointment, has_active_job: hasActiveJob } });
   } catch (err) {
     console.error('POS appointment GET error:', err);
     return NextResponse.json(

@@ -6,6 +6,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2C-β-2 — admin intercept + POS revert button + has_active_job (Item 15e CLOSED) (2026-05-27)
+
+Completes Phase 2C and **closes Item 15e**. Wires the shared
+`UnMaterializeConfirmationDialog` (β-1) into both surfaces. 5 production files,
+~130 lines (mostly mechanical); judged one reviewable unit (well under the
+300-line cognitive threshold).
+
+**`AppointmentWithRelations.has_active_job?: boolean`** (`lib/appointments/types.ts`)
+— optional; `undefined` = not populated (don't intercept), `false` = no active
+job, `true` = intercept. Read only by the admin intercept.
+
+**GET widening (derive `has_active_job`, strip the raw `jobs` array):**
+- POS `GET /api/pos/appointments/[id]` — joins `jobs:jobs!appointment_id(id, status)`,
+  derives `has_active_job` (true if any job status ∉ completed/closed/cancelled),
+  strips `jobs` from the response.
+- Admin Appointments page (`admin/appointments/page.tsx`) — the admin dialog's
+  data source is a **direct browser Supabase query** (there is no admin GET route),
+  so both month/day selects gained the `jobs` join + a `withHasActiveJob()` mapper.
+
+**Admin dialog Save intercept** (`appointment-detail-dialog.tsx`): after the
+existing cancel short-circuit, fires the un-materialize modal ONLY when all three
+hold — status changed, `isEarlierState(new, current)` (a revert; excludes
+cancel/no_show), and `has_active_job === true`. Every other save is
+byte-identical to before.
+
+**POS job-detail "Revert to Pending" button** (`job-detail.tsx`): in the header,
+gated on `appointments.cancel` permission + non-terminal `job.status` +
+`job.transaction_id == null` (hidden when a 409 is guaranteed). Click → fetch the
+appointment → mount the modal (`context="pos"`); on success → `onBack()` to the
+Jobs queue (the job is gone). Reuses `appointments.cancel` (no new key);
+`transaction_id` added to `JobDetailData` (present via `JOB_SELECT *`).
+
+**Tests (+10):** POS GET `has_active_job` derivation (5 — none/scheduled/completed/
+mixed + jobs-array stripping); admin intercept render test (5 — revert+active→modal
+& no onSave; revert+no-active→save; later-state→save; unchanged→save; cancel
+short-circuit). The β-1 populate-rerun invariant still passes. POS button
+visibility is operator-verified (Gate 5 — no render harness for the 2000-line
+job-detail).
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test`
+2544/2544 (2534 + 10); build clean. No migrations, no new permission keys.
+
+**Item 15e CLOSED** — Phase 1A/1B (Schedule scope + populate gate) → 2A/2B
+(dual-context dialog + POS mount) → audit → 2C-α/β-1/β-2 (un-materialize). Next:
+Item 15h (full bidirectional sync) + Item 13 (Detailer Mobile Link) remain open.
+
+---
+
 ## Item 15e Phase 2C-β-1 — un-materialize shared modal + dryRun preview (2026-05-27)
 
 First half of the 2C-β UI work (split per Memory #8 — full 2C-β spans 6-7
