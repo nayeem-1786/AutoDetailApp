@@ -6,6 +6,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #113 — Harden + version-control the VPS deploy script (2026-05-28)
+
+Infra hardening + repo hygiene. **No app code, no migrations, no app deploy.** Branch
+`chore/harden-deploy-smartdetails-script`; built in an isolated `git worktree` (parallel
+to other active sessions on the shared checkout).
+
+**Why:** On 2026-05-27, `npm ci --include=dev --silent` in the production deploy script
+failed for the FIRST time in 100+ runs. An immediate manual re-run succeeded → a transient
+registry/network blip. But `--silent` hid the real npm error, and the hardcoded failure
+message ("check package-lock.json drift") sent the operator chasing a phantom lockfile
+problem that didn't exist. Net: a ~10-minute incident from a non-diagnosable, non-retried
+transient blip. The script also lived ONLY at `/usr/local/bin/deploy-smartdetails` on the
+VPS — unversioned, no git history.
+
+**Brought into the repo** at `scripts/deploy/deploy-smartdetails.sh` (executable, `100755`
+tracked by git) + `scripts/deploy/README.md`. `/usr/local/bin/deploy-smartdetails` becomes a
+**symlink** to the repo copy so future hardening ships via `git pull` (no more hand-editing
+the server). Hardening applied to the verbatim production script — **additive only; every
+existing guard preserved**:
+
+- **H1 — diagnosable `npm ci`:** dropped `--silent`; output is tee'd to a timestamped
+  `…-npm-ci.log`. `${PIPESTATUS[0]}` recovers npm's true exit code (pipe-to-`tee` under
+  `set -e` would otherwise mask it as tee's `0`).
+- **H2 — honest failure message:** replaced the wrong hardcoded "lockfile drift" diagnosis
+  with the captured log path + likely causes in probability order (1 transient → re-run;
+  2 drift → `npm install` + commit; 3 disk → `df -h`).
+- **H3 — retry once:** failed `npm ci` waits 5 s and retries a single time. A transient blip
+  is absorbed; a genuine drift/disk error fails BOTH attempts and correctly aborts (exit 2).
+  Implemented via `if run_install_attempt; …` (function-in-test position disables `set -e`
+  inside it for the first attempt; `set -e` resumes after the block).
+- **H4 — clean build:** `rm -rf .next` before `next build` (deterministic builds; matches the
+  dev-session discipline).
+- **H5 — phase logging:** all output tee'd to `/var/log/deploy-smartdetails/<ts>.log`
+  (fallback `/tmp/`), path printed at the end, logs older than 30 days pruned.
+
+**Preserved:** GUARD 1 (`unset NODE_ENV`), GUARD 2 (reject `NODE_ENV` in `.env.local`),
+GUARD 3 (`--include=dev`), GUARD 4 (typescript devDep sanity); all 9 steps; exit codes 0-5
+(npm-ci failure stays exit 2; the two old npm `fail` lines consolidated into one retry-aware
+`fail … 2`). **Verification:** `bash -n` clean; shellcheck unavailable on this machine
+(documented); the `${PIPESTATUS[0]}`/retry/`set -e` logic validated against an isolated stub
+harness — clean-success (exit 0), one-transient-failure absorbed on retry (exit 0),
+double-failure aborts (exit 2).
+
+**DO NOT merge automatically** — operator reviews, merges, then runs the one-time VPS
+migration (back up current script → symlink to repo copy → verify on next real deploy), per
+`scripts/deploy/README.md`. Session numbered **#113** (the concurrent #112 went to the POS
+prerequisite size-aware-pricing audit, below; the catalog S1 slug-on-rename remediation
+earmarked in the #111 writeup remains deferred).
+
 ## Session #112 — Audit: POS prerequisite auto-add ignores size-aware pricing (2026-05-28)
 
 Read-only diagnostic audit. **No source/migration/test changes.** Deliverable:

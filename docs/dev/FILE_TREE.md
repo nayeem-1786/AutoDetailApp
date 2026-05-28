@@ -1806,6 +1806,8 @@ scripts/seed-data.ts
 scripts/seed-receipt-test-transactions.sql  # Phase 0b.1: receipt-test seed scaffolding (NOT executed; for Phase 0b.2 byte-diff harness)
 scripts/fix-zelle-misclassification.sql     # Phase 1A.5: one-off SQL fix template for the Zelle-mismarked-as-Cash transaction (NOT executed)
 scripts/fix-mobile-backfill.sql             # Mobile fix D2: backfill template for SD-006253 + SD-006278 (NOT executed; operator runs manually post-deploy)
+scripts/deploy/deploy-smartdetails.sh       # Session #113: canonical version-controlled VPS deploy script (was unversioned at /usr/local/bin/deploy-smartdetails). Hardened 2026-05-28 — diagnosable npm ci (tee + ${PIPESTATUS[0]}, no --silent), retry-once on transient failure, honest probability-ordered fail message, rm -rf .next before build, timestamped phase log. Preserves GUARD 1-4 + 9 steps + exit codes 0-5. Executable (100755). /usr/local/bin/deploy-smartdetails becomes a symlink to this.
+scripts/deploy/README.md                    # Session #113: deploy script docs — what it does, exit codes, guards, H1-H5 hardening, one-time VPS symlink-from-repo migration steps, how to update later.
 ```
 
 ## Config
