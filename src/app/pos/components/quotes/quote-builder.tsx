@@ -18,6 +18,7 @@ import { QuoteTicketPanel } from './quote-ticket-panel';
 import type { CatalogProduct, CatalogService, TicketItem, QuoteState } from '../../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { calculateItemTax } from '../../utils/tax';
+import { selectPricingTierForVehicle } from '@/lib/services/picker-engine';
 
 type CatalogTab = 'products' | 'services';
 
@@ -376,11 +377,22 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
       return;
     }
 
-    // Add prerequisite, tagged with dependent service ID
+    // Add prerequisite, tagged with dependent service ID. Select the tier for
+    // THIS vehicle's size_class via the canonical engine — NOT prereqPricing[0]
+    // (always the sedan/first tier), which mispriced size-aware prerequisites
+    // (see docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md).
     const prereqExtra = { prerequisiteForServiceId: originalService.id };
     const prereqPricing = prereqService.pricing ?? [];
     if (prereqPricing.length > 0) {
-      dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: prereqPricing[0], vehicleSizeClass, ...prereqExtra });
+      const tier = selectPricingTierForVehicle(prereqPricing, vehicleSizeClass);
+      if (!tier) {
+        // No tier matches this vehicle size (data gap). The prerequisite is
+        // required-same-ticket, so block the whole add — neither the
+        // prerequisite nor the dependent add-on is added.
+        toast.error(`Cannot auto-add "${prereqService.name}": no price configured for this vehicle size. Add it manually.`);
+        return;
+      }
+      dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass, ...prereqExtra });
       toast.success(`Added ${prereqService.name}`);
     } else if (prereqService.flat_price != null) {
       const syntheticPricing: ServicePricing = {

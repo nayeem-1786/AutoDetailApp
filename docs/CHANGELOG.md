@@ -6,6 +6,50 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #114 — Fix: POS prerequisite size-aware pricing via canonical `selectPricingTierForVehicle()` (2026-05-28)
+
+Fixes the Critical pricing bug from `docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md`
+(now marked RESOLVED): the POS prerequisite auto-add grabbed `prereqPricing[0]`
+(always the sedan/first tier) instead of the tier matching the ticket vehicle's
+`size_class`. A Suburban (`suv_3row_van`) customer's auto-added "Express Exterior
+Wash" prerequisite was priced at **$75** (sedan) instead of **$110** (suv_3row_van).
+
+**Root cause:** a 1-line tier-selection (`pricing.find((t) => t.tier_name === vsc)`)
+existed correctly in 4 add paths but was skipped by the 2 prerequisite paths,
+which used `[0]`. A classic drift bug — same logic copied N times, one copy wrong.
+
+**Fix — D1 (DRY refactor):** extracted the canonical **`selectPricingTierForVehicle(pricing, vsc)`**
+into `src/lib/services/picker-engine.ts` (CLAUDE.md Rule 22). It handles all
+storage patterns — single non-size-aware tier, row-based size tiers (Pattern B,
+match by `tier_name`), single column-based size-aware row (Pattern A) — and
+returns `null` on no-match (unrecognized multi-tier shape, no vehicle, or no row
+for the vehicle's size). Routed **all 6** tier-selection sites through it:
+- 2 prerequisite paths (**the fix**): `catalog-browser.tsx` `handleAddPrerequisite`,
+  `quote-builder.tsx` `handleAddPrerequisite`.
+- 4 previously-correct paths (behavior-preserving): `routeServiceTap`
+  (`picker-engine.ts`), `catalog-browser.tsx` direct + unchecked add,
+  `register-tab.tsx`.
+
+**Fix — D2 (no-match handling):** `null` means different things per caller.
+**Prerequisite** sites **block** with a warning toast and add neither the
+prerequisite nor the dependent add-on (required-same-ticket ⇒ un-priceable
+blocks the whole add). **Normal-add** sites preserve their existing
+fall-through to the manual picker dialog.
+
+**Tests (+15 → 2580):** 9 `selectPricingTierForVehicle` unit cases (incl. the
+exact $110-not-$75 bug, no-match→null, column-based, single-tier, empty,
+scope/specialty) in `picker-engine.test.ts`; 6 integration cases in new
+`src/app/pos/context/__tests__/prerequisite-size-aware-pricing.test.ts` (ticket +
+quote reducers land $110 for `suv_3row_van`; the old `[0]` would land $75; every
+size class resolves to its own price; no-match→null drives the block). All 64
+pre-existing picker-engine/reducer/component tests stay green (behavior-preservation
+proof for the 4 refactored sites).
+
+**Gates:** tsc 0; lint 0 errors / 97 warnings (baseline); `npm test` 2580/2580
+(2565 + 15); build clean. No migrations, no new permission keys. Booking wizard
+unaffected (no prerequisite logic there). Forward-only (no retro-correction of
+persisted line items).
+
 ## Session #113 — Harden + version-control the VPS deploy script (2026-05-28)
 
 Infra hardening + repo hygiene. **No app code, no migrations, no app deploy.** Branch

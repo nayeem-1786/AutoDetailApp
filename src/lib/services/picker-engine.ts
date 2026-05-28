@@ -147,6 +147,76 @@ export type ServiceTapRoute =
 const VEHICLE_SIZE_CLASSES_SET = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
 
 /**
+ * Canonical tier selector — given a service's `service_pricing` rows and the
+ * current vehicle size class, return the single tier whose price should be
+ * used (the resolver reads the final amount via `resolveServicePrice`).
+ *
+ * Handles both storage patterns (CLAUDE.md Rule 22):
+ *  - **Single non-size-aware tier** (`length === 1 && !is_vehicle_size_aware`):
+ *    a flat price that does not vary by vehicle → return it (vehicle-agnostic).
+ *  - **Row-based size tiers** (`pricing_model = 'vehicle_size'`, Pattern B):
+ *    multiple rows, one per size_class, each `is_vehicle_size_aware = false`.
+ *    Return the row whose `tier_name === vehicleSizeClass`.
+ *  - **Column-based single row** (`is_vehicle_size_aware = true`, Pattern A):
+ *    one row holding all per-size prices in columns. Return that row;
+ *    `resolveServicePrice` reads the correct column downstream.
+ *
+ * Returns `null` when no tier can be auto-selected — i.e. an unrecognized
+ * multi-tier shape (scope/specialty), a size-dependent service with no
+ * vehicle context, or a row-based service with no row matching the vehicle's
+ * size_class (a data gap). Callers decide what `null` means for them:
+ *  - Interactive add paths (catalog browser, register favorites, the
+ *    `routeServiceTap` decision) fall through to the manual picker.
+ *  - Automated add paths (prerequisite auto-add) block with a warning rather
+ *    than silently mis-pricing.
+ *
+ * This centralizes the size-tier selection logic previously duplicated across
+ * `<CatalogBrowser>` (handleTapServiceDirect + the unchecked variant),
+ * `<RegisterTab>`, and `routeServiceTap` (CLAUDE.md Rule 22). It was a 1-line
+ * copy of this that the prerequisite auto-add path skipped — it grabbed
+ * `prereqPricing[0]` (always the sedan/first tier) instead of the size match
+ * (see `docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md`).
+ *
+ * NOTE: flat-price synthesis for a service with NO `service_pricing` rows
+ * (`length === 0 && services.flat_price != null`) is intentionally NOT handled
+ * here — it requires `services.flat_price`, which this row-only selector does
+ * not receive. Callers keep that synthesis inline (see `routeServiceTap`'s
+ * `quick-add-synthetic-flat` branch) and only reach this selector with the
+ * service's actual pricing rows.
+ */
+export function selectPricingTierForVehicle(
+  pricing: ServicePricing[],
+  vehicleSizeClass: VehicleSizeClass | null,
+): ServicePricing | null {
+  if (pricing.length === 0) return null;
+
+  // A single non-size-aware tier is the price regardless of vehicle.
+  if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
+    return pricing[0];
+  }
+
+  // Everything below varies by vehicle size — without a size class the caller
+  // must fall through to its own handling (manual picker / block).
+  if (!vehicleSizeClass) return null;
+
+  // Row-based size tiers (Pattern B): one row per size_class, matched by name.
+  const isVehicleSizeTiers =
+    pricing.length > 1 &&
+    pricing.every((t) => VEHICLE_SIZE_CLASSES_SET.has(t.tier_name));
+  if (isVehicleSizeTiers) {
+    return pricing.find((t) => t.tier_name === vehicleSizeClass) ?? null;
+  }
+
+  // Column-based single row (Pattern A): resolveServicePrice reads the column.
+  if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
+    return pricing[0];
+  }
+
+  // Unrecognized multi-tier shape (scope/specialty) → caller decides.
+  return null;
+}
+
+/**
  * Pure routing function — given a service and the current vehicle size class,
  * decide what UI action the caller should take. The non-custom branches are
  * byte-identical to the routing logic at `<CatalogBrowser>:333-419` (and the
@@ -209,19 +279,12 @@ export function routeServiceTap(
     return { action: 'quick-add-synthetic-flat', pricing: syntheticPricing };
   }
 
-  // Vehicle prequalification: auto-add when vehicle is set.
-  if (vehicleSizeClass) {
-    const isVehicleSizeTiers =
-      pricing.length > 1 && pricing.every((t) => VEHICLE_SIZE_CLASSES_SET.has(t.tier_name));
-    if (isVehicleSizeTiers) {
-      const matchingTier = pricing.find((t) => t.tier_name === vehicleSizeClass);
-      if (matchingTier) {
-        return { action: 'quick-add', pricing: matchingTier };
-      }
-    }
-    if (pricing.length === 1 && pricing[0].is_vehicle_size_aware) {
-      return { action: 'quick-add', pricing: pricing[0] };
-    }
+  // Vehicle prequalification: auto-add the size-matched tier when one resolves
+  // (canonical selection — see `selectPricingTierForVehicle`). `null` covers
+  // both "no vehicle yet" and "no tier matches this size" → manual picker.
+  const tier = selectPricingTierForVehicle(pricing, vehicleSizeClass);
+  if (tier) {
+    return { action: 'quick-add', pricing: tier };
   }
 
   // Fallback: open the manual picker.

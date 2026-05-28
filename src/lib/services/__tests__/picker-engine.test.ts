@@ -4,6 +4,7 @@ import {
   resolveServicePriceWithSale,
   getServicePriceRange,
   routeServiceTap,
+  selectPricingTierForVehicle,
 } from '../picker-engine';
 import type { CatalogService } from '@/app/pos/types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
@@ -470,5 +471,89 @@ describe('routeServiceTap', () => {
     ];
     const svc = mockService({ pricing_model: 'vehicle_size', pricing: rows });
     expect(routeServiceTap(svc, 'sedan')).toEqual({ action: 'open-picker-dialog' });
+  });
+});
+
+// ───────────────────────────────────────────────────────────────
+// selectPricingTierForVehicle — the canonical tier selector
+// (extracted to fix the prerequisite auto-add mispricing — see
+//  docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md)
+// ───────────────────────────────────────────────────────────────
+
+describe('selectPricingTierForVehicle', () => {
+  // Real row-based vehicle_size pricing from the audit live-data check:
+  // "Express Exterior Wash" — one row per size_class, is_vehicle_size_aware=false.
+  function expressExteriorWashTiers(): ServicePricing[] {
+    return [
+      mockTier({ id: 'sedan', tier_name: 'sedan', price: 75, display_order: 0 }),
+      mockTier({ id: 'truck', tier_name: 'truck_suv_2row', price: 90, display_order: 1 }),
+      mockTier({ id: 'suvvan', tier_name: 'suv_3row_van', price: 110, display_order: 2 }),
+      mockTier({ id: 'exotic', tier_name: 'exotic', price: 150, display_order: 3 }),
+      mockTier({ id: 'classic', tier_name: 'classic', price: 175, display_order: 4 }),
+    ];
+  }
+
+  it('row-based tiers + suv_3row_van → selects the $110 row, NOT [0]/sedan ($75) — the prereq bug', () => {
+    const tiers = expressExteriorWashTiers();
+    const tier = selectPricingTierForVehicle(tiers, 'suv_3row_van');
+    expect(tier?.id).toBe('suvvan');
+    expect(tier?.price).toBe(110);
+    // Guard: prove the regression. The old code used tiers[0] (sedan = $75).
+    expect(tiers[0].price).toBe(75);
+    expect(tier).not.toBe(tiers[0]);
+  });
+
+  it('row-based tiers + sedan → selects the sedan row', () => {
+    const tiers = expressExteriorWashTiers();
+    expect(selectPricingTierForVehicle(tiers, 'sedan')?.price).toBe(75);
+  });
+
+  it('row-based tiers + exotic when no exotic tier exists → null (data gap)', () => {
+    const tiers = expressExteriorWashTiers().filter((t) => t.tier_name !== 'exotic');
+    expect(selectPricingTierForVehicle(tiers, 'exotic')).toBeNull();
+  });
+
+  it('row-based tiers + null vehicleSizeClass → null (caller falls through / blocks)', () => {
+    expect(selectPricingTierForVehicle(expressExteriorWashTiers(), null)).toBeNull();
+  });
+
+  it('single column-based (is_vehicle_size_aware) row → returns that row regardless of size', () => {
+    const row = mockTier({
+      id: 'colrow',
+      tier_name: 'base',
+      is_vehicle_size_aware: true,
+      vehicle_size_sedan_price: 100,
+      vehicle_size_suv_van_price: 160,
+    });
+    expect(selectPricingTierForVehicle([row], 'suv_3row_van')?.id).toBe('colrow');
+    expect(selectPricingTierForVehicle([row], 'sedan')?.id).toBe('colrow');
+  });
+
+  it('single non-size-aware tier → returned regardless of vehicle (vehicle-agnostic flat)', () => {
+    const row = mockTier({ id: 'flatrow', tier_name: 'standard', price: 60, is_vehicle_size_aware: false });
+    expect(selectPricingTierForVehicle([row], 'exotic')?.id).toBe('flatrow');
+    expect(selectPricingTierForVehicle([row], null)?.id).toBe('flatrow');
+  });
+
+  it('empty pricing array → null', () => {
+    expect(selectPricingTierForVehicle([], 'sedan')).toBeNull();
+    expect(selectPricingTierForVehicle([], null)).toBeNull();
+  });
+
+  it('unrecognized multi-tier shape (scope/specialty, non-size tier_names) + vehicle → null', () => {
+    const rows: ServicePricing[] = [
+      mockTier({ id: 'r1', tier_name: 'half_floor', price: 75 }),
+      mockTier({ id: 'r2', tier_name: 'full_interior', price: 150 }),
+    ];
+    expect(selectPricingTierForVehicle(rows, 'sedan')).toBeNull();
+    expect(selectPricingTierForVehicle(rows, null)).toBeNull();
+  });
+
+  it('mixed tier_names (only some are size classes) + vehicle → null (must be ALL size classes)', () => {
+    const rows: ServicePricing[] = [
+      mockTier({ id: 'r1', tier_name: 'sedan', price: 100 }),
+      mockTier({ id: 'r2', tier_name: 'express', price: 80 }),
+    ];
+    expect(selectPricingTierForVehicle(rows, 'sedan')).toBeNull();
   });
 });
