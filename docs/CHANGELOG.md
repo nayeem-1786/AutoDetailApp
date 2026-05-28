@@ -6,6 +6,54 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Item 15e Phase 2C-β-1 — un-materialize shared modal + dryRun preview (2026-05-27)
+
+First half of the 2C-β UI work (split per Memory #8 — full 2C-β spans 6-7
+production files). Ships the reusable confirmation modal + its server preview
+support + the load-bearing populate-rerun invariant test. **The modal is inert
+until 2C-β-2 mounts it** (same foundation-then-wiring pattern as 2A/2C-α).
+
+**`src/lib/appointments/lifecycle-sync.ts` (MOD — `dryRun` preview):**
+- Added `dryRun?: boolean` to `UnMaterializeOptions` + an early preview-return in
+  `executeUnMaterialize`: runs the guards (`not_found`/`transaction_linked`/
+  `terminal`) and collects the full data enumeration, then returns `200 + data`
+  WITHOUT mutating (no appointment revert, no job delete, no Storage cleanup, no
+  audit). The modal calls this first to preview exactly what will be deleted; a
+  blocked job still surfaces its 409 in dry-run.
+
+**Endpoints (MOD — thread `dryRun`):** both
+`POST /api/pos/appointments/[id]/unmaterialize` and
+`POST /api/appointments/[id]/unmaterialize` accept `dryRun` in the body and
+forward it to the executor.
+
+**`src/components/appointments/un-materialize-confirmation-dialog.tsx` (NEW — shared):**
+- Reused by BOTH surfaces (canonical-engine). `context: 'admin' | 'pos'` selects
+  the endpoint URL + the auth fetch wrapper (`adminFetch` vs `posFetch`).
+- On open: dry-run preview → renders the exact deletion enumeration (photos +
+  "image files removed", add-on requests, timer progress, intake notes) or a
+  block message (payment attached / terminal). Type-to-confirm input (exact,
+  whitespace-trimmed "DELETE") for `in_progress`/`pending_approval` jobs; Revert
+  disabled until valid. Execute re-POSTs without dryRun. No webhook (silent
+  revert). Dark-mode aware.
+
+**Tests (+14):** `lifecycle-sync.test.ts` (+6 — dryRun preview cases + the
+**populate-rerun re-materialization invariant** asserting a post-un-materialize
+appointment is `pending` and therefore not a populate candidate); modal component
+test (7 — dry-run-on-open per context, enumeration accuracy, free-zone vs
+confirm-required Revert gating, payment-block); endpoint dryRun passthrough (+1 each).
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline); `npm test`
+2534/2534 (2520 + 14); build clean. No migrations.
+
+**Phase 2C-β-2 (next, deferred per Memory #8):** widen `AppointmentWithRelations`
+with `has_active_job` + the two GET endpoints; admin dialog Save intercept (via
+`isEarlierState` + `has_active_job`, mounting this modal with `context="admin"`);
+POS job-detail "Revert to Pending" button (mounting with `context="pos"`). Then
+Item 15h = full bidirectional sync; Item 16 = Mobile Detailer Remote Job
+Management (roadmap entry added this session).
+
+---
+
 ## Item 15e Phase 2C-α — un-materialize server foundation (lifecycle-sync seam) (2026-05-27)
 
 Server half of Phase 2C (split per Memory #8 — full 2C spans 6-7 production

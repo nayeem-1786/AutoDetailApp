@@ -1525,6 +1525,8 @@ SMS AI v2 Layer 3b additions (tool dispatcher real routing + parallel agent disp
 Item 15g Layer 15g-iii (UI surfacing + checkout hydration for modifiers) additions:
 - `src/components/appointments/modifier-summary.tsx` — Shared `<ModifierSummary variant="admin|pos">` + `hasAppliedModifiers()` helper. Read-only summary of coupon / loyalty / manual discount on appointment-derived surfaces. Mounted on Admin Appointment dialog + Jobs card Services tile.
 - `src/components/appointments/__tests__/modifier-summary.test.tsx` — 12 cases covering both the helper truth table + the component's conditional rendering per modifier type + POS dark-mode variant.
+- `src/components/appointments/un-materialize-confirmation-dialog.tsx` — Item 15e Phase 2C-β-1: shared `<UnMaterializeConfirmationDialog>` reused by BOTH admin + POS surfaces. `context: 'admin'|'pos'` selects endpoint URL + auth wrapper (adminFetch vs posFetch). Dry-run preview on open → deletion enumeration (photos/addons/timer/intake) or block (payment/terminal); exact "DELETE" type-to-confirm for in_progress/pending_approval; execute re-POSTs to the un-materialize endpoint; no webhook; dark-aware. Mounted by the admin Save intercept + POS "Revert to Pending" button in Phase 2C-β-2.
+- `src/components/appointments/__tests__/un-materialize-confirmation-dialog.test.tsx` — 7 cases: dry-run-on-open per context (endpoint + wrapper), enumeration accuracy, free-zone Revert executes with confirmString=DELETE, confirm-required gating (wrong-case stays disabled), payment-block hides Revert.
 
 ---
 

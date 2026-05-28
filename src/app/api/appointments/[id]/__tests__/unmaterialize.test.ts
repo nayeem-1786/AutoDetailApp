@@ -79,6 +79,11 @@ describe('POST /api/appointments/[id]/unmaterialize', () => {
     expect((state.execArgs?.options.actor as Record<string, unknown>).employeeName).toBe('Ada Min');
   });
 
+  it('forwards dryRun:true to the executor (modal preview)', async () => {
+    await POST(makeReq({ dryRun: true }), { params });
+    expect(state.execArgs?.options.dryRun).toBe(true);
+  });
+
   it('passes through 422 confirm_required with data', async () => {
     state.execResult = {
       ok: false,

@@ -8,6 +8,7 @@ import { executeUnMaterialize } from '@/lib/appointments/lifecycle-sync';
 
 const bodySchema = z.object({
   confirmString: z.string().optional(),
+  dryRun: z.boolean().optional(),
 });
 
 /**
@@ -51,6 +52,7 @@ export async function POST(
 
     const result = await executeUnMaterialize(supabase, id, {
       confirmString: parsed.data.confirmString,
+      dryRun: parsed.data.dryRun,
       actor: {
         userId: employee.auth_user_id,
         userEmail: employee.email,
