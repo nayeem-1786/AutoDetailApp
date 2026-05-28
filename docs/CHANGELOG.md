@@ -43,6 +43,52 @@ that UNIQUE-FK embeds return a single object, with the normalize-before-iterate 
 
 ---
 
+## Catalog CRUD wiring audit — root-cause of "Failed to create service" (2026-05-27)
+
+Read-only diagnostic audit (branch `audit/catalog-services-products-tiers-addons-crud-wiring`).
+No source / migration / test changes. Performed in an isolated `git worktree` to avoid
+disturbing the parallel Item 15e β-2 code session's uncommitted working tree.
+
+**Root cause (Critical) — confirmed and deterministic.** Admin → Services → Add New →
+"Create Service" fails on every attempt because the form writes directly via the
+**browser Supabase client** (`createClient()`) and its insert payload **never sets `slug`**
+(`src/app/admin/catalog/services/new/page.tsx:148-183`). `services.slug` is
+`UNIQUE, NOT NULL` with no default and no slug-generating trigger (only `tr_services_updated_at`
+exists — live-verified), so every insert is rejected with a NOT-NULL violation (Postgres 23502).
+The `catch` masks the real error behind a generic `toast.error('Failed to create service')`
+(`:250-252`). The omission spans three layers: `serviceCreateSchema` has no `slug` field
+(`src/lib/utils/validation.ts:158-178`), the form has no slug input / auto-generate effect,
+and the payload has no `slug` key. The sibling **product** create form does all three correctly
+(`products/new/page.tsx:140-164`), which is why product creation works. **RLS and permissions
+were ruled out via live DB**: `services_write` is an `ALL` policy for `{authenticated}` with
+`with_check = is_employee()` (insert allowed), and `services.edit` is granted to admin +
+super_admin (super_admin also bypasses, `src/lib/auth/check-permission.ts:33-34`).
+
+**Broader sweep.** Catalog CRUD is otherwise wired and working (products, service edit, tier
+`service_pricing` CRUD, add-on suggestions, prerequisites, category management). Key secondary
+findings: (S1) service rename does **not** maintain `slug` → public SEO URL drift
+(`services/[id]/page.tsx:501-517`); (S2) sale-price `CHECK` violation trap when lowering a tier
+price that has an existing sale price in the same save (validation compares stale DB rows,
+`:557-571`); (S3) **systemic generic-toast error masking** across catalog mutations (this is
+what hid the slug bug). Minor: category merge/drag-reorder/re-activation absent vs CLAUDE.md
+rule 14; scope/specialty duplicate `tier_name` UNIQUE risk; inconsistent permission gating;
+no products/services reorder UI. Architectural note: essentially all catalog writes use the
+browser-client + RLS path rather than the documented `createAdminClient()` service-role admin-API
+pattern, and there is **no `route.ts` create/update endpoint** for services or products.
+
+**DB integrity sweep — clean.** 30 active services (1 inactive), 64 `service_pricing` rows,
+432 products, 6 service + 13 product categories. Zero orphans, zero active tier-based services
+missing pricing rows, zero NULL price columns, zero `sale_price >= price` violations, no real
+test/seed data. One minor hygiene item: 1 add-on suggestion ("Signature Complete Detail")
+still points to the now-inactive "Paint Decontamination & Ceramic Protection" add-on.
+
+**Severity:** 1 Critical, 3 Significant, 5 Minor, plus Informational. Full findings, all 12
+audit targets, severity table, recommended remediation sequence, and open operator decisions in
+**`docs/dev/CATALOG_CRUD_WIRING_AUDIT.md`**. No fixes applied — operator + Claude lock the
+remediation plan before any code change.
+
+---
+
 ## Item 15e Phase 2C-β-2 — admin intercept + POS revert button + has_active_job (Item 15e CLOSED) (2026-05-27)
 
 Completes Phase 2C and **closes Item 15e**. Wires the shared
