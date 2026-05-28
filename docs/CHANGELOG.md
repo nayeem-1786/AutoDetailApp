@@ -6,6 +6,65 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #118 — Sweep: POS Sale-vs-Quotes shared-component parity (2026-05-28)
+
+Read-only diagnostic SWEEP. **No source/migration/test changes.** No DB access.
+Isolated `git worktree`; branch `audit/sale-vs-quotes-shared-component-parity-sweep`;
+**merged to main this session.** Deliverable: `docs/dev/SALE_VS_QUOTES_PARITY_SWEEP.md`.
+Fifth Sale-vs-Quotes artifact today — the prior four (#114–#117) each found ONE gap by
+stumbling onto a symptom; this sweep deliberately enumerates ALL of them in one pass so the
+upcoming fix arc is the last one.
+
+**7 components are mounted in BOTH panels** (`ticket-panel.tsx` / `quotes/quote-ticket-panel.tsx`):
+`CustomerVehicleSummary`, `CustomerLookup`, `CustomerCreateDialog`, `VehicleSelector`,
+`VehicleCreateDialog`, `PrerequisiteRemovalDialog`, `ManagerPinDialog`. Their callback props are
+**not** byte-for-byte — `CustomerVehicleSummary` alone has **3 prop deltas** in Quotes.
+
+**Gaps found (1 Critical in-flight + 4 Significant + 1 Minor):**
+- **G1 — Customer-type pill** (`onCustomerTypeChanged` omitted, `quote-ticket-panel.tsx:830-842`).
+  Critical (silent demote). **In-flight — parallel fix session; not re-investigated.**
+- **G2 — Vehicle edit unreachable in Quotes.** `onEditVehicle` omitted on the quote summary → the
+  edit pencil never renders (`customer-vehicle-summary.tsx:116` gates on the prop); `editVehicle`
+  never passed to the quote `VehicleCreateDialog` (`:1152-1157`) → `isEdit` always `false`
+  (`vehicle-create-dialog.tsx:52`); no `editingVehicle` state. Operator cannot correct a quote
+  vehicle's `size_class` inline → silent mispricing. Significant.
+- **G3 — Reprice failure fully silent in Quotes.** `quote-reducer.ts:393-423` sets `repriceFailed`
+  (mirrors `ticket-reducer.ts:523-553`) but Quotes surface it NOWHERE: no panel toast watcher
+  (Sale: `ticket-panel.tsx:123-143`) AND `quote-item-row.tsx` renders no badge (Sale:
+  `ticket-item-row.tsx:138-140`). Changing a quote's vehicle to an unpriceable size keeps stale
+  prices with zero operator signal. Significant. Two surfacing sites missing.
+- **G4 — `CustomerTypePrompt` never shown in Quotes.** Sale-only mount (`ticket-panel.tsx:739`);
+  quote `handleSelectCustomer`/`handleCustomerCreated` skip the `if (!customer.customer_type)`
+  prompt (Sale `:279-281`/`:295-297`). Unknown-type customers in a quote are never classified.
+  Significant.
+- **G5 — Quote browse prereq wrong-context** (`<CatalogBrowser>` `useTicket()`, `:76-80`). Already
+  documented in `POS_SALE_VS_QUOTES_PARITY_AUDIT.md` (#116). Significant; Track A.
+- **G6 — No swipe-to-delete + undo in Quotes** (`RESTORE_ITEM` absent from quote reducer;
+  auto-save persists accidental removals with no undo). Minor.
+
+**Target 3 (context sweep):** NONE of the 7 panel-mounted shared components read `useTicket()` —
+all take customer/vehicle via props. The only wrong-context shared component is `catalog-browser`,
+mounted by `quote-builder` (not the panel) = G5. **Target 5 (reducer parity):** reducers are at
+functional parity for every shared concern; `SET_CUSTOMER`/`SET_VEHICLE` identical both sides →
+**G1–G4 require NO reducer change** (G6 alone needs a `RESTORE_ITEM` quote action).
+
+**Fix-arc (two tracks, disjoint code areas, can run in parallel):**
+- **Track A — service-add validation:** the `useValidatedServiceAdd` helper from #116 (prereq +
+  add-on gating across Sale `catalog-browser`, Quotes `quote-builder` both views, `register-tab`).
+  Closes G5 + add-on gating + register-tab no-check.
+- **Track B — Quotes-panel parity:** one session wiring the props/handlers Sale already has, all in
+  `quote-ticket-panel.tsx` + `customer-vehicle-summary` wiring + `quote-item-row` +
+  `vehicle-create-dialog`. G1 (in-flight) is the first commit; G2/G3/G4 follow, G6 optional.
+- **Structural guard:** add a test asserting both panels pass the same callback-prop set to each
+  shared component (catches the next omitted-prop gap at CI).
+
+**Informational (by design, not gaps):** `disabled` prop (quotes have no checkout), guest-checkout
+(quotes need a customer), `ENTER/EXIT_EDIT_MODE` (Sale job-edit vs quote load+autosave),
+`pos-vehicle-needed` gate skipped in quotes (vehicle-optional by design — `catalog-browser.tsx:359`
+gates behind `if (!onAddService)`), mobile/validity/draft actions (quote-only features).
+
+---
+
 ## Session #117 — Audit: POS customer-type pill Sale-vs-Quotes parity + persistence (2026-05-28)
 
 Read-only diagnostic. **No source/migration/test changes.** One observational SELECT.
