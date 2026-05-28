@@ -29,7 +29,7 @@ import { QuoteSendDialog } from './quote-send-dialog';
 import { PrerequisiteRemovalDialog } from '../prerequisite-removal-dialog';
 import { ManagerPinDialog } from '../manager-pin-dialog';
 import { SaveAddressDialog } from '../checkout/save-address-dialog';
-import type { Customer, Vehicle } from '@/lib/supabase/types';
+import type { Customer, CustomerType, Vehicle } from '@/lib/supabase/types';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import type { TicketItem, QuoteState } from '../../types';
@@ -535,6 +535,16 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
     dispatch({ type: 'SET_VEHICLE', vehicle: null, services, blockedByPayment: false });
   }
 
+  // Mirror of ticket-panel.tsx:357-361 — keep the quote's local customer in sync
+  // after the pill PATCHes customers.customer_type, so the badge cycles
+  // (Unknown → Enthusiast → Professional → Unknown) instead of repeating one
+  // transition from stale state. See docs/dev/POS_CUSTOMER_TYPE_PILL_PARITY_AUDIT.md.
+  function handleCustomerTypeChanged(newType: CustomerType | null) {
+    if (quote.customer) {
+      dispatch({ type: 'SET_CUSTOMER', customer: { ...quote.customer, customer_type: newType } });
+    }
+  }
+
   function handleApplyDiscount() {
     const parsed = parseFloat(discountValue);
     if (isNaN(parsed) || parsed <= 0) {
@@ -839,6 +849,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
             }
           }}
           onClear={handleClearCustomer}
+          onCustomerTypeChanged={handleCustomerTypeChanged}
         />
       </div>
 

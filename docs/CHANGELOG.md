@@ -6,6 +6,37 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #119 — Fix: wire onCustomerTypeChanged in Quotes pill mount (silent customer demotion) (2026-05-28)
+
+Production bug fix (data integrity). Resolves the Critical finding from
+`docs/dev/POS_CUSTOMER_TYPE_PILL_PARITY_AUDIT.md` (Session #117, now RESOLVED). Built in an
+isolated `git worktree` (parallel to the read-only parity-sweep audit, #118); **merged to main this
+session** (renumbered #118 → #119 — the sweep took #118 on main first).
+
+The customer-type pill (`CustomerTypeBadge`, shared via `CustomerVehicleSummary`) PATCHes the
+**permanent** customer record on tap and then calls `onTypeChanged(newType)` so the host can sync
+its **local** customer state — which is what makes the pill cycle Unknown → Enthusiast →
+Professional → Unknown. The Sale mount wires that callback (`ticket-panel.tsx:413`); the **Quotes
+mount never did** (`quote-ticket-panel.tsx`), so every Quotes tap silently re-tagged the customer
+globally while the pill rendered stale state (operator saw "Customer type cleared" because their
+customer was already `professional`).
+
+**Fix (mirror Sale exactly, ~9 lines, 1 production file):** added `handleCustomerTypeChanged` to
+`quote-ticket-panel.tsx` (dispatches `SET_CUSTOMER` with `{ ...quote.customer, customer_type:
+newType }`) and passed it as `onCustomerTypeChanged` to the `CustomerVehicleSummary` mount; added
+the `CustomerType` import. **No reducer change** — `quote-reducer.ts:361` already handles
+`SET_CUSTOMER`. Sale path and `CustomerTypeBadge`/API route untouched. Product decision LOCKED:
+pill stays global + permanent, no confirm dialog.
+
+**Tests (+4 → 2584):** new `src/app/pos/components/__tests__/customer-type-badge.test.tsx` — locks
+the badge contract the fix relies on: tap persists (PATCH) AND signals `onTypeChanged` with the
+cycled value; full cycle order; **the stale-state regression** (no callback → tap still PATCHes
+but the badge can't advance — the exact Quotes bug); and display-follows-prop. (No
+`QuoteTicketPanel` render harness exists — ~14 children + 4 contexts — so the panel wiring is
+guaranteed by `tsc` + manual verification rather than a fragile full-panel mount.) **Gates:**
+`tsc --noEmit` 0; lint clean on touched files; `npm test` 2584/2584; `next build` clean. No
+migrations, no new keys.
+
 ## Session #118 — Sweep: POS Sale-vs-Quotes shared-component parity (2026-05-28)
 
 Read-only diagnostic SWEEP. **No source/migration/test changes.** No DB access.
