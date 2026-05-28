@@ -571,6 +571,8 @@ src/app/admin/page.tsx
 ### Appointments
 ```
 src/app/admin/appointments/page.tsx
+src/app/admin/appointments/has-active-job.ts                  # Session #110: withHasActiveJob mapper + asRelationArray (normalizes Supabase 1:1 UNIQUE-FK embed shape — single object|null|array — into an array). Extracted from page.tsx (Next.js pages can't export named fns). Tested in __tests__/with-has-active-job.test.ts.
+src/app/admin/appointments/__tests__/with-has-active-job.test.ts # Session #110: 7 cases — object/null/undefined/array shapes + raw-jobs stripping.
 src/app/admin/appointments/scheduling/page.tsx
 src/app/admin/appointments/waitlist/page.tsx
 ```

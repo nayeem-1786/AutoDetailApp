@@ -69,12 +69,23 @@ export async function GET(
     }
 
     // Item 15e Phase 2C-β-2: derive `has_active_job` (true if a non-terminal job
-    // exists) and strip the raw `jobs` array from the response. Mirrors the
+    // exists) and strip the raw `jobs` relation from the response. Mirrors the
     // canonical terminal set in lifecycle-sync.ts (TERMINAL_JOB_STATUSES).
+    //
+    // Session #110 corrective: `jobs.appointment_id` has a UNIQUE constraint
+    // (migration 20260329000002), so Supabase/PostgREST infers 1:1 cardinality
+    // and returns the embedded `jobs` relation as a SINGLE OBJECT `{id, status}`
+    // (or null) — NOT an array. Normalize the legitimate shapes (object | null |
+    // array) before `.some()`. See CLAUDE.md "Supabase relation cardinality".
     const { jobs, ...appointment } = data as Record<string, unknown> & {
-      jobs?: Array<{ status: string }> | null;
+      jobs?: Array<{ status: string }> | { status: string } | null;
     };
-    const hasActiveJob = (jobs ?? []).some(
+    const jobsArray: Array<{ status: string }> = Array.isArray(jobs)
+      ? jobs
+      : jobs
+        ? [jobs]
+        : [];
+    const hasActiveJob = jobsArray.some(
       (j) => !['completed', 'closed', 'cancelled'].includes(j.status)
     );
 

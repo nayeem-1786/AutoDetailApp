@@ -17,6 +17,7 @@ import { CancelAppointmentDialog } from './components/cancel-appointment-dialog'
 import { AppointmentStats } from './components/appointment-stats';
 import { AppointmentFilters } from './components/appointment-filters';
 import type { AppointmentWithRelations } from './types';
+import { withHasActiveJob } from './has-active-job';
 import type { Employee } from '@/lib/supabase/types';
 import type { AppointmentUpdateInput, AppointmentCancelInput } from '@/lib/utils/validation';
 
@@ -26,24 +27,6 @@ interface AppointmentStatsData {
   pending: number;
   newBookings: number;
   bookedRevenue: number;
-}
-
-// Item 15e Phase 2C-β-2: derive `has_active_job` from the joined `jobs` rows so
-// the Appointment dialog Save intercept knows whether reverting an earlier
-// status should un-materialize the job. Mirrors the canonical terminal set in
-// `lifecycle-sync.ts` (TERMINAL_JOB_STATUSES). The raw `jobs` array (used only
-// for this derivation) is discarded so it never leaks into the dialog.
-const TERMINAL_JOB_STATUSES = ['completed', 'closed', 'cancelled'];
-function withHasActiveJob(
-  rows: unknown[]
-): AppointmentWithRelations[] {
-  return (rows as Array<Record<string, unknown>>).map((row) => {
-    const jobs = (row.jobs as Array<{ status: string }> | null | undefined) ?? [];
-    const hasActiveJob = jobs.some((j) => !TERMINAL_JOB_STATUSES.includes(j.status));
-    const { jobs: _drop, ...rest } = row;
-    void _drop;
-    return { ...rest, has_active_job: hasActiveJob } as unknown as AppointmentWithRelations;
-  });
 }
 
 export default function AppointmentsPage() {

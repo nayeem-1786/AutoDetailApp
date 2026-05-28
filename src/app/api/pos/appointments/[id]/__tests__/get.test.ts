@@ -20,7 +20,14 @@ const state = {
   viewGranted: true,
   appointment: null as
     | null
-    | { id: string; scheduled_date: string; jobs?: Array<{ id: string; status: string }> },
+    | {
+        id: string;
+        scheduled_date: string;
+        // Supabase returns the embedded `jobs` relation as an ARRAY (no UNIQUE FK)
+        // OR a SINGLE OBJECT / null (1:1, when the FK column is UNIQUE — the case
+        // jobs.appointment_id is). The handler must handle both shapes.
+        jobs?: Array<{ id: string; status: string }> | { id: string; status: string } | null;
+      },
 };
 
 vi.mock('@/lib/pos/api-auth', () => ({
@@ -143,6 +150,28 @@ describe('GET /api/pos/appointments/[id]', () => {
       state.appointment = { id: 'appt-1', scheduled_date: '2026-05-16', jobs: [{ id: 'j1', status: 'scheduled' }] };
       const json = await (await GET(makeReq(), { params })).json();
       expect(json.data.jobs).toBeUndefined();
+    });
+
+    // Session #110 corrective — the production crash shape. jobs.appointment_id
+    // has a UNIQUE constraint, so Supabase returns `jobs` as a SINGLE OBJECT
+    // (or null), not an array. `.some()` on the object threw at runtime.
+    it('true when Supabase returns jobs as a single object (1:1 cardinality)', async () => {
+      state.appointment = { id: 'appt-1', scheduled_date: '2026-05-16', jobs: { id: 'j1', status: 'scheduled' } };
+      const json = await (await GET(makeReq(), { params })).json();
+      expect(json.data.has_active_job).toBe(true);
+      expect(json.data.jobs).toBeUndefined();
+    });
+
+    it('false when the single-object job is terminal', async () => {
+      state.appointment = { id: 'appt-1', scheduled_date: '2026-05-16', jobs: { id: 'j1', status: 'completed' } };
+      const json = await (await GET(makeReq(), { params })).json();
+      expect(json.data.has_active_job).toBe(false);
+    });
+
+    it('false when jobs is null (no related job)', async () => {
+      state.appointment = { id: 'appt-1', scheduled_date: '2026-05-16', jobs: null };
+      const json = await (await GET(makeReq(), { params })).json();
+      expect(json.data.has_active_job).toBe(false);
     });
   });
 });
