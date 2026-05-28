@@ -49,6 +49,9 @@ import { ZonePicker } from './zone-picker';
 import { JobTimer } from './job-timer';
 import { FlagIssueFlow } from './flag-issue-flow';
 import { ChangeTimeButton } from './change-time-button';
+// Item 15e Phase 2C-β-2 — POS "Revert to Pending" un-materialize affordance.
+import { UnMaterializeConfirmationDialog } from '@/components/appointments/un-materialize-confirmation-dialog';
+import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import { CustomerLookup } from '../../components/customer-lookup';
 import { ModifierSummary } from '@/components/appointments/modifier-summary';
 import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
@@ -76,6 +79,9 @@ interface JobDetailData {
   id: string;
   status: JobStatus;
   appointment_id: string | null;
+  // Item 15e Phase 2C-β-2: gates the "Revert to Pending" button (hidden when a
+  // transaction is linked — un-materialize would 409). Present via JOB_SELECT `*`.
+  transaction_id: string | null;
   services: JobServiceSnapshot[];
   estimated_pickup_at: string | null;
   created_at: string;
@@ -241,6 +247,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
   const { granted: canCancelJobs } = usePosPermission('pos.jobs.cancel');
   const { granted: canFlagIssue } = usePosPermission('pos.jobs.flag_issue');
+  // Item 15e Phase 2C-β-2 — un-materialize ("Revert to Pending") reuses the
+  // existing appointments.cancel permission (no new key).
+  const { granted: canUnMaterialize } = usePosPermission('appointments.cancel');
   const { enabled: photosEnabled } = useFeatureFlag(FEATURE_FLAGS.PHOTO_DOCUMENTATION);
   const [job, setJob] = useState<JobDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -253,6 +262,12 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   const [minInterior, setMinInterior] = useState(DEFAULT_MIN_INTERIOR);
   const [completionMinExterior, setCompletionMinExterior] = useState(DEFAULT_MIN_EXTERIOR);
   const [completionMinInterior, setCompletionMinInterior] = useState(DEFAULT_MIN_INTERIOR);
+
+  // Item 15e Phase 2C-β-2 — "Revert to Pending" un-materialize modal state.
+  const [showRevertModal, setShowRevertModal] = useState(false);
+  const [revertAppointment, setRevertAppointment] = useState<
+    Pick<AppointmentWithRelations, 'id' | 'customer'> | null
+  >(null);
 
   // Cancellation state
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -377,6 +392,29 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
       posFetch(`/api/pos/jobs/${jobId}/addons`).then(() => fetchJob());
     }
   }, [job?.addons, jobId, fetchJob]);
+
+  // Item 15e Phase 2C-β-2 — open the shared un-materialize modal. Fetch the
+  // full appointment (the modal needs id + customer) then mount it; the modal
+  // owns the dry-run preview + confirm + execute against the POS endpoint.
+  async function handleRevertClick() {
+    if (!job?.appointment_id) {
+      toast.error('No appointment linked to this job');
+      return;
+    }
+    const res = await posFetch(`/api/pos/appointments/${job.appointment_id}`);
+    if (!res.ok) {
+      toast.error('Failed to load appointment');
+      return;
+    }
+    const json = await res.json().catch(() => ({}));
+    const appt = json.data ?? json;
+    if (!appt?.id) {
+      toast.error('Failed to load appointment');
+      return;
+    }
+    setRevertAppointment(appt as Pick<AppointmentWithRelations, 'id' | 'customer'>);
+    setShowRevertModal(true);
+  }
 
   async function handleStartIntake() {
     setStartingIntake(true);
@@ -788,6 +826,13 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   }
 
   const statusConfig = STATUS_CONFIG[job.status];
+  // Item 15e Phase 2C-β-2 — "Revert to Pending" visibility matrix: permission +
+  // non-terminal job + no linked transaction (a transaction would 409, so hide
+  // rather than offer a guaranteed failure).
+  const canRevertToPending =
+    canUnMaterialize &&
+    !['completed', 'closed', 'cancelled'].includes(job.status) &&
+    job.transaction_id == null;
   // Phase Mobile-1.7: services list rendered through composeLineItems so
   // the synthetic mobile-fee row appears in the breakdown on mobile jobs.
   // Totals derive from the composed list so the sum matches the visible
@@ -887,6 +932,16 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">{formatVehicle(job.vehicle)}</p>
           </div>
+          {/* Item 15e Phase 2C-β-2 — Revert to Pending (un-materialize). */}
+          {canRevertToPending && (
+            <button
+              type="button"
+              onClick={handleRevertClick}
+              className="shrink-0 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 text-xs font-medium text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+            >
+              Revert to Pending
+            </button>
+          )}
         </div>
 
         {/* Timer in header */}
@@ -1963,6 +2018,26 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
         </div>
       )}
 
+      {/* Item 15e Phase 2C-β-2 — un-materialize confirmation (POS context). On
+          success the job is deleted, so navigate back to the Jobs queue. */}
+      {showRevertModal && revertAppointment && (
+        <UnMaterializeConfirmationDialog
+          open={showRevertModal}
+          onOpenChange={(o) => {
+            if (!o) {
+              setShowRevertModal(false);
+              setRevertAppointment(null);
+            }
+          }}
+          appointment={revertAppointment}
+          context="pos"
+          onSuccess={() => {
+            setShowRevertModal(false);
+            setRevertAppointment(null);
+            onBack();
+          }}
+        />
+      )}
     </div>
   );
 }

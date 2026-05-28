@@ -33,6 +33,8 @@ import { ModifierSummary } from '@/components/appointments/modifier-summary';
 // lifted to shared lib so this dialog can be reused dual-context (admin + POS
 // Schedule scope). Admin behavior is unchanged; the data is identical.
 import { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
+import { isEarlierState } from '@/lib/appointments/lifecycle-sync';
+import { UnMaterializeConfirmationDialog } from '@/components/appointments/un-materialize-confirmation-dialog';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
@@ -92,6 +94,11 @@ export function AppointmentDetailDialog({
 }: AppointmentDetailDialogProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  // Item 15e Phase 2C-β-2: un-materialize intercept. When Save reverts the
+  // status to an earlier lifecycle state AND an active job exists, open the
+  // shared confirmation modal instead of the normal save.
+  const [showUnMaterializeModal, setShowUnMaterializeModal] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<AppointmentUpdateInput | null>(null);
   // Phase Mobile-1.9: full mobile picker edit replaces the Phase 1.6
   // address-only inline editor. State drives the shared modal + the
   // post-save mismatch banner. Local overrides so the dialog reflects
@@ -197,6 +204,22 @@ export function AppointmentDetailDialog({
       }
       onOpenChange(false);
       onCancel(appointment);
+      return;
+    }
+
+    // Item 15e Phase 2C-β-2 — un-materialize intercept. Fires ONLY when all
+    // three hold: the status is actually changing, it is moving to an EARLIER
+    // lifecycle state (a revert — not cancel/no_show, which `isEarlierState`
+    // excludes), and a non-terminal job exists (`has_active_job === true`).
+    // Otherwise this is byte-identical to the prior normal save path.
+    if (
+      data.status !== undefined &&
+      data.status !== appointment.status &&
+      isEarlierState(data.status, appointment.status) &&
+      appointment.has_active_job === true
+    ) {
+      setPendingFormData(data);
+      setShowUnMaterializeModal(true);
       return;
     }
 
@@ -580,6 +603,29 @@ export function AppointmentDetailDialog({
           }
           onClose={() => setEditingMobile(null)}
           onSaved={handleMobileEditSaved}
+        />
+      )}
+      {/* Item 15e Phase 2C-β-2 — un-materialize confirmation (admin context).
+          Opened by the Save intercept when an earlier-status revert targets an
+          appointment with an active job. On success the job is deleted + the
+          appointment reverted to pending; close the detail dialog so the parent
+          page refetches. */}
+      {showUnMaterializeModal && pendingFormData && (
+        <UnMaterializeConfirmationDialog
+          open={showUnMaterializeModal}
+          onOpenChange={(o) => {
+            if (!o) {
+              setShowUnMaterializeModal(false);
+              setPendingFormData(null);
+            }
+          }}
+          appointment={appointment}
+          context="admin"
+          onSuccess={() => {
+            setShowUnMaterializeModal(false);
+            setPendingFormData(null);
+            onOpenChange(false);
+          }}
         />
       )}
     </Dialog>

@@ -28,6 +28,24 @@ interface AppointmentStatsData {
   bookedRevenue: number;
 }
 
+// Item 15e Phase 2C-β-2: derive `has_active_job` from the joined `jobs` rows so
+// the Appointment dialog Save intercept knows whether reverting an earlier
+// status should un-materialize the job. Mirrors the canonical terminal set in
+// `lifecycle-sync.ts` (TERMINAL_JOB_STATUSES). The raw `jobs` array (used only
+// for this derivation) is discarded so it never leaks into the dialog.
+const TERMINAL_JOB_STATUSES = ['completed', 'closed', 'cancelled'];
+function withHasActiveJob(
+  rows: unknown[]
+): AppointmentWithRelations[] {
+  return (rows as Array<Record<string, unknown>>).map((row) => {
+    const jobs = (row.jobs as Array<{ status: string }> | null | undefined) ?? [];
+    const hasActiveJob = jobs.some((j) => !TERMINAL_JOB_STATUSES.includes(j.status));
+    const { jobs: _drop, ...rest } = row;
+    void _drop;
+    return { ...rest, has_active_job: hasActiveJob } as unknown as AppointmentWithRelations;
+  });
+}
+
 export default function AppointmentsPage() {
   const supabase = createClient();
   useAuth();
@@ -143,7 +161,8 @@ export default function AppointmentsPage() {
           customer:customers!customer_id(id, first_name, last_name, phone, email),
           vehicle:vehicles!vehicle_id(id, year, make, model, color, size_class),
           employee:employees!employee_id(id, first_name, last_name, role),
-          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name)),
+          jobs:jobs!appointment_id(id, status)
         `)
         .gte('scheduled_date', monthStart)
         .lte('scheduled_date', monthEnd)
@@ -156,7 +175,7 @@ export default function AppointmentsPage() {
       }
 
       if (data) {
-        setAppointments(data as unknown as AppointmentWithRelations[]);
+        setAppointments(withHasActiveJob(data));
       }
     } else {
       const today = format(new Date(), 'yyyy-MM-dd');
@@ -168,7 +187,8 @@ export default function AppointmentsPage() {
           customer:customers!customer_id(id, first_name, last_name, phone, email),
           vehicle:vehicles!vehicle_id(id, year, make, model, color, size_class),
           employee:employees!employee_id(id, first_name, last_name, role),
-          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name))
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name)),
+          jobs:jobs!appointment_id(id, status)
         `)
         .eq('scheduled_date', today)
         .order('scheduled_start_time');
@@ -179,7 +199,7 @@ export default function AppointmentsPage() {
       }
 
       if (data) {
-        setAppointments(data as unknown as AppointmentWithRelations[]);
+        setAppointments(withHasActiveJob(data));
       }
     }
 
