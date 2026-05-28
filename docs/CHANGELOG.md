@@ -6,6 +6,43 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #117 — Audit: POS customer-type pill Sale-vs-Quotes parity + persistence (2026-05-28)
+
+Read-only diagnostic. **No source/migration/test changes.** One observational SELECT.
+Isolated `git worktree`; branch `audit/pos-customer-type-pill-sale-vs-quotes-parity`;
+**merged to main this session.** Deliverable: `docs/dev/POS_CUSTOMER_TYPE_PILL_PARITY_AUDIT.md`.
+Fourth Sale-vs-Quotes parity gap surfaced today.
+
+The customer-type pill (Unknown/Enthusiast/Professional) cycles in Sale but shows
+"Customer type cleared" instead of cycling in Quotes. **Root cause = a missing prop
+(classification (c) half-built wiring),** not the prior "wrong-context" mechanism. The pill
+(`CustomerTypeBadge`) is shared, mounted via `CustomerVehicleSummary` in both surfaces; on tap
+it PATCHes the customer record then calls `onTypeChanged(newType)` so the host updates its
+**local** customer state. Sale wires `onCustomerTypeChanged={handleCustomerTypeChanged}`
+(`ticket-panel.tsx:413` → dispatch `SET_CUSTOMER` with new `customer_type`, `:357-360`) → badge
+re-renders fresh → cycle advances. **Quotes omits `onCustomerTypeChanged` entirely**
+(`quote-ticket-panel.tsx:830-840`), so `onTypeChanged` is undefined (no-op,
+`customer-type-badge.tsx:70`); the PATCH persists but the quote's local `customer.customer_type`
+never updates → the badge renders the stale initial value → every tap repeats one transition
+(operator saw "cleared" because the test customer was already `professional`,
+`nextType(professional)=null`, toast `:75`).
+
+**Persistence: YES in both surfaces** — the badge PATCHes `/api/pos/customers/[id]/type`, which
+updates `customers.customer_type` directly + writes an audit row (`route.ts:38-69`). Live DB:
+732 enthusiast / 285 professional / 370 null. The pill is a **global, permanent** customer-record
+change (shown in Admin → Customers), not quote/ticket-scoped. **Data-integrity hazard in
+Quotes:** stale UI means tapping a `professional` customer silently persists `null` (demote) on
+the first tap while the pill still reads "Professional," and the operator can never reach
+`enthusiast` via the quote.
+
+**Fix:** mirror Sale — add `handleCustomerTypeChanged` to `quote-ticket-panel.tsx` dispatching
+`SET_CUSTOMER` with `{...quote.customer, customer_type:newType}` and pass it as
+`onCustomerTypeChanged`. The quote-reducer already supports `SET_CUSTOMER` (`quote-reducer.ts:361`)
+— **no reducer change**; **1 file, ~3 lines.** **Bundle into the same Quotes-parity fix session
+as an independent small commit** (thematically identical, but NOT part of the prereq/gating shared
+add-with-validation helper — different code area). Optional hardening: a confirm step, since the
+pill mutates the permanent record on a stray tap. 3 open operator questions.
+
 ## Session #116 — Audit: POS Sale-vs-Quotes prerequisite + add-on gating parity (2026-05-28)
 
 Read-only diagnostic. **No source/migration/test changes; no DB.** Isolated `git worktree`.
