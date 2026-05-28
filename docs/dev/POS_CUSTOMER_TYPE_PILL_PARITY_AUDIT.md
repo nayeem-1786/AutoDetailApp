@@ -1,5 +1,7 @@
 # POS Customer-Type Pill — Sale vs Quotes Parity + Persistence Audit (2026-05-28)
 
+> **STATUS: ✅ RESOLVED — Session #118** (`fix/quotes-customer-type-pill-callback-wiring`). The Quotes mount now wires `onCustomerTypeChanged` (mirror of Sale's `handleCustomerTypeChanged` → `SET_CUSTOMER`); the pill cycles + syncs locally in Quotes identically to Sale. Regression-locked by `src/app/pos/components/__tests__/customer-type-badge.test.tsx` (+4). Product decision LOCKED: pill stays global+permanent, no confirm dialog. Persistence already worked in both surfaces (unchanged).
+>
 > Read-only diagnostic. No source/migration/test changes. Live read-only SELECT only.
 > Branch: `audit/pos-customer-type-pill-sale-vs-quotes-parity`. Isolated `git worktree` off `origin/main` (`6b40fa14`).
 > Fourth Sale-vs-Quotes parity gap surfaced today (after prereq browse-path context, register-tab no-check, add-on gating). Sibling to `POS_SALE_VS_QUOTES_PARITY_AUDIT.md`.
