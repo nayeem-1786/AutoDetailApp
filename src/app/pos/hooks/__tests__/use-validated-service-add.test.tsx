@@ -118,6 +118,27 @@ function prereqResponse(satisfied: boolean) {
   };
 }
 
+/** Prereqs ARE configured and satisfied (e.g. by an on-ticket primary). Distinct
+ *  from `prereqResponse(true)`, which means "no prereqs configured". */
+function satisfiedWithPrereqs() {
+  return {
+    ok: true,
+    json: async () => ({
+      has_prerequisites: true,
+      satisfied: true,
+      prerequisites: [
+        {
+          service_name: 'Express Exterior Wash',
+          enforcement: 'required_same_ticket',
+          required_within_days: null,
+          warning_message: null,
+          met_by: { source: 'ticket' },
+        },
+      ],
+    }),
+  };
+}
+
 interface HarnessProps {
   service: CatalogService;
   serviceIds: string[];
@@ -206,9 +227,12 @@ describe('useValidatedServiceAdd — prerequisite check', () => {
   });
 });
 
-describe('useValidatedServiceAdd — add-on-only gate', () => {
-  it('warns when an addon_only service is added solo (no anchor present, no commit, no network)', async () => {
-    posFetchMock.mockResolvedValue(prereqResponse(true));
+describe('useValidatedServiceAdd — add-on-only gate (fires ONLY when no prereqs configured)', () => {
+  it('warns when an addon_only service WITH NO prereqs is added solo (after the prereq check confirms none)', async () => {
+    // #122 contract: the prereq check runs FIRST; with no prereqs configured the
+    // add-on-only gate then fires. The network call DOES happen (it's how we
+    // learn there are no prereqs) — the old "no network" assertion was wrong.
+    posFetchMock.mockResolvedValue(prereqResponse(true)); // has_prerequisites:false
     const onAdd = vi.fn();
     const addon = makeService({ id: 'addon-1', name: 'Pet Hair Removal', classification: 'addon_only' });
     render(<Harness service={addon} serviceIds={[]} services={[addon]} onAdd={onAdd} />);
@@ -216,8 +240,33 @@ describe('useValidatedServiceAdd — add-on-only gate', () => {
     fireEvent.click(screen.getByTestId('add'));
     expect(await screen.findByRole('heading', { name: /Add-On Service/i })).toBeDefined();
     expect(onAdd).not.toHaveBeenCalled();
-    // Add-on gate runs BEFORE the prerequisite check — no network call yet.
-    expect(posFetchMock).not.toHaveBeenCalled();
+    expect(posFetchMock).toHaveBeenCalled();
+  });
+
+  it('shows the PREREQUISITE dialog (not the add-on PIN) for an addon_only service with UNMET prereqs', async () => {
+    // The headline #122 fix: prereq dialog is primary; the add-on-only gate
+    // never fires when prerequisites are configured.
+    posFetchMock.mockResolvedValue(prereqResponse(false)); // has_prerequisites:true, unmet
+    const onAdd = vi.fn();
+    const addon = makeService({ id: 'addon-1', name: 'Paint Correction Prep', classification: 'addon_only' });
+    render(<Harness service={addon} serviceIds={[]} services={[addon]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    expect(await screen.findByRole('heading', { name: /Service Prerequisite Required/i })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /Add-On Service/i })).toBeNull();
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('commits an addon_only service with SATISFIED prereqs — no add-on PIN (prereqs are the gate)', async () => {
+    posFetchMock.mockResolvedValue(satisfiedWithPrereqs()); // has_prerequisites:true, satisfied:true
+    const onAdd = vi.fn();
+    const addon = makeService({ id: 'addon-1', name: 'Paint Correction Prep', classification: 'addon_only' });
+    render(<Harness service={addon} serviceIds={[]} services={[addon]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole('heading', { name: /Add-On Service/i })).toBeNull();
+    expect(screen.queryByRole('heading', { name: /Service Prerequisite Required/i })).toBeNull();
   });
 
   it('does NOT warn when an anchor (primary) service is present — proceeds to commit', async () => {

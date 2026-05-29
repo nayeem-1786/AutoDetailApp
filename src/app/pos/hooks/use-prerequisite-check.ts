@@ -35,6 +35,14 @@ export interface PrerequisiteCheckResult {
   canAdd: boolean;
   /** When satisfied by history, the note to display on the ticket item */
   prerequisiteNote?: string;
+  /**
+   * Whether the service has ANY prerequisites configured (independent of whether
+   * they are satisfied). The add-time helper (`use-validated-service-add.tsx`)
+   * branches on this: the add-on-only gate fires ONLY when a service has no
+   * prerequisites (a pure add-on with no parent dependency). When prerequisites
+   * exist, the prerequisite flow IS the gate.
+   */
+  hasPrerequisites: boolean;
 }
 
 /**
@@ -48,10 +56,12 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
   optionsRef.current = options;
 
   /**
-   * Check prerequisites for a service. Returns { canAdd, prerequisiteNote }.
-   * canAdd=true means the service can be added immediately.
+   * Check prerequisites for a service. Returns { canAdd, prerequisiteNote, hasPrerequisites }.
+   * canAdd=true means the service can be added immediately (prereqs satisfied OR none configured).
    * canAdd=false means prerequisites are unmet (warning dialog will be shown).
    * prerequisiteNote is set when the prereq was satisfied by customer history.
+   * hasPrerequisites reflects whether ANY prereqs are configured (lets the add-time
+   * helper decide whether the add-on-only gate applies — see use-validated-service-add.tsx).
    */
   const checkPrerequisites = useCallback(async (
     service: CatalogService,
@@ -75,7 +85,9 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
       });
 
       if (!res.ok) {
-        return { canAdd: true };
+        // Fail-open: can't reach the endpoint → allow the add. Treat as "no
+        // prerequisites known" so the helper's add-on-only gate still applies.
+        return { canAdd: true, hasPrerequisites: false };
       }
 
       const data = await res.json();
@@ -94,10 +106,13 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
             prerequisiteNote = `Prereq met: ${historyMatch.met_by.service_name || historyMatch.service_name}${dateStr ? ` (${dateStr})` : ''}`;
           }
         }
-        return { canAdd: true, prerequisiteNote };
+        // canAdd: prerequisites are satisfied OR none are configured.
+        // hasPrerequisites distinguishes the two so the helper knows whether the
+        // add-on-only gate applies (it applies ONLY when none are configured).
+        return { canAdd: true, prerequisiteNote, hasPrerequisites: !!data.has_prerequisites };
       }
 
-      // Show warning dialog
+      // Prerequisites exist and are unmet → show warning dialog (the primary gate).
       setWarning({
         service,
         pricing,
@@ -105,9 +120,10 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
         perUnitQty,
         prerequisites: data.prerequisites,
       });
-      return { canAdd: false };
+      return { canAdd: false, hasPrerequisites: true };
     } catch {
-      return { canAdd: true };
+      // Fail-open (see !res.ok above).
+      return { canAdd: true, hasPrerequisites: false };
     } finally {
       setChecking(false);
     }

@@ -66,20 +66,27 @@ interface UseValidatedServiceAddOptions {
 
 /**
  * Surface-agnostic add-with-validation helper (canonical add-time gate —
- * CLAUDE.md Rule 22). Runs two checks before committing a service, in order:
+ * CLAUDE.md Rule 22). The gate order is LOCKED (#122 corrective):
  *
- *   1. **Add-on-only gate.** If the service is classified `addon_only` and no
- *      anchor service (classification `primary` | `both`) is present on the
- *      ticket/quote, the add is "solo" → warn with a manager-PIN override
- *      (same permission + UX as the prerequisite override). On confirm it
- *      proceeds to the prerequisite check; on cancel it aborts.
- *   2. **Prerequisite check.** Delegates to `usePrerequisiteCheck` with the
- *      caller's context. Unmet → the prerequisite warning dialog (add a
- *      prerequisite first, or manager-override).
+ *   1. **Prerequisite check is PRIMARY.** Delegates to `usePrerequisiteCheck`.
+ *      - Prereqs configured + unmet → the `PrerequisiteWarningDialog` (add a
+ *        prerequisite, or manager-override behind its own Override button). The
+ *        add-on-only gate NEVER fires in this case.
+ *      - Prereqs configured + satisfied → commit directly (gate skipped).
+ *   2. **Add-on-only gate is conditional.** It fires ONLY when the service has
+ *      **no prerequisites configured** (a pure add-on with no parent
+ *      dependency) AND is classified `addon_only` AND is solo (no `primary`/
+ *      `both` anchor on the order) → warn with a manager-PIN override (reuses
+ *      `pos.override_prerequisites`). On confirm it commits; on cancel it aborts.
  *
- * Then it calls `onAdd`. The helper OWNS both dialogs (returned as `dialogs`)
- * and the prerequisite auto-add orchestration that was previously duplicated
- * in catalog-browser and quote-builder.
+ * Rationale (#122): when prerequisites exist they ARE the gate — a satisfied or
+ * overridden prerequisite implicitly authorizes the add-on, so a second
+ * manager-PIN for the add-on-only classification would be redundant and put the
+ * PIN dialog wrongly in front of the prerequisite dialog.
+ *
+ * The helper OWNS both dialogs (returned as `dialogs`) and the prerequisite
+ * auto-add orchestration that was previously duplicated in catalog-browser and
+ * quote-builder.
  *
  * Consumers call `addService(...)` for direct add funnels and pass
  * `runValidations` to sub-dialogs (e.g. `<ServiceDetailDialog onPrerequisiteCheck>`)
@@ -131,11 +138,15 @@ export function useValidatedServiceAdd(options: UseValidatedServiceAddOptions) {
   );
 
   /**
-   * Run both gates without committing. Returns `{ canAdd }` like the raw
-   * prerequisite check so it can be passed straight to
-   * `<ServiceDetailDialog onPrerequisiteCheck>`. When the add-on-solo gate
-   * fires it raises the solo warning and returns `{ canAdd: false }`; the
-   * override re-enters the pipeline via `onAdd`.
+   * Run the gates without committing (LOCKED order, #122). Returns a
+   * `PrerequisiteCheckResult` so it can be passed straight to
+   * `<ServiceDetailDialog onPrerequisiteCheck>`.
+   *
+   * 1. Prerequisite check FIRST (primary). Unmet → the prerequisite dialog is
+   *    shown (`canAdd: false`); the add-on-only gate does not fire.
+   * 2. Only when prereqs pass AND none are configured does the add-on-only gate
+   *    apply: a solo `addon_only` add raises the add-on-solo warning
+   *    (`canAdd: false`); its override re-enters the pipeline via `onAdd`.
    */
   const runValidations = useCallback(
     async (
@@ -144,11 +155,16 @@ export function useValidatedServiceAdd(options: UseValidatedServiceAddOptions) {
       vsc: VehicleSizeClass | null,
       perUnitQty?: number,
     ): Promise<PrerequisiteCheckResult> => {
-      if (isAddOnSolo(service)) {
+      const result = await checkPrerequisites(service, pricing, vsc, perUnitQty);
+      if (!result.canAdd) return result; // prerequisite dialog is showing
+      // Prereqs passed. The add-on-only gate applies ONLY when the service has
+      // no prerequisites configured (a pure add-on) — when prereqs exist, they
+      // were the gate.
+      if (!result.hasPrerequisites && isAddOnSolo(service)) {
         setAddOnSoloWarning({ service, pricing, vehicleSizeClass: vsc, perUnitQty });
-        return { canAdd: false };
+        return { canAdd: false, hasPrerequisites: false };
       }
-      return checkPrerequisites(service, pricing, vsc, perUnitQty);
+      return result;
     },
     [isAddOnSolo, checkPrerequisites],
   );
@@ -246,20 +262,19 @@ export function useValidatedServiceAdd(options: UseValidatedServiceAddOptions) {
   }, []);
 
   /**
-   * Manager authorized selling the add-on solo. Proceed to the prerequisite
-   * check (step 2 of the pipeline) and then commit. The override is not
-   * annotated on the item (no schema field); the manager identity is captured
-   * server-side by the verify-override endpoint.
+   * Manager authorized selling the add-on solo. The add-on-solo warning only
+   * appears when the service has NO prerequisites (already verified in
+   * `runValidations`), so there is nothing further to check — commit directly.
+   * The override is not annotated on the item (no schema field); the manager
+   * identity is captured server-side by the verify-override endpoint.
    */
   const handleAddOnSoloOverride = useCallback(async () => {
     const w = addOnSoloWarning;
     if (!w) return;
     clearAddOnSoloWarning();
-    const result = await checkPrerequisites(w.service, w.pricing, w.vehicleSizeClass, w.perUnitQty);
-    if (!result.canAdd) return; // prerequisite warning now showing
-    await onAdd(w.service, w.pricing, w.vehicleSizeClass, w.perUnitQty, result.prerequisiteNote ? { prerequisiteNote: result.prerequisiteNote } : undefined);
+    await onAdd(w.service, w.pricing, w.vehicleSizeClass, w.perUnitQty);
     if (!onAddHandlesToast) toast.success(`Added ${w.service.name}`);
-  }, [addOnSoloWarning, clearAddOnSoloWarning, checkPrerequisites, onAdd, onAddHandlesToast]);
+  }, [addOnSoloWarning, clearAddOnSoloWarning, onAdd, onAddHandlesToast]);
 
   // ─── Dialogs (owned by the helper, rendered by consumers) ────────
 

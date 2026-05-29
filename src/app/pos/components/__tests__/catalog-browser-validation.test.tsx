@@ -129,7 +129,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('<CatalogBrowser> — Sale add-time validation', () => {
-  it('add-on-only solo tap raises the add-on warning (manager PIN) and does NOT dispatch', async () => {
+  it('add-on-only solo tap (service with NO prereqs) raises the add-on warning and does NOT dispatch', async () => {
     posFetchMock.mockResolvedValue(noPrereqs());
     const addon = makeService({ id: 'addon-1', name: 'Pet Hair Removal', classification: 'addon_only' });
     mockCatalog.services = [addon];
@@ -140,8 +140,23 @@ describe('<CatalogBrowser> — Sale add-time validation', () => {
 
     expect(await screen.findByRole('heading', { name: /Add-On Service/i })).toBeDefined();
     expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
-    // Gate runs before the prerequisite network call.
-    expect(posFetchMock).not.toHaveBeenCalled();
+    // #122: the prereq check runs FIRST (it's how we learn there are no prereqs),
+    // then the add-on gate fires.
+    expect(posFetchMock).toHaveBeenCalled();
+  });
+
+  it('addon_only WITH unmet prereqs shows the PREREQ dialog, not the add-on PIN (#122 gate order)', async () => {
+    posFetchMock.mockResolvedValue(unmetPrereq());
+    const addon = makeService({ id: 'prep-1', name: 'Paint Correction Prep', classification: 'addon_only' });
+    mockCatalog.services = [addon];
+    mockTicket.value = saleTicket({ items: [] });
+
+    render(<CatalogBrowser type="services" search="Paint" />);
+    fireEvent.click(screen.getByText('Paint Correction Prep').closest('button')!);
+
+    expect(await screen.findByRole('heading', { name: /Service Prerequisite Required/i })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /Add-On Service/i })).toBeNull();
+    expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
   });
 
   it('prerequisite warning fires for an unmet required_same_ticket prereq (no dispatch)', async () => {

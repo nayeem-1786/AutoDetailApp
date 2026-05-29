@@ -11,6 +11,19 @@
 > question 3). +17 regression tests including per-surface prereq-fire + add-on-solo + override coverage.
 > The read-only diagnostic below is preserved as the original finding.
 
+> 🔧 **Gate-order correction — Session #122** (`fix/track-a-prereq-primary-gate-order`). #121 ran the
+> add-on-only gate BEFORE the prerequisite check, so an `addon_only` service that ALSO has
+> prerequisites (e.g. "Paint Correction Prep") fired the **manager-PIN dialog first**, then the prereq
+> dialog — backwards. The LOCKED contract is now: **(1) the prerequisite check is PRIMARY** — when
+> prerequisites are configured they ARE the gate (unmet → `PrerequisiteWarningDialog` with its own
+> Override→manager-PIN button; satisfied → commit), and the add-on-only gate never fires. **(2) the
+> add-on-only gate is CONDITIONAL** — it fires ONLY when a service has **no prerequisites configured**
+> (a pure add-on with no parent dependency) AND is `addon_only` AND solo. Implemented by surfacing
+> `hasPrerequisites` from `usePrerequisiteCheck`'s result (the endpoint already reported it) and
+> restructuring `useValidatedServiceAdd` to check prereqs first; `handleAddOnSoloOverride` commits
+> directly (no re-check). The 4 add-on-solo "no network" regression assertions from #121 locked the
+> wrong order and were rewritten; +5 tests (→ 2620).
+
 > Read-only diagnostic. No source/migration/test changes. Live read-only SELECTs only.
 > Branch: `audit/pos-prereq-enforcement-regression-and-addon-gating`
 > Performed in an isolated `git worktree` off `origin/main` (`81c28ee4`, the #114 merge)
