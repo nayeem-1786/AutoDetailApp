@@ -25,7 +25,7 @@ The four gap shapes used throughout this sweep:
 
 **Total: 1 Critical (in-flight) + 4 Significant + 1 Minor + several Informational (by-design) gaps.**
 
-> **RESOLUTION STATUS (updated 2026-05-28):** G1 RESOLVED in #119 (pill fix). **G2/G3/G4 RESOLVED in #120 (Track B)** — `fix/track-b-quotes-panel-parity-wiring`. G5 remains OPEN (Track A — the `useValidatedServiceAdd` helper). G6 DEFERRED (Minor; needs a `RESTORE_ITEM` quote action + swipe restructure — out of Track B scope). A new CI **structural guard** (`src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`) now blocks the whole prop-omission class.
+> **RESOLUTION STATUS (updated 2026-05-28):** G1 RESOLVED in #119 (pill fix). **G2/G3/G4 RESOLVED in #120 (Track B)** — `fix/track-b-quotes-panel-parity-wiring`. **G5 RESOLVED in #121 (Track A)** — `fix/track-a-useValidatedServiceAdd-shared-helper`: the `useValidatedServiceAdd` shared helper now runs add-on-only + prerequisite gating across Sale (`catalog-browser`), Quotes (search/picker + browse, via new `customerIdOverride`/`vehicleIdOverride`/`serviceIdsOverride` props on `<CatalogBrowser>`), and the register-tab favorites. G6 DEFERRED (Minor; needs a `RESTORE_ITEM` quote action + swipe restructure — out of Track B scope). A new CI **structural guard** (`src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`) now blocks the whole prop-omission class.
 
 | # | Gap | Shape | Severity | Status |
 |---|-----|-------|----------|--------|
@@ -33,7 +33,7 @@ The four gap shapes used throughout this sweep:
 | **G2** | **Vehicle edit unreachable** in Quotes — `onEditVehicle` omitted + `editVehicle` never passed to `VehicleCreateDialog` + no `editingVehicle` state | b + c | **Significant** | ✅ **RESOLVED #120** |
 | **G3** | **Reprice-failure fully silent** in Quotes — no panel toast watcher AND `quote-item-row` renders no `repriceFailed` badge (reducer sets the flag, nothing surfaces it) | c | **Significant** | ✅ **RESOLVED #120** |
 | **G4** | **`CustomerTypePrompt` never shown** in Quotes — selecting/creating an unknown-type customer never prompts for classification | c | **Significant** | ✅ **RESOLVED #120** |
-| **G5** | Quote **browse** prereq check runs against Sale-ticket context (`<CatalogBrowser>` `useTicket()`) | a | **Significant** | ⏳ OPEN — Track A (prior audit #3) |
+| **G5** | Quote **browse** prereq check runs against Sale-ticket context (`<CatalogBrowser>` `useTicket()`) | a | **Significant** | ✅ **RESOLVED #121** (Track A) |
 | **G6** | **No swipe-to-delete + undo** in Quotes — `RESTORE_ITEM` unused; accidental remove auto-saves with no undo | c | **Minor** | ⏸ DEFERRED (#120 — Track B scope guard) |
 | — | `disabled`, guest-checkout, edit-mode, `pos-vehicle-needed` gate, mobile/validity/draft | — | **Informational** (by-design) | n/a |
 

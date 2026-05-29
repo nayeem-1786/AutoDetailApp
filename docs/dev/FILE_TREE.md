@@ -1395,11 +1395,13 @@ stripe-terminal.ts    — Stripe Terminal SDK integration
 
 ```
 use-catalog.ts              — Shared catalog data hook (products, services)
-use-prerequisite-check.ts   — Service prerequisite check before adding to ticket/quote
+use-prerequisite-check.ts   — Service prerequisite check before adding to ticket/quote (surface-agnostic; POSTs context to /api/pos/services/check-prerequisites)
+use-validated-service-add.tsx — Track A (#121). Canonical add-time validation hook (CLAUDE.md Rule 22). Surface-agnostic: add-on-only gate (addon_only + no primary/both anchor → warn + manager-PIN override) → prerequisite check (wraps use-prerequisite-check) → commit via caller `onAdd`. Owns BOTH warning dialogs + the prerequisite auto-add orchestration (previously duplicated in catalog-browser + quote-builder). Used by Sale catalog-browser, Quotes quote-builder (search/picker + browse), and register-tab favorites. `.tsx` because it renders the dialogs.
 use-edit-mode-drain.ts      — Item 15f Phase 1 Layer 8b. POS deep-link drain (`/pos?source=...&id=...&returnTo=...`). Validates UUID + safe-internal-path, fetches load endpoint, dispatches ENTER_EDIT_MODE + modifier follow-ups. Mounted in pos-workspace.tsx. Exports pure helpers (`isUuid`, `isSafeInternalPath`, `buildTicketStateFromLoad`, `runEditModeDrain`) for unit-testing.
 ```
 
 - `src/app/pos/hooks/__tests__/use-edit-mode-drain.test.ts` — 24 cases: validators (UUID + 5 open-redirect attack classes), build-state pure helper, drain endpoint selection + dispatch sequence + coupon re-validation, error paths (403/404/network/malformed), Layer 8c `MARK_EDIT_INITIAL_STATE` as final dispatch (ordering vs coupon revalidate).
+- `src/app/pos/hooks/__tests__/use-validated-service-add.test.tsx` — Track A (#121), 8 cases: prereq commit/fire/context-POST/override + add-on-solo fire/anchor-bypass/both-anchor/override. Engine-level lock for all three surfaces.
 
 - `src/app/pos/components/edit-mode-banner.tsx` — Item 15f Phase 1 Layer 8c + Layer 8d label revamp. Subtle amber banner at top of Sale workspace when `ticket.editMode` is true. Surfaces "Editing Appointment: {customer} — {date}" via `buildEditLabel` helper (exported for tests), with fallback hierarchy: customer+date → customer-only → date-only → UUID-prefix safety net. "Unsaved changes" badge compares `serializeTicketEditSlice(ticket)` against `ticket.editInitialSnapshot`. Returns null outside edit mode.
 - `src/app/pos/components/__tests__/edit-mode-banner.test.tsx` — 14 cases: render gating, Layer 8d customer+date label (appointment + job variants), 4-tier fallback hierarchy, dirty/clean states, pre-MARK snapshot=null suppression, `buildEditLabel` pure-function unit tests.

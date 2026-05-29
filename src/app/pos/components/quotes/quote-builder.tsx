@@ -6,8 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { useQuote } from '../../context/quote-context';
 import { useCatalog } from '../../hooks/use-catalog';
-import { usePrerequisiteCheck } from '../../hooks/use-prerequisite-check';
-import { PrerequisiteWarningDialog } from '../prerequisite-warning-dialog';
+import { useValidatedServiceAdd } from '../../hooks/use-validated-service-add';
 import { posFetch } from '../../lib/pos-fetch';
 import { useBarcodeScanner } from '@/lib/hooks/use-barcode-scanner';
 import { SearchBar } from '../search-bar';
@@ -18,7 +17,6 @@ import { QuoteTicketPanel } from './quote-ticket-panel';
 import type { CatalogProduct, CatalogService, TicketItem, QuoteState } from '../../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { calculateItemTax } from '../../utils/tax';
-import { selectPricingTierForVehicle } from '@/lib/services/picker-engine';
 
 type CatalogTab = 'products' | 'services';
 
@@ -213,16 +211,12 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     [quote.items]
   );
 
-  // Prerequisite check for quote search flow (catalog browser handles its own checks)
+  // Quote line-item service IDs — used for both the validation helper context
+  // and the CatalogBrowser context-override props (browse path).
   const quoteServiceIds = useMemo(
     () => quote.items.filter((i) => i.itemType === 'service' && i.serviceId).map((i) => i.serviceId!),
     [quote.items]
   );
-  const { warning: prereqWarning, checkPrerequisites, clearWarning: clearPrereqWarning } = usePrerequisiteCheck({
-    customerId: quote.customer?.id ?? null,
-    vehicleId: quote.vehicle?.id ?? null,
-    ticketServiceIds: quoteServiceIds,
-  });
 
   // Callbacks for catalog browser to dispatch to quote context
   const handleAddProduct = useCallback((product: CatalogProduct) => {
@@ -257,7 +251,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
   useBarcodeScanner({ onScan: handleBarcodeScan });
 
-  const handleAddService = useCallback((service: CatalogService, pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) => {
+  const handleAddService = useCallback((service: CatalogService, pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number, opts?: { prerequisiteNote?: string; prerequisiteForServiceId?: string }) => {
     // Check if this service is already on the ticket
     const existing = quote.items.find(
       (i) => i.itemType === 'service' && i.serviceId === service.id
@@ -283,9 +277,23 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
       return;
     }
 
-    dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc, perUnitQty });
+    dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote: opts?.prerequisiteNote, prerequisiteForServiceId: opts?.prerequisiteForServiceId });
     toast.success(`Added ${service.name}`);
   }, [dispatch, quote.items]);
+
+  // Canonical add-time validation (CLAUDE.md Rule 22), bound to the QUOTE
+  // context — fixes the search/picker paths and (via the context-override
+  // props passed to <CatalogBrowser>) the browse path's G5 wrong-context bug.
+  // `onAddHandlesToast` is true: handleAddService shows its own success toast.
+  const { addService, dialogs: validationDialogs } = useValidatedServiceAdd({
+    customerId: quote.customer?.id ?? null,
+    vehicleId: quote.vehicle?.id ?? null,
+    serviceIds: quoteServiceIds,
+    services,
+    vehicleSizeClass,
+    onAdd: handleAddService,
+    onAddHandlesToast: true,
+  });
 
   // Global search handlers (for search in the Register-like view)
   const searchLower = search.toLowerCase();
@@ -311,11 +319,9 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
 
     const pricing = service.pricing ?? [];
     if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
-      const result = await checkPrerequisites(service, pricing[0], vehicleSizeClass);
-      if (result.canAdd) {
-        dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass, prerequisiteNote: result.prerequisiteNote });
-        toast.success(`Added ${service.name}`);
-      }
+      // Routes through the canonical helper (add-on gate → prereq → onAdd).
+      // handleAddService (onAdd) shows the success toast.
+      await addService(service, pricing[0], vehicleSizeClass);
       return;
     }
     if (pricing.length === 0 && service.flat_price != null) {
@@ -337,11 +343,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
         qty_label: null,
         created_at: '',
       };
-      const result = await checkPrerequisites(service, syntheticPricing, vehicleSizeClass);
-      if (result.canAdd) {
-        dispatch({ type: 'ADD_SERVICE', service, pricing: syntheticPricing, vehicleSizeClass, prerequisiteNote: result.prerequisiteNote });
-        toast.success(`Added ${service.name}`);
-      }
+      await addService(service, syntheticPricing, vehicleSizeClass);
       return;
     }
     setPickerService(service);
@@ -351,64 +353,7 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
     if (!pickerService) return;
     const svc = pickerService;
     setPickerService(null);
-    const result = await checkPrerequisites(svc, pricing, vsc, perUnitQty);
-    if (result.canAdd) {
-      handleAddService(svc, pricing, vsc, perUnitQty);
-    }
-  }
-
-  function handlePrereqOverride(managerName?: string) {
-    if (!prereqWarning) return;
-    const { service, pricing, vehicleSizeClass: vsc, perUnitQty } = prereqWarning;
-    clearPrereqWarning();
-    const note = managerName ? `Prereq overridden by ${managerName}` : undefined;
-    dispatch({ type: 'ADD_SERVICE', service, pricing, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote: note });
-    toast.success(`Added ${service.name}`);
-  }
-
-  function handleAddPrerequisite(prereqServiceName: string) {
-    if (!prereqWarning) return;
-    const { service: originalService, pricing: originalPricing, vehicleSizeClass: originalVsc, perUnitQty: originalPerUnitQty } = prereqWarning;
-    clearPrereqWarning();
-
-    const prereqService = services.find((s) => s.name === prereqServiceName);
-    if (!prereqService) {
-      toast.error(`Service "${prereqServiceName}" not found in catalog`);
-      return;
-    }
-
-    // Add prerequisite, tagged with dependent service ID. Select the tier for
-    // THIS vehicle's size_class via the canonical engine — NOT prereqPricing[0]
-    // (always the sedan/first tier), which mispriced size-aware prerequisites
-    // (see docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md).
-    const prereqExtra = { prerequisiteForServiceId: originalService.id };
-    const prereqPricing = prereqService.pricing ?? [];
-    if (prereqPricing.length > 0) {
-      const tier = selectPricingTierForVehicle(prereqPricing, vehicleSizeClass);
-      if (!tier) {
-        // No tier matches this vehicle size (data gap). The prerequisite is
-        // required-same-ticket, so block the whole add — neither the
-        // prerequisite nor the dependent add-on is added.
-        toast.error(`Cannot auto-add "${prereqService.name}": no price configured for this vehicle size. Add it manually.`);
-        return;
-      }
-      dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass, ...prereqExtra });
-      toast.success(`Added ${prereqService.name}`);
-    } else if (prereqService.flat_price != null) {
-      const syntheticPricing: ServicePricing = {
-        id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
-        price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
-      };
-      dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });
-      toast.success(`Added ${prereqService.name}`);
-    } else {
-      toast.error(`Cannot auto-add ${prereqService.name} — no pricing available`);
-      return;
-    }
-
-    // Add original service
-    handleAddService(originalService, originalPricing, originalVsc, originalPerUnitQty);
+    await addService(svc, pricing, vsc, perUnitQty);
   }
 
   if (loadingQuote) {
@@ -500,6 +445,9 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
               vehicleSizeOverride={vehicleSizeClass}
               vehicleSpecialtyTierOverride={vehicleSpecialtyTier}
               addedServiceIds={addedServiceIds}
+              customerIdOverride={quote.customer?.id ?? null}
+              vehicleIdOverride={quote.vehicle?.id ?? null}
+              serviceIdsOverride={quoteServiceIds}
             />
           )}
         </div>
@@ -520,15 +468,10 @@ export function QuoteBuilder({ quoteId, walkInMode, onBack, onSaved }: QuoteBuil
         />
       )}
 
-      {/* Prerequisite Warning Dialog (for search flow — catalog browser handles its own) */}
-      {prereqWarning && (
-        <PrerequisiteWarningDialog
-          warning={prereqWarning}
-          onClose={clearPrereqWarning}
-          onOverride={handlePrereqOverride}
-          onAddPrerequisite={handleAddPrerequisite}
-        />
-      )}
+      {/* Add-time validation dialogs (prerequisite + add-on-solo) for the
+          quote search/picker paths. The browse path's <CatalogBrowser> renders
+          its own helper dialogs with the quote context-override props. */}
+      {validationDialogs}
     </div>
   );
 }
