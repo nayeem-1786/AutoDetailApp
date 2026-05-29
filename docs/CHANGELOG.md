@@ -6,6 +6,50 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #122 — Fix: Track A gate-order — prereq dialog primary, manager-PIN only on override (2026-05-29)
+
+Production UX-correctness fix to the Track A `useValidatedServiceAdd` helper (#121, `f8cba37f`).
+Operator-reported: tapping an `addon_only` service that also has prerequisites (e.g. "Paint
+Correction Prep") fired the **manager-PIN dialog FIRST** (the add-on-only gate), then the
+prerequisite dialog — backwards. Built in an isolated `git worktree`; **merged to main this session**.
+
+**The LOCKED gate-order contract (now enforced):**
+1. **Prerequisite check is PRIMARY.** Prereqs configured + unmet → the `PrerequisiteWarningDialog`
+   (add a prerequisite, or manager-override behind *its own* Override button). The add-on-only gate
+   never fires. Prereqs satisfied → commit directly.
+2. **Add-on-only gate is CONDITIONAL** — it fires ONLY when the service has **no prerequisites
+   configured** (a pure add-on with no parent dependency) AND is classified `addon_only` AND is solo
+   (no `primary`/`both` anchor on the order) → warn + manager-PIN override (`pos.override_prerequisites`).
+
+Logical basis: when prerequisites exist they ARE the gate — a satisfied or overridden prerequisite
+implicitly authorizes the add-on, so a separate add-on-only PIN would be redundant and (the bug)
+wrongly preempts the prerequisite dialog.
+
+**Implementation (2 production files, ~40 lines):**
+- `src/app/pos/hooks/use-prerequisite-check.ts` — `checkPrerequisites` now returns
+  `hasPrerequisites: boolean` alongside `canAdd`/`prerequisiteNote` (the endpoint already reports it;
+  it was being folded into `canAdd`). Minimal additive change — the helper needs it to know whether
+  the add-on gate even applies. (Scope had assumed the hook already exposed it.)
+- `src/app/pos/hooks/use-validated-service-add.tsx` — `runValidations` now runs the prerequisite
+  check FIRST; the add-on-only gate fires only when `canAdd && !hasPrerequisites && isAddOnSolo`.
+  `handleAddOnSoloOverride` simplified (no re-check — the solo warning only appears when prereqs are
+  already clear, so the manager-PIN override commits directly). The prerequisite dialog + its own
+  Override→PIN flow were already correct and are unchanged.
+
+No reducer, migration, schema, or new-permission-key change. No change to `PrerequisiteWarningDialog`,
+`ManagerPinDialog`, the endpoint, or Track B's work. The three consumer surfaces
+(catalog-browser / quote-builder / register-tab) are untouched — the fix is internal to the helper.
+
+**Tests (+5 → 2620):** the 4 add-on-solo "no network" assertions across the engine + 3 per-surface
+tests **locked the wrong behavior** and were rewritten (the prereq check now runs first, so the
+network IS called before the add-on gate). New contract tests added per surface: **`addon_only` WITH
+unmet prereqs → PREREQUISITE dialog (not add-on PIN)**, and (engine) `addon_only` WITH satisfied
+prereqs → commits with no PIN. Gates: `tsc --noEmit` 0; `npm run lint` 0 errors / 97 warnings
+(baseline); `npm test` 2620/2620; `next build` clean.
+
+**Operator: deploy + retest the Paint Correction Prep flow — the prerequisite dialog should be
+primary; the manager PIN only appears behind the Override button.**
+
 ## Session #121 — Fix Track A: `useValidatedServiceAdd` shared helper — prereq + add-on gating across Sale/Quotes/register-tab (2026-05-28)
 
 Production code fix + canonical-engine refactor. Closes the **last** Sale-vs-Quotes parity gap and

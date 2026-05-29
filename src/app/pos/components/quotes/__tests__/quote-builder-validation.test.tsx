@@ -141,7 +141,7 @@ describe('<QuoteBuilder> — search path validation', () => {
     expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
   });
 
-  it('add-on-only solo search tap raises the add-on warning (no dispatch, no network)', async () => {
+  it('add-on-only solo search tap (service with NO prereqs) raises the add-on warning, no dispatch', async () => {
     posFetchMock.mockResolvedValue(noPrereqs());
     const addon = makeService({ id: 'addon-1', name: 'Pet Hair Removal', classification: 'addon_only' });
     mockCatalog.services = [addon];
@@ -153,6 +153,24 @@ describe('<QuoteBuilder> — search path validation', () => {
 
     expect(await screen.findByRole('heading', { name: /Add-On Service/i })).toBeDefined();
     expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
-    expect(posFetchMock).not.toHaveBeenCalled();
+    // #122: prereq check runs first (learns there are no prereqs), then the add-on gate.
+    expect(posFetchMock).toHaveBeenCalled();
+  });
+
+  it('addon_only WITH unmet prereqs shows the PREREQ dialog (quote context), not the add-on PIN (#122)', async () => {
+    posFetchMock.mockResolvedValue(unmetPrereq());
+    const addon = makeService({ id: 'prep-1', name: 'Paint Correction Prep', classification: 'addon_only' });
+    mockCatalog.services = [addon];
+    mockQuote.value = makeQuote({ items: [] });
+
+    render(<QuoteBuilder quoteId="q-1" onBack={() => {}} onSaved={() => {}} />);
+    search('Paint');
+    fireEvent.click(screen.getByText('Paint Correction Prep'));
+
+    expect(await screen.findByRole('heading', { name: /Service Prerequisite Required/i })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /Add-On Service/i })).toBeNull();
+    const body = JSON.parse(posFetchMock.mock.calls[0][1].body);
+    expect(body.customer_id).toBe('quote-cust');
+    expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
   });
 });

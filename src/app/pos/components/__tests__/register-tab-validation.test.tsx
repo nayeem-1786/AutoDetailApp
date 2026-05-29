@@ -116,7 +116,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('RegisterTab — favorite quick-add validation', () => {
-  it('add-on-only solo favorite raises the add-on warning and does NOT dispatch', async () => {
+  it('add-on-only solo favorite (service with NO prereqs) raises the add-on warning and does NOT dispatch', async () => {
     posFetchMock.mockResolvedValue(noPrereqs());
     const addon = makeService({ id: 'addon-1', name: 'Pet Hair Removal', classification: 'addon_only' });
     mockCatalog.services = [addon];
@@ -128,7 +128,23 @@ describe('RegisterTab — favorite quick-add validation', () => {
 
     expect(await screen.findByRole('heading', { name: /Add-On Service/i })).toBeDefined();
     expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
-    expect(posFetchMock).not.toHaveBeenCalled();
+    // #122: prereq check runs first (learns there are no prereqs), then the add-on gate.
+    expect(posFetchMock).toHaveBeenCalled();
+  });
+
+  it('addon_only favorite WITH unmet prereqs shows the PREREQ dialog, not the add-on PIN (#122)', async () => {
+    posFetchMock.mockResolvedValue(unmetPrereq());
+    const addon = makeService({ id: 'prep-1', name: 'Paint Correction Prep', classification: 'addon_only' });
+    mockCatalog.services = [addon];
+    mockFavorites.value = [serviceFavorite('prep-1', 'Paint Correction Prep')];
+    mockTicket.value = makeTicket({ items: [] });
+
+    render(<RegisterTab onOpenCustomerLookup={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Paint Correction Prep/i }));
+
+    expect(await screen.findByRole('heading', { name: /Service Prerequisite Required/i })).toBeDefined();
+    expect(screen.queryByRole('heading', { name: /Add-On Service/i })).toBeNull();
+    expect(dispatchMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_SERVICE' }));
   });
 
   it('prerequisite warning fires for an unmet prereq on a favorite (no dispatch)', async () => {
