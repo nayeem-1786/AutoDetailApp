@@ -1452,6 +1452,10 @@ Phase Mobile-1.1 additions:
 - `src/app/pos/components/checkout/__tests__/save-address-dialog.test.tsx`
 - `src/app/pos/components/quotes/__tests__/mobile-fee-picker.test.tsx`
 
+Track B — Quotes-panel parity (#120, G2/G3/G4) additions:
+- `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx` # STRUCTURAL GUARD — source-contract test asserting every prop the Sale panel (ticket-panel.tsx) wires on a SHARED component is also wired in the Quotes panel (quote-ticket-panel.tsx), minus a documented Sale-only allowlist (`disabled`). Also pins CustomerTypePrompt mounted in both (G4) + repriceFailed surfaced in both (G3). Catches the NEXT omitted-prop gap at CI. 10 tests.
+- `src/app/pos/components/quotes/__tests__/quote-item-row-reprice-badge.test.tsx` # G3 — locks the amber "No <size> pricing" badge into the forked quote-item-row (parity with ticket-item-row) so a no-tier vehicle change can't silently keep a stale price on a customer-facing quote. 4 tests.
+
 Roadmap Item 12 (POS Appointments) additions:
 - `src/app/pos/components/appointments/appointments-view.tsx`
 - `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx`

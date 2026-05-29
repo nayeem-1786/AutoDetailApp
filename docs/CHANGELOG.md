@@ -6,6 +6,57 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #120 — Fix Track B: Quotes-panel parity wiring (G2/G3/G4) + structural guard test (2026-05-28)
+
+Production fix. Branch `fix/track-b-quotes-panel-parity-wiring`, isolated `git worktree`;
+**merged to main this session.** Closes three Sale-vs-Quotes parity gaps from the #118
+sweep (`docs/dev/SALE_VS_QUOTES_PARITY_SWEEP.md`) by mirroring Sale exactly — Quotes was a
+partial copy of Sale and never wired these. No reducer/migration changes (sweep Target 5
+confirmed `SET_CUSTOMER`/`SET_VEHICLE` are identical both sides).
+
+**G2 — vehicle edit unreachable in Quotes (now reachable).** Mirror of `ticket-panel.tsx`:
+added `editingVehicle` state, wired `onEditVehicle` on `<CustomerVehicleSummary>` (the edit
+pencil only renders when the prop is passed — `customer-vehicle-summary.tsx:116`), and passed
+`editVehicle` to `<VehicleCreateDialog>` with an edit branch in `onCreated` that dispatches
+`SET_VEHICLE` (`blockedByPayment: false` — quotes have no checkout). An operator can now fix a
+quote vehicle's `size_class` inline instead of being unable to re-price.
+
+**G3 — reprice failure no longer silent in Quotes.** `quote-reducer` SET_VEHICLE already set
+`item.repriceFailed` on a no-tier vehicle change and kept the stale price, but nothing surfaced
+it. Added (a) the panel-level `toast.warning` watcher (mirror `ticket-panel.tsx:123-143`) and
+(b) the amber "No <size> pricing" badge in `quote-item-row.tsx` (mirror `ticket-item-row.tsx:138-151`).
+Two surfaces, matching Sale.
+
+**G4 — `CustomerTypePrompt` now shown in Quotes.** Mounted the prompt (Sale-only until now);
+`handleSelectCustomer`/`handleCustomerCreated` open it when the attached customer has no
+`customer_type`, then sequence into the vehicle selector on dismiss (the quote flow collects a
+vehicle next — Sale has no such step, so the sequencing is the faithful adaptation). Reuses the
+#119 `handleCustomerTypeChanged` for local sync after the prompt PATCHes the record.
+
+**STRUCTURAL GUARD (the durable win) — `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`.**
+A source-contract test (not a render harness — the #119 author already established that a full
+QuoteTicketPanel harness is disproportionate): for every component mounted in BOTH panels
+(`CustomerVehicleSummary`, `CustomerLookup`, `CustomerCreateDialog`, `VehicleSelector`,
+`VehicleCreateDialog`, `PrerequisiteRemovalDialog`, `ManagerPinDialog`), it parses each panel's
+JSX and asserts every prop Sale wires is also wired in Quotes (minus a documented Sale-only
+allowlist — currently just `disabled`). Also pins `CustomerTypePrompt` mounted in both (G4) and
+`repriceFailed` surfaced in both (G3). **Verified it has teeth:** temporarily removing
+`onEditVehicle` made it fail with `missing prop(s) Sale wires: [onEditVehicle]`. This catches the
+NEXT omitted-prop gap at CI instead of in production — the recurring failure mode behind four
+audits. Plus `quote-item-row-reprice-badge.test.tsx` locks the G3 badge in the forked row.
+
+**G6 (swipe-to-delete + undo) DEFERRED** — Minor; needs a `RESTORE_ITEM` quote-reducer action +
+restructuring the quote items list into `SwipeableCartItem`. Out of Track B scope (would dilute);
+noted in the sweep doc.
+
+**Scope:** 2 production files (`quote-ticket-panel.tsx`, `quote-item-row.tsx`) + 2 new test files.
+No Sale changes (reference untouched), no Track A files (`catalog-browser`/`quote-builder`/`register-tab`).
+**Gates:** tsc 0 errors · lint 0 errors / 94 warnings (none new) · **2598/2598 tests pass (+14)** · build clean.
+Not a 13-item entry (Sale-vs-Quotes parity arc). Operator: deploy + manually verify Quotes vehicle
+edit, reprice surface, and the customer-type prompt.
+
+---
+
 ## Session #119 — Fix: wire onCustomerTypeChanged in Quotes pill mount (silent customer demotion) (2026-05-28)
 
 Production bug fix (data integrity). Resolves the Critical finding from

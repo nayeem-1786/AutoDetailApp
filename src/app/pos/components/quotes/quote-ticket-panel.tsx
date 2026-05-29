@@ -28,8 +28,10 @@ import { VehicleCreateDialog } from '../vehicle-create-dialog';
 import { QuoteSendDialog } from './quote-send-dialog';
 import { PrerequisiteRemovalDialog } from '../prerequisite-removal-dialog';
 import { ManagerPinDialog } from '../manager-pin-dialog';
+import { CustomerTypePrompt } from '../customer-type-prompt';
 import { SaveAddressDialog } from '../checkout/save-address-dialog';
-import type { Customer, CustomerType, Vehicle } from '@/lib/supabase/types';
+import type { Customer, CustomerType, Vehicle, VehicleSizeClass } from '@/lib/supabase/types';
+import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
 import { useRouter } from 'next/navigation';
 import { posFetch } from '../../lib/pos-fetch';
 import type { TicketItem, QuoteState } from '../../types';
@@ -165,6 +167,11 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   const [discountOverrideGranted, setDiscountOverrideGranted] = useState(false);
   const [showDiscountOverridePin, setShowDiscountOverridePin] = useState(false);
   const [pendingVehicleChange, setPendingVehicleChange] = useState<Vehicle | null>(null);
+  // G2 — vehicle being edited (parity with ticket-panel.tsx:67). When set, the
+  // VehicleCreateDialog opens in edit mode and saving dispatches SET_VEHICLE.
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  // G4 — customer-type classification prompt (parity with ticket-panel.tsx:77).
+  const [showTypePrompt, setShowTypePrompt] = useState(false);
 
   // Prerequisite removal guard state
   const [prereqRemoval, setPrereqRemoval] = useState<{
@@ -218,6 +225,31 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   useEffect(() => {
     quoteRef.current = quote;
   }, [quote]);
+
+  // G3 — toast when a vehicle-change reprice failed for one or more items
+  // (parity with ticket-panel.tsx:123-143). quote-reducer SET_VEHICLE already
+  // sets the `repriceFailed` flag and keeps the stale price; without this the
+  // mispricing would persist silently on a customer-facing quote. Watches
+  // quote.items for NEWLY-failed flags (not carried over from prior state).
+  const prevFailedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentFailedIds = new Set(
+      quote.items.filter((i) => i.repriceFailed).map((i) => i.id)
+    );
+    const newlyFailed = quote.items.filter(
+      (i) => i.repriceFailed && !prevFailedIdsRef.current.has(i.id)
+    );
+    if (newlyFailed.length > 0) {
+      // All newly-failed items share the same attemptedSize (set in the same reducer pass).
+      const attemptedSize = newlyFailed[0].repriceFailed!.attemptedSize;
+      const sizeLabel = attemptedSize ? VEHICLE_SIZE_LABELS[attemptedSize as VehicleSizeClass] : 'this vehicle';
+      toast.warning(
+        `${newlyFailed.length} item${newlyFailed.length === 1 ? '' : 's'} kept at previous price — no pricing configured for ${sizeLabel}`,
+        { duration: 5000 }
+      );
+    }
+    prevFailedIdsRef.current = currentFailedIds;
+  }, [quote.items]);
 
   const persistDraft = useCallback(
     async ({ silent }: { silent: boolean }): Promise<boolean> => {
@@ -480,13 +512,27 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
   function handleSelectCustomer(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
     setCustomerLookupOpen(false);
-    setShowVehicleSelector(true);
+    // G4 (parity with ticket-panel.tsx:279-281): prompt to classify an
+    // unknown-type customer. The quote flow also collects a vehicle next, so we
+    // sequence — the vehicle selector opens once the prompt is dismissed (see
+    // CustomerTypePrompt's onOpenChange below). Known type → straight to vehicle.
+    if (!customer.customer_type) {
+      setShowTypePrompt(true);
+    } else {
+      setShowVehicleSelector(true);
+    }
   }
 
   function handleCustomerCreated(customer: Customer) {
     dispatch({ type: 'SET_CUSTOMER', customer });
     setShowCustomerCreate(false);
-    setShowVehicleSelector(true);
+    // G4 — same sequencing as handleSelectCustomer (the create dialog may have
+    // already set a type, in which case we skip straight to the vehicle selector).
+    if (!customer.customer_type) {
+      setShowTypePrompt(true);
+    } else {
+      setShowVehicleSelector(true);
+    }
   }
 
   function applyVehicleSelection(vehicle: Vehicle) {
@@ -850,6 +896,12 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           }}
           onClear={handleClearCustomer}
           onCustomerTypeChanged={handleCustomerTypeChanged}
+          onEditVehicle={() => {
+            if (quote.vehicle) {
+              setEditingVehicle(quote.vehicle);
+              setShowVehicleCreate(true);
+            }
+          }}
         />
       </div>
 
@@ -1158,13 +1210,24 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         </Dialog>
       )}
 
-      {/* Vehicle Create Dialog */}
+      {/* Vehicle Create/Edit Dialog */}
       {quote.customer && (
         <VehicleCreateDialog
           open={showVehicleCreate}
-          onClose={() => setShowVehicleCreate(false)}
+          onClose={() => { setShowVehicleCreate(false); setEditingVehicle(null); }}
           customerId={quote.customer.id}
-          onCreated={handleVehicleCreated}
+          onCreated={(vehicle) => {
+            if (editingVehicle) {
+              // G2 — editing existing vehicle: update on the quote. Quotes have
+              // no checkout/payment path, so blockedByPayment is always false.
+              dispatch({ type: 'SET_VEHICLE', vehicle, services, blockedByPayment: false });
+              setShowVehicleCreate(false);
+              setEditingVehicle(null);
+            } else {
+              handleVehicleCreated(vehicle);
+            }
+          }}
+          editVehicle={editingVehicle}
         />
       )}
 
@@ -1243,6 +1306,24 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
           customerId={saveAddressAction.customer_id}
           currentProfileAddress={saveAddressAction.current_profile_address}
           enteredAddress={saveAddressAction.entered_address}
+        />
+      )}
+
+      {/* G4 — Customer Type Prompt (parity with ticket-panel.tsx:738-750). Shown
+          when a selected/created customer has no customer_type. On dismiss
+          (classify or skip) the quote flow continues to the vehicle selector.
+          onTypeSelected reuses handleCustomerTypeChanged (the #119 pill handler)
+          to sync the quote's local customer after the prompt PATCHes the record. */}
+      {quote.customer && (
+        <CustomerTypePrompt
+          open={showTypePrompt}
+          onOpenChange={(open) => {
+            setShowTypePrompt(open);
+            if (!open) setShowVehicleSelector(true);
+          }}
+          customerId={quote.customer.id}
+          customerName={`${quote.customer.first_name} ${quote.customer.last_name}`}
+          onTypeSelected={handleCustomerTypeChanged}
         />
       )}
     </div>
