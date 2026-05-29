@@ -1,5 +1,16 @@
 # POS Sale vs Quotes — Prerequisite + Add-On Gating Parity Audit (2026-05-28)
 
+> ✅ **RESOLVED in Session #121 (Track A)** — `fix/track-a-useValidatedServiceAdd-shared-helper`.
+> Target 5's recommended fix shipped exactly as specced: one surface-agnostic
+> `useValidatedServiceAdd` hook (`src/app/pos/hooks/use-validated-service-add.tsx`) runs the add-on-only
+> gate → prerequisite check → commit, and owns both warning dialogs + the prerequisite auto-add.
+> All three surfaces route through it — Sale `catalog-browser` (byte-behavior-identical reference),
+> Quotes `quote-builder` (search/picker + browse via new `customerIdOverride`/`vehicleIdOverride`/
+> `serviceIdsOverride` props on `<CatalogBrowser>`, fixing the G5 wrong-context bug), and `register-tab`
+> favorites (gained the prereq check it never had). Add-on-only solo = **warn + manager-PIN override**
+> (reuses `pos.override_prerequisites`), mirroring the prereq override. +17 regression tests. The
+> read-only diagnostic below is preserved as the original finding.
+
 > Read-only diagnostic. No source/migration/test changes. No DB needed (pure code-path trace).
 > Branch: `audit/pos-sale-vs-quotes-prereq-gating-parity`. Isolated `git worktree` off `origin/main` (`ab36cb56`).
 > Builds on `POS_PREREQ_ENFORCEMENT_AND_GATING_AUDIT.md` (prior) and `POS_PREREQUISITE_PRICING_AUDIT.md` (#112).

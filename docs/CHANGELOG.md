@@ -6,6 +6,71 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #121 — Fix Track A: `useValidatedServiceAdd` shared helper — prereq + add-on gating across Sale/Quotes/register-tab (2026-05-28)
+
+Production code fix + canonical-engine refactor. Closes the **last** Sale-vs-Quotes parity gap and
+two long-standing add-time-validation gaps in one shared mechanism. Built in an isolated `git
+worktree` parallel to Track B (which merged #120 first) → this session is **#121**, rebased onto
+Track B cleanly (zero source overlap); **merged to main this session**.
+
+Resolves three audits at once:
+- **G5** (`SALE_VS_QUOTES_PARITY_SWEEP.md`): the quote **browse** view delegated to `<CatalogBrowser>`,
+  whose prerequisite check was hardwired to the **Sale-ticket** context (`useTicket()`), not the
+  quote's — so quote-browse prereqs validated against the wrong customer/vehicle/line-items (could
+  over-fire on an empty Sale ticket, or silently under-fire when a concurrent Sale ticket already
+  held the prerequisite).
+- **Add-on-only gating** (`POS_PREREQ_ENFORCEMENT_AND_GATING_AUDIT.md` Issue 2): never built on any
+  surface — an `addon_only` service (e.g. "Paint Correction Prep") could be sold solo with no signal.
+- **register-tab no-validation** (Issue 3): favorites + the picker dispatched `ADD_SERVICE` directly
+  with **zero** prerequisite or add-on gating.
+
+**The fix (canonical, CLAUDE.md Rule 11/22):** one surface-agnostic hook
+`src/app/pos/hooks/use-validated-service-add.tsx` that runs, in order, (1) the **add-on-only gate**
+— if `classification === 'addon_only'` and no anchor service (`primary` | `both`) is present on the
+order, the add is "solo" → **warn with a manager-PIN override** (reuses the `pos.override_prerequisites`
+permission, mirroring the existing prereq override exactly) — then (2) the **prerequisite check**
+(wraps `use-prerequisite-check` with the caller's context), then (3) commit via the caller's `onAdd`.
+The hook OWNS both warning dialogs and the prerequisite auto-add orchestration that was previously
+**duplicated** across catalog-browser and quote-builder.
+
+Routed through all three add surfaces:
+- **Sale `catalog-browser`** — `addServiceChecked` + the two prereq handlers replaced by the hook;
+  refactored **byte-behavior-identically** (the reference path — proven by the existing Sale tests
+  staying green plus a new parity-guard test). Gained the add-on-only gate.
+- **Quotes `quote-builder`** — search/picker route through the hook with **quote** context; the
+  **browse** path passes new `customerIdOverride`/`vehicleIdOverride`/`serviceIdsOverride` props to
+  `<CatalogBrowser>` so the same hook validates against the quote (the G5 fix). The duplicated
+  prereq-auto-add/override handlers were deleted.
+- **register-tab** — favorites quick-add + the internal picker route through the hook (the prereq
+  check + add-on gating it never had).
+- **`service-detail-dialog`** — now runs the validation check in **callback (quote) mode** too
+  (was dispatch-only), closing the quote-browse-via-detail-dialog hole; Sale's dispatch path (dup-check
+  first) is unchanged.
+
+Product decisions LOCKED: add-on-only solo = **warn-and-allow with manager override** (not a hard
+block); register-tab favorites **enforce** prereqs + gating (consistency over speed). **No reducer,
+migration, or schema change** — the add-on override is not annotated on the item (no field; manager
+identity is captured server-side by `verify-override`).
+
+**Tests (+17 → 2601 Track A alone; 2615 combined with Track B #120, 153 files):**
+- `src/app/pos/hooks/__tests__/use-validated-service-add.test.tsx` (8) — engine: prereq commit /
+  fire / context-driven POST / manager override; add-on-solo fire / anchor-bypass / `both`-anchor /
+  override.
+- `src/app/pos/components/__tests__/catalog-browser-validation.test.tsx` (4) — Sale add-on-solo
+  warning, Sale prereq-fire, Sale parity-guard (happy-path still dispatches), and the **G5 proof**
+  (quote-context override props → prereq POST carries the quote's ids, not the Sale ticket's).
+- `src/app/pos/components/__tests__/register-tab-validation.test.tsx` (3) — favorite add-on-solo,
+  favorite prereq-fire, normal favorite still dispatches.
+- `src/app/pos/components/quotes/__tests__/quote-builder-validation.test.tsx` (2) — quote **search**
+  prereq-fire (posting quote context) + add-on-solo.
+
+**Gates:** `tsc --noEmit` 0; `npm run lint` 0 errors / 97 warnings (baseline, none new);
+`npm test` 2615/2615; `next build` clean. No migrations, no new env keys.
+
+**Operator: deploy + manually verify** (a) Quotes browse prereq fires against the quote (open a quote,
+browse categories, add a service needing a prereq); (b) a register-tab favorite triggers the prereq
+warning; (c) adding an add-on-only service solo prompts the manager-PIN override.
+
 ## Session #120 — Fix Track B: Quotes-panel parity wiring (G2/G3/G4) + structural guard test (2026-05-28)
 
 Production fix. Branch `fix/track-b-quotes-panel-parity-wiring`, isolated `git worktree`;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Package, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -10,6 +10,7 @@ import { useTicket } from '../context/ticket-context';
 import { usePosPermission } from '../context/pos-permission-context';
 import { usePosTheme } from '../context/pos-theme-context';
 import { useEnterSubmit } from '@/lib/hooks/use-enter-submit';
+import { useValidatedServiceAdd, type ValidatedAddOpts } from '../hooks/use-validated-service-add';
 import { ServicePricingPicker } from './service-pricing-picker';
 import { PinPad } from './pin-pad';
 import { resolveServicePriceWithSale } from '../utils/pricing';
@@ -55,9 +56,38 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
   const display = dollars.toFixed(2);
   const enterSubmitNote = useEnterSubmit(handleAddToTicket, cents > 0);
 
+  // Canonical add-time validation (CLAUDE.md Rule 22). The favorite quick-add
+  // and the pricing picker route through this — the register tab previously
+  // dispatched ADD_SERVICE directly with ZERO prerequisite or add-on-only
+  // gating (POS_PREREQ_ENFORCEMENT_AND_GATING_AUDIT.md). `onAdd` is a plain
+  // dispatch (no dup-check, matching the tab's prior behavior); the caller
+  // shows the success toast, so `onAddHandlesToast` stays false.
+  const ticketServiceIds = useMemo(
+    () => ticket.items.filter((i) => i.itemType === 'service' && i.serviceId).map((i) => i.serviceId!),
+    [ticket.items]
+  );
+  const commitAdd = useCallback((
+    svc: CatalogService,
+    p: ServicePricing,
+    vsc: VehicleSizeClass | null,
+    perUnitQty?: number,
+    opts?: ValidatedAddOpts,
+  ) => {
+    dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote: opts?.prerequisiteNote, prerequisiteForServiceId: opts?.prerequisiteForServiceId });
+  }, [dispatch]);
+  const { addService, dialogs: validationDialogs } = useValidatedServiceAdd({
+    customerId: ticket.customer?.id ?? null,
+    vehicleId: ticket.vehicle?.id ?? null,
+    serviceIds: ticketServiceIds,
+    services,
+    vehicleSizeClass,
+    onAdd: commitAdd,
+    onAddHandlesToast: false,
+  });
+
   // ─── Favorites handlers ────────────────────────────────────
 
-  function handleTapFavorite(fav: FavoriteItem) {
+  async function handleTapFavorite(fav: FavoriteItem) {
     // Allow non-item favorites (customer_lookup) through, but block item-adding ones
     const isItemFavorite = fav.type === 'product' || fav.type === 'service' || fav.type === 'custom_amount' || fav.type === 'surcharge';
     if (isItemFavorite && addDisabled) {
@@ -110,10 +140,12 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
         }
         const pricing = service.pricing ?? [];
 
-        // Quick-add: single tier, not vehicle-size-aware
+        // Quick-add: single tier, not vehicle-size-aware. Routes through the
+        // canonical helper (add-on gate → prereq → dispatch).
         if (pricing.length === 1 && !pricing[0].is_vehicle_size_aware) {
-          dispatch({ type: 'ADD_SERVICE', service, pricing: pricing[0], vehicleSizeClass });
-          toast.success(`Added ${service.name}`);
+          if (await addService(service, pricing[0], vehicleSizeClass)) {
+            toast.success(`Added ${service.name}`);
+          }
           return;
         }
 
@@ -137,8 +169,9 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
             qty_label: null,
             created_at: '',
           };
-          dispatch({ type: 'ADD_SERVICE', service, pricing: syntheticPricing, vehicleSizeClass });
-          toast.success(`Added ${service.name}`);
+          if (await addService(service, syntheticPricing, vehicleSizeClass)) {
+            toast.success(`Added ${service.name}`);
+          }
           return;
         }
 
@@ -150,8 +183,9 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
         const tier = selectPricingTierForVehicle(pricing, vehicleSizeClass);
         if (tier) {
           const price = getToastPrice(service, tier, vehicleSizeClass);
-          dispatch({ type: 'ADD_SERVICE', service, pricing: tier, vehicleSizeClass });
-          toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+          if (await addService(service, tier, vehicleSizeClass)) {
+            toast.success(`Added ${service.name} — $${price.toFixed(2)}`);
+          }
           return;
         }
 
@@ -194,11 +228,13 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
     }
   }
 
-  function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) {
+  async function handlePricingSelect(pricing: ServicePricing, vsc: VehicleSizeClass | null, perUnitQty?: number) {
     if (!pickerService) return;
-    dispatch({ type: 'ADD_SERVICE', service: pickerService, pricing, vehicleSizeClass: vsc, perUnitQty });
-    toast.success(`Added ${pickerService.name}`);
+    const svc = pickerService;
     setPickerService(null);
+    if (await addService(svc, pricing, vsc, perUnitQty)) {
+      toast.success(`Added ${svc.name}`);
+    }
   }
 
   // ─── Keypad handlers ────────────────────────────────────────
@@ -353,6 +389,9 @@ export function RegisterTab({ onOpenCustomerLookup }: RegisterTabProps) {
           onSelect={handlePricingSelect}
         />
       )}
+
+      {/* Add-time validation dialogs (prerequisite + add-on-solo) */}
+      {validationDialogs}
     </div>
   );
 }

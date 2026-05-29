@@ -5,8 +5,7 @@ import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCatalog } from '../hooks/use-catalog';
 import { useTicket } from '../context/ticket-context';
-import { usePrerequisiteCheck } from '../hooks/use-prerequisite-check';
-import { PrerequisiteWarningDialog } from './prerequisite-warning-dialog';
+import { useValidatedServiceAdd, type ValidatedAddOpts } from '../hooks/use-validated-service-add';
 import type { CatalogProduct, CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
 import { usePosPermission } from '../context/pos-permission-context';
@@ -39,16 +38,27 @@ interface CatalogBrowserProps {
   /** When provided, use this callback instead of dispatching to ticket context */
   onAddProduct?: (product: CatalogProduct) => void;
   /** When provided, use this callback instead of dispatching to ticket context */
-  onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
+  onAddService?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number, opts?: ValidatedAddOpts) => void;
   /** Override vehicle size class (for quote builder where vehicle is in a different context) */
   vehicleSizeOverride?: VehicleSizeClass | null;
   /** Override specialty tier (for quote builder where vehicle is in a different context) */
   vehicleSpecialtyTierOverride?: string | null;
   /** Set of service IDs already on the ticket — shows checkmark indicator */
   addedServiceIds?: Set<string>;
+  /**
+   * Prerequisite/add-on context overrides (for quote builder). Without these
+   * the add-time validation reads the Sale ticket via `useTicket()` — the G5
+   * wrong-context bug when this browser is mounted inside a quote. When the
+   * quote builder mounts CatalogBrowser it passes the quote's customer/vehicle/
+   * line-item ids so the same `useValidatedServiceAdd` helper validates against
+   * the quote instead. `undefined` = fall back to the Sale ticket (default).
+   */
+  customerIdOverride?: string | null;
+  vehicleIdOverride?: string | null;
+  serviceIdsOverride?: string[];
 }
 
-export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride, vehicleSpecialtyTierOverride, addedServiceIds }: CatalogBrowserProps) {
+export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehicleSizeOverride, vehicleSpecialtyTierOverride, addedServiceIds, customerIdOverride, vehicleIdOverride, serviceIdsOverride }: CatalogBrowserProps) {
   const { products, services } = useCatalog();
   const { ticket, dispatch: ticketDispatch } = useTicket();
   const { granted: canCreateTickets } = usePosPermission('pos.create_tickets');
@@ -68,16 +78,16 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   const [detailService, setDetailService] = useState<CatalogService | null>(null);
   const [compatWarning, setCompatWarning] = useState<{ service: CatalogService; mode: 'direct' | 'detail' } | null>(null);
 
-  // Prerequisite check hook
+  // Prerequisite/add-on context — the live Sale ticket by default, overridden
+  // by the quote builder so the SAME validation helper runs against the quote
+  // (fixes the G5 wrong-context bug).
   const ticketServiceIds = useMemo(
     () => ticket.items.filter((i) => i.itemType === 'service' && i.serviceId).map((i) => i.serviceId!),
     [ticket.items]
   );
-  const { warning: prereqWarning, checkPrerequisites, clearWarning: clearPrereqWarning } = usePrerequisiteCheck({
-    customerId: ticket.customer?.id ?? null,
-    vehicleId: ticket.vehicle?.id ?? null,
-    ticketServiceIds,
-  });
+  const validationCustomerId = customerIdOverride !== undefined ? customerIdOverride : (ticket.customer?.id ?? null);
+  const validationVehicleId = vehicleIdOverride !== undefined ? vehicleIdOverride : (ticket.vehicle?.id ?? null);
+  const validationServiceIds = serviceIdsOverride !== undefined ? serviceIdsOverride : ticketServiceIds;
 
   // Auto-compute addedServiceIds from ticket when no external prop provided
   const resolvedAddedServiceIds = useMemo(() => {
@@ -193,127 +203,64 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
   }
 
   /**
-   * Core service add with prerequisite check. All add paths funnel through here.
-   * Returns true if the service was added, false if blocked by prerequisites.
+   * Commit primitive for the validation helper. Owns the POS-ticket
+   * duplicate-check + per-unit-increment + dispatch (dispatch mode), or
+   * forwards to the caller's callback (quote builder). The helper calls this
+   * only AFTER its add-on + prerequisite gates pass (or after an override) —
+   * the gates themselves moved into `useValidatedServiceAdd`.
    */
-  const addServiceChecked = useCallback(async (
+  const commitAdd = useCallback((
     svc: CatalogService,
     p: ServicePricing,
     vsc: VehicleSizeClass | null,
     perUnitQty?: number,
-    skipPrereqCheck?: boolean,
-    extraFields?: { prerequisiteNote?: string; prerequisiteForServiceId?: string },
-  ): Promise<boolean> => {
-    let prerequisiteNote = extraFields?.prerequisiteNote;
-    const prerequisiteForServiceId = extraFields?.prerequisiteForServiceId;
-
-    // Skip prerequisites for addons (parentItemId cases don't come through here)
-    if (!skipPrereqCheck) {
-      const result = await checkPrerequisites(svc, p, vsc, perUnitQty);
-      if (!result.canAdd) return false;
-      if (result.prerequisiteNote) prerequisiteNote = result.prerequisiteNote;
-    }
-
+    opts?: ValidatedAddOpts,
+  ) => {
     if (onAddService) {
-      onAddService(svc, p, vsc, perUnitQty);
-    } else if (dispatch) {
-      // Duplicate check for POS ticket path
-      const useTierMatching = svc.pricing_model === 'scope' || svc.pricing_model === 'specialty';
-      const tierName = p ? (p.tier_label || p.tier_name) : null;
-      const existingItem = ticket.items.find(
-        (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId && (!useTierMatching || !tierName || i.tierName === tierName)
-      );
-      if (existingItem) {
-        const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
-        if (isPerUnit) {
-          const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
-          if (existingItem.perUnitQty! >= max) {
-            const label = existingItem.perUnitLabel || svc.per_unit_label || 'unit';
-            toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
-          } else {
-            const newQty = perUnitQty ?? (existingItem.perUnitQty! + 1);
-            dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: newQty });
-            const label = existingItem.perUnitLabel || svc.per_unit_label || 'unit';
-            toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
-          }
+      onAddService(svc, p, vsc, perUnitQty, opts);
+      return;
+    }
+    if (!dispatch) return;
+    // Duplicate check for POS ticket path
+    const useTierMatching = svc.pricing_model === 'scope' || svc.pricing_model === 'specialty';
+    const tierName = p ? (p.tier_label || p.tier_name) : null;
+    const existingItem = ticket.items.find(
+      (i) => i.itemType === 'service' && i.serviceId === svc.id && !i.parentItemId && (!useTierMatching || !tierName || i.tierName === tierName)
+    );
+    if (existingItem) {
+      const isPerUnit = existingItem.perUnitQty != null && existingItem.perUnitPrice != null;
+      if (isPerUnit) {
+        const max = existingItem.perUnitMax ?? svc.per_unit_max ?? 10;
+        if (existingItem.perUnitQty! >= max) {
+          const label = existingItem.perUnitLabel || svc.per_unit_label || 'unit';
+          toast.warning(`${svc.name} is already at maximum (${max} ${label}${max > 1 ? 's' : ''})`);
         } else {
-          toast.warning('Already on ticket');
+          const newQty = perUnitQty ?? (existingItem.perUnitQty! + 1);
+          dispatch({ type: 'UPDATE_PER_UNIT_QTY', itemId: existingItem.id, perUnitQty: newQty });
+          const label = existingItem.perUnitLabel || svc.per_unit_label || 'unit';
+          toast.success(`${svc.name} — ${newQty} ${label}${newQty > 1 ? 's' : ''}`);
         }
-        return true;
+      } else {
+        toast.warning('Already on ticket');
       }
-      dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote, prerequisiteForServiceId });
-    }
-    return true;
-  }, [onAddService, dispatch, ticket.items, checkPrerequisites]);
-
-  /** Handle prerequisite warning: override → add the original service */
-  const handlePrereqOverride = useCallback((managerName?: string) => {
-    if (!prereqWarning) return;
-    const { service, pricing, vehicleSizeClass, perUnitQty } = prereqWarning;
-    clearPrereqWarning();
-    const note = managerName ? `Prereq overridden by ${managerName}` : undefined;
-    addServiceChecked(service, pricing, vehicleSizeClass, perUnitQty, true, { prerequisiteNote: note }).then((added) => {
-      if (added && !onAddService) toast.success(`Added ${service.name}`);
-    });
-  }, [prereqWarning, clearPrereqWarning, addServiceChecked, onAddService]);
-
-  /** Handle prerequisite warning: add a prerequisite service to the ticket first */
-  const handleAddPrerequisite = useCallback((prereqServiceName: string) => {
-    if (!prereqWarning) return;
-    const { service: originalService, pricing: originalPricing, vehicleSizeClass: originalVsc, perUnitQty: originalPerUnitQty } = prereqWarning;
-    clearPrereqWarning();
-
-    // Find the prerequisite service in catalog
-    const prereqService = services.find((s) => s.name === prereqServiceName);
-    if (!prereqService) {
-      toast.error(`Service "${prereqServiceName}" not found in catalog`);
       return;
     }
+    dispatch({ type: 'ADD_SERVICE', service: svc, pricing: p, vehicleSizeClass: vsc, perUnitQty, prerequisiteNote: opts?.prerequisiteNote, prerequisiteForServiceId: opts?.prerequisiteForServiceId });
+  }, [onAddService, dispatch, ticket.items]);
 
-    // Add the prerequisite service first (skip its own prereq check), tagged with the dependent service's ID.
-    // Select the tier for THIS vehicle's size_class via the canonical engine —
-    // NOT prereqPricing[0] (always the sedan/first tier), which mispriced
-    // size-aware prerequisites (Suburban charged $75 instead of $110; see
-    // docs/dev/POS_PREREQUISITE_PRICING_AUDIT.md).
-    const prereqPricing = prereqService.pricing ?? [];
-    const prereqExtra = { prerequisiteForServiceId: originalService.id };
-    if (prereqPricing.length > 0) {
-      const tier = selectPricingTierForVehicle(prereqPricing, vehicleSizeClass);
-      if (!tier) {
-        // No tier matches this vehicle size (data gap). The prerequisite is
-        // required-same-ticket, so if it can't be priced we block the whole
-        // add — neither the prerequisite nor the dependent add-on is added.
-        toast.error(`Cannot auto-add "${prereqService.name}": no price configured for this vehicle size. Add it manually.`);
-        return;
-      }
-      if (onAddService) {
-        onAddService(prereqService, tier, vehicleSizeClass);
-      } else if (dispatch) {
-        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: tier, vehicleSizeClass, ...prereqExtra });
-      }
-      if (!onAddService) toast.success(`Added ${prereqService.name}`);
-    } else if (prereqService.flat_price != null) {
-      const syntheticPricing: ServicePricing = {
-        id: 'flat', service_id: prereqService.id, tier_name: 'default', tier_label: null,
-        price: prereqService.flat_price, sale_price: prereqService.sale_price ?? null, display_order: 0, is_vehicle_size_aware: false,
-        vehicle_size_sedan_price: null, vehicle_size_truck_suv_price: null, vehicle_size_suv_van_price: null, vehicle_size_exotic_price: null, vehicle_size_classic_price: null, max_qty: null, qty_label: null, created_at: '',
-      };
-      if (onAddService) {
-        onAddService(prereqService, syntheticPricing, vehicleSizeClass);
-      } else if (dispatch) {
-        dispatch({ type: 'ADD_SERVICE', service: prereqService, pricing: syntheticPricing, vehicleSizeClass, ...prereqExtra });
-      }
-      if (!onAddService) toast.success(`Added ${prereqService.name}`);
-    } else {
-      toast.error(`Cannot auto-add ${prereqService.name} — no pricing available`);
-      return;
-    }
-
-    // Then add the original service (skip prereq check since we just added the prerequisite)
-    addServiceChecked(originalService, originalPricing, originalVsc, originalPerUnitQty, true).then((added) => {
-      if (added && !onAddService) toast.success(`Added ${originalService.name}`);
-    });
-  }, [prereqWarning, clearPrereqWarning, services, onAddService, dispatch, vehicleSizeClass, addServiceChecked]);
+  // Canonical add-time validation (CLAUDE.md Rule 22): add-on-only gate →
+  // prerequisite check → commit. Same helper drives Sale, Quotes, and the
+  // register tab. `onAddHandlesToast` is true in callback (quote) mode where
+  // the caller's `onAddService` shows its own success toast.
+  const { addService: addServiceChecked, runValidations, dialogs: validationDialogs } = useValidatedServiceAdd({
+    customerId: validationCustomerId,
+    vehicleId: validationVehicleId,
+    serviceIds: validationServiceIds,
+    services,
+    vehicleSizeClass,
+    onAdd: commitAdd,
+    onAddHandlesToast: hasCallbacks,
+  });
 
   function handleTapProduct(product: CatalogProduct) {
     if (addDisabled) {
@@ -588,17 +535,10 @@ export function CatalogBrowser({ type, search, onAddProduct, onAddService, vehic
           onAdd={onAddService}
           vehicleSizeOverride={vehicleSizeOverride}
           vehicleSpecialtyTierOverride={vehicleSpecialtyTierOverride}
-          onPrerequisiteCheck={checkPrerequisites}
+          onPrerequisiteCheck={runValidations}
         />
       )}
-      {prereqWarning && (
-        <PrerequisiteWarningDialog
-          warning={prereqWarning}
-          onClose={clearPrereqWarning}
-          onOverride={handlePrereqOverride}
-          onAddPrerequisite={handleAddPrerequisite}
-        />
-      )}
+      {validationDialogs}
     </>
   );
 

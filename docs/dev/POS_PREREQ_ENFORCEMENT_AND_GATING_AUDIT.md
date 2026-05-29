@@ -1,5 +1,16 @@
 # POS Prerequisite Enforcement + Add-On Gating Audit (2026-05-28)
 
+> ✅ **Issue 2 (add-on-only gating) + Issue 3 (register-tab no add-time validation) RESOLVED in
+> Session #121 (Track A)** — `fix/track-a-useValidatedServiceAdd-shared-helper`. The recommended
+> shared checked-add helper shipped as `useValidatedServiceAdd` (`src/app/pos/hooks/use-validated-service-add.tsx`):
+> it gates **add-on-only** services added solo (no `primary`/`both` anchor on the order → warn +
+> manager-PIN override, `pos.override_prerequisites`) and runs the prerequisite check, and **register-tab
+> favorites + its picker now route through it** (closing the zero-validation gap). Sale `catalog-browser`
+> was refactored behind the same helper byte-behavior-identically; Quotes (`quote-builder`) gained correct
+> per-surface context. Add-on-only rule = warn-and-allow with manager override (operator decision, Open
+> question 3). +17 regression tests including per-surface prereq-fire + add-on-solo + override coverage.
+> The read-only diagnostic below is preserved as the original finding.
+
 > Read-only diagnostic. No source/migration/test changes. Live read-only SELECTs only.
 > Branch: `audit/pos-prereq-enforcement-regression-and-addon-gating`
 > Performed in an isolated `git worktree` off `origin/main` (`81c28ee4`, the #114 merge)

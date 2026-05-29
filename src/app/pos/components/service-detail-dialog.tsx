@@ -17,7 +17,7 @@ interface ServiceDetailDialogProps {
   open: boolean;
   onClose: () => void;
   /** When provided, use this callback instead of dispatching to ticket context */
-  onAdd?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number) => void;
+  onAdd?: (service: CatalogService, pricing: ServicePricing, vehicleSizeClass: VehicleSizeClass | null, perUnitQty?: number, opts?: { prerequisiteNote?: string; prerequisiteForServiceId?: string }) => void;
   /** Override vehicle size class */
   vehicleSizeOverride?: VehicleSizeClass | null;
   /** Override specialty tier */
@@ -191,16 +191,19 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
         qty_label: null,
         created_at: '',
       };
+      // Canonical add-time validation (add-on gate + prerequisites) for
+      // non-addon adds, run in BOTH callback (quote) and dispatch (Sale) modes.
+      // The callback path previously skipped this, leaving quote-browse adds
+      // unvalidated against the quote's own context.
+      let prerequisiteNote: string | undefined;
+      if (!parentItemId && onPrerequisiteCheck) {
+        const result = await onPrerequisiteCheck(service, syntheticPricing, vehicleSizeClass, perUnitQty);
+        if (!result.canAdd) { onClose(); return; }
+        prerequisiteNote = result.prerequisiteNote;
+      }
       if (onAdd) {
-        onAdd(service, syntheticPricing, vehicleSizeClass, perUnitQty);
+        onAdd(service, syntheticPricing, vehicleSizeClass, perUnitQty, prerequisiteNote ? { prerequisiteNote } : undefined);
       } else if (dispatch) {
-        // Prerequisite check for non-addon services
-        let prerequisiteNote: string | undefined;
-        if (!parentItemId && onPrerequisiteCheck) {
-          const result = await onPrerequisiteCheck(service, syntheticPricing, vehicleSizeClass, perUnitQty);
-          if (!result.canAdd) { onClose(); return; }
-          prerequisiteNote = result.prerequisiteNote;
-        }
         dispatch({
           type: 'ADD_SERVICE',
           service,
@@ -221,16 +224,17 @@ export function ServiceDetailDialog({ service, open, onClose, onAdd, vehicleSize
       return;
     }
     const scopeTierQty = isScopeTierMultiQty ? perUnitQty : undefined;
+    // Canonical add-time validation (add-on gate + prerequisites) for non-addon
+    // adds, run in BOTH callback (quote) and dispatch (Sale) modes.
+    let prerequisiteNote: string | undefined;
+    if (!parentItemId && onPrerequisiteCheck) {
+      const result = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass, scopeTierQty);
+      if (!result.canAdd) { onClose(); return; }
+      prerequisiteNote = result.prerequisiteNote;
+    }
     if (onAdd) {
-      onAdd(service, selectedTier, vehicleSizeClass, scopeTierQty);
+      onAdd(service, selectedTier, vehicleSizeClass, scopeTierQty, prerequisiteNote ? { prerequisiteNote } : undefined);
     } else if (dispatch) {
-      // Prerequisite check for non-addon services
-      let prerequisiteNote: string | undefined;
-      if (!parentItemId && onPrerequisiteCheck) {
-        const result = await onPrerequisiteCheck(service, selectedTier, vehicleSizeClass, scopeTierQty);
-        if (!result.canAdd) { onClose(); return; }
-        prerequisiteNote = result.prerequisiteNote;
-      }
       dispatch({
         type: 'ADD_SERVICE',
         service,
