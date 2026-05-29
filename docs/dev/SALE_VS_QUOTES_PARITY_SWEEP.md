@@ -25,14 +25,16 @@ The four gap shapes used throughout this sweep:
 
 **Total: 1 Critical (in-flight) + 4 Significant + 1 Minor + several Informational (by-design) gaps.**
 
-| # | Gap | Shape | Severity | Covered by in-flight pill fix? |
-|---|-----|-------|----------|-------------------------------|
-| **G1** | Customer-type **pill** — `onCustomerTypeChanged` omitted on quote `CustomerVehicleSummary` | b | **Critical** (silent demote/persist) | ✅ YES — being fixed now |
-| **G2** | **Vehicle edit unreachable** in Quotes — `onEditVehicle` omitted + `editVehicle` never passed to `VehicleCreateDialog` + no `editingVehicle` state | b + c | **Significant** | ❌ NO |
-| **G3** | **Reprice-failure fully silent** in Quotes — no panel toast watcher AND `quote-item-row` renders no `repriceFailed` badge (reducer sets the flag, nothing surfaces it) | c | **Significant** | ❌ NO |
-| **G4** | **`CustomerTypePrompt` never shown** in Quotes — selecting/creating an unknown-type customer never prompts for classification | c | **Significant** | ❌ NO |
-| **G5** | Quote **browse** prereq check runs against Sale-ticket context (`<CatalogBrowser>` `useTicket()`) | a | **Significant** | ❌ NO (Track A) — prior audit #3 |
-| **G6** | **No swipe-to-delete + undo** in Quotes — `RESTORE_ITEM` unused; accidental remove auto-saves with no undo | c | **Minor** | ❌ NO |
+> **RESOLUTION STATUS (updated 2026-05-28):** G1 RESOLVED in #119 (pill fix). **G2/G3/G4 RESOLVED in #120 (Track B)** — `fix/track-b-quotes-panel-parity-wiring`. G5 remains OPEN (Track A — the `useValidatedServiceAdd` helper). G6 DEFERRED (Minor; needs a `RESTORE_ITEM` quote action + swipe restructure — out of Track B scope). A new CI **structural guard** (`src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`) now blocks the whole prop-omission class.
+
+| # | Gap | Shape | Severity | Status |
+|---|-----|-------|----------|--------|
+| **G1** | Customer-type **pill** — `onCustomerTypeChanged` omitted on quote `CustomerVehicleSummary` | b | **Critical** (silent demote/persist) | ✅ **RESOLVED #119** |
+| **G2** | **Vehicle edit unreachable** in Quotes — `onEditVehicle` omitted + `editVehicle` never passed to `VehicleCreateDialog` + no `editingVehicle` state | b + c | **Significant** | ✅ **RESOLVED #120** |
+| **G3** | **Reprice-failure fully silent** in Quotes — no panel toast watcher AND `quote-item-row` renders no `repriceFailed` badge (reducer sets the flag, nothing surfaces it) | c | **Significant** | ✅ **RESOLVED #120** |
+| **G4** | **`CustomerTypePrompt` never shown** in Quotes — selecting/creating an unknown-type customer never prompts for classification | c | **Significant** | ✅ **RESOLVED #120** |
+| **G5** | Quote **browse** prereq check runs against Sale-ticket context (`<CatalogBrowser>` `useTicket()`) | a | **Significant** | ⏳ OPEN — Track A (prior audit #3) |
+| **G6** | **No swipe-to-delete + undo** in Quotes — `RESTORE_ITEM` unused; accidental remove auto-saves with no undo | c | **Minor** | ⏸ DEFERRED (#120 — Track B scope guard) |
 | — | `disabled`, guest-checkout, edit-mode, `pos-vehicle-needed` gate, mobile/validity/draft | — | **Informational** (by-design) | n/a |
 
 **Fix-arc shape:** TWO tracks. **Track A** = the `useValidatedServiceAdd` shared helper from prior audit #3 (covers G5 + add-on gating + register-tab no-check; code area = `catalog-browser` / `quote-builder` / `register-tab` + new hook). **Track B** = a single **Quotes-panel-parity** session that wires the props/handlers Sale already has (G1 in-flight, then G2/G3/G4, optionally G6; code area = `quote-ticket-panel.tsx` + `customer-vehicle-summary` wiring + `quote-item-row` + `vehicle-create-dialog`). The in-flight pill fix is the first commit of Track B; **this sweep's payload is the G2/G3/G4/G6 siblings the pill fix does NOT touch.** Add one structural guard test asserting both panels pass the same prop set to each shared component.

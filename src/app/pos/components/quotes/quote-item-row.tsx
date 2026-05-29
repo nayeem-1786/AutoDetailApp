@@ -99,10 +99,27 @@ export function QuoteItemRow({ item, onRemoveItem }: QuoteItemRowProps) {
 
   return (
     <div className="border-b border-gray-100 dark:border-gray-800 py-2">
-      {/* Line 1: Full item name */}
-      <p className="text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
-        {item.itemName}
-      </p>
+      {/* Line 1: Full item name + reprice-failure badge (G3, parity with
+          ticket-item-row.tsx:138-151) */}
+      <div className="flex items-center gap-1.5">
+        <p className="text-sm font-medium leading-snug text-gray-900 dark:text-gray-100">
+          {item.itemName}
+        </p>
+        {item.repriceFailed?.reason === 'no_tier_for_size' && (() => {
+          const attempted = item.repriceFailed.attemptedSize;
+          const previous = item.repriceFailed.previousSize;
+          const attemptedLabel = attempted ? VEHICLE_SIZE_LABELS[attempted as VehicleSizeClass] : 'vehicle';
+          const previousLabel = previous ? VEHICLE_SIZE_LABELS[previous as VehicleSizeClass] : 'previous vehicle';
+          return (
+            <span
+              className="shrink-0 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-600 dark:text-amber-400"
+              title={`This service has no price configured for ${attemptedLabel}. Price shown is from previous vehicle (${previousLabel}). Remove or override.`}
+            >
+              No {attemptedLabel} pricing
+            </span>
+          );
+        })()}
+      </div>
 
       {/* Line 2: Sub-text + note icon | qty + price + remove */}
       <div className="mt-1 flex items-center gap-2">
