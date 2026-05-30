@@ -34,8 +34,9 @@ vi.mock('../../components/manager-pin-dialog', () => ({
 }));
 
 const toastSuccess = vi.hoisted(() => vi.fn());
+const toastError = vi.hoisted(() => vi.fn());
 vi.mock('sonner', () => ({
-  toast: { success: toastSuccess, error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  toast: { success: toastSuccess, error: toastError, warning: vi.fn(), info: vi.fn() },
 }));
 
 import { useValidatedServiceAdd } from '../use-validated-service-add';
@@ -112,8 +113,46 @@ function prereqResponse(satisfied: boolean) {
               enforcement: 'required_same_ticket',
               required_within_days: null,
               warning_message: null,
+              // V2 (Session #130): server flags each prereq with compat. The
+              // default fixture uses an automobile-compatible prereq against
+              // an automobile ticket — the existing pre-#129 tests rely on
+              // the "Add Prereq" button NOT being blocked.
+              is_compatible_with_vehicle: true,
+              compatible_categories: ['automobile'],
             },
           ],
+      ticket_vehicle_category: 'automobile',
+    }),
+  };
+}
+
+/** Single unmet prereq that the server has flagged INCOMPATIBLE with the ticket
+ *  vehicle's category. Used to exercise the V1 cross-category block path. */
+function prereqResponseIncompatible({
+  prereqName,
+  prereqAllowed,
+  ticketCategory,
+}: {
+  prereqName: string;
+  prereqAllowed: string[];
+  ticketCategory: string;
+}) {
+  return {
+    ok: true,
+    json: async () => ({
+      has_prerequisites: true,
+      satisfied: false,
+      prerequisites: [
+        {
+          service_name: prereqName,
+          enforcement: 'required_same_ticket',
+          required_within_days: null,
+          warning_message: null,
+          is_compatible_with_vehicle: false,
+          compatible_categories: prereqAllowed,
+        },
+      ],
+      ticket_vehicle_category: ticketCategory,
     }),
   };
 }
@@ -170,6 +209,7 @@ function Harness({ service, serviceIds, services, vsc = 'sedan', onAdd }: Harnes
 beforeEach(() => {
   posFetchMock.mockReset();
   toastSuccess.mockReset();
+  toastError.mockReset();
 });
 afterEach(cleanup);
 
@@ -305,5 +345,127 @@ describe('useValidatedServiceAdd — add-on-only gate (fires ONLY when no prereq
     fireEvent.click(screen.getByTestId('approve-pin'));
 
     await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe('useValidatedServiceAdd — V1 cross-category prereq block (Session #130, Option A)', () => {
+  it('blocks the "Add prerequisite" auto-add with a category-specific error when the prereq is incompatible', async () => {
+    // Sedan ticket; dependent service requires an RV-only prereq. The server
+    // flags the prereq incompatible. Clicking "Add RV Interior Clean" must
+    // surface the precise error, NOT fall through to the misleading
+    // "no price configured for this vehicle size" toast (the V1 symptom).
+    posFetchMock.mockResolvedValue(
+      prereqResponseIncompatible({
+        prereqName: 'RV Interior Clean',
+        prereqAllowed: ['rv'],
+        ticketCategory: 'automobile',
+      }),
+    );
+    const onAdd = vi.fn();
+    const dependent = makeService({ id: 'svc-ozone', name: 'Ozone Odor Treatment', classification: 'primary' });
+    render(<Harness service={dependent} serviceIds={[]} services={[dependent]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    await screen.findByRole('heading', { name: /Service Prerequisite Required/i });
+    fireEvent.click(screen.getByText(/Add RV Interior Clean/i));
+
+    // No commit; precise toast.
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(onAdd).not.toHaveBeenCalled();
+    const msg = String(toastError.mock.calls[0][0]);
+    expect(msg).toMatch(/RV Interior Clean is only available for RV vehicles/i);
+    expect(msg).toMatch(/this ticket's vehicle is an Automobile/i);
+    expect(msg).not.toMatch(/no price configured for this vehicle size/i);
+  });
+
+  it('Manager Override bypasses the compat block — commits the dependent service with an override note', async () => {
+    posFetchMock.mockResolvedValue(
+      prereqResponseIncompatible({
+        prereqName: 'RV Interior Clean',
+        prereqAllowed: ['rv'],
+        ticketCategory: 'automobile',
+      }),
+    );
+    const onAdd = vi.fn();
+    const dependent = makeService({ id: 'svc-ozone', name: 'Ozone Odor Treatment', classification: 'primary' });
+    render(<Harness service={dependent} serviceIds={[]} services={[dependent]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    await screen.findByRole('heading', { name: /Service Prerequisite Required/i });
+    fireEvent.click(screen.getByText(/Manager Override/i));
+    fireEvent.click(screen.getByTestId('approve-pin'));
+
+    // Override commits the DEPENDENT service (Ozone), NOT the incompatible prereq.
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1));
+    expect(onAdd.mock.calls[0][0]).toMatchObject({ id: 'svc-ozone' });
+    const opts = onAdd.mock.calls[0][4];
+    expect(opts.prerequisiteNote).toMatch(/overridden by Manager Jane/i);
+  });
+
+  it('phrases ticket vehicle correctly for non-automobile category (regression — preposition + label)', async () => {
+    // Confirms the "a Motorcycle" / "an Automobile" preposition rule applies
+    // across the 5-category set, so the operator-facing wording stays clean.
+    posFetchMock.mockResolvedValue(
+      prereqResponseIncompatible({
+        prereqName: 'Aircraft Wing Polish',
+        prereqAllowed: ['aircraft'],
+        ticketCategory: 'motorcycle',
+      }),
+    );
+    const onAdd = vi.fn();
+    const dependent = makeService({ id: 'svc-x', name: 'Custom Detail', classification: 'primary' });
+    render(<Harness service={dependent} serviceIds={[]} services={[dependent]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    await screen.findByRole('heading', { name: /Service Prerequisite Required/i });
+    fireEvent.click(screen.getByText(/Add Aircraft Wing Polish/i));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    const msg = String(toastError.mock.calls[0][0]);
+    expect(msg).toMatch(/only available for Aircraft vehicles/i);
+    expect(msg).toMatch(/this ticket's vehicle is a Motorcycle/i);
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('phrases multi-category allowed list with "or" — "RV or Boat vehicles"', async () => {
+    posFetchMock.mockResolvedValue(
+      prereqResponseIncompatible({
+        prereqName: 'Marine Hull Wash',
+        prereqAllowed: ['rv', 'boat'],
+        ticketCategory: 'automobile',
+      }),
+    );
+    const onAdd = vi.fn();
+    const dependent = makeService({ id: 'svc-x', name: 'Custom Detail', classification: 'primary' });
+    render(<Harness service={dependent} serviceIds={[]} services={[dependent]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    await screen.findByRole('heading', { name: /Service Prerequisite Required/i });
+    fireEvent.click(screen.getByText(/Add Marine Hull Wash/i));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    const msg = String(toastError.mock.calls[0][0]);
+    expect(msg).toMatch(/RV or Boat vehicles/i);
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
+  it('compatible prereqs still work — regression guard for the Option-A "block on click" path', async () => {
+    // Default prereqResponse(false) returns an automobile-compatible prereq.
+    // The add-prerequisite path must commit (prereq + dependent) without the
+    // compat block firing.
+    posFetchMock.mockResolvedValue(prereqResponse(false));
+    const onAdd = vi.fn();
+    const dependent = makeService({ id: 'svc-y', name: 'Full Detail', classification: 'primary' });
+    // Catalog includes the prereq service so handleAddPrerequisite can resolve it.
+    const prereq = makeService({ id: 'svc-wash', name: 'Express Exterior Wash', classification: 'primary' });
+    render(<Harness service={dependent} serviceIds={[]} services={[dependent, prereq]} onAdd={onAdd} />);
+
+    fireEvent.click(screen.getByTestId('add'));
+    await screen.findByRole('heading', { name: /Service Prerequisite Required/i });
+    fireEvent.click(screen.getByText(/Add Express Exterior Wash/i));
+
+    // Both the prereq and the dependent service committed; no error toast fired.
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(2));
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

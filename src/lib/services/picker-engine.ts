@@ -183,6 +183,22 @@ const VEHICLE_SIZE_CLASSES_SET = new Set<string>(VEHICLE_SIZE_CLASS_KEYS);
  * not receive. Callers keep that synthesis inline (see `routeServiceTap`'s
  * `quick-add-synthetic-flat` branch) and only reach this selector with the
  * service's actual pricing rows.
+ *
+ * NOTE (V1+V2 / Session #130): cross-vehicle-category mismatches (e.g. an
+ * RV-only service against a sedan ticket) are an UPSTREAM concern handled
+ * via the service's `vehicle_compatibility` JSONB (see
+ * `categoryToCompatibilityKey` in `vehicle-categories.ts`). The engine does
+ * NOT know about vehicle category — by design. When called with a
+ * specialty-tier service (e.g. `tier_name = 'rv_up_to_24'`) against a
+ * `sedan` size_class, this function returns `null` for the same reason it
+ * returns `null` on any unrecognized multi-tier shape: no row matches.
+ * Callers MUST gate on `vehicle_compatibility` BEFORE this selector when
+ * the auto-add error needs to be category-aware (the prereq auto-add path
+ * in `use-validated-service-add` does this via the server's
+ * `is_compatible_with_vehicle` flag on each prereq). Without the upstream
+ * gate, callers will surface a `null` here and emit the generic
+ * "no price configured for this vehicle size" fallback — which is correct
+ * for a true pricing-config gap but misleading for a cross-category gap.
  */
 export function selectPricingTierForVehicle(
   pricing: ServicePricing[],

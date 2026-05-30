@@ -6,6 +6,98 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #130 — Fix: V1+V2 prereq vehicle-compat block (Option A) — server flag + client error + selectPricingTierForVehicle clarification (2026-05-30)
+
+Production fix. Branch `fix/v1-v2-prereq-vehicle-compat-block`, isolated
+`git worktree` (Memory #8); **merged to main this session.** Closes V1
+(Critical) and V2 (Significant) from the vehicle-taxonomy audit (#126,
+`docs/dev/VEHICLE_TAXONOMY_AUDIT.md`). The Critical was operator's daily
+blocker: tapping a vehicle-type-incompatible prereq in the prerequisite
+dialog (e.g., RV-only "RV Interior Clean" on a sedan ticket) used to
+fail with the misleading "no price configured for this vehicle size"
+toast — a generic pricing-config error that hid the real cause (the
+prereq isn't available for the ticket's vehicle category at all).
+
+**Option A locked (transparency over filtering).** The dialog continues
+to render every configured prerequisite — incompatible ones are NOT
+filtered out. Instead the operator sees them dimmed with an inline
+hint, and clicking one surfaces a precise category-specific toast and
+keeps the dialog open so they can pick a compatible prereq or use the
+existing Manager Override. Reasoning: a dialog filter would hide an
+admin-configuration bug (incompatible prereq attached to a service);
+transparency keeps the configuration visible and surfaces the wrongness
+at the right moment.
+
+**Defense in depth — both server and client ship.** Without both, the
+contract is incomplete:
+
+- **Server (V2 — `check-prerequisites/route.ts`):** each prereq in the
+  response now carries `is_compatible_with_vehicle: boolean` plus
+  `compatible_categories: VehicleCategory[]`. Computed by reading the
+  prereq service's `vehicle_compatibility` JSONB against the ticket
+  vehicle's `vehicle_category` (mapped via `categoryToCompatibilityKey`
+  to bridge the "standard ↔ automobile" vocabulary). The response
+  top-level gains `ticket_vehicle_category: VehicleCategory | null` so
+  the client can build error wording without a second lookup.
+  Incompatible prereqs are NOT filtered out — Option A.
+- **Client (V1 — `use-validated-service-add.tsx`):** the
+  `handleAddPrerequisite` callback now gates on the server's compat flag
+  BEFORE calling `selectPricingTierForVehicle`. When the flag is false,
+  the precise error fires:
+  *"RV Interior Clean is only available for RV vehicles; this ticket's
+  vehicle is an Automobile. Use Manager Override to add Ozone Odor
+  Treatment without this prerequisite."* Multi-category allowed lists
+  read "RV or Boat vehicles." Article preposition is "an Automobile" /
+  "a Motorcycle" (regression-tested). The dialog stays open on block so
+  the operator can adjust without re-triggering the network round-trip.
+- **Manager Override unaffected.** Override commits the DEPENDENT
+  service with an override note as before; it does NOT invoke the
+  prerequisite auto-add, so the compat block never fires on that path.
+- **Dialog visual marking (`prerequisite-warning-dialog.tsx`):**
+  incompatible prereqs render with `opacity-60`, a `<Ban>` icon, and a
+  trailing `(For RV vehicles only)` hint. Still clickable — clicking
+  surfaces the toast (Option A). `title` attribute provides the same
+  hint on hover for keyboard / pointer-fine users.
+
+**`selectPricingTierForVehicle` clarification (picker-engine.ts).** The
+function continues to return `null` on cross-category mismatches (e.g.
+RV-only tiers against a sedan size_class) for the same structural
+reason it returns `null` on any unrecognized multi-tier shape: no row
+matches. The doc comment now explicitly says cross-category awareness
+is an UPSTREAM concern, gated via `vehicle_compatibility` BEFORE
+invoking this selector. A regression test pins the contract across all
+5 automobile size_classes against an RV-tier-set. No return-type
+refactor — that would touch all 6 Rule 22 call sites, well over the
+session budget; the caller misinterpretation is now fixed at the call
+site.
+
+**Tests (+12; total 2649).** `check-prerequisites/route.ts` gets a new
+`__tests__/route.test.ts` (8 tests covering all 5 categories, the
+"standard ↔ automobile" bridge, null vehicle, empty/missing compat
+list, and the Option-A no-filter contract). `use-validated-service-add`
+gets 5 new tests (incompatible block, Override bypass, non-automobile
+preposition, multi-category allowed list, compatible-prereq
+regression). `picker-engine` gets 1 new test pinning the
+cross-category null contract.
+
+**Files touched.** Production: `check-prerequisites/route.ts` (+96/-18),
+`use-prerequisite-check.ts` (response type), `use-validated-service-add.tsx`
+(+37 cross-category gate), `prerequisite-warning-dialog.tsx` (visual
+marking), `picker-engine.ts` (doc comment). Tests: 1 new file + 2
+extended. Docs: CHANGELOG, ROADMAP-13-ITEMS ledger, VEHICLE_TAXONOMY_AUDIT
+(V1+V2 marked RESOLVED), CLAUDE.md Rule 22 (vehicle-compat axis note).
+No migrations, no new permission keys, no UI surface beyond the dialog
+visual polish.
+
+**Session-number collision.** Prompt expected #127; #127 + #128 were
+already taken by parallel booking/taxonomy audits (Memory #3 playbook).
+I claimed #129 → another parallel session (vehicle-classifier
+corrective) merged its #129 into local main first → I renumbered to
+#130 across CHANGELOG / ROADMAP / commit message / in-source comments.
+Branch name unaffected.
+
+---
+
 ## Session #129 — Fix: vehicle classifier corrective (C1) + dev-warn ride-along (Q7) + portal classifier opt-in (C3) (2026-05-30)
 
 Production code fix bundle. Branch

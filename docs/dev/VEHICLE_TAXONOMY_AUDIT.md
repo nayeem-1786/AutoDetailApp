@@ -482,8 +482,8 @@ The duplicated `ALL_VEHICLE_TYPES` constant (vs `VEHICLE_CATEGORIES` in
 
 | ID | Severity | Gap | Surface(s) | Fix shape | Suggested session |
 |----|----------|-----|------------|-----------|-------------------|
-| **V1** | **Critical** | Prereq auto-add fails with misleading "no price configured for this vehicle size" when prereq is vehicle-type-incompatible | `use-validated-service-add.tsx:232-237`; `check-prerequisites/route.ts` (server doesn't filter either) | Add compat gate before auto-add + clearer error; consider server-side compat-filter on returned prereqs (T4.3 A+B) | **Session A** (1 medium, ~80-150 lines) |
-| **V2** | Significant | Server-side `check-prerequisites` route returns incompatible prereqs to the client (gap-class sibling of V1) | `src/app/api/pos/services/check-prerequisites/route.ts` | Filter the returned `prerequisites` array by ticket vehicle's compat | Bundle with **Session A** (same diff, ~30 lines) |
+| **V1** | **Critical** | ✅ **RESOLVED (Session #130, 2026-05-30)** — Prereq auto-add fails with misleading "no price configured for this vehicle size" when prereq is vehicle-type-incompatible | `use-validated-service-add.tsx:232-237`; `check-prerequisites/route.ts` (server doesn't filter either) | **Option A landed** — server flags each prereq with `is_compatible_with_vehicle`; `handleAddPrerequisite` blocks with a category-specific toast before invoking the selector. Override path unaffected. | **Session A** ✅ (#130, 4 prod files / +12 tests) |
+| **V2** | Significant | ✅ **RESOLVED (Session #130, 2026-05-30)** — Server-side `check-prerequisites` route returns incompatible prereqs to the client (gap-class sibling of V1) | `src/app/api/pos/services/check-prerequisites/route.ts` | **Option A landed** — response now carries `is_compatible_with_vehicle` per prereq + `compatible_categories` + top-level `ticket_vehicle_category`. Incompatible prereqs NOT filtered out (transparency over filtering, per lock). | Bundled with **Session A** ✅ (#130) |
 | **V3** | Significant (SEO) | Public service detail JSON-LD `AggregateOffer.highPrice` / `offerCount` leaks exotic/classic | `src/lib/seo/json-ld.ts:160-178` | Filter `pricingRows` to `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` for `vehicle_size` model. Synthesize per-customer-size offers for column-pattern. | **Session B** (1 small, ~15 lines) — from #125 |
 | **V4** | Significant (visual) | Public `<VehicleSizePricing>` table renders exotic/classic columns | `src/components/public/service-pricing-display.tsx:54-113` | Filter `tiers` to `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` before sort/map | Bundle with **Session B** (~3 lines) |
 | **V5** | Significant | Admin Create form silently drops operator-typed exotic/classic prices for `vehicle_size` model | `src/app/admin/catalog/services/new/page.tsx:231-237` | Mirror Edit's standard+specialty insert pattern (~15 lines, 1 file, no schema change) | **Session C** (1 small, ~15-25 lines) — from #125 |
@@ -498,7 +498,7 @@ The duplicated `ALL_VEHICLE_TYPES` constant (vs `VEHICLE_CATEGORIES` in
 ### Fix-arc sequencing
 
 ```
-Session A (V1+V2) ────────────────────────► prereq compat
+Session A (V1+V2) ────────────────────────► prereq compat ✅ #130 (2026-05-30)
                                             (independent, can run anytime)
 
 Session B (V3+V4+V6+V7) ──────────────────► public-site exotic/classic

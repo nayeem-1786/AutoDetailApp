@@ -556,4 +556,28 @@ describe('selectPricingTierForVehicle', () => {
     ];
     expect(selectPricingTierForVehicle(rows, 'sedan')).toBeNull();
   });
+
+  // V1+V2 (Session #130) — cross-category contract pin. The engine intentionally
+  // does NOT know about vehicle_compatibility (that's an upstream concern); when
+  // a specialty-tier service (e.g. RV-only with tier_name='rv_up_to_24') is
+  // passed alongside a sedan size_class, this selector returns null for the same
+  // structural reason any unrecognized multi-tier shape does. The prereq
+  // auto-add path gates on the server's `is_compatible_with_vehicle` flag
+  // BEFORE invoking this selector, so the operator gets the precise
+  // category-specific error rather than this null surfacing the generic
+  // "no price configured for this vehicle size" toast.
+  it('specialty-tier rows (RV) + sedan size_class → null (caller MUST upstream-gate on vehicle_compatibility)', () => {
+    const rvTiers: ServicePricing[] = [
+      mockTier({ id: 'r1', tier_name: 'rv_up_to_24', price: 200 }),
+      mockTier({ id: 'r2', tier_name: 'rv_25_35', price: 300 }),
+      mockTier({ id: 'r3', tier_name: 'rv_36_plus', price: 400 }),
+    ];
+    // Same null result for ANY automobile size_class — confirms the engine
+    // surfaces null structurally; cross-category awareness lives upstream.
+    expect(selectPricingTierForVehicle(rvTiers, 'sedan')).toBeNull();
+    expect(selectPricingTierForVehicle(rvTiers, 'truck_suv_2row')).toBeNull();
+    expect(selectPricingTierForVehicle(rvTiers, 'suv_3row_van')).toBeNull();
+    expect(selectPricingTierForVehicle(rvTiers, 'exotic')).toBeNull();
+    expect(selectPricingTierForVehicle(rvTiers, 'classic')).toBeNull();
+  });
 });
