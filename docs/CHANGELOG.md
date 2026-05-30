@@ -6,6 +6,89 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #126 — Audit: vehicle taxonomy — schema, POS, admin, public, pricing/prereq (2026-05-29)
+
+Read-only diagnostic audit. Branch `audit/vehicle-taxonomy-comprehensive`,
+isolated `git worktree`; **merged to main this session.** No source /
+migration / test changes. Broadest audit this week: maps the full vehicle
+classification model end-to-end to root-cause the operator-reported prereq
+auto-add failure (RV/Boat prereq on Standard ticket) and to consolidate the
+exotic/classic deferred fixes from #125 into a single fix-arc.
+
+**Schema reality (T1) — the load-bearing finding.** Vehicles carry TWO
+orthogonal axes: a 5-value category (`vehicle_category` + redundant
+`vehicle_type` enum, vocabularies bridged by `categoryToCompatibilityKey()`)
+AND a size axis (`size_class` enum for automobiles, `specialty_tier` text
+for the 4 non-automobile categories). Services declare which categories
+they support via `services.vehicle_compatibility` JSONB (default
+`["standard"]`). The size axis is shape-shared in `service_pricing` via a
+single `tier_name TEXT` column with no CHECK — same column carries
+`'sedan'` for automobile services and `'rv_up_to_24'` for RV services.
+Hypothesis (c) from the audit prompt is correct: hierarchical, with
+category gating which size dictionary applies. The model is internally
+consistent — every gap below is application-layer, not schema.
+
+**Operator bug root cause (T4) — V1+V2.** `selectPricingTierForVehicle`
+(`picker-engine.ts:187`) is `size_class`-only. For RV-Interior-Clean's
+specialty-tier pricing rows, the row-pattern detection at line 205 fails
+and the function returns null (correctly per its spec, locked by
+`picker-engine.test.ts:543`). The prereq auto-add path
+(`use-validated-service-add.tsx:232-237`) treats that null as
+"no-size-match" and emits the misleading "no price configured for this
+vehicle size" toast. **There is no vehicle_compatibility gate upstream**
+in the prereq auto-add path or in the `check-prerequisites` API route —
+compatibility IS checked elsewhere (catalog direct-tap warning,
+booking API server-side reject), but those two paths skip it. Sibling
+finding: `check-prerequisites` returns incompatible prereqs to the
+client, so even if the client gate were fixed, the dialog still offers
+incompatible prereqs as "Add" buttons.
+
+**Operator hypothesis "POS can't classify RV/Boat" — wrong.**
+`vehicle-create-dialog.tsx` fully supports all 5 categories + specialty
+tiers (`:205-345`); mounted identically by Sale and Quotes. UX is in
+place; the bug is downstream.
+
+**Quotes "Add New Vehicle" sibling — cannot reproduce.** Both panels
+mount `<VehicleSelector>` (with "Add Vehicle" button at
+`vehicle-selector.tsx:101`) and `<VehicleCreateDialog>` identically;
+edit-mode (G2) was resolved in #120. `grep "Add New Vehicle"` returns no
+matches anywhere. Flagged as **needs operator confirmation** (Q5) before
+scoping a fix.
+
+**Severity-ranked catalogue: 12 gaps.** 1 Critical (V1 prereq auto-add),
+4 Significant (V2 server compat-filter, V3 JSON-LD exotic/classic SEO,
+V4 VehicleSizePricing table, V5 admin Create exotic/classic), 7 Minor /
+Optional / Informational. **Fix-arc shape: 5 sessions** — Session A
+(V1+V2, prereq compat), Session B (V3+V4+V6+V7, public exotic/classic
+adoption — same as #125's recommendation), Session C (V5+V9, admin
+Create exotic/classic + DRY constant), Session D (V8 optional admin
+compat-warning), Session E (V10 optional regression tests). A/B/C
+parallelizable (no file overlap). **Recommended order: B → A → C** (B
+first because SEO leaks are hardest to un-index).
+
+**Structural recommendations.** S1: use `VEHICLE_CATEGORIES` from
+`vehicle-categories.ts:9-15` as the single source of truth; admin pages
+duplicate `ALL_VEHICLE_TYPES` (V9). S2: keep
+`selectPricingTierForVehicle` size-only; add sibling
+`assertServiceCompatibleWithVehicle()` for the compat gate currently
+scattered across `catalog-browser.tsx:185`, `api/book/route.ts:253`,
+and missing from prereq paths. S3: end-to-end test coverage gap — no
+test asserts "POS prereq with incompatible vehicle shows clear error"
+or "server filters incompatible prereqs." Pair with V10.
+
+**Open operator questions: 9.** Q1-Q4 net new (public vehicle-type
+visibility, exotic/classic extension to types, T4.3 fix posture, server
+compat-filter scope). Q5 needs screenshot reconfirmation. Q6-Q8 carry
+over from #125 (B6 personalized-link rendering, A4 empty-price
+predicate, B5 offerCount). Q9 informational
+(vehicle_category/vehicle_type schema cleanup).
+
+**Files added:** `docs/dev/VEHICLE_TAXONOMY_AUDIT.md` (~530 lines —
+schema map, surface enumeration, severity catalogue with fix-arc
+sequencing, structural recommendations, consolidated open questions).
+
+---
+
 ## Session #125 — Audit: exotic/classic tier handling — admin create-form gap + public-site leak sweep (2026-05-29)
 
 Read-only diagnostic audit. Branch `audit/exotic-classic-create-form-and-public-site-leak`,
