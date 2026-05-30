@@ -6,6 +6,76 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #124 — Fix: Admin Services Edit add-on dropdown + parent-self exclusion + named UNIQUE-constraint messages (sibling to #123) (2026-05-29)
+
+Production fix. Branch `fix/admin-services-edit-addon-dropdown-and-parent-self-exclusion`,
+isolated `git worktree`; **merged to main this session.** Closes the three open
+questions from `docs/dev/PREREQ_SERVICE_DROPDOWN_AUDIT.md` (Targets 3 + 4 sibling
+gap; pre-existing parent-self latent; UNIQUE-constraint specificity). All three
+were operator-locked as one bundled session — same code area, same patterns.
+
+**Sibling — add-on edit dropdown un-disabled** (mirrors #123 byte-for-byte):
+- Removed `disabled={!!editingAddon}` from `page.tsx:1714`. The save handler
+  (`saveAddon()`, `:823-864`) already includes `addon_service_id` in the UPDATE
+  payload; no FK depends on `service_addon_suggestions.id`; runtime code reads
+  the table by parent (`primary_service_id`) only.
+- New `src/app/admin/catalog/services/[id]/addon-helpers.ts` — pure helper
+  `getEditAddonOptions(allServices, addons, editingAddonServiceId, parentServiceId)`.
+  Returns the current value PLUS every unused non-primary service that is not
+  the parent. Mirrors `getEditPrereqOptions` (signature now also takes
+  `parentServiceId`) plus the addon-specific `classification !== 'primary'`
+  clause.
+- Wired `describeSupabaseError` into the `saveAddon()` catch (mirrors #123
+  `savePrereq` change). UNIQUE/CHECK violations now surface as actionable text.
+
+**Parent-self exclusion (defense-in-depth) on BOTH eligibility filters and BOTH edit helpers.**
+`page.tsx:1008-1014` now reads `s.id !== serviceId &&` ahead of each filter
+chain (covers ADD mode for both dropdowns). `getEditPrereqOptions` +
+`getEditAddonOptions` now take a `parentServiceId` parameter and the prereq
+dropdown call site passes `serviceId` as the 4th arg (covers EDIT mode for
+both). The current-selection clause (`s.id === editing*ServiceId`) always
+takes precedence — by construction the editing row cannot be the parent
+(CHECK forbids), so this never accidentally re-introduces it.
+
+**Named UNIQUE-constraint messages.** Two entries added to `CONSTRAINT_MESSAGES`
+in `src/lib/utils/supabase-error.ts`:
+- `/service_prerequisites_service_id_prerequisite_service_id.*key/i` →
+  "That prerequisite is already configured for this service."
+- `/service_addon_suggestions_primary_service_id_addon_service.*key/i` →
+  "That add-on is already configured for this service."
+Live constraint names verified against `docs/dev/DB_SCHEMA.md` (the add-on name
+carries Postgres' double-underscore truncation at 63 chars). Regexes use the
+permissive `.*key` tail so a future rename / re-truncation doesn't silently
+downgrade to the generic 23505 wording.
+
+**Tests +10 → 2635 (within expected +6-10 range):**
+- `addon-helpers.test.ts` — 7 cases mirroring `prereq-helpers.test.ts` plus
+  the addon-specific classification clause (current value always present;
+  unused non-primary included; primary excluded; other-used excluded;
+  parent excluded; defensive primary-classified current value preserved;
+  defensive duplicate-in-list current value preserved).
+- `prereq-helpers.test.ts` extended +1 case for the new `parentServiceId`
+  exclusion + the existing 5 tests updated to pass the new 4th arg.
+- `supabase-error.test.ts` +2 cases asserting the new constraint regexes
+  resolve to the specific friendly messages (and not the generic 23505 wording).
+
+**Scope:** 3 production files (`page.tsx`, `prereq-helpers.ts`, `supabase-error.ts`)
++ 1 new production file (`addon-helpers.ts`) + 1 new test file + 2 extended test
+files. ~90 production lines net. No reducer/migration/schema/permission change.
+The structural guard from #120 stays clean (this session doesn't touch any
+Sale/Quotes panel).
+
+**This closes out the Admin Services Edit prereq/add-on dropdown UX cluster
+completely** — no more "we found another disabled field" sequels expected on
+that page. **Gates:** tsc 0 · lint 0 errors / 94 warnings (none new, none in
+touched files) · **2635/2635 tests pass (+10)** · build clean.
+
+Not a 13-item entry (admin catalog UX polish; sibling closeout to #123).
+**Operator:** deploy + retest editing BOTH a prereq AND an add-on; verify
+the clear error messages on duplicate-add attempts.
+
+---
+
 ## Session #123 — Audit + fix: Admin Services Edit prereq-service dropdown un-disabled + error-surfaced (2026-05-29)
 
 Audit + production fix. Branch `audit/admin-services-edit-prereq-service-dropdown`,
