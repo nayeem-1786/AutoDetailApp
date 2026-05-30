@@ -6,6 +6,91 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #127 — Audit: public booking flow — form-reset bug + end-to-end flow verification (2026-05-30)
+
+Read-only diagnostic audit. Branch `audit/public-booking-form-reset-and-flow-verification`,
+isolated `git worktree`; **merged to main this session.** No source /
+migration / test changes. Diagnoses the operator-confirmed form-reset bug
+on the live public site (non-automobile category + make selection silently
+resets to Automobile) and walks the booking flow end-to-end for all 5
+vehicle categories.
+
+**Form-reset root cause (CONCERN A) — classification (a):** auto-effect
+overrides user input. Single line at `src/components/booking/step-vehicle.tsx:117-120`:
+the debounced `classify()` call passes through
+`resolveVehicleClassification()` (`src/lib/utils/vehicle-categories.ts:684-773`).
+That resolver has **three default-to-'automobile' paths** when it cannot
+uniquely match the make: (1) make not in `vehicle_makes` table
+(`vehicle-categories.ts:691`), (2) dual-category make with empty model
+(`:302-305`, fires for the 400ms debounce hot path because the
+make-change handler clears model at `step-vehicle.tsx:388`), (3) DB error
+(`:712-714`). All three return `vehicle_category='automobile'`, the
+step-vehicle line 119 check then fires `setCategory('automobile')`,
+overwriting the user's explicit RV/Boat/Motorcycle/Aircraft pick. The
+`<VehicleMakeCombobox>`'s own category-change effect
+(`vehicle-make-combobox.tsx:43-51`) cascades — clears the typed make
+and re-fetches the automobile-makes list. End-user sees: the form reset.
+
+**Fix shape (A3) — small, single-file hotfix.** Recommended Y-1: refuse
+the auto-correction when model is empty (~3-5 lines, 1 file). Kills the
+dual-category dominant trigger, preserves the resolver's "Honda
+motorcycle vs car" auto-correction value once the user has typed a model
+character. Optional structural follow-up X: add a
+`category_source: 'single-row-match' | 'disambiguated' | 'defaulted'`
+discriminator to `VehicleClassification`, gate the override on
+high-confidence sources only (~15 lines, 2 files).
+
+**Cross-surface (CONCERN C) — bug is contained.** POS
+(`vehicle-create-dialog.tsx`), customer portal
+(`account/vehicle-form-dialog.tsx`), admin Customers, and quote-builder
+vehicle flows all expose `category` as a manual operator-controlled
+`useState` with no auto-classifier. `grep "resolveVehicleClassification"`
+returns hits only in `step-vehicle.tsx`. The
+auto-classification+auto-correction code is unique to the public booking
+form. **Memory #19 DRY-concern noted:** the prior taxonomy audit flagged
+two independent vehicle-form patterns; this audit shows the gap
+concretely — public form has the feature AND the defect, POS/account is
+auto-classification-free. Future consolidation is a structural TODO (F5).
+
+**End-to-end booking flow verification (CONCERN B):** state graph
+downstream of Step 1 is taxonomy-complete. `bookingVehicleSchema`
+(`validation.ts:336-351`) accepts all 5 categories + `specialty_tier`,
+`api/book/route.ts:253-262` enforces vehicle/service compat server-side,
+`booking-wizard.tsx:680-689` filters services by `vehicle_compatibility`,
+`step-service-select.tsx` auto-selects `specialty_tier` (`:230-238`) and
+handles `custom`-model pricing (`:1576-1579`). Two downstream gaps tied
+to Q1/Q2 operator rulings:
+- **F2 Significant (operator decision)**: RV/Boat/Aircraft custom-quote
+  gating MISSING. The exotic/classic `<SpecialtyVehicleBlock>` callback
+  flow (`specialty-vehicle-block.tsx`) only triggers for automobile
+  exotic/classic (`booking-wizard.tsx:705`). Per Q2's "custom-quote =
+  staff reaches out" semantics, RV/Boat/Aircraft likely want the same
+  callback gate. 3 implementation options (B4-1.A extend gate /
+  B4-1.B replace continue with callback CTA / B4-1.C status quo).
+- **F3 Minor**: RV/Boat/Aircraft `custom`-model services with
+  `custom_starting_price` set become standard-bookable — contradicting
+  quote-only intent. Resolution depends on F2 choice.
+
+**Severity catalogue: 6 findings.** F1 Critical (form-reset), F2
+Significant (custom-quote gate), F3 Minor (auto-bookable contradiction),
+F4 Minor (resolver dev-warn data drift), F5 Minor (vehicle-form DRY),
+F6 Minor (regression-locking test). **Fix-arc: 2 sessions.** Session F1
+(F1+F6, hotfix-class, ~30 min, ships ASAP, parallel-safe with the prior
+arc's Sessions A/B/C). Session F2 (F2+F3, ~2 hr, sequenced after Q1/Q2
+operator confirmation). F4 optional, F5 long-term.
+
+**5 open operator questions** (Q1-Q2 re-affirm the audit-prompt's stated
+custom-quote ruling and ask which gating posture to implement, Q3 hotfix
+shape Y-1 vs X, Q4 resolver dev-warn priority, Q5 vehicle-form
+consolidation priority).
+
+**Files added:** `docs/dev/PUBLIC_BOOKING_FLOW_AUDIT.md` (~530 lines —
+root-cause trace with the full effect chain, per-category × per-stage
+matrix, cross-surface verification, severity catalogue with fix-arc
+sequencing, regression-test outline).
+
+---
+
 ## Session #126 — Audit: vehicle taxonomy — schema, POS, admin, public, pricing/prereq (2026-05-29)
 
 Read-only diagnostic audit. Branch `audit/vehicle-taxonomy-comprehensive`,
