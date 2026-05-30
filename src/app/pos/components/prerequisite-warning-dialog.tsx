@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, ShieldAlert, Plus } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Plus, Ban } from 'lucide-react';
 import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ManagerPinDialog } from './manager-pin-dialog';
 import { formatDate } from '@/lib/utils/format';
+import { VEHICLE_CATEGORY_LABELS } from '@/lib/utils/vehicle-categories';
 import type { PrerequisiteWarning } from '../hooks/use-prerequisite-check';
 
 interface PrerequisiteWarningDialogProps {
@@ -71,23 +72,55 @@ export function PrerequisiteWarningDialog({
           ))}
         </div>
 
-        {/* Add prerequisite options — show ALL unmet prerequisites */}
+        {/* Add prerequisite options — show ALL unmet prerequisites (Option A,
+            Session #130: transparency over filtering — incompatible ones are
+            visually dimmed and titled with a category hint, but they remain
+            clickable so the operator gets the precise category-specific error
+            toast wired by `use-validated-service-add.handleAddPrerequisite`
+            instead of the misleading "no price configured" fallback). */}
         {unmetPrereqs.length > 0 && (
           <div className="mt-4 space-y-2">
             <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
               Add a prerequisite:
             </p>
-            {unmetPrereqs.map((prereq, idx) => (
-              <Button
-                key={idx}
-                variant="outline"
-                onClick={() => onAddPrerequisite(prereq.service_name)}
-                className="w-full justify-start gap-1.5"
-              >
-                <Plus className="h-4 w-4 shrink-0" />
-                Add {prereq.service_name}
-              </Button>
-            ))}
+            {unmetPrereqs.map((prereq, idx) => {
+              const incompatible = prereq.is_compatible_with_vehicle === false;
+              const allowed = (prereq.compatible_categories ?? [])
+                .map((c) => VEHICLE_CATEGORY_LABELS[c])
+                .filter(Boolean);
+              const incompatHint = incompatible
+                ? allowed.length === 0
+                  ? "Not for this vehicle's category"
+                  : `For ${allowed.join(' / ')} vehicles only`
+                : undefined;
+              return (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  onClick={() => onAddPrerequisite(prereq.service_name)}
+                  className={`w-full justify-start gap-1.5 ${
+                    incompatible ? 'opacity-60' : ''
+                  }`}
+                  title={incompatHint}
+                  aria-describedby={incompatible ? `prereq-incompat-${idx}` : undefined}
+                >
+                  {incompatible ? (
+                    <Ban className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  ) : (
+                    <Plus className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className="flex-1 text-left">Add {prereq.service_name}</span>
+                  {incompatible && (
+                    <span
+                      id={`prereq-incompat-${idx}`}
+                      className="text-xs text-amber-700 dark:text-amber-300"
+                    >
+                      ({incompatHint})
+                    </span>
+                  )}
+                </Button>
+              );
+            })}
           </div>
         )}
 

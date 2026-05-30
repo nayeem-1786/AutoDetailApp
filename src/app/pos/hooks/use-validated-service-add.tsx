@@ -10,6 +10,7 @@ import {
   usePrerequisiteCheck,
   type PrerequisiteCheckResult,
 } from './use-prerequisite-check';
+import { VEHICLE_CATEGORY_LABELS } from '@/lib/utils/vehicle-categories';
 import { PrerequisiteWarningDialog } from '../components/prerequisite-warning-dialog';
 import { ManagerPinDialog } from '../components/manager-pin-dialog';
 import type { CatalogService } from '../types';
@@ -213,7 +214,43 @@ export function useValidatedServiceAdd(options: UseValidatedServiceAddOptions) {
         pricing: originalPricing,
         vehicleSizeClass: originalVsc,
         perUnitQty: originalPerUnitQty,
+        prerequisites,
+        ticketVehicleCategory,
       } = prereqWarning;
+
+      // V1 (Session #130) — cross-category gate. The server flags each prereq
+      // with `is_compatible_with_vehicle`; if the operator picks one that's
+      // incompatible with the ticket vehicle's category, block with a
+      // category-specific message instead of falling through to
+      // `selectPricingTierForVehicle` (which would return null for the
+      // specialty-tier service, surfacing the misleading "no price configured
+      // for this vehicle size" toast — V1's headline symptom). The Manager
+      // Override path is unaffected: it adds the DEPENDENT service with an
+      // override note and never invokes this auto-add.
+      const prereqInfo = prerequisites.find((p) => p.service_name === prereqServiceName);
+      if (
+        prereqInfo &&
+        prereqInfo.is_compatible_with_vehicle === false &&
+        ticketVehicleCategory
+      ) {
+        const allowed = (prereqInfo.compatible_categories ?? [])
+          .map((c) => VEHICLE_CATEGORY_LABELS[c])
+          .filter(Boolean);
+        const allowedText =
+          allowed.length === 0
+            ? 'a different vehicle category'
+            : allowed.length === 1
+              ? `${allowed[0]} vehicles`
+              : `${allowed.slice(0, -1).join(', ')} or ${allowed[allowed.length - 1]} vehicles`;
+        const ticketLabel = VEHICLE_CATEGORY_LABELS[ticketVehicleCategory] ?? ticketVehicleCategory;
+        toast.error(
+          `${prereqServiceName} is only available for ${allowedText}; this ticket's vehicle is ${
+            ticketLabel === 'Automobile' ? 'an Automobile' : `a ${ticketLabel}`
+          }. Use Manager Override to add ${originalService.name} without this prerequisite.`,
+        );
+        return; // keep the dialog open so operator can pick a compatible prereq or Override
+      }
+
       clearPrereqWarning();
 
       const prereqService = services.find((s) => s.name === prereqServiceName);
@@ -231,9 +268,11 @@ export function useValidatedServiceAdd(options: UseValidatedServiceAddOptions) {
       if (prereqPricing.length > 0) {
         const tier = selectPricingTierForVehicle(prereqPricing, vehicleSizeClass);
         if (!tier) {
-          // No tier matches this vehicle size (data gap). The prerequisite is
-          // required-same-ticket, so if it can't be priced we block the whole
-          // add — neither the prerequisite nor the dependent add-on is added.
+          // No tier matches this vehicle size (data gap). The cross-category
+          // case was already caught above; reaching here means the prereq IS
+          // compatible with the ticket vehicle's category but has no row for
+          // its size_class (a legit pricing-config gap). Block the whole add —
+          // neither the prerequisite nor the dependent add-on is added.
           toast.error(`Cannot auto-add "${prereqService.name}": no price configured for this vehicle size. Add it manually.`);
           return;
         }

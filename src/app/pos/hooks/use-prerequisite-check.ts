@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import { posFetch } from '../lib/pos-fetch';
 import type { CatalogService } from '../types';
 import type { ServicePricing, VehicleSizeClass } from '@/lib/supabase/types';
+import type { VehicleCategory } from '@/lib/utils/vehicle-categories';
 
 export interface PrerequisiteInfo {
   service_name: string;
@@ -15,6 +16,22 @@ export interface PrerequisiteInfo {
     date?: string;
     service_name?: string;
   };
+  /**
+   * V1+V2 (Session #130) — set by the server. True when the prereq service is
+   * compatible with the ticket vehicle's category (or no restriction / no
+   * vehicle attached); false ONLY when the prereq's `vehicle_compatibility`
+   * explicitly excludes the ticket vehicle's category. The auto-add path in
+   * `use-validated-service-add` uses this to block the "Add prerequisite"
+   * button with a clear category-specific message instead of falling through
+   * to the misleading "no price configured for this vehicle size" toast.
+   *
+   * Older server responses (pre-#129) omit this field — callers default it to
+   * `true` (no compat assertion, preserves legacy behavior).
+   */
+  is_compatible_with_vehicle?: boolean;
+  /** The prereq's allowed vehicle categories (compat-key vocabulary already
+   *  translated back into `VehicleCategory`). Empty/missing = no restriction. */
+  compatible_categories?: VehicleCategory[];
 }
 
 export interface PrerequisiteWarning {
@@ -23,6 +40,10 @@ export interface PrerequisiteWarning {
   vehicleSizeClass: VehicleSizeClass | null;
   perUnitQty?: number;
   prerequisites: PrerequisiteInfo[];
+  /** Server-resolved category of the ticket vehicle (or null when no vehicle).
+   *  The dialog uses it to build the cross-category error message without a
+   *  second lookup. */
+  ticketVehicleCategory: VehicleCategory | null;
 }
 
 interface UsePrerequisiteCheckOptions {
@@ -119,6 +140,10 @@ export function usePrerequisiteCheck(options: UsePrerequisiteCheckOptions) {
         vehicleSizeClass,
         perUnitQty,
         prerequisites: data.prerequisites,
+        // Top-level on the response — null when no ticket vehicle or unknown
+        // category (server falls back to null on either). Defaulting to null
+        // here keeps the dialog safe against pre-#129 server responses.
+        ticketVehicleCategory: data.ticket_vehicle_category ?? null,
       });
       return { canAdd: false, hasPrerequisites: true };
     } catch {
