@@ -12,8 +12,11 @@ import {
   TIER_DROPDOWN_LABELS,
   MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
+  resolveVehicleClassification,
   type VehicleCategory,
+  type VehicleClassification,
 } from '@/lib/utils/vehicle-categories';
+import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
   DialogHeader,
@@ -59,6 +62,16 @@ export function VehicleFormDialog({
   const [saving, setSaving] = useState(false);
   const [category, setCategory] = useState<VehicleCategory>('automobile');
   const [yearOtherMode, setYearOtherMode] = useState(false);
+
+  // #129 C3 — opt-in classifier: surfaces an inline specialty-tier advisory
+  // when the typed make+model resolves to 'exotic' or 'classic'. The server
+  // (POST + PATCH in /api/customer/vehicles) is the authoritative writer for
+  // `size_class` and ALREADY overrides client-supplied size_class with the
+  // classifier's exotic/classic result (Session 29 anti-gaming). This dialog
+  // surfaces that decision pre-save so customers know their vehicle will be
+  // flagged for the specialty service tier. See VEHICLE_FORM_UNIFICATION_AUDIT.md
+  // C3 / Q4 and CLAUDE.md Rule 19.
+  const [classification, setClassification] = useState<VehicleClassification | null>(null);
 
   const {
     register,
@@ -125,6 +138,10 @@ export function VehicleFormDialog({
 
   const handleMakeChange = useCallback((val: string) => {
     setValue('make', val, { shouldDirty: true });
+    // Model is make-specific — clear it on make change so the classifier
+    // doesn't keep stale model context. Mirrors step-vehicle.tsx:388.
+    setValue('model', '', { shouldDirty: true });
+    setClassification(null);
   }, [setValue]);
 
   function handleCategoryChange(newCategory: VehicleCategory) {
@@ -133,9 +150,40 @@ export function VehicleFormDialog({
     setValue('vehicle_category', newCategory, { shouldDirty: true });
     setValue('vehicle_type', isSpecialty ? newCategory : 'standard', { shouldDirty: true });
     setValue('make', '', { shouldDirty: true });
+    setValue('model', '', { shouldDirty: true });
     setValue('size_class', null, { shouldDirty: true });
     setValue('specialty_tier', null, { shouldDirty: true });
+    setClassification(null);
   }
+
+  // --- Debounced classifier — opt-in: only fires when make AND model are typed
+  // (the #129 C1 gate; without a model, the resolver silently defaults to
+  // automobile, masking exotic/classic detection). The classifier's result
+  // is used purely for the inline advisory below — the server is the
+  // authoritative writer for size_class on POST/PATCH.
+  const watchedMake = watch('make') ?? '';
+  const watchedModel = watch('model') ?? '';
+  const watchedYear = watch('year') ?? null;
+  useEffect(() => {
+    if (!open) return;
+    const mk = watchedMake.trim();
+    const mdl = watchedModel.trim();
+    // C1 gate — require both make AND model before invoking the classifier.
+    if (!mk || !mdl) {
+      setClassification(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      const supabase = createClient();
+      resolveVehicleClassification(supabase, mk, mdl, watchedYear ?? undefined)
+        .then((result) => setClassification(result))
+        .catch(() => setClassification(null));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [open, watchedMake, watchedModel, watchedYear]);
+
+  const classifierSpecialty =
+    classification?.size_class === 'exotic' || classification?.size_class === 'classic';
 
   const isSpecialty = isSpecialtyCategory(category);
   const tierLabel = TIER_DROPDOWN_LABELS[category];
@@ -267,6 +315,24 @@ export function VehicleFormDialog({
               />
             </FormField>
           </div>
+
+          {/* Specialty-tier advisory (C3) — surfaces when classifier detects
+              exotic/classic. Customer cannot self-elect this tier from the
+              dropdown (CUSTOMER_SELF_SERVICE_SIZE_CLASSES restricts to 3),
+              but the server will write the classifier's `size_class` on save. */}
+          {classifierSpecialty && (
+            <div
+              role="status"
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+              data-testid="specialty-tier-advisory"
+            >
+              <strong className="font-semibold">
+                {classification!.size_class === 'exotic' ? 'Specialty / Exotic vehicle' : 'Classic vehicle'}
+                {' '}detected.
+              </strong>{' '}
+              Your {[watchedYear, watchedMake, watchedModel].filter(Boolean).join(' ')} qualifies for our specialty service tier — our team will reach out to confirm pricing.
+            </div>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Color" error={errors.color?.message} htmlFor="vehicle_color">

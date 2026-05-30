@@ -7,7 +7,7 @@
  * Run: npx vitest run src/lib/utils/__tests__/vehicle-categories.test.ts
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   isExoticMake,
   isExoticModel,
@@ -567,5 +567,141 @@ describe('Session 29 — resolveVehicleClassification size_class output', () => 
       'vehicle_category',
       'vehicle_type',
     ]);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #129 Q7 — dev-only console.warn on the resolver's three silent-default paths
+// (PUBLIC_BOOKING_FLOW_AUDIT.md F4 + VEHICLE_FORM_UNIFICATION_AUDIT.md S9).
+// In production NODE_ENV the warnings are suppressed; in dev/test they fire.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('#129 Q7 — resolver dev-warns on silent defaults', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  // Mock that returns one row per make — used by the disambiguation test.
+  const dualCategoryMock = (categories: string[]) => ({
+    from: () => ({
+      select: () => ({
+        ilike: () => ({
+          eq: () => Promise.resolve({ data: categories.map((c) => ({ category: c })) }),
+        }),
+      }),
+    }),
+  }) as unknown as Parameters<typeof resolveVehicleClassification>[0];
+
+  // Mock that throws (DB error) — exercises the catch block path.
+  const dbErrorMock = {
+    from: () => ({
+      select: () => ({
+        ilike: () => ({
+          eq: () => Promise.reject(new Error('connection refused')),
+        }),
+      }),
+    }),
+  } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+
+  it('logs dev-warn when no vehicle_makes row matches the make', async () => {
+    // mockSupabase (top of file) returns no rows → 0-row default path fires.
+    await resolveVehicleClassification(mockSupabase, 'TotallyMadeUpBrand', 'Anything', 2024);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('No vehicle_makes row matched')
+    );
+  });
+
+  it('logs dev-warn when dual-category make has empty model (disambiguation default)', async () => {
+    const mock = dualCategoryMock(['automobile', 'motorcycle']);
+    await resolveVehicleClassification(mock, 'Honda'); // no model
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Dual-category make with no model')
+    );
+  });
+
+  it('logs dev-warn when vehicle_makes lookup throws (DB error path)', async () => {
+    await resolveVehicleClassification(dbErrorMock, 'Toyota', 'Camry');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('vehicle_makes lookup failed'),
+      expect.any(Error)
+    );
+  });
+
+  it('suppresses dev-warns when NODE_ENV is production', async () => {
+    const original = process.env.NODE_ENV;
+    // vi.stubEnv survives the test via the afterEach below.
+    vi.stubEnv('NODE_ENV', 'production');
+    try {
+      await resolveVehicleClassification(mockSupabase, 'AnotherFakeBrand', 'X', 2024);
+      const mock = dualCategoryMock(['automobile', 'motorcycle']);
+      await resolveVehicleClassification(mock, 'Honda');
+      await resolveVehicleClassification(dbErrorMock, 'Toyota', 'Camry');
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.stubEnv('NODE_ENV', original ?? 'test');
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #129 C1 — resolver baseline that justifies the step-vehicle override gate.
+// The gate ('!model.trim() → don't override category') exists because the
+// resolver silently returns automobile for the three paths above. These
+// tests pin that defaulting behavior so the gate's purpose stays grounded.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('#129 C1 — resolver default-to-automobile behavior the override gate guards', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  it('returns vehicle_category=automobile when make is unknown (0-row default)', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'Winnebago');
+    // mockSupabase returns no rows → category falls back to automobile.
+    expect(result.vehicle_category).toBe('automobile');
+  });
+
+  it('returns vehicle_category=automobile for dual-category make with empty model', async () => {
+    const dualCategoryMock = {
+      from: () => ({
+        select: () => ({
+          ilike: () => ({
+            eq: () => Promise.resolve({
+              data: [{ category: 'automobile' }, { category: 'motorcycle' }],
+            }),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+    const result = await resolveVehicleClassification(dualCategoryMock, 'Honda');
+    expect(result.vehicle_category).toBe('automobile');
+  });
+
+  it('disambiguates correctly when dual-category make has a model (gate allows the override)', async () => {
+    const dualCategoryMock = {
+      from: () => ({
+        select: () => ({
+          ilike: () => ({
+            eq: () => Promise.resolve({
+              data: [{ category: 'automobile' }, { category: 'motorcycle' }],
+            }),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+    const result = await resolveVehicleClassification(dualCategoryMock, 'Honda', 'Sportster');
+    expect(result.vehicle_category).toBe('motorcycle');
   });
 });

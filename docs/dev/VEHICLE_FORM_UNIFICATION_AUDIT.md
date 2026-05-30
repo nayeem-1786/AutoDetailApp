@@ -6,6 +6,24 @@
 > the public booking flow audit merge) so the shared checkout stays
 > undisturbed.
 
+> **Resolution status (2026-05-30, Session #129):**
+> - **C1 — SHIPPED.** F1 hotfix landed in `step-vehicle.tsx`: `classify()`
+>   refuses category auto-override when `!mdl.trim()`. Operator-confirmed
+>   F1 repro blocked.
+> - **Q7 — SHIPPED.** F4 dev-warn (NODE_ENV-gated) landed at all three
+>   silent-fall-through paths in `resolveVehicleClassification`.
+> - **C3 — SHIPPED.** Customer portal `account/vehicle-form-dialog.tsx`
+>   now mounts the classifier as a debounced opt-in (same C1 gate — both
+>   make AND model required); inline advisory surfaces when
+>   classifier resolves to exotic/classic. `api/customer/vehicles/[id]`
+>   PATCH gains classifier parity with POST (was a gap — edits never
+>   reclassified). Server remains the authoritative writer.
+> - **C2 — OPEN.** POS dialog raw-useState → RHF port remains an optional
+>   future ride-along.
+> - **Q5 / Q6 / Q9 / S10 — OPEN.** Schema-cleanup follow-ups carry into
+>   subsequent sessions.
+> - **F5 — LOCKED as informational.** Re-flag suppressed per #128 verdict.
+
 ## Context
 
 The prior audit (`docs/dev/PUBLIC_BOOKING_FLOW_AUDIT.md`) raised F5 —

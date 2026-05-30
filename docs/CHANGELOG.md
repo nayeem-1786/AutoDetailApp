@@ -6,6 +6,101 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #129 — Fix: vehicle classifier corrective (C1) + dev-warn ride-along (Q7) + portal classifier opt-in (C3) (2026-05-30)
+
+Production code fix bundle. Branch
+`fix/vehicle-classifier-corrective-and-portal-opt-in`, isolated `git
+worktree`; **merged to main this session.** Three related changes
+bundled because they form one architectural unit per the #128
+NO-UNIFICATION verdict (four context-driven vehicle-form patterns are
+intentional; classifier is structurally mandatory for public booking
+and optionally extensible to other customer-facing surfaces).
+
+**C1 — public-booking F1 hotfix (`step-vehicle.tsx`, +5 net lines).**
+`classify()` now refuses the category auto-override when the user
+hasn't typed at least one model character. The classifier still runs
+for telemetry, but `setCategory(result.vehicle_category)` only fires
+when `mdl.trim()` is non-empty. Resolves F1 from
+`PUBLIC_BOOKING_FLOW_AUDIT.md` (#127): customer selects RV / motorcycle
+/ boat / aircraft → typed make selection silently reset the entire form
+to Automobile because the resolver defaults to `'automobile'` in three
+silent-fall-through paths (`vehicle-categories.ts:302-305`, `:691`,
+`:712-714`). The gate preserves the original Honda-motorcycle-vs-Honda-
+car correction for cases where the user has typed at least a model
+character; only the empty-model dual-category disambiguation path is
+suppressed. Operator-confirmed repro now blocked. Y-1 shape per the
+audit recommendation.
+
+**Q7 — F4 dev-warn ride-along (`vehicle-categories.ts`, +12 net
+lines).** Three silent-fall-through paths in
+`resolveVehicleClassification` now emit `console.warn` in
+non-production environments: (1) `0-row vehicle_makes` lookup (data
+drift between combobox source and resolver source — PUBLIC_BOOKING_FLOW
+F4); (2) dual-category make with empty model (existing warning now
+NODE_ENV-gated for log-volume hygiene); (3) DB / network failure in
+the make lookup. Helps catch future similar regressions without leaking
+internal-state telemetry to production. See
+VEHICLE_FORM_UNIFICATION_AUDIT.md S9.
+
+**C3 — portal classifier opt-in (`vehicle-form-dialog.tsx` +66 lines,
+`api/customer/vehicles/[id]/route.ts` +23 lines).** Customer portal
+vehicle-add/edit dialog now mounts a debounced opt-in classifier that
+fires when BOTH make AND model are typed (the same C1 gate; without
+both, the resolver silently defaults to automobile, masking exotic /
+classic detection — pointless to invoke). When the result is exotic or
+classic, an inline amber advisory surfaces: "Specialty / Exotic
+vehicle detected. Your [year make model] qualifies for our specialty
+service tier — our team will reach out to confirm pricing." The
+authoritative writer remains the server: POST already runs the
+classifier and overrides `size_class` per Session 29 anti-gaming;
+PATCH now mirrors the same behavior (was a gap — a customer who
+created a vehicle without a model then later edited to add the model
+would never get re-classified). Closes Q4 from
+`VEHICLE_FORM_UNIFICATION_AUDIT.md` (#128) and Q3 from
+`PUBLIC_BOOKING_FLOW_AUDIT.md` (#127). Ferrari-tier customers
+self-managing in the portal now see the correct specialty advisory
+pre-save AND the server persists the right `size_class`.
+
+**Tests (+12 → 2647):** `vehicle-categories.test.ts` +9 (Q7 dev-warn
+fires for each of 3 silent paths + suppressed under
+`NODE_ENV=production` + C1 baseline behavior the gate guards against);
+`step-vehicle.test.tsx` (new, 89 lines) +5 (C1 override-gate predicate
+mirror — empty model refuses override across all 4 non-automobile
+categories; model-present allows correct Honda-motorcycle override;
+no-op when classifier matches current). No render-level integration
+test for the dialog or step-vehicle — the predicate mirror + resolver
+defaulting tests pin both ends of the contract; render tests would
+disproportionately mock `createClient` + `fetch('/api/vehicle-makes')`
++ the 400 ms debounce without adding evidence beyond what the unit
+tests already lock.
+
+**Scope discipline (Memory #8):** 4 production files modified + 1 new
+test file. Production delta ~115 lines (well under the 200-line
+target). All four surfaces' established patterns preserved per the
+#128 NO-UNIFICATION verdict — no shared component, no schema
+unification, no public-booking-pattern propagation to POS/admin.
+
+**Resolves:** F1 + F4 from `PUBLIC_BOOKING_FLOW_AUDIT.md` (#127); C1 +
+Q7 + C3 from `VEHICLE_FORM_UNIFICATION_AUDIT.md` (#128). **Open:** F2
+(RV/Boat/Aircraft custom-quote gate, awaiting operator Q1/Q2); F3;
+F5 reframed as informational; C2 (POS dialog RHF port — optional);
+Q5 (vin/license_plate/notes schema cleanup); Q6 (`is_incomplete`
+consistency).
+
+**Files added:** `src/components/booking/__tests__/step-vehicle.test.tsx`.
+
+**Files modified:** `src/components/booking/step-vehicle.tsx`,
+`src/lib/utils/vehicle-categories.ts`,
+`src/components/account/vehicle-form-dialog.tsx`,
+`src/app/api/customer/vehicles/[id]/route.ts`,
+`src/lib/utils/__tests__/vehicle-categories.test.ts`.
+
+**Gates:** `tsc --noEmit` 0 errors; `npm run lint` 0 errors / 97
+warnings (none new in touched files); `npm test` 2647/2647 pass;
+`next build` clean.
+
+---
+
 ## Session #128 — Audit: vehicle-form pattern unification feasibility (2026-05-30)
 
 Read-only diagnostic audit. Branch
