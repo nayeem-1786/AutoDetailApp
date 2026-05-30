@@ -23,6 +23,33 @@ describe('describeSupabaseError (Catalog S3)', () => {
     expect(describeSupabaseError(err, 'fallback')).toMatch(/slug already exists/i);
   });
 
+  it('maps the prereq duplicate-add UNIQUE to friendly text (Session #124)', () => {
+    // Live constraint name per DB_SCHEMA.md:
+    // service_prerequisites_service_id_prerequisite_service_id_key
+    const err = {
+      code: '23505',
+      message:
+        'duplicate key value violates unique constraint "service_prerequisites_service_id_prerequisite_service_id_key"',
+    };
+    expect(describeSupabaseError(err, 'fallback')).toBe(
+      'That prerequisite is already configured for this service.'
+    );
+  });
+
+  it('maps the add-on duplicate-add UNIQUE to friendly text (Session #124)', () => {
+    // Live constraint name per DB_SCHEMA.md — note the double underscore
+    // (Postgres truncates auto-generated names at 63 chars):
+    // service_addon_suggestions_primary_service_id_addon_service__key
+    const err = {
+      code: '23505',
+      message:
+        'duplicate key value violates unique constraint "service_addon_suggestions_primary_service_id_addon_service__key"',
+    };
+    expect(describeSupabaseError(err, 'fallback')).toBe(
+      'That add-on is already configured for this service.'
+    );
+  });
+
   it('maps 23514 check violation (sale-price constraint) to friendly text', () => {
     const err = { code: '23514', message: 'new row violates check constraint "chk_service_sale_price"' };
     expect(describeSupabaseError(err, 'fallback')).toMatch(/sale price must be lower/i);

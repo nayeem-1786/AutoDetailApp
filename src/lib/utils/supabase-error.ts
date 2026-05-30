@@ -33,6 +33,16 @@ const CONSTRAINT_MESSAGES: Array<{ match: RegExp; message: string }> = [
   { match: /services_slug_key|services_slug/i, message: 'A service with this URL slug already exists. Choose a different slug.' },
   { match: /products_slug_key|products_slug/i, message: 'A product with this URL slug already exists. Choose a different slug.' },
   { match: /_slug_key|_slug_unique/i, message: 'That URL slug is already in use. Choose a different one.' },
+  // Session #124 — Admin Services Edit duplicate-add guards (sibling to the
+  // #123 prereq dropdown fix). Live constraint names per docs/dev/DB_SCHEMA.md:
+  //   service_prerequisites_service_id_prerequisite_service_id_key
+  //   service_addon_suggestions_primary_service_id_addon_service__key
+  // (the add-on name has a double underscore — Postgres truncates auto-generated
+  // names at 63 chars, dropping characters mid-name). The regexes are written
+  // permissively (`.*key` tail) so a future rename / re-truncation does not
+  // silently downgrade to the generic 23505 wording.
+  { match: /service_prerequisites_service_id_prerequisite_service_id.*key/i, message: 'That prerequisite is already configured for this service.' },
+  { match: /service_addon_suggestions_primary_service_id_addon_service.*key/i, message: 'That add-on is already configured for this service.' },
 ];
 
 /**

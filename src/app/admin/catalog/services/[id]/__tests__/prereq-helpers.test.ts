@@ -4,15 +4,16 @@ import { getEditPrereqOptions } from '../prereq-helpers';
 /**
  * Session #123 — locks the substantive logic change behind the
  * prereq-service-dropdown un-disabling fix
- * (`docs/dev/PREREQ_SERVICE_DROPDOWN_AUDIT.md`).
+ * (`docs/dev/PREREQ_SERVICE_DROPDOWN_AUDIT.md`). With the disable removed,
+ * edit-mode options must (a) include the currently-selected prereq service
+ * so the dropdown renders its value, and (b) exclude every OTHER already-used
+ * prereq so the operator cannot pick one that would collide with UNIQUE
+ * (service_id, prerequisite_service_id) at save time.
  *
- * The helper is the surgical replacement for the prior
- * `editingPrereq ? allServices : prereqEligibleServices` ternary, which paired
- * with `disabled={!!editingPrereq}` to lock the field. With the disable
- * removed, edit-mode options must (a) include the currently-selected prereq
- * service so the dropdown renders its value, and (b) exclude every OTHER
- * already-used prereq so the operator cannot pick one that would collide with
- * UNIQUE (service_id, prerequisite_service_id) at save time.
+ * Session #124 — `parentServiceId` parameter added for defense-in-depth
+ * parent-self exclusion (CHECK service_id <> prerequisite_service_id). The
+ * existing tests now pass a distinct sentinel ('PARENT') that does not appear
+ * in their `allServices`; the new last case exercises the exclusion explicitly.
  */
 
 type Service = { id: string; name: string };
@@ -25,6 +26,7 @@ describe('getEditPrereqOptions', () => {
       // 'A' is the editing row, 'B' is a sibling prereq already used.
       [{ prerequisite_service_id: 'A' }, { prerequisite_service_id: 'B' }],
       'A',
+      'PARENT',
     );
     expect(options.map((o) => o.id)).toContain('A');
   });
@@ -34,6 +36,7 @@ describe('getEditPrereqOptions', () => {
       [svc('A'), svc('B'), svc('C')],
       [{ prerequisite_service_id: 'A' }, { prerequisite_service_id: 'B' }],
       'A',
+      'PARENT',
     );
     // 'B' is already a prereq for this parent (on a different row) — picking
     // it would collide with (service_id, B) at DB save time.
@@ -45,6 +48,7 @@ describe('getEditPrereqOptions', () => {
       [svc('A'), svc('B'), svc('C'), svc('D')],
       [{ prerequisite_service_id: 'A' }, { prerequisite_service_id: 'B' }],
       'A',
+      'PARENT',
     );
     expect(options.map((o) => o.id).sort()).toEqual(['A', 'C', 'D']);
   });
@@ -54,6 +58,7 @@ describe('getEditPrereqOptions', () => {
       [svc('A'), svc('B')],
       [{ prerequisite_service_id: 'A' }],
       'A',
+      'PARENT',
     );
     expect(options.map((o) => o.id).sort()).toEqual(['A', 'B']);
   });
@@ -66,8 +71,24 @@ describe('getEditPrereqOptions', () => {
       [svc('A')],
       [{ prerequisite_service_id: 'A' }, { prerequisite_service_id: 'A' }],
       'A',
+      'PARENT',
     );
     expect(options).toHaveLength(1);
     expect(options[0].id).toBe('A');
+  });
+
+  it('excludes the parent service itself (Session #124 — CHECK service_id <> prerequisite_service_id)', () => {
+    // The operator must not be able to pick the parent as its own prereq.
+    // The CHECK constraint would reject it at DB save; this guards at the UI
+    // so describeSupabaseError is the safety net, not the primary defense.
+    const options = getEditPrereqOptions(
+      [svc('PARENT'), svc('A'), svc('B')],
+      // 'A' is the editing row's current prereq. Parent is not (CHECK forbids).
+      [{ prerequisite_service_id: 'A' }],
+      'A',
+      'PARENT',
+    );
+    expect(options.map((o) => o.id)).not.toContain('PARENT');
+    expect(options.map((o) => o.id).sort()).toEqual(['A', 'B']);
   });
 });

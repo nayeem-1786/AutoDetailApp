@@ -29,6 +29,7 @@ import { formatCurrency } from '@/lib/utils/format';
 import { describeSupabaseError } from '@/lib/utils/supabase-error';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
 import { getEditPrereqOptions } from './prereq-helpers';
+import { getEditAddonOptions } from './addon-helpers';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -857,7 +858,11 @@ export default function ServiceDetailPage() {
       loadData();
     } catch (err) {
       console.error('Failed to save add-on suggestion:', err);
-      toast.error('Failed to save add-on suggestion');
+      // Session #124 (mirrors #123 savePrereq): surface the real Postgres
+      // error so UNIQUE (primary_service_id, addon_service_id) collisions
+      // and CHECK (primary_service_id <> addon_service_id) violations are
+      // actionable instead of hidden behind a fixed generic toast.
+      toast.error(describeSupabaseError(err, 'Failed to save add-on suggestion'));
     } finally {
       setSavingAddon(false);
     }
@@ -1005,12 +1010,19 @@ export default function ServiceDetailPage() {
 
   if (!service) return null;
 
+  // Session #124: `s.id !== serviceId` (the parent) is defense-in-depth for
+  // the underlying CHECK constraints — `service_addon_suggestions_check`
+  // (primary_service_id <> addon_service_id) and `service_prerequisites_check`
+  // (service_id <> prerequisite_service_id). describeSupabaseError surfaces
+  // the violation as actionable text if anything slips past at save time
+  // (e.g. helper-bypass code paths), but the UI never offers the parent as a
+  // legal choice in either dropdown's ADD mode. See `PREREQ_SERVICE_DROPDOWN_AUDIT.md`.
   const addonEligibleServices = allServices.filter(
-    (s) => s.classification !== 'primary' && !addons.some((a) => a.addon_service_id === s.id)
+    (s) => s.id !== serviceId && s.classification !== 'primary' && !addons.some((a) => a.addon_service_id === s.id)
   );
 
   const prereqEligibleServices = allServices.filter(
-    (s) => !prerequisites.some((p) => p.prerequisite_service_id === s.id)
+    (s) => s.id !== serviceId && !prerequisites.some((p) => p.prerequisite_service_id === s.id)
   );
 
   return (
@@ -1708,13 +1720,27 @@ export default function ServiceDetailPage() {
         </DialogHeader>
         <DialogContent className="space-y-4">
           <FormField label="Add-On Service" required>
+            {/* Session #124 (sibling to #123): the prior `disabled={!!editingAddon}`
+                was the symmetric half-built convention to the prereq dropdown
+                — same initial bulk Phase 1 commit, no schema or data-integrity
+                reason. `saveAddon` already includes `addon_service_id` in the
+                UPDATE payload (:832) and no FK references
+                `service_addon_suggestions.id`. In edit mode options come from
+                `getEditAddonOptions` — the current value PLUS every unused
+                non-primary service that is not the parent itself — so the
+                dropdown preserves the current selection while still excluding
+                already-used add-ons that would collide with
+                UNIQUE (primary_service_id, addon_service_id), and the parent
+                that would violate the CHECK constraint. */}
             <Select
               value={addonForm.addon_service_id}
               onChange={(e) => setAddonForm({ ...addonForm, addon_service_id: e.target.value })}
-              disabled={!!editingAddon}
             >
               <option value="">Select a service...</option>
-              {(editingAddon ? allServices.filter((s) => s.classification !== 'primary') : addonEligibleServices).map((s) => (
+              {(editingAddon
+                ? getEditAddonOptions(allServices, addons, editingAddon.addon_service_id, serviceId)
+                : addonEligibleServices
+              ).map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
@@ -1823,7 +1849,7 @@ export default function ServiceDetailPage() {
             >
               <option value="">Select a service...</option>
               {(editingPrereq
-                ? getEditPrereqOptions(allServices, prerequisites, editingPrereq.prerequisite_service_id)
+                ? getEditPrereqOptions(allServices, prerequisites, editingPrereq.prerequisite_service_id, serviceId)
                 : prereqEligibleServices
               ).map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>

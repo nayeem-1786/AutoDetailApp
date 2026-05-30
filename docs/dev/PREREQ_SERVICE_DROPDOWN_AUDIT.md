@@ -121,6 +121,16 @@ The add-on dropdown sibling gap at `page.tsx:1708` is **deliberately untouched**
 2. **Parent-self exclusion (pre-existing latent):** add an explicit "exclude parent service" clause to both `prereqEligibleServices` and `addonEligibleServices`, or leave as-is (the `CHECK` violation now surfaces via `describeSupabaseError`)? (Recommend: add the filter — defense in depth, ~2 lines, satisfies "fail-safe at the UI before the DB").
 3. **UNIQUE-constraint specificity:** add a named-constraint entry to `CONSTRAINT_MESSAGES` in `supabase-error.ts` for `service_prerequisites_service_id_prerequisite_service_id_key` ("That prerequisite is already configured for this service. Pick a different one.") — friendlier than the generic 23505 wording? (Out of scope for this session, ~3 lines if approved.)
 
+## ✅ Sibling resolved — Session #124 (2026-05-29)
+
+All three open questions above were operator-locked as one bundled session and shipped in `fix/admin-services-edit-addon-dropdown-and-parent-self-exclusion` — same code area, same patterns as #123. Headlines:
+
+1. **Add-on edit dropdown (Q1):** removed `disabled={!!editingAddon}` at `page.tsx:1714`; new `src/app/admin/catalog/services/[id]/addon-helpers.ts` with `getEditAddonOptions(allServices, addons, editingAddonServiceId, parentServiceId)` mirroring `getEditPrereqOptions` plus the addon-specific `classification !== 'primary'` clause; wired `describeSupabaseError` into the `saveAddon()` catch.
+2. **Parent-self exclusion (Q2):** applied to BOTH ADD-mode eligibility filters (`prereqEligibleServices` + `addonEligibleServices`) AND BOTH edit helpers (`getEditPrereqOptions` + `getEditAddonOptions` now take `parentServiceId`). The current-selection clause in each helper always takes precedence — by construction the editing row's prereq/addon cannot be the parent (CHECK forbids), so this never accidentally re-introduces it.
+3. **Named UNIQUE-constraint messages (Q3):** two entries added to `CONSTRAINT_MESSAGES` in `src/lib/utils/supabase-error.ts`: `service_prerequisites_..._key` → "That prerequisite is already configured for this service."; `service_addon_suggestions_..._addon_service__key` → "That add-on is already configured for this service." (Live constraint names verified against `docs/dev/DB_SCHEMA.md` — the add-on name carries Postgres' 63-char double-underscore truncation. Regexes use the permissive `.*key` tail so a future rename / re-truncation does not silently downgrade to the generic 23505 wording.)
+
+Tests +10 → 2635 (within expected +6-10). The Admin Services Edit prereq/add-on dropdown UX cluster is now closed end-to-end. See `docs/CHANGELOG.md` Session #124 and `docs/dev/ROADMAP-13-ITEMS.md` row 124.
+
 ## Verification of audit hard rules
 
 - ✅ Audit phase was read-only; fix phase only triggered after classification = (a) was established with file:line evidence.
