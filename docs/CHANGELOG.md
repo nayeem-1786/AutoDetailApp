@@ -6,6 +6,76 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #125 — Audit: exotic/classic tier handling — admin create-form gap + public-site leak sweep (2026-05-29)
+
+Read-only diagnostic audit. Branch `audit/exotic-classic-create-form-and-public-site-leak`,
+isolated `git worktree`; **merged to main this session.** No source / migration /
+test changes. Bundled two related concerns: (A) the admin Add-New-Service form's
+silent-drop of exotic/classic prices for the `vehicle_size` model (already
+diagnosed Session #120 / Target 3 — confirmed and refined), and (B) the
+public-website leak sweep — the operator constraint (2026-05-29) is that public,
+customer-facing surfaces MUST NOT show exotic or classic tiers.
+
+**CONCERN A — refined.** The prior audit said the Create form "doesn't collect"
+exotic/classic. Re-reading the shared `<ServicePricingForm>` component
+(`src/components/service-pricing-form.tsx:116-145`) shows it DOES collect all 5
+size keys via `VEHICLE_SIZE_CLASS_KEYS`. The bug is sharper: the operator's
+typed exotic/classic values are **silently dropped at insert** by
+`new/page.tsx:231-237`'s hardcoded 3-element array. Edit-page reference
+implementation lives at `[id]/page.tsx:608-655` (standard tiers always-upsert,
+specialty tiers `priceValue > 0` predicate). No schema change required.
+Fix shape: ~15 lines in one file.
+
+**CONCERN B — chokepoint already exists, adoption is the gap.**
+`CUSTOMER_SELF_SERVICE_SIZE_CLASSES` (`src/lib/utils/constants.ts:65-79`, added
+Session 30) is the explicit 3-value subset for customer-facing surfaces. The
+booking wizard, customer portal, public ServiceCard, validation schemas, and
+booking API all import and respect it. Sitemap, robots.txt, category page, city
+pages, and Specialty/Scope tier rendering are all clean. **Three public surfaces
+do NOT adopt it** and currently leak:
+
+| # | Surface | File:line | Severity |
+|---|---------|-----------|----------|
+| 1 | JSON-LD `AggregateOffer.highPrice` / `offerCount` | `src/lib/seo/json-ld.ts:160-178` | **HIGH (SEO, machine-readable, indexed by Google)** |
+| 2 | Public `<VehicleSizePricing>` table on `/services/[cat]/[svc]` | `src/components/public/service-pricing-display.tsx:54-113` | **HIGH (visual)** |
+| 3 | Service OG image `Math.min` floor | `src/app/(public)/services/[categorySlug]/[serviceSlug]/opengraph-image.tsx:32` | LOW (mathematical only) |
+| 4 | Booking wizard `vehicle_size`-model top-level picker | `src/components/booking/step-service-select.tsx:995-1021` | LATENT (Zod rejects upstream) |
+
+**Recommended fix posture (B7).** Per-surface adoption of the existing constant,
+NOT a data-layer filter — the data layer feeds quotes/receipts/pay (B6 surfaces)
+and admin/POS which legitimately need the full 5-row set. Total: ~30 lines
+across 3-4 files. **Fix `json-ld.ts` first** (highest SEO stakes; hard to
+un-index).
+
+**Operator decisions surfaced (not decided in audit):**
+1. **B6 — personalized link rendering of "Exotic" / "Classic".** When a customer
+   with an actually-exotic vehicle receives `/quote/[token]`, `/receipt/[token]`,
+   or `/pay/[token]`, `renderTierToken` (`src/lib/quotes/tier-display.ts:90`)
+   surfaces the tier label. Operator picks: always-mask vs show-on-personalized-only.
+2. **A4 empty-price semantics** (confirm `0` / blank means "no tier", matching
+   Edit).
+3. **`offerCount` post-fix** (3 not 5 — confirm).
+4. **`CUSTOMER_FACING_TIER_NAMES` Set helper** — pure optimization next to the
+   existing readonly array.
+
+**Structural finding (C1).** No new constant needed; no DB-layer guard
+recommended. The Session 30 constant is the right shape. Adoption coverage is
+the gap. Recommend adding a snapshot/contract test per non-adopting surface
+(JSON-LD output, rendered VehicleSizePricing, booking picker) — ~80-120 lines —
+to block future regressions at PR time.
+
+**Files added:** `docs/dev/EXOTIC_CLASSIC_HANDLING_AUDIT.md` (~520 lines —
+audit deliverable with surface enumeration, fix recommendations, severity
+ranking, and 4 operator-decision open questions).
+
+**Next session** (suggested split): (a) one small session for CONCERN A
+(`new/page.tsx` exotic/classic insert + unit test), (b) one medium session for
+CONCERN B fix arc (JSON-LD + VehicleSizePricing + OG image + booking picker +
+3 regression tests). Resolve B6 with operator before B starts so the per-link
+rendering decision can be packaged in the same arc.
+
+---
+
 ## Session #124 — Fix: Admin Services Edit add-on dropdown + parent-self exclusion + named UNIQUE-constraint messages (sibling to #123) (2026-05-29)
 
 Production fix. Branch `fix/admin-services-edit-addon-dropdown-and-parent-self-exclusion`,
