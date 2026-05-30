@@ -30,7 +30,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
-import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
+import {
+  VehicleMakeCombobox,
+  getCustomerVehicleYearOptions,
+  validateCustomerVehicleYear,
+  titleCaseField,
+} from '@/components/ui/vehicle-make-combobox';
 import { toast } from 'sonner';
 
 const AUTOMOBILE_SIZE_CLASSES = CUSTOMER_SELF_SERVICE_SIZE_CLASSES;
@@ -106,8 +111,9 @@ export function VehicleFormDialog({
     if (open && vehicle) {
       const cat = deriveCategory(vehicle);
       setCategory(cat);
-      // Auto-detect "Other" mode if year is outside the dropdown range
-      const yearOptions = getVehicleYearOptions();
+      // Auto-detect "Other" mode if year is outside the customer dropdown range
+      // (#131 Issue 2 — dropdown is now 2028→2000; older vehicles auto-route to write-in).
+      const yearOptions = getCustomerVehicleYearOptions();
       setYearOtherMode(!!vehicle.year && !yearOptions.includes(vehicle.year));
       reset({
         vehicle_category: cat,
@@ -262,9 +268,20 @@ export function VehicleFormDialog({
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
+                    maxLength={4}
                     placeholder="Enter year (e.g., 1965)"
                     className={errors.year ? 'border-red-500' : ''}
-                    {...register('year')}
+                    {...register('year', {
+                      // #131 Issue 2 — enforce 1900-2028 client-side per the
+                      // customer-facing write-in bounds. The schema accepts a
+                      // wider range (1900-2100) for non-customer paths.
+                      validate: (val) => {
+                        if (val === null || val === undefined) return true;
+                        const str = String(val).trim();
+                        if (str === '') return true;
+                        return validateCustomerVehicleYear(str) ?? true;
+                      },
+                    })}
                   />
                   <button
                     type="button"
@@ -288,10 +305,10 @@ export function VehicleFormDialog({
                   })}
                 >
                   <option value="">Year...</option>
-                  {getVehicleYearOptions().map((y) => (
+                  {getCustomerVehicleYearOptions().map((y) => (
                     <option key={y} value={y}>{y}</option>
                   ))}
-                  <option value="other">Other</option>
+                  <option value="other">Other...</option>
                 </Select>
               )}
             </FormField>

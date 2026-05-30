@@ -6,10 +6,16 @@
 > the public booking flow audit merge) so the shared checkout stays
 > undisturbed.
 
-> **Resolution status (2026-05-30, Session #129):**
-> - **C1 — SHIPPED.** F1 hotfix landed in `step-vehicle.tsx`: `classify()`
->   refuses category auto-override when `!mdl.trim()`. Operator-confirmed
->   F1 repro blocked.
+> **Resolution status (2026-05-30, Session #131 — supersedes #129 C1):**
+> - **C1 — SHIPPED at the architectural level via #131 Layer 2.** #129's
+>   Y-1 patch (`mdl.trim()` gate) covered only one of three silent-default
+>   paths in the resolver; operator confirmed the regression returned
+>   when model was typed but the resolver fell through via the 0-row
+>   lookup path. **Session #131** added `category_confident: boolean` to
+>   `VehicleClassification`; callers in `step-vehicle.tsx` (both
+>   `setCategory` AND the previously-missed `buildSelection()` effectiveCat)
+>   gate on this flag, covering all silent paths uniformly. See
+>   PUBLIC_BOOKING_FLOW_AUDIT.md for the full F1 closeout.
 > - **Q7 — SHIPPED.** F4 dev-warn (NODE_ENV-gated) landed at all three
 >   silent-fall-through paths in `resolveVehicleClassification`.
 > - **C3 — SHIPPED.** Customer portal `account/vehicle-form-dialog.tsx`

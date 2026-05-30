@@ -114,9 +114,18 @@ export async function findOrCreateVehicle(
     // Step 1: Resolve classification BEFORE the dedup query
     const classification = await resolveVehicleClassification(supabase, make, model || undefined, year || undefined);
 
-    // Phase 5: Override path — log when caller-provided category contradicts classifier
+    // Phase 5: Override path — log when caller-provided category contradicts classifier.
+    // #131 Layer 2: skip the warn when the classifier is not confident — its
+    // 'automobile' default is the silent fall-through, not a real disagreement.
+    // Logging a "mismatch" against an unconfident default produces false-positive
+    // noise in production (every Winnebago / niche RV maker / data-drift case
+    // would warn). The caller's value is the right one to use, no surprise.
     const resolvedCategory = params.vehicle_category || classification.vehicle_category;
-    if (params.vehicle_category && params.vehicle_category !== classification.vehicle_category) {
+    if (
+      params.vehicle_category &&
+      classification.category_confident &&
+      params.vehicle_category !== classification.vehicle_category
+    ) {
       console.warn(
         `[findOrCreateVehicle] Override mismatch: caller sent vehicle_category="${params.vehicle_category}" ` +
         `but classifier resolved "${classification.vehicle_category}" for ${make} ${model || ''}` +

@@ -1,89 +1,143 @@
 /**
- * #129 C1 — public-booking step-vehicle classifier override gate.
+ * #131 Layer 2 — public-booking step-vehicle classifier override gate.
  *
- * Locks the regression flagged in PUBLIC_BOOKING_FLOW_AUDIT.md F1:
- * the classifier's silent default to 'automobile' (for dual-category make
- * + empty model, 0-row lookup, DB error) must NOT overwrite a customer's
- * explicit non-automobile category pick. The gate in `step-vehicle.tsx`'s
- * `classify()` (the `if (mdl.trim() && result.vehicle_category !== cat)`
- * predicate) is what stops the override from firing without a model.
+ * Replaces #129 C1's `mdl.trim()` heuristic with a structural confidence
+ * check (`result.category_confident`) that covers all three silent-default
+ * paths in the resolver uniformly. The operator-confirmed regression that
+ * triggered #131 reproduced because the user CAN type a model, which
+ * satisfied #129 C1's gate, but the resolver still fell through to the
+ * 0-row lookup path (data drift for niche makes like Winnebago) and
+ * silently overrode the user's category to automobile.
  *
- * The classify() function is not exported, so this suite exercises the
- * same predicate against the same resolver behavior captured in
- * `vehicle-categories.test.ts:#129 C1`. Together they pin both ends of
- * the contract: the resolver's defaulting + the call-site's gate on it.
+ * This suite pins TWO sides of the contract:
+ *   1) The override gate (setCategory in classify()) only fires on
+ *      `category_confident === true`.
+ *   2) `buildSelection()`'s pre-existing silent-override of
+ *      `vehicle_category` from the classifier (lines 234-244, missed by
+ *      #129) ALSO gates on `category_confident === true`.
+ *
+ * The two functions are not exported, so this suite mirrors both
+ * predicates as pure functions. Any contributor who edits either
+ * predicate without updating this mirror will see a test fail.
  */
 import { describe, it, expect } from 'vitest';
 
-// Mirror the gate predicate from step-vehicle.tsx — keeping it as a pure
-// function in the test (rather than exporting from production code) avoids
-// inflating the production surface area. Any future contributor who edits
-// the inline predicate without updating this mirror will see the test fail.
+// Mirror #1 — the setCategory gate inside classify()
 function shouldOverrideCategoryFromClassifier(args: {
+  categoryConfident: boolean;
   classifierCategory: string;
   currentCategory: string;
-  model: string;
 }): boolean {
-  // Predicate matches step-vehicle.tsx's `if (mdl.trim() && result.vehicle_category !== cat)`.
-  return args.model.trim() !== '' && args.classifierCategory !== args.currentCategory;
+  // Matches step-vehicle.tsx's
+  // `if (result.category_confident && result.vehicle_category !== cat)`.
+  return args.categoryConfident && args.classifierCategory !== args.currentCategory;
 }
 
-describe('#129 C1 — classifier override gate predicate', () => {
-  it('refuses override when model is empty (the F1 fix)', () => {
-    // Reproduces F1: user picks RV, classifier (defaulted to automobile
-    // because dual-category make + empty model) tries to override.
+// Mirror #2 — the buildSelection() effectiveCat / effectiveVehicleType gate
+function resolveEffectiveCategoryForSubmit(args: {
+  classifierCategoryConfident: boolean | undefined;
+  classifierCategory: string | undefined;
+  userCategory: string;
+}): string {
+  // Matches step-vehicle.tsx's buildSelection():
+  //   const useClassifierCategory = classification?.category_confident === true;
+  //   const effectiveCat = useClassifierCategory ? classification!.vehicle_category : category;
+  const useClassifier = args.classifierCategoryConfident === true;
+  return useClassifier && args.classifierCategory ? args.classifierCategory : args.userCategory;
+}
+
+describe('#131 Layer 2 — setCategory gate (Mirror #1)', () => {
+  it('refuses override when classifier is NOT confident — covers all 3 silent-default paths', () => {
+    for (const cat of ['motorcycle', 'rv', 'boat', 'aircraft']) {
+      expect(
+        shouldOverrideCategoryFromClassifier({
+          categoryConfident: false,
+          classifierCategory: 'automobile',
+          currentCategory: cat,
+        })
+      ).toBe(false);
+    }
+  });
+
+  it('refuses override even when model is typed but classifier defaulted (the #131 regression)', () => {
+    // The operator-confirmed bug: model IS typed (satisfies #129 C1's old
+    // heuristic) but the 0-row vehicle_makes lookup defaults category to
+    // automobile silently. Without the Layer 2 fix, this would override.
     expect(
       shouldOverrideCategoryFromClassifier({
+        categoryConfident: false, // 0-row lookup → not confident
         classifierCategory: 'automobile',
         currentCategory: 'rv',
-        model: '',
       })
     ).toBe(false);
   });
 
-  it('refuses override when model is whitespace-only', () => {
+  it('allows override when classifier IS confident and disagrees (Honda motorcycle case preserved)', () => {
+    // Customer picked 'automobile', typed 'Honda Sportster'. Classifier
+    // disambiguates via motorcycle keyword, returns confident=true. Override fires.
     expect(
       shouldOverrideCategoryFromClassifier({
-        classifierCategory: 'automobile',
-        currentCategory: 'motorcycle',
-        model: '   ',
-      })
-    ).toBe(false);
-  });
-
-  it('allows override when model is present and classifier disagrees (Honda motorcycle case)', () => {
-    // Preserves the original intent: customer typed 'Honda' + 'Sportster',
-    // picked 'automobile' as default category. Classifier correctly detects
-    // motorcycle. Override fires.
-    expect(
-      shouldOverrideCategoryFromClassifier({
+        categoryConfident: true,
         classifierCategory: 'motorcycle',
         currentCategory: 'automobile',
-        model: 'Sportster',
       })
     ).toBe(true);
   });
 
-  it('does not fire when classifier matches current category', () => {
+  it('does not fire when classifier matches current category (no-op)', () => {
     expect(
       shouldOverrideCategoryFromClassifier({
-        classifierCategory: 'automobile',
-        currentCategory: 'automobile',
-        model: 'Camry',
+        categoryConfident: true,
+        classifierCategory: 'rv',
+        currentCategory: 'rv',
       })
     ).toBe(false);
   });
+});
 
-  it('refuses override for every non-automobile category when model is empty (F1 universality)', () => {
-    // The bug reproduced across motorcycle/rv/boat/aircraft. Lock all four.
+describe('#131 Layer 2 — buildSelection() effectiveCat gate (Mirror #2)', () => {
+  it('keeps user category when classifier is not confident — the second silent-override #129 missed', () => {
+    // Even with #129 C1's setCategory gate keeping 'rv' on screen, buildSelection's
+    // OLD logic (effectiveCat = classification?.vehicle_category ?? category) would
+    // submit 'automobile' to the server. Layer 2 fixes that.
+    expect(
+      resolveEffectiveCategoryForSubmit({
+        classifierCategoryConfident: false,
+        classifierCategory: 'automobile',
+        userCategory: 'rv',
+      })
+    ).toBe('rv');
+  });
+
+  it('uses classifier category when confident', () => {
+    expect(
+      resolveEffectiveCategoryForSubmit({
+        classifierCategoryConfident: true,
+        classifierCategory: 'motorcycle',
+        userCategory: 'automobile',
+      })
+    ).toBe('motorcycle');
+  });
+
+  it('falls back to user category when classifier result is absent (null/undefined)', () => {
+    expect(
+      resolveEffectiveCategoryForSubmit({
+        classifierCategoryConfident: undefined,
+        classifierCategory: undefined,
+        userCategory: 'boat',
+      })
+    ).toBe('boat');
+  });
+
+  it('regression — all 5 non-automobile categories survive non-confident classifier on submit', () => {
     for (const cat of ['motorcycle', 'rv', 'boat', 'aircraft']) {
       expect(
-        shouldOverrideCategoryFromClassifier({
+        resolveEffectiveCategoryForSubmit({
+          classifierCategoryConfident: false,
           classifierCategory: 'automobile',
-          currentCategory: cat,
-          model: '',
+          userCategory: cat,
         })
-      ).toBe(false);
+      ).toBe(cat);
     }
   });
 });
