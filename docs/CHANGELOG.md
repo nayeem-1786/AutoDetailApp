@@ -6,6 +6,70 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #123 — Audit + fix: Admin Services Edit prereq-service dropdown un-disabled + error-surfaced (2026-05-29)
+
+Audit + production fix. Branch `audit/admin-services-edit-prereq-service-dropdown`,
+isolated `git worktree`; **merged to main this session.** Deliverable
+`docs/dev/PREREQ_SERVICE_DROPDOWN_AUDIT.md`. Operator-reported: on Admin →
+Services → Edit → Prerequisites tab, editing a prereq row left the "which service
+is the prerequisite" dropdown greyed out and un-interactive.
+
+**Audit conclusion — classification (a) half-built convention.** `git blame` on
+`src/app/admin/catalog/services/[id]/page.tsx:1807` traces the
+`disabled={!!editingPrereq}` (and its paired allServices fallback at `:1810`) to
+the **initial bulk Phase 1 admin commit** `846ece126` (2026-02-01) — no inline
+comment, no design discussion, no schema or data-integrity rationale. Schema
+reality: `service_prerequisites` PK on `id`, UNIQUE on
+`(service_id, prerequisite_service_id)`, CHECK `service_id <> prerequisite_service_id`;
+**zero FKs reference `service_prerequisites.id`**; runtime code queries only by
+parent `service_id`. The save handler (`savePrereq()`, `:903-941`) already includes
+`prerequisite_service_id` in the UPDATE payload — the DB would accept the change
+today if the UI were enabled. Workaround (delete+add) exists and works, but is
+2 extra clicks. Not (b) schema-forced, not (c) data-integrity, not (d) permissions.
+
+**Fix applied in-session** (3 files, ~25 prod lines):
+- **Removed** `disabled={!!editingPrereq}` (`page.tsx:1807`).
+- **New** `src/app/admin/catalog/services/[id]/prereq-helpers.ts` — pure helper
+  `getEditPrereqOptions(allServices, prerequisites, editingPrereqServiceId)`
+  that returns the current value PLUS every unused service (preserves the
+  current selection while still excluding already-used prereqs that would
+  collide with the UNIQUE constraint at save time). Replaces the prior
+  `editingPrereq ? allServices : prereqEligibleServices` ternary.
+- **Wired** `describeSupabaseError` (C1/S3 / #111) into the `savePrereq()` catch
+  so UNIQUE-collision (23505) and CHECK-violation (23514) errors surface as
+  actionable text instead of being hidden behind a fixed generic toast.
+- **New** `src/app/admin/catalog/services/[id]/__tests__/prereq-helpers.test.ts`
+  — 5 cases locking the helper's invariants (current value always present;
+  unused services included; other already-used prereqs excluded; degenerate
+  no-prereqs case; defensive: current value kept even if duplicated in the list).
+  Mirrors the #119 precedent (no heavy admin-page render harness — a
+  ~2150-line component is disproportionate to a ~15-line wiring fix).
+
+**Targets 3 & 4 surfaced (intentionally not fixed in this session):**
+- **Sibling gap:** the **add-on edit dropdown** at `page.tsx:1708` carries the
+  identical `disabled={!!editingAddon}` + `(editingAddon ? allServices.filter(s => s.classification !== 'primary') : addonEligibleServices)`
+  pattern from the same bulk commit. Same root cause, same fix shape.
+  Recommend a sibling follow-up session.
+- **Pre-existing latent:** `prereqEligibleServices` (`:1006-1008`) and
+  `addonEligibleServices` (`:1002-1004`) do not exclude the parent service
+  itself — operator can pick the parent as its own prereq/add-on → DB rejects
+  with CHECK 23514. After this fix the prereq path surfaces a `describeSupabaseError`
+  message instead of the prior generic toast; the add-on path remains on the
+  generic toast until the sibling session.
+
+**Add + delete affordances (Target 3) confirmed working today:** "Add Prerequisite"
+button at `:1649`, pencil at `:1681` opens the edit dialog, trash icon at `:1684`
+deletes (cascade-clean — no FK depends on `service_prerequisites.id`). The
+disable was friction, not a functional blocker.
+
+**Gates:** tsc 0 errors · lint 0 errors / 94 warnings (none new, none in touched files) ·
+**2625/2625 tests pass (+5)** · build clean.
+
+Not a 13-item entry (admin catalog UX polish; operator-reported gap).
+**Operator:** deploy + retest editing a prereq service.
+
+---
+
 ## Session #122 — Fix: Track A gate-order — prereq dialog primary, manager-PIN only on override (2026-05-29)
 
 Production UX-correctness fix to the Track A `useValidatedServiceAdd` helper (#121, `f8cba37f`).

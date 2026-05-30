@@ -26,7 +26,9 @@ import {
   VEHICLE_SIZE_LABELS,
 } from '@/lib/utils/constants';
 import { formatCurrency } from '@/lib/utils/format';
+import { describeSupabaseError } from '@/lib/utils/supabase-error';
 import { dateToPstStartOfDay, dateToPstEndOfDay } from '@/lib/utils/pst-date';
+import { getEditPrereqOptions } from './prereq-helpers';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -934,7 +936,11 @@ export default function ServiceDetailPage() {
       loadData();
     } catch (err) {
       console.error('Failed to save prerequisite:', err);
-      toast.error('Failed to save prerequisite');
+      // Session #123: surface the real Postgres error so UNIQUE
+      // (service_id, prerequisite_service_id) collisions and CHECK
+      // (service_id <> prerequisite_service_id) violations are actionable
+      // instead of hidden behind a fixed generic toast (per Catalog S3 / #111).
+      toast.error(describeSupabaseError(err, 'Failed to save prerequisite'));
     } finally {
       setSavingPrereq(false);
     }
@@ -1801,13 +1807,25 @@ export default function ServiceDetailPage() {
         </DialogHeader>
         <DialogContent className="space-y-4">
           <FormField label="Prerequisite Service" required>
+            {/* Session #123 (audit `docs/dev/PREREQ_SERVICE_DROPDOWN_AUDIT.md`):
+                the prior `disabled={!!editingPrereq}` was a half-built
+                convention from the initial bulk Phase 1 commit — no schema or
+                data-integrity reason. The save handler already supports the
+                UPDATE (`prerequisite_service_id` is in the payload at :912/921),
+                and no FK references `service_prerequisites.id`. In edit mode
+                options come from `getEditPrereqOptions` — the current value
+                PLUS every unused service — so the dropdown preserves the
+                current selection while still excluding already-used prereqs
+                that would collide with UNIQUE (service_id, prerequisite_service_id). */}
             <Select
               value={prereqForm.prerequisite_service_id}
               onChange={(e) => setPrereqForm({ ...prereqForm, prerequisite_service_id: e.target.value })}
-              disabled={!!editingPrereq}
             >
               <option value="">Select a service...</option>
-              {(editingPrereq ? allServices : prereqEligibleServices).map((s) => (
+              {(editingPrereq
+                ? getEditPrereqOptions(allServices, prerequisites, editingPrereq.prerequisite_service_id)
+                : prereqEligibleServices
+              ).map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </Select>
