@@ -6,16 +6,28 @@
 > the vehicle taxonomy audit merge) so the shared checkout stays
 > undisturbed.
 
-> **Resolution status (2026-05-30, Session #129):**
-> - **F1 — RESOLVED.** `step-vehicle.tsx`'s `classify()` now refuses the
->   category auto-override when `!mdl.trim()` (Y-1 shape per A3). Classifier
->   still runs; the override only fires when the user has typed at least one
->   model character. Operator-confirmed repro blocked.
-> - **F4 — RESOLVED.** All three silent-fall-through paths in
+> **Resolution status (2026-05-30, Session #131 — supersedes #129):**
+> - **F1 — RESOLVED at the architectural level (Session #131).** #129 C1's
+>   `mdl.trim()` heuristic was insufficient — it only covered the
+>   dual-category empty-model silent-default path. The two other paths
+>   the audit identified (0-row `vehicle_makes` lookup, DB error) still
+>   fired override when model was typed, and operator confirmed the
+>   regression: typing a model after picking RV/motorcycle/boat/aircraft
+>   still silently reset the form to automobile. **#131 Layer 2** added a
+>   `category_confident: boolean` flag to `VehicleClassification`: set
+>   `true` only on positive evidence (single-row match OR dual-category
+>   disambiguation via known model keyword); `false` on every fall-through.
+>   Callers (`step-vehicle.tsx` setCategory + `buildSelection()` effectiveCat)
+>   gate on this flag, covering all silent paths uniformly. A 4TH silent
+>   path was surfaced and fixed during the work (dual-category + model that
+>   matches no category keyword). A SECOND silent-override path #129 missed
+>   in `buildSelection()` was also closed.
+> - **F4 — RESOLVED.** All silent-fall-through paths in
 >   `resolveVehicleClassification` now emit a dev-only `console.warn`
 >   (NODE_ENV-gated): 0-row `vehicle_makes` lookup, dual-category empty-
->   model disambiguation, and DB error catch. Data drift between the
->   combobox source and the resolver source is now visible in dev logs.
+>   model disambiguation, dual-category unmatched-model fallback (added
+>   #131), and DB error catch. Data drift between the combobox source
+>   and the resolver source is now visible in dev logs.
 > - **F2 / F3 — OPEN.** Awaiting operator Q1/Q2 on the RV/Boat/Aircraft
 >   custom-quote gating UX choice (B4-1.A vs .B vs .C).
 > - **F5 — REFRAMED.** Per the follow-up vehicle-form unification audit

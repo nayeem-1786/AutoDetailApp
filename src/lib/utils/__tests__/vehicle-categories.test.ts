@@ -559,7 +559,11 @@ describe('Session 29 — resolveVehicleClassification size_class output', () => 
   it('classifier output shape has no parallel flag fields', async () => {
     const result = await resolveVehicleClassification(mockSupabase, 'Ferrari', '488');
     const keys = Object.keys(result).sort();
+    // #131 Layer 2 added `category_confident`. Exotic/classic detection
+    // (Layers 4+5) is independent of category-resolution confidence — the
+    // `size_class` field stays the single source of truth for specialty.
     expect(keys).toEqual([
+      'category_confident',
       'needs_year_confirmation',
       'seat_rows',
       'size_class',
@@ -703,5 +707,136 @@ describe('#129 C1 — resolver default-to-automobile behavior the override gate 
     } as unknown as Parameters<typeof resolveVehicleClassification>[0];
     const result = await resolveVehicleClassification(dualCategoryMock, 'Honda', 'Sportster');
     expect(result.vehicle_category).toBe('motorcycle');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #131 Layer 2 — `category_confident` flag is the structural fix for F1
+// (PUBLIC_BOOKING_FLOW_AUDIT.md). #129 C1's empty-model heuristic only
+// covered ONE of the three silent-default paths in the resolver. This
+// suite pins the new contract: the resolver returns
+// `category_confident: false` for ALL three silent fall-throughs
+// (0-row lookup, dual-category empty/unmatched model, DB error) and
+// `category_confident: true` for both positive-evidence paths (single
+// `vehicle_makes` row, disambiguated multi-row with matching model keyword).
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('#131 Layer 2 — category_confident flag for all paths', () => {
+  // Helpers — mocks for each path
+  const singleRowMock = (cat: string) => ({
+    from: () => ({
+      select: () => ({
+        ilike: () => ({
+          eq: () => Promise.resolve({ data: [{ category: cat }] }),
+        }),
+      }),
+    }),
+  }) as unknown as Parameters<typeof resolveVehicleClassification>[0];
+
+  const multiRowMock = (cats: string[]) => ({
+    from: () => ({
+      select: () => ({
+        ilike: () => ({
+          eq: () => Promise.resolve({ data: cats.map((c) => ({ category: c })) }),
+        }),
+      }),
+    }),
+  }) as unknown as Parameters<typeof resolveVehicleClassification>[0];
+
+  const dbErrorMock = {
+    from: () => ({
+      select: () => ({
+        ilike: () => ({
+          eq: () => Promise.reject(new Error('connection refused')),
+        }),
+      }),
+    }),
+  } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+
+  describe('confident=true paths (positive evidence)', () => {
+    it('single vehicle_makes row → category_confident=true', async () => {
+      const result = await resolveVehicleClassification(singleRowMock('rv'), 'Winnebago', 'View');
+      expect(result.category_confident).toBe(true);
+      expect(result.vehicle_category).toBe('rv');
+    });
+
+    it('dual-category make + model keyword matches motorcycle → confident=true', async () => {
+      const result = await resolveVehicleClassification(
+        multiRowMock(['automobile', 'motorcycle']), 'Honda', 'Sportster'
+      );
+      expect(result.category_confident).toBe(true);
+      expect(result.vehicle_category).toBe('motorcycle');
+    });
+
+    it('dual-category make + model in MODEL_SIZE_HINTS → confident=true (automobile)', async () => {
+      const result = await resolveVehicleClassification(
+        multiRowMock(['automobile', 'motorcycle']), 'Honda', 'Civic'
+      );
+      expect(result.category_confident).toBe(true);
+      expect(result.vehicle_category).toBe('automobile');
+    });
+
+    it('single-row automobile + EXOTIC_MAKES match → confident=true + size_class=exotic (regression: classifier still detects exotic)', async () => {
+      const result = await resolveVehicleClassification(singleRowMock('automobile'), 'Ferrari', '488 GTB');
+      expect(result.category_confident).toBe(true);
+      expect(result.vehicle_category).toBe('automobile');
+      expect(result.size_class).toBe('exotic');
+    });
+  });
+
+  describe('confident=false paths (all three silent defaults)', () => {
+    it('0-row vehicle_makes lookup → category_confident=false', async () => {
+      // mockSupabase (top of file) returns no rows
+      const result = await resolveVehicleClassification(mockSupabase, 'NonexistentBrand', 'X', 2024);
+      expect(result.category_confident).toBe(false);
+      expect(result.vehicle_category).toBe('automobile'); // default fallback
+    });
+
+    it('dual-category make with empty model → category_confident=false', async () => {
+      const result = await resolveVehicleClassification(
+        multiRowMock(['automobile', 'motorcycle']), 'Honda'
+      );
+      expect(result.category_confident).toBe(false);
+      expect(result.vehicle_category).toBe('automobile');
+    });
+
+    it('dual-category make with model that matches NO category keyword → category_confident=false', async () => {
+      const result = await resolveVehicleClassification(
+        multiRowMock(['automobile', 'motorcycle']), 'Honda', 'ZzzzNonsenseModel'
+      );
+      expect(result.category_confident).toBe(false);
+      expect(result.vehicle_category).toBe('automobile');
+    });
+
+    it('DB error in vehicle_makes lookup → category_confident=false', async () => {
+      const result = await resolveVehicleClassification(dbErrorMock, 'Toyota', 'Camry');
+      expect(result.category_confident).toBe(false);
+      expect(result.vehicle_category).toBe('automobile');
+    });
+
+    it('empty-make input → category_confident=false (defensive)', async () => {
+      const result = await resolveVehicleClassification(mockSupabase, '');
+      expect(result.category_confident).toBe(false);
+    });
+  });
+
+  describe('regression — confident-path size_class detection still works (Session 29 anti-gaming preserved)', () => {
+    it('Lamborghini (full-make exotic) → confident=true + size_class=exotic', async () => {
+      const result = await resolveVehicleClassification(singleRowMock('automobile'), 'Lamborghini', 'Huracan');
+      expect(result.category_confident).toBe(true);
+      expect(result.size_class).toBe('exotic');
+    });
+
+    it('1969 Ford Mustang → confident=true + size_class=classic', async () => {
+      const result = await resolveVehicleClassification(singleRowMock('automobile'), 'Ford', 'Mustang', 1969);
+      expect(result.category_confident).toBe(true);
+      expect(result.size_class).toBe('classic');
+    });
+
+    it('Porsche 911 GT3 → confident=true + size_class=exotic', async () => {
+      const result = await resolveVehicleClassification(singleRowMock('automobile'), 'Porsche', '911 GT3');
+      expect(result.category_confident).toBe(true);
+      expect(result.size_class).toBe('exotic');
+    });
   });
 });

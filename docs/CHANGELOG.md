@@ -6,6 +6,143 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #131 — Fix: Layer 2 classifier hardening (corrects #129 Y-1 insufficiency) + year dropdown 2028→2000 with Other write-in (2026-05-30)
+
+Production code fix bundle. Branch
+`fix/classifier-layer2-hardening-and-year-dropdown`, isolated `git
+worktree` (Memory #8); **merged to main this session.** Two related
+changes bundled because they live in the same files and same review unit.
+
+**Issue 1 — F1 RETURNED with a different trigger after #129.** Operator
+confirmed: typing a MODEL after selecting a non-automobile category
+(motorcycle/RV/boat/aircraft) still silently reset the form to
+automobile. #129 C1 only gated ONE of the three silent-default paths in
+`resolveVehicleClassification` (the empty-model case via `mdl.trim()`);
+the other two paths — 0-row `vehicle_makes` lookup (`vehicle-categories.ts:691`,
+fires for any make not in `vehicle_makes` like niche RV/boat brands due
+to data drift) and DB error (`:712-714`) — were still vulnerable. The
+prompt audit explicitly identified all three but #129 only patched one.
+Today's fix promotes the gate from a one-path heuristic to a
+**structural confidence signal** that covers ALL paths uniformly.
+
+**Layer 2 fix shape — `category_confident: boolean` flag on
+`VehicleClassification`.** Additive (no breaking change to existing
+fields). Set `true` only on positive evidence (single `vehicle_makes`
+row match OR dual-category disambiguation via known model keyword);
+`false` on every fall-through (no make, 0-row lookup, dual-category
+empty/unmatched model, DB error). Callers that auto-write category from
+the classifier (`step-vehicle.tsx`) now gate on `result.category_confident`
+instead of `mdl.trim()`. The Q7 dev-warns from #129 stay — they're
+orthogonal telemetry and still fire on the same paths.
+
+**Pre-existing additional silent-override path fixed at the same time.**
+While auditing `step-vehicle.tsx` per Memory #11, surfaced a SECOND
+silent-override in `buildSelection()` (lines 234-244) that #129 missed:
+even with the setCategory gate keeping the user's RV on screen, the
+submitted record used `classification?.vehicle_category` directly,
+sending `vehicle_category: 'automobile'` to the server. Layer 2 closes
+this with the same `category_confident` gate.
+
+**Production files modified (6):**
+- `vehicle-categories.ts` — `category_confident` field added to
+  `VehicleClassification`; `disambiguateCategory` refactored to return
+  `{ category, matched }` so the resolver can distinguish positive
+  evidence from the disambiguation fall-through; the dual-category
+  no-keyword-match path now also emits a NODE_ENV-gated dev-warn
+  (previously silent — 4th silent path surfaced during the work).
+- `step-vehicle.tsx` — setCategory gate switched from `mdl.trim()` to
+  `result.category_confident`; `buildSelection()` `effectiveCat` /
+  `effectiveVehicleType` gated on `classification?.category_confident === true`.
+- `vehicle-form-dialog.tsx` — TypeScript-compatible with new field
+  (advisory was already correctly scoped to `size_class` — independent
+  of category confidence per Session 29 anti-gaming).
+- `vehicle-helpers.ts` (shared `findOrCreateVehicle`) — override-mismatch
+  warn now suppresses when classifier is not confident (was producing
+  false-positive log noise for every Winnebago/niche-make case).
+- `api/pos/customers/[id]/vehicles/route.ts` — same false-positive
+  warn-gate as `vehicle-helpers.ts`.
+- (Side note — `api/customer/vehicles/route.ts` POST and PATCH callers
+  remain unchanged: they consume `classification.size_class`
+  authoritatively for exotic/classic detection — that path is correctly
+  independent of `category_confident` per Session 29 anti-gaming.)
+
+**Issue 2 — Customer-facing year dropdown 2028→2000 + Other write-in.**
+Per operator ruling. New helper `getCustomerVehicleYearOptions()`
+exported from `vehicle-make-combobox.tsx` (29 entries descending);
+sibling `validateCustomerVehicleYear()` enforces 4-digit integer
+1900–2028. New constants `CUSTOMER_VEHICLE_YEAR_INPUT_MIN` /
+`_MAX` for callers to consume.
+
+- **Public booking `step-vehicle.tsx`:** dropdown switched to new
+  helper; added `yearOtherMode` + `customYearInput` state mirroring
+  the portal dialog's existing pattern; "Other..." last option reveals
+  4-digit text input with `inputMode="numeric"` + `maxLength={4}` +
+  on-change validation against the helper; "Back to list" button
+  reverts. iOS auto-zoom prevented via `text-base sm:text-sm` per
+  CLAUDE.md Rule 16.
+- **Customer portal `vehicle-form-dialog.tsx`:** existing "Other"
+  pattern preserved; dropdown switched to new helper; RHF
+  `validate:` block added to year `register()` to enforce the
+  1900–2028 bound client-side (the schema's 1900–2100 stays for
+  back-compat with other paths).
+- **Out-of-scope surfaces NOT touched** per the session's explicit
+  exclusion: POS `vehicle-create-dialog.tsx` and admin Customers
+  vehicle inline form continue to use the legacy `getVehicleYearOptions()`
+  (range 1980→currentYear+2). The new helper is purposefully a
+  separate function so the customer-facing narrowing doesn't bleed
+  into operator surfaces (Memory #19 — DRY honored within each trust
+  boundary).
+
+**Tests (+26 → 2687):**
+- `vehicle-categories.test.ts` +12 — `category_confident=true` for
+  positive-evidence paths (single-row, disambiguation match, EXOTIC_MAKES
+  regression); `confident=false` for all 4 silent fall-throughs (0-row,
+  empty-model, unmatched-model, DB error, empty-make defensive); Session
+  29 anti-gaming regression preserved (exotic/classic still detected on
+  confident automobile paths).
+- `step-vehicle.test.tsx` — rewritten as Layer 2 contract suite. Two
+  predicate mirrors (the setCategory gate AND the buildSelection
+  effectiveCat gate, locking both silent-override paths). 8 tests
+  including the specific operator-confirmed regression assertion.
+- `vehicle-year-helpers.test.ts` (new, 87 lines) +11 — dropdown shape
+  (29 descending entries, 2028→2000, unique integers), validator
+  semantics (4-digit-only, bounds, whitespace trim), regression that
+  the operator-facing `getVehicleYearOptions()` is NOT inadvertently
+  narrowed.
+- Pre-existing classifier shape test updated to include
+  `category_confident` in the expected key set.
+
+**Scope discipline (Memory #8):** 6 prod files modified + 1 new test
+file + 2 test files updated. Production delta ~245 lines (within
+≤250-line target). No POS / admin / quote-builder vehicle FORM
+edits (NO-UNIFICATION verdict from #128 respected). No migrations,
+no new permission keys, no V3-V7 public exotic/classic suppression
+(separate session).
+
+**Resolves:** F1 (RETURNED) from `PUBLIC_BOOKING_FLOW_AUDIT.md` (#127)
+— now closed at the architectural level, not patch-level; superseded
+#129's insufficient C1 gate. Year-dropdown Issue 2 is a new UX
+enhancement bundled because it lives in the same files. **Open:** F2
+(custom-quote gating, awaiting operator Q1/Q2); C2 POS RHF port; Q5
+schema cleanup; Q6 is_incomplete consistency.
+
+**Files added:** `src/components/ui/__tests__/vehicle-year-helpers.test.ts`.
+
+**Files modified:** `src/lib/utils/vehicle-categories.ts`,
+`src/lib/utils/vehicle-helpers.ts`,
+`src/components/booking/step-vehicle.tsx`,
+`src/components/account/vehicle-form-dialog.tsx`,
+`src/components/ui/vehicle-make-combobox.tsx`,
+`src/app/api/pos/customers/[id]/vehicles/route.ts`,
+`src/components/booking/__tests__/step-vehicle.test.tsx`,
+`src/lib/utils/__tests__/vehicle-categories.test.ts`.
+
+**Gates:** `tsc --noEmit` 0 errors; `npm run lint` 0 errors / 97
+warnings (none new in touched files); `npm test` 2687/2687 pass;
+`next build` clean.
+
+---
+
 ## Session #130 — Fix: V1+V2 prereq vehicle-compat block (Option A) — server flag + client error + selectPricingTierForVehicle clarification (2026-05-30)
 
 Production fix. Branch `fix/v1-v2-prereq-vehicle-compat-block`, isolated

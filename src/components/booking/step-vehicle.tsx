@@ -7,7 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
-import { VehicleMakeCombobox, getVehicleYearOptions, titleCaseField } from '@/components/ui/vehicle-make-combobox';
+import {
+  VehicleMakeCombobox,
+  getCustomerVehicleYearOptions,
+  validateCustomerVehicleYear,
+  titleCaseField,
+} from '@/components/ui/vehicle-make-combobox';
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_LABELS,
@@ -57,7 +62,8 @@ const CATEGORY_ICONS: Record<string, typeof Car> = {
   aircraft: Plane,
 };
 
-const yearOptions = getVehicleYearOptions();
+const yearOptions = getCustomerVehicleYearOptions();
+const YEAR_OTHER_SENTINEL = 'other';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -85,6 +91,16 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   const [model, setModel] = useState(initialVehicle?.model ?? '');
   const [year, setYear] = useState<number | null>(initialVehicle?.year ?? null);
   const [color, setColor] = useState(initialVehicle?.color ?? '');
+
+  // #131 Issue 2 — year dropdown shows 2028→2000. Vehicles outside that range
+  // (classics, future model years) use the "Other..." write-in path. Edit-mode
+  // detection: if the initial year is outside the dropdown list, start in
+  // Other-mode so the customer can see + edit their existing value.
+  const initialYearOther = !!initialVehicle?.year && !yearOptions.includes(initialVehicle.year);
+  const [yearOtherMode, setYearOtherMode] = useState(initialYearOther);
+  const [customYearInput, setCustomYearInput] = useState(
+    initialYearOther ? String(initialVehicle!.year) : ''
+  );
 
   // Auto-resolved classification
   const [classification, setClassification] = useState<VehicleClassification | null>(null);
@@ -114,15 +130,14 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       const supabase = createClient();
       const result = await resolveVehicleClassification(supabase, mk.trim(), mdl.trim() || undefined);
       setClassification(result);
-      // Auto-update category only when the classifier is high-confidence:
-      // the user has typed at least one model character. Without a model the
-      // resolver silently defaults to 'automobile' for dual-category makes
-      // (`vehicle-categories.ts:302-305`), 0-row lookups (`:691`), and DB
-      // errors (`:712-714`) — which would otherwise overwrite the user's
-      // explicit RV/motorcycle/boat/aircraft pick. This is the public-booking-
-      // flow audit's Y-1 hotfix (PUBLIC_BOOKING_FLOW_AUDIT.md F1, #129) and
-      // the C1 corrective from VEHICLE_FORM_UNIFICATION_AUDIT.md.
-      if (mdl.trim() && result.vehicle_category !== cat) {
+      // Auto-update category only when the classifier is CONFIDENT — i.e. it
+      // matched a single `vehicle_makes` row OR disambiguated a dual-category
+      // make via a known model keyword. The classifier flags this via
+      // `category_confident` (#131 Layer 2 — promotes #129 C1's `mdl.trim()`
+      // heuristic to a structural confidence signal that covers ALL silent-
+      // default paths uniformly: 0-row lookup, dual-category empty/unmatched
+      // model, DB error). See CLAUDE.md Rule 19 + PUBLIC_BOOKING_FLOW_AUDIT.md F1.
+      if (result.category_confident && result.vehicle_category !== cat) {
         setCategory(result.vehicle_category);
       }
     } catch {
@@ -232,10 +247,23 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     // Manual entry — all fields required.
     // Session 29: classifier's exotic/classic detection flows through effectiveSizeClass
     // (derived above) and overrides the user's manual size_class pick for specialty cases.
-    const effectiveCat = classification?.vehicle_category ?? category;
+    // #131 Layer 2: only trust the classifier's `vehicle_category` / `vehicle_type`
+    // when it's confident (`category_confident: true`). Without this gate, an
+    // unconfident classifier (0-row lookup, dual-category-empty-model, DB error)
+    // would silently submit `vehicle_category: 'automobile'` even though the
+    // setCategory gate above kept the user's RV/motorcycle/etc. on screen. That's
+    // the second silent-override path #129's hotfix missed — the form looked
+    // right, the submitted record was wrong.
+    const useClassifierCategory = classification?.category_confident === true;
+    const effectiveCat = useClassifierCategory
+      ? classification!.vehicle_category
+      : category;
+    const effectiveVehicleType = useClassifierCategory
+      ? classification!.vehicle_type
+      : (effectiveCat === 'automobile' ? 'standard' : effectiveCat);
     return {
       vehicle_category: effectiveCat,
-      vehicle_type: classification?.vehicle_type ?? (effectiveCat === 'automobile' ? 'standard' : effectiveCat),
+      vehicle_type: effectiveVehicleType,
       size_class: effectiveSizeClass,
       specialty_tier: effectiveSpecialtyTier,
       make: make.trim(),
@@ -413,16 +441,66 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
         {/* Year + Color row */}
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Year" required htmlFor="vehicle-year" error={errors.year}>
-            <Select
-              id="vehicle-year"
-              value={year?.toString() ?? ''}
-              onChange={(e) => { setYear(e.target.value ? parseInt(e.target.value, 10) : null); setErrors((prev) => ({ ...prev, year: '' })); }}
-            >
-              <option value="">Select year</option>
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </Select>
+            {yearOtherMode ? (
+              <div className="space-y-1">
+                <Input
+                  id="vehicle-year"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={4}
+                  value={customYearInput}
+                  placeholder="Enter year (e.g., 1965)"
+                  className="text-base sm:text-sm"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+                    setCustomYearInput(raw);
+                    const err = validateCustomerVehicleYear(raw);
+                    if (err) {
+                      setYear(null);
+                      setErrors((prev) => ({ ...prev, year: raw ? err : '' }));
+                    } else {
+                      setYear(parseInt(raw, 10));
+                      setErrors((prev) => ({ ...prev, year: '' }));
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setYearOtherMode(false);
+                    setCustomYearInput('');
+                    setYear(null);
+                    setErrors((prev) => ({ ...prev, year: '' }));
+                  }}
+                  className="text-xs text-accent-brand hover:underline"
+                >
+                  Back to list
+                </button>
+              </div>
+            ) : (
+              <Select
+                id="vehicle-year"
+                value={year?.toString() ?? ''}
+                onChange={(e) => {
+                  if (e.target.value === YEAR_OTHER_SENTINEL) {
+                    setYearOtherMode(true);
+                    setYear(null);
+                    setCustomYearInput('');
+                    setErrors((prev) => ({ ...prev, year: '' }));
+                    return;
+                  }
+                  setYear(e.target.value ? parseInt(e.target.value, 10) : null);
+                  setErrors((prev) => ({ ...prev, year: '' }));
+                }}
+              >
+                <option value="">Select year</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+                <option value={YEAR_OTHER_SENTINEL}>Other...</option>
+              </Select>
+            )}
           </FormField>
           <FormField label="Color" required htmlFor="vehicle-color" error={errors.color}>
             <Input

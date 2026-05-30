@@ -284,6 +284,9 @@ export function VehicleMakeCombobox({
 
 /**
  * Generate year options from (currentYear + 2) down to 1980.
+ * Used by operator-facing surfaces (POS vehicle dialog, admin Customers
+ * vehicle inline form). Wide range to cover classics without forcing
+ * operators into a write-in path.
  */
 export function getVehicleYearOptions(): number[] {
   const max = new Date().getFullYear() + 2;
@@ -292,6 +295,46 @@ export function getVehicleYearOptions(): number[] {
     years.push(y);
   }
   return years;
+}
+
+// #131 Issue 2 — customer-facing year list.
+// Per operator ruling: 2028 down to 2000 (29 entries), with an explicit
+// "Other..." write-in for vehicles outside that range (1900-2028).
+// Bounded list keeps the typical-vehicle case fast; the write-in path
+// handles classics + future model-year releases.
+const CUSTOMER_VEHICLE_YEAR_MAX = 2028;
+const CUSTOMER_VEHICLE_YEAR_MIN = 2000;
+/** Inclusive lower bound for the "Other..." custom-year input. */
+export const CUSTOMER_VEHICLE_YEAR_INPUT_MIN = 1900;
+/** Inclusive upper bound for the "Other..." custom-year input. */
+export const CUSTOMER_VEHICLE_YEAR_INPUT_MAX = CUSTOMER_VEHICLE_YEAR_MAX;
+
+/**
+ * Generate the year options shown on customer-facing vehicle forms
+ * (public booking, customer portal). Operator-facing forms (POS, admin)
+ * continue to use `getVehicleYearOptions()` for the wider range.
+ */
+export function getCustomerVehicleYearOptions(): number[] {
+  const years: number[] = [];
+  for (let y = CUSTOMER_VEHICLE_YEAR_MAX; y >= CUSTOMER_VEHICLE_YEAR_MIN; y--) {
+    years.push(y);
+  }
+  return years;
+}
+
+/**
+ * Validate a customer-entered year against the "Other..." write-in bounds.
+ * Returns null if valid; an error string if not.
+ */
+export function validateCustomerVehicleYear(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return 'Year is required';
+  if (!/^\d{4}$/.test(trimmed)) return 'Enter a 4-digit year';
+  const n = parseInt(trimmed, 10);
+  if (n < CUSTOMER_VEHICLE_YEAR_INPUT_MIN || n > CUSTOMER_VEHICLE_YEAR_INPUT_MAX) {
+    return `Year must be between ${CUSTOMER_VEHICLE_YEAR_INPUT_MIN} and ${CUSTOMER_VEHICLE_YEAR_INPUT_MAX}`;
+  }
+  return null;
 }
 
 /**

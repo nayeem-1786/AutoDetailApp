@@ -293,22 +293,32 @@ const AIRCRAFT_MODEL_KEYWORDS = [
 /**
  * Disambiguate vehicle category when a make exists in multiple categories.
  * Checks model against keyword hints for each possible category.
- * Falls back to automobile if model is unknown (most common case).
+ *
+ * Returns `{ category, matched }`:
+ * - `matched: true` when a keyword hint resolved the category positively
+ *   (either via category-keyword match or via the automobile MODEL_SIZE_HINTS
+ *   list — both are evidence the classifier knows what the vehicle is).
+ * - `matched: false` when the function fell through to its automobile
+ *   default (no model OR model didn't match any keyword for any of the
+ *   provided categories). The #131 Layer 2 caller (resolveVehicleClassification)
+ *   uses this flag to flag the classification as `category_confident: false`,
+ *   which in turn tells UI callers (step-vehicle.tsx, vehicle-form-dialog.tsx)
+ *   not to auto-override the user's explicit category pick.
  */
 function disambiguateCategory(
   categories: string[],
   model: string | null | undefined
-): VehicleCategory {
+): { category: VehicleCategory; matched: boolean } {
   if (!model) {
-    // Dev-warn (#129 Q7): one of three silent fall-throughs to 'automobile'.
-    // Caller (step-vehicle.tsx) now gates the auto-override on `model.trim()`
-    // per #129 C1, so this path no longer mis-overwrites the user's category,
-    // but the data-drift signal is still useful in development. See
+    // Dev-warn (#129 Q7): one of the silent fall-throughs to 'automobile'.
+    // #131 Layer 2 made this path explicit via `matched: false`, so the
+    // resolver's caller never auto-overrides a user category from this
+    // fall-through. The dev-warn stays as data-drift telemetry — see
     // VEHICLE_FORM_UNIFICATION_AUDIT.md S9.
     if (process.env.NODE_ENV !== 'production') {
       console.warn('[VehicleClassify] Dual-category make with no model — defaulting to automobile');
     }
-    return 'automobile';
+    return { category: 'automobile', matched: false };
   }
 
   const modelLower = model.toLowerCase();
@@ -316,28 +326,28 @@ function disambiguateCategory(
   // Check motorcycle models
   if (categories.includes('motorcycle')) {
     if (MOTORCYCLE_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
-      return 'motorcycle';
+      return { category: 'motorcycle', matched: true };
     }
   }
 
   // Check boat models
   if (categories.includes('boat')) {
     if (BOAT_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
-      return 'boat';
+      return { category: 'boat', matched: true };
     }
   }
 
   // Check RV models
   if (categories.includes('rv')) {
     if (RV_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
-      return 'rv';
+      return { category: 'rv', matched: true };
     }
   }
 
   // Check aircraft models
   if (categories.includes('aircraft')) {
     if (AIRCRAFT_MODEL_KEYWORDS.some((kw) => modelLower.includes(kw))) {
-      return 'aircraft';
+      return { category: 'aircraft', matched: true };
     }
   }
 
@@ -345,12 +355,15 @@ function disambiguateCategory(
   if (categories.includes('automobile')) {
     const allAutoModels = Object.values(MODEL_SIZE_HINTS).flat();
     if (allAutoModels.some((hint) => modelLower.includes(hint.toLowerCase()))) {
-      return 'automobile';
+      return { category: 'automobile', matched: true };
     }
   }
 
-  // No model match — default to automobile
-  return 'automobile';
+  // No model match — default to automobile (Layer 2: flagged as not matched).
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(`[VehicleClassify] Dual-category make + model="${model}" matched no keyword — defaulting to automobile`);
+  }
+  return { category: 'automobile', matched: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -648,6 +661,30 @@ export interface VehicleClassification {
    * classifier confidence, not vehicle attributes.
    */
   needs_year_confirmation: boolean;
+  /**
+   * #131 Layer 2 — confidence signal for `vehicle_category` resolution.
+   *
+   * `true` when the resolver matched a single `vehicle_makes` row OR
+   * disambiguated a dual-category match via a known model keyword. Callers
+   * that auto-write category from this result (e.g. `step-vehicle.tsx`'s
+   * classifier effect) may trust `vehicle_category` and override the user's
+   * pick.
+   *
+   * `false` when the resolver fell through to its automobile default
+   * (no make, 0-row `vehicle_makes` lookup, dual-category make with
+   * empty/unmatched model, DB error). Callers MUST NOT auto-override
+   * the user's explicit non-automobile category from a non-confident
+   * result — that was the F1 form-reset bug
+   * (PUBLIC_BOOKING_FLOW_AUDIT.md, #127) that #129 C1's empty-model gate
+   * only partially fixed and #131 promotes to a structural Layer 2 fix.
+   *
+   * Note: this flag is scoped to CATEGORY confidence only. `size_class`
+   * (Layers 4+5 — exotic/classic detection) is independent of category
+   * resolution and stays authoritative on server writes via the
+   * `/api/customer/vehicles` POST/PATCH routes (Session 29 anti-gaming).
+   * See CLAUDE.md Rule 19.
+   */
+  category_confident: boolean;
 }
 
 export function getSeatRows(sizeClass: string | null, vehicleCategory: string): number {
@@ -696,6 +733,12 @@ export async function resolveVehicleClassification(
 ): Promise<VehicleClassification> {
   // --- Layer 1: resolve category from vehicle_makes table ---
   let category: VehicleCategory = 'automobile';
+  // #131 Layer 2 — start unconfident; only the two positive-evidence
+  // branches below (single-row match, disambiguation match) flip this to
+  // true. Every other path (no make, 0-row lookup, DB error, ambiguous
+  // disambiguation fallback) leaves it false, and the UI callers refuse
+  // to auto-override the user's category in that case.
+  let categoryConfident = false;
 
   if (make) {
     try {
@@ -712,14 +755,18 @@ export async function resolveVehicleClassification(
 
       if (validRows.length === 1) {
         category = validRows[0].category as VehicleCategory;
+        categoryConfident = true;
       } else if (validRows.length > 1) {
         const categories = validRows.map((r: { category: string }) => r.category);
-        category = disambiguateCategory(categories, model);
+        const disambiguated = disambiguateCategory(categories, model);
+        category = disambiguated.category;
+        categoryConfident = disambiguated.matched;
       } else if (process.env.NODE_ENV !== 'production') {
         // Dev-warn (#129 Q7): no `vehicle_makes` row matched — signals data drift
         // between the combobox source (also `vehicle_makes`) and this resolver's
         // ilike lookup (whitespace, accents, deactivation). Silently defaults to
-        // automobile in production. See PUBLIC_BOOKING_FLOW_AUDIT.md F4.
+        // automobile in production. See PUBLIC_BOOKING_FLOW_AUDIT.md F4. The
+        // #131 Layer 2 fix prevents UI callers from acting on this silent default.
         console.warn(`[VehicleClassify] No vehicle_makes row matched make="${make.trim()}" — defaulting to automobile`);
       }
     } catch (err) {
@@ -754,6 +801,7 @@ export async function resolveVehicleClassification(
       specialty_tier: null,
       seat_rows: getSeatRows(sizeClass, 'automobile'),
       needs_year_confirmation: false,
+      category_confident: categoryConfident,
     };
   } else {
     baseResult = {
@@ -763,6 +811,7 @@ export async function resolveVehicleClassification(
       specialty_tier: DEFAULT_SPECIALTY_TIERS[category],
       seat_rows: getSeatRows(null, category),
       needs_year_confirmation: false,
+      category_confident: categoryConfident,
     };
   }
 

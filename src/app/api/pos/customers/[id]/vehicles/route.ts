@@ -84,8 +84,16 @@ export async function POST(
       );
       classifierSizeClass = classification.size_class;
 
-      // Log override mismatch
-      if (vehicle_category && vehicle_category !== classification.vehicle_category) {
+      // Log override mismatch — #131 Layer 2: only when classifier is
+      // confident. Its 'automobile' fall-through default is not a real
+      // disagreement; logging mismatches against it would flood production
+      // with false positives every time an operator entered a niche RV
+      // / boat / motorcycle that isn't in `vehicle_makes`.
+      if (
+        vehicle_category &&
+        classification.category_confident &&
+        vehicle_category !== classification.vehicle_category
+      ) {
         console.warn(
           `[POS Vehicle Create] Override: caller sent vehicle_category="${vehicle_category}" ` +
           `but classifier resolved "${classification.vehicle_category}" for ${canonicalMake} ${trimmedModel || ''}`
