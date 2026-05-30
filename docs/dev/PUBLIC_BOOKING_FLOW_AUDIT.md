@@ -6,6 +6,29 @@
 > the vehicle taxonomy audit merge) so the shared checkout stays
 > undisturbed.
 
+> **Resolution status (2026-05-30, Session #129):**
+> - **F1 — RESOLVED.** `step-vehicle.tsx`'s `classify()` now refuses the
+>   category auto-override when `!mdl.trim()` (Y-1 shape per A3). Classifier
+>   still runs; the override only fires when the user has typed at least one
+>   model character. Operator-confirmed repro blocked.
+> - **F4 — RESOLVED.** All three silent-fall-through paths in
+>   `resolveVehicleClassification` now emit a dev-only `console.warn`
+>   (NODE_ENV-gated): 0-row `vehicle_makes` lookup, dual-category empty-
+>   model disambiguation, and DB error catch. Data drift between the
+>   combobox source and the resolver source is now visible in dev logs.
+> - **F2 / F3 — OPEN.** Awaiting operator Q1/Q2 on the RV/Boat/Aircraft
+>   custom-quote gating UX choice (B4-1.A vs .B vs .C).
+> - **F5 — REFRAMED.** Per the follow-up vehicle-form unification audit
+>   (`VEHICLE_FORM_UNIFICATION_AUDIT.md`, #128), F5 is intentional/
+>   informational (four context-driven patterns; classifier is structurally
+>   required for public booking and optionally extensible to other surfaces).
+>   Session #129 implemented C3 — extending the classifier as an opt-in
+>   advisory to the customer portal (`account/vehicle-form-dialog.tsx`).
+> - **F6 — PARTIAL.** Session #129 adds `step-vehicle.test.tsx` with a
+>   predicate-mirror test covering the C1 override gate across all four
+>   non-automobile categories. Full RTL render test deferred (predicate
+>   mirror + resolver tests already pin both contract ends).
+
 ## Context
 
 Two intertwined concerns:

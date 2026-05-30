@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { customerVehicleSchema } from '@/lib/utils/validation';
+import { resolveVehicleClassification, canonicalizeMake } from '@/lib/utils/vehicle-categories';
 
 export async function PATCH(
   request: NextRequest,
@@ -52,10 +53,32 @@ export async function PATCH(
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
     }
 
+    // #129 C3 — PATCH classifier parity with POST.
+    // Without this, a customer who edits a vehicle (e.g. corrects a model
+    // typo from "488" to "488 GTB") would never get the exotic/classic
+    // re-classification that POST does. Session 29 anti-gaming: classifier's
+    // 'exotic'/'classic' detection wins over client-supplied size_class
+    // (customer-portal dropdown only exposes 3 values).
+    const canonicalMake = parsed.data.make ? canonicalizeMake(parsed.data.make) : null;
+    const trimmedModel = parsed.data.model ?? null;
+    let classifierSizeClass: string | null = null;
+    if (canonicalMake && trimmedModel) {
+      const classification = await resolveVehicleClassification(
+        admin, canonicalMake, trimmedModel, parsed.data.year || undefined
+      );
+      classifierSizeClass = classification.size_class;
+    }
+    const isClassifierSpecialty = classifierSizeClass === 'exotic' || classifierSizeClass === 'classic';
+    const resolvedSizeClass = isClassifierSpecialty
+      ? classifierSizeClass
+      : (parsed.data.size_class !== undefined ? parsed.data.size_class : undefined);
+
     const updateData = {
       ...parsed.data,
       vehicle_category: parsed.data.vehicle_category ?? undefined,
       specialty_tier: parsed.data.specialty_tier ?? undefined,
+      ...(canonicalMake !== null ? { make: canonicalMake } : {}),
+      ...(resolvedSizeClass !== undefined ? { size_class: resolvedSizeClass } : {}),
       updated_at: new Date().toISOString(),
     };
 

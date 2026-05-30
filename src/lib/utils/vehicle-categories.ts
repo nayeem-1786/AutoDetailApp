@@ -300,7 +300,14 @@ function disambiguateCategory(
   model: string | null | undefined
 ): VehicleCategory {
   if (!model) {
-    console.warn('[VehicleClassify] Dual-category make with no model — defaulting to automobile');
+    // Dev-warn (#129 Q7): one of three silent fall-throughs to 'automobile'.
+    // Caller (step-vehicle.tsx) now gates the auto-override on `model.trim()`
+    // per #129 C1, so this path no longer mis-overwrites the user's category,
+    // but the data-drift signal is still useful in development. See
+    // VEHICLE_FORM_UNIFICATION_AUDIT.md S9.
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[VehicleClassify] Dual-category make with no model — defaulting to automobile');
+    }
     return 'automobile';
   }
 
@@ -708,9 +715,19 @@ export async function resolveVehicleClassification(
       } else if (validRows.length > 1) {
         const categories = validRows.map((r: { category: string }) => r.category);
         category = disambiguateCategory(categories, model);
+      } else if (process.env.NODE_ENV !== 'production') {
+        // Dev-warn (#129 Q7): no `vehicle_makes` row matched — signals data drift
+        // between the combobox source (also `vehicle_makes`) and this resolver's
+        // ilike lookup (whitespace, accents, deactivation). Silently defaults to
+        // automobile in production. See PUBLIC_BOOKING_FLOW_AUDIT.md F4.
+        console.warn(`[VehicleClassify] No vehicle_makes row matched make="${make.trim()}" — defaulting to automobile`);
       }
-    } catch {
-      // DB unavailable — default to automobile
+    } catch (err) {
+      // DB unavailable — default to automobile.
+      // Dev-warn (#129 Q7): surface infra failure that would otherwise be silent.
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[VehicleClassify] vehicle_makes lookup failed — defaulting to automobile', err);
+      }
     }
   }
 

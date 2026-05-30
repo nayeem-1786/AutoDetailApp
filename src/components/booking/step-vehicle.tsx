@@ -114,8 +114,15 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       const supabase = createClient();
       const result = await resolveVehicleClassification(supabase, mk.trim(), mdl.trim() || undefined);
       setClassification(result);
-      // Auto-update category if classification disagrees (e.g., Honda motorcycle)
-      if (result.vehicle_category !== cat) {
+      // Auto-update category only when the classifier is high-confidence:
+      // the user has typed at least one model character. Without a model the
+      // resolver silently defaults to 'automobile' for dual-category makes
+      // (`vehicle-categories.ts:302-305`), 0-row lookups (`:691`), and DB
+      // errors (`:712-714`) — which would otherwise overwrite the user's
+      // explicit RV/motorcycle/boat/aircraft pick. This is the public-booking-
+      // flow audit's Y-1 hotfix (PUBLIC_BOOKING_FLOW_AUDIT.md F1, #129) and
+      // the C1 corrective from VEHICLE_FORM_UNIFICATION_AUDIT.md.
+      if (mdl.trim() && result.vehicle_category !== cat) {
         setCategory(result.vehicle_category);
       }
     } catch {
