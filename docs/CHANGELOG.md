@@ -6,6 +6,98 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #128 — Audit: vehicle-form pattern unification feasibility (2026-05-30)
+
+Read-only diagnostic audit. Branch
+`audit/vehicle-form-pattern-unification-feasibility`, isolated `git
+worktree`; **merged to main this session.** No source / migration / test
+changes. Resolves the architectural question raised by F5 in the public
+booking flow audit (#127): should the auto-classifier-driven public
+booking form and the manual POS/portal/admin forms be unified, or are
+they legitimately different patterns?
+
+**Surface count refinement.** Prior audit said "two patterns." Reality
+is FOUR distinct components: (W) `step-vehicle.tsx` 514 lines,
+(P) `pos/vehicle-create-dialog.tsx` 361 lines (shared by Sale + Quote),
+(C) `account/vehicle-form-dialog.tsx` 327 lines, (A) inline form in
+`admin/customers/[id]/page.tsx` ~250 lines.
+
+**VERDICT: NO-UNIFICATION** (with three small targeted improvements
+available independently). Reasoning is evidence-based, not preference-
+based.
+
+**Classifier is structurally MANDATORY for public booking.** Layers 4+5
+of `resolveVehicleClassification` (`vehicle-categories.ts:752-770` —
+exotic/classic detection via EXOTIC_MAKES/EXOTIC_MAKE_MODELS/
+CLASSIC_ELIGIBLE_MAKES tables) are the only path to detect a Ferrari
+customer's vehicle as exotic. The customer-facing manual size_class
+dropdown is restricted to 3 values per CUSTOMER_SELF_SERVICE_SIZE_CLASSES
+(Session 29 anti-gaming) — customers have no manual path to flag their
+own vehicle as exotic/classic. Removing the classifier silently
+mis-routes exotic customers through the sedan price path and breaks the
+SpecialtyVehicleBlock callback flow. **Shape Alpha (kill classifier) is
+rejected — load-bearing customer-routing feature.**
+
+**Shape Beta (classifier everywhere)** propagates F1's defect class to
+POS/portal/admin where operators already know the vehicle. Actively
+worsens surfaces that work today. **Rejected.**
+
+**Shape Gamma (shared configurable component)** requires NINE
+configuration axes (validation schema / state manager / submit target /
+size_class set / classifier on-off / size_class_manual_override write /
+is_incomplete write / layout button-grid-vs-dropdown / saved-vehicle
+picker on-off) to absorb the legitimate context-driven deltas. ~35% line
+reduction is not worth the 9-axis abstraction (Memory #13).
+**Rejected as over-engineering.**
+
+**Inventory matrix (T1):** the four forms collect the same six fields
+(category / year / make / model / color / size-or-specialty). Schema
+fields vin/license_plate/notes are dead — declared in vehicleSchema
+(validation.ts:80-82) but no surface captures them (S1). Of 12 deltas
+catalogued: 7 different-by-valid-design, 4 different-by-accident
+(state manager: POS uses raw useState alone among the four; tier label
+adaptive helper; model placeholder helper; is_incomplete write), 1
+valid-but-contributes-to-F1 (reset-model-on-make-change — fix the
+override gate, not the reset).
+
+**F1 fix shape under NO-UNIFICATION:** stays a single-file ~5-line patch
+in step-vehicle.tsx per the prior audit's Y-1 recommendation. Ships ASAP
+as hotfix-class, parallel-safe with all prior-arc sessions.
+
+**Three optional small improvements (separate sessions):**
+- C1 (Significant, hotfix-class): F1 fix ~5 lines 1 file. Ships ASAP.
+- C2 (Minor, optional): port POS dialog from raw useState +
+  hand-rolled validate() → react-hook-form + vehicleSchema, ~80-line
+  refactor, no behavior change. Aligns POS with prevailing RHF + Zod
+  pattern.
+- C3 (Minor, operator decision): extend classifier to customer portal
+  so Ferrari customers self-managing their vehicles auto-route to
+  exotic/callback handling. ~50 lines. Mirrors the prior audit's Q3.
+
+**F5 reframed.** Future audits should refer to NO-UNIFICATION as the
+locked verdict — surfaces have legitimate context-driven needs
+(customer-trust-boundary W/C vs operator-trust-boundary P/A; classifier
+mandatory only where customer enters own vehicle AND system must detect
+exotic). Stop flagging F5 as a defect.
+
+**10 sibling findings (T8):** S1 unused vin/license_plate/notes schema
+fields; S2 is_incomplete written by admin only; S3 POS+admin grid layout
+trivially shareable; S4 portal-classifier gap (== C3); S5/S6 positive
+observations (titleCaseField + VehicleMakeCombobox are working shared
+primitives); S7/S8 minor booking-step inconsistencies; S9 dev-warn
+telemetry useful for F1 post-ship; S10 vehicle_type/vehicle_category
+redundancy (carry-over from vehicle-taxonomy audit Q9).
+
+**7 open operator questions** (Q1 approve no-unification verdict, Q2
+approve C1 hotfix ship-soon, Q3 approve C2 RHF port, Q4 approve C3
+portal classifier, Q5 vin/license_plate/notes schema cleanup, Q6
+is_incomplete consistency, Q7 ride-along F4 dev-warn with F1 hotfix).
+
+**Files added:** `docs/dev/VEHICLE_FORM_UNIFICATION_AUDIT.md` (~600
+lines).
+
+---
+
 ## Session #127 — Audit: public booking flow — form-reset bug + end-to-end flow verification (2026-05-30)
 
 Read-only diagnostic audit. Branch `audit/public-booking-form-reset-and-flow-verification`,
