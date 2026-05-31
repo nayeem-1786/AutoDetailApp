@@ -6,6 +6,124 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session — Audit (Unit B): public booking navigation + admin-service-option wiring + pricing_model immutability rationale (2026-05-30)
+
+Read-only diagnostic audit. Branch
+`audit/public-booking-navigation-and-admin-option-wiring`, isolated
+`git worktree` (Memory #8); **merged to main this session.** Three
+concerns landed in one session on the Unit A merge base
+(`b1668c62`). No source / migration / test changes.
+
+**Concern A — Step 2 back navigation: CONFIRMED missing.** Mapped per-step
+nav across Vehicle → Service → Schedule → Confirm. Step 3 has an
+explicit `<Button onClick={onBack}>` at `step-schedule.tsx:285`; Step 4
+has both an explicit Back button (`onBack={() => goToStep(3)}` at
+`booking-wizard.tsx:1204`) and three edit-from-summary pencil icons
+(`step-confirm-book.tsx:437-480` → Step 1/2/3). Step 2 has **NONE** —
+the only backward path is the small completed-step circle on
+`StepIndicator` (`step-indicator.tsx:34-46` desktop, `:86-99` mobile),
+which is technically clickable when `isCompleted` (state preservation
+works) but reads as a progress indicator, not a navigation control.
+Classification: (a) affordance never added on Step 2 alone. URL state
+sync works (`updateUrl` at `booking-wizard.tsx:554-614`), state is fully
+preserved on backward navigation, and `editEntryStep` round-tripping
+(`:528`, `:1205`) correctly restores Step 4 context when editing earlier
+steps.
+
+**Concern B — 13 admin-service options audited.** Built a complete
+admin-set → DB column → public-read-path → server-enforce matrix:
+
+- ✅ **HONORED end-to-end (7):** `online_bookable`
+  (`booking.ts:92, 158` + `route.ts:66`), `is_active`
+  (`booking.ts:91, 157` + `route.ts:65`), `vehicle_compatibility`
+  (`booking-wizard.tsx:680-689` + `route.ts:254-262`), `pricing_model`
+  (`step-service-select.tsx:944` PricingSelector dispatch + `_pricing.ts:57`
+  server validator), sale window
+  (`resolveServicePriceWithSale` everywhere + `_pricing.ts` saleWindow
+  pass-through), `display_order` (`booking.ts:94`), `base_duration_minutes`
+  (`booking-wizard.tsx:1057-1062` → Step 3 slots), plus `image_url`/
+  `image_alt`/`category_id`/per-pricing-model price columns.
+- ⚠️ **PARTIAL (1):** `mobile_eligible` — client gates the UI
+  (`step-service-select.tsx:475`) but `api/book/route.ts` has no
+  per-service mobile re-check (only the global MOBILE_SERVICE flag at
+  `:270`). Tampered request with `is_mobile=true` on a non-mobile
+  service would be accepted.
+- ❌ **DEAD on public booking (4):**
+  - `staff_assessed` — admin Switch at `[id]/page.tsx:1167-1179` with
+    helper text "Requires staff evaluation for pricing"; ZERO references
+    in `src/components/booking/**`, `src/lib/data/booking.ts`, or
+    `src/app/api/book/**`. A flagged service is fully customer-self-
+    bookable at the listed price with no callback, no banner, no surcharge.
+  - `is_taxable` — `api/book/route.ts:492, 511, 537` HARDCODE
+    `is_taxable: false` for ALL booking-deposit line items (primary +
+    addons + mobile fee); `tax_amount: 0` everywhere. Admin toggle is
+    UI-only with respect to booking-deposit receipts (POS finalization
+    may apply tax — not in scope).
+  - `classification` — operator's explicit rule "only primary
+    standalone services on Step 2; everything else is add-on" is
+    UNENFORCED. `booking-wizard.tsx:684` filters only by
+    `vehicle_compatibility`; an `addon_only` service with
+    `online_bookable=true` would surface as a Step 2 choice. Server
+    accepts any matching `service_id` as primary
+    (`route.ts:60-67` has no classification filter).
+  - `service_prerequisites` — POS-only enforcement
+    (`api/pos/services/check-prerequisites/route.ts`); public booking
+    does not check. `special_requirements` — never displayed to customer.
+- **N/A (1):** `show_on_website` — distinct from `online_bookable`;
+  controls `/services` catalog page + sitemap, not booking.
+
+**Concern C — `pricing_model` immutability rationale: NONE
+DOCUMENTED.** Verbatim extract from `CATALOG_CRUD_WIRING_AUDIT.md`
+shows five references (lines 32, 82, 129, 212, 225) flagging it
+Informational/coherence, plus the audit's own **open operator
+decision Q4** (line 244-245): *"`pricing_model` mutability: should
+operators be able to change a service's pricing model after creation,
+or is immutability intended (in which case document it)?"* Verified
+against current code: edit page renders model read-only at
+`[id]/page.tsx:1342` (`{PRICING_MODEL_LABELS[service.pricing_model]} Pricing`)
+and `onSaveDetails` payload (`:504-520`) omits `pricing_model` entirely.
+The behavior is by-omission, not by-design with documented rationale.
+**Not surfaced in UI** — no tooltip, no help text, no lock icon, no error
+message anywhere explains why the model is locked. The most likely
+engineering risk if mutability were added (un-stated in either audit)
+is the data-migration story for orphaned `service_pricing` tier rows
+and historical `appointment_services`/`transaction_items` referencing
+the old `tier_name`. Operator decision needed.
+
+**Severity ranking (Target D):** 1 Significant nav (N1 = Step 2 back),
+1 Significant rule-unenforced (W1 = classification), 1 Significant
+dead-flag (W3 = staff_assessed), 4 Moderate (W2 = mobile_eligible
+server, W4 = is_taxable booking, W5 = prereq on public booking,
+W6 = special_requirements display), 1 Minor (W7 = addon's own
+vehicle_compatibility), 9 sibling findings (E1-E9 incl. E5 = wizard
+uses `replaceState` not `pushState`, so browser back exits the booking
+page entirely — likely reinforces operator's "no way back" perception).
+
+**Recommended fix arc:** 3 small Memory#8-safe sessions (U-B.1 = N1+W2+W6
+≈80 lines no decisions needed; U-B.2 = W1 after Q-A; U-B.3 = W3 after
+Q-B; U-B.4 = W4 after Q-C; U-B.5 = W5+W7 standalone). U-B.1 ships
+immediately; others gated on operator answers to Q-A through Q-E
+(documented in audit doc).
+
+**Deliverable:** `docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`
+(comprehensive: 3 concerns + matrix + severity table + 9 siblings +
+5 open operator questions).
+
+**Cross-references:**
+- Prior public-booking audit `PUBLIC_BOOKING_FLOW_AUDIT.md` —
+  F1 resolved via #131; F2/F3 (RV/Boat/Aircraft custom-quote gating)
+  still open per Q1/Q2.
+- `CATALOG_CRUD_WIRING_AUDIT.md` — source of Concern C and the open
+  Q4 punt.
+- `POS_PREREQ_ENFORCEMENT_AND_GATING_AUDIT.md` — model for W5
+  (public-booking prereq enforcement should mirror the POS pattern).
+
+**Files changed (audit only):** new `docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`;
+`docs/dev/FILE_TREE.md` (+1 entry); this CHANGELOG entry. No `src/`
+changes, no migrations, no tests.
+
+---
+
 ## Session #132 — Fix (Unit A): year text input supersedes #131 dropdown+Other + model case preservation (2026-05-30)
 
 Production UI correction. Branch `fix/unit-a-year-text-input-and-model-case`,
