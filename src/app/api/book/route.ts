@@ -7,6 +7,10 @@ import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { APPOINTMENT, FEATURE_FLAGS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { computeExpectedPrice } from './_pricing';
 import { checkMobileEligibility, mobileIneligibleErrorMessage } from './_mobile-eligibility';
+import {
+  checkPrimaryClassification,
+  primaryClassificationErrorMessage,
+} from './_classification';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
@@ -70,6 +74,27 @@ export async function POST(request: NextRequest) {
     if (!serviceRow) {
       return NextResponse.json(
         { error: 'Service not found or not bookable' },
+        { status: 400 }
+      );
+    }
+
+    // W1 (Unit B audit, 2026-05-30) layer 2 — server classification check.
+    // The data layer (`getBookableServices` / `getBookableServiceBySlug`)
+    // applies the same rule via Supabase `.in('classification', …)` so
+    // addon_only services never reach the Step 2 picker on a properly-
+    // rendered page; this is the server's catch for tampered/replayed
+    // requests + the operator-misconfiguration case (classification set
+    // to addon_only but online_bookable left true). Pure rule lives in
+    // `./_classification.ts` (see header for the two-layer rationale).
+    // Validation order: existence → classification → pricing → slot
+    // (each layer assumes the prior one passed).
+    const classificationCheck = checkPrimaryClassification({
+      name: serviceRow.name as string,
+      classification: serviceRow.classification,
+    });
+    if (!classificationCheck.ok) {
+      return NextResponse.json(
+        { error: primaryClassificationErrorMessage(classificationCheck.serviceName) },
         { status: 400 }
       );
     }
