@@ -6,6 +6,133 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #133 — Fix (U-B.1 + E5): Step 2 Back button + server mobile_eligible defense + special_requirements display + pushState navigation (2026-05-30)
+
+Production code change bundle. Branch
+`fix/u-b-1-step2-back-server-mobile-special-pushstate`, isolated
+`git worktree` (Memory #8); **merged to main this session.** Closes
+**four no-decision-needed findings** from the Unit B audit
+(merge `1eeade10`, `docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`):
+**N1** (Significant — Step 2 back affordance missing), **W2** (Moderate —
+server `mobile_eligible` defense-in-depth), **W6** (Moderate —
+`special_requirements` never surfaced publicly), and **E5** (sibling —
+wizard used `replaceState` so browser back exited the booking page
+entirely instead of walking the wizard steps). All four ship together
+because they touch the same public-booking surface and have orthogonal
+test coverage. **5 production files + 1 helper file + 2 test files,
+~165 prod lines net** (Memory #8 budget honored).
+
+**N1 — Step 2 explicit Back button.** Mirrored Step 3's pattern
+(`step-schedule.tsx:285`) byte-for-byte (same `Button variant="outline"`,
+same border/bg/hover/dark classes). Added `onBack?: () => void` prop to
+`StepServiceSelect`; renders a `<Button>Back</Button>` at the bottom of
+the left column (`step-service-select.tsx`, before the mobile spacer)
+when the prop is provided. Wizard wires
+`onBack={editEntryStep === null ? () => goToStep(1) : undefined}`
+(`booking-wizard.tsx:1144-1148`) — explicitly suppressed during
+edit-from-Step-4 mode so the existing "Back to Booking" path remains
+the only backward affordance and we don't stack two backward buttons.
+State preservation works because the wizard's existing `goToStep(1)`
+re-renders Step 1 with the preserved `state.vehicleData` (which Step 1
+rehydrates via the `initialVehicle` prop). The stepper-dot path
+(`step-indicator.tsx:34-46`) remains functional but is now the SECOND
+backward affordance, not the only one. Step 4's existing edit-from-
+summary pencils (`step-confirm-book.tsx:437-480`) already cover Steps
+1/2/3 (vehicle, service, date) — no new pencil needed.
+
+**W2 — server-side `mobile_eligible` defense.** Pure rule extracted to
+`src/app/api/book/_mobile-eligibility.ts` (`checkMobileEligibility(primary,
+addons)` + `mobileIneligibleErrorMessage(name)`), mirroring the
+`_pricing.ts` extraction pattern (underscore prefix excludes from Next
+route resolution; tests can import the helper without standing up
+Supabase/Stripe/Twilio). Route wires the check between the existing
+`MOBILE_SERVICE` feature-flag check and the mobile-zone validation —
+preserves the validation order (feature flag → service eligibility →
+zone). For each `is_mobile=true` request: primary `serviceRow.mobile_eligible`
+is checked first; addon services are then batch-fetched
+(`select('id, name, mobile_eligible').in('id', addonIds)`) and checked.
+First ineligible service surfaces in the 400 with a friendly per-service
+message: `"{name} is not available as a mobile service. Please remove
+it or choose in-shop booking."` Client gate at `step-service-select.tsx:475`
+unchanged — this is defense-in-depth for tampered/replayed requests.
+
+**W6 — `special_requirements` display.** Surfaced the
+`services.special_requirements` text (admin sets it via Textarea at
+`admin/catalog/services/[id]/page.tsx:1128`) on two customer surfaces:
+(1) Step 2 service card — rendered below the description as a subdued
+italic line with a `<span class="font-medium">Note:</span>` prefix,
+`line-clamp-2`; (2) Step 4 order summary — same styling, rendered
+directly below the service line item so it's anchored to the service
+it describes. New `serviceSpecialRequirements?: string | null` prop on
+`StepConfirmBook`; wizard passes
+`serviceSpecialRequirements={state.service.special_requirements ?? null}`.
+`BookableService` already extends `Service` so the field flows through
+`booking.ts`'s existing `select('*')`. Addon `special_requirements`
+deliberately NOT surfaced (sub-select picks specific columns; out of
+scope and addon notes are rare).
+
+**E5 — `replaceState` → `pushState` + popstate listener.** Root of the
+operator's "no way back" perception. Pre-fix every `updateUrl` call
+used `replaceState`, so browser back skipped the entire wizard and
+exited the booking page. Added `isInitial` flag to `updateUrl`: the
+mount call (which replaces the bare `/book` URL) uses `replaceState`
+(no duplicate history entry); every `goToStep` transition now uses
+`pushState` so browser back/forward walks the wizard step-by-step.
+Added a `popstate` event listener that rehydrates wizard step + state
+from `window.location.search` via a refactored
+`getInitialState(paramsArg?: URLSearchParams)` (default arg preserves
+the original mount behavior reading from `useSearchParams()`; popstate
+explicitly passes `new URLSearchParams(window.location.search)` to read
+fresh URL since the hook value may be stale at synchronous-popstate
+firing time). Listener is attached once at mount, removed at unmount.
+The booking-confirmation cleanup at `:1096` correctly retains
+`replaceState` (don't add a history entry when clearing the form post-
+confirmation). `handleCategoryChange` is dead code (defined, never
+called) and was left as-is per Memory #19 scope discipline.
+
+**Tests (+15 → 2712):** `src/app/api/book/__tests__/mobile-eligibility.test.ts`
+(new, 7 tests — primary ineligible / addon ineligible / primary
+precedence over addon / first-ineligible-by-array-order / message
+wording lock). `src/components/booking/__tests__/step-service-select-render.test.tsx`
+(new, 6 tests — N1: Back button renders when `onBack` provided, hidden
+when omitted, invokes handler on click; W6: requirements text renders
+when set, hidden when null, hidden when empty string). Pre-existing
+`step-service-select.test.tsx` unit tests untouched (different
+test-style layer). Step 4 W6 test skipped — implementation mirrors the
+service card path that we DO test, and `<StepConfirmBook>`'s many
+hooks/network deps (useFeatureFlag, fetch on mount for business info,
+inline auth) would require disproportionate mocking. E5 popstate
+end-to-end test skipped for the same reason; verified by manual
+walkthrough + comment block.
+
+**Gates:** `npx tsc --noEmit` clean (0 errors); `npm run lint` clean
+(0 errors / 97 warnings baseline — none new in touched files);
+`npm test` 2712/2712 passing (was 2697); `npm run build` clean compile
++ 790/790 static pages generated.
+
+**Files changed:**
+- `src/components/booking/step-service-select.tsx` (N1 Back button + W6 service card note; `onBack` prop)
+- `src/components/booking/step-confirm-book.tsx` (W6 Step 4 summary note; `serviceSpecialRequirements` prop)
+- `src/components/booking/booking-wizard.tsx` (N1 wiring; E5 pushState + popstate; `getInitialState` refactor)
+- `src/app/api/book/route.ts` (W2 wiring to helper)
+- `src/app/api/book/_mobile-eligibility.ts` (new — W2 pure helper)
+- `src/app/api/book/__tests__/mobile-eligibility.test.ts` (new — 7 tests)
+- `src/components/booking/__tests__/step-service-select-render.test.tsx` (new — 6 tests)
+- `docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md` (mark N1/W2/W6/E5 RESOLVED)
+- `docs/dev/FILE_TREE.md` (2 new entries)
+- `docs/dev/ROADMAP-13-ITEMS.md` (ledger row)
+- This CHANGELOG entry
+
+**NOT in scope** (gated on operator decisions, per audit Q-A/B/C/D):
+W1 (classification primary-only filter — gates on Q-A canonical-rule
+confirmation); W3 (`staff_assessed` resolution — gates on Q-B path);
+W4 (`is_taxable` honoring — gates on Q-C path); W5 (public prereq
+enforcement — separate session U-B.5); W7 (addon vehicle_compat —
+bundles with U-B.5); pricing_model mutability (Concern C — gates on
+Q-D). Per Memory #19 scope discipline + audit's locked fix arc.
+
+---
+
 ## Session — Audit (Unit B): public booking navigation + admin-service-option wiring + pricing_model immutability rationale (2026-05-30)
 
 Read-only diagnostic audit. Branch

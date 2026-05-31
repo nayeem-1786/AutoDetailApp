@@ -87,6 +87,16 @@ interface StepServiceSelectProps {
    * empty (LOCKED-10 — don't overwrite typed input).
    */
   customerProfileAddress?: string | null;
+  /**
+   * N1 (Unit B audit, 2026-05-30): when provided, renders an explicit
+   * "Back" button at the bottom of the left column mirroring Step 3's
+   * pattern (step-schedule.tsx:285). The wizard passes
+   * `onBack={() => goToStep(1)}` when NOT in edit-from-Step-4 mode; in
+   * edit mode the wizard renders its own "Back to Booking" button
+   * outside this component, so `onBack` is left undefined to avoid
+   * stacking two backward affordances.
+   */
+  onBack?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +114,7 @@ export function StepServiceSelect({
   vehicleSizeClass,
   vehicleSpecialtyTier,
   customerProfileAddress,
+  onBack,
 }: StepServiceSelectProps) {
   // Helper to find a service by ID across all categories
   function findService(id: string | null): BookableService | null {
@@ -722,6 +733,28 @@ export function StepServiceSelect({
             </Tabs>
           )}
 
+          {/* N1 (Unit B audit, 2026-05-30): explicit Back button mirroring
+              Step 3's pattern at step-schedule.tsx:285. On desktop the
+              Continue button lives in the right-column sidebar; on mobile
+              it lives in the sticky footer. Both surfaces lacked any
+              backward affordance other than the small step-indicator dot
+              (step-indicator.tsx:34-46 desktop, :86-99 mobile) — operator
+              confirmed this read as "no way back from Step 2." Renders
+              only when `onBack` is provided; the wizard suppresses it
+              during edit-from-Step-4 mode in favor of the "Back to
+              Booking" path rendered outside this component. */}
+          {onBack && (
+            <div className="mt-6 flex justify-start">
+              <Button
+                variant="outline"
+                onClick={onBack}
+                className="border-site-border bg-transparent text-site-text-secondary hover:bg-brand-surface dark:border-site-border dark:bg-transparent dark:text-site-text-secondary dark:hover:bg-brand-surface"
+              >
+                Back
+              </Button>
+            </div>
+          )}
+
           {/* Mobile spacer for sticky footer */}
           {pendingServiceId && price > 0 && <div className="h-24 lg:hidden" />}
         </div>
@@ -837,6 +870,18 @@ function ServiceCard({
         {service.description && (
           <p className="mt-0.5 text-xs sm:text-sm text-site-text-muted line-clamp-1 sm:line-clamp-2">
             {service.description}
+          </p>
+        )}
+
+        {/* W6 (Unit B audit, 2026-05-30): surface special_requirements as a
+            subdued italic note below the description so customers see
+            preparation/access notes (e.g., "Vehicle must be lifted") BEFORE
+            they pick the service. Admin sets this via the "Special
+            Requirements" Textarea at admin/catalog/services/[id]/page.tsx:1128.
+            Pre-fix the field was admin-only despite being customer-relevant. */}
+        {service.special_requirements && (
+          <p className="mt-1 text-xs italic text-site-text-muted line-clamp-2">
+            <span className="not-italic font-medium">Note:</span> {service.special_requirements}
           </p>
         )}
 

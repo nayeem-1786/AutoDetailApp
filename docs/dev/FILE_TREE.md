@@ -281,10 +281,12 @@ src/app/api/book/check-customer/route.ts
 src/app/api/book/check-phone/route.ts
 src/app/api/book/payment-intent/route.ts
 src/app/api/book/route.ts
+src/app/api/book/_mobile-eligibility.ts                 # Session #133 (U-B.1 W2, 2026-05-30) — pure helper `checkMobileEligibility(primary, addons)` + `mobileIneligibleErrorMessage(name)`. Server-side defense-in-depth for `services.mobile_eligible` — the Step 2 client already gates the mobile UI but a tampered/replayed request could submit `is_mobile=true` with a non-eligible service. Extracted from `route.ts` so the rule can be unit-tested without standing up Supabase/Stripe/Twilio (mirrors `_pricing.ts` pattern; underscore prefix excludes from Next.js route resolution). Return contract: `{ ok: true }` | `{ ok: false; serviceName }` — caller emits 400 with the per-service message. Primary precedence: primary's name surfaces first if both ineligible.
 src/app/api/book/slots/route.ts
 src/app/api/book/validate-coupon/route.ts
 src/app/api/book/__tests__/modifier-persistence.test.ts  # 4 tests — pins Item 15g Layer 15g-iv Scenario A: POST /api/book persists coupon + loyalty to dedicated columns, never to internal_notes (post-cleanup contract)
 src/app/api/book/__tests__/booking-combo.test.ts        # NEW Issue 33 Layer 1 — 11 tests. Boundary pin: bookingVehicleSchema rejects exotic/classic size_class at Zod layer (CUSTOMER_SELF_SERVICE_SIZE_CLASSES). Combo HIT/MISS on booking-shaped items (primary + addons), lowestWins prevents combo from raising addon price.
+src/app/api/book/__tests__/mobile-eligibility.test.ts   # Session #133 (U-B.1 W2, 2026-05-30) — 7 tests pinning the server-side mobile-eligibility rule. Covers primary ineligible (no addons), addon ineligible (eligible primary), primary-before-addon precedence, first-ineligible-by-array-order, single-addon edge cases (start + end of array), and `mobileIneligibleErrorMessage` wording lock (so the customer-facing string is byte-stable across refactors).
 ```
 
 ### Checkout (Online Store)
@@ -1358,6 +1360,7 @@ src/components/booking/step-service-select.tsx      (merged service select + con
 src/components/booking/step-vehicle.tsx              (vehicle selection — Step 1)
 src/components/booking/specialty-vehicle-block.tsx   (exotic/classic booking block page — Session 27)
 src/components/booking/__tests__/step-service-select.test.tsx  # Item 15f Layer 3c — pins all 6 pricing_model values through canonical-engine path
+src/components/booking/__tests__/step-service-select-render.test.tsx  # Session #133 (U-B.1, 2026-05-30) — 6 render tests for StepServiceSelect. N1 (Step 2 Back button): renders when `onBack` provided, hidden when omitted (edit-from-Step-4 mode), invokes handler on click. W6 (`services.special_requirements`): renders as italic "Note: …" line below service description when set, hidden when null, hidden when empty string (falsy guard). Companion to the unit-test file `step-service-select.test.tsx`; keeps render-layer tests separable from pure helper-function tests.
 ```
 
 ### Quote Components

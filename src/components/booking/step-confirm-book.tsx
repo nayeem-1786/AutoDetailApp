@@ -58,6 +58,14 @@ export interface StepConfirmBookProps {
   // Service data
   serviceName: string;
   serviceId: string;
+  /**
+   * W6 (Unit B audit, 2026-05-30): primary service's
+   * `services.special_requirements` text, when set in admin. Surfaced
+   * inline below the service line in the order summary so customers
+   * see preparation/access notes BEFORE confirming the booking.
+   * Mirrors the same note shown on the Step 2 service card.
+   */
+  serviceSpecialRequirements?: string | null;
   tierName: string | null;
   price: number;
   durationMinutes: number;
@@ -108,6 +116,7 @@ export interface StepConfirmBookProps {
 export function StepConfirmBook({
   serviceName,
   serviceId,
+  serviceSpecialRequirements,
   tierName: _tierName,
   price,
   durationMinutes,
@@ -481,6 +490,16 @@ export function StepConfirmBook({
         </div>
         <span className="font-medium text-site-text">{formatCurrency(price)}</span>
       </div>
+      {/* W6 (Unit B audit, 2026-05-30): primary service's
+          special_requirements rendered as a subdued italic note directly
+          below the service line so it's anchored to the service it
+          describes. Mirrors the Step 2 service-card display so customers
+          see the same note on both surfaces — no surprises at checkout. */}
+      {serviceSpecialRequirements && (
+        <p className="text-xs italic text-site-text-muted pl-0">
+          <span className="not-italic font-medium">Note:</span> {serviceSpecialRequirements}
+        </p>
+      )}
       {addons.map((addon) => (
         <div key={addon.service_id} className="flex justify-between">
           <span className="text-site-text-secondary">{addon.name}</span>
