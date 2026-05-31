@@ -1,87 +1,104 @@
 /**
- * #131 Issue 2 — customer-facing vehicle year helpers.
+ * #132 Issue 2 — customer-facing vehicle year text input.
  *
- * Operator ruling: customer dropdown shows 2028 → 2000 (29 entries) with an
- * "Other..." last option that reveals a write-in accepting 4-digit years
- * 1900–2028 inclusive. Operator-facing surfaces (POS, admin) continue to
- * use the wider `getVehicleYearOptions()` range and are NOT affected.
+ * Supersedes #131's dropdown+Other... pattern. New rule: a single 4-digit
+ * text input accepting `/^(19|20)\d{2}$/` (years 1900–2099). The "19/20"
+ * prefix IS the range constraint.
+ *
+ * Operator-facing surfaces (POS, admin) continue to use the wider
+ * `getVehicleYearOptions()` (1980→currentYear+2) per Memory #19's
+ * "DRY within each trust boundary" finding — that helper is untouched
+ * and its regression test stays.
  */
 import { describe, it, expect } from 'vitest';
 import {
-  getCustomerVehicleYearOptions,
   validateCustomerVehicleYear,
   getVehicleYearOptions,
-  CUSTOMER_VEHICLE_YEAR_INPUT_MIN,
-  CUSTOMER_VEHICLE_YEAR_INPUT_MAX,
 } from '../vehicle-make-combobox';
 
-describe('#131 Issue 2 — getCustomerVehicleYearOptions', () => {
-  const options = getCustomerVehicleYearOptions();
+describe('#132 Issue 2 — validateCustomerVehicleYear (text-input rule: 4 digits starting with 19/20)', () => {
+  describe('accepts', () => {
+    it('typical recent year', () => {
+      expect(validateCustomerVehicleYear('2024')).toBeNull();
+      expect(validateCustomerVehicleYear('2025')).toBeNull();
+    });
 
-  it('returns 29 years from 2028 down to 2000 (inclusive)', () => {
-    expect(options.length).toBe(29);
-    expect(options[0]).toBe(2028);
-    expect(options[options.length - 1]).toBe(2000);
+    it('classic year (starts with 19)', () => {
+      expect(validateCustomerVehicleYear('1965')).toBeNull();
+      expect(validateCustomerVehicleYear('1900')).toBeNull(); // lower edge
+      expect(validateCustomerVehicleYear('1999')).toBeNull();
+    });
+
+    it('upper edge (2099)', () => {
+      expect(validateCustomerVehicleYear('2099')).toBeNull();
+    });
+
+    it('trims surrounding whitespace before validating', () => {
+      expect(validateCustomerVehicleYear('  2024  ')).toBeNull();
+      expect(validateCustomerVehicleYear('\t1965\n')).toBeNull();
+    });
   });
 
-  it('every entry is a unique integer', () => {
-    const set = new Set(options);
-    expect(set.size).toBe(options.length);
-    for (const y of options) expect(Number.isInteger(y)).toBe(true);
+  describe('rejects with "Year is required"', () => {
+    it('empty string', () => {
+      expect(validateCustomerVehicleYear('')).toBe('Year is required');
+    });
+
+    it('whitespace-only', () => {
+      expect(validateCustomerVehicleYear('   ')).toBe('Year is required');
+    });
   });
 
-  it('strictly descending (no gaps)', () => {
-    for (let i = 1; i < options.length; i++) {
-      expect(options[i - 1] - options[i]).toBe(1);
-    }
+  describe('rejects with "Year must be 4 digits"', () => {
+    it('3 digits', () => {
+      expect(validateCustomerVehicleYear('199')).toBe('Year must be 4 digits');
+    });
+
+    it('5 digits', () => {
+      // maxLength=4 prevents this UX-wise; validator covers it anyway.
+      expect(validateCustomerVehicleYear('19655')).toBe('Year must be 4 digits');
+    });
+
+    it('non-digit characters', () => {
+      expect(validateCustomerVehicleYear('abc')).toBe('Year must be 4 digits');
+      expect(validateCustomerVehicleYear('19a5')).toBe('Year must be 4 digits');
+      expect(validateCustomerVehicleYear('20.4')).toBe('Year must be 4 digits');
+    });
   });
 
-  it('does NOT shrink the operator-facing range (POS/admin still see wide list)', () => {
-    // Out-of-scope surfaces must retain the 1980+ range. If this fails, the
-    // shared `getVehicleYearOptions()` was inadvertently narrowed and POS/admin
-    // forms lose their classic-year coverage.
-    const operatorOptions = getVehicleYearOptions();
-    expect(operatorOptions[operatorOptions.length - 1]).toBe(1980);
-    expect(operatorOptions.length).toBeGreaterThan(options.length);
+  describe('rejects with "Year must start with 19 or 20"', () => {
+    it('1800s', () => {
+      expect(validateCustomerVehicleYear('1899')).toBe('Year must start with 19 or 20');
+      expect(validateCustomerVehicleYear('1500')).toBe('Year must start with 19 or 20');
+    });
+
+    it('2100+', () => {
+      // 2100 starts with 21 — rejected by the prefix rule (the constraint
+      // upper bound that replaces #131's numeric max).
+      expect(validateCustomerVehicleYear('2100')).toBe('Year must start with 19 or 20');
+      expect(validateCustomerVehicleYear('9999')).toBe('Year must start with 19 or 20');
+    });
+
+    it('zero-padded but invalid', () => {
+      expect(validateCustomerVehicleYear('0001')).toBe('Year must start with 19 or 20');
+    });
   });
 });
 
-describe('#131 Issue 2 — validateCustomerVehicleYear (write-in bounds 1900–2028)', () => {
-  it('exposes min/max constants the dialog renderers consume', () => {
-    expect(CUSTOMER_VEHICLE_YEAR_INPUT_MIN).toBe(1900);
-    expect(CUSTOMER_VEHICLE_YEAR_INPUT_MAX).toBe(2028);
+describe('#132 Issue 2 — operator-facing year helper untouched (Memory #19 DRY-within-trust-boundary)', () => {
+  // Regression: ensure the wide-range `getVehicleYearOptions()` for POS/admin
+  // surfaces is not inadvertently narrowed by this session's customer-facing
+  // changes. POS/admin operators still get classic-year coverage in their
+  // dropdowns; the customer-facing text input handles 1900-2099 via free entry.
+  const operatorOptions = getVehicleYearOptions();
+
+  it('still returns the full operator range down to 1980', () => {
+    expect(operatorOptions[operatorOptions.length - 1]).toBe(1980);
   });
 
-  it('accepts a 4-digit year inside the inclusive bounds', () => {
-    expect(validateCustomerVehicleYear('1965')).toBeNull();
-    expect(validateCustomerVehicleYear('2024')).toBeNull();
-    expect(validateCustomerVehicleYear('1900')).toBeNull(); // lower edge
-    expect(validateCustomerVehicleYear('2028')).toBeNull(); // upper edge
-  });
-
-  it('rejects empty/whitespace input', () => {
-    expect(validateCustomerVehicleYear('')).toBe('Year is required');
-    expect(validateCustomerVehicleYear('   ')).toBe('Year is required');
-  });
-
-  it('rejects non-4-digit inputs', () => {
-    expect(validateCustomerVehicleYear('19')).toMatch(/4-digit/);
-    expect(validateCustomerVehicleYear('19655')).toMatch(/4-digit/);
-    expect(validateCustomerVehicleYear('abc')).toMatch(/4-digit/);
-    expect(validateCustomerVehicleYear('19a5')).toMatch(/4-digit/);
-  });
-
-  it('rejects years below the lower bound', () => {
-    expect(validateCustomerVehicleYear('1899')).toMatch(/between 1900 and 2028/);
-    expect(validateCustomerVehicleYear('0001')).toMatch(/between 1900 and 2028/);
-  });
-
-  it('rejects years above the upper bound', () => {
-    expect(validateCustomerVehicleYear('2029')).toMatch(/between 1900 and 2028/);
-    expect(validateCustomerVehicleYear('9999')).toMatch(/between 1900 and 2028/);
-  });
-
-  it('trims surrounding whitespace before validating', () => {
-    expect(validateCustomerVehicleYear('  1965  ')).toBeNull();
+  it('every entry is a unique integer', () => {
+    const set = new Set(operatorOptions);
+    expect(set.size).toBe(operatorOptions.length);
+    for (const y of operatorOptions) expect(Number.isInteger(y)).toBe(true);
   });
 });
