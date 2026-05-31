@@ -6,6 +6,115 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #134 — Fix (U-B.2): classification filter on public booking Step 2 — client + server defense in depth (2026-05-30)
+
+Production code change. Branch
+`fix/u-b-2-classification-filter-public-booking-step2`, isolated
+`git worktree` (Memory #8); **merged to main this session.** Closes
+**W1 (Significant)** from the Unit B audit (merge `1eeade10`,
+`docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`).
+
+**Operator decision Q-A LOCKED (resolved this session):** *Only
+services with `classification IN ('primary', 'both')` may appear as
+standalone selectable options on Step 2 of public booking. Services
+with `classification = 'addon_only'` must never appear as standalone
+options.* This is canonical behavior, not a default oversight.
+
+**Two-layer defense-in-depth** (mirrors W2 / `_mobile-eligibility.ts`
+from #133, plus a bonus data-layer query filter):
+- **Layer 1 — data layer (`src/lib/data/booking.ts`).** Both
+  `getBookableServices` (Step 2 category-grouped list) and
+  `getBookableServiceBySlug` (`?service=slug` deep-link) gained a
+  Supabase `.in('classification', PRIMARY_BOOKABLE_CLASSIFICATIONS)`
+  filter — the operator-preferred "source query" location. addon_only
+  services never reach the wizard on a properly-rendered page (smaller
+  payload, no leak risk). The addon sub-select intentionally stays
+  unfiltered — addon_only is the whole point of the addon list.
+- **Layer 2 — server validation (`src/app/api/book/route.ts`).** After
+  the existing service-not-found check, the route invokes
+  `checkPrimaryClassification({ name, classification })` and returns
+  400 with `"{name} cannot be booked as a standalone service. Please
+  select a different service."` if the primary's classification is
+  `addon_only`. Catches three failure modes the data layer can't:
+  (a) tampered/replayed POSTs, (b) deep-links to addon_only slugs that
+  bypass the wizard, (c) operator misconfiguration where
+  `online_bookable=true` is left while classification flips to
+  `addon_only`. Validation order: existence → classification →
+  pricing → slot.
+
+**Helper extraction (`src/app/api/book/_classification.ts`, new):**
+mirrors `_mobile-eligibility.ts` byte-symmetrically:
+- `isPrimaryBookable(classification): boolean` — canonical predicate;
+  single source of truth for "is this service allowed as a standalone
+  primary on Step 2?"
+- `PRIMARY_BOOKABLE_CLASSIFICATIONS = ['primary', 'both'] as const` —
+  imported by `booking.ts` for the Supabase `.in()` filter so the
+  client and server share one constant (drift guard).
+- `checkPrimaryClassification(primary)` — the route's runtime check
+  returning `{ ok: true } | { ok: false; serviceName }`.
+- `primaryClassificationErrorMessage(name)` — wording lock so the
+  route + tests share the customer-facing string verbatim.
+- `'both' counts as primary` is explicit in the predicate (not a magic
+  array) — schema intent is "usable in BOTH surfaces"; Step 2 primary
+  picker is one of those surfaces.
+- Underscore prefix excludes the file from Next.js route resolution
+  (mirrors `_pricing.ts` / `_mobile-eligibility.ts` pattern); helper
+  is unit-testable without standing up Supabase/Stripe/Twilio.
+
+**Cross-package import direction (`@/lib/data/booking.ts` imports from
+`@/app/api/book/_classification`):** unusual lib→app direction is
+justified — the helper is a small server-side rule shared between two
+server-side modules, and there's existing precedent in the codebase
+(`src/lib/pos/tile-colors.ts` imports from `@/app/pos/types`;
+`src/lib/data/receipt-data.ts` imports from
+`@/app/pos/lib/receipt-template`). Alternative (extracting predicate
+to a third file under `@/lib/services/`) would be over-engineering
+for a 3-line rule.
+
+**Tests (+11 → 2723):**
+- `src/app/api/book/__tests__/classification.test.ts` (new, 11 tests):
+  predicate covers all 3 classification values; constant drift guard
+  (every value bookable per predicate; addon_only NOT in constant);
+  helper covers all 3 outcomes; message wording lock with punctuation
+  edge.
+- `src/app/api/book/__tests__/modifier-persistence.test.ts` — single
+  test-fixture line added (`classification: 'primary'` +
+  `mobile_eligible: true` for symmetry with W2's pattern) so the
+  shared mock service row satisfies the new server check. No
+  production behavior change to the modifier-persistence path.
+
+**Gates:** `npx tsc --noEmit` clean (0 errors); `npm run lint` clean
+(0 errors / 97 warnings baseline — none new in touched files);
+`npm test` 2723/2723 passing (was 2712); `npm run build` clean
+compile + 790/790 static pages.
+
+**Files changed:**
+- `src/app/api/book/_classification.ts` (new — pure helper, 87 lines)
+- `src/app/api/book/route.ts` (+ helper import + check between service-fetch and price-validation)
+- `src/lib/data/booking.ts` (+ `.in('classification', PRIMARY_BOOKABLE_CLASSIFICATIONS)` on both queries)
+- `src/app/api/book/__tests__/classification.test.ts` (new — 11 tests)
+- `src/app/api/book/__tests__/modifier-persistence.test.ts` (fixture)
+- `docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md` (mark W1 RESOLVED)
+- `docs/dev/FILE_TREE.md` (new helper + test file entries)
+- `docs/dev/ROADMAP-13-ITEMS.md` (ledger row)
+- `CLAUDE.md` (Rule 22 — note two-layer classification enforcement)
+- This CHANGELOG entry
+
+Scope: 3 prod files modified + 1 new prod helper + 1 new test file + 1
+fixture line; ~120 prod lines net (well under 250 target per Memory #8).
+
+**NOT in scope** per the audit's locked fix arc:
+- W3 (`staff_assessed` resolution) — gates on operator decision Q-B
+- W4 (`is_taxable` honoring) — gates on Q-C
+- W5 / W7 (public-booking prereq enforcement + addon vehicle_compat)
+  — bundled in separate session U-B.5
+- Concern C (`pricing_model` mutability) — gates on Q-D
+- Admin / POS / quote-builder classification handling — already
+  governed by Item #121's `useValidatedServiceAdd` (CLAUDE.md Rule 22)
+  and outside the public-booking audit's scope
+
+---
+
 ## Session #133 — Fix (U-B.1 + E5): Step 2 Back button + server mobile_eligible defense + special_requirements display + pushState navigation (2026-05-30)
 
 Production code change bundle. Branch

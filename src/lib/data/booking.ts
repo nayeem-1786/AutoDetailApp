@@ -2,6 +2,17 @@ import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createAnonClient } from '@/lib/supabase/anon';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
+// W1 (Unit B audit, 2026-05-30) — operator's locked Q-A rule: only
+// services with `classification IN ('primary', 'both')` may surface as
+// standalone primaries on Step 2 of public booking. addon_only services
+// stay valid AS ADD-ONS (the sub-select below intentionally does NOT
+// filter — addon_only is the whole point of the addon list) but must
+// never appear as primary picks. Canonical predicate + constant live
+// in the API route's `_classification.ts` so the same rule drives
+// client filter (here, via the Supabase `.in()` below) AND server
+// validation (in `route.ts`); see that file's header for the
+// two-layer defense rationale (mirrors W2 / `_mobile-eligibility.ts`).
+import { PRIMARY_BOOKABLE_CLASSIFICATIONS } from '@/app/api/book/_classification';
 import type {
   Service,
   ServiceCategory,
@@ -91,6 +102,9 @@ export async function getBookableServices(): Promise<BookableCategory[]> {
     .eq('is_active', true)
     .eq('online_bookable', true)
     .eq('service_categories.is_active', true)
+    // W1 layer 1 (client/data) — primary-classification filter.
+    // PRIMARY_BOOKABLE_CLASSIFICATIONS = ['primary', 'both'].
+    .in('classification', PRIMARY_BOOKABLE_CLASSIFICATIONS as unknown as string[])
     .order('display_order', { ascending: true });
 
   if (error) {
@@ -156,6 +170,10 @@ export async function getBookableServiceBySlug(
     .eq('slug', slug)
     .eq('is_active', true)
     .eq('online_bookable', true)
+    // W1 layer 1 (client/data) — addon_only services never resolve via
+    // deep-link `?service=slug`; returns null so the wizard falls back
+    // to Step 1 instead of pre-selecting an unbookable primary.
+    .in('classification', PRIMARY_BOOKABLE_CLASSIFICATIONS as unknown as string[])
     .single();
 
   if (error || !service) return null;

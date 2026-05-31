@@ -108,6 +108,11 @@ function makeBuilder(table: string): unknown {
           per_unit_price: null,
           is_active: true,
           online_bookable: true,
+          // W1 (Session #134) — server-side classification check requires
+          // this field on the fetched row. Default fixture is a normal
+          // standalone-bookable service.
+          classification: 'primary',
+          mobile_eligible: true,
           vehicle_compatibility: [],
           service_pricing: [],
         },

@@ -5,14 +5,16 @@
 > Worktree: `~/Claude/SmartDetails/wt-unit-b` (Memory #8 isolation)
 > Base: `b1668c62` (Unit A's year text input + model case merge)
 >
-> **Status update (Session #133, 2026-05-30):** **N1, W2, W6, and E5
-> RESOLVED** via Session #133's U-B.1 + E5 bundle (branch
-> `fix/u-b-1-step2-back-server-mobile-special-pushstate`). See the
+> **Status update (Session #134, 2026-05-30):** **N1, W1, W2, W6, and
+> E5 RESOLVED.** N1/W2/W6/E5 via Session #133's U-B.1 + E5 bundle
+> (branch `fix/u-b-1-step2-back-server-mobile-special-pushstate`);
+> **W1 via Session #134** (Q-A LOCKED canonical+enforce; branch
+> `fix/u-b-2-classification-filter-public-booking-step2`). See the
 > per-finding ✅ RESOLVED markers in the matrices below and the
-> `Session #133` entry in `docs/CHANGELOG.md` for full fix documentation.
-> **W1, W3, W4, W5, W7, and Concern C remain open** — each gated on
-> the corresponding operator decision (Q-A through Q-D in the Open
-> Operator Questions section).
+> `Session #133` + `#134` entries in `docs/CHANGELOG.md` for full
+> fix documentation. **W3, W4, W5, W7, and Concern C remain open** —
+> each gated on the corresponding operator decision (Q-B through Q-D
+> in the Open Operator Questions section).
 
 ## Context
 
@@ -241,7 +243,7 @@ Severity scale:
 | ID | Severity | Finding | Surface | Fix shape | Memory #8 safe? |
 |----|----------|---------|---------|-----------|------------------|
 | **N1** | **Significant** | Step 2 lacks explicit Back button — operator confirmed | `step-service-select.tsx` (add `<Button onClick={onBack}>` analogous to step-schedule.tsx:285); wire `onBack={() => goToStep(1)}` from wizard at `booking-wizard.tsx:1129–1155` | ≤30 lines, 2 files | ✅ Yes (≤3 files, <250 lines) — **✅ RESOLVED Session #133 (U-B.1)** |
-| **W1** | **Significant** | `classification` rule unenforced at Step 2 — operator's "only primary on Step 2" rule | `booking.ts:91–93` (add `.in('classification', ['primary', 'both'])`) + `api/book/route.ts:60–67` (add same filter to server re-check) + `getBookableServiceBySlug` parity at `:156–158` | ≤15 lines, 2 files; needs operator confirmation that the rule is canonical (vs. just "default behavior") | ✅ Yes |
+| **W1** | **Significant** | `classification` rule unenforced at Step 2 — operator's "only primary on Step 2" rule | `booking.ts:91–93` (add `.in('classification', ['primary', 'both'])`) + `api/book/route.ts:60–67` (add same filter to server re-check) + `getBookableServiceBySlug` parity at `:156–158` | ≤15 lines, 2 files; needs operator confirmation that the rule is canonical (vs. just "default behavior") | ✅ Yes — **✅ RESOLVED Session #134 (U-B.2)** — Q-A LOCKED canonical+enforce. Two-layer defense: Layer 1 — `booking.ts` both `getBookableServices` + `getBookableServiceBySlug` got `.in('classification', PRIMARY_BOOKABLE_CLASSIFICATIONS)`; Layer 2 — `route.ts` invokes `checkPrimaryClassification` between service-fetch and price-validation. Helper extracted to `_classification.ts` (mirrors `_mobile-eligibility.ts`); single constant drives client + server (drift guard); 11 unit tests. |
 | **W3** | **Significant** | `staff_assessed` completely dead on public booking | Decision required: (a) hide `staff_assessed=true` services from public booking entirely (analogous to `online_bookable=false`); (b) keep visible but suppress "Book My Detail" CTA + show "Requires staff evaluation — request a quote" CTA; (c) deprecate the flag. Each option is 1 small session | ≤50 lines, 2–3 files depending on choice | ✅ Yes |
 | **W2** | **Moderate** | `mobile_eligible` client-only — server has no defense | `api/book/route.ts` (after the service re-fetch at `:60–67`, add: `if (data.is_mobile && !serviceRow.mobile_eligible) return 400 'This service is not mobile-eligible'`) | ≤10 lines, 1 file | ✅ Yes — **✅ RESOLVED Session #133 (U-B.1)** — pure helper extracted to `_mobile-eligibility.ts` (mirrors `_pricing.ts` pattern), 7 unit tests pin the rule; route checks primary + batch-fetches addons |
 | **W4** | **Moderate** | `is_taxable` always false on booking-deposit line items — admin-set true has no booking-time effect | Decision required: (a) honor `is_taxable` at booking by computing tax + adding tax line to Step 4 + writing real `tax_amount` on the deposit transaction; (b) document that booking deposits are intentionally non-taxable and tax is applied only at POS finalization; (c) hide the admin toggle when the only consumer is POS. Each option is a separate small-to-medium session | Variable; needs operator decision first | ✅ Yes for any path |
