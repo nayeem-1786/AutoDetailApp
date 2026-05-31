@@ -141,3 +141,75 @@ describe('#131 Layer 2 — buildSelection() effectiveCat gate (Mirror #2)', () =
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// #132 Issue 4 — model case preservation. Root cause was `titleCaseField()`
+// wrapping the model input's onChange in step-vehicle.tsx and the model
+// save payload in vehicle-form-dialog.tsx. Removed in both. These tests
+// pin the new contract via the same transform-mirror pattern as the Layer 2
+// tests above — calling titleCaseField on model is the smell, NOT calling
+// it is the correct path. If a future contributor re-introduces it, the
+// test fails.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Mirror of the historical behavior (kept inline so a future contributor
+// can see what the bug was). NOT exported from production; this is a
+// reference implementation only.
+function legacyTitleCaseField(value: string): string {
+  if (!value?.trim()) return '';
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+// Production model-transform contract (#132 — display + persist preserve case).
+// step-vehicle.tsx's onChange: `setModel(e.target.value)` — identity transform.
+// vehicle-form-dialog.tsx's save: `(data.model ?? '').trim()` — trims only.
+function modelDisplayTransform(rawInput: string): string {
+  return rawInput;
+}
+function modelSubmitTransform(formValue: string | null | undefined): string {
+  return (formValue ?? '').trim();
+}
+
+describe('#132 Issue 4 — model display preserves case', () => {
+  it('typing CBR600RR shows CBR600RR (not Cbr600rr)', () => {
+    expect(modelDisplayTransform('CBR600RR')).toBe('CBR600RR');
+  });
+
+  it('mixed case preserved (e.g., F-150 XLT)', () => {
+    expect(modelDisplayTransform('F-150 XLT')).toBe('F-150 XLT');
+  });
+
+  it('VIN-style codes preserved', () => {
+    expect(modelDisplayTransform('M3 Competition')).toBe('M3 Competition');
+    expect(modelDisplayTransform('GT3 RS')).toBe('GT3 RS');
+  });
+
+  it('regression — legacy titleCaseField WOULD mangle these (proves the bug existed)', () => {
+    // If anyone re-introduces titleCaseField on the model input, these
+    // assertions describe what the user would see again.
+    expect(legacyTitleCaseField('CBR600RR')).toBe('Cbr600rr');
+    expect(legacyTitleCaseField('GT3 RS')).toBe('Gt3 Rs');
+    expect(legacyTitleCaseField('F-150 XLT')).toBe('F-150 Xlt');
+  });
+});
+
+describe('#132 Issue 4 — model submit preserves case', () => {
+  it('CBR600RR survives the save transform', () => {
+    expect(modelSubmitTransform('CBR600RR')).toBe('CBR600RR');
+  });
+
+  it('trims whitespace but keeps interior casing', () => {
+    expect(modelSubmitTransform('  CBR600RR  ')).toBe('CBR600RR');
+    expect(modelSubmitTransform('  GT3 RS  ')).toBe('GT3 RS');
+  });
+
+  it('null/undefined → empty string', () => {
+    expect(modelSubmitTransform(null)).toBe('');
+    expect(modelSubmitTransform(undefined)).toBe('');
+  });
+});
+

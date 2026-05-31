@@ -6,6 +6,105 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #132 — Fix (Unit A): year text input supersedes #131 dropdown+Other + model case preservation (2026-05-30)
+
+Production UI correction. Branch `fix/unit-a-year-text-input-and-model-case`,
+isolated `git worktree` (Memory #8); **merged to main this session.**
+Two small contained changes on the same two files, ~30-minute scope.
+
+**Issue 2 (DESIGN REVERSAL) — Operator reconsidered #131's dropdown +
+Other... pattern shipped ~3 hours earlier.** New design: replace the year
+dropdown entirely with a single 4-digit text input on both customer-facing
+forms. Allowed values: 4 digits beginning with "19" or "20" (range
+1900–2099 inclusive — the prefix rule IS the range constraint). The
+helper `getCustomerVehicleYearOptions()` (#131) is now dead code and was
+removed; `validateCustomerVehicleYear()` was repurposed (same export
+name, new rule) so callers stay byte-stable on imports. The constants
+`CUSTOMER_VEHICLE_YEAR_INPUT_MIN`/`_MAX` (#131) are also gone — the new
+prefix-based rule doesn't need numeric bounds.
+
+- **`step-vehicle.tsx`** (public booking): year UI collapsed from
+  Select+yearOtherMode+customYearInput state machine (~70 lines) to a
+  single `<Input type="text" inputMode="numeric" maxLength={4}>` with
+  `onChange` that strips non-digits, validates against the new rule,
+  and commits to the canonical `year: number | null` state when valid.
+  `onBlur` forces the error once the field is left, even if empty.
+  `handleContinue()`'s "Required" error now uses the validator's
+  specific message so customers see WHY their year was rejected
+  (e.g., a "204" typo surfaces "Year must be 4 digits" rather than
+  the generic "Required"). Removed: `Select` import (no other Select
+  in the file), `getCustomerVehicleYearOptions` import,
+  `yearOtherMode`/`customYearInput`/`YEAR_OTHER_SENTINEL` references.
+- **`vehicle-form-dialog.tsx`** (customer portal): year UI collapsed
+  from the same dual-mode pattern to one `<Input>` wired through
+  react-hook-form `register('year', { setValueAs, validate })` so the
+  digits-only coercion and the prefix-rule validation both flow
+  through RHF's existing pipeline. Removed: `yearOtherMode` state,
+  initial-Other-mode detection in the open effect, `getCustomerVehicleYearOptions`
+  import. The schema's wider `z.coerce.number().min(1900).max(2100)`
+  stays untouched (other paths still consume it).
+- **Operator-facing surfaces untouched** per session scope. POS
+  `vehicle-create-dialog.tsx` and admin `customers/[id]/page.tsx`
+  continue using the legacy `getVehicleYearOptions()` (range
+  1980→currentYear+2). Memory #19's "DRY within trust boundary"
+  finding still holds.
+
+**Issue 4 — Model input strips case.** Root cause traced (Memory #11)
+before fix-shape commitment. Found at TWO locations, NO CSS involved:
+- `step-vehicle.tsx:435` — `setModel(titleCaseField(e.target.value))`
+  on every keystroke. Typing "CBR600RR" rendered as "Cbr600rr"
+  (titleCaseField uppercases the first character of each
+  whitespace-split word and lowercases the rest). **Fix: replaced
+  with `setModel(e.target.value)` — identity transform.** The Input's
+  `value={model}` then displays exactly what the user typed.
+- `vehicle-form-dialog.tsx:211` — `titleCaseField(data.model || '')`
+  on save (not display — RHF preserves display case via `register`).
+  Same mangling on the payload hitting the API. **Fix: replaced
+  with `(data.model ?? '').trim()` — strip whitespace only.**
+- Color's `titleCaseField` calls stay — operator decision separates
+  model casing from color casing per session scope ("Make has a
+  separate case story from model — DO NOT touch make casing").
+- Server-side: clean. API routes do NOT lowercase model (confirmed via
+  grep of `src/app/api/customer/vehicles` + `src/app/api/book` —
+  only email normalization hits).
+
+**Tests (+10 → 2697):**
+- `vehicle-year-helpers.test.ts` rewritten — 17 tests covering the new
+  validator rule (accepts 1965/2024/1900/2099/whitespace-trim; rejects
+  empty with "Year is required", non-4-digit with "Year must be 4
+  digits", non-19/20 prefix with "Year must start with 19 or 20").
+  Operator-range-NOT-narrowed regression preserved. Dead-helper tests
+  (`getCustomerVehicleYearOptions` + constants) removed.
+- `step-vehicle.test.tsx` +8 — model display + submit transforms locked
+  via the same predicate-mirror pattern as the existing Layer 2 tests.
+  Includes a "legacy titleCaseField WOULD mangle these" regression that
+  documents the bug shape so any future re-introduction fails the test
+  with a clear message.
+
+**Scope discipline (Memory #8):** 3 prod files modified + 2 test files
+updated. Production delta ~42 lines net (+256 / -224 — much removal
+since the dropdown+Other state machine collapsed to a single Input).
+Well under the ~150-200 line ceiling. No migrations / new permission
+keys / POS / admin / quote-builder edits.
+
+**Supersedes #131 Issue 2's dropdown+Other UX within 24 hours.** The
+helper churn is intentional: keep export names byte-stable so the
+operator's design pivot doesn't ripple beyond the immediate UI swap.
+Layer 2 classifier hardening from #131 is NOT touched — orthogonal
+concern, still in production.
+
+**Files modified:** `src/components/booking/step-vehicle.tsx`,
+`src/components/account/vehicle-form-dialog.tsx`,
+`src/components/ui/vehicle-make-combobox.tsx`,
+`src/components/booking/__tests__/step-vehicle.test.tsx`,
+`src/components/ui/__tests__/vehicle-year-helpers.test.ts`.
+
+**Gates:** `tsc --noEmit` 0 errors; `npm run lint` 0 errors / 97
+warnings (none new in touched files); `npm test` 2697/2697 pass;
+`next build` clean.
+
+---
+
 ## Session #131 — Fix: Layer 2 classifier hardening (corrects #129 Y-1 insufficiency) + year dropdown 2028→2000 with Other write-in (2026-05-30)
 
 Production code fix bundle. Branch

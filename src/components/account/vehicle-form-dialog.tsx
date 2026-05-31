@@ -32,7 +32,6 @@ import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import {
   VehicleMakeCombobox,
-  getCustomerVehicleYearOptions,
   validateCustomerVehicleYear,
   titleCaseField,
 } from '@/components/ui/vehicle-make-combobox';
@@ -66,7 +65,6 @@ export function VehicleFormDialog({
   const isEdit = !!vehicle;
   const [saving, setSaving] = useState(false);
   const [category, setCategory] = useState<VehicleCategory>('automobile');
-  const [yearOtherMode, setYearOtherMode] = useState(false);
 
   // #129 C3 — opt-in classifier: surfaces an inline specialty-tier advisory
   // when the typed make+model resolves to 'exotic' or 'classic'. The server
@@ -111,10 +109,8 @@ export function VehicleFormDialog({
     if (open && vehicle) {
       const cat = deriveCategory(vehicle);
       setCategory(cat);
-      // Auto-detect "Other" mode if year is outside the customer dropdown range
-      // (#131 Issue 2 — dropdown is now 2028→2000; older vehicles auto-route to write-in).
-      const yearOptions = getCustomerVehicleYearOptions();
-      setYearOtherMode(!!vehicle.year && !yearOptions.includes(vehicle.year));
+      // #132 Issue 2 — year is now a single 4-digit text input; no Other-mode
+      // detection needed (the #131 dropdown + Other-mode toggle was removed).
       reset({
         vehicle_category: cat,
         vehicle_type: vehicle.vehicle_type as CustomerVehicleInput['vehicle_type'],
@@ -127,7 +123,6 @@ export function VehicleFormDialog({
       });
     } else if (open) {
       setCategory('automobile');
-      setYearOtherMode(false);
       reset({
         vehicle_category: 'automobile',
         vehicle_type: 'standard',
@@ -213,7 +208,13 @@ export function VehicleFormDialog({
           vehicle_type: isSpecialty ? category : 'standard',
           size_class: !isSpecialty ? data.size_class : null,
           specialty_tier: isSpecialty ? (data.specialty_tier || null) : null,
-          model: titleCaseField(data.model || ''),
+          // #132 Issue 4 — preserve model case as the user typed it
+          // (e.g., "CBR600RR" stays "CBR600RR"). Previously called
+          // `titleCaseField(...)` here which lower-cased everything after
+          // each word's first character, mangling VINs / part-style model
+          // codes. Color's titleCase stays — operator decision separates
+          // model casing from color casing.
+          model: (data.model ?? '').trim(),
           color: titleCaseField(data.color || ''),
         }),
       });
@@ -260,57 +261,40 @@ export function VehicleFormDialog({
           </FormField>
 
           <div className="grid gap-4 sm:grid-cols-3">
+            {/* Year — #132 Issue 2: single 4-digit text input (supersedes
+                #131's dropdown+Other... pattern). Rule: 4 digits starting
+                with 19 or 20 (1900–2099). The "19/20" prefix IS the
+                range constraint; the schema's 1900-2100 stays for back-compat
+                with non-customer paths but the form rejects 2100+ via this
+                validator. */}
             <FormField label="Year" error={errors.year?.message} htmlFor="vehicle_year">
-              {yearOtherMode ? (
-                <>
-                  <Input
-                    id="vehicle_year"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    placeholder="Enter year (e.g., 1965)"
-                    className={errors.year ? 'border-red-500' : ''}
-                    {...register('year', {
-                      // #131 Issue 2 — enforce 1900-2028 client-side per the
-                      // customer-facing write-in bounds. The schema accepts a
-                      // wider range (1900-2100) for non-customer paths.
-                      validate: (val) => {
-                        if (val === null || val === undefined) return true;
-                        const str = String(val).trim();
-                        if (str === '') return true;
-                        return validateCustomerVehicleYear(str) ?? true;
-                      },
-                    })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => { setYearOtherMode(false); setValue('year', null); }}
-                    className="mt-1 text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    Back to list
-                  </button>
-                </>
-              ) : (
-                <Select
-                  id="vehicle_year"
-                  className={errors.year ? 'border-red-500' : ''}
-                  {...register('year', {
-                    onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-                      if (e.target.value === 'other') {
-                        setYearOtherMode(true);
-                        setValue('year', null);
-                      }
-                    },
-                  })}
-                >
-                  <option value="">Year...</option>
-                  {getCustomerVehicleYearOptions().map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                  <option value="other">Other...</option>
-                </Select>
-              )}
+              <Input
+                id="vehicle_year"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={4}
+                placeholder="e.g., 2024"
+                className={errors.year ? 'border-red-500' : ''}
+                {...register('year', {
+                  setValueAs: (val: unknown) => {
+                    // Strip non-digits and coerce to integer; RHF stores the
+                    // numeric value while the input displays the raw string.
+                    if (val === null || val === undefined) return null;
+                    const str = String(val).trim();
+                    if (str === '') return null;
+                    const cleaned = str.replace(/\D/g, '').slice(0, 4);
+                    const n = parseInt(cleaned, 10);
+                    return Number.isFinite(n) ? n : null;
+                  },
+                  validate: (val) => {
+                    if (val === null || val === undefined) return true;
+                    const str = String(val).trim();
+                    if (str === '') return true;
+                    return validateCustomerVehicleYear(str) ?? true;
+                  },
+                })}
+              />
             </FormField>
 
             <FormField label="Make" error={errors.make?.message} htmlFor="vehicle_make">

@@ -4,12 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { FormField } from '@/components/ui/form-field';
 import { Spinner } from '@/components/ui/spinner';
 import {
   VehicleMakeCombobox,
-  getCustomerVehicleYearOptions,
   validateCustomerVehicleYear,
   titleCaseField,
 } from '@/components/ui/vehicle-make-combobox';
@@ -62,9 +60,6 @@ const CATEGORY_ICONS: Record<string, typeof Car> = {
   aircraft: Plane,
 };
 
-const yearOptions = getCustomerVehicleYearOptions();
-const YEAR_OTHER_SENTINEL = 'other';
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -92,14 +87,14 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   const [year, setYear] = useState<number | null>(initialVehicle?.year ?? null);
   const [color, setColor] = useState(initialVehicle?.color ?? '');
 
-  // #131 Issue 2 — year dropdown shows 2028→2000. Vehicles outside that range
-  // (classics, future model years) use the "Other..." write-in path. Edit-mode
-  // detection: if the initial year is outside the dropdown list, start in
-  // Other-mode so the customer can see + edit their existing value.
-  const initialYearOther = !!initialVehicle?.year && !yearOptions.includes(initialVehicle.year);
-  const [yearOtherMode, setYearOtherMode] = useState(initialYearOther);
-  const [customYearInput, setCustomYearInput] = useState(
-    initialYearOther ? String(initialVehicle!.year) : ''
+  // #132 Issue 2 — year is a single 4-digit text input (supersedes #131's
+  // dropdown+Other design). `yearInput` mirrors what the user typed (string);
+  // `year` (above) is the canonical numeric value committed when the input
+  // is valid. Inline-error rendering is gated by the onChange's `raw ? err : ''`
+  // pattern so an empty initial state doesn't show "Year is required"; onBlur
+  // forces the error once the user moves on, even if the input is empty.
+  const [yearInput, setYearInput] = useState<string>(
+    initialVehicle?.year ? String(initialVehicle.year) : ''
   );
 
   // Auto-resolved classification
@@ -279,7 +274,10 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     if (mode === 'manual') {
       if (!make.trim()) newErrors.make = 'Required';
       if (!model.trim()) newErrors.model = 'Required';
-      if (!year) newErrors.year = 'Required';
+      // #132 Issue 2 — surface the validator's specific message rather than
+      // a generic "Required" so the customer sees why their year was rejected
+      // (e.g., "Year must start with 19 or 20" for a typo like "2024" → "204").
+      if (!year) newErrors.year = validateCustomerVehicleYear(yearInput) ?? 'Required';
       if (!color.trim()) newErrors.color = 'Required';
       if (category === 'automobile' && !effectiveSizeClass) {
         newErrors.size_class = 'Please select a vehicle size';
@@ -427,12 +425,16 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
           />
         </FormField>
 
-        {/* Model */}
+        {/* Model — #132 Issue 4: preserve case as the user types.
+            Previously called `titleCaseField(e.target.value)` on every
+            keystroke, which lower-cased "CBR600RR" to "Cbr600rr". The DB
+            persists whatever the input emits; preserving case here means
+            VINs / part-style model codes are saved verbatim. */}
         <FormField label="Model" required htmlFor="vehicle-model" error={errors.model}>
           <Input
             id="vehicle-model"
             value={model}
-            onChange={(e) => { setModel(titleCaseField(e.target.value)); setErrors((prev) => ({ ...prev, model: '' })); }}
+            onChange={(e) => { setModel(e.target.value); setErrors((prev) => ({ ...prev, model: '' })); }}
             placeholder={category === 'automobile' ? 'e.g., Camry' : 'e.g., Sportster'}
             className="text-base sm:text-sm"
           />
@@ -440,67 +442,39 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
 
         {/* Year + Color row */}
         <div className="grid grid-cols-2 gap-3">
+          {/* Year — #132 Issue 2: single 4-digit text input. Allowed values
+              match `/^(19|20)\d{2}$/` (1900–2099). The "19/20" prefix rule IS
+              the range constraint. Replaces #131's dropdown+Other... pattern
+              per operator reconsideration. */}
           <FormField label="Year" required htmlFor="vehicle-year" error={errors.year}>
-            {yearOtherMode ? (
-              <div className="space-y-1">
-                <Input
-                  id="vehicle-year"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={4}
-                  value={customYearInput}
-                  placeholder="Enter year (e.g., 1965)"
-                  className="text-base sm:text-sm"
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
-                    setCustomYearInput(raw);
-                    const err = validateCustomerVehicleYear(raw);
-                    if (err) {
-                      setYear(null);
-                      setErrors((prev) => ({ ...prev, year: raw ? err : '' }));
-                    } else {
-                      setYear(parseInt(raw, 10));
-                      setErrors((prev) => ({ ...prev, year: '' }));
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setYearOtherMode(false);
-                    setCustomYearInput('');
-                    setYear(null);
-                    setErrors((prev) => ({ ...prev, year: '' }));
-                  }}
-                  className="text-xs text-accent-brand hover:underline"
-                >
-                  Back to list
-                </button>
-              </div>
-            ) : (
-              <Select
-                id="vehicle-year"
-                value={year?.toString() ?? ''}
-                onChange={(e) => {
-                  if (e.target.value === YEAR_OTHER_SENTINEL) {
-                    setYearOtherMode(true);
-                    setYear(null);
-                    setCustomYearInput('');
-                    setErrors((prev) => ({ ...prev, year: '' }));
-                    return;
-                  }
-                  setYear(e.target.value ? parseInt(e.target.value, 10) : null);
+            <Input
+              id="vehicle-year"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              value={yearInput}
+              placeholder="e.g., 2024"
+              className="text-base sm:text-sm"
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setYearInput(raw);
+                const validationError = validateCustomerVehicleYear(raw);
+                if (validationError) {
+                  setYear(null);
+                  // Only surface error after user has typed something;
+                  // an empty input shouldn't render "Year is required" until blur/submit.
+                  setErrors((prev) => ({ ...prev, year: raw ? validationError : '' }));
+                } else {
+                  setYear(parseInt(raw, 10));
                   setErrors((prev) => ({ ...prev, year: '' }));
-                }}
-              >
-                <option value="">Select year</option>
-                {yearOptions.map((y) => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-                <option value={YEAR_OTHER_SENTINEL}>Other...</option>
-              </Select>
-            )}
+                }
+              }}
+              onBlur={() => {
+                const validationError = validateCustomerVehicleYear(yearInput);
+                setErrors((prev) => ({ ...prev, year: validationError ?? '' }));
+              }}
+            />
           </FormField>
           <FormField label="Color" required htmlFor="vehicle-color" error={errors.color}>
             <Input

@@ -297,43 +297,28 @@ export function getVehicleYearOptions(): number[] {
   return years;
 }
 
-// #131 Issue 2 — customer-facing year list.
-// Per operator ruling: 2028 down to 2000 (29 entries), with an explicit
-// "Other..." write-in for vehicles outside that range (1900-2028).
-// Bounded list keeps the typical-vehicle case fast; the write-in path
-// handles classics + future model-year releases.
-const CUSTOMER_VEHICLE_YEAR_MAX = 2028;
-const CUSTOMER_VEHICLE_YEAR_MIN = 2000;
-/** Inclusive lower bound for the "Other..." custom-year input. */
-export const CUSTOMER_VEHICLE_YEAR_INPUT_MIN = 1900;
-/** Inclusive upper bound for the "Other..." custom-year input. */
-export const CUSTOMER_VEHICLE_YEAR_INPUT_MAX = CUSTOMER_VEHICLE_YEAR_MAX;
+// #132 Issue 2 — supersedes #131's dropdown+Other design.
+// Operator reconsidered: replace the year dropdown entirely with a single
+// 4-digit text input on customer-facing vehicle forms. Allowed values
+// must match `/^(19|20)\d{2}$/` (1900–2099, integer). The "19/20" prefix
+// rule IS the range constraint — no separate numeric bounds needed.
+//
+// The #131 helper `getCustomerVehicleYearOptions()` and constants
+// `CUSTOMER_VEHICLE_YEAR_INPUT_MIN`/`_MAX` were removed as dead code.
+// The wide-range `getVehicleYearOptions()` above stays — operator surfaces
+// (POS, admin) are out of scope per Memory #19's "DRY within trust
+// boundary" finding.
 
 /**
- * Generate the year options shown on customer-facing vehicle forms
- * (public booking, customer portal). Operator-facing forms (POS, admin)
- * continue to use `getVehicleYearOptions()` for the wider range.
- */
-export function getCustomerVehicleYearOptions(): number[] {
-  const years: number[] = [];
-  for (let y = CUSTOMER_VEHICLE_YEAR_MAX; y >= CUSTOMER_VEHICLE_YEAR_MIN; y--) {
-    years.push(y);
-  }
-  return years;
-}
-
-/**
- * Validate a customer-entered year against the "Other..." write-in bounds.
- * Returns null if valid; an error string if not.
+ * Validate a customer-entered vehicle year against the #132 text-input rule.
+ * Returns `null` when valid; an error message when not.
+ * Rule: 4-digit integer with prefix "19" or "20" (range 1900–2099 inclusive).
  */
 export function validateCustomerVehicleYear(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return 'Year is required';
-  if (!/^\d{4}$/.test(trimmed)) return 'Enter a 4-digit year';
-  const n = parseInt(trimmed, 10);
-  if (n < CUSTOMER_VEHICLE_YEAR_INPUT_MIN || n > CUSTOMER_VEHICLE_YEAR_INPUT_MAX) {
-    return `Year must be between ${CUSTOMER_VEHICLE_YEAR_INPUT_MIN} and ${CUSTOMER_VEHICLE_YEAR_INPUT_MAX}`;
-  }
+  if (!/^\d{4}$/.test(trimmed)) return 'Year must be 4 digits';
+  if (!/^(19|20)\d{2}$/.test(trimmed)) return 'Year must start with 19 or 20';
   return null;
 }
 
