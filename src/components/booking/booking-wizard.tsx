@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, type ReadonlyURLSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils/cn';
 import { LOYALTY } from '@/lib/utils/constants';
 import { STRIPE_MIN_DOLLARS } from '@/lib/utils/money';
@@ -229,20 +229,26 @@ export function BookingWizard({
   }
 
   // --- URL state restoration ---
-  function getInitialState(): { step: number; state: BookingState } {
-    const urlStep = parseInt(searchParams.get('step') ?? '', 10);
-    const urlVehicle = searchParams.get('vehicle') as VehicleSizeClass | null;
-    const urlDate = searchParams.get('date');
-    const urlTime = searchParams.get('time');
-    const urlAddons = searchParams.get('addons');
-    const urlCategory = searchParams.get('category') ?? 'automobile';
+  // E5 (Unit B audit, 2026-05-30): accept an optional URLSearchParams arg
+  // so the popstate handler can rehydrate from a FRESH read of
+  // `window.location.search` rather than the (potentially stale)
+  // useSearchParams() hook value at popstate firing time. The default
+  // (`searchParams`) preserves the original mount-time behavior.
+  function getInitialState(paramsArg?: URLSearchParams): { step: number; state: BookingState } {
+    const params: URLSearchParams | ReadonlyURLSearchParams = paramsArg ?? searchParams;
+    const urlStep = parseInt(params.get('step') ?? '', 10);
+    const urlVehicle = params.get('vehicle') as VehicleSizeClass | null;
+    const urlDate = params.get('date');
+    const urlTime = params.get('time');
+    const urlAddons = params.get('addons');
+    const urlCategory = params.get('category') ?? 'automobile';
 
     // URL vehicle data restoration
-    const urlVehicleId = searchParams.get('vehicle_id');
-    const urlVehicleCategory = searchParams.get('vehicle_category') ?? urlCategory;
-    const urlSizeClass = searchParams.get('size_class');
-    const urlMake = searchParams.get('make');
-    const urlModel = searchParams.get('model');
+    const urlVehicleId = params.get('vehicle_id');
+    const urlVehicleCategory = params.get('vehicle_category') ?? urlCategory;
+    const urlSizeClass = params.get('size_class');
+    const urlMake = params.get('make');
+    const urlModel = params.get('model');
 
     const service = rebookService ?? preSelectedService;
     const rebookVehicle = buildRebookVehicle();
@@ -551,7 +557,15 @@ export function BookingWizard({
     );
 
   // --- URL state sync ---
-  const updateUrl = useCallback((newStep: number, newState: BookingState) => {
+  // E5 (Unit B audit, 2026-05-30): `isInitial=true` calls use
+  // `history.replaceState` so the mount doesn't add a duplicate history
+  // entry on top of the bare `/book` URL the user actually navigated to.
+  // Subsequent step transitions use `history.pushState` so browser
+  // back walks the wizard step-by-step instead of exiting the booking
+  // page entirely (the prior `replaceState`-everywhere behavior was the
+  // root of the operator's "no way back" perception that surfaced in
+  // the Unit B audit). Paired with the `popstate` listener below.
+  const updateUrl = useCallback((newStep: number, newState: BookingState, isInitial = false) => {
     const params = new URLSearchParams();
 
     // Always set step
@@ -610,19 +624,48 @@ export function BookingWizard({
     }
 
     const newUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.replaceState(null, '', newUrl);
+    if (isInitial) {
+      window.history.replaceState(null, '', newUrl);
+    } else {
+      window.history.pushState(null, '', newUrl);
+    }
   }, [couponCode, searchParams]);
 
-  // Set initial URL on first render
+  // Set initial URL on first render. Uses `isInitial=true` so the bare
+  // `/book` URL is replaced (no duplicate history entry) — see updateUrl
+  // header for the pushState/replaceState rationale.
   useEffect(() => {
     if (!initializedRef.current) {
       initializedRef.current = true;
-      updateUrl(step, state);
+      updateUrl(step, state, true);
       return;
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Custom setStep that also updates URL
+  // E5 (Unit B audit, 2026-05-30): popstate listener so browser back/
+  // forward walks the wizard steps. Reads FRESH `window.location.search`
+  // because `useSearchParams()` may not have settled by the time the
+  // synchronous popstate handler fires. Re-derives step + full state via
+  // `getInitialState(params)` so URL-bound data (vehicle, service slug,
+  // date, time, addons) rehydrates exactly as it would on a deep-link
+  // refresh — keeping the back/forward path symmetric with the deep-link
+  // path. The closure captures the latest `getInitialState` via React's
+  // re-render cycle; deps are intentionally empty (the listener is
+  // attached once at mount and reads fresh URL on every fire).
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const restored = getInitialState(params);
+      setStep(restored.step);
+      setState(restored.state);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Custom setStep that also updates URL (push, not replace, so browser
+  // back walks the wizard — see updateUrl header).
   function goToStep(newStep: number, updatedState?: BookingState) {
     const s = updatedState ?? state;
     setStep(newStep);
@@ -1139,6 +1182,11 @@ export function BookingWizard({
             vehicleSizeClass={(state.vehicleData?.size_class as VehicleSizeClass) ?? null}
             vehicleSpecialtyTier={state.vehicleData?.specialty_tier ?? null}
             customerProfileAddress={matchedCustomerAddress}
+            // N1 (Unit B audit): wire the new Back-to-Step-1 affordance.
+            // Suppressed during edit-from-Step-4 mode so the "Back to
+            // Booking" button below remains the only backward path —
+            // stacking two would be a UX regression.
+            onBack={editEntryStep === null ? () => goToStep(1) : undefined}
           />
           {editEntryStep !== null && (
             <div className="mt-4">
@@ -1175,6 +1223,9 @@ export function BookingWizard({
           <StepConfirmBook
             serviceName={state.service.name}
             serviceId={state.service.id}
+            // W6 (Unit B audit): pass through so the order summary mirrors
+            // the Step 2 service card's special-requirements note.
+            serviceSpecialRequirements={state.service.special_requirements ?? null}
             tierName={state.config.tier_label ?? state.config.tier_name}
             price={state.config.price}
             durationMinutes={totalDuration}

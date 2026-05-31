@@ -6,6 +6,7 @@ import { normalizePhone } from '@/lib/utils/format';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { APPOINTMENT, FEATURE_FLAGS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import { computeExpectedPrice } from './_pricing';
+import { checkMobileEligibility, mobileIneligibleErrorMessage } from './_mobile-eligibility';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
@@ -272,6 +273,44 @@ export async function POST(request: NextRequest) {
         { error: 'Mobile service is not currently available' },
         { status: 400 }
       );
+    }
+
+    // W2 (Unit B audit, 2026-05-30): server-side defense for
+    // `services.mobile_eligible`. The Step 2 client already gates the
+    // "Add mobile service" UI on `selectedService.mobile_eligible`
+    // (step-service-select.tsx:475) and the addon cards on
+    // `service.mobile_eligible` (`:870`), but a tampered or replayed
+    // request could submit `is_mobile=true` with a non-eligible
+    // service or addon. Pure rule lives in `./_mobile-eligibility.ts`
+    // (see header for rationale + unit tests). Validation order mirrors
+    // existing pattern: feature flag → service eligibility → zone.
+    if (data.is_mobile) {
+      let addonEligibilityRows: { name: string; mobile_eligible: boolean }[] = [];
+      if (data.addons.length > 0) {
+        const addonIds = data.addons.map((a) => a.service_id);
+        const { data: addonRows, error: addonErr } = await supabase
+          .from('services')
+          .select('id, name, mobile_eligible')
+          .in('id', addonIds);
+        if (addonErr) {
+          console.error('Addon mobile_eligible lookup failed:', addonErr.message);
+          return NextResponse.json(
+            { error: 'Failed to validate add-on services' },
+            { status: 500 }
+          );
+        }
+        addonEligibilityRows = addonRows ?? [];
+      }
+      const eligibilityCheck = checkMobileEligibility(
+        { name: serviceRow.name as string, mobile_eligible: serviceRow.mobile_eligible },
+        addonEligibilityRows
+      );
+      if (!eligibilityCheck.ok) {
+        return NextResponse.json(
+          { error: mobileIneligibleErrorMessage(eligibilityCheck.serviceName) },
+          { status: 400 }
+        );
+      }
     }
 
     // Server-side mobile zone validation. Anonymous booking clients can't be

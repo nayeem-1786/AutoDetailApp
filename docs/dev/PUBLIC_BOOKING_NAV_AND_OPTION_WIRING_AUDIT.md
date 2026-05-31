@@ -4,6 +4,15 @@
 > Branch: `audit/public-booking-navigation-and-admin-option-wiring`
 > Worktree: `~/Claude/SmartDetails/wt-unit-b` (Memory #8 isolation)
 > Base: `b1668c62` (Unit A's year text input + model case merge)
+>
+> **Status update (Session #133, 2026-05-30):** **N1, W2, W6, and E5
+> RESOLVED** via Session #133's U-B.1 + E5 bundle (branch
+> `fix/u-b-1-step2-back-server-mobile-special-pushstate`). See the
+> per-finding ✅ RESOLVED markers in the matrices below and the
+> `Session #133` entry in `docs/CHANGELOG.md` for full fix documentation.
+> **W1, W3, W4, W5, W7, and Concern C remain open** — each gated on
+> the corresponding operator decision (Q-A through Q-D in the Open
+> Operator Questions section).
 
 ## Context
 
@@ -231,13 +240,13 @@ Severity scale:
 
 | ID | Severity | Finding | Surface | Fix shape | Memory #8 safe? |
 |----|----------|---------|---------|-----------|------------------|
-| **N1** | **Significant** | Step 2 lacks explicit Back button — operator confirmed | `step-service-select.tsx` (add `<Button onClick={onBack}>` analogous to step-schedule.tsx:285); wire `onBack={() => goToStep(1)}` from wizard at `booking-wizard.tsx:1129–1155` | ≤30 lines, 2 files | ✅ Yes (≤3 files, <250 lines) |
+| **N1** | **Significant** | Step 2 lacks explicit Back button — operator confirmed | `step-service-select.tsx` (add `<Button onClick={onBack}>` analogous to step-schedule.tsx:285); wire `onBack={() => goToStep(1)}` from wizard at `booking-wizard.tsx:1129–1155` | ≤30 lines, 2 files | ✅ Yes (≤3 files, <250 lines) — **✅ RESOLVED Session #133 (U-B.1)** |
 | **W1** | **Significant** | `classification` rule unenforced at Step 2 — operator's "only primary on Step 2" rule | `booking.ts:91–93` (add `.in('classification', ['primary', 'both'])`) + `api/book/route.ts:60–67` (add same filter to server re-check) + `getBookableServiceBySlug` parity at `:156–158` | ≤15 lines, 2 files; needs operator confirmation that the rule is canonical (vs. just "default behavior") | ✅ Yes |
 | **W3** | **Significant** | `staff_assessed` completely dead on public booking | Decision required: (a) hide `staff_assessed=true` services from public booking entirely (analogous to `online_bookable=false`); (b) keep visible but suppress "Book My Detail" CTA + show "Requires staff evaluation — request a quote" CTA; (c) deprecate the flag. Each option is 1 small session | ≤50 lines, 2–3 files depending on choice | ✅ Yes |
-| **W2** | **Moderate** | `mobile_eligible` client-only — server has no defense | `api/book/route.ts` (after the service re-fetch at `:60–67`, add: `if (data.is_mobile && !serviceRow.mobile_eligible) return 400 'This service is not mobile-eligible'`) | ≤10 lines, 1 file | ✅ Yes |
+| **W2** | **Moderate** | `mobile_eligible` client-only — server has no defense | `api/book/route.ts` (after the service re-fetch at `:60–67`, add: `if (data.is_mobile && !serviceRow.mobile_eligible) return 400 'This service is not mobile-eligible'`) | ≤10 lines, 1 file | ✅ Yes — **✅ RESOLVED Session #133 (U-B.1)** — pure helper extracted to `_mobile-eligibility.ts` (mirrors `_pricing.ts` pattern), 7 unit tests pin the rule; route checks primary + batch-fetches addons |
 | **W4** | **Moderate** | `is_taxable` always false on booking-deposit line items — admin-set true has no booking-time effect | Decision required: (a) honor `is_taxable` at booking by computing tax + adding tax line to Step 4 + writing real `tax_amount` on the deposit transaction; (b) document that booking deposits are intentionally non-taxable and tax is applied only at POS finalization; (c) hide the admin toggle when the only consumer is POS. Each option is a separate small-to-medium session | Variable; needs operator decision first | ✅ Yes for any path |
 | **W5** | **Moderate** | `service_prerequisites` not enforced on public booking | Add prereq check (analogous to `api/pos/services/check-prerequisites/route.ts`) to `api/book/route.ts` before appointment insert; surface friendly error to customer with what prereq is needed | ≤80 lines, 2 files | ✅ Yes |
-| **W6** | **Moderate** | `special_requirements` text never shown to customer | Add to `BookableService` interface + render as expandable note on Step 2 service card; mirror admin's intent ("special requirements" = customer-visible disclosure) | ≤40 lines, 2 files | ✅ Yes |
+| **W6** | **Moderate** | `special_requirements` text never shown to customer | Add to `BookableService` interface + render as expandable note on Step 2 service card; mirror admin's intent ("special requirements" = customer-visible disclosure) | ≤40 lines, 2 files | ✅ Yes — **✅ RESOLVED Session #133 (U-B.1)** — surfaced on Step 2 service card (italic "Note: …" below description, `line-clamp-2`) + Step 4 order summary (same styling, directly below service line); 3 unit tests pin the conditional |
 | **W7** | **Minor** | Addon services' own `vehicle_compatibility` not enforced | Filter addon list in `step-service-select.tsx:382–456` against `vehicleCategory` using addon's own `vehicle_compatibility` (requires loading the field — current sub-select doesn't include it; add to `booking.ts:84–88`) | ≤20 lines, 2 files | ✅ Yes |
 | **C-Open** | (Product decision — not a fix) | `pricing_model` immutability has no documented rationale and no UI surfacing | Q4 from catalog audit — operator decides: (a) keep + document; (b) build edit support with data-migration story; (c) accept indefinitely | Out of fix-arc scope per operator's directive | N/A |
 
@@ -275,7 +284,7 @@ Spotted while auditing; not part of the three concerns. Surface so the operator 
 | **E2** | Minor | Step 2 loading state — none. The Step 2 list renders directly from server-fetched categories prop; no skeleton. Not a bug given the page is server-rendered with the data, but worth noting if a future redesign moves to client-fetch | `step-service-select.tsx` (no Suspense / loading fallback) |
 | **E3** | Minor | Step 3 loading + empty states are present and informative | `step-schedule.tsx:222–231` |
 | **E4** | Minor | Mobile step indicator (`step-indicator.tsx:76–104`) shows only colored dots — neither labels nor explicit aria-current for the dot variant. Combined with N1, mobile users have an even weaker back signal than desktop | `step-indicator.tsx:76–104` |
-| **E5** | Moderate | Wizard uses `window.history.replaceState` (`booking-wizard.tsx:613`) on every step change, NOT `pushState`. Browser back exits the booking page entirely rather than walking the wizard backward. Inconsistent with user expectation of "back = previous step." May reinforce the operator's "no way back" perception | `booking-wizard.tsx:613` |
+| **E5** | Moderate | Wizard uses `window.history.replaceState` (`booking-wizard.tsx:613`) on every step change, NOT `pushState`. Browser back exits the booking page entirely rather than walking the wizard backward. Inconsistent with user expectation of "back = previous step." May reinforce the operator's "no way back" perception | `booking-wizard.tsx:613` — **✅ RESOLVED Session #133 (U-B.1)** — `updateUrl` accepts `isInitial` flag: mount + confirmation-clear retain `replaceState`; step transitions now `pushState`. New `popstate` listener rehydrates step + state from fresh `window.location.search` via refactored `getInitialState(paramsArg?)`. |
 | **E6** | Minor | Customer-facing self-service size dropdown is restricted to 3 size_classes (`CUSTOMER_SELF_SERVICE_SIZE_CLASSES`); exotic/classic are routed to the SpecialtyVehicleBlock callback flow. This is intentional and correct per CLAUDE.md Rule 19; flagging only because admin operators may not realize the public dropdown shows only 3 options vs. admin's full 5 | `step-vehicle.tsx:498–525`, `CUSTOMER_SELF_SERVICE_SIZE_CLASSES` constant |
 | **E7** | Minor | Specialty Vehicle Block fires telemetry on view (`specialty-vehicle-block.tsx:30–43`) AND has its own back path (ArrowLeft → `onEditVehicle`). The back path is clearer than Step 2's because the button is large and labeled — consider mirroring this pattern when fixing N1 | `specialty-vehicle-block.tsx:30–43` |
 | **E8** | Minor | Per `PUBLIC_BOOKING_FLOW_AUDIT.md:31, 651–653`, F2/F3 (RV/Boat/Aircraft custom-quote gating) remain open pending operator Q1/Q2 from that audit. Cross-reference for future booking-flow work | `docs/dev/PUBLIC_BOOKING_FLOW_AUDIT.md:651–653` |
