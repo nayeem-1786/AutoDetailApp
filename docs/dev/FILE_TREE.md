@@ -342,6 +342,7 @@ src/app/api/customer/receipts/html/route.ts
 src/app/api/customer/transactions/[id]/route.ts
 src/app/api/customer/transactions/route.ts
 src/app/api/customer/vehicles/[id]/route.ts
+src/app/api/customer/vehicles/[id]/__tests__/route.test.ts  # Session #136 (U-B.3, 2026-05-31) — 5 tests pinning B3/B4 PATCH null-preservation. Covers client-sent specialty_tier:null WRITTEN as NULL (operator-confirmed B3 scenario where specialty→automobile category change silently dropped the null pre-#136), missing-field-with-no-default SKIPPED contract, classifier-resolved size_class override regression (Session 29 anti-gaming preserved), and updated_at timestamp always set.
 src/app/api/customer/vehicles/route.ts
 ```
 

@@ -4,6 +4,17 @@
 > Branch: `audit/vehicle-forms-comprehensive-behavior`
 > Performed in an isolated `git worktree` off `origin/main` (`d01879dd`,
 > Session #134's U-B.2 merge) so the shared checkout stays undisturbed.
+
+> **Resolution status (2026-05-31, Session #136 — fix arc):**
+> - **RESOLVED (16 of 24):** B1, B2, B2-P, B3, B4, B5, B5-P, B6, B7,
+>   B9, B10, B11, B15, B22, B30, B31. All Significant + Moderate
+>   defects closed. See `docs/CHANGELOG.md` Session #136 for per-defect
+>   fix shape. The **T8 contract test** shipped as
+>   `src/components/__tests__/vehicle-forms-reset-contract.test.tsx`
+>   (6 tests across both surfaces).
+> - **DEFERRED (8 of 24, Informational / a11y / mobile-polish):** B12,
+>   B17, B19, B24, B25, B26, B27, B28, B29. Recommended for a separate
+>   a11y-polish pass per this audit's fix-arc recommendation.
 >
 > **Scope:** `src/components/booking/step-vehicle.tsx` (public booking
 > Step 1) and `src/components/account/vehicle-form-dialog.tsx` (customer

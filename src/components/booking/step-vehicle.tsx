@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import {
   SPECIALTY_TIERS,
   isSpecialtyCategory,
   resolveVehicleClassification,
+  getSpecialtyTierLabel,
   type VehicleCategory,
   type VehicleClassification,
 } from '@/lib/utils/vehicle-categories';
@@ -114,16 +115,32 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   // Errors
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // #136 B5 — classifier request-id ref for race-cancellation. Every fresh
+  // classify() call increments this; in-flight resolves check whether their
+  // captured id is still current before writing state. handleCategoryChange
+  // also increments it to invalidate any in-flight call from the prior
+  // category. Without this guard, a stale classify('Yamaha', '', 'rv')
+  // resolution could overwrite the just-cleared classification AFTER the
+  // user switched to motorcycle.
+  const classifyRequestIdRef = useRef(0);
+
   // --- Auto-classify when make/model changes ---
   const classify = useCallback(async (mk: string, mdl: string, cat: VehicleCategory) => {
     if (!mk.trim()) {
       setClassification(null);
       return;
     }
+    const myRequestId = ++classifyRequestIdRef.current;
     setClassifying(true);
     try {
       const supabase = createClient();
       const result = await resolveVehicleClassification(supabase, mk.trim(), mdl.trim() || undefined);
+      // #136 B5 race-cancellation: abandon stale results so a slow Yamaha-RV
+      // fetch can't overwrite a cleared/changed classification after the
+      // user picked a different category mid-flight.
+      if (classifyRequestIdRef.current !== myRequestId) {
+        return;
+      }
       setClassification(result);
       // Auto-update category only when the classifier is CONFIDENT — i.e. it
       // matched a single `vehicle_makes` row OR disambiguated a dual-category
@@ -136,9 +153,12 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
         setCategory(result.vehicle_category);
       }
     } catch {
+      if (classifyRequestIdRef.current !== myRequestId) return;
       setClassification(null);
     } finally {
-      setClassifying(false);
+      if (classifyRequestIdRef.current === myRequestId) {
+        setClassifying(false);
+      }
     }
   }, []);
 
@@ -154,12 +174,25 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     return () => clearTimeout(timer);
   }, [make, model, category, mode, classify]);
 
-  // Reset make/model when category changes manually
+  // #136 T1/Q1/B1 — Category change resets ALL non-category fields. The
+  // operator-locked anchor (VEHICLE_FORMS_BEHAVIOR_AUDIT.md T1.1): all
+  // non-category state has category-specific validity, so a category change
+  // invalidates every field's prior value. Previously this handler missed
+  // year/yearInput/color (added to the form after the handler was authored,
+  // refactor never updated). T8 contract test in
+  // vehicle-forms-reset-contract.test.tsx locks this against regression.
   function handleCategoryChange(newCat: VehicleCategory) {
+    // #136 B5 — invalidate any in-flight classifier call so its stale
+    // result can't overwrite the cleared classification below.
+    classifyRequestIdRef.current++;
     setCategory(newCat);
     setMake('');
     setModel('');
+    setYear(null);
+    setYearInput('');
+    setColor('');
     setClassification(null);
+    setClassifying(false);
     setManualSizeClass(null);
     setManualSpecialtyTier(null);
     setErrors({});
@@ -264,7 +297,11 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
       make: make.trim(),
       model: model.trim(),
       year: year,
-      color: color.trim(),
+      // #136 B30 — color title-cased at SUBMIT, not on display. Matches
+      // model's identity-on-display + transform-on-submit pattern (#132)
+      // AND matches the portal dialog's submit-time titleCase, so both
+      // surfaces converge on one timing.
+      color: titleCaseField(color),
     };
   }
 
@@ -310,7 +347,14 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
             const label = [v.year, v.color, v.make, v.model].filter(Boolean).join(' ') || 'Unknown Vehicle';
             const catLabel = VEHICLE_CATEGORY_LABELS[(v.vehicle_category ?? 'automobile') as VehicleCategory] ?? 'Automobile';
             const sizeLabel = v.size_class ? VEHICLE_SIZE_LABELS[v.size_class] ?? v.size_class : null;
-            const tierLabel = v.specialty_tier ?? null;
+            // #136 B22 — humanize specialty_tier key (e.g. "rv_up_to_24" →
+            // "Up to 24'") via the canonical helper. Previously rendered the
+            // raw DB key, which was operator-unfriendly on the saved-vehicle
+            // picker.
+            const vehicleCategory = (v.vehicle_category ?? 'automobile') as VehicleCategory;
+            const tierLabel = v.specialty_tier
+              ? getSpecialtyTierLabel(vehicleCategory, v.specialty_tier)
+              : null;
 
             return (
               <button
@@ -412,14 +456,18 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
         </FormField>
 
         {/* Make */}
-        <FormField label="Make" required htmlFor="vehicle-make" error={errors.make}>
+        <FormField label="Make" required htmlFor="vehicle-make" error={errors.make} reserveErrorSpace>
           <VehicleMakeCombobox
             id="vehicle-make"
             value={make}
             onChange={(val) => {
               setMake(val);
               if (val !== make) setModel('');
-              setErrors((prev) => ({ ...prev, make: '' }));
+              // #136 Q5/B7 — real-time validation: any selection or typed
+              // value clears the error; empty value will be re-flagged on
+              // blur or submit. Combobox does not expose a separate blur,
+              // so onChange-clear is the available feedback path.
+              setErrors((prev) => ({ ...prev, make: val.trim() ? '' : prev.make }));
             }}
             category={category}
           />
@@ -430,11 +478,19 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
             keystroke, which lower-cased "CBR600RR" to "Cbr600rr". The DB
             persists whatever the input emits; preserving case here means
             VINs / part-style model codes are saved verbatim. */}
-        <FormField label="Model" required htmlFor="vehicle-model" error={errors.model}>
+        <FormField label="Model" required htmlFor="vehicle-model" error={errors.model} reserveErrorSpace>
           <Input
             id="vehicle-model"
             value={model}
-            onChange={(e) => { setModel(e.target.value); setErrors((prev) => ({ ...prev, model: '' })); }}
+            onChange={(e) => {
+              const v = e.target.value;
+              setModel(v);
+              // #136 Q5/B7 — real-time validation.
+              setErrors((prev) => ({ ...prev, model: v.trim() ? '' : prev.model }));
+            }}
+            onBlur={() => {
+              setErrors((prev) => ({ ...prev, model: model.trim() ? '' : 'Required' }));
+            }}
             placeholder={category === 'automobile' ? 'e.g., Camry' : 'e.g., Sportster'}
             className="text-base sm:text-sm"
           />
@@ -446,7 +502,7 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
               match `/^(19|20)\d{2}$/` (1900–2099). The "19/20" prefix rule IS
               the range constraint. Replaces #131's dropdown+Other... pattern
               per operator reconsideration. */}
-          <FormField label="Year" required htmlFor="vehicle-year" error={errors.year}>
+          <FormField label="Year" required htmlFor="vehicle-year" error={errors.year} reserveErrorSpace>
             <Input
               id="vehicle-year"
               type="text"
@@ -476,24 +532,48 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
               }}
             />
           </FormField>
-          <FormField label="Color" required htmlFor="vehicle-color" error={errors.color}>
+          <FormField label="Color" required htmlFor="vehicle-color" error={errors.color} reserveErrorSpace>
+            {/* #136 B30 — preserve case as user types; titleCaseField runs in
+                buildSelection() at submit time, mirroring the model field's
+                identity-on-display pattern (#132). */}
             <Input
               id="vehicle-color"
               value={color}
-              onChange={(e) => { setColor(titleCaseField(e.target.value)); setErrors((prev) => ({ ...prev, color: '' })); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setColor(v);
+                // #136 Q5/B7 — real-time validation. Empty/whitespace-only
+                // surfaces "Required" inline; valid input clears the error.
+                setErrors((prev) => ({ ...prev, color: v.trim() ? '' : prev.color }));
+              }}
+              onBlur={() => {
+                setErrors((prev) => ({ ...prev, color: color.trim() ? '' : 'Required' }));
+              }}
               placeholder="e.g., Silver"
               className="text-base sm:text-sm"
             />
           </FormField>
         </div>
 
-        {/* Classification spinner */}
-        {classifying && (
-          <div className="flex items-center gap-2 text-sm text-site-text-secondary">
-            <Spinner className="h-4 w-4" />
-            Identifying vehicle...
-          </div>
-        )}
+        {/* #136 Q4/B2 — height-reserved classifier slot. Previously the
+            "Identifying vehicle..." row appeared on `setClassifying(true)`
+            and disappeared on `setClassifying(false)` per debounced model
+            keystroke, pushing every downstream row (Vehicle Size / Specialty
+            tier) up and down each classifier cycle. The container always
+            renders at fixed height (h-5 ≈ 20px); the spinner+text fills it
+            conditionally. Operator-reported "two rows flash" eliminated. */}
+        <div
+          className="flex h-5 items-center gap-2 text-sm text-site-text-secondary"
+          aria-live="polite"
+          aria-busy={classifying}
+        >
+          {classifying && (
+            <>
+              <Spinner className="h-4 w-4" />
+              <span>Identifying vehicle...</span>
+            </>
+          )}
+        </div>
 
         {/* Vehicle size picker — always visible for automobiles, auto-detection pre-selects */}
         {category === 'automobile' && (

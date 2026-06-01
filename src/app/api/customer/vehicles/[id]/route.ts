@@ -73,20 +73,36 @@ export async function PATCH(
       ? classifierSizeClass
       : (parsed.data.size_class !== undefined ? parsed.data.size_class : undefined);
 
-    const updateData = {
+    // #136 B3/B4 — preserve null-vs-undefined distinction. Supabase treats
+    // `undefined` as "don't write this column" and `null` as "write NULL".
+    // The prior implementation collapsed null→undefined via `?? undefined`
+    // on vehicle_category + specialty_tier, which silently dropped the
+    // client's null when the dialog sent `specialty_tier: null` after a
+    // category change from specialty→automobile. Net effect: row ended up
+    // with `vehicle_category='automobile'` AND `specialty_tier='rv_25_35'`
+    // (DB inconsistency invisible until next read).
+    //
+    // The fix: spread parsed.data as-is (Zod's `.partial()` only includes
+    // keys present in the request, so undefined = missing = skip, null =
+    // explicit clear = write null). The classifier-derived overrides for
+    // `make` (canonicalized) and `size_class` (specialty-detection) layer
+    // on top and only fire when they have real values to write.
+    const updateData: Record<string, unknown> = {
       ...parsed.data,
-      vehicle_category: parsed.data.vehicle_category ?? undefined,
-      specialty_tier: parsed.data.specialty_tier ?? undefined,
-      ...(canonicalMake !== null ? { make: canonicalMake } : {}),
-      ...(resolvedSizeClass !== undefined ? { size_class: resolvedSizeClass } : {}),
       updated_at: new Date().toISOString(),
     };
+    if (canonicalMake !== null) {
+      updateData.make = canonicalMake;
+    }
+    if (resolvedSizeClass !== undefined) {
+      updateData.size_class = resolvedSizeClass;
+    }
 
     const { data: vehicle, error } = await admin
       .from('vehicles')
       .update(updateData)
       .eq('id', id)
-      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, created_at')
+      .select('id, vehicle_category, vehicle_type, size_class, specialty_tier, year, make, model, color, vin, license_plate, notes, is_incomplete, created_at')
       .single();
 
     if (error) {

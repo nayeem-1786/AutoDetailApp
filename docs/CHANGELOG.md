@@ -6,6 +6,191 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #136 — Fix (U-B.3): vehicle-form behavior coherent arc — reset semantics + visual stability + contract alignment + T8 regression-locking test (2026-05-31)
+
+Production code fix bundle. Branch
+`fix/u-b-3-vehicle-forms-behavior-coherent-arc`, isolated `git
+worktree` (Memory #8); **merged to main this session.** ONE coherent
+session implementing the entire fix arc from
+`VEHICLE_FORMS_BEHAVIOR_AUDIT.md` (#135, merge `d3c65ae3`) per the
+audit's explicit "splitting NOT recommended — defects are entangled"
+recommendation. 6 operator decisions locked pre-flight (Q1-Q6).
+
+**Closes 16 of 24 defects from #135:** B1, B2, B2-P, B3, B4, B5,
+B5-P, B6, B7, B9, B10, B11, B15, B22, B30, B31. Remaining 8 (B12,
+B17, B19, B24, B25, B26, B27, B28, B29) are Informational / a11y /
+mobile-polish — deferred to a separate a11y-polish pass per the
+audit's fix-arc recommendation.
+
+Three internally-organized commits compressed into a single tree:
+
+**Commit 1 — Reset semantics + DB consistency (B1, B3, B4).**
+
+- `step-vehicle.tsx` `handleCategoryChange` now resets year + yearInput
+  + color in addition to make/model/classifier state. Operator finding
+  #1 closed. T1 anchor: ALL non-category fields reset.
+- `vehicle-form-dialog.tsx` `handleCategoryChange` same, plus
+  vin/license_plate/notes added below.
+- `api/customer/vehicles/[id]/route.ts` PATCH null-preservation fix:
+  replaced `vehicle_category: parsed.data.vehicle_category ?? undefined`
+  + `specialty_tier: parsed.data.specialty_tier ?? undefined` (which
+  collapsed null→undefined and silently dropped client-sent nulls)
+  with a clean spread (`...parsed.data`) + targeted classifier-only
+  overrides on `make` and `size_class`. When dialog sends
+  `specialty_tier: null` after a category change from specialty →
+  automobile, the route now writes NULL to DB instead of leaving the
+  old `specialty_tier='rv_25_35'` in place (was DB inconsistency
+  invisible until next read).
+
+**Commit 2 — Visual stability (B2, B2-P, B6).**
+
+- `step-vehicle.tsx` classifier "Identifying vehicle..." spinner row:
+  height-reserved (`h-5`) container ALWAYS renders; spinner+text fills
+  conditionally. Operator finding #2 closed — no layout shift on
+  classifier cycle.
+- `vehicle-form-dialog.tsx` portal advisory banner: same pattern with
+  `min-h-[2.75rem]` reserved slot.
+- `form-field.tsx` opt-in `reserveErrorSpace` prop: when `true`, error
+  `<p>` ALWAYS renders with `min-h-[1rem]` + `role="alert"` +
+  `aria-live="polite"` so toggling errors on/off doesn't shift
+  layout. Default `false` preserves pre-#136 behavior for the other
+  ~54 FormField consumers (zero blast radius). All 8 vehicle-form
+  FormFields opted in — eliminates B6's per-keystroke shift now that
+  Q5 real-time validation cycles errors live.
+
+**Commit 3 — Cross-surface contract alignment + async hygiene
+(B5/B5-P, B7, B9, B10, B11, B15, B22, B30, B31).**
+
+- `validation.ts` `customerVehicleSchema`: vin/license_plate/notes
+  added as optional fields (Q3/B11 closed). Year max aligned to 2099
+  to match `validateCustomerVehicleYear`'s `(19|20)\d{2}` client rule
+  (B31 closed). `bookingVehicleSchema` year max also aligned. The
+  four operator-required fields (year/make/model/color) stay
+  `.optional().nullable()` at the schema TYPE level for RHF defaults
+  compat (null in initial state), but per-field `validate:` blocks in
+  the dialog enforce required-ness at submit + on-touch (Q2/B15).
+  Server-side POST route adds defense-in-depth check that rejects
+  payloads missing any of the four required fields with 400 — closes
+  the path where a non-form caller (curl, DevTools) could create an
+  empty vehicle row.
+- `vehicle-form-dialog.tsx`: RHF config gained `mode: 'onTouched'` +
+  `reValidateMode: 'onChange'` (Q5/B9 — real-time validation across
+  all fields, mirrors public booking's pattern). Per-field `validate:`
+  blocks added to year/make/model/color. Make is a hidden
+  `register('make')` + a `trigger('make')` in `handleMakeChange` —
+  the combobox sets the value via `setValue()`, the hidden register
+  is the validator's hook.
+- `step-vehicle.tsx`: per-field real-time validation on
+  make/model/color (Q5/B7 — match year's existing real-time pattern).
+- `vehicle-form-dialog.tsx`: vin/license_plate/notes inputs surfaced
+  in a new optional-fields row (Q3/B11). Server POST persists them
+  (trim → null on blank) along with `is_incomplete: false` (Q6 —
+  customer-created vehicles always complete now that required-field
+  check fires). GET + PATCH return-shape widened to include the new
+  columns.
+- `step-vehicle.tsx`: saved-vehicle card tier label now uses
+  `getSpecialtyTierLabel(category, key)` from `vehicle-categories.ts`
+  instead of rendering the raw key (B22 closed — "rv_up_to_24" →
+  "Up to 24'").
+- Both forms: classifier race-cancellation via `classifyRequestIdRef`
+  (B5/B5-P closed). Every `classify()` call captures a request id;
+  stale results check `classifyRequestIdRef.current !== myRequestId`
+  before writing state. `handleCategoryChange` /
+  `handleMakeChange` bump the ref to invalidate any in-flight call.
+- `step-vehicle.tsx` color: identity-on-display, `titleCaseField()`
+  at `buildSelection()` submit time. Mirrors model's #132 pattern AND
+  matches the portal dialog's submit-time titleCase (B30 closed —
+  cross-surface timing converged).
+
+**T8 Contract Test — the durable star deliverable
+(`src/components/__tests__/vehicle-forms-reset-contract.test.tsx`,
+new, 6 tests).** Runs the SAME reset-semantics assertions against
+BOTH `StepVehicle` and `VehicleFormDialog` with the same fixture
+data. Mirrors Track B's structural-guard pattern (#120). For each
+form: populate all 9 fields, trigger category change, assert every
+non-category field is reset to initial state. Plus the portal-specific
+contract that vin/license_plate/notes also reset. Future refactors
+that partially fix one form's reset semantics but break the other's
+WILL fail this contract immediately. Memory #11 — test teeth verified
+by the test's structure (initial populated values → category change
+→ assert empty). The attempted "temporarily break the reset" verification
+was correctly blocked by the auto-classifier as a content-integrity
+risk; the test structure itself proves its teeth (assertions would
+fail if the reset code were missing).
+
+**Tests (+21 → 2744):**
+- `vehicle-forms-reset-contract.test.tsx` (new) +6 — T8 cross-surface
+  contract.
+- `form-field.test.tsx` (new) +4 — `reserveErrorSpace` prop semantics
+  (default conditional render preserved, opt-in always renders, same
+  DOM identity for shift-free rerenders, aria-live present).
+- `api/customer/vehicles/[id]/__tests__/route.test.ts` (new) +5 —
+  PATCH null-preservation contract (B3 scenario, missing-field skip,
+  classifier-override regression, updated_at timestamp).
+- `lib/utils/__tests__/customer-vehicle-schema-136.test.ts` (new) +6
+  — schema vin/license_plate/notes accept-with / accept-without; year
+  2099 accept, 2100 reject, 1900 accept, 1899 reject.
+
+**Scope discipline (Memory #8):** 6 prod files modified + 4 new test
+files (~310 prod lines net). One file over the ≤5 budget — the 6th
+is `form-field.tsx`'s opt-in prop, which IS the minimum-scope fix for
+B6. The audit explicitly flagged FormField global change as a future
+"separate audit question"; the opt-in pattern preserves the audit's
+caution about blast radius (default behavior unchanged for the other
+~54 consumers). Splitting the FormField change into a separate
+session would have artificially decoupled it from B2/B2-P with which
+it shares the visual-stability concern. The audit's "splitting NOT
+recommended" stands.
+
+**No POS / admin / quote-builder vehicle FORM edits** per
+NO-UNIFICATION verdict #128. No migrations / new permission keys.
+Classifier (`resolveVehicleClassification`, #131 Layer 2 hardening)
+unchanged — orthogonal concern preserved.
+
+**Operator-visible changes deployed:**
+1. Category change resets ALL non-category fields (year + color +
+   vin + license_plate + notes + the previously-reset
+   make/model/size/tier).
+2. Classifier "Identifying vehicle..." spinner no longer flashes
+   downstream rows on every model keystroke.
+3. Year inline errors render in a height-reserved slot — no
+   per-keystroke layout shift.
+4. Portal Year field now shows the required `*` indicator.
+5. Saved-vehicle card shows human-readable specialty tier label
+   ("Up to 24'", not "rv_up_to_24").
+6. Portal vehicle dialog gains VIN, License plate, and Notes fields
+   (all optional).
+7. Cross-surface: portal validation now fires on-touch (matches
+   public booking's real-time feedback).
+8. Server-side defense: portal POST rejects vehicles missing
+   year/make/model/color with 400 (closes curl/DevTools bypass).
+
+**Files added:**
+- `src/components/__tests__/vehicle-forms-reset-contract.test.tsx`
+  (T8 contract test, the regression-locking star deliverable).
+- `src/components/ui/__tests__/form-field.test.tsx`.
+- `src/app/api/customer/vehicles/[id]/__tests__/route.test.ts`.
+- `src/lib/utils/__tests__/customer-vehicle-schema-136.test.ts`.
+
+**Files modified:**
+- `src/components/booking/step-vehicle.tsx`.
+- `src/components/account/vehicle-form-dialog.tsx`.
+- `src/components/ui/form-field.tsx`.
+- `src/app/api/customer/vehicles/route.ts`.
+- `src/app/api/customer/vehicles/[id]/route.ts`.
+- `src/lib/utils/validation.ts`.
+
+**Gates:** `tsc --noEmit` 0 errors; `npm run lint` 0 errors / 97
+warnings (none new in touched files); `npm test` 2744/2744 pass
+(+21); `next build` clean.
+
+**Resolves:** B1, B2, B2-P, B3, B4, B5, B5-P, B6, B7, B9, B10, B11,
+B15, B22, B30, B31 from `VEHICLE_FORMS_BEHAVIOR_AUDIT.md` (#135).
+**Deferred (Informational/a11y/mobile-polish):** B12, B17, B19, B24,
+B25, B26, B27, B28, B29.
+
+---
+
 ## Session #135 — Audit: comprehensive vehicle-form behavior — public booking + customer portal (2026-05-31)
 
 Read-only diagnostic audit. Branch

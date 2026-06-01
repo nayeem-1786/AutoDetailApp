@@ -333,6 +333,10 @@ export const bookingCustomerSchema = z.object({
   email_consent: z.boolean().default(false),
 });
 
+// #136 B31 — year max aligned to 2099 to match validateCustomerVehicleYear's
+// `(19|20)\d{2}` client rule. The wider schema-only `max(2100)` is gone.
+// Customer-facing booking submission rejects 2100+ at the API boundary too,
+// not just at the UI.
 export const bookingVehicleSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft'], {
@@ -344,7 +348,7 @@ export const bookingVehicleSchema = z.object({
     { error: 'Please select a size class' }
   ).optional().nullable(),
   specialty_tier: optionalString,
-  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
+  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Year must be between 1900 and 2099').max(2099, 'Year must be between 1900 and 2099').optional().nullable(),
   make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
   model: z.string().min(1, 'Please enter a model').optional().nullable(),
   color: z.string().min(1, 'Please enter a color').optional().nullable(),
@@ -424,7 +428,18 @@ export const phoneOtpVerifySchema = z.object({
   code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
 });
 
-// Customer vehicle schema (customer portal vehicle management)
+// Customer vehicle schema (customer portal vehicle management).
+// #136 Q2/B15 — year/make/model/color remain `.optional().nullable()` at the
+// schema TYPE level (so RHF defaultValues + setValue can use null/empty for
+// in-progress form state), but per-field RHF `validate:` blocks in
+// `vehicle-form-dialog.tsx` enforce required-ness at submit time. This
+// achieves Q2 (portal requires the same four fields as public booking) without
+// forcing the form's internal state to use sentinel values. The `.min(1, '...')`
+// message strings here remain accurate when a non-null string IS supplied.
+// #136 Q3/B11 — vin/license_plate/notes added as OPTIONAL (Q3 locks
+// "surface", not "require"; operator-useful fields for vehicle ID + history).
+// #136 B31 — year max aligned to 2099 to match validateCustomerVehicleYear's
+// `(19|20)\d{2}` client rule (was schema-only 2100).
 export const customerVehicleSchema = z.object({
   vehicle_category: z.enum(['automobile', 'motorcycle', 'rv', 'boat', 'aircraft'], {
     error: 'Please select a vehicle category',
@@ -435,10 +450,13 @@ export const customerVehicleSchema = z.object({
     { error: 'Please select a size class' }
   ).optional().nullable(),
   specialty_tier: optionalString,
-  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Please enter a valid 4-digit year').max(2100, 'Please enter a valid 4-digit year').optional().nullable(),
+  year: z.coerce.number({ error: 'Please enter a valid 4-digit year' }).int().min(1900, 'Year must be between 1900 and 2099').max(2099, 'Year must be between 1900 and 2099').optional().nullable(),
   make: z.string().min(1, 'Please select or enter a make').optional().nullable(),
   model: z.string().min(1, 'Please enter a model').optional().nullable(),
   color: z.string().min(1, 'Please enter a color').optional().nullable(),
+  vin: optionalString,
+  license_plate: optionalString,
+  notes: optionalString,
 });
 
 // Customer signup schema (customer portal registration)
