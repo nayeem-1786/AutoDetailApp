@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { formResolver } from '@/lib/utils/form';
 import { customerVehicleSchema, type CustomerVehicleInput } from '@/lib/utils/validation';
@@ -52,6 +52,11 @@ interface VehicleFormDialogProps {
     make: string | null;
     model: string | null;
     color: string | null;
+    // #136 Q3/B11 — vin / license_plate / notes surfaced on the portal
+    // vehicle form. Optional fields (Q3 locks "surface", not "require").
+    vin?: string | null;
+    license_plate?: string | null;
+    notes?: string | null;
   } | null;
   onSuccess: () => void;
 }
@@ -76,15 +81,28 @@ export function VehicleFormDialog({
   // C3 / Q4 and CLAUDE.md Rule 19.
   const [classification, setClassification] = useState<VehicleClassification | null>(null);
 
+  // #136 B5-P — race-cancellation ref for the debounced classifier. A stale
+  // in-flight call from a prior (make, model, category) tuple cannot
+  // overwrite the cleared classification after the user changed category
+  // mid-flight. handleCategoryChange + the classify effect both bump this.
+  const classifyRequestIdRef = useRef(0);
+
   const {
     register,
     handleSubmit,
     reset,
     watch,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<CustomerVehicleInput>({
     resolver: formResolver(customerVehicleSchema),
+    // #136 Q5/B9 — real-time validation: validate on blur first, then on
+    // every change once a field has been touched. Mirrors public booking's
+    // per-keystroke feedback; eliminates the cross-surface timing
+    // divergence noted in the audit.
+    mode: 'onTouched',
+    reValidateMode: 'onChange',
     defaultValues: {
       vehicle_category: 'automobile',
       vehicle_type: 'standard',
@@ -94,6 +112,9 @@ export function VehicleFormDialog({
       make: '',
       model: '',
       color: '',
+      vin: '',
+      license_plate: '',
+      notes: '',
     },
   });
 
@@ -120,6 +141,9 @@ export function VehicleFormDialog({
         make: vehicle.make ?? '',
         model: vehicle.model ?? '',
         color: vehicle.color ?? '',
+        vin: vehicle.vin ?? '',
+        license_plate: vehicle.license_plate ?? '',
+        notes: vehicle.notes ?? '',
       });
     } else if (open) {
       setCategory('automobile');
@@ -132,26 +156,49 @@ export function VehicleFormDialog({
         make: '',
         model: '',
         color: '',
+        vin: '',
+        license_plate: '',
+        notes: '',
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, vehicle, reset]);
 
   const handleMakeChange = useCallback((val: string) => {
-    setValue('make', val, { shouldDirty: true });
+    setValue('make', val, { shouldDirty: true, shouldTouch: true });
     // Model is make-specific — clear it on make change so the classifier
     // doesn't keep stale model context. Mirrors step-vehicle.tsx:388.
     setValue('model', '', { shouldDirty: true });
+    // #136 Q5/B7 — re-run the Make validator so real-time required-field
+    // feedback fires when the combobox transitions empty ↔ non-empty.
+    // The combobox doesn't expose its own onBlur to RHF; trigger() is the
+    // explicit handshake.
+    trigger('make');
+    // #136 B5-P — invalidate any in-flight classifier so its stale result
+    // (from the prior make+model) can't overwrite the cleared classification.
+    classifyRequestIdRef.current++;
     setClassification(null);
-  }, [setValue]);
+  }, [setValue, trigger]);
 
+  // #136 T1/Q1/B1 — Category change resets ALL non-category fields. Mirrors
+  // step-vehicle.tsx; T8 contract test locks parity. Previously missed
+  // year + color. vin/license_plate/notes are added below (Commit 3 / Q3)
+  // and their reset is included in the same handler.
   function handleCategoryChange(newCategory: VehicleCategory) {
+    // #136 B5-P — invalidate in-flight classifier so its stale result
+    // can't overwrite the cleared classification below.
+    classifyRequestIdRef.current++;
     setCategory(newCategory);
     const isSpecialty = isSpecialtyCategory(newCategory);
     setValue('vehicle_category', newCategory, { shouldDirty: true });
     setValue('vehicle_type', isSpecialty ? newCategory : 'standard', { shouldDirty: true });
     setValue('make', '', { shouldDirty: true });
     setValue('model', '', { shouldDirty: true });
+    setValue('year', null, { shouldDirty: true });
+    setValue('color', '', { shouldDirty: true });
+    setValue('vin', '', { shouldDirty: true });
+    setValue('license_plate', '', { shouldDirty: true });
+    setValue('notes', '', { shouldDirty: true });
     setValue('size_class', null, { shouldDirty: true });
     setValue('specialty_tier', null, { shouldDirty: true });
     setClassification(null);
@@ -175,10 +222,17 @@ export function VehicleFormDialog({
       return;
     }
     const timer = setTimeout(() => {
+      const myRequestId = ++classifyRequestIdRef.current;
       const supabase = createClient();
       resolveVehicleClassification(supabase, mk, mdl, watchedYear ?? undefined)
-        .then((result) => setClassification(result))
-        .catch(() => setClassification(null));
+        .then((result) => {
+          if (classifyRequestIdRef.current !== myRequestId) return;
+          setClassification(result);
+        })
+        .catch(() => {
+          if (classifyRequestIdRef.current !== myRequestId) return;
+          setClassification(null);
+        });
     }, 400);
     return () => clearTimeout(timer);
   }, [open, watchedMake, watchedModel, watchedYear]);
@@ -216,6 +270,13 @@ export function VehicleFormDialog({
           // model casing from color casing.
           model: (data.model ?? '').trim(),
           color: titleCaseField(data.color || ''),
+          // #136 Q3/B11 — preserve case + trim. VIN is conventionally
+          // uppercase but operators sometimes paste mixed case; trim only,
+          // server can uppercase later if needed. Empty strings collapse
+          // to null on the server (see POST/PATCH route normalization).
+          vin: (data.vin ?? '').trim() || null,
+          license_plate: (data.license_plate ?? '').trim() || null,
+          notes: (data.notes ?? '').trim() || null,
         }),
       });
 
@@ -267,7 +328,7 @@ export function VehicleFormDialog({
                 range constraint; the schema's 1900-2100 stays for back-compat
                 with non-customer paths but the form rejects 2100+ via this
                 validator. */}
-            <FormField label="Year" error={errors.year?.message} htmlFor="vehicle_year">
+            <FormField label="Year" error={errors.year?.message} htmlFor="vehicle_year" required reserveErrorSpace>
               <Input
                 id="vehicle_year"
                 type="text"
@@ -287,17 +348,31 @@ export function VehicleFormDialog({
                     const n = parseInt(cleaned, 10);
                     return Number.isFinite(n) ? n : null;
                   },
+                  // #136 Q2/B15 — required at the validate layer (schema
+                  // stays nullable for form-state compat; this enforces the
+                  // operator-locked requirement at submit + on-touch).
                   validate: (val) => {
-                    if (val === null || val === undefined) return true;
+                    if (val === null || val === undefined) return 'Year is required';
                     const str = String(val).trim();
-                    if (str === '') return true;
+                    if (str === '') return 'Year is required';
                     return validateCustomerVehicleYear(str) ?? true;
                   },
                 })}
               />
             </FormField>
 
-            <FormField label="Make" error={errors.make?.message} htmlFor="vehicle_make">
+            <FormField label="Make" error={errors.make?.message} htmlFor="vehicle_make" required reserveErrorSpace>
+              {/* #136 Q2/B15 — register `make` for its validator side-effect
+                  even though the combobox sets the value via setValue().
+                  RHF runs the validate fn on every value change once the
+                  field is touched (mode: 'onTouched'); handleMakeChange
+                  calls trigger('make') to handshake combobox → RHF. */}
+              <input type="hidden" {...register('make', {
+                validate: (val) => {
+                  const str = (val ?? '').toString().trim();
+                  return str.length > 0 || 'Make is required';
+                },
+              })} />
               <VehicleMakeCombobox
                 id="vehicle_make"
                 value={watch('make') || ''}
@@ -307,12 +382,18 @@ export function VehicleFormDialog({
               />
             </FormField>
 
-            <FormField label="Model" error={errors.model?.message} htmlFor="vehicle_model">
+            <FormField label="Model" error={errors.model?.message} htmlFor="vehicle_model" required reserveErrorSpace>
               <Input
                 id="vehicle_model"
                 placeholder={MODEL_PLACEHOLDERS[category]}
                 className={errors.model ? 'border-red-500' : ''}
-                {...register('model')}
+                {...register('model', {
+                  // #136 Q2/B15 — required at validate layer.
+                  validate: (val) => {
+                    const str = (val ?? '').toString().trim();
+                    return str.length > 0 || 'Model is required';
+                  },
+                })}
               />
             </FormField>
           </div>
@@ -320,28 +401,41 @@ export function VehicleFormDialog({
           {/* Specialty-tier advisory (C3) — surfaces when classifier detects
               exotic/classic. Customer cannot self-elect this tier from the
               dropdown (CUSTOMER_SELF_SERVICE_SIZE_CLASSES restricts to 3),
-              but the server will write the classifier's `size_class` on save. */}
-          {classifierSpecialty && (
-            <div
-              role="status"
-              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
-              data-testid="specialty-tier-advisory"
-            >
-              <strong className="font-semibold">
-                {classification!.size_class === 'exotic' ? 'Specialty / Exotic vehicle' : 'Classic vehicle'}
-                {' '}detected.
-              </strong>{' '}
-              Your {[watchedYear, watchedMake, watchedModel].filter(Boolean).join(' ')} qualifies for our specialty service tier — our team will reach out to confirm pricing.
-            </div>
-          )}
+              but the server will write the classifier's `size_class` on save.
+              #136 Q4/B2-P — height-reserved container eliminates the layout
+              shift that occurred when the banner appeared/disappeared on
+              classifier resolution. Min-height fits a single-line banner
+              (~2.75rem with px-3/py-2 padding); banners that wrap to 2-3
+              lines grow gracefully but never shift content below. */}
+          <div className="min-h-[2.75rem]" data-testid="specialty-tier-advisory-slot">
+            {classifierSpecialty && (
+              <div
+                role="status"
+                className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+                data-testid="specialty-tier-advisory"
+              >
+                <strong className="font-semibold">
+                  {classification!.size_class === 'exotic' ? 'Specialty / Exotic vehicle' : 'Classic vehicle'}
+                  {' '}detected.
+                </strong>{' '}
+                Your {[watchedYear, watchedMake, watchedModel].filter(Boolean).join(' ')} qualifies for our specialty service tier — our team will reach out to confirm pricing.
+              </div>
+            )}
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Color" error={errors.color?.message} htmlFor="vehicle_color">
+            <FormField label="Color" error={errors.color?.message} htmlFor="vehicle_color" required reserveErrorSpace>
               <Input
                 id="vehicle_color"
                 placeholder="e.g., Silver"
                 className={errors.color ? 'border-red-500' : ''}
-                {...register('color')}
+                {...register('color', {
+                  // #136 Q2/B15 — required at validate layer.
+                  validate: (val) => {
+                    const str = (val ?? '').toString().trim();
+                    return str.length > 0 || 'Color is required';
+                  },
+                })}
               />
             </FormField>
 
@@ -379,6 +473,43 @@ export function VehicleFormDialog({
               )}
             </FormField>
           </div>
+
+          {/* #136 Q3/B11 — vin / license_plate / notes. Optional fields
+              surfaced for customers who want to keep complete vehicle
+              records. None of them feed pricing or the classifier — they
+              persist as-is on the `vehicles` row and the operator-side
+              admin form sees them later. */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormField label="VIN (optional)" error={errors.vin?.message} htmlFor="vehicle_vin">
+              <Input
+                id="vehicle_vin"
+                placeholder="17-character VIN"
+                maxLength={17}
+                autoComplete="off"
+                className={errors.vin ? 'border-red-500' : ''}
+                {...register('vin')}
+              />
+            </FormField>
+            <FormField label="License plate (optional)" error={errors.license_plate?.message} htmlFor="vehicle_license_plate">
+              <Input
+                id="vehicle_license_plate"
+                placeholder="e.g., 8ABC123"
+                maxLength={20}
+                autoComplete="off"
+                className={errors.license_plate ? 'border-red-500' : ''}
+                {...register('license_plate')}
+              />
+            </FormField>
+          </div>
+          <FormField label="Notes (optional)" error={errors.notes?.message} htmlFor="vehicle_notes">
+            <Input
+              id="vehicle_notes"
+              placeholder="Anything we should know — e.g., aftermarket wheels, ceramic coating"
+              maxLength={500}
+              className={errors.notes ? 'border-red-500' : ''}
+              {...register('notes')}
+            />
+          </FormField>
         </form>
       </DialogContent>
       <DialogFooter>
