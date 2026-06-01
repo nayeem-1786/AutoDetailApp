@@ -6,6 +6,121 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #135 — Audit: comprehensive vehicle-form behavior — public booking + customer portal (2026-05-31)
+
+Read-only diagnostic audit. Branch
+`audit/vehicle-forms-comprehensive-behavior`, isolated `git worktree`;
+**merged to main this session.** No source / migration / test changes.
+Triggered by operator's holistic-not-patch framing: *"Why do I have to
+keep bringing up one error at a time then have you fix it? Why can't
+you review the entire logic being used on this form then analyze how
+the form should respond and work?"*
+
+Sessions #129/#131/#132 each shipped a narrow fix on `step-vehicle.tsx`
++ `vehicle-form-dialog.tsx`; each fix surfaced the next defect. The
+audit defines the **intended behavior contract first** (TARGET T1 —
+reset semantics matrix, initial state, persistence model, cross-field
+dependencies, validation timing), then catalogues every gap.
+
+**24 defects catalogued** across both surfaces (4 Significant, 9
+Moderate, 8 Minor, 3 Informational). Both operator findings
+confirmed and root-caused:
+
+- **B1 (Significant) — operator finding #1:** `handleCategoryChange`
+  in BOTH forms resets make/model/size/specialty/classification but
+  MISSES year + color. Classic "refactor missed a sibling" defect —
+  year + color were added to the form after the reset handler was
+  authored; reset never updated.
+- **B2 (Moderate) — operator finding #2:** the
+  `{classifying && ...}` spinner row at `step-vehicle.tsx:491-496`
+  is conditionally rendered. Sequence: model keystroke → 400ms
+  debounce → `setClassifying(true)` → row appears (~32px DOM growth)
+  → promise resolves → `setClassifying(false)` → row disappears. The
+  rows below (Vehicle Size for automobile, Specialty tier for
+  specialty) shift up/down with each classifier cycle. Two rows
+  perceived as flashing because spinner row + downstream picker row
+  both move.
+
+**Two ADDITIONAL Significant defects surfaced** operator hasn't
+reported yet:
+- **B3 (Significant):** PATCH route at
+  `api/customer/vehicles/[id]/route.ts:79` uses
+  `specialty_tier: parsed.data.specialty_tier ?? undefined` —
+  Supabase treats `undefined` as "don't write," so when the dialog
+  sends `specialty_tier: null` after a category change from
+  specialty→automobile, the route silently DROPS the null. Row ends
+  up with `vehicle_category='automobile'` AND
+  `specialty_tier='rv_25_35'` — DB inconsistency invisible until
+  next read.
+- **B15 (Significant):** `customerVehicleSchema` makes year, make,
+  model, color all `.optional().nullable()` (despite their
+  `.min(1, '...')` chain reading as required). Portal accepts a
+  vehicle save with NO year / NO make / NO model / NO color — just
+  category + size. Public booking REQUIRES all four. Cross-surface
+  required-semantics divergence — almost certainly accidental.
+
+**Sibling Moderate findings (8 total):** classifier in-flight race
+condition (B5, both forms — stale result overwrites cleared state
+after category change); portal advisory banner layout shift (B2-P);
+year-input inline error layout shift on every keystroke (B6, both
+forms); B4 asymmetric null-handling between size_class and
+specialty_tier in PATCH route.
+
+**Sibling Minor findings (8 total):** validation timing inconsistent
+within form (B7) and cross-surface (B9); portal Year missing
+required indicator (B10); B17 no focus management on category
+change; B19 saved-vehicle→manual toggle doesn't clear stale state;
+B26 FormField `<p>` no aria-live; B27 category buttons not exposed
+as radio group; B28 mobile category grid asymmetric; B30 color case
+timing differs between forms; B31 schema accepts year 2100 but
+client validator rejects 2100+.
+
+**Informational (3 total):** B11 carry-over of #128 Q5
+(vin/license_plate/notes in vehicleSchema not surfaced by any
+customer form); B12 customerData prop doesn't re-react after mount;
+B24 dead useEffect with empty branches.
+
+**Fix-arc shape: ONE coherent session.** Defects collapse to three
+behavioral concerns — reset semantics + DB consistency, visual
+stability, cross-surface contract alignment + async hygiene. ~250-350
+production lines net. Splitting NOT recommended — defects are
+entangled; one session preserves the intended-behavior model coherence.
+
+**T5 fix shape for B2 + B2-P:** Option A (height-reserved spinner /
+banner containers, ~5-10 lines per form) recommended over Option B
+(inline-icon, ~30 lines for `<Input>` `endAdornment` slot). Operator
+choice surfaces as Q4.
+
+**T8 contract test:** locks the T1 reset-semantics matrix across both
+surfaces in a single `vehicle-forms-reset-contract.test.tsx` file
+(new). Pattern mirrors Track B's structural-guard test from #120 —
+small, single-concern, mock-light, runs the same assertions across
+both forms. Without this, the next refactor silently breaks reset
+semantics again (B1 already existed across ≥3 sessions before today's
+audit).
+
+**6 open operator questions:** Q1 confirm T1 reset anchor; Q2 resolve
+B15 (portal required semantics); Q3 resolve B11 (vin/license/notes);
+Q4 pick T5 fix option (A vs B); Q5 standardize validation timing
+(real-time vs submit); Q6 `is_incomplete` write semantics.
+
+**Files added:** `docs/dev/VEHICLE_FORMS_BEHAVIOR_AUDIT.md` (~830
+lines — comprehensive 8-target deliverable with file:line citations,
+defect inventory table, T1 reset matrix, T5 fix-shape options, T6
+schema correctness check, T8 contract-test pattern, operator-question
+table).
+
+**Verification of audit hard rules:** ✅ No src/migration/test changes
+(pure audit); ✅ file:line citations throughout; ✅ Memory #11 —
+every claim grounded in actual code (both forms + shared
+collaborators + PATCH route + schemas read end-to-end); ✅ Memory #25
+— operator's holistic-not-patch framing applied at the behavioral
+level; ✅ both forms equal treatment (NO-UNIFICATION #128 respected);
+✅ audit MAPS, does not draft fix code; ✅ worktree isolation off
+`origin/main` (`d01879dd`).
+
+---
+
 ## Session #134 — Fix (U-B.2): classification filter on public booking Step 2 — client + server defense in depth (2026-05-30)
 
 Production code change. Branch
