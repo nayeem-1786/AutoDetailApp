@@ -6,6 +6,152 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #138 — Fix (U-B.4 / W4): services `is_taxable` on booking deposit — line-item persistence mirror (audit + fix, Option A) (2026-06-01)
+
+Production code change. Branch
+`fix/u-b-4-is-taxable-mirror-products-pattern`, isolated `git worktree`
+(Memory #8); **merged to main this session.** Closes **W4 (Moderate)**
+from Unit B audit (merge `1eeade10`,
+`docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`). Pre-W4, the
+booking route hardcoded `is_taxable: false` on every `transaction_items`
+row written for the deposit transaction — admin-set `is_taxable=true`
+had zero effect on the deposit's persisted line items, surfacing as a
+`---` (typed non-taxable) column on the admin Transaction Detail page
+(`transaction-detail.tsx:306`) even for taxable services.
+
+**Q-C-1 LOCKED Option A (line-item persistence mirror — NOT full
+checkout tax computation):** per-row `is_taxable` reflects the
+underlying `services.is_taxable` flag; `tax_amount` stays `0` on items
++ the deposit transaction because no tax is collected at deposit time
+(CA CDTFA Pub 100 ties tax to service completion, which POS
+finalization via `/api/pos/appointments/[id]/load` +
+`calculateItemTax` in `src/app/pos/utils/tax.ts` already handles
+correctly via a live `services.is_taxable` lookup at drain time).
+
+**Phase 1 audit findings (in-session per Option 1 structure):**
+
+- **Three hardcoded-false sites in `/api/book/route.ts`** (line numbers
+  shifted slightly post-U-B.3): `:603` primary service line item
+  (no justification comment), `:623` addon service line item (no
+  comment), `:648` mobile fee line item (JUSTIFIED via CDTFA Pub 100
+  comment at `:632-635`). Plus `tax_amount: 0` at `:602/621/646` on
+  items and at `:537` on the deposit `transactions` row (all
+  intentionally 0 — deposit isn't a completed sale).
+- **Persistence ONLY** — no client-facing UI exists for tax on Step 4.
+  Visible defect surfaces in one place: admin Transaction Detail
+  renders `---` for taxable items because the deposit's persisted
+  `is_taxable: false` mistypes the column.
+- **POS finalization is unaffected** — when the appointment drains to
+  POS at service-completion (`/api/pos/appointments/[id]/load/route.ts:118, :145`),
+  the drain LOOKS UP LIVE `services.is_taxable` from the catalog and
+  writes it onto the POS-side line items. Tax collection at completion
+  has always been correct.
+- **Products' pattern has TWO shapes** (Pattern A — POS-side line-item
+  persistence via the `calculateItemTax(price, isTaxable)` helper +
+  `is_taxable` flag wiring; Pattern B — full e-commerce checkout in
+  `/api/checkout/create-payment-intent/route.ts` with tax computation
+  on the payment intent). **14 production files touch `is_taxable`
+  significantly** — Pattern A is the reusable subset for the booking
+  deposit (Pattern B applies to immediate-pay-in-full e-commerce, not
+  the booking deposit's partial-prepayment model).
+- **Operator confirmed Option A** during Phase 1 stop-and-report:
+  "matches the Q-C operator wording (follow products' pattern), aligns
+  with California CDTFA Pub 100 (tax due at service completion, not
+  deposit), is the minimum correct change, and leaves POS
+  finalization's existing tax math unchanged. The
+  `addonMeta?.is_taxable ?? false` defensive default is acceptable
+  since POS re-reads canonical at finalization."
+
+**Phase 2 fix:**
+
+- `src/app/api/book/route.ts` — primary line item now persists
+  `is_taxable: serviceRow.is_taxable as boolean` (was hardcoded false).
+- Addon line items persist
+  `is_taxable: addonMetaById.get(addon.service_id)?.is_taxable ?? false`
+  via a one-line `Map` lookup from `addonServiceRows` (the addon-fetch
+  introduced in U-B.3's W2/W3 work). Defensive `?? false` default
+  matches the locked Q-C-1 guidance — a deleted addon row between fetch
+  and insert resolves to non-taxable client-side, but POS finalization
+  re-reads canonical `services.is_taxable` from the live catalog at
+  drain time so the downstream tax math stays correct.
+- `addonServiceRows` SELECT extended to include `is_taxable` — same
+  query that already fetched `id, name, mobile_eligible,
+  staff_assessed` (one query, three flags' worth of work). Inline
+  comment on the AddonValidationRow type updated to list all three
+  consumers.
+- Mobile fee at `:648` STAYS `is_taxable: false`; in-source comment
+  expanded to flag this is the ONE legitimate hardcoded-false post-W4
+  (CDTFA Pub 100 — separately-stated delivery fee). Future maintainers
+  reading the file see at-a-glance why this one differs.
+- `tax_amount: 0` on items + on the deposit transaction row STAYS — no
+  tax computation at deposit time per the locked Q-C-1 Option A. POS
+  drain + `calculateItemTax` handle tax at service-completion as before.
+
+**Scope (Memory #8: ≤4 prod files):**
+
+- `src/app/api/book/route.ts` (MOD — ~10 lines net: 3 line-item
+  changes + 1 select extension + 1 type field + 1 Map construction +
+  comment block expansions)
+
+1 prod file. Well under budget.
+
+**Tests (+8 → 2767):**
+
+- `src/app/api/book/__tests__/deposit-tax-persistence.test.ts` (NEW —
+  8 tests). Mirrors `modifier-persistence.test.ts` harness style
+  (Stripe + combo-resolver + card-detail mocked; supabase builder
+  extended for `transactions` + `transaction_items` + `payments` +
+  `services.in()` paths). Coverage: primary taxable + primary
+  non-taxable (anti-overshoot guard against always-true regressions);
+  mixed-flag addon case (one taxable + one non-taxable in the same
+  submission proves per-row lookup); missing addon row defensive
+  default; CDTFA mobile-fee always-false regression pin (defends
+  against a blanket "use serviceRow flag everywhere" refactor);
+  `tax_amount=0` invariant on all items + on the deposit transaction
+  row (anti-overshoot guard against future Option-B drift); no-deposit
+  path writes zero `transaction_items` rows (boundary pin).
+
+**Gates:** `tsc --noEmit` 0 errors; `npm run lint` 0 errors / 98 warnings
+(unchanged from #137 baseline); `npm test` 2767 / 2767; `next build`
+clean.
+
+**Not in scope** per audit's locked fix arc + Q-C-1 Option A:
+
+- ❌ Step 4 UI tax line (would be Option B path — separate session if
+  operator wants customer-visible tax UX)
+- ❌ Payment intent tax computation (Option B path)
+- ❌ Receipt template tax line / SMS confirmation tax line (Option B
+  path)
+- ❌ Admin tax-rate setting (Option B path — TAX_RATE stays in
+  `src/lib/utils/constants.ts` as a hardcoded 0.1025 constant)
+- ❌ Refactoring `pos/utils/tax.ts` comment "services are tax-free"
+  (stale/aspirational — POS already supports taxable services via the
+  `service.is_taxable` flag; comment doc-only update deferred to a
+  separate quick pass)
+- ❌ U-B.5 prereq enforcement, W5/W7, Concern C (separate fix-arc waves)
+
+**CLAUDE.md Rule 22** extended with the W4 services-deposit-persistence
+mirror note (now lists the family of four: W1 classification + W2
+mobile_eligible + W3 staff_assessed + W4 is_taxable persistence).
+**PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md** updated to mark W4
+RESOLVED with commit hash + Option A annotation. **FILE_TREE.md**
+updated with the new test file.
+
+**Decision log (locked):**
+
+- Q-C-1 Option A locked over Option B during Phase 1 stop-and-report.
+  Operator's exact wording: "matches Q-C operator wording... CDTFA Pub
+  100... minimum correct change... POS finalization unchanged."
+- Defensive `?? false` default for missing addon row: operator
+  accepted ("POS re-reads canonical at finalization").
+- Mobile fee CDTFA-justified `is_taxable: false` stays; expanded
+  in-source comment flags it as the one legitimate post-W4 hardcoded-
+  false to prevent over-fixing in future audits.
+
+Not a 13-item entry (public-booking audit follow-up arc).
+
+---
+
 ## Session #137 — Fix (U-B.3 / W3): `staff_assessed` → "Request a Quote" CTA on public booking Step 2 — two-layer defense + shared form base (2026-06-01)
 
 Production code change. Branch

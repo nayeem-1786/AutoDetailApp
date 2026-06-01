@@ -104,24 +104,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch addon service rows once for downstream validation checks
-    // (W3 staff_assessed + W2 mobile_eligibility). Selecting both
-    // `staff_assessed` and `mobile_eligible` here means we issue ONE
-    // query instead of two when an `is_mobile` booking carries addons,
-    // and zero extra queries when no addons are present. Defining the
-    // shared row type once also keeps the two checks honest about which
-    // flags they read.
+    // (W3 staff_assessed + W2 mobile_eligibility) AND for the W4 line-item
+    // is_taxable persistence below. Selecting `staff_assessed`,
+    // `mobile_eligible`, and `is_taxable` here means we issue ONE query
+    // instead of three when an `is_mobile` booking carries addons, and
+    // zero extra queries when no addons are present. Defining the shared
+    // row type once also keeps each consumer honest about which flags it
+    // reads.
     type AddonValidationRow = {
       id: string;
       name: string;
       mobile_eligible: boolean;
       staff_assessed: boolean;
+      is_taxable: boolean;
     };
     let addonServiceRows: AddonValidationRow[] = [];
     if (data.addons.length > 0) {
       const addonIds = data.addons.map((a) => a.service_id);
       const { data: addonRows, error: addonErr } = await supabase
         .from('services')
-        .select('id, name, mobile_eligible, staff_assessed')
+        .select('id, name, mobile_eligible, staff_assessed, is_taxable')
         .in('id', addonIds);
       if (addonErr) {
         console.error('Addon row lookup failed:', addonErr.message);
@@ -588,6 +590,32 @@ export async function POST(request: NextRequest) {
           const resolvedPrimary = resolvedItems[0];
           const resolvedAddons = resolvedItems.slice(1);
 
+          // W4 (Unit B audit, 2026-05-30 — Session #138, U-B.4 Phase 2):
+          // mirror products' POS-side line-item persistence pattern for
+          // services on the booking deposit. Each `transaction_items` row
+          // now carries the SERVICE's own `is_taxable` flag instead of
+          // hardcoded `false`. Q-C LOCKED Option A (line-item persistence
+          // only — no Step 4 tax UI, no payment-intent tax computation):
+          // the deposit is a partial pre-payment, not a completed sale;
+          // CA CDTFA Pub 100 ties tax to service completion (which
+          // /api/pos/appointments/[id]/load + POS finalization handle
+          // correctly today via a live `services.is_taxable` lookup +
+          // the canonical `calculateItemTax(price, isTaxable)` helper in
+          // `src/app/pos/utils/tax.ts`). The persistence fix surfaces in
+          // the admin Transaction Detail page (`transaction-detail.tsx:306`)
+          // — taxable items now show `$0.00` (correctly typed) instead of
+          // `---` (mistyped as non-taxable). `tax_amount: 0` stays on
+          // both items + the deposit transaction because no tax is
+          // collected at deposit time.
+          //
+          // Addons look up via `addonServiceRows` (fetched once above for
+          // W2/W3 — extended in U-B.4 to include `is_taxable`). Defensive
+          // `?? false` default per operator guidance: POS finalization
+          // re-reads canonical `services.is_taxable` at drain time, so a
+          // race where an addon row was deleted between fetch + insert
+          // still resolves correctly downstream.
+          const addonMetaById = new Map(addonServiceRows.map((a) => [a.id, a]));
+
           const lineItems = [
             {
               transaction_id: depositTx.id,
@@ -600,7 +628,7 @@ export async function POST(request: NextRequest) {
               unit_price: resolvedPrimary.unit_price,
               total_price: resolvedPrimary.unit_price,
               tax_amount: 0,
-              is_taxable: false,
+              is_taxable: serviceRow.is_taxable as boolean,
               tier_name: data.tier_name || null,
               vehicle_size_class: sizeClass,
               notes: null,
@@ -620,7 +648,7 @@ export async function POST(request: NextRequest) {
               unit_price: addon.unit_price,
               total_price: addon.unit_price,
               tax_amount: 0,
-              is_taxable: false,
+              is_taxable: addonMetaById.get(addon.service_id)?.is_taxable ?? false,
               tier_name: addon.tier_name,
               vehicle_size_class: sizeClass,
               notes: null,
@@ -632,7 +660,11 @@ export async function POST(request: NextRequest) {
             // Mobile fee materialization (Option D2). Visible line item on
             // the deposit transaction so receipts + ticket displays show
             // "<zone name> — $40.00" alongside the services. Non-taxable
-            // per CDTFA Pub 100 (separately-stated delivery fee).
+            // per CDTFA Pub 100 (separately-stated delivery fee) — this
+            // is the ONE line item that legitimately stays
+            // `is_taxable: false` after W4 (Session #138) closed the
+            // service+addon persistence gap. The CDTFA citation is the
+            // justification; do not "fix" this to `serviceRow.is_taxable`.
             ...(data.is_mobile && mobileSurcharge > 0
               ? [{
                   transaction_id: depositTx.id,
