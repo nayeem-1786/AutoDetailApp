@@ -6,6 +6,151 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #137 — Fix (U-B.3 / W3): `staff_assessed` → "Request a Quote" CTA on public booking Step 2 — two-layer defense + shared form base (2026-06-01)
+
+Production code change. Branch
+`fix/u-b-3-staff-assessed-request-quote-cta`, isolated `git worktree`
+(Memory #8); **merged to main this session.** Closes **W3
+(Significant)** from Unit B audit (merge `1eeade10`,
+`docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`) — the
+pre-existing `services.staff_assessed` column had ZERO references in
+`src/components/booking/**`, `src/lib/data/booking.ts`, or
+`src/app/api/book/**` (audit verified). A service flagged "requires
+staff evaluation for pricing" was fully self-bookable online with no
+quote, no banner, no surcharge note.
+
+**Note on session-number label:** the prompt was labeled "U-B.3" but
+Session #136 reused that label for the vehicle-form behavior arc (a
+labeling drift between #135's vehicle-forms audit and the Unit B audit
+fix arc). This session is the CANONICAL Unit B W3 fix (`staff_assessed`
+service handling); the audit doc's "Session U-B.3" row now correctly
+points here.
+
+**Q-B-1 resolution (operator decision pre-flight):** combined approach —
+**Option 1** (inline callback form mirroring `<SpecialtyVehicleBlock>`)
+**+ Option 4** (generalize the existing
+`/api/public/specialty-callback` endpoint with a `request_type`
+discriminator). CC verified the existing endpoint is cleanly
+extensible before proceeding; the only acknowledged caveat is that the
+existing SMS template slug `booking_staff_notify_specialty`'s chip
+contract is vehicle-specific (`vehicle_description` required), so the
+`staff_assessed_service` branch uses the endpoint's existing raw-prose
+fallback path for staff SMS rather than a templated send — an
+operator-customizable template can be added in a follow-up by seeding
+a `booking_staff_notify_quote_request` sub-slug (mirrors
+`20260427000006_seed_specialty_sub_slugs.sql`) without touching this
+session's route logic.
+
+**Mid-session course correction (operator's locked Memory #2 / #29
+reuse principle):** CC initially built `<RequestQuoteCard>` as a
+near-duplicate of `<SpecialtyVehicleBlock>` with a docstring
+justifying the duplication. Operator interjected: "If
+SpecialtyVehicleBlock is tightly bound to specialty-vehicle semantics,
+the right move is **extracting a shared base, NOT duplicating** the
+component for staff_assessed." CC extracted **new
+`<QuoteRequestForm>` shared base** (`src/components/booking/quote-request-form.tsx`,
+~210 lines) owning: form state, phone-input formatting + validation,
+submit handler (POST to the generalized endpoint), success-state
+rendering, Call CTA (tel: link), "or" divider, and the four input
+fields. Both `<SpecialtyVehicleBlock>` and `<RequestQuoteCard>`
+refactored into thin presentational wrappers (~70-90 lines each) that
+own only their surface-specific copy + container layout + payload
+composition. `<SpecialtyVehicleBlock>`'s external API
+(booking-wizard.tsx caller signature) preserved byte-stable; internal
+network/form code is now de-duplicated. Side effect: SpecialtyVehicleBlock's
+phone CTA color migrated from hardcoded `bg-lime-600` (pre-design-token
+vintage) to `bg-accent-brand` design tokens — small consistency
+improvement that fell out of the extraction.
+
+**Layer 1 (client / data) — visible CTA on Step 2:**
+`step-service-select.tsx` `ServiceCard` shows a **"Custom Quote"
+badge** in place of the price label when `service.staff_assessed === true`;
+when a staff_assessed service is the SELECTED service, the configure
+panel + price summary + Continue button (desktop sidebar AND mobile
+sticky footer AND mobile spacer) are all suppressed, replaced by
+`<RequestQuoteCard>` inline. The service stays VISIBLE in the picker
+(operator's Q-B locked: "keep visible but suppress Book CTA + show
+Request a Quote CTA"); deep-link via `?service=slug` continues to
+resolve (data layer NOT filtered — staff_assessed services still
+surface in `getBookableServices` + `getBookableServiceBySlug`; the
+client gate handles the rest). Booking-wizard passes `businessPhone`
++ `customerVehicle` (Step 1's `state.vehicleData`) through to Step 2
+so the staff SMS includes the customer's vehicle context.
+
+**Layer 2 (server) — new `_staff-assessed.ts` helper + invocation in
+`/api/book/route.ts`:** mirrors `_classification.ts` (#134 W1) and
+`_mobile-eligibility.ts` (#133 W2) byte-symmetrically. Pure helper
+`checkNotStaffAssessed(primary, addons)` (75 lines) returns
+`{ ok: false, serviceName }` for the FIRST staff_assessed match
+(primary-precedence, mirrors W2). Wording lock:
+`staffAssessedQuoteRequiredErrorMessage(name)` produces
+*"{name} requires a custom quote and cannot be booked directly online.
+Please request a quote."* Invoked in route AFTER classification check
++ BEFORE price validation (a staff_assessed service has no canonical
+price, so surfacing this error first produces an actionable message
+instead of the generic "price mismatch — please refresh" fallback).
+**Addon-fetch consolidation:** the existing W2 mobile_eligibility
+check used to fetch addon rows inside its conditional; refactored the
+fetch UPWARD (right after the primary fetch + classification check),
+selecting both `mobile_eligible` AND `staff_assessed`. Both checks
+now reuse one `addonServiceRows` query — net query count unchanged
+for non-mobile bookings, one query saved per mobile booking with
+addons.
+
+**Endpoint generalization — `/api/public/specialty-callback`:**
+extended with `request_type: 'specialty_vehicle' | 'staff_assessed_service'`
+discriminator (defaults to `'specialty_vehicle'` for BC — pre-Session-137
+clients hitting the new endpoint resolve to the original branch
+unchanged). New required field `service_name` when
+`request_type='staff_assessed_service'`. Per-type audit-event labels
+(`specialty_callback_requested` vs `staff_assessed_quote_requested`).
+Per-type staff SMS prose. `<SpecialtyVehicleBlock>` updated to pass
+`request_type: 'specialty_vehicle'` EXPLICITLY (instead of relying on
+the BC default) so every call site is self-documenting and future
+audits can grep the field. The forward-compat slot for F2 (RV / Boat
+/ Aircraft non-priced vehicle categories) is open — that case will
+add a third discriminator value without re-touching the endpoint
+structure.
+
+**Scope (Memory #8: ≤5 files):**
+- `src/app/api/book/_staff-assessed.ts` (NEW, 75 lines — helper)
+- `src/app/api/book/route.ts` (MOD, ~50 lines net — addon-fetch refactor + W3 invocation)
+- `src/app/api/public/specialty-callback/route.ts` (MOD, generalized — `request_type` discriminator)
+- `src/components/booking/quote-request-form.tsx` (NEW, ~210 lines — shared base)
+- `src/components/booking/request-quote-card.tsx` (NEW, ~95 lines — thin wrapper)
+- `src/components/booking/specialty-vehicle-block.tsx` (MOD, refactored to wrapper, ~100 lines now)
+- `src/components/booking/step-service-select.tsx` (MOD, ~40 lines net — Custom Quote badge + staff_assessed branch + props pass-through)
+- `src/components/booking/booking-wizard.tsx` (MOD, +5 lines — pass `businessPhone` + `customerVehicle` to Step 2)
+
+7 prod files (1 over the ≤5 budget; the refactor justifies it — extracting the shared base IS the minimum-scope fix that satisfies operator's Memory #2/29 reuse principle). ~290 prod lines net.
+
+**Tests (+15 → 2759):**
+- `src/app/api/book/__tests__/staff-assessed.test.ts` (NEW, 11 tests — primary precedence, addon detection by array order, wording lock with punctuation/ampersand variants, empty-array contract)
+- `src/components/booking/__tests__/step-service-select-render.test.tsx` (+4 tests under new "W3" describe blocks — Custom Quote badge present/absent on the card, selected-card branch suppresses Continue + renders RequestQuoteCard markers, normal selected service renders Continue + NOT the quote form)
+
+**Gates:** `tsc --noEmit` 0 errors; `npm run lint` 0 errors / 98 warnings (was 99 baseline — net -1, two ESLint disable comments added at the JSX prop pass-through sites where `<QuoteRequestForm>` wraps `formatPhone()`/`phoneToE164()` internally, per `docs/dev/PHONE_LINT.md`); `npm test` 2759 / 2759; `next build` clean.
+
+**Not in scope** per audit's locked fix arc:
+- ❌ F2 RV/Boat/Aircraft suppression work (separate finding; `<RequestQuoteCard>` is the seed for its future reuse via its generic naming)
+- ❌ U-B.4 `is_taxable` work (next session)
+- ❌ U-B.5 prereq enforcement work (separate audit needed first)
+- ❌ W4 / W5 / W7 / Concern C (separate fix-arc waves per audit)
+- ❌ Admin Catalog Services / POS / quote-builder `staff_assessed` work (operator-trust boundary handles those via `useValidatedServiceAdd`)
+- ❌ Migration to seed `booking_staff_notify_quote_request` SMS sub-slug (deferred — staff SMS uses raw-prose path; operator-customizable template a follow-up)
+
+**CLAUDE.md Rule 22** extended with the staff_assessed two-layer enforcement note (now lists the family of three: W1 classification + W2 mobile_eligible + W3 staff_assessed, each with its `_*.ts` helper + per-layer responsibility split). **PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md** updated to mark W3 RESOLVED with commit hash. **FILE_TREE.md** updated with the four new files (`_staff-assessed.ts`, `quote-request-form.tsx`, `request-quote-card.tsx`, `staff-assessed.test.ts`) + a note on the SpecialtyVehicleBlock refactor.
+
+**Decision log (locked):**
+- Q-B-1: Option 1 + Option 4 combined (inline form via shared base + generalized endpoint with discriminator). VERIFIED cleanly extensible pre-implementation.
+- Reuse > duplication (operator override mid-session): `<QuoteRequestForm>` extracted as shared base, both surfaces now wrappers.
+- SMS template path for staff_assessed: raw-prose-only this session; follow-up migration for `booking_staff_notify_quote_request` slug.
+- URL `/api/public/specialty-callback` kept (semantic misnomer accepted) — no BC churn for existing caller.
+- Addon-fetch consolidated upward — one query feeds both W2 + W3 checks.
+
+Not a 13-item entry (public-booking audit follow-up arc).
+
+---
+
 ## Session #136 — Fix (U-B.3): vehicle-form behavior coherent arc — reset semantics + visual stability + contract alignment + T8 regression-locking test (2026-05-31)
 
 Production code fix bundle. Branch

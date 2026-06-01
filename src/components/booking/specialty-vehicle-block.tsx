@@ -1,14 +1,25 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { FormField } from '@/components/ui/form-field';
-import { Phone, ArrowLeft, CheckCircle } from 'lucide-react';
-import { formatPhone, formatPhoneInput, normalizePhone, phoneToE164 } from '@/lib/utils/format';
+import { useEffect, useRef } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { QuoteRequestForm } from './quote-request-form';
 import type { VehicleSelection } from './step-vehicle';
 
+/**
+ * SpecialtyVehicleBlock — Step 1 callback CTA for exotic/classic
+ * vehicles (Session 29).
+ *
+ * Session U-B.3 (2026-06-01): refactored to use the shared
+ * `<QuoteRequestForm>` base introduced for W3. The component's
+ * external API (props consumed by `booking-wizard.tsx`) is unchanged;
+ * internally the form + network + success-state are now shared with
+ * `<RequestQuoteCard>` instead of duplicated. The block-view
+ * telemetry, the vehicle-specific headline/body copy, and the
+ * Edit-my-vehicle footer link remain owned by this wrapper — those
+ * are the Step-1-specific bits the shared base intentionally doesn't
+ * know about.
+ */
 interface SpecialtyVehicleBlockProps {
   vehicle: VehicleSelection;
   businessPhone: string;
@@ -25,7 +36,10 @@ export function SpecialtyVehicleBlock({
   // so we only need to check whether size_class is 'classic' or 'exotic'.
   const vehicleWord: 'exotic' | 'classic' = vehicle.size_class === 'classic' ? 'classic' : 'exotic';
 
-  // Fire block-view audit event on mount (denominator for conversion tracking)
+  // Fire block-view audit event on mount (denominator for conversion tracking).
+  // Stays in the wrapper rather than the shared base — RequestQuoteCard
+  // doesn't have an equivalent tracking endpoint yet, and pushing this
+  // into the base would force every consumer to opt in/out.
   const viewLoggedRef = useRef(false);
   useEffect(() => {
     if (viewLoggedRef.current) return;
@@ -42,51 +56,11 @@ export function SpecialtyVehicleBlock({
     }).catch(() => {}); // Fire-and-forget
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [callbackName, setCallbackName] = useState('');
-  const [callbackPhone, setCallbackPhone] = useState('');
-  const [callbackEmail, setCallbackEmail] = useState('');
-  const [callbackTime, setCallbackTime] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
   const vehicleDesc = cleanVehicleDescription({
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
   });
-
-  const callbackPhoneValid = !callbackPhone || normalizePhone(callbackPhone) !== null;
-
-  async function handleCallbackSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!callbackName.trim() || !callbackPhone.trim()) return;
-    const normalized = normalizePhone(callbackPhone);
-    if (!normalized) return;
-
-    setSubmitting(true);
-    try {
-      await fetch('/api/public/specialty-callback', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: callbackName.trim(),
-          phone: normalized,
-          email: callbackEmail.trim() || null,
-          preferred_time: callbackTime.trim() || null,
-          vehicle_year: vehicle.year,
-          vehicle_make: vehicle.make,
-          vehicle_model: vehicle.model,
-          size_class: vehicle.size_class,
-        }),
-      });
-      setSubmitted(true);
-    } catch {
-      // Silently fail — staff notification is best-effort
-      setSubmitted(true);
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-lg space-y-6 py-8 text-center">
@@ -101,82 +75,28 @@ export function SpecialtyVehicleBlock({
         </p>
       </div>
 
-      {/* Phone CTA */}
-      <a
-        href={`tel:${phoneToE164(businessPhone)}`}
-        className="inline-flex items-center gap-2 rounded-lg bg-lime-600 px-6 py-3 text-lg font-semibold text-white shadow-md hover:bg-lime-700 transition-colors"
-      >
-        <Phone className="h-5 w-5" />
-        Call us now: {formatPhone(businessPhone)}
-      </a>
+      <QuoteRequestForm
+        // Session U-B.3 (2026-06-01): the endpoint now accepts two
+        // request_type discriminators ('specialty_vehicle' |
+        // 'staff_assessed_service'). It defaults missing values to
+        // 'specialty_vehicle' for backward compatibility, but we pass
+        // it explicitly so every call site is self-documenting and a
+        // future audit can grep the field.
+        payloadBase={{
+          request_type: 'specialty_vehicle',
+          vehicle_year: vehicle.year,
+          vehicle_make: vehicle.make,
+          vehicle_model: vehicle.model,
+          size_class: vehicle.size_class,
+        }}
+        // eslint-disable-next-line phone/no-raw-display -- pass-through to QuoteRequestForm, which wraps with phoneToE164() (tel:) + formatPhone() (display) at the actual render sites; the wrapped uses live in quote-request-form.tsx
+        businessPhone={businessPhone}
+      />
 
-      <div className="relative py-2">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
-        </div>
-        <div className="relative flex justify-center">
-          <span className="bg-white px-4 text-sm text-gray-500">or</span>
-        </div>
-      </div>
-
-      {/* Callback form */}
-      {submitted ? (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
-          <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-500" />
-          <p className="font-medium text-green-800">Callback requested!</p>
-          <p className="text-sm text-green-700">
-            One of our specialists will reach out soon.
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={handleCallbackSubmit} className="space-y-3 text-left">
-          <p className="text-sm font-medium text-gray-700 text-center">Request a callback</p>
-          <FormField label="Name" required>
-            <Input
-              value={callbackName}
-              onChange={(e) => setCallbackName(e.target.value)}
-              placeholder="Your name"
-              required
-              className="text-base sm:text-sm"
-            />
-          </FormField>
-          <FormField label="Phone" required>
-            <Input
-              type="tel"
-              value={callbackPhone}
-              onChange={(e) => setCallbackPhone(formatPhoneInput(e.target.value))}
-              placeholder="(555) 555-5555"
-              required
-              className="text-base sm:text-sm"
-            />
-            {callbackPhone && !callbackPhoneValid && (
-              <p className="mt-1 text-xs text-red-500">Enter a valid US phone number.</p>
-            )}
-          </FormField>
-          <FormField label="Email">
-            <Input
-              type="email"
-              value={callbackEmail}
-              onChange={(e) => setCallbackEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="text-base sm:text-sm"
-            />
-          </FormField>
-          <FormField label="Best time to reach you">
-            <Input
-              value={callbackTime}
-              onChange={(e) => setCallbackTime(e.target.value)}
-              placeholder="e.g., Weekday afternoons"
-              className="text-base sm:text-sm"
-            />
-          </FormField>
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? 'Sending...' : 'Request Callback'}
-          </Button>
-        </form>
-      )}
-
-      {/* Edit vehicle link */}
+      {/* Edit vehicle link — Step-1-specific affordance (lets the
+          customer back-up out of the specialty-vehicle branch if they
+          picked the wrong size_class). Lives in the wrapper because
+          RequestQuoteCard has no equivalent. */}
       <button
         onClick={onEditVehicle}
         className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"

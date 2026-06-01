@@ -11,6 +11,10 @@ import {
   checkPrimaryClassification,
   primaryClassificationErrorMessage,
 } from './_classification';
+import {
+  checkNotStaffAssessed,
+  staffAssessedQuoteRequiredErrorMessage,
+} from './_staff-assessed';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
@@ -95,6 +99,62 @@ export async function POST(request: NextRequest) {
     if (!classificationCheck.ok) {
       return NextResponse.json(
         { error: primaryClassificationErrorMessage(classificationCheck.serviceName) },
+        { status: 400 }
+      );
+    }
+
+    // Fetch addon service rows once for downstream validation checks
+    // (W3 staff_assessed + W2 mobile_eligibility). Selecting both
+    // `staff_assessed` and `mobile_eligible` here means we issue ONE
+    // query instead of two when an `is_mobile` booking carries addons,
+    // and zero extra queries when no addons are present. Defining the
+    // shared row type once also keeps the two checks honest about which
+    // flags they read.
+    type AddonValidationRow = {
+      id: string;
+      name: string;
+      mobile_eligible: boolean;
+      staff_assessed: boolean;
+    };
+    let addonServiceRows: AddonValidationRow[] = [];
+    if (data.addons.length > 0) {
+      const addonIds = data.addons.map((a) => a.service_id);
+      const { data: addonRows, error: addonErr } = await supabase
+        .from('services')
+        .select('id, name, mobile_eligible, staff_assessed')
+        .in('id', addonIds);
+      if (addonErr) {
+        console.error('Addon row lookup failed:', addonErr.message);
+        return NextResponse.json(
+          { error: 'Failed to validate add-on services' },
+          { status: 500 }
+        );
+      }
+      addonServiceRows = (addonRows ?? []) as AddonValidationRow[];
+    }
+
+    // W3 (Unit B audit, 2026-05-30) layer 2 — server staff_assessed check.
+    // Operator's Q-B rule (Session U-B.3): services with
+    // `staff_assessed=true` require staff evaluation for pricing and are
+    // not self-bookable online; customers are routed to a "Request a
+    // Quote" CTA (RequestQuoteCard → /api/public/specialty-callback with
+    // request_type='staff_assessed_service'). The client gates this on
+    // `selectedService.staff_assessed` in step-service-select.tsx so the
+    // rendered page never reaches the Continue button for these
+    // services; this is the server's catch for tampered/replayed
+    // requests + the operator-misconfiguration case (staff_assessed
+    // toggled on but online_bookable left true). Pure rule lives in
+    // `./_staff-assessed.ts`. Checked here BEFORE price validation
+    // because staff_assessed services have no canonical price, so
+    // surfacing this error first produces a more actionable message
+    // than a downstream "price mismatch — please refresh" fallback.
+    const staffAssessedCheck = checkNotStaffAssessed(
+      { name: serviceRow.name as string, staff_assessed: serviceRow.staff_assessed },
+      addonServiceRows.map((a) => ({ name: a.name, staff_assessed: a.staff_assessed }))
+    );
+    if (!staffAssessedCheck.ok) {
+      return NextResponse.json(
+        { error: staffAssessedQuoteRequiredErrorMessage(staffAssessedCheck.serviceName) },
         { status: 400 }
       );
     }
@@ -310,25 +370,12 @@ export async function POST(request: NextRequest) {
     // (see header for rationale + unit tests). Validation order mirrors
     // existing pattern: feature flag → service eligibility → zone.
     if (data.is_mobile) {
-      let addonEligibilityRows: { name: string; mobile_eligible: boolean }[] = [];
-      if (data.addons.length > 0) {
-        const addonIds = data.addons.map((a) => a.service_id);
-        const { data: addonRows, error: addonErr } = await supabase
-          .from('services')
-          .select('id, name, mobile_eligible')
-          .in('id', addonIds);
-        if (addonErr) {
-          console.error('Addon mobile_eligible lookup failed:', addonErr.message);
-          return NextResponse.json(
-            { error: 'Failed to validate add-on services' },
-            { status: 500 }
-          );
-        }
-        addonEligibilityRows = addonRows ?? [];
-      }
+      // Reuses `addonServiceRows` fetched once above (post-classification
+      // check) so this branch no longer issues its own addon query when
+      // both W2 and W3 checks need addon flags.
       const eligibilityCheck = checkMobileEligibility(
         { name: serviceRow.name as string, mobile_eligible: serviceRow.mobile_eligible },
-        addonEligibilityRows
+        addonServiceRows.map((a) => ({ name: a.name, mobile_eligible: a.mobile_eligible }))
       );
       if (!eligibilityCheck.ok) {
         return NextResponse.json(

@@ -205,3 +205,126 @@ describe('W6 — special_requirements on service card', () => {
     expect(screen.queryByText('Note:')).toBeNull();
   });
 });
+
+// ───────────────────────────────────────────────────────────────
+// W3 — staff_assessed → "Request a Quote" CTA on Step 2
+// ───────────────────────────────────────────────────────────────
+
+describe('W3 — staff_assessed service card badge', () => {
+  it('renders a "Custom Quote" badge in place of a price label when staff_assessed=true', () => {
+    const svc = service({
+      id: 'svc-staff',
+      name: 'Concours Detail',
+      staff_assessed: true,
+      flat_price: 50, // Even with a flat_price set, the badge supersedes
+    });
+    render(
+      <StepServiceSelect
+        categories={[category({}, [svc])]}
+        selectedServiceId={null}
+        onSelect={vi.fn()}
+        mobileZones={baseMobileZones}
+      />
+    );
+    // Badge appears, price label suppressed. Two distinct assertions
+    // so a regression that re-introduces the price wouldn't silently
+    // pass via badge-presence alone.
+    expect(screen.getByText('Custom Quote')).toBeTruthy();
+    expect(screen.queryByText('$50')).toBeNull();
+  });
+
+  it('does NOT render "Custom Quote" badge when staff_assessed=false', () => {
+    const svc = service({
+      id: 'svc-normal',
+      name: 'Express Wash',
+      staff_assessed: false,
+      flat_price: 50,
+    });
+    render(
+      <StepServiceSelect
+        categories={[category({}, [svc])]}
+        selectedServiceId={null}
+        onSelect={vi.fn()}
+        mobileZones={baseMobileZones}
+      />
+    );
+    expect(screen.queryByText('Custom Quote')).toBeNull();
+    // The normal price label should be present — match `$50` with any
+    // formatting (commas, decimals, currency-tail). `formatCurrency`
+    // returns "$50" / "$50.00" depending on locale; regex tolerates both.
+    expect(screen.getAllByText(/\$50(\.00)?/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('W3 — selected staff_assessed service renders RequestQuoteCard', () => {
+  it('renders the Request a Quote form and SUPPRESSES the Continue button when a staff_assessed service is selected', () => {
+    const svc = service({
+      id: 'svc-staff',
+      name: 'Concours Detail',
+      staff_assessed: true,
+      flat_price: 50,
+    });
+    render(
+      <StepServiceSelect
+        categories={[category({}, [svc])]}
+        // Pre-select it so the configure panel + sidebar render the
+        // selected-service branch (renderConfigurePanel + Continue gate).
+        selectedServiceId="svc-staff"
+        onSelect={vi.fn()}
+        mobileZones={baseMobileZones}
+        businessPhone="+14244010094"
+      />
+    );
+
+    // RequestQuoteCard surface markers — service-specific headline +
+    // form intro + submit-button label. All three locked so future
+    // copy changes assert intent. The configure panel renders in BOTH
+    // the mobile accordion (inside the selected card) AND the desktop
+    // sidebar (CSS toggles which is visible at runtime), so each
+    // marker appears at least twice in JSDOM where CSS isn't applied —
+    // assert `getAllBy*().length > 0` rather than `getBy*` which
+    // assumes uniqueness.
+    expect(
+      screen.getAllByRole('heading', { name: /Let's talk about your Concours Detail/i }).length
+    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Request a quote').length).toBeGreaterThan(0);
+    // RequestQuoteForm submit button uses the "Request Quote" label
+    // (passed in by RequestQuoteCard via the `submitLabel` prop).
+    expect(screen.getAllByRole('button', { name: /Request Quote/i }).length).toBeGreaterThan(0);
+
+    // Suppression — the normal Continue button must NOT render. This
+    // is the W3 client-layer gate; the server-layer gate is in
+    // `_staff-assessed.ts`. Both must hold; this test owns layer 1.
+    expect(screen.queryByRole('button', { name: /^Continue$/i })).toBeNull();
+  });
+
+  it('renders the normal Continue button (NOT the quote form) when the selected service is NOT staff_assessed', () => {
+    const svc = service({
+      id: 'svc-normal',
+      name: 'Express Wash',
+      staff_assessed: false,
+      flat_price: 50,
+    });
+    render(
+      <StepServiceSelect
+        categories={[category({}, [svc])]}
+        selectedServiceId="svc-normal"
+        onSelect={vi.fn()}
+        mobileZones={baseMobileZones}
+        businessPhone="+14244010094"
+      />
+    );
+
+    // Continue button present (right-column sidebar — there's also a
+    // mobile-footer variant gated on `lg:hidden`, but the desktop
+    // sidebar one always renders for a selected non-staff_assessed
+    // service with price > 0).
+    expect(screen.getAllByRole('button', { name: /^Continue$/i }).length).toBeGreaterThan(0);
+
+    // RequestQuoteCard markers MUST be absent.
+    expect(
+      screen.queryByRole('heading', { name: /Let's talk about your/i })
+    ).toBeNull();
+    expect(screen.queryByText('Request a quote')).toBeNull();
+  });
+});
