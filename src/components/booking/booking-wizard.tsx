@@ -1187,6 +1187,14 @@ export function BookingWizard({
             // Booking" button below remains the only backward path —
             // stacking two would be a UX regression.
             onBack={editEntryStep === null ? () => goToStep(1) : undefined}
+            // W3 (Unit B audit — Session U-B.3): pass through business
+            // phone + Step 1 vehicle context so RequestQuoteCard can
+            // render the Call CTA + include the vehicle on the staff
+            // notification SMS when the selected Step 2 service has
+            // `staff_assessed=true`. Both are optional — RequestQuoteCard
+            // degrades gracefully when either is missing.
+            businessPhone={businessPhone}
+            customerVehicle={state.vehicleData}
           />
           {editEntryStep !== null && (
             <div className="mt-4">

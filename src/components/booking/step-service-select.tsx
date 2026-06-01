@@ -21,6 +21,8 @@ import { FormField } from '@/components/ui/form-field';
 import { VEHICLE_SIZE_LABELS, CUSTOMER_SELF_SERVICE_SIZE_CLASSES } from '@/lib/utils/constants';
 import type { BookableCategory, BookableService } from '@/lib/data/booking';
 import type { MobileZone, ServicePricing, VehicleSizeClass, VehicleCategoryRecord } from '@/lib/supabase/types';
+import { RequestQuoteCard } from './request-quote-card';
+import type { VehicleSelection } from './step-vehicle';
 
 // ---------------------------------------------------------------------------
 // Exported types (used by booking-wizard.tsx)
@@ -97,6 +99,23 @@ interface StepServiceSelectProps {
    * stacking two backward affordances.
    */
   onBack?: () => void;
+  /**
+   * W3 (Unit B audit, 2026-05-30 — Session U-B.3): business phone for
+   * the `RequestQuoteCard` Call CTA + tel: link. Rendered only when
+   * the customer picks a `staff_assessed=true` service. Optional —
+   * RequestQuoteCard renders nothing when omitted, but the wizard
+   * always passes it for any staff_assessed surface (mirrors how
+   * Step 1's specialty-vehicle block needs it).
+   */
+  businessPhone?: string;
+  /**
+   * W3 (Unit B audit, 2026-05-30 — Session U-B.3): Step 1 vehicle
+   * context, passed through to `RequestQuoteCard` so the staff
+   * notification SMS for a staff_assessed quote request includes the
+   * vehicle the customer picked. Optional — the card still works
+   * without it (omits the "your {vehicle}" phrasing).
+   */
+  customerVehicle?: VehicleSelection | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +134,8 @@ export function StepServiceSelect({
   vehicleSpecialtyTier,
   customerProfileAddress,
   onBack,
+  businessPhone,
+  customerVehicle,
 }: StepServiceSelectProps) {
   // Helper to find a service by ID across all categories
   function findService(id: string | null): BookableService | null {
@@ -364,6 +385,27 @@ export function StepServiceSelect({
   // Rendered inside mobile accordion AND desktop sidebar (CSS-toggled)
   function renderConfigurePanel() {
     if (!selectedService) return null;
+
+    // W3 (Unit B audit, 2026-05-30 — Session U-B.3): when the selected
+    // service requires staff evaluation for pricing, replace the entire
+    // configure panel with the RequestQuoteCard. The customer cannot
+    // proceed to Continue from here — the right-column sidebar's
+    // Continue button + price summary are also gated below
+    // (`selectedService.staff_assessed` checks at the desktop sidebar
+    // + mobile sticky footer + mobile spacer). This is layer 1 of the
+    // two-layer defense; layer 2 is `checkNotStaffAssessed` in
+    // `src/app/api/book/_staff-assessed.ts`.
+    if (selectedService.staff_assessed) {
+      return (
+        <RequestQuoteCard
+          serviceName={selectedService.name}
+          serviceId={selectedService.id}
+          businessPhone={businessPhone ?? ''}
+          vehicle={customerVehicle ?? null}
+        />
+      );
+    }
+
     const addonSuggestions = selectedService.service_addon_suggestions;
     const visibleAddons = showAllAddons ? addonSuggestions : addonSuggestions.slice(0, 3);
     const hiddenCount = addonSuggestions.length - 3;
@@ -755,8 +797,12 @@ export function StepServiceSelect({
             </div>
           )}
 
-          {/* Mobile spacer for sticky footer */}
-          {pendingServiceId && price > 0 && <div className="h-24 lg:hidden" />}
+          {/* Mobile spacer for sticky footer — suppressed for
+              staff_assessed services since the footer is also
+              suppressed (no price-driven Continue button to clear). */}
+          {pendingServiceId && price > 0 && !selectedService?.staff_assessed && (
+            <div className="h-24 lg:hidden" />
+          )}
         </div>
 
         {/* Right column: Desktop sidebar */}
@@ -771,19 +817,28 @@ export function StepServiceSelect({
                   {renderConfigurePanel()}
                 </div>
 
-                {price > 0 && (
+                {/* W3 (Session U-B.3): for staff_assessed services the
+                    configure panel above is REPLACED by
+                    RequestQuoteCard, so the price summary and Continue
+                    button are intentionally suppressed — there is no
+                    canonical price to display and the booking path is
+                    inert (server check in `_staff-assessed.ts` rejects
+                    any submission anyway). */}
+                {!selectedService.staff_assessed && price > 0 && (
                   <div className="booking-summary-dark rounded-lg bg-brand-surface p-4">
                     {renderPriceSummary()}
                   </div>
                 )}
 
-                <Button
-                  onClick={handleContinue}
-                  disabled={!canContinue}
-                  className="w-full bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
-                >
-                  Continue
-                </Button>
+                {!selectedService.staff_assessed && (
+                  <Button
+                    onClick={handleContinue}
+                    disabled={!canContinue}
+                    className="w-full bg-accent-brand text-site-text-on-primary hover:bg-accent-brand-hover dark:bg-accent-brand dark:text-site-text-on-primary dark:hover:bg-accent-brand-hover"
+                  >
+                    Continue
+                  </Button>
+                )}
               </>
             ) : (
               <div className="rounded-lg border border-dashed border-site-border p-8 text-center">
@@ -796,8 +851,12 @@ export function StepServiceSelect({
         </div>
       </div>
 
-      {/* Mobile sticky footer */}
-      {pendingServiceId && selectedService && price > 0 && (
+      {/* Mobile sticky footer — W3 (Session U-B.3): suppressed for
+          staff_assessed services. The configure panel renders
+          RequestQuoteCard inline below the selected card on mobile
+          (mobile accordion path), and there is no canonical price to
+          show in the footer's compact summary. */}
+      {pendingServiceId && selectedService && price > 0 && !selectedService.staff_assessed && (
         <div className="booking-summary-dark lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
           <div className="max-w-3xl mx-auto">
             {renderPriceSummary(true)}
@@ -886,8 +945,16 @@ function ServiceCard({
         )}
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-site-text-muted">
-          {/* Price */}
-          {priceLabel && (
+          {/* Price — for staff_assessed services we surface a "Custom
+              Quote" badge instead of a price label so the customer
+              sees at-a-glance that pricing is staff-evaluated. The
+              card stays clickable; clicking it expands the
+              RequestQuoteCard via the configure panel branch. */}
+          {service.staff_assessed ? (
+            <span className="inline-flex items-center rounded bg-accent-brand/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent-brand">
+              Custom Quote
+            </span>
+          ) : priceLabel ? (
             <span className="font-medium text-site-text">
               {isOnSale && originalPrice && (
                 <>
@@ -901,7 +968,7 @@ function ServiceCard({
               )}
               {priceLabel}
             </span>
-          )}
+          ) : null}
 
           {/* Duration */}
           {service.base_duration_minutes > 0 && (
