@@ -3,6 +3,22 @@
 > Read-only architectural audit, 2026-06-02. Branch:
 > `audit/public-booking-architectural-coherence-expanded`.
 >
+> **Status update (Session #140, 2026-06-02):** **Path B Session 1
+> COMPLETE.** Q-Arch-1/2/3 locked upstream (Path B chosen).
+> Q-W5-UX LOCKED in-session as **Option 1** (badge + RequestQuoteCard,
+> reuse `request_type='staff_assessed_service'`). **W5 (prereq
+> vehicle-compatibility enforcement on public booking) + W7 (addon
+> vehicle-compatibility enforcement) shipped** with byte-symmetric
+> two-layer defense (new `_prereq-enforcement.ts` + `_addon-vehicle-compat.ts`
+> helpers mirroring `_classification.ts` / `_staff-assessed.ts`;
+> client wiring in `step-service-select.tsx` widens the existing W3
+> staff_assessed branch via a unified `selectedRequiresQuote`
+> derived bool; addon list filters by vehicle_compatibility BEFORE
+> rendering). See `Session #140` in `docs/CHANGELOG.md` for the full
+> resolution, including the operator post-deploy verification
+> checklist. **Path B Session 2 (Concern 2 — save-to-account
+> transparency) is the next planned session.**
+>
 > Memory #29 type: **Architectural** (system-level soundness, not
 > per-component). The audit's job is to map the design space and
 > surface decisions — not to recommend the answer.

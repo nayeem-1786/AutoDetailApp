@@ -53,10 +53,34 @@ export interface BookableService extends Service {
       | 'base_duration_minutes'
       | 'classification'
       | 'mobile_eligible'
+      // W7 (Unit B audit, 2026-05-30 — Session U-B.5): each addon's own
+      // vehicle_compatibility is now read at Step 2 so the client can
+      // filter incompatible addons out of the picker. Server reads the
+      // same column via `checkAddonsVehicleCompatible` for the layer-2
+      // defense — see `src/app/api/book/_addon-vehicle-compat.ts`.
+      | 'vehicle_compatibility'
     > & {
       service_pricing: ServicePricing[];
     };
   })[];
+  // W5 (Unit B audit, 2026-05-30 — Session U-B.5): prerequisite services'
+  // names + their vehicle_compatibility, embedded so the Step 2 client can
+  // compute the "Custom Quote" badge / RequestQuoteCard branch for each
+  // primary service without an extra round-trip. The server reads the
+  // same shape via `assertPrereqsCompatible` for the layer-2 defense —
+  // see `src/app/api/book/_prereq-enforcement.ts`.
+  //
+  // PostgREST embed via the `service_id` FK of `service_prerequisites`
+  // (the dependent-side column). The nested `prerequisite_service` join
+  // uses the `prerequisite_service_id` FK to pull the required service's
+  // name + vehicle_compatibility — mirrors the same join shape used in
+  // `src/app/api/pos/services/check-prerequisites/route.ts:107`.
+  service_prerequisites: {
+    prerequisite_service: {
+      name: string;
+      vehicle_compatibility: string[] | null;
+    } | null;
+  }[];
 }
 
 export interface BookableCategory {
@@ -95,7 +119,13 @@ export async function getBookableServices(): Promise<BookableCategory[]> {
           id, name, slug, description, pricing_model, flat_price,
           custom_starting_price, per_unit_price, per_unit_label, per_unit_max,
           base_duration_minutes, classification, mobile_eligible,
+          vehicle_compatibility,
           service_pricing(*)
+        )
+      ),
+      service_prerequisites!service_id(
+        prerequisite_service:services!prerequisite_service_id(
+          name, vehicle_compatibility
         )
       )`
     )
@@ -163,7 +193,13 @@ export async function getBookableServiceBySlug(
           id, name, slug, description, pricing_model, flat_price,
           custom_starting_price, per_unit_price, per_unit_label, per_unit_max,
           base_duration_minutes, classification, mobile_eligible,
+          vehicle_compatibility,
           service_pricing(*)
+        )
+      ),
+      service_prerequisites!service_id(
+        prerequisite_service:services!prerequisite_service_id(
+          name, vehicle_compatibility
         )
       )`
     )

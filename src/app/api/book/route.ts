@@ -15,6 +15,15 @@ import {
   checkNotStaffAssessed,
   staffAssessedQuoteRequiredErrorMessage,
 } from './_staff-assessed';
+import {
+  assertPrereqsCompatible,
+  prereqIncompatibleErrorMessage,
+  type PrereqRow,
+} from './_prereq-enforcement';
+import {
+  checkAddonsVehicleCompatible,
+  addonVehicleIncompatibleErrorMessage,
+} from './_addon-vehicle-compat';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
@@ -104,26 +113,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch addon service rows once for downstream validation checks
-    // (W3 staff_assessed + W2 mobile_eligibility) AND for the W4 line-item
-    // is_taxable persistence below. Selecting `staff_assessed`,
-    // `mobile_eligible`, and `is_taxable` here means we issue ONE query
-    // instead of three when an `is_mobile` booking carries addons, and
-    // zero extra queries when no addons are present. Defining the shared
-    // row type once also keeps each consumer honest about which flags it
-    // reads.
+    // (W3 staff_assessed + W2 mobile_eligibility + W7 addon
+    // vehicle_compatibility) AND for the W4 line-item is_taxable
+    // persistence below. Selecting `staff_assessed`, `mobile_eligible`,
+    // `is_taxable`, and `vehicle_compatibility` here means we issue ONE
+    // query instead of four when an `is_mobile` booking carries addons,
+    // and zero extra queries when no addons are present. Defining the
+    // shared row type once also keeps each consumer honest about which
+    // flags it reads.
     type AddonValidationRow = {
       id: string;
       name: string;
       mobile_eligible: boolean;
       staff_assessed: boolean;
       is_taxable: boolean;
+      vehicle_compatibility: string[] | null;
     };
     let addonServiceRows: AddonValidationRow[] = [];
     if (data.addons.length > 0) {
       const addonIds = data.addons.map((a) => a.service_id);
       const { data: addonRows, error: addonErr } = await supabase
         .from('services')
-        .select('id, name, mobile_eligible, staff_assessed, is_taxable')
+        .select('id, name, mobile_eligible, staff_assessed, is_taxable, vehicle_compatibility')
         .in('id', addonIds);
       if (addonErr) {
         console.error('Addon row lookup failed:', addonErr.message);
@@ -157,6 +168,101 @@ export async function POST(request: NextRequest) {
     if (!staffAssessedCheck.ok) {
       return NextResponse.json(
         { error: staffAssessedQuoteRequiredErrorMessage(staffAssessedCheck.serviceName) },
+        { status: 400 }
+      );
+    }
+
+    // W5 (Unit B audit, 2026-05-30 — Session U-B.5 / Path B Session 1)
+    // layer 2 — server prerequisite-vehicle-compatibility check.
+    //
+    // Q-W5-UX LOCKED rule (Session U-B.5): when a primary service has
+    // prerequisites configured AND at least one of those prerequisite
+    // services is NOT compatible with the customer's vehicle category,
+    // the customer can never self-service the dependent service —
+    // they need staff assistance via the `<RequestQuoteCard>` CTA
+    // (Q-W5-UX Option 1: show with "Custom Quote" badge, reuse
+    // `request_type='staff_assessed_service'`). Pure rule lives in
+    // `./_prereq-enforcement.ts`. The client renders the badge +
+    // suppresses the Continue button for these services on Step 2;
+    // this is the server's catch for tampered/replayed requests + the
+    // operator-misconfiguration case (prereq with
+    // `vehicle_compatibility: ['standard']` on a service available
+    // to non-automobile customers).
+    //
+    // Public-booking SUBSET semantics (Q-Arch-1 LOCKED): unlike POS —
+    // which gates prereqs by SATISFACTION (history/same-ticket) and
+    // offers a manager override — public booking checks ONE axis only:
+    // prereq vehicle-compatibility. That's the axis the customer can
+    // never resolve themselves; satisfaction is something staff will
+    // work out via the quote request. No manager override on this
+    // surface.
+    //
+    // Fetched as a separate query (rather than re-fetching the primary
+    // with an embed) because the primary row was already retrieved
+    // above; pulling prereqs once via the dedicated table mirrors how
+    // POS does it in `check-prerequisites/route.ts`. When the primary
+    // has no prereqs configured this is one round-trip that returns
+    // zero rows — cheap.
+    const { data: prereqRows, error: prereqErr } = await supabase
+      .from('service_prerequisites')
+      .select(
+        `prerequisite_service:services!prerequisite_service_id(name, vehicle_compatibility)`
+      )
+      .eq('service_id', data.service_id);
+
+    if (prereqErr) {
+      console.error('Prerequisite row lookup failed:', prereqErr.message);
+      return NextResponse.json(
+        { error: 'Failed to validate service prerequisites' },
+        { status: 500 }
+      );
+    }
+
+    const prereqCheck = assertPrereqsCompatible(
+      {
+        name: serviceRow.name as string,
+        service_prerequisites: (prereqRows ?? []) as unknown as PrereqRow[],
+      },
+      data.vehicle?.vehicle_category ?? null
+    );
+    if (!prereqCheck.ok) {
+      return NextResponse.json(
+        {
+          error: prereqIncompatibleErrorMessage(
+            prereqCheck.serviceName,
+            prereqCheck.offendingPrereqs
+          ),
+        },
+        { status: 400 }
+      );
+    }
+
+    // W7 (Unit B audit, 2026-05-30 — Session U-B.5 / Path B Session 1)
+    // layer 2 — server addon-vehicle-compatibility check.
+    //
+    // Each addon carries its own `vehicle_compatibility` (same shape
+    // as the primary). The client filter at Step 2 hides incompatible
+    // addons from the picker; this is the server's catch for
+    // tampered/replayed requests + the case where the customer
+    // selected addons for one vehicle then switched categories
+    // mid-flow (the client filter runs at render time only).
+    //
+    // Reuses `addonServiceRows` fetched once above (extended in U-B.5
+    // to include `vehicle_compatibility`). Pure rule lives in
+    // `./_addon-vehicle-compat.ts`. The primary's own
+    // vehicle_compatibility is checked separately at `:343` against
+    // the find-or-create canonical row — this helper handles addons
+    // only, by design.
+    const addonCompatCheck = checkAddonsVehicleCompatible(
+      addonServiceRows.map((a) => ({
+        name: a.name,
+        vehicle_compatibility: a.vehicle_compatibility,
+      })),
+      data.vehicle?.vehicle_category ?? null
+    );
+    if (!addonCompatCheck.ok) {
+      return NextResponse.json(
+        { error: addonVehicleIncompatibleErrorMessage(addonCompatCheck.serviceName) },
         { status: 400 }
       );
     }
