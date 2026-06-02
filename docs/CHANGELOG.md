@@ -6,6 +6,63 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #141 — Fix (Path B Session 2 / Concern 2): save-to-account transparency for vehicles — silent-save toast (2026-06-02)
+
+Closes **Concern 2 (Significant)** from the architectural audit (`docs/dev/PUBLIC_BOOKING_ARCHITECTURAL_AUDIT.md`, commit `709befa5`). Path B Session 2 of 3 (Session 3's deferred T6.4 siblings + Q-Arch-7 signup acknowledgment remain optional). The audit corrected the operator's stated premise: the vehicle data WAS being persisted via `findOrCreateVehicle` (`vehicle-helpers.ts:188-204`) to the same `vehicles` table the portal reads. **The gap was transparency, not persistence** — the customer was never told it happened.
+
+**Q-PB-S2 LOCKED in-session as Option 1 (transparency-only)** after pre-flight surfaced two architectural blockers against the session prompt's original "toggle + opt-out" shape:
+
+1. **`vehicles.customer_id` is `NOT NULL`** (DB_SCHEMA.md:3040) and the dedup `idx_vehicles_customer_make_model` UNIQUE index is scoped by customer_id. A "vehicle without account linkage" data path doesn't exist today — the toggle's OFF branch would require a schema migration (out of scope per session prompt's "NO migrations"). Anonymous bookings already create a customer record before linking the vehicle, so there's no "stateless vehicle" path anywhere in the data model.
+2. **Address-save is already Phase Mobile-1.1 LOCKED** with silent-save + diff prompt UX (D18 in audit). Adding a parallel "save toggle" to the address step would partially re-litigate that operator-locked design.
+
+**Operator post-flight directive:** match Mobile-1.1's silent-save + toast precedent (Memory #2); reuse `sonner` (already shared); fold both save events into one mount-effect; include "View →" link to `/account/vehicles` for authenticated sessions as the customer's agency-preservation escape hatch (review or delete the saved vehicle from portal).
+
+**Server — new helper mirroring Mobile-1.1 shape:**
+
+- `src/lib/utils/vehicle-save-action.ts` (NEW) — `resolveVehicleSaveAction({ customerId, vehicleId, vehicleCreated })` returns `{ silently_saved: true, vehicle_id, customer_id }` ONLY when `findOrCreateVehicle` returned `created: true` (fresh insert — customer didn't have this vehicle before) AND there's a customer + vehicle linkage. Returns `null` otherwise (matched existing vehicle = no announcement; missing ids = defensive guard). Sync (no DB calls) — unlike `resolveMobileAddressAction` which queries customers + may run an UPDATE, the vehicle case's work is already done by `findOrCreateVehicle` upstream.
+- `src/app/api/book/route.ts` — captures `vehicleResult.created` from the existing `findOrCreateVehicle` call (the helper already exposes this discriminant; no API surface change), invokes `resolveVehicleSaveAction` next to the existing `resolveMobileAddressAction` call right before the response builder, adds `vehicle_save_action` to the JSON response alongside `mobile_address_action`.
+
+**Client — single mount-effect with three branches:**
+
+- `src/components/booking/booking-wizard.tsx` — confirmation state extended with `vehicleSaveAction: VehicleSaveAction | null`; plumbed from `result.vehicle_save_action` to `<BookingConfirmation>`.
+- `src/components/booking/booking-confirmation.tsx` — the existing Mobile-1.1 useEffect that fired `toast.success("We've saved your address to your profile.")` is widened to a three-branch dispatch on `[vehicleSaveAction?.silently_saved, mobileAddressAction?.silently_saved]`:
+  - **Combined:** `"We've saved your vehicle and address to your account."` — ONE toast (not two stacked), with `action: { label: 'View →', onClick: → /account/vehicles }` when `isPortal === true`.
+  - **Vehicle-only:** `"We've saved your vehicle to your account."` — same action conditional.
+  - **Address-only:** Mobile-1.1's existing wording byte-stable (`"We've saved your address to your profile."`, no action button) — the test suite asserts this literally so any future widening must be a deliberate operator decision, not accidental drift.
+- **"View →" is `isPortal`-gated:** the link routes to `/account/vehicles` which requires auth; sending an anonymous customer there would redirect them through `/signin`. Anonymous bookings still get the transparency toast (the save still happened — they just created an account in the same flow), they just don't get the deep-link.
+
+**Why one effect, three branches (not three effects):** Memory #2 — the Mobile-1.1 toast pattern is the operator-locked precedent; Concern 2 lands as a peer of that pattern, not a parallel one. A customer who triggers BOTH a vehicle save AND an address save on the same booking should see ONE combined acknowledgment, not two stacked toasts. The combined-message branch is anti-regression-locked in tests.
+
+**Why no opt-out:** structurally impossible without a schema migration (above). Q-PB-S2's pragmatic shape is: surface the save, give the customer the escape hatch (portal delete affordance via "View →" link). Customer agency preserved without breaking the NOT NULL invariant or the dedup index.
+
+**Files modified**
+
+- `src/lib/utils/vehicle-save-action.ts` (NEW)
+- `src/app/api/book/route.ts` — import + `vehicleCreated` tracking through the find-or-create branch + helper call + response field
+- `src/components/booking/booking-wizard.tsx` — confirmation state type + render prop
+- `src/components/booking/booking-confirmation.tsx` — `VehicleSaveActionProp` type, prop wiring, widened useEffect
+- `src/lib/utils/__tests__/vehicle-save-action.test.ts` (NEW, 8 tests)
+- `src/components/booking/__tests__/booking-confirmation-toast.test.tsx` (NEW, 8 tests)
+- `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/PUBLIC_BOOKING_ARCHITECTURAL_AUDIT.md`, `docs/dev/FILE_TREE.md`, `CLAUDE.md`
+
+**Verification**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors, 97 warnings (baseline preserved)
+- `npm run build` → clean (790 pages)
+- `npm test` → 2844 / 2844 (was 2828 after #140; +16 new — 8 helper + 8 render branches)
+
+**Operator post-deploy verification checklist**
+
+1. **Logged-in customer + new vehicle:** book with a NEW make/model the account hasn't seen. On confirmation, expect a `toast.success` "We've saved your vehicle to your account." with a clickable "View →" that lands on `/account/vehicles`.
+2. **Logged-in customer + saved vehicle:** book with a SAVED vehicle (picked from Step 1 dropdown). On confirmation, expect NO vehicle save toast (matched existing — nothing to announce).
+3. **Logged-in customer + new vehicle + first-time mobile address:** expect ONE combined toast "We've saved your vehicle and address to your account." with the "View →" action — NOT two stacked toasts.
+4. **Anonymous booking with new vehicle:** expect the vehicle save toast to fire (the silent-save still happened — customer just created an account in the same flow), but WITHOUT the "View →" action button (link would route them to `/signin`).
+5. **Mobile-1.1 regression:** address-only flow (no vehicle change) still fires Mobile-1.1's original "We've saved your address to your profile." toast byte-stable — wording unchanged, no action button.
+6. **Portal escape hatch:** click "View →" from the toast, confirm `/account/vehicles` opens with the freshly-saved vehicle visible; delete works as before.
+
+---
+
 ## Session #140 — Fix (U-B.5 / Path B Session 1): W5 prereq + W7 addon vehicle_compat enforcement on public booking — two-layer defense (2026-06-02)
 
 Closes W5 (Moderate) and W7 (Minor) from the Unit B audit (`docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`), reframed by the expanded architectural audit (commit `709befa5`) as Path B Session 1. Architectural decisions LOCKED upstream: public booking is intentionally a SUBSET of POS (Q-Arch-1) — "self-service customer with a known service; anything requiring staff judgment, multi-service orchestration, or operator-level pricing goes elsewhere." Single-primary stays (Q-Arch-2 LOCKED — Concern 1 not restructured). W5 + W7 are real defects that the subset philosophy doesn't excuse; this session closes them as parity-with-POS fixes, NOT as architectural restructuring.

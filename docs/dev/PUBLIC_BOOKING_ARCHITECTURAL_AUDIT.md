@@ -3,21 +3,36 @@
 > Read-only architectural audit, 2026-06-02. Branch:
 > `audit/public-booking-architectural-coherence-expanded`.
 >
-> **Status update (Session #140, 2026-06-02):** **Path B Session 1
+> **Status update (Session #141, 2026-06-02):** **Path B Session 1 + 2
 > COMPLETE.** Q-Arch-1/2/3 locked upstream (Path B chosen).
-> Q-W5-UX LOCKED in-session as **Option 1** (badge + RequestQuoteCard,
-> reuse `request_type='staff_assessed_service'`). **W5 (prereq
-> vehicle-compatibility enforcement on public booking) + W7 (addon
-> vehicle-compatibility enforcement) shipped** with byte-symmetric
-> two-layer defense (new `_prereq-enforcement.ts` + `_addon-vehicle-compat.ts`
-> helpers mirroring `_classification.ts` / `_staff-assessed.ts`;
-> client wiring in `step-service-select.tsx` widens the existing W3
-> staff_assessed branch via a unified `selectedRequiresQuote`
-> derived bool; addon list filters by vehicle_compatibility BEFORE
-> rendering). See `Session #140` in `docs/CHANGELOG.md` for the full
-> resolution, including the operator post-deploy verification
-> checklist. **Path B Session 2 (Concern 2 — save-to-account
-> transparency) is the next planned session.**
+> **Session 1 (#140):** Q-W5-UX LOCKED Option 1 — W5 (prereq
+> vehicle-compatibility enforcement) + W7 (addon vehicle-compatibility
+> enforcement) shipped with byte-symmetric two-layer defense (new
+> `_prereq-enforcement.ts` + `_addon-vehicle-compat.ts` helpers
+> mirroring `_classification.ts` / `_staff-assessed.ts`).
+> **Session 2 (#141):** Q-PB-S2 LOCKED Option 1 (transparency-only) —
+> **Concern 2 RESOLVED.** Pre-flight surfaced two architectural
+> blockers against the prompt's original "toggle + opt-out" shape:
+> (1) `vehicles.customer_id` is `NOT NULL` so a "vehicle without
+> account linkage" data path doesn't exist without a schema migration
+> (out of scope), and (2) address-save is already Phase Mobile-1.1
+> LOCKED with silent-save+diff UX (D18 in this audit) — a parallel
+> toggle would re-litigate that locked design. Operator post-flight
+> directive: match Mobile-1.1 precedent (Memory #2), reuse `sonner`,
+> fold both saves into one mount-effect, include "View →" link to
+> `/account/vehicles` for authenticated sessions. **What shipped:**
+> new `vehicle-save-action.ts` server helper synthesizes
+> `vehicle_save_action` alongside the existing `mobile_address_action`
+> in the `/api/book` response; the existing `booking-confirmation.tsx`
+> useEffect is widened to a three-branch dispatch (combined toast /
+> vehicle-only / address-only with Mobile-1.1's wording byte-stable).
+> Customer agency preserved via the "View →" escape hatch — no schema
+> migration, no NOT NULL violation, no dedup-index drift. See
+> `Session #141` in `docs/CHANGELOG.md` for the full resolution +
+> operator post-deploy verification checklist. **Path B Session 3 is
+> OPTIONAL** (Q-Arch-7 signup acknowledgment + 3 deferred T6.4 minor
+> siblings — name updates, saved payment, notes propagation; bundled
+> by Q-Arch-8 as optional).
 >
 > Memory #29 type: **Architectural** (system-level soundness, not
 > per-component). The audit's job is to map the design space and
