@@ -132,6 +132,7 @@ export const SMS_CONTRACTS_SOURCE = {
     details: { description: 'Free-text details from agent', sample: 'Customer wants ceramic coating for fleet of 5 vehicles', format: 'plain' },
     cancellation_reason: { description: 'Reason for cancellation', sample: 'Schedule conflict', format: 'plain' },
     preferred_time: { description: 'Customer preferred callback time', sample: 'Tomorrow afternoon', format: 'plain' },
+    request_subject: { description: 'Variant-specific subject for quote-request acknowledgments (e.g., a service name or "specialty vehicle")', sample: 'Ceramic Coating', format: 'plain' },
     customer_message_excerpt: { description: 'Excerpt of inbound customer message', sample: 'Hi, I need a ceramic…', format: 'plain' },
     transcript_summary: { description: 'Voice call transcript summary', sample: 'Customer asked about pricing for…', format: 'plain' },
     inferred_customer_type: { description: 'Inferred customer type (enthusiast / professional)', sample: 'enthusiast', format: 'plain' },
@@ -201,6 +202,10 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['customer_name', 'services', 'appointment_date', 'appointment_time', 'deposit_info'],
       optional: ['customer_email', 'customer_phone', 'last_name', 'vehicle_description'],
     },
+    booking_staff_notify_quote_request: {
+      required: ['customer_name', 'customer_phone', 'service_name'],
+      optional: ['vehicle_description', 'customer_email', 'preferred_time'],
+    },
     booking_staff_notify_specialty: {
       required: ['customer_name', 'customer_phone', 'vehicle_description'],
       optional: ['customer_email', 'size_class', 'preferred_time'],
@@ -240,6 +245,10 @@ export const SMS_CONTRACTS_SOURCE = {
     quote_reminder: {
       required: ['first_name', 'short_url'],
       optional: ['last_name', 'vehicle_description'],
+    },
+    quote_request_received_customer: {
+      required: ['first_name', 'request_subject'],
+      optional: ['business_name', 'business_phone'],
     },
     quote_sms_admin: {
       required: ['quote_number', 'total_amount', 'short_url'],

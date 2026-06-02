@@ -6,6 +6,55 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #139 — Fix: Quote-request SMS bundle — Pattern B + footgun + universal customer template + sendSms self-send chokepoint (2026-06-02)
+
+Closes the four-concern bundle from `docs/dev/QUOTE_REQUEST_SMS_AUDIT.md` (the Targeted audit run between #138 and this session). #137's W3 generalization of `/api/public/specialty-callback` introduced a `request_type='staff_assessed_service'` branch but left the staff-recipient lookup gated to `specialty_vehicle` only — the new branch fell through to `recipients = [biz.phone]` (the business's own Twilio number `+14244010094`), causing Twilio self-sends and zero staff cell coverage. This session fixes that plus three adjacent concerns surfaced by the audit.
+
+**Concern 1 — Pattern B: per-`request_type` staff slug lookup**
+- New migration `20260602004932_seed_quote_request_sms_templates.sql` seeds `booking_staff_notify_quote_request` (category `system`, recipient_type `staff`) with the same two staff phones as `booking_staff_notify_specialty`. Operators can split routing per-slug via admin UI later without code changes.
+- `STAFF_SLUG_BY_REQUEST_TYPE` map in `src/app/api/public/specialty-callback/route.ts` makes the slug-per-variant routing explicit: `specialty_vehicle → booking_staff_notify_specialty`, `staff_assessed_service → booking_staff_notify_quote_request`. Adding F2's future RV/Boat/Aircraft variant is a one-line addition.
+- Required chips for the new staff slug: `customer_name`, `customer_phone`, `service_name`. Optional: `vehicle_description`, `customer_email`, `preferred_time`.
+
+**Concern 2 — Footgun hardening**
+- Both fallback sites in `route.ts` (init + template-result fallback) previously defaulted to `[biz.phone]`. Both now drop to `[]` + `console.warn` describing which slug had no `recipient_phones` configured. Closes S2 (admin clears all phones via UI) and S3 (fresh DB / forgotten seed) trigger scenarios from the audit's deep-dive.
+- The dispatch loop is now safe-by-default — an empty recipient list silently no-ops with a logged hint, instead of self-sending to Twilio.
+
+**Concern 3 — Universal customer SMS (BEHAVIOR CHANGE for specialty_vehicle)**
+- New customer-recipient template `quote_request_received_customer` (category `quote`, recipient_type `customer`). Variables: required `first_name`, `request_subject`; optional auto-injected `business_name`, `business_phone`. Body: `"Hi {first_name}, thanks for your {request_subject} request! We received your details and will reach out shortly. Questions? Call {business_phone}."`
+- The route dispatches this template after the audit_log row writes, in a separate `try/catch` from the staff SMS so neither blocks the other.
+- `request_subject` resolves per-variant: `staff_assessed_service → service_name`, `specialty_vehicle → "specialty vehicle"`, future F2 → variant-defined.
+- **EXPLICIT BEHAVIOR CHANGE**: pre-#139, the `specialty_vehicle` flow sent NO customer SMS — only the form's UI success card. Post-#139 it WILL send a customer ack via SMS. Operator approved per QUOTE_REQUEST_SMS_AUDIT Target E.
+
+**Concern 4 — Global `sendSms` self-send chokepoint**
+- Added defense-in-depth guard in `src/lib/utils/sms.ts` BEFORE the Twilio fetch: if `normalizePhone(to) === normalizePhone(TWILIO_PHONE_NUMBER)`, refuse + `console.warn` + return `{ success: false, error: 'Self-send blocked: recipient matches TWILIO_PHONE_NUMBER' }`. Skipped when env is unset/empty so tests/dev don't false-positive.
+- Backward compatible: failure shape mirrors the existing `Invalid phone number format` rejection — any caller already handling `result.success === false` continues to work. No `sms_delivery_log` row is written for blocked self-sends (no Twilio SID).
+- Protects every current and future SMS caller (cron jobs, lifecycle engine, voice-agent handlers, etc.) from the same class of bug — the route-level fix in Concern 2 plus this chokepoint form a belt-and-suspenders defense.
+
+**Files modified**
+- `supabase/migrations/20260602004932_seed_quote_request_sms_templates.sql` (NEW)
+- `src/lib/sms/sms-contracts.source.ts` — added `request_subject` chip; added two new slugs; ran `npx tsx scripts/regen-sms-contracts.ts`
+- `src/lib/sms/palette.ts` (REGEN)
+- `src/lib/sms/generated-contracts.ts` (REGEN)
+- `src/app/api/public/specialty-callback/route.ts` — Pattern B refactor + Concern 2 footgun + Concern 3 customer SMS dispatch
+- `src/lib/utils/sms.ts` — Concern 4 chokepoint
+- `src/app/api/public/specialty-callback/__tests__/route.test.ts` (NEW, 21 tests)
+- `src/lib/utils/__tests__/sms-self-send.test.ts` (NEW, 10 tests)
+- `docs/CHANGELOG.md`, `docs/dev/QUOTE_REQUEST_SMS_AUDIT.md`, `docs/dev/FILE_TREE.md`, `CLAUDE.md`
+
+**Verification**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors, 98 warnings (baseline preserved)
+- `npm run build` → clean (790 pages)
+- `npm test` → 2798 / 2798 (was 2767 after #138; +31 new — 10 sendSms self-send + 21 specialty-callback route)
+
+**Operator post-deploy verification checklist**
+1. `supabase db push` to apply the migration on production; verify both new template rows visible in admin SMS Templates UI (staff slug under `system` section with two staff phones editable; customer slug under `quote` section, no per-template recipients).
+2. Submit a `staff_assessed_service` quote request from public booking Step 2 — confirm BOTH staff phones receive the new `booking_staff_notify_quote_request` SMS, AND the customer's phone receives the `quote_request_received_customer` ack.
+3. Submit a `specialty_vehicle` callback from Step 1 — confirm the existing staff SMS still fires (regression) AND the customer now ALSO receives an ack (NEW behavior).
+4. If desired, clear all phones on `booking_staff_notify_quote_request` via admin UI and re-test — confirm staff SMS silently drops with a warn-log in PM2 (no Twilio self-send).
+
+---
+
 ## Session #138 — Fix (U-B.4 / W4): services `is_taxable` on booking deposit — line-item persistence mirror (audit + fix, Option A) (2026-06-01)
 
 Production code change. Branch

@@ -1,10 +1,25 @@
 # Audit — Quote-Request SMS Notification Failure (#137 regression)
 
 > **Status:** Conclusive. Bug identified at config layer; no escalation to PII queries needed.
-> **Scope:** Targeted audit (Memory #29 type 1). Single finding, single fix recommended.
+> **Resolution:** ALL TARGETS A–E + Q3 footgun deep-dive RESOLVED by Session #139 (2026-06-02). See `docs/CHANGELOG.md` #139 entry for the per-concern resolution mapping; this document is preserved as the diagnostic trail.
+> **Scope:** Targeted audit (Memory #29 type 1). Single finding originally; expanded by operator decision to a 4-concern fix bundle in #139.
 > **Audit date:** 2026-06-01
 > **Branch:** `audit/quote-request-sms-failure`
 > **Related session:** U-B.3 / #137 (c2aca5db) — generalized specialty-callback endpoint with `request_type` discriminator + added `RequestQuoteCard` for staff_assessed services.
+> **Fix session:** #139 (2026-06-02) — Pattern B (Concern 1) + footgun hardening (Concern 2) + universal customer template (Concern 3) + sendSms self-send chokepoint (Concern 4).
+
+---
+
+## Resolution mapping (Session #139)
+
+| Audit target / concern | Resolution | Commit |
+|---|---|---|
+| Target C: Pattern A or Pattern B fix recommendation | Pattern B chosen — new slug `booking_staff_notify_quote_request` seeded via migration; `STAFF_SLUG_BY_REQUEST_TYPE` map in route owns per-variant slug routing | #139 (Concern 1) |
+| Target D minimal fix recommendation | Implemented — both `recipients = [biz.phone]` fallback sites replaced with `[]` + warn-log | #139 (Concern 2) |
+| Target E customer SMS expectation | Universal customer template `quote_request_received_customer` shipped; both variants now send customer ack (BEHAVIOR CHANGE for `specialty_vehicle`) | #139 (Concern 3) |
+| Q3 latent fallback footgun (S2/S3) | Closed at the route layer (Concern 2) PLUS defense-in-depth `sendSms` self-send chokepoint at the utility layer (Concern 4) | #139 (Concerns 2+4) |
+
+Original audit findings below are preserved verbatim for the diagnostic trail.
 
 ---
 
