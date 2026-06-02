@@ -102,6 +102,7 @@ export const SMS_PALETTE: Record<string, ChipMetadata> = {
   details: { key: "details", description: "Free-text details from agent", sample: "Customer wants ceramic coating for fleet of 5 vehicles", format: "plain" },
   cancellation_reason: { key: "cancellation_reason", description: "Reason for cancellation", sample: "Schedule conflict", format: "plain" },
   preferred_time: { key: "preferred_time", description: "Customer preferred callback time", sample: "Tomorrow afternoon", format: "plain" },
+  request_subject: { key: "request_subject", description: "Variant-specific subject for quote-request acknowledgments (e.g., a service name or \"specialty vehicle\")", sample: "Ceramic Coating", format: "plain" },
   customer_message_excerpt: { key: "customer_message_excerpt", description: "Excerpt of inbound customer message", sample: "Hi, I need a ceramic…", format: "plain" },
   transcript_summary: { key: "transcript_summary", description: "Voice call transcript summary", sample: "Customer asked about pricing for…", format: "plain" },
   inferred_customer_type: { key: "inferred_customer_type", description: "Inferred customer type (enthusiast / professional)", sample: "enthusiast", format: "plain" },

@@ -71,6 +71,30 @@ export async function sendSms(to: string, body: string, options?: SendSmsOptions
     return { success: false, error: 'Invalid phone number format' };
   }
 
+  // Session #139 — Concern 4: self-send chokepoint. Refuse to send when
+  // the recipient resolves to the same number Twilio sends FROM. The
+  // pre-#139 specialty-callback route fell back to [biz.phone] for the
+  // staff_assessed_service branch's recipients, which on production is
+  // the business's own Twilio number — Twilio either rejected (21266
+  // To==From) or self-routed the message into the inbound webhook,
+  // silently dropping every staff notification. The route-level fix is
+  // in the same session's route commit; this guard hardens EVERY
+  // sendSms caller against the same class of bug recurring. Skipped
+  // when TWILIO_PHONE_NUMBER env is unset (test environments / dev
+  // without a configured number) so it never false-positives.
+  if (twilioFrom) {
+    const normalizedFrom = normalizePhone(twilioFrom);
+    if (normalizedFrom && normalized === normalizedFrom) {
+      console.warn(
+        `[SMS] Self-send blocked — recipient ${normalized} matches ` +
+        `TWILIO_PHONE_NUMBER. This usually means a notification was ` +
+        `routed to the business's own Twilio line instead of a staff/` +
+        `customer phone; check recipient_phones config and caller logic.`
+      );
+      return { success: false, error: 'Self-send blocked: recipient matches TWILIO_PHONE_NUMBER' };
+    }
+  }
+
   try {
     const formData = new URLSearchParams();
     // MessagingServiceSid and From are mutually exclusive — the Twilio API

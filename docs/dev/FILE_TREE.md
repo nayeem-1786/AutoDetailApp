@@ -491,6 +491,7 @@ src/app/api/public/cms/tickers/route.ts
 src/app/api/public/products/search/route.ts
 src/app/api/public/specialty-block-view/route.ts
 src/app/api/public/specialty-callback/route.ts
+src/app/api/public/specialty-callback/__tests__/route.test.ts   # Session #139 (2026-06-02) — pins the four-concern bundle: Concern 1 per-request_type slug lookup, Concern 2 footgun (empty/null recipient_phones drops + warn-log), Concern 3 universal customer SMS for both variants. 21 tests.
 ```
 
 ### Quotes
@@ -1213,6 +1214,7 @@ src/lib/utils/__tests__/validation-mobile-address.test.ts
 src/lib/utils/__tests__/validation-refund-shopuse.test.ts
 src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/__tests__/sms-normalization.test.ts         # Phase Normalization-1: 8 cases — sendSms/sendMarketingSms rejection on invalid, normalization of (XXX) XXX-XXXX and 11-digit shapes, E.164 pass-through
+src/lib/utils/__tests__/sms-self-send.test.ts             # Session #139 (2026-06-02) — Concern 4 self-send chokepoint: sendSms refuses when normalize(to) == normalize(TWILIO_PHONE_NUMBER); skipped when env unset; backward-compatible failure shape. 10 tests.
 src/lib/utils/__tests__/conversation-helpers-normalization.test.ts # Phase Normalization-1: 4 cases — findOrCreateConversation rejection on invalid + normalized lookup/insert
 src/lib/utils/webhook.ts
 ```

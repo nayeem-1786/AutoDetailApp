@@ -30,6 +30,7 @@ export const SMS_SLUGS = [
   "booking_confirmed",
   "booking_reminder",
   "booking_staff_notify",
+  "booking_staff_notify_quote_request",
   "booking_staff_notify_specialty",
   "detailer_job_assigned",
   "job_complete",
@@ -40,6 +41,7 @@ export const SMS_SLUGS = [
   "quote_accepted_single",
   "quote_accepted_staff_notify",
   "quote_reminder",
+  "quote_request_received_customer",
   "quote_sms_admin",
   "quote_sms_midcall",
   "quote_sms_postcall",
@@ -70,6 +72,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   booking_confirmed: { required: ["services", "appointment_date", "appointment_time", "service_total"], optional: ["first_name", "last_name", "vehicle_description", "business_name", "business_phone"] },
   booking_reminder: { required: ["service_name", "appointment_time"], optional: ["first_name", "last_name", "vehicle_description", "business_name", "business_phone"] },
   booking_staff_notify: { required: ["customer_name", "services", "appointment_date", "appointment_time", "deposit_info"], optional: ["customer_email", "customer_phone", "last_name", "vehicle_description"] },
+  booking_staff_notify_quote_request: { required: ["customer_name", "customer_phone", "service_name"], optional: ["vehicle_description", "customer_email", "preferred_time"] },
   booking_staff_notify_specialty: { required: ["customer_name", "customer_phone", "vehicle_description"], optional: ["customer_email", "size_class", "preferred_time"] },
   detailer_job_assigned: { required: ["job_summary", "appointment_date", "appointment_time", "service_total"], optional: ["mobile_service_address", "detailer_first_name", "customer_email", "customer_phone", "last_name"] },
   job_complete: { required: ["gallery_link", "hours_line"], optional: ["first_name", "vehicle_description", "last_name", "business_name", "business_phone", "business_address"] },
@@ -80,6 +83,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   quote_accepted_single: { required: ["item_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone", "customer_email", "last_name", "vehicle_description"] },
   quote_reminder: { required: ["first_name", "short_url"], optional: ["last_name", "vehicle_description"] },
+  quote_request_received_customer: { required: ["first_name", "request_subject"], optional: ["business_name", "business_phone"] },
   quote_sms_admin: { required: ["quote_number", "total_amount", "short_url"], optional: [] },
   quote_sms_midcall: { required: ["services", "short_url"], optional: [] },
   quote_sms_postcall: { required: ["short_url"], optional: ["first_name", "last_name", "vehicle_description"] },
@@ -200,6 +204,17 @@ export interface RenderVarsBySlug {
     business_phone?: string | undefined;
     business_address?: string | undefined;
   };
+  booking_staff_notify_quote_request: {
+    customer_name: string;
+    customer_phone: string;
+    service_name: string;
+    vehicle_description?: string | undefined;
+    customer_email?: string | undefined;
+    preferred_time?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
   booking_staff_notify_specialty: {
     customer_name: string;
     customer_phone: string;
@@ -296,6 +311,13 @@ export interface RenderVarsBySlug {
     short_url: string;
     last_name?: string | undefined;
     vehicle_description?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  quote_request_received_customer: {
+    first_name: string;
+    request_subject: string;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
