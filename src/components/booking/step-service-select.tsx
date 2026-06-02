@@ -23,6 +23,73 @@ import type { BookableCategory, BookableService } from '@/lib/data/booking';
 import type { MobileZone, ServicePricing, VehicleSizeClass, VehicleCategoryRecord } from '@/lib/supabase/types';
 import { RequestQuoteCard } from './request-quote-card';
 import type { VehicleSelection } from './step-vehicle';
+import {
+  VEHICLE_CATEGORIES,
+  categoryToCompatibilityKey,
+  type VehicleCategory,
+} from '@/lib/utils/vehicle-categories';
+import { assertPrereqsCompatible } from '@/app/api/book/_prereq-enforcement';
+
+// ---------------------------------------------------------------------------
+// W5 (Unit B audit, 2026-05-30 — Session U-B.5 / Path B Session 1) +
+// W7 helpers — client-side mirrors of the server's two new rules.
+//
+// `serviceRequiresQuote(service, vehicleCategory)` widens the W3
+// `staff_assessed` branch to also fire when the primary has at least
+// one prereq whose `vehicle_compatibility` excludes the customer's
+// vehicle category — Q-W5-UX Option 1: show the "Custom Quote"
+// badge + replace the configure panel with `<RequestQuoteCard>`,
+// reusing W3's `request_type='staff_assessed_service'` discriminator.
+//
+// `addonAllowedForVehicle(addon, vehicleCategory)` implements W7's
+// addon filter — same shape as the primary's vehicle_compatibility
+// check at the server (`route.ts:343`) but applied per addon at
+// render time so incompatible addons never appear in the picker.
+// Empty/null compat = compatible-with-all (matches the existing
+// implicit-default semantic on the primary).
+//
+// `narrowVehicleCategory()` coerces the loose `selectedCategoryKey`
+// string prop into a `VehicleCategory` discriminant; the wizard
+// passes one of the canonical 5 values from `vehicle-categories.ts`,
+// but the prop is typed loosely for legacy reasons — guard at the
+// boundary so the helpers see strict types.
+// ---------------------------------------------------------------------------
+
+function narrowVehicleCategory(key: string | null | undefined): VehicleCategory | null {
+  if (!key) return null;
+  return (VEHICLE_CATEGORIES as readonly string[]).includes(key) ? (key as VehicleCategory) : null;
+}
+
+function serviceRequiresQuote(
+  service: BookableService,
+  vehicleCategory: VehicleCategory | null
+): boolean {
+  // W3 — staff_assessed is the canonical "needs a quote" signal.
+  if (service.staff_assessed) return true;
+  // W5 — prereq-vehicle-incompatibility is the second reason.
+  const result = assertPrereqsCompatible(
+    {
+      name: service.name,
+      service_prerequisites: service.service_prerequisites ?? [],
+    },
+    vehicleCategory
+  );
+  return !result.ok;
+}
+
+function addonAllowedForVehicle(
+  addonVehicleCompatibility: string[] | null | undefined,
+  vehicleCategory: VehicleCategory | null
+): boolean {
+  // No vehicle category → nothing to check against; show.
+  if (!vehicleCategory) return true;
+  const compat = Array.isArray(addonVehicleCompatibility) ? addonVehicleCompatibility : [];
+  // Empty compat list = compatible with all vehicles (implicit default
+  // — matches the same shape's interpretation at `route.ts:343` and
+  // for the primary services).
+  if (compat.length === 0) return true;
+  return compat.includes(categoryToCompatibilityKey(vehicleCategory));
+}
 
 // ---------------------------------------------------------------------------
 // Exported types (used by booking-wizard.tsx)
@@ -169,6 +236,21 @@ export function StepServiceSelect({
   // --- Selected service state ---
   const [pendingServiceId, setPendingServiceId] = useState<string | null>(selectedServiceId);
   const selectedService = findService(pendingServiceId);
+
+  // W5 + W7 (Session U-B.5): narrow the vehicle category once. Default
+  // `selectedCategoryKey` is `'automobile'` per prop default at the
+  // wizard, so this is rarely null — but the helpers guard regardless.
+  const activeVehicleCategory = narrowVehicleCategory(selectedCategoryKey);
+
+  // W5 (Q-W5-UX Option 1 LOCKED): widens the existing W3 `staff_assessed`
+  // branches. The desktop sidebar suppression, the mobile sticky footer
+  // suppression, the mobile spacer suppression, and the
+  // RequestQuoteCard substitution in the configure panel all switch on
+  // this derived flag instead of `selectedService.staff_assessed`. The
+  // ServiceCard's "Custom Quote" badge follows the same logic per-service.
+  const selectedRequiresQuote = selectedService
+    ? serviceRequiresQuote(selectedService, activeVehicleCategory)
+    : false;
 
   // --- Configure state ---
   const [selectedTier, setSelectedTier] = useState<string | null>(() => {
@@ -386,16 +468,22 @@ export function StepServiceSelect({
   function renderConfigurePanel() {
     if (!selectedService) return null;
 
-    // W3 (Unit B audit, 2026-05-30 — Session U-B.3): when the selected
-    // service requires staff evaluation for pricing, replace the entire
-    // configure panel with the RequestQuoteCard. The customer cannot
-    // proceed to Continue from here — the right-column sidebar's
+    // W3 + W5 (Unit B audit, 2026-05-30 — Sessions U-B.3 / U-B.5): when
+    // the selected service requires staff evaluation for pricing
+    // (W3 `staff_assessed=true`) OR has at least one prereq whose
+    // `vehicle_compatibility` excludes the customer's vehicle category
+    // (W5 — Q-W5-UX Option 1 LOCKED reuses the same affordance), replace
+    // the entire configure panel with the RequestQuoteCard. The customer
+    // cannot proceed to Continue from here — the right-column sidebar's
     // Continue button + price summary are also gated below
-    // (`selectedService.staff_assessed` checks at the desktop sidebar
-    // + mobile sticky footer + mobile spacer). This is layer 1 of the
-    // two-layer defense; layer 2 is `checkNotStaffAssessed` in
-    // `src/app/api/book/_staff-assessed.ts`.
-    if (selectedService.staff_assessed) {
+    // (`selectedRequiresQuote` checks at the desktop sidebar + mobile
+    // sticky footer + mobile spacer). This is layer 1 of the two-layer
+    // defense; layer 2 is `checkNotStaffAssessed` +
+    // `assertPrereqsCompatible` in `src/app/api/book/_staff-assessed.ts`
+    // + `_prereq-enforcement.ts`. Q-W5-UX LOCKED: prereq-incompatible
+    // submissions reuse `request_type='staff_assessed_service'` — same
+    // staff triage path, same customer-facing copy.
+    if (selectedRequiresQuote) {
       return (
         <RequestQuoteCard
           serviceName={selectedService.name}
@@ -406,7 +494,16 @@ export function StepServiceSelect({
       );
     }
 
-    const addonSuggestions = selectedService.service_addon_suggestions;
+    // W7 (Unit B audit, 2026-05-30 — Session U-B.5) layer 1: filter the
+    // addon list by each addon's own `vehicle_compatibility`. Incompatible
+    // addons simply don't appear in the picker — there's no value in
+    // showing a "you can't add this" affordance for an optional addon.
+    // Empty/null compat = compatible with all (implicit default).
+    // Server enforcement: `checkAddonsVehicleCompatible` in
+    // `src/app/api/book/_addon-vehicle-compat.ts`.
+    const addonSuggestions = selectedService.service_addon_suggestions.filter((s) =>
+      addonAllowedForVehicle(s.addon_service?.vehicle_compatibility ?? null, activeVehicleCategory)
+    );
     const visibleAddons = showAllAddons ? addonSuggestions : addonSuggestions.slice(0, 3);
     const hiddenCount = addonSuggestions.length - 3;
 
@@ -760,6 +857,12 @@ export function StepServiceSelect({
                           onClick={() => handleCardClick(service)}
                           vehicleSizeClass={vehicleSizeClass}
                           vehicleSpecialtyTier={vehicleSpecialtyTier}
+                          // W3 + W5 (Session U-B.5): per-service derived
+                          // flag — true when the service is staff_assessed
+                          // OR has at least one prereq incompatible with
+                          // the customer's vehicle. Drives the card's
+                          // "Custom Quote" badge in the price slot.
+                          requiresQuote={serviceRequiresQuote(service, activeVehicleCategory)}
                         />
                         {/* Mobile accordion: configure panel inline below selected card */}
                         {pendingServiceId === service.id && (
@@ -797,10 +900,11 @@ export function StepServiceSelect({
             </div>
           )}
 
-          {/* Mobile spacer for sticky footer — suppressed for
-              staff_assessed services since the footer is also
+          {/* Mobile spacer for sticky footer — suppressed for services
+              that require a custom quote (W3 staff_assessed OR W5
+              prereq-vehicle-incompatible) since the footer is also
               suppressed (no price-driven Continue button to clear). */}
-          {pendingServiceId && price > 0 && !selectedService?.staff_assessed && (
+          {pendingServiceId && price > 0 && !selectedRequiresQuote && (
             <div className="h-24 lg:hidden" />
           )}
         </div>
@@ -817,20 +921,22 @@ export function StepServiceSelect({
                   {renderConfigurePanel()}
                 </div>
 
-                {/* W3 (Session U-B.3): for staff_assessed services the
-                    configure panel above is REPLACED by
-                    RequestQuoteCard, so the price summary and Continue
-                    button are intentionally suppressed — there is no
-                    canonical price to display and the booking path is
-                    inert (server check in `_staff-assessed.ts` rejects
-                    any submission anyway). */}
-                {!selectedService.staff_assessed && price > 0 && (
+                {/* W3 + W5 (Sessions U-B.3 / U-B.5): for services that
+                    require a custom quote (staff_assessed OR
+                    prereq-vehicle-incompatible) the configure panel
+                    above is REPLACED by RequestQuoteCard, so the price
+                    summary and Continue button are intentionally
+                    suppressed — there is no canonical price to display
+                    and the booking path is inert (server checks in
+                    `_staff-assessed.ts` + `_prereq-enforcement.ts`
+                    reject any submission anyway). */}
+                {!selectedRequiresQuote && price > 0 && (
                   <div className="booking-summary-dark rounded-lg bg-brand-surface p-4">
                     {renderPriceSummary()}
                   </div>
                 )}
 
-                {!selectedService.staff_assessed && (
+                {!selectedRequiresQuote && (
                   <Button
                     onClick={handleContinue}
                     disabled={!canContinue}
@@ -851,12 +957,13 @@ export function StepServiceSelect({
         </div>
       </div>
 
-      {/* Mobile sticky footer — W3 (Session U-B.3): suppressed for
-          staff_assessed services. The configure panel renders
-          RequestQuoteCard inline below the selected card on mobile
-          (mobile accordion path), and there is no canonical price to
-          show in the footer's compact summary. */}
-      {pendingServiceId && selectedService && price > 0 && !selectedService.staff_assessed && (
+      {/* Mobile sticky footer — W3 + W5 (Sessions U-B.3 / U-B.5):
+          suppressed for services that require a custom quote
+          (staff_assessed OR prereq-vehicle-incompatible). The configure
+          panel renders RequestQuoteCard inline below the selected card
+          on mobile (mobile accordion path), and there is no canonical
+          price to show in the footer's compact summary. */}
+      {pendingServiceId && selectedService && price > 0 && !selectedRequiresQuote && (
         <div className="booking-summary-dark lg:hidden fixed bottom-0 left-0 right-0 z-10 border-t border-site-border bg-brand-surface px-4 py-3">
           <div className="max-w-3xl mx-auto">
             {renderPriceSummary(true)}
@@ -879,6 +986,7 @@ function ServiceCard({
   onClick,
   vehicleSizeClass,
   vehicleSpecialtyTier,
+  requiresQuote,
 }: {
   service: BookableService;
   categoryName: string;
@@ -886,6 +994,16 @@ function ServiceCard({
   onClick: () => void;
   vehicleSizeClass?: VehicleSizeClass | null;
   vehicleSpecialtyTier?: string | null;
+  /**
+   * W3 + W5 (Session U-B.5): widened from the original W3-only
+   * `service.staff_assessed` check. The parent computes
+   * `serviceRequiresQuote(service, vehicleCategory)` once per
+   * service and passes the derived bool here — true when the
+   * service is `staff_assessed=true` OR has at least one prereq
+   * whose `vehicle_compatibility` excludes the customer's vehicle
+   * category. Drives the "Custom Quote" badge in the price slot.
+   */
+  requiresQuote: boolean;
 }) {
   const { priceLabel, originalPrice, isOnSale } = getServicePriceDisplay(service, vehicleSizeClass, vehicleSpecialtyTier);
 
@@ -945,12 +1063,13 @@ function ServiceCard({
         )}
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-site-text-muted">
-          {/* Price — for staff_assessed services we surface a "Custom
-              Quote" badge instead of a price label so the customer
-              sees at-a-glance that pricing is staff-evaluated. The
-              card stays clickable; clicking it expands the
+          {/* Price — for services that require a custom quote
+              (W3 staff_assessed OR W5 prereq-vehicle-incompatible) we
+              surface a "Custom Quote" badge instead of a price label so
+              the customer sees at-a-glance that pricing is staff-evaluated.
+              The card stays clickable; clicking it expands the
               RequestQuoteCard via the configure panel branch. */}
-          {service.staff_assessed ? (
+          {requiresQuote ? (
             <span className="inline-flex items-center rounded bg-accent-brand/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent-brand">
               Custom Quote
             </span>

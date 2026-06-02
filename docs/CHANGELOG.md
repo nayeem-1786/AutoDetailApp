@@ -6,6 +6,67 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #140 — Fix (U-B.5 / Path B Session 1): W5 prereq + W7 addon vehicle_compat enforcement on public booking — two-layer defense (2026-06-02)
+
+Closes W5 (Moderate) and W7 (Minor) from the Unit B audit (`docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`), reframed by the expanded architectural audit (commit `709befa5`) as Path B Session 1. Architectural decisions LOCKED upstream: public booking is intentionally a SUBSET of POS (Q-Arch-1) — "self-service customer with a known service; anything requiring staff judgment, multi-service orchestration, or operator-level pricing goes elsewhere." Single-primary stays (Q-Arch-2 LOCKED — Concern 1 not restructured). W5 + W7 are real defects that the subset philosophy doesn't excuse; this session closes them as parity-with-POS fixes, NOT as architectural restructuring.
+
+**Q-W5-UX LOCKED in-session (Option 1):** when a primary has a prereq incompatible with the customer's vehicle category, show the service with a "Custom Quote" badge (mirrors the W3 staff_assessed pattern visually), and on selection replace the configure panel with `<RequestQuoteCard>`. Service stays visible in Step 2 — preserves discoverability ("the customer learns the service exists but knows they need staff assistance"). Reuses `request_type='staff_assessed_service'` per locked operator guidance — no strong reason to split the analytics axis since the staff triage path is identical (customer SMS body `{name} requires a custom quote` reads correctly for both reasons; staff notification template `booking_staff_notify_quote_request` is reason-agnostic).
+
+**Public-booking SUBSET semantics (Q-Arch-1 LOCKED) — what this enforces vs. what it doesn't:** unlike POS — which gates prereqs by SATISFACTION (history/same-ticket via `check-prerequisites/route.ts`) AND offers a manager override behind a PIN — public booking checks ONE axis only: prereq vehicle-compatibility. That's the axis the customer can never resolve themselves via the public surface; satisfaction is something staff will work out via the quote request. NO manager override on this surface, by design — the customer's escape hatch is the RequestQuoteCard CTA, not a bypass. POS's prereq enforcement is unchanged (canonical via #121/#122/#130, `use-validated-service-add.tsx`).
+
+**W5 prereq enforcement — two-layer defense (the canonical pattern, now at 5 surfaces)**
+
+- **Layer 1 — data + client**
+  - `src/lib/data/booking.ts` extended in BOTH `getBookableServices` and `getBookableServiceBySlug` to embed `service_prerequisites` with the prereq services' `name` + `vehicle_compatibility`. PostgREST embed via the `service_id` FK; nested `prerequisite_service` join via `prerequisite_service_id` — mirrors the join shape in `src/app/api/pos/services/check-prerequisites/route.ts:107`.
+  - `src/components/booking/step-service-select.tsx` computes `serviceRequiresQuote(service, vehicleCategory)` per service. The flag is true when `staff_assessed=true` (W3) OR `assertPrereqsCompatible(...).ok === false` (W5). The `<ServiceCard>` "Custom Quote" badge, the configure-panel branch (renders `<RequestQuoteCard>` instead of the pricing UI), the desktop sidebar's Continue button + price summary suppression, the mobile sticky-footer suppression, and the mobile spacer suppression all now switch on the unified `selectedRequiresQuote` derived bool (was `selectedService.staff_assessed`-only).
+- **Layer 2 — server**
+  - New `src/app/api/book/_prereq-enforcement.ts` — pure helper `assertPrereqsCompatible(primary, vehicleCategory)` returns `{ok: true}` or `{ok: false, serviceName, offendingPrereqs[]}`. Mirrors `_classification.ts` / `_staff-assessed.ts` byte-symmetrically. Empty/null `vehicle_compatibility` on a prereq = compatible-with-all (implicit default — matches the same shape's interpretation at `route.ts:343`).
+  - `src/app/api/book/route.ts` fetches prereq rows via a dedicated `service_prerequisites` query after the staff_assessed check + BEFORE price validation (mirrors W3 ordering — surface gate errors before price-mismatch fallback). Rejects with `prereqIncompatibleErrorMessage(serviceName, offendingPrereqs)`: single-offender variant names the prereq inline (`"{primary} requires {prereq}, which is not available for your vehicle. Please request a quote."`); multi-offender variant comma-joins (`"{primary} requires services ({A, B, C}) that are not available for your vehicle. Please request a quote."`). Wording closes with "Please request a quote." — same imperative as W3 so the customer is routed to the same `RequestQuoteCard` CTA.
+
+**W7 addon vehicle_compat enforcement — two-layer defense**
+
+- **Layer 1 — data + client**
+  - `src/lib/data/booking.ts` addon sub-select now includes `vehicle_compatibility` (was omitted — that's why W7 was DEAD).
+  - `src/components/booking/step-service-select.tsx` filters `service_addon_suggestions` by `addonAllowedForVehicle(addon.vehicle_compatibility, activeVehicleCategory)` before rendering. Incompatible addons simply don't appear in the picker — addons are optional, so there's no value in showing a "you can't add this" affordance (filter-out, not keep-visible-suppress; symmetric with the audit's W1 pattern, NOT W3's). Empty/null compat = compatible-with-all (implicit default).
+- **Layer 2 — server**
+  - New `src/app/api/book/_addon-vehicle-compat.ts` — pure helper `checkAddonsVehicleCompatible(addons, vehicleCategory)` returns `{ok: true}` or `{ok: false, serviceName}` (first-fail by array order; mirrors `_mobile-eligibility.ts`'s primary-precedence pattern). Mirrors `_classification.ts` / `_mobile-eligibility.ts` byte-symmetrically.
+  - `route.ts` invokes the helper after the W5 prereq check, using `data.vehicle?.vehicle_category` against `addonServiceRows` (the existing W2/W3/W4 batch addon fetch, extended in this session to include `vehicle_compatibility`). Rejects with `addonVehicleIncompatibleErrorMessage(name)`: `"{addon} is not available for your vehicle. Please remove it and try again."` — closes with "Please remove it" (NOT "request a quote") because the customer can resolve the block by unchecking the addon.
+
+**Why two distinct error-closer wordings (W5 vs W7):** W5's `"Please request a quote."` matches W3 byte-for-byte because the customer cannot resolve the block themselves — the next page-load needs to route them to the `RequestQuoteCard` CTA. W7's `"Please remove it and try again."` is the actionable closer because addons are optional and unchecking is the resolution. The test files lock both wordings.
+
+**Shared addon row fetch — extended once for FOUR consumers**
+
+`addonServiceRows` (introduced in U-B.3 for W2+W3, extended in U-B.4 for W4) is now extended for W7 as well — selects `mobile_eligible`, `staff_assessed`, `is_taxable`, AND `vehicle_compatibility` in one query. Net: one round-trip serves all four addon checks + the line-item persistence path. Zero extra queries for the no-addon case. The `AddonValidationRow` type comment documents the four consumers explicitly.
+
+**Files modified**
+
+- `src/app/api/book/_prereq-enforcement.ts` (NEW — W5 pure helper + message builder)
+- `src/app/api/book/_addon-vehicle-compat.ts` (NEW — W7 pure helper + message builder)
+- `src/lib/data/booking.ts` — `BookableService` interface extended (`service_prerequisites` embed + addon `vehicle_compatibility`); both `getBookableServices` + `getBookableServiceBySlug` queries updated
+- `src/app/api/book/route.ts` — imports both new helpers, addon-row select extended with `vehicle_compatibility`, W5 prereq fetch + check + W7 addon-compat check inserted between staff_assessed and price-validation steps
+- `src/components/booking/step-service-select.tsx` — `serviceRequiresQuote()` + `addonAllowedForVehicle()` + `narrowVehicleCategory()` helpers, `selectedRequiresQuote` derived bool replaces 5 prior `selectedService?.staff_assessed` checks, ServiceCard takes `requiresQuote` prop, addon-suggestions filtered by vehicle compatibility
+- `src/app/api/book/__tests__/prereq-enforcement.test.ts` (NEW, 16 tests)
+- `src/app/api/book/__tests__/addon-vehicle-compat.test.ts` (NEW, 14 tests)
+- `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/PUBLIC_BOOKING_NAV_AND_OPTION_WIRING_AUDIT.md`, `docs/dev/PUBLIC_BOOKING_ARCHITECTURAL_AUDIT.md`, `docs/dev/FILE_TREE.md`, `CLAUDE.md`
+
+**Verification**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors, 97 warnings (was 98 — one fewer; W5 unification eliminated a redundant raw `service.staff_assessed` read)
+- `npm run build` → clean (790 pages)
+- `npm test` → 2828 / 2828 (was 2798 after #139; +30 new — 16 prereq + 14 addon-compat)
+
+**Operator post-deploy verification checklist**
+
+1. **W5 client — incompatible primary.** Set up a service with a prereq that's automobile-only (`vehicle_compatibility: ['standard']`). On public booking with an RV vehicle, confirm: (a) the service is VISIBLE in Step 2's list, (b) shows a "Custom Quote" badge instead of a price, (c) on selection the configure panel is REPLACED by the RequestQuoteCard, (d) desktop sidebar's Continue button + price summary are suppressed, (e) mobile sticky footer + spacer are suppressed.
+2. **W5 server.** Tamper a `/api/book` POST to submit a primary whose prereq is incompatible with the customer's vehicle category. Confirm 400 with `"{primary} requires {prereq}, which is not available for your vehicle. Please request a quote."` (or the multi-offender variant if multiple).
+3. **W5 RequestQuoteCard flow.** Submit the inline quote-request form for a prereq-blocked primary. Confirm: (a) staff SMS arrives on `booking_staff_notify_quote_request` (the `staff_assessed_service` reuse), (b) customer ack SMS arrives on `quote_request_received_customer`, (c) audit_log row written.
+4. **W7 client.** Set up an addon with `vehicle_compatibility: ['standard']` on a primary that's compatible with all categories. On public booking with an RV vehicle, confirm the incompatible addon does NOT appear in the Step 2 addon picker for the primary.
+5. **W7 server.** Tamper a `/api/book` POST to submit a primary + an incompatible addon. Confirm 400 with `"{addon} is not available for your vehicle. Please remove it and try again."`
+6. **Regression — W3 staff_assessed still works.** Pick a `staff_assessed=true` primary; confirm the badge + configure-panel substitution still fire as before (the unified `selectedRequiresQuote` derived bool covers both reasons; nothing changed for the W3-only path).
+
+---
+
 ## Session #139 — Fix: Quote-request SMS bundle — Pattern B + footgun + universal customer template + sendSms self-send chokepoint (2026-06-02)
 
 Closes the four-concern bundle from `docs/dev/QUOTE_REQUEST_SMS_AUDIT.md` (the Targeted audit run between #138 and this session). #137's W3 generalization of `/api/public/specialty-callback` introduced a `request_type='staff_assessed_service'` branch but left the staff-recipient lookup gated to `specialty_vehicle` only — the new branch fell through to `recipients = [biz.phone]` (the business's own Twilio number `+14244010094`), causing Twilio self-sends and zero staff cell coverage. This session fixes that plus three adjacent concerns surfaced by the audit.
