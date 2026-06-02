@@ -16,6 +16,16 @@ interface MobileAddressActionProp {
   customer_id: string;
 }
 
+// Path B Session 2 / Concern 2 (Session #141, 2026-06-02) — mirrors
+// the SHAPE of MobileAddressActionProp.silently_saved so the
+// mount-effect below can fold both saves into a single combined toast
+// when they fire together.
+interface VehicleSaveActionProp {
+  silently_saved: boolean;
+  vehicle_id: string;
+  customer_id: string;
+}
+
 interface BookingConfirmationProps {
   appointment: {
     id: string;
@@ -40,6 +50,17 @@ interface BookingConfirmationProps {
   //   diff=true → render the inline save-address banner
   //   null → not applicable (no mobile / no customer / empty address)
   mobileAddressAction?: MobileAddressActionProp | null;
+  // Path B Session 2 / Concern 2 (Session #141): vehicle save action,
+  // structurally similar to mobileAddressAction.silently_saved. When
+  // non-null, a fresh vehicle row was just created + linked to this
+  // customer's account during the booking; the mount-effect renders
+  // a "We've saved your vehicle to your account" toast with a
+  // "View →" deep-link into /account/vehicles for authenticated
+  // sessions (the customer's escape hatch — they can review or
+  // delete from the portal). Null when the booking used an existing
+  // saved vehicle (no announcement needed) or no vehicle/customer
+  // linkage (anonymous bookings with no vehicle never trip this).
+  vehicleSaveAction?: VehicleSaveActionProp | null;
 }
 
 function getPaymentFootnote(
@@ -83,6 +104,7 @@ export function BookingConfirmation({
   isPortal,
   vehicleDescription,
   mobileAddressAction,
+  vehicleSaveAction,
 }: BookingConfirmationProps) {
   const footnote = getPaymentFootnote(paymentOption, amountCharged, grandTotal, appointment.total);
 
@@ -93,13 +115,49 @@ export function BookingConfirmation({
   const [bannerSaving, setBannerSaving] = useState(false);
   const [bannerSaved, setBannerSaved] = useState(false);
 
-  // Silent-save toast — fires once on mount when the server already
-  // persisted the first-time profile address (LOCKED-7).
+  // Silent-save transparency toast — fires once on mount for either
+  // the Phase Mobile-1.1 first-time address save (LOCKED-7) OR the
+  // Path B Session 2 / Concern 2 vehicle save (Q-PB-S2 LOCKED Option 1),
+  // OR both folded into a single combined toast.
+  //
+  // **Why one effect, three branches:** Memory #2 — the Mobile-1.1
+  // toast pattern is the operator-locked precedent for silent-save
+  // transparency. Concern 2 (vehicle save) lands as a peer of that
+  // pattern, not a parallel one. Folding both into one mount-effect
+  // means a customer who has BOTH events on the same booking sees a
+  // single combined acknowledgment, not two stacked toasts.
+  //
+  // **"View →" action link** (Q-PB-S2 operator spec): on authenticated
+  // sessions (`isPortal === true`) the toast includes a "View →"
+  // deep-link to `/account/vehicles` — the customer's agency-
+  // preservation escape hatch (review the saved vehicle, delete if
+  // unwanted). Anonymous sessions don't get the link (they're not
+  // logged in to a portal context yet; the link would land on
+  // `/signin`). The address-only toast keeps its existing minimal
+  // form — Mobile-1.1's locked wording is unchanged.
   useEffect(() => {
-    if (mobileAddressAction?.silently_saved) {
+    const vehicleSaved = vehicleSaveAction?.silently_saved === true;
+    const addressSaved = mobileAddressAction?.silently_saved === true;
+
+    if (vehicleSaved && addressSaved) {
+      toast.success(
+        "We've saved your vehicle and address to your account.",
+        isPortal
+          ? { action: { label: 'View →', onClick: () => { window.location.href = '/account/vehicles'; } } }
+          : undefined
+      );
+    } else if (vehicleSaved) {
+      toast.success(
+        "We've saved your vehicle to your account.",
+        isPortal
+          ? { action: { label: 'View →', onClick: () => { window.location.href = '/account/vehicles'; } } }
+          : undefined
+      );
+    } else if (addressSaved) {
       toast.success("We've saved your address to your profile.");
     }
-  }, [mobileAddressAction?.silently_saved]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicleSaveAction?.silently_saved, mobileAddressAction?.silently_saved]);
 
   async function handleUpdateProfileAddress() {
     if (!mobileAddressAction) return;

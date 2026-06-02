@@ -128,6 +128,20 @@ interface ConfirmationData {
     entered_address: string;
     customer_id: string;
   } | null;
+  // Path B Session 2 / Concern 2 (Session #141, 2026-06-02) —
+  // server-computed save-to-customer action for the vehicle. Mirrors
+  // the shape of `mobileAddressAction.silently_saved` so the
+  // confirmation page can fire a single combined transparency toast
+  // when both saves happened, or one of two individual toasts.
+  // Null when no new vehicle row was inserted (booking used a
+  // pre-existing saved vehicle, OR the customer/vehicle linkage was
+  // absent). See `src/lib/utils/vehicle-save-action.ts` for the
+  // server-side rule.
+  vehicleSaveAction: {
+    silently_saved: boolean;
+    vehicle_id: string;
+    customer_id: string;
+  } | null;
 }
 
 // Step mapping (4-step wizard):
@@ -701,6 +715,7 @@ export function BookingWizard({
           ? cleanVehicleDescription({ year: state.vehicleData.year, color: state.vehicleData.color, make: state.vehicleData.make, model: state.vehicleData.model }) || null
           : null}
         mobileAddressAction={confirmation.mobileAddressAction}
+        vehicleSaveAction={confirmation.vehicleSaveAction}
       />
     );
   }
@@ -1090,6 +1105,7 @@ export function BookingWizard({
       grandTotal,
       customerEmail: customer.email || null,
       mobileAddressAction: result.mobile_address_action ?? null,
+      vehicleSaveAction: result.vehicle_save_action ?? null,
     });
 
     // Clear URL params so refresh doesn't restore the booking form

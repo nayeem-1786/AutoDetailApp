@@ -32,6 +32,7 @@ import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { sendWelcomeEmail } from '@/lib/email/send-welcome-email';
 import { sendSms } from '@/lib/utils/sms';
 import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
+import { resolveVehicleSaveAction } from '@/lib/utils/vehicle-save-action';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
@@ -424,6 +425,16 @@ export async function POST(request: NextRequest) {
 
     // 5. Find existing or create vehicle linked to customer — shared dedup
     let vehicleId: string | null = null;
+    // Path B Session 2 / Concern 2 (Session #141): track whether the
+    // vehicle was a fresh insert vs. matched an existing row. Mirrors
+    // `findOrCreateVehicle`'s own `created` discriminant — we propagate
+    // it down to `resolveVehicleSaveAction` at response-build time so
+    // the booking-confirmation page can fire a "We've saved your
+    // vehicle to your account" toast ONLY when there's something new
+    // to announce (matched existing → customer already knew about it).
+    // Default false: the `data.vehicle?.id` branch is by definition
+    // "existing vehicle picked from saved list," so no announcement.
+    let vehicleCreated = false;
     if (data.vehicle?.id) {
       // Existing vehicle selected from Step 1 — use directly
       vehicleId = data.vehicle.id;
@@ -443,6 +454,7 @@ export async function POST(request: NextRequest) {
       });
       if (vehicleResult) {
         vehicleId = vehicleResult.id;
+        vehicleCreated = vehicleResult.created;
 
         // Vehicle/service compatibility check
         const compatKey = categoryToCompatibilityKey(vehicleResult.vehicle_category as 'automobile' | 'motorcycle' | 'rv' | 'boat' | 'aircraft');
@@ -1129,6 +1141,29 @@ ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
       enteredAddress: data.mobile_address ?? null,
     });
 
+    // Path B Session 2 / Concern 2 (Session #141, 2026-06-02) —
+    // save-to-customer action for the vehicle, mirroring the SHAPE of
+    // `mobile_address_action`. Returns null when the booking used an
+    // existing vehicle (no announcement needed — customer already
+    // knew about it) OR when there's no customer/vehicle linkage.
+    // Returns `{ silently_saved: true, vehicle_id, customer_id }` when
+    // `findOrCreateVehicle` inserted a fresh row — the client uses
+    // this signal to fire the "We've saved your vehicle to your
+    // account" toast on the booking confirmation page with a "View →"
+    // deep-link into `/account/vehicles`. Pure synth (no DB calls) —
+    // unlike `resolveMobileAddressAction` which queries customers +
+    // may run an UPDATE, the vehicle case's work is already done by
+    // `findOrCreateVehicle` upstream; this helper just synthesizes
+    // the response shape. Q-PB-S2 LOCKED Option 1 (transparency-only;
+    // no opt-out toggle because `vehicles.customer_id NOT NULL`
+    // makes a "vehicle without account linkage" data path impossible
+    // without a schema migration — out of scope per session prompt).
+    const vehicle_save_action = resolveVehicleSaveAction({
+      customerId,
+      vehicleId,
+      vehicleCreated,
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -1140,6 +1175,7 @@ ${data.notes ? `<p><strong>Notes:</strong> ${data.notes}</p>` : ''}
           total: appointment.total_amount,
         },
         mobile_address_action,
+        vehicle_save_action,
       },
       { status: 201 }
     );
