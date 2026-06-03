@@ -4,6 +4,19 @@
 > Branch: `audit/step1-size-class-and-mustang-classic-targeted`
 > Worktree: `~/Claude/SmartDetails/wt-targeted` (Memory #8 isolation)
 > Base: `7b116a70` (#142 Vehicle Classifier Restoration merge)
+>
+> **Status update (Session #143, 2026-06-02): Findings 1 + 2 RESOLVED.**
+> Q-A.4 LOCKED **Option (iii) — refined rule, not replaced**: classifier
+> may pre-select `size_class` ONLY for `'exotic'` / `'classic'`
+> (flow-routing to SpecialtyVehicleBlock); mundane sizes + non-automobile
+> specialty_tier seeds silently dropped from UI state. Finding 1
+> tightened `effectiveSizeClass` / `effectiveSpecialtyTier` formulas
+> + guarded the manual-clear useEffect to fire only on classifier
+> specialty. Finding 2 plumbed `year` through the `classify()`
+> signature + wrapper call (mirrors `vehicle-form-dialog.tsx:227`).
+> 10 new anti-regression tests in `classifier-output-rules.test.tsx`
+> lock the refined rule + year propagation permanently. See
+> `Session #143` in `docs/CHANGELOG.md`.
 
 ## Context
 
