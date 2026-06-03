@@ -6,6 +6,91 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #142 — Fix: Vehicle classifier restoration — C1 architectural refactor + S1 error signal + T9 contract test + M1 doc + Mi1+Mi2 cleanup (2026-06-02)
+
+Closes 5 findings (C1 Critical + S1 Significant + M1 Moderate + Mi1 Minor + Mi2 Minor) from `docs/dev/VEHICLE_CLASSIFIER_BEHAVIOR_AUDIT.md` (commit `5e3d3388`). Public booking Step 1 "Add a New Vehicle" path is restored for anonymous customers (the audit's production-blocking acute bug — RV + Airstream stuck-spinner screenshot).
+
+**Operator decisions LOCKED upstream:**
+- **Q-1 → Option B (architectural refactor)** rather than Option A (RLS hotfix migration). One canonical classifier execution path — server-side under admin client. No drift between "browser callers route through API" and "server callers call directly" patterns.
+- **Q-2 → `console.warn` only** for S1 telemetry; NOT `audit_log`. RLS denial is a config/code error, not a runtime customer-impacting concern.
+- **Q-3 → Layer 3 specialty_tier is INTENTIONALLY user-input**, not classifier-derived. Operator-facing surfaces now explicit about this.
+
+**C1 — Architectural refactor (the production fix)**
+
+Shape chosen: **Shape B (full server-side execution via dedicated endpoint)**. The canonical `resolveVehicleClassification` in `vehicle-categories.ts` retains its parameter-injection signature unchanged — server-side callers (POS, voice agent, customer portal POST/PATCH, `findOrCreateVehicle`) continue to call it directly with admin client. Browser-side callers now route through the new wrapper.
+
+- **NEW `src/app/api/classify-vehicle/route.ts`** — public GET endpoint accepting `?make=&model=&year=` query params. Internally calls `resolveVehicleClassification(adminClient, ...)`. Mirrors `/api/vehicle-makes` pattern (public + admin server-side). No auth required — vehicle makes are public knowledge.
+- **NEW `src/lib/utils/classify-vehicle-client.ts`** — thin browser wrapper `classifyVehicleClient(make, model?, year?)` that `fetch()`'s the endpoint. Returns the same `VehicleClassification` shape as the canonical function. Defensive `CLASSIFIER_TIMEOUT_MS = 10_000` via AbortController so a hung fetch can't trap the spinner forever (T9 contract requirement). On `classifier_reason === 'query_failed'` emits `console.warn` with caller context (S1 telemetry).
+- **MOD `src/components/booking/step-vehicle.tsx`** — drops `createClient()` + `resolveVehicleClassification(supabase, ...)`; routes through `classifyVehicleClient(...)`. Spinner lifecycle (setClassifying true/false pairing, race-cancellation via `classifyRequestIdRef`) is byte-stable — only the DB access primitive changed.
+- **MOD `src/components/account/vehicle-form-dialog.tsx`** — same replacement. Portal is authenticated (RLS would let direct queries work here), but routing through the same wrapper eliminates Mi2's two-data-path drift. One canonical classifier access pattern for ALL browser callers.
+- **Pre-flight architectural verification (Memory #11):** the audit identified `vehicle_makes` as the classifier's Layer-1 lookup. CC verified via grep that `vehicle-categories.ts` queries ONLY this one table — Layers 2-5 (automobile size_class hints, exotic, classic) all use hardcoded TypeScript constants with no DB access. So the refactor's blast radius is bounded to the single Layer-1 query path.
+- **Why a dedicated `/api/classify-vehicle` endpoint instead of extending `/api/vehicle-makes`:** the existing endpoint returns the FULL filtered list of makes for the combobox (array of `{id, name}`). The classifier needs a single make→classification lookup (object response). Fusing two unrelated concerns into one endpoint would degrade both.
+
+**S1 — Error signal hardening**
+
+Pre-#142 the classifier swallowed Supabase's `error` field — `{data: null, error: <RLS denial>}` was indistinguishable from `{data: [], error: null}`. Both fell through to the same dev-warn-and-default path with no caller signal.
+
+- **MOD `vehicle-categories.ts`** — `VehicleClassification` interface gains optional `classifier_reason?: 'no_match' | 'query_failed'`. Set on Layer 1 0-row matches (`'no_match'`), disambiguation fall-through (`'no_match'`), Supabase `error` non-null response (`'query_failed'`), and `catch` block thrown errors (`'query_failed'`). Omitted on confident results. Backward compatible.
+- **MOD `classify-vehicle-client.ts`** — on `classifier_reason === 'query_failed'` emits `console.warn` for operator devtools telemetry.
+
+**M1 — Layer 3 documentation + UI microcopy**
+
+Layer 3 seeds the smallest tier from `DEFAULT_SPECIALTY_TIERS` as a placeholder; the operator/customer picks the actual tier manually. Q-3 LOCKED: INTENTIONAL by design.
+
+- **MOD `vehicle-categories.ts`** — explicit code comment at the Layer-3 site documenting the manual-pick design alongside the classifier-derived Layers 1/2/4/5.
+- **MOD `step-vehicle.tsx`** — non-automobile specialty tier picker now carries microcopy `"Please select the size that matches your {category} — affects service pricing."` — framed as required information from the customer, NOT as a fallback because automatic detection "failed."
+
+**Mi1 — Dead useEffect removed**
+
+The dead useEffect at the old `step-vehicle.tsx:225–232` (empty `if` branches with only comments) was removed cleanly. Auto-detect routing happens via `effectiveSizeClass` / `effectiveSpecialtyTier` derived values; no side-effect needed.
+
+**Mi2 — Two-data-path drift closed**
+
+Pre-#142: `vehicle_makes` exposed via TWO browser paths — direct browser-client query (the bug) AND `/api/vehicle-makes` endpoint (which uses admin server-side). Post-#142: ALL browser-side classifier traffic flows through `/api/classify-vehicle`. The two-path drift is closed structurally.
+
+**T9 — Regression-locking contract test**
+
+**NEW `src/components/booking/__tests__/classifier-spinner-lifecycle.test.tsx`** (6 tests, 5 failure-mode scenarios). Mirrors #136 T8's structural-guard pattern from `vehicle-forms-reset-contract.test.tsx`. For each of the 5 scenarios, asserts that `aria-busy` on the height-reserved spinner container becomes `false` within a bounded time:
+
+1. **Confident success** — fetch resolves with `category_confident: true`; spinner clears
+2. **`no_match`** — fetch resolves with non-confident + `classifier_reason: 'no_match'`; spinner clears
+3. **`query_failed`** — fetch resolves with non-confident + `classifier_reason: 'query_failed'`; spinner clears AND `console.warn` fires (S1 telemetry verification)
+4. **HTTP error** (2 sub-tests) — fetch returns non-2xx (wrapper throws) OR fetch rejects (network error); spinner clears in both
+5. **Never-resolve** (THE production stuck-spinner bug class) — fetch returns a Promise that never resolves on its own; `CLASSIFIER_TIMEOUT_MS` AbortController fires after 10s; wrapper throws "Classifier timeout…"; spinner clears
+
+**Anti-regression contract:** if any future refactor removes `CLASSIFIER_TIMEOUT_MS` from `classify-vehicle-client.ts`, or breaks the try/catch/finally lifecycle in `step-vehicle.tsx`'s `classify()`, scenario 5 (or one of the other four) fails. Single source of truth for the spinner-lifecycle contract.
+
+**S1 test coverage extended** in `vehicle-categories.test.ts`: 4 new unit tests pin the `classifier_reason` contract: omitted on confident results, `'no_match'` on 0-row Layer-1, `'query_failed'` on thrown DB errors, `'query_failed'` on `{data: null, error: <RLS denial>}` non-throw responses (the RLS-denial-equivalent path that's the audit's smoking gun).
+
+**Files modified (3 NEW + 4 MOD prod + 2 test files)**
+
+- **NEW** `src/app/api/classify-vehicle/route.ts` — C1 server endpoint
+- **NEW** `src/lib/utils/classify-vehicle-client.ts` — C1 browser wrapper + S1 telemetry + T9 timeout
+- **NEW** `src/components/booking/__tests__/classifier-spinner-lifecycle.test.tsx` — T9 (6 tests, 5 scenarios)
+- **MOD** `src/lib/utils/vehicle-categories.ts` — S1 `classifier_reason` field + M1 Layer-3 doc comment
+- **MOD** `src/components/booking/step-vehicle.tsx` — C1 wrapper wiring + Mi1 dead useEffect removed + M1 microcopy
+- **MOD** `src/components/account/vehicle-form-dialog.tsx` — C1 wrapper wiring (Mi2 drift closure)
+- **MOD** `src/lib/utils/__tests__/vehicle-categories.test.ts` — shape fixture + 4 new S1 unit tests
+- `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/VEHICLE_CLASSIFIER_BEHAVIOR_AUDIT.md` (RESOLVED markers), `docs/dev/FILE_TREE.md`, `CLAUDE.md` Rule 22
+
+**Verification**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors, 97 warnings (baseline preserved)
+- `npm run build` → clean (790 pages)
+- `npm test` → 2854 / 2854 (was 2844 after #141; +10 new — 6 T9 + 4 S1)
+
+**Operator post-deploy verification checklist**
+
+1. **Anonymous /book Step 1 — the production fix.** Incognito window. Pick each of the 5 vehicle categories. For each, type a make + model. Spinner should briefly appear and clear within ~1 second. Verify all 5 paths complete to Step 2 without spinner hang.
+2. **Automobile size_class detection.** Honda Civic → Sedan; Chevy Suburban → SUV (3 row); Ford F-150 → Truck/SUV (2 row); Ferrari 488 → Exotic; 1965 Ford Mustang → Classic.
+3. **Non-automobile microcopy.** Pick RV/Motorcycle/Boat/Aircraft. Verify the new clarifying microcopy under the size buttons (framed as required input, not detection failure).
+4. **Returning customer regression.** Login with saved-vehicles account. Saved picker works AND "Add New" works.
+5. **Portal vehicle form regression.** `/account/vehicles` → add/edit. Classifier advisory unchanged.
+6. **T9 contract test in CI** — protects spinner-lifecycle contract against future regression.
+
+---
+
 ## Session #141 — Fix (Path B Session 2 / Concern 2): save-to-account transparency for vehicles — silent-save toast (2026-06-02)
 
 Closes **Concern 2 (Significant)** from the architectural audit (`docs/dev/PUBLIC_BOOKING_ARCHITECTURAL_AUDIT.md`, commit `709befa5`). Path B Session 2 of 3 (Session 3's deferred T6.4 siblings + Q-Arch-7 signup acknowledgment remain optional). The audit corrected the operator's stated premise: the vehicle data WAS being persisted via `findOrCreateVehicle` (`vehicle-helpers.ts:188-204`) to the same `vehicles` table the portal reads. **The gap was transparency, not persistence** — the customer was never told it happened.
