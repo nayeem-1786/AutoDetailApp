@@ -1071,6 +1071,7 @@ src/lib/quotes/__tests__/send-service.test.ts            # Extended in Layer 15g
 supabase/migrations/20260517052147_quote_sent_template_modifier_block.sql   # Layer 15g-v: update seeded `quote_sent` email template body to render {quote_modifier_block} between Tax and Total; widen variables list with 7 new modifier-related variables. Guarded by `is_customized = false` to preserve operator-customized templates.
 supabase/migrations/20260525030037_add_quote_source.sql                     # Phase Quote-Source-1: CREATE TYPE quote_source ENUM (6 values) + ALTER TABLE quotes ADD COLUMN source quote_source NULL. No backfill — historical rows render notes verbatim via NULL-source fallback.
 supabase/migrations/20260527000000_pos_jobs_unified_schedule_flag.sql       # Item 15e Phase 1B: DATA seed only — INSERT feature_flags row `pos_jobs_unified_schedule` (enabled=false, category 'Core POS'), ON CONFLICT DO NOTHING. Gates the POS Jobs Today/Schedule scope toggle. No schema change.
+supabase/migrations/20260603000000_enable_pos_jobs_unified_schedule.sql     # Session #146 — flag-flip companion: UPDATE feature_flags SET enabled=true WHERE key='pos_jobs_unified_schedule'. Idempotent. Pre-flight audit at docs/dev/POS_JOBS_UNIFIED_SCHEDULE_FLAG_FLIP_PREFLIGHT.md verified clean drift on the gated paths since 15e closed. Rollback is a one-line UPDATE flipping enabled=false.
 ```
 
 ### Search

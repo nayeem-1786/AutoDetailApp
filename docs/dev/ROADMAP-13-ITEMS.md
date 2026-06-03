@@ -1315,6 +1315,19 @@ revealed that framing was wrong; the full edit set is needed at POS.
   different visual treatments — decoupled deliberately). Flag-gated; admin
   byte-identical; Phase 1B populate invariant preserved. +8 tests. **Phase 3
   (next):** retire the POS Appointments tab + nav redirect.
+- 2026-06-03: Session #146 — `pos_jobs_unified_schedule` flag flipped to
+  enabled=true via the new migration
+  `20260603000000_enable_pos_jobs_unified_schedule.sql`. Pre-flight audit
+  (`docs/dev/POS_JOBS_UNIFIED_SCHEDULE_FLAG_FLIP_PREFLIGHT.md`, Targets A-E)
+  verified zero drift on the gated code paths across the 35 sessions since
+  #109 (only #110's `has_active_job` 1:1 cardinality corrective touched a
+  flag-relevant file, and that touch is strictly an improvement). Risk
+  verdict: Clean. Test gates 2869/2869 (incl. the 29 flag-gated tests +
+  100 dialog/appointment tests). The OFF code path is preserved for
+  rollback; the seed migration's `ON CONFLICT DO NOTHING` ensures a
+  hypothetical re-seed does not downgrade the flipped value. Operator
+  applies via `npx supabase db push` against the linked project. **Closes
+  the dormant config decision left over from the 2026-05-27 closure.**
 
 ---
 
