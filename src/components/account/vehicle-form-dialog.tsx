@@ -12,11 +12,17 @@ import {
   TIER_DROPDOWN_LABELS,
   MODEL_PLACEHOLDERS,
   isSpecialtyCategory,
-  resolveVehicleClassification,
   type VehicleCategory,
   type VehicleClassification,
 } from '@/lib/utils/vehicle-categories';
-import { createClient } from '@/lib/supabase/client';
+// C1 (Session #142, 2026-06-02 — Vehicle Classifier Restoration):
+// the portal surface is authenticated (RLS would let direct browser
+// queries work here), but routing through the same browser-wrapper
+// as public booking eliminates the two-data-path drift (Mi2 in the
+// audit). One canonical classifier access pattern for ALL browser
+// callers — server endpoint with admin client. Authenticated portal
+// users hit the same endpoint as anonymous booking customers.
+import { classifyVehicleClient } from '@/lib/utils/classify-vehicle-client';
 import {
   Dialog,
   DialogHeader,
@@ -223,8 +229,15 @@ export function VehicleFormDialog({
     }
     const timer = setTimeout(() => {
       const myRequestId = ++classifyRequestIdRef.current;
-      const supabase = createClient();
-      resolveVehicleClassification(supabase, mk, mdl, watchedYear ?? undefined)
+      // C1 (Session #142): replaces `resolveVehicleClassification(browserSupabase, …)`
+      // with the wrapper that routes through `/api/classify-vehicle`. Same
+      // promise contract — `.then` on success, `.catch` on network/HTTP error.
+      // The wrapper does NOT throw on classifier non-confident results
+      // (those come back as a normal VehicleClassification with
+      // `category_confident: false` + `classifier_reason` set), so the
+      // existing `.then` branch handles both confident + non-confident
+      // results identically. No advisory behavior change for the portal.
+      classifyVehicleClient(mk, mdl, watchedYear ?? undefined)
         .then((result) => {
           if (classifyRequestIdRef.current !== myRequestId) return;
           setClassification(result);

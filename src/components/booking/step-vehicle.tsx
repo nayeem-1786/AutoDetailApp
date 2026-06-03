@@ -16,13 +16,19 @@ import {
   VEHICLE_CATEGORY_LABELS,
   SPECIALTY_TIERS,
   isSpecialtyCategory,
-  resolveVehicleClassification,
   getSpecialtyTierLabel,
   type VehicleCategory,
   type VehicleClassification,
 } from '@/lib/utils/vehicle-categories';
+// C1 (Session #142, 2026-06-02 — Vehicle Classifier Restoration):
+// classifier moves from direct browser-Supabase access (which fails
+// for anonymous public-booking customers under `vehicle_makes` RLS;
+// see VEHICLE_CLASSIFIER_BEHAVIOR_AUDIT.md 5e3d3388) to the server-
+// routed wrapper. The wrapper calls /api/classify-vehicle which uses
+// the admin client server-side (RLS bypassed). The browser Supabase
+// client import is no longer needed on this surface.
+import { classifyVehicleClient } from '@/lib/utils/classify-vehicle-client';
 import { VEHICLE_SIZE_LABELS } from '@/lib/utils/constants';
-import { createClient } from '@/lib/supabase/client';
 import { Car, Bike, Ship, Plane, Truck, Plus, Check } from 'lucide-react';
 import type { AuthCustomerData } from './inline-auth';
 
@@ -125,6 +131,17 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   const classifyRequestIdRef = useRef(0);
 
   // --- Auto-classify when make/model changes ---
+  // C1 (Session #142): the lifecycle is unchanged from the pre-refactor
+  // version — `setClassifying(true)` in try, `setClassifying(false)` in
+  // finally (gated on race-cancellation ticket); race-cancellation logic
+  // also unchanged. The ONLY change is the DB-access primitive: the call
+  // to `resolveVehicleClassification(browserSupabase, …)` is replaced
+  // with `classifyVehicleClient(…)`, which routes the lookup through
+  // `/api/classify-vehicle` (server admin-client). This eliminates the
+  // RLS-denial hang/silent-default that broke /book Step 1 for anonymous
+  // customers. The T9 contract test (`classifier-spinner-lifecycle.test.tsx`)
+  // locks `setClassifying(false)` against all five classifier failure
+  // modes — including the network-error case the wrapper newly surfaces.
   const classify = useCallback(async (mk: string, mdl: string, cat: VehicleCategory) => {
     if (!mk.trim()) {
       setClassification(null);
@@ -133,8 +150,7 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     const myRequestId = ++classifyRequestIdRef.current;
     setClassifying(true);
     try {
-      const supabase = createClient();
-      const result = await resolveVehicleClassification(supabase, mk.trim(), mdl.trim() || undefined);
+      const result = await classifyVehicleClient(mk.trim(), mdl.trim() || undefined);
       // #136 B5 race-cancellation: abandon stale results so a slow Yamaha-RV
       // fetch can't overwrite a cleared/changed classification after the
       // user picked a different category mid-flight.
@@ -220,16 +236,11 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   // Effective specialty tier: manual override takes priority, then auto-detected
   const effectiveSpecialtyTier = manualSpecialtyTier ?? classification?.specialty_tier ?? null;
 
-  // Auto-sync: when classification changes, pre-select the detected size/tier
-  // (only if user hasn't manually overridden yet)
-  useEffect(() => {
-    if (classification?.size_class && !manualSizeClass) {
-      // Auto-detected — will be used via effectiveSizeClass
-    }
-    if (classification?.specialty_tier && !manualSpecialtyTier) {
-      // Auto-detected — will be used via effectiveSpecialtyTier
-    }
-  }, [classification, manualSizeClass, manualSpecialtyTier]);
+  // Mi1 (Session #142): the dead useEffect that previously sat here had
+  // empty `if` branches with only comments — auto-detect routing already
+  // happens via `effectiveSizeClass` / `effectiveSpecialtyTier` derived
+  // values above, no side-effect needed. Removed cleanly with no
+  // behavioral impact. Audit ref: VEHICLE_CLASSIFIER_BEHAVIOR_AUDIT.md Mi1.
 
   // --- Determine if Continue is enabled ---
   function isValid(): boolean {
@@ -604,7 +615,15 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
           </FormField>
         )}
 
-        {/* Specialty tier picker — always visible for specialty categories */}
+        {/* Specialty tier picker — always visible for specialty categories.
+            M1 (Session #142): the tier here is intentionally operator-input.
+            Unlike automobile size_class (auto-detected via MODEL_SIZE_HINTS +
+            Layers 4-5 exotic/classic), there's no classifier-derived
+            mapping from RV/motorcycle/boat/aircraft model → tier. The
+            microcopy below frames the picker as required information we
+            need from the customer, NOT as a fallback because automatic
+            detection "failed." Audit ref:
+            VEHICLE_CLASSIFIER_BEHAVIOR_AUDIT.md M1. */}
         {isSpecialty && (
           <FormField label="Size / Type" required error={errors.specialty_tier}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -627,6 +646,9 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
                 );
               })}
             </div>
+            <p className="text-xs text-site-text-muted mt-1">
+              Please select the size that matches your {VEHICLE_CATEGORY_LABELS[category].toLowerCase()} — affects service pricing.
+            </p>
           </FormField>
         )}
       </div>

@@ -685,6 +685,34 @@ export interface VehicleClassification {
    * See CLAUDE.md Rule 19.
    */
   category_confident: boolean;
+  /**
+   * S1 (Session #142, Vehicle Classifier Restoration, 2026-06-02) —
+   * telemetry signal for why `category_confident` is false. Disambiguates
+   * "Layer 1 ran successfully but found no matching make" (operator
+   * typo, make missing from `vehicle_makes` taxonomy) from "Layer 1's
+   * `vehicle_makes` query failed entirely" (DB error, RLS denial pre-C1
+   * fix). Pre-S1 the resolver swallowed Supabase's `error` field and
+   * the caller couldn't tell the two cases apart — both fell through
+   * to the same dev-warn-then-silent-default path.
+   *
+   * **Values:**
+   *   - `undefined` / absent on confident classifications — `category_confident=true`
+   *     means Layer 1 found positive evidence; no reason field needed.
+   *   - `'no_match'` — Layer 1's `vehicle_makes` query SUCCEEDED but
+   *     returned 0 valid rows for the supplied make. Typically a make
+   *     typo or a make missing from the curated taxonomy. The classifier
+   *     defaults to `automobile` + `category_confident=false` and the
+   *     caller leaves the user's category pick alone (#131 Layer 2).
+   *   - `'query_failed'` — Layer 1's `vehicle_makes` query threw OR
+   *     returned a non-null `error` field. The caller should
+   *     `console.warn` for telemetry; UI behavior is identical to
+   *     `'no_match'` (default to automobile + don't override user's
+   *     category).
+   *
+   * Backward compatible: existing callers that read only
+   * `category_confident` continue to work unchanged.
+   */
+  classifier_reason?: 'no_match' | 'query_failed';
 }
 
 export function getSeatRows(sizeClass: string | null, vehicleCategory: string): number {
@@ -739,43 +767,81 @@ export async function resolveVehicleClassification(
   // disambiguation fallback) leaves it false, and the UI callers refuse
   // to auto-override the user's category in that case.
   let categoryConfident = false;
+  // S1 (Session #142, 2026-06-02) — telemetry signal disambiguating
+  // the two non-confident paths. `undefined` for confident results,
+  // `'no_match'` for 0-row Layer-1, `'query_failed'` for any error
+  // surfaced by Supabase (RLS denial pre-C1 fix, network, schema
+  // mismatch). Browser callers `console.warn` on `'query_failed'`
+  // for telemetry; UI behavior between the two reasons is identical.
+  let classifierReason: 'no_match' | 'query_failed' | undefined;
 
   if (make) {
     try {
+      // S1 — destructure `error` too so we can detect non-throw failure
+      // paths (RLS denial, table-missing, etc. — Supabase returns
+      // `{data: null, error: {...}}` without throwing). Pre-S1 the
+      // resolver only read `data`, making `{data:[], error:null}`
+      // indistinguishable from `{data:null, error:RLS}` — both fell
+      // through to the dev-warn-and-default path with no caller signal.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: makeRows } = await (supabase as any)
+      const { data: makeRows, error: makeErr } = await (supabase as any)
         .from('vehicle_makes')
         .select('category')
         .ilike('name', make.trim())
         .eq('is_active', true);
 
-      const validRows = (makeRows || []).filter(
-        (r: { category: string }) => VEHICLE_CATEGORIES.includes(r.category as VehicleCategory)
-      );
+      if (makeErr) {
+        // Non-throw failure path — Supabase surfaced an error object
+        // (RLS denial, network, schema mismatch). Treat as query_failed.
+        classifierReason = 'query_failed';
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            `[VehicleClassify] vehicle_makes query returned error for make="${make.trim()}" — defaulting to automobile`,
+            makeErr
+          );
+        }
+      } else {
+        const validRows = (makeRows || []).filter(
+          (r: { category: string }) => VEHICLE_CATEGORIES.includes(r.category as VehicleCategory)
+        );
 
-      if (validRows.length === 1) {
-        category = validRows[0].category as VehicleCategory;
-        categoryConfident = true;
-      } else if (validRows.length > 1) {
-        const categories = validRows.map((r: { category: string }) => r.category);
-        const disambiguated = disambiguateCategory(categories, model);
-        category = disambiguated.category;
-        categoryConfident = disambiguated.matched;
-      } else if (process.env.NODE_ENV !== 'production') {
-        // Dev-warn (#129 Q7): no `vehicle_makes` row matched — signals data drift
-        // between the combobox source (also `vehicle_makes`) and this resolver's
-        // ilike lookup (whitespace, accents, deactivation). Silently defaults to
-        // automobile in production. See PUBLIC_BOOKING_FLOW_AUDIT.md F4. The
-        // #131 Layer 2 fix prevents UI callers from acting on this silent default.
-        console.warn(`[VehicleClassify] No vehicle_makes row matched make="${make.trim()}" — defaulting to automobile`);
+        if (validRows.length === 1) {
+          category = validRows[0].category as VehicleCategory;
+          categoryConfident = true;
+        } else if (validRows.length > 1) {
+          const categories = validRows.map((r: { category: string }) => r.category);
+          const disambiguated = disambiguateCategory(categories, model);
+          category = disambiguated.category;
+          categoryConfident = disambiguated.matched;
+          // disambiguation fall-through (matched=false) counts as no_match
+          // — Layer 1 returned data, but couldn't pin the category.
+          if (!disambiguated.matched) classifierReason = 'no_match';
+        } else {
+          // Dev-warn (#129 Q7): no `vehicle_makes` row matched — signals
+          // data drift between the combobox source (also `vehicle_makes`)
+          // and this resolver's ilike lookup (whitespace, accents,
+          // deactivation). Silently defaults to automobile in production.
+          // See PUBLIC_BOOKING_FLOW_AUDIT.md F4. The #131 Layer 2 fix
+          // prevents UI callers from acting on this silent default.
+          classifierReason = 'no_match';
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`[VehicleClassify] No vehicle_makes row matched make="${make.trim()}" — defaulting to automobile`);
+          }
+        }
       }
     } catch (err) {
-      // DB unavailable — default to automobile.
-      // Dev-warn (#129 Q7): surface infra failure that would otherwise be silent.
+      // Throw path — DB unavailable, JS error, etc. Treat as query_failed
+      // (sibling to the makeErr non-throw branch above).
+      classifierReason = 'query_failed';
       if (process.env.NODE_ENV !== 'production') {
         console.warn('[VehicleClassify] vehicle_makes lookup failed — defaulting to automobile', err);
       }
     }
+  } else {
+    // No make supplied — caller invoked the classifier with empty make.
+    // Layer 1 couldn't run; semantically closer to no_match than to
+    // query_failed.
+    classifierReason = 'no_match';
   }
 
   // --- Layer 2+3: build base classification ---
@@ -802,8 +868,27 @@ export async function resolveVehicleClassification(
       seat_rows: getSeatRows(sizeClass, 'automobile'),
       needs_year_confirmation: false,
       category_confident: categoryConfident,
+      // S1 — telemetry signal. Omitted on confident results so callers
+      // can use `!result.classifier_reason` as the success check.
+      ...(categoryConfident ? {} : { classifier_reason: classifierReason }),
     };
   } else {
+    // **Layer 3 — specialty_tier (M1, Session #142, 2026-06-02 — INTENTIONAL
+    // MANUAL-PICK by design, NOT a fallback).** For non-automobile categories
+    // (motorcycle / rv / boat / aircraft) the classifier seeds the smallest
+    // tier from `DEFAULT_SPECIALTY_TIERS` as a placeholder, and the operator
+    // or customer picks the actual tier manually from the SPECIALTY_TIERS UI
+    // dropdown. There is **no DB lookup** that maps `(make, model)` → specialty
+    // tier — the make/model→tier relationship is operator domain knowledge
+    // that doesn't scale into a curated table (RV lengths, motorcycle
+    // body-types, boat sizes, aircraft seat-counts are all 1:N with model
+    // variants AND change per model-year). Layers 1 (category), 2 (automobile
+    // size_class hints), 4 (exotic), 5 (classic) ARE classifier-derived;
+    // Layer 3 is the lone manual-pick layer by design. Operator-facing
+    // surfaces should make this distinction clear (`step-vehicle.tsx`'s
+    // specialty-tier section now carries a "Please select your size" label
+    // framed as required input, NOT as a fallback because detection failed).
+    // See CLAUDE.md Rule 22.
     baseResult = {
       vehicle_category: category,
       vehicle_type: category,
@@ -812,6 +897,7 @@ export async function resolveVehicleClassification(
       seat_rows: getSeatRows(null, category),
       needs_year_confirmation: false,
       category_confident: categoryConfident,
+      ...(categoryConfident ? {} : { classifier_reason: classifierReason }),
     };
   }
 

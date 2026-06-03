@@ -562,8 +562,16 @@ describe('Session 29 — resolveVehicleClassification size_class output', () => 
     // #131 Layer 2 added `category_confident`. Exotic/classic detection
     // (Layers 4+5) is independent of category-resolution confidence — the
     // `size_class` field stays the single source of truth for specialty.
+    // S1 (Session #142, 2026-06-02) added the optional `classifier_reason`
+    // field present ONLY on non-confident results (`category_confident: false`).
+    // Ferrari via the 0-row mockSupabase falls through Layer 1 → confident=false
+    // → classifier_reason='no_match' is set. Then Layer 4 overrides
+    // size_class to 'exotic'. The 8-key shape pins both the original
+    // 7 fields AND the new optional reason field — anti-regression for any
+    // future change that drops the reason on the non-confident path.
     expect(keys).toEqual([
       'category_confident',
+      'classifier_reason',
       'needs_year_confirmation',
       'seat_rows',
       'size_class',
@@ -571,6 +579,66 @@ describe('Session 29 — resolveVehicleClassification size_class output', () => 
       'vehicle_category',
       'vehicle_type',
     ]);
+  });
+
+  it('classifier output OMITS classifier_reason on confident results (S1)', async () => {
+    // S1 (Session #142): the reason field is set ONLY when
+    // category_confident=false. Confident results return the 7-key shape
+    // unchanged (backward compatible). Verified via a single-row mock so
+    // Layer 1 resolves confidently.
+    const singleRowMock = {
+      from: () => ({
+        select: () => ({
+          ilike: () => ({
+            eq: () => Promise.resolve({ data: [{ category: 'automobile' }] }),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+    const result = await resolveVehicleClassification(singleRowMock, 'Toyota', 'Camry');
+    expect(result.category_confident).toBe(true);
+    expect(result).not.toHaveProperty('classifier_reason');
+  });
+
+  it('classifier_reason="no_match" when Layer 1 returns zero matching rows (S1)', async () => {
+    const result = await resolveVehicleClassification(mockSupabase, 'UnknownBrand', 'Anything');
+    expect(result.category_confident).toBe(false);
+    expect(result.classifier_reason).toBe('no_match');
+  });
+
+  it('classifier_reason="query_failed" when Layer 1 throws (S1)', async () => {
+    const dbErrorMock = {
+      from: () => ({
+        select: () => ({
+          ilike: () => ({
+            eq: () => Promise.reject(new Error('connection refused')),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+    const result = await resolveVehicleClassification(dbErrorMock, 'Toyota', 'Camry');
+    expect(result.category_confident).toBe(false);
+    expect(result.classifier_reason).toBe('query_failed');
+  });
+
+  it('classifier_reason="query_failed" when Supabase returns error field without throwing (S1 RLS-denial-equivalent)', async () => {
+    // The MOST IMPORTANT pre-#142 footgun: Supabase returns
+    // `{data: null, error: <RLS denial>}` WITHOUT throwing. Pre-S1
+    // the resolver swallowed the error and the caller couldn't tell
+    // RLS-denied from genuine zero-row matches. Post-S1 this surfaces
+    // as 'query_failed'.
+    const rlsDeniedMock = {
+      from: () => ({
+        select: () => ({
+          ilike: () => ({
+            eq: () => Promise.resolve({ data: null, error: { code: 'PGRST301', message: 'permission denied' } }),
+          }),
+        }),
+      }),
+    } as unknown as Parameters<typeof resolveVehicleClassification>[0];
+    const result = await resolveVehicleClassification(rlsDeniedMock, 'Honda', 'Civic');
+    expect(result.category_confident).toBe(false);
+    expect(result.classifier_reason).toBe('query_failed');
   });
 });
 
