@@ -6,6 +6,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #145 — Chore: ROADMAP-13-ITEMS audit + #118 ledger backfill + Roll-up/Status-Table drift reconciliation (2026-06-03)
+
+Documentation-only housekeeping session. **No production code, no migrations, no tests, no permission keys.** Cross-references `docs/dev/ROADMAP-13-ITEMS.md` documented status against the session-by-session ledger and recent CHANGELOG entries (#110 → #144) to produce a current-state summary per item, evidence-cited per Memory #11.
+
+**Three trivial fixes applied:**
+
+1. **#118 backfill** — added the missing ledger row for the Sale-vs-Quotes shared-component parity sweep that landed on main 2026-05-28. The audit (`audit/sale-vs-quotes-shared-component-parity-sweep`, branch tip `31199db7`, merge `c79dcf91`) shipped with `docs/dev/SALE_VS_QUOTES_PARITY_SWEEP.md` enumerating 6 gaps (G1–G6) and a clean merge to main, but the ROADMAP ledger row was never added. The renumbering note inside #119's ledger row (`renumbered #118 → #119`) was a misread of the parallel-session collision — both #118 (sweep) and #119 (panel-parity fix) shipped that day on disjoint branches. New ledger row uses the audit-backfill format precedent established by the #73–79 SMS-AI v2 backfill (commit hash + merge hash + branch name; no `_(this commit)_` since the row was added 5 days after the work landed).
+
+2. **15e drift reconciliation** — the Status Table at line 31–55 marked Item 15e as `✅ CLOSED (2026-05-27)` after the Phase 2C-β-2 close, but the Roll-up at line 56–62 still said `In progress (1): 15e` and the "Total items" line at line 23 listed 8 done items while claiming "9 done" (15e was missing from the enumeration). Roll-up updated to `Done (9): 1, 6, 12, 15a, 15b, 15c, 15e, 15f, 15g`; `In progress (0)`; "Total items" line corrected. Status Table itself was already correct — no change to the per-item row.
+
+3. **"Last session updated" header refresh** — was `2026-05-29 — Session #124`, now reflects this session (#145) with the prior #144 entry preserved as "Earlier 2026-05-29 — Session #124" prefix per the existing header-chaining convention. Header was 21 sessions stale.
+
+**One new section added** at the top of the doc (after the Roll-up, before Out-of-Scope Workstreams): **"Current Status — Evidence-Based (as of 2026-06-03, post-Session #145)"** with three parts:
+
+- **Per-item evidence table** — for each of items 1–14 (plus sub-items 15a–g): documented status, evidence citation (session number + commit hash), evidence-based verdict. All 9 DONE items cite a specific session + hash; all 10 NOT-STARTED items cite the absence of any ledger entry covering that item. No UNKNOWN verdicts.
+- **Recent activity not in the 13-item table (last 35 sessions)** — clusters sessions #110 → #144 by workstream: 15e Phase 2 corrective (#110), catalog CRUD wiring (#111–#114), POS Sale-vs-Quotes parity arc (#115–#124), vehicle taxonomy / classifier / form-behavior arc (#125–#143), quote-request SMS bundle (#137–#139), Q-D pricing_model immutability (#144). Every session ends with "Not a 13-item entry" — the 13-item scope itself has been idle since 2026-05-17 (15f Layer 8f).
+- **Target C — operator-decision surface** — gaps NOT silently swept, with the rationale per gap.
+
+**Target C — surfaced for operator decision (not applied this session):**
+
+(a) **5 additional missing audit-ledger rows:** #112 (`audit/pos-prerequisite-autoadd-size-aware-pricing`, merge `15c0a78f`), #125 (exotic/classic create-form gap + public-site leak sweep, merge `464d544c`), #126 (vehicle taxonomy comprehensive, merge `1dd4cac7`), #127 (public booking form-reset bug + flow verification, merge `d5ea9e65`), #128 (vehicle-form pattern unification feasibility, merge `c872c05d`), #135 (vehicle-forms comprehensive behavior, merge `d3c65ae3`). All read-only audits with full CHANGELOG entries on main. Operator decision: backfill as a sibling session (~30 min, ~5 ledger rows) or leave the CHANGELOG as the operative record for audit sessions of this era.
+
+(b) **Memory #12 — "Booking multi-service SHELVED INDEFINITELY":** Q-Arch-2 architectural lock (single-primary stays) is captured in CLAUDE.md Rule 22's W5 paragraph and in the #140 ledger row's out-of-scope note ("multi-primary work — Path B locked — Q-Arch-2 single-primary stays"). The ROADMAP-13 itself never carried a booking-multi-service item, so there is nothing to formally re-status; if Memory #12's framing should be made discoverable from this doc (e.g., a new entry in "Closed items" or "Decisions superseded" citing Q-Arch-2 as the durable reason), that's an operator product decision deferred here.
+
+(c) **Older session-number gaps** (#12, #15, #16, #18, #38, #56, #83, #84) — left as-is. Likely renumbering / parallel-session collisions / abandoned branches from the early-sprint era; chasing them down would expand scope well beyond Memory #29's Targeted discipline.
+
+(d) **`Document version: v4.0 (2026-05-27)` block** — could be bumped to v4.1 to make the post-#124 follow-up arcs (catalog, Sale-vs-Quotes parity, vehicle/classifier, public-booking Path B, Q-D) discoverable from the doc-version header. Content-scoping decision deferred.
+
+**Per-item verdicts (evidence-based):** 9 DONE (1, 6, 12, 15a–c, 15e, 15f, 15g) + 1 CLOSED (5) + 1 ABSORBED (15d) + 10 NOT STARTED (2, 3, 4, 7, 8, 9, 10, 11, 13, 14) + 0 IN PROGRESS + 0 BLOCKED.
+
+**Scope:** 0 prod files, 0 migrations, 0 tests, 0 permission keys; 2 doc files MOD (`docs/dev/ROADMAP-13-ITEMS.md` + `docs/CHANGELOG.md`). **Gates (sanity check, expected no-op since no code touched):** `npx tsc --noEmit` 0 errors, `npm run lint` 0err/97warn baseline preserved, `npm test` 2869/2869, `npm run build` clean. Not a 13-item entry (housekeeping).
+
+**Operator manual verification:** open `docs/dev/ROADMAP-13-ITEMS.md` → scroll to the new "Current Status — Evidence-Based" section to see the per-item table at a glance; the Target C subsection lists the 4 surfaced operator decisions.
+
+---
+
 ## Session #144 — Fix (Q-D): `services.pricing_model` immutability — documentation + admin UI tooltip (2026-06-03)
 
 Closes **Q4** in `docs/dev/CATALOG_CRUD_WIRING_AUDIT.md` (the prior catalog audit's only deferred Informational item) and Q-Arch-D from the public-booking architectural audit (commit `709befa5`). **Q-Arch-D LOCKED KEEP-IMMUTABLE — documentation only, NO behavior change.** The Edit Service page's `onSaveDetails` PUT payload (`src/app/admin/catalog/services/[id]/page.tsx`) was already intentionally omitting `pricing_model` from the update set — pre-session and post-session — and the page renders no pricing_model selector. The session adds the operator-facing surfacing of that constraint plus regression guards.
