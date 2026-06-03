@@ -142,7 +142,21 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
   // customers. The T9 contract test (`classifier-spinner-lifecycle.test.tsx`)
   // locks `setClassifying(false)` against all five classifier failure
   // modes — including the network-error case the wrapper newly surfaces.
-  const classify = useCallback(async (mk: string, mdl: string, cat: VehicleCategory) => {
+  const classify = useCallback(async (
+    mk: string,
+    mdl: string,
+    cat: VehicleCategory,
+    // Finding 2 (Session #143, 2026-06-02 — STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT):
+    // year is now forwarded through to the wrapper. Pre-fix the call at
+    // the wrapper boundary dropped year silently, which broke Layer 5
+    // classic detection across all year-gated classic candidates (Ford
+    // Mustang, Chevy Camaro, etc.). Latent since the classifier was
+    // first wired in — #142's restoration made it observable because
+    // the rest of the classifier started returning useful results on
+    // anonymous /book. Mirrors `vehicle-form-dialog.tsx:227` which has
+    // always passed year correctly (canonical reference per Memory #2).
+    yr: number | null
+  ) => {
     if (!mk.trim()) {
       setClassification(null);
       return;
@@ -150,7 +164,11 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     const myRequestId = ++classifyRequestIdRef.current;
     setClassifying(true);
     try {
-      const result = await classifyVehicleClient(mk.trim(), mdl.trim() || undefined);
+      const result = await classifyVehicleClient(
+        mk.trim(),
+        mdl.trim() || undefined,
+        yr ?? undefined
+      );
       // #136 B5 race-cancellation: abandon stale results so a slow Yamaha-RV
       // fetch can't overwrite a cleared/changed classification after the
       // user picked a different category mid-flight.
@@ -178,17 +196,22 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     }
   }, []);
 
-  // Debounced classification
+  // Debounced classification. Finding 2 (Session #143): `year` is now
+  // forwarded so Layer 5 (classic) can run. Adding `year` to the
+  // dependency array re-fires the debounce when the customer types a
+  // new year — e.g., typing 1965 for a Ford Mustang triggers a
+  // reclassify that now resolves to 'classic' (previously stayed
+  // 'sedan' because year was dropped at the wrapper boundary).
   useEffect(() => {
     if (mode !== 'manual' || !make.trim()) {
       setClassification(null);
       return;
     }
     const timer = setTimeout(() => {
-      classify(make, model, category);
+      classify(make, model, category, year);
     }, 400);
     return () => clearTimeout(timer);
-  }, [make, model, category, mode, classify]);
+  }, [make, model, category, year, mode, classify]);
 
   // #136 T1/Q1/B1 — Category change resets ALL non-category fields. The
   // operator-locked anchor (VEHICLE_FORMS_BEHAVIOR_AUDIT.md T1.1): all
@@ -214,27 +237,62 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     setErrors({});
   }
 
-  // When auto-classification updates (make/model changed), clear manual overrides
-  // so the new detected size takes effect. User can still override afterward.
+  // Finding 1 (Session #143, 2026-06-02 — Q-A.4 LOCKED Option (iii),
+  // STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT). The previous useEffect
+  // here unconditionally cleared the customer's manual size_class +
+  // specialty_tier picks whenever the classifier returned. Combined
+  // with the old `effectiveSizeClass` formula's classifier fallback,
+  // this caused mundane classifier results (Sedan, Truck/SUV, etc.)
+  // to auto-highlight a size button — the bug the operator flagged
+  // post-#142.
+  //
+  // **REFINED RULE:** the classifier may pre-select size_class ONLY
+  // when it detects 'exotic' or 'classic' (the two cases that trigger
+  // the SpecialtyVehicleBlock short-circuit via
+  // `booking-wizard.tsx:763`). Those two values are flow-routing
+  // signals, not button-defaulting. For every other classifier
+  // result — mundane automobile sizes (sedan / truck_suv_2row /
+  // suv_3row_van) AND non-automobile specialty_tier seeds — the
+  // customer's manual pick is authoritative. Classifier output is
+  // silently dropped from UI state.
+  //
+  // So this effect clears the manual picks ONLY when the classifier
+  // returns exotic/classic (so `effectiveSizeClass` below can route
+  // through `classification.size_class`). Mundane classifier returns
+  // leave the customer's manual pick untouched.
   useEffect(() => {
-    if (classification) {
+    const isClassifierSpecialty =
+      classification?.size_class === 'exotic' ||
+      classification?.size_class === 'classic';
+    if (isClassifierSpecialty) {
       setManualSizeClass(null);
       setManualSpecialtyTier(null);
     }
-  }, [classification]);
+  }, [classification?.size_class]);
 
-  // Effective size class: classifier-detected 'exotic' / 'classic' always wins; otherwise
-  // manual override takes priority, then auto-detected. Session 29 anti-gaming: the manual
-  // dropdown is limited to 3 values (sedan / truck_suv_2row / suv_3row_van), so classifier
-  // is the only authority for specialty vehicles.
+  // Effective size class. Finding 1 refined rule (Session #143):
+  //   - Classifier-detected 'exotic' / 'classic' wins (flow-routing
+  //     to SpecialtyVehicleBlock via `booking-wizard.tsx:763` reading
+  //     `vehicle.size_class` from `buildSelection().size_class`).
+  //   - Otherwise: `manualSizeClass` ONLY. The old fallback to
+  //     `classification?.size_class` was the auto-fill bug — removed.
+  //     Mundane classifier results no longer leak into UI state.
   const classifierSpecialty =
     classification?.size_class === 'exotic' || classification?.size_class === 'classic';
   const effectiveSizeClass = classifierSpecialty
     ? classification!.size_class
-    : (manualSizeClass ?? classification?.size_class ?? null);
+    : manualSizeClass;
 
-  // Effective specialty tier: manual override takes priority, then auto-detected
-  const effectiveSpecialtyTier = manualSpecialtyTier ?? classification?.specialty_tier ?? null;
+  // Effective specialty tier. Finding 1 refined rule (Session #143):
+  // non-automobile specialty_tier is purely customer-picked. The old
+  // fallback `?? classification?.specialty_tier` auto-seeded the first
+  // tier (e.g., 'rv_up_to_24' for any RV) the moment the classifier
+  // returned, which violated the locked rule for non-automobile
+  // surfaces. Classifier's specialty_tier output (always the smallest
+  // tier per Layer-3 manual-pick design — see CLAUDE.md Rule 22) is
+  // silently dropped from UI state; customer picks via the
+  // SPECIALTY_TIERS buttons.
+  const effectiveSpecialtyTier = manualSpecialtyTier;
 
   // Mi1 (Session #142): the dead useEffect that previously sat here had
   // empty `if` branches with only comments — auto-detect routing already

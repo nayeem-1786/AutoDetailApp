@@ -6,6 +6,56 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #143 — Fix: Step 1 classifier-output rules — refined exotic/classic-only pre-select + Mustang year propagation + stale comment (2026-06-02)
+
+Closes Finding 1 + Finding 2 from `docs/dev/STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT.md` (commit `e807f543`). Both findings were LATENT bugs surfaced (not introduced) by #142's classifier restoration — pre-#142 anonymous customers hit RLS-denied classifier returns and the auto-fill UX never appeared; post-#142 the classifier works correctly and the latent UI behavior became visible.
+
+**Q-A.4 LOCKED Option (iii) — refined rule, not replaced:** the classifier may pre-select `size_class` ONLY when it detects `'exotic'` or `'classic'` (the two flow-routing values that trigger `SpecialtyVehicleBlock` via `booking-wizard.tsx:763`). For mundane automobile sizes (sedan / truck_suv_2row / suv_3row_van) AND for non-automobile `specialty_tier` seeds, the classifier's output is silently dropped from UI state; the customer's manual pick is authoritative. Architectural justification: setting `size_class='exotic'/'classic'` is flow-routing, not button-defaulting; the original "NEVER" intent was about the latter.
+
+**Finding 1 — refined-rule wiring (`step-vehicle.tsx`):**
+
+- **`effectiveSizeClass` formula** (was: `manualSizeClass ?? classification?.size_class ?? null` for the non-specialty branch). Now: `manualSizeClass` only. The classifier fallback that auto-highlighted mundane size buttons is removed.
+- **`effectiveSpecialtyTier`** (was: `manualSpecialtyTier ?? classification?.specialty_tier ?? null`). Now: `manualSpecialtyTier` only. The classifier's smallest-tier seed (`DEFAULT_SPECIALTY_TIERS[category]` per Layer-3 manual-pick design) is dropped from UI state for non-automobile categories.
+- **Manual-clear useEffect** (was: unconditional `setManualSizeClass(null)` + `setManualSpecialtyTier(null)` on every classification change). Now: clears manual ONLY when `classification?.size_class === 'exotic' || 'classic'` so the flow-routing branch of `effectiveSizeClass` can take effect. Mundane classifier returns leave the customer's manual pick untouched. Dep narrowed to `classification?.size_class` so the effect fires only on the relevant transition.
+
+**Finding 2 — year propagation (`step-vehicle.tsx`):**
+
+- `classify(mk, mdl, cat)` signature extended to `classify(mk, mdl, cat, yr)`. Internal call to `classifyVehicleClient(mk, mdl, yr ?? undefined)` mirrors `vehicle-form-dialog.tsx:227`'s canonical pattern. Wrapper + endpoint already accepted `year` from #142 (verified pre-edit — Memory #11); the bug was purely the caller dropping it.
+- Debounce useEffect deps extended to include `year` so typing 1965 for a Ford Mustang triggers a reclassify that resolves to `'classic'` via Layer 5 (`vehicle-categories.ts:603–617`). Pre-fix the call sent only `make` + `model` → Layer 5 took the `!year && mightBeClassicVehicle` branch → set `needs_year_confirmation: true` but kept `size_class: 'sedan'`.
+
+**Stale comment cleanup:** the `:228` comment claiming "manual dropdown is limited to 3 values (sedan / truck_suv_2row / suv_3row_van), so classifier is the only authority for specialty vehicles" was wrong (UI actually renders all 5 `VEHICLE_SIZE_LABELS` entries at `:593`) and superseded by the refined rule documented inline. Replaced with the refined-rule explanation. The CLAUDE.md Rule 19 "filter to 3" architectural question (5 buttons vs. 3) is intentionally OUT OF SCOPE per Targeted-scope discipline — separate concern.
+
+**Anti-regression tests — NEW `classifier-output-rules.test.tsx`** (10 tests, sibling to #142's T9 `classifier-spinner-lifecycle.test.tsx`):
+
+- **Mundane classifier does NOT auto-select** (3): Honda Civic → sedan not highlighted; Chevy Suburban → suv_3row_van not highlighted; manual pick of Truck/SUV survives a mundane classifier return (the unconditional-clear-useEffect regression guard).
+- **Exotic/classic DOES pre-select** (3): Ferrari → Exotic highlighted; Ford Mustang 1965 → Classic highlighted; manual Sedan pick IS wiped on classifier upgrade to exotic (flow-routing correctness).
+- **Non-automobile specialty_tier is purely manual** (2): Motorcycle + classifier returning `standard_cruiser` → button NOT highlighted; RV + Airstream returning `rv_up_to_24` → button NOT highlighted.
+- **Year propagation** (2): Ford Mustang 1965 → fetch URL includes `year=1965` + `make=Ford` + `model=Mustang`; no year typed → URL OMITS `year=` param (anti-regression for accidental `year=null`/`year=NaN` literals).
+
+**Files modified**
+
+- MOD `src/components/booking/step-vehicle.tsx` — classify signature + useEffect deps (Finding 2) + effectiveSizeClass/effectiveSpecialtyTier formulas + manual-clear useEffect refinement + stale comment replacement (Finding 1)
+- NEW `src/components/booking/__tests__/classifier-output-rules.test.tsx` — 10 anti-regression tests
+- `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT.md` (RESOLVED markers), `CLAUDE.md` Rule 22
+
+**Verification**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors, 97 warnings (baseline preserved)
+- `npm run build` → clean (790 pages)
+- `npm test` → 2864 / 2864 (was 2854 after #142; +10 new — all in `classifier-output-rules.test.tsx`)
+
+**Operator post-deploy verification checklist**
+
+1. **Mundane automobile**: Automobile + Civic, Suburban, F-150 → size buttons stay blank; customer picks manually.
+2. **Ferrari**: Automobile + Ferrari 488 → Exotic auto-selected (briefly visible before Continue) → SpecialtyVehicleBlock fires on Continue.
+3. **Ford Mustang 1965**: Automobile + Ford + Mustang + 1965 → Classic auto-selected → SpecialtyVehicleBlock fires on Continue.
+4. **Non-automobile**: Motorcycle / RV / Boat / Aircraft → size buttons stay blank; customer picks manually.
+5. **Manual-survives-classifier**: type Honda first, pick Truck/SUV, then type Civic → Truck/SUV stays selected (manual pick is authoritative for mundane).
+6. **T9 regression** (carry-over from #142): spinner clears across all 5 failure modes (`classifier-spinner-lifecycle.test.tsx` still green).
+
+---
+
 ## Session #142 — Fix: Vehicle classifier restoration — C1 architectural refactor + S1 error signal + T9 contract test + M1 doc + Mi1+Mi2 cleanup (2026-06-02)
 
 Closes 5 findings (C1 Critical + S1 Significant + M1 Moderate + Mi1 Minor + Mi2 Minor) from `docs/dev/VEHICLE_CLASSIFIER_BEHAVIOR_AUDIT.md` (commit `5e3d3388`). Public booking Step 1 "Add a New Vehicle" path is restored for anonymous customers (the audit's production-blocking acute bug — RV + Airstream stuck-spinner screenshot).
