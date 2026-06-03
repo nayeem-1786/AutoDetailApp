@@ -157,8 +157,8 @@ function isButtonSelected(button: HTMLElement): boolean {
 // Refined rule — mundane classifier results do NOT auto-select
 // ═══════════════════════════════════════════════════════════════
 
-describe('Refined rule — mundane classifier results do NOT auto-select size buttons', () => {
-  it('Honda Civic → classifier returns sedan, but NO size button is highlighted', async () => {
+describe('Session #144 — automobile mundane classifier results DO auto-pre-select', () => {
+  it('Honda Civic → classifier returns sedan → Sedan button IS highlighted', async () => {
     fetchSpy.mockResolvedValue(jsonResponse({
       classification: classification({ size_class: 'sedan' }),
     }));
@@ -172,15 +172,10 @@ describe('Refined rule — mundane classifier results do NOT auto-select size bu
     });
 
     const sedanBtn = screen.getByRole('button', { name: /^Sedan$/ });
-    const truckBtn = screen.getByRole('button', { name: /Truck\/SUV/ });
-    const suvBtn = screen.getByRole('button', { name: /SUV \(3-Row\)/ });
-
-    expect(isButtonSelected(sedanBtn)).toBe(false);
-    expect(isButtonSelected(truckBtn)).toBe(false);
-    expect(isButtonSelected(suvBtn)).toBe(false);
+    expect(isButtonSelected(sedanBtn)).toBe(true);
   });
 
-  it('Chevy Suburban → classifier returns suv_3row_van, but NO size button is highlighted', async () => {
+  it('Chevy Suburban → classifier returns suv_3row_van → SUV (3-Row) button IS highlighted', async () => {
     fetchSpy.mockResolvedValue(jsonResponse({
       classification: classification({ size_class: 'suv_3row_van' }),
     }));
@@ -194,32 +189,107 @@ describe('Refined rule — mundane classifier results do NOT auto-select size bu
     });
 
     const suvBtn = screen.getByRole('button', { name: /SUV \(3-Row\)/ });
-    expect(isButtonSelected(suvBtn)).toBe(false);
+    expect(isButtonSelected(suvBtn)).toBe(true);
   });
+});
 
-  it("Customer's manual pick survives a mundane classifier return (not wiped)", async () => {
-    // Anti-regression for the OLD useEffect that unconditionally
-    // wiped manualSizeClass on every classification change.
+// ═══════════════════════════════════════════════════════════════
+// Session #144 — override-survival logic
+// ═══════════════════════════════════════════════════════════════
+
+describe('Session #144 — manual override survives for same (make, model); clears on retype', () => {
+  it('Civic auto-selects Sedan, customer clicks Truck/SUV, types year (same make+model) → Truck/SUV stays', async () => {
+    // Year change re-fires the debounce (year is a classify dep from
+    // #143's Finding 2 fix) without changing make/model — proves the
+    // override survives subsequent classifier returns for the SAME
+    // (make, model) tuple. Year-typing is the test surface for "any
+    // non-make-non-model field change."
     fetchSpy.mockResolvedValue(jsonResponse({
       classification: classification({ size_class: 'sedan' }),
     }));
 
     await renderStep();
+    await typeMake('Honda');
+    await typeModel('Civic');
+    await advanceDebounce();
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+    // Verify pre-select fired first.
+    const sedanBtn = screen.getByRole('button', { name: /^Sedan$/ });
+    expect(isButtonSelected(sedanBtn)).toBe(true);
+
+    // Customer corrects to Truck/SUV.
     const truckBtn = screen.getByRole('button', { name: /Truck\/SUV/ });
     await act(async () => {
       fireEvent.click(truckBtn);
     });
     expect(isButtonSelected(truckBtn)).toBe(true);
 
+    // Type a year — same make+model. Classifier re-fires with sedan.
+    await typeYear('2020');
+    await advanceDebounce();
+
+    // Override survives.
+    expect(isButtonSelected(truckBtn)).toBe(true);
+    expect(isButtonSelected(sedanBtn)).toBe(false);
+  });
+
+  it('Civic→Truck/SUV override → model change to Accord → Sedan pre-selects again (override cleared)', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({
+      classification: classification({ size_class: 'sedan' }),
+    }));
+
+    await renderStep();
     await typeMake('Honda');
+    await typeModel('Civic');
     await advanceDebounce();
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalled();
     });
 
+    const truckBtn = screen.getByRole('button', { name: /Truck\/SUV/ });
+    await act(async () => {
+      fireEvent.click(truckBtn);
+    });
     expect(isButtonSelected(truckBtn)).toBe(true);
-    const sedanBtn = screen.getByRole('button', { name: /^Sedan$/ });
-    expect(isButtonSelected(sedanBtn)).toBe(false);
+
+    // Change model — override clears. The "fresh make/model triggers
+    // auto-pre-select" path is already proven by the first describe-
+    // block's Honda Civic test; this test specifically locks the
+    // CLEAR-side of the contract, which is the new behavior added in
+    // Session #144 (pre-#144 + post-#143 had no clear at all).
+    await typeModel('Accord');
+    await waitFor(() => {
+      expect(isButtonSelected(truckBtn)).toBe(false);
+    });
+  });
+
+  it('Civic→Truck/SUV override → make change to Toyota → Sedan pre-selects (override cleared by make)', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({
+      classification: classification({ size_class: 'sedan' }),
+    }));
+
+    await renderStep();
+    await typeMake('Honda');
+    await typeModel('Civic');
+    await advanceDebounce();
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+
+    const truckBtn = screen.getByRole('button', { name: /Truck\/SUV/ });
+    await act(async () => {
+      fireEvent.click(truckBtn);
+    });
+    expect(isButtonSelected(truckBtn)).toBe(true);
+
+    // Change make — override clears. (Same scoping as the model-change
+    // test above — the auto-pre-select path is proven separately.)
+    await typeMake('Toyota');
+    await waitFor(() => {
+      expect(isButtonSelected(truckBtn)).toBe(false);
+    });
   });
 });
 

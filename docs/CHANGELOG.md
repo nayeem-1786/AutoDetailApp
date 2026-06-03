@@ -6,6 +6,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #144 — Fix: Step 1 classifier rule THIRD refinement — restore mundane automobile auto-select with make/model-scoped override survival (2026-06-02)
+
+Refines #143's classifier-output rule based on operator feedback that #143's "manual-only for mundane" position rolled back previously-working pre-#143 behavior (Civic→Sedan, Suburban→SUV, F-150→Truck/SUV). The operator's original stated rule was about **non-automobile** auto-select; #143 over-strengthened to all 5 categories. This session re-refines to match operator's actual intent.
+
+**Rule-evolution history** (capture for future readers):
+- Pre-#143: classifier auto-selected all 5 size buttons (latent mechanism surfaced when #142 fixed RLS).
+- #143 first pass: NEVER auto-select (over-strengthened).
+- #143 final pass: exotic/classic only (Q-A.4 LOCKED Option (iii)).
+- **#144 (this):** exotic/classic AND mundane automobile auto-pre-select; customer can correct; correction survives until make OR model changes. Non-automobile specialty_tier stays manual-pick (operator-stated rule, unchanged).
+
+**NEW LOCKED RULE (third refinement):**
+
+For **automobile**: classifier MAY pre-select size_class when confident. Pre-selection is a STARTING POINT. Customer can override. Override survives subsequent classifier returns for the SAME (make, model). When make OR model changes, override clears and classifier output pre-selects again. Exotic/classic still triggers SpecialtyVehicleBlock (preserved from #143).
+
+For **non-automobile** (motorcycle/RV/boat/aircraft): classifier NEVER pre-selects specialty_tier. UNCHANGED from #143.
+
+**Implementation (`step-vehicle.tsx`):**
+
+- `effectiveSizeClass` non-specialty branch: `manualSizeClass ?? (category === 'automobile' ? classification?.size_class ?? null : null)`. Automobile gets classifier fallback restored; non-automobile stays manual-only.
+- **NEW useEffect on `[make, model]`** — clears `manualSizeClass` + `manualSpecialtyTier` when either changes. Guards initial-mount via `isInitialMakeModelMountRef` so edit-from-Step-4 round-trips don't nuke prior pick before customer touches anything. Independent of (and simultaneously correct with) #143's exotic/classic-clear useEffect.
+- `effectiveSpecialtyTier = manualSpecialtyTier` — UNCHANGED from #143.
+
+**No separate `manualOverride: boolean` state needed** — `manualSizeClass !== null` IS the override signal; formula `??` precedence wins manual over classifier; make/model-change useEffect resets it. Adding a parallel boolean would be redundant.
+
+**Anti-regression tests (`classifier-output-rules.test.tsx`):**
+
+- **Flipped 2** (#143's "do NOT auto-select" → #144's "DOES auto-pre-select"): Civic → Sedan IS highlighted; Suburban → SUV (3-Row) IS highlighted.
+- **Removed 1** (#143's manual-survives-across-make-change — contradicts #144's clear-on-retype rule).
+- **Added 3**: override survives year-typing (same make+model); override clears on model change to Accord; override clears on make change to Toyota.
+- **Unchanged from #143**: exotic/classic DOES pre-select × 3 (Ferrari/Mustang 1965/Sedan-then-Ferrari wipe); non-automobile manual × 2 (Motorcycle/RV); year propagation × 2.
+
+12 tests in this file (was 10 in #143). Suite-wide: 2866 / 2866 (was 2864 after #143; +2 net).
+
+**Files modified**
+
+- MOD `src/components/booking/step-vehicle.tsx` — formula + new useEffect
+- MOD `src/components/booking/__tests__/classifier-output-rules.test.tsx` — flipped/removed/added
+- `docs/CHANGELOG.md`, `docs/dev/ROADMAP-13-ITEMS.md`, `docs/dev/STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT.md`, `CLAUDE.md` Rule 22
+
+**Verification**
+
+- tsc 0 errors, lint 0err/97warn, build clean (790 pages), 2866/2866.
+
+**Operator post-deploy verification checklist**
+
+1. Automobile + Civic → Sedan pre-selected.
+2. Automobile + Suburban → SUV (3-Row) pre-selected.
+3. Automobile + Civic + click Truck/SUV → Truck/SUV stays even on subsequent classifier returns for same make+model (e.g., year typing).
+4. Automobile + Civic + click Truck/SUV + change model to Accord → override cleared; Sedan pre-selects.
+5. Automobile + Ford + Mustang + 1965 → Classic pre-selected → SpecialtyVehicleBlock fires (carry-over from #143).
+6. Motorcycle / RV / Boat / Aircraft → still manual-pick only (carry-over from #143).
+
+---
+
 ## Session #143 — Fix: Step 1 classifier-output rules — refined exotic/classic-only pre-select + Mustang year propagation + stale comment (2026-06-02)
 
 Closes Finding 1 + Finding 2 from `docs/dev/STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT.md` (commit `e807f543`). Both findings were LATENT bugs surfaced (not introduced) by #142's classifier restoration — pre-#142 anonymous customers hit RLS-denied classifier returns and the auto-fill UX never appeared; post-#142 the classifier works correctly and the latent UI behavior became visible.

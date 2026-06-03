@@ -237,29 +237,32 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     setErrors({});
   }
 
-  // Finding 1 (Session #143, 2026-06-02 — Q-A.4 LOCKED Option (iii),
-  // STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT). The previous useEffect
-  // here unconditionally cleared the customer's manual size_class +
-  // specialty_tier picks whenever the classifier returned. Combined
-  // with the old `effectiveSizeClass` formula's classifier fallback,
-  // this caused mundane classifier results (Sedan, Truck/SUV, etc.)
-  // to auto-highlight a size button — the bug the operator flagged
-  // post-#142.
+  // Session #144 (2026-06-02) — THIRD refinement of the classifier-
+  // output rule. Rule-evolution history (capture for future readers
+  // tracing this code):
+  //   - Pre-#143: classifier auto-selected all 5 size buttons (the
+  //     latent auto-fill mechanism).
+  //   - #143 first pass: NEVER auto-select (operator's initial framing).
+  //   - #143 final pass: exotic/classic only (Q-A.4 LOCKED Option (iii)
+  //     — flow-routing carve-out).
+  //   - #144 (this): exotic/classic AND mundane automobile sizes auto-
+  //     pre-select; customer can correct by clicking another size
+  //     button; correction SURVIVES until make OR model changes (then
+  //     classifier pre-selects again for the new tuple). Non-automobile
+  //     specialty_tier stays manual-pick only — that part of the rule
+  //     was operator-stated and unchanged.
   //
-  // **REFINED RULE:** the classifier may pre-select size_class ONLY
-  // when it detects 'exotic' or 'classic' (the two cases that trigger
-  // the SpecialtyVehicleBlock short-circuit via
-  // `booking-wizard.tsx:763`). Those two values are flow-routing
-  // signals, not button-defaulting. For every other classifier
-  // result — mundane automobile sizes (sedan / truck_suv_2row /
-  // suv_3row_van) AND non-automobile specialty_tier seeds — the
-  // customer's manual pick is authoritative. Classifier output is
-  // silently dropped from UI state.
+  // **Two clear triggers** for `manualSizeClass`:
+  //   1. Classifier upgrades to exotic/classic (effect below):
+  //      override is wiped so `effectiveSizeClass` can route through
+  //      classifier's specialty value → SpecialtyVehicleBlock fires.
+  //   2. Customer types a new make OR model (effect below it):
+  //      override is wiped so the next classifier return pre-selects
+  //      freshly. This is the "starting point, not a lock" UX.
   //
-  // So this effect clears the manual picks ONLY when the classifier
-  // returns exotic/classic (so `effectiveSizeClass` below can route
-  // through `classification.size_class`). Mundane classifier returns
-  // leave the customer's manual pick untouched.
+  // The two effects are independent and both correct simultaneously.
+
+  // Trigger 1 (carryover from #143) — exotic/classic upgrade wipes manual.
   useEffect(() => {
     const isClassifierSpecialty =
       classification?.size_class === 'exotic' ||
@@ -270,28 +273,52 @@ export function StepVehicle({ customerData, onContinue, initialVehicle }: StepVe
     }
   }, [classification?.size_class]);
 
-  // Effective size class. Finding 1 refined rule (Session #143):
+  // Trigger 2 (NEW Session #144) — make/model change wipes manual so
+  // the classifier output for the NEW (make, model) tuple can pre-
+  // select on next return. `isInitialMakeModelMountRef` skips the
+  // on-mount fire so edit-from-Step-4 round-trips with
+  // `initialVehicle.size_class` don't nuke the customer's prior pick
+  // before they touch anything. Specialty_tier cleared too — when
+  // customer enters a different non-automobile vehicle, the prior
+  // tier pick shouldn't carry over (e.g., switching from a small RV
+  // model to a large one).
+  const isInitialMakeModelMountRef = useRef(true);
+  useEffect(() => {
+    if (isInitialMakeModelMountRef.current) {
+      isInitialMakeModelMountRef.current = false;
+      return;
+    }
+    setManualSizeClass(null);
+    setManualSpecialtyTier(null);
+  }, [make, model]);
+
+  // Effective size class. Session #144 refined rule:
   //   - Classifier-detected 'exotic' / 'classic' wins (flow-routing
-  //     to SpecialtyVehicleBlock via `booking-wizard.tsx:763` reading
-  //     `vehicle.size_class` from `buildSelection().size_class`).
-  //   - Otherwise: `manualSizeClass` ONLY. The old fallback to
-  //     `classification?.size_class` was the auto-fill bug — removed.
-  //     Mundane classifier results no longer leak into UI state.
+  //     to SpecialtyVehicleBlock — preserved from #143).
+  //   - Automobile non-specialty: `manualSizeClass ?? classifier
+  //     output` — restored from pre-#143 to match operator's stated
+  //     "size_class IS auto-detected for automobiles" intent. Manual
+  //     pick wins when present; classifier seeds the starting point.
+  //   - Non-automobile: `manualSizeClass` only (which is always null
+  //     in practice since the size_class buttons aren't shown for
+  //     non-automobile categories — the specialty_tier picker is the
+  //     non-auto equivalent). Classifier's mundane size_class output
+  //     for non-automobile is null anyway (Layer 3 returns null for
+  //     non-auto size_class), so this branch is structurally
+  //     defensive rather than functional.
   const classifierSpecialty =
     classification?.size_class === 'exotic' || classification?.size_class === 'classic';
   const effectiveSizeClass = classifierSpecialty
     ? classification!.size_class
-    : manualSizeClass;
+    : (manualSizeClass ?? (category === 'automobile' ? classification?.size_class ?? null : null));
 
-  // Effective specialty tier. Finding 1 refined rule (Session #143):
-  // non-automobile specialty_tier is purely customer-picked. The old
-  // fallback `?? classification?.specialty_tier` auto-seeded the first
-  // tier (e.g., 'rv_up_to_24' for any RV) the moment the classifier
-  // returned, which violated the locked rule for non-automobile
-  // surfaces. Classifier's specialty_tier output (always the smallest
-  // tier per Layer-3 manual-pick design — see CLAUDE.md Rule 22) is
-  // silently dropped from UI state; customer picks via the
-  // SPECIALTY_TIERS buttons.
+  // Effective specialty tier. UNCHANGED from #143 — non-automobile
+  // specialty_tier is purely customer-picked. Classifier's seed
+  // (always `DEFAULT_SPECIALTY_TIERS[category]`, the smallest tier
+  // per Layer-3 manual-pick design — see CLAUDE.md Rule 22) is
+  // silently dropped from UI state. Operator's original observation
+  // ("Size/Type previously was never auto-selected for motorcycle,
+  // RV, Boat and Aircraft") is the canonical rule for this branch.
   const effectiveSpecialtyTier = manualSpecialtyTier;
 
   // Mi1 (Session #142): the dead useEffect that previously sat here had

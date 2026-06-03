@@ -5,7 +5,26 @@
 > Worktree: `~/Claude/SmartDetails/wt-targeted` (Memory #8 isolation)
 > Base: `7b116a70` (#142 Vehicle Classifier Restoration merge)
 >
-> **Status update (Session #143, 2026-06-02): Findings 1 + 2 RESOLVED.**
+> **Status update (Session #144, 2026-06-02): Finding 1 re-refined.**
+> Operator post-deploy feedback: #143's "manual-only for mundane" position
+> rolled back previously-working pre-#143 behavior (Civic→Sedan, Suburban
+> →SUV, F-150→Truck/SUV pre-selected). The operator's original stated
+> rule was about **non-automobile** auto-select; #143 over-strengthened
+> to all 5 categories. **#144 LOCKS the third refinement:** classifier
+> may pre-select size_class for AUTOMOBILE (mundane sizes AND
+> exotic/classic flow-routing). Customer can override via button click.
+> Override survives subsequent classifier returns for the SAME (make,
+> model) tuple. When make OR model changes, override clears + classifier
+> output pre-selects again for the new tuple. Non-automobile
+> specialty_tier stays manual-pick only (operator's original rule,
+> unchanged). Implementation: `effectiveSizeClass` non-specialty branch
+> restored to `manualSizeClass ?? (auto ? classifier : null)`; NEW
+> useEffect on `[make, model]` clears manual with `isInitialMount` guard.
+> See `Session #144` in `docs/CHANGELOG.md`. **Finding 2 (year
+> propagation) unchanged — still RESOLVED via #143.**
+>
+> **Status update (Session #143, 2026-06-02): Findings 1 + 2 RESOLVED
+> (Finding 1 superseded by #144 re-refinement above).**
 > Q-A.4 LOCKED **Option (iii) — refined rule, not replaced**: classifier
 > may pre-select `size_class` ONLY for `'exotic'` / `'classic'`
 > (flow-routing to SpecialtyVehicleBlock); mundane sizes + non-automobile
