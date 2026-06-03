@@ -22,6 +22,28 @@ Evidence was gathered three ways: (1) reading the UI/API/validation source on a 
   (`services/[id]`, `products/new`, `products/[id]`) deferred to **#111b**.
 - **S1 (slug-on-rename), S2 (sale-price CHECK trap) — ⏳ Session #112.** M5 (racy slug
   pre-check) intentionally left as-is (matches product behavior).
+- **Q4 (`pricing_model` mutability) — ✅ RESOLVED (Session #144, 2026-06-03; Q-Arch-D
+  LOCKED KEEP-IMMUTABLE).** Decision: the immutability is BY DESIGN. Changing a
+  service's `pricing_model` after creation would orphan its `service_pricing` tier rows
+  (each model has its own incoherent tier-name vocabulary — `'sedan'/'truck_suv_2row'`
+  for `vehicle_size` vs. `'per_seat'/'per_row'` for `scope` vs. category-tier names for
+  `specialty`) AND would risk inconsistency in historical `quote_items` /
+  `appointment_services` / `transaction_items` rows that reference the service at the
+  OLD model (their `price_at_booking` snapshots were computed under the old model's
+  rules; reinterpreting those snapshots under a new model is not well-defined). The
+  supported operator workflow is **delete and recreate** the service under the new
+  model — forcing explicit tier-row re-entry and leaving prior history attached to the
+  old `service_id`. **Surface changes (Session #144 — documentation-only, NO behavior
+  change):** (1) `Info` tooltip next to the Edit Service page's "Pricing" tab title —
+  mirrors the canonical admin tooltip pattern at `marketing/coupons/new/page.tsx:1555-1564`
+  with a keyboard-accessibility extension (`tabIndex={0}` + `group-focus-within:opacity-100`
+  + `aria-describedby` + `role="tooltip"`); (2) code comment at the `onSaveDetails`
+  PUT-payload site explaining the omission + linking back to this audit; (3) `CLAUDE.md`
+  Rule 22 amended with the immutability convention + an "add a new immutable-after-create
+  constraint" pattern for future readers; (4) `src/app/admin/catalog/services/[id]/__tests__/pricing-model-tooltip.test.ts`
+  pins tooltip presence + a11y attrs + PUT-payload omission as regression guards. The
+  PUT route's payload still does NOT include `pricing_model` — exactly as it was
+  pre-session.
 
 ## TL;DR
 

@@ -6,6 +6,30 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #144 — Fix (Q-D): `services.pricing_model` immutability — documentation + admin UI tooltip (2026-06-03)
+
+Closes **Q4** in `docs/dev/CATALOG_CRUD_WIRING_AUDIT.md` (the prior catalog audit's only deferred Informational item) and Q-Arch-D from the public-booking architectural audit (commit `709befa5`). **Q-Arch-D LOCKED KEEP-IMMUTABLE — documentation only, NO behavior change.** The Edit Service page's `onSaveDetails` PUT payload (`src/app/admin/catalog/services/[id]/page.tsx`) was already intentionally omitting `pricing_model` from the update set — pre-session and post-session — and the page renders no pricing_model selector. The session adds the operator-facing surfacing of that constraint plus regression guards.
+
+**Rationale for KEEP-IMMUTABLE.** Changing a service's `pricing_model` after creation would (a) orphan existing `service_pricing` tier rows (each model carries its own incoherent tier-name vocabulary — `vehicle_size`'s `'sedan'/'truck_suv_2row'/'suv_3row_van'/'exotic'/'classic'` set vs. `scope`'s `'per_seat'/'per_row'/'per_patch'/'complete'` style set vs. `specialty`'s category-tier names are mutually unmappable) AND (b) risk inconsistency in historical `quote_items` / `appointment_services` / `transaction_items` rows whose `price_at_booking` was computed under the OLD model's rules — reinterpreting those snapshots under a new model is not well-defined. **Operator workflow:** delete and recreate the service under the new model — forces explicit tier-row re-entry and leaves prior history attached to the old `service_id`.
+
+**Three surface changes (no behavior delta):**
+
+1. **Admin UI tooltip** — `Info` icon next to the Edit Service page's "Pricing" tab title (`src/app/admin/catalog/services/[id]/page.tsx`). Mirrors the canonical admin tooltip pattern from `marketing/coupons/new/page.tsx:1555-1564` (Memory #2 reuse) — `group relative` wrapper + lucide `Info` trigger + absolutely-positioned dark popover with arrow. Adds the keyboard-accessibility layer the existing pattern omits — `tabIndex={0}` on the wrapper, `group-focus-within:opacity-100` on the popover, `aria-describedby="pricing-model-immutable-tip"` linked to `id="pricing-model-immutable-tip"` + `role="tooltip"` on the popover, plus `sr-only` accessible name for the icon-only trigger. Wording (locked): **"Cannot be changed after creation. To use a different pricing model, delete and recreate the service. This keeps tier rows, ticket history, and price calculations consistent."**
+
+2. **Code comment at PUT payload site** — multi-line comment immediately above the `payload` const in `onSaveDetails` explaining the omission, the rationale (tier-row + ticket-history consistency), the operator workflow (delete-and-recreate), and the audit reference (`Q-Arch-D LOCKED (KEEP-IMMUTABLE) — see CATALOG_CRUD_WIRING_AUDIT.md Q4`). Future readers who think "the omission must be a bug" find the rationale at the line where they'd be tempted to "fix" it.
+
+3. **CLAUDE.md Rule 22 amendment** — Rule 22 (Service pricing — canonical engine only) gains a new paragraph documenting the immutability convention + an "Adding a new immutable-after-create constraint" pattern: (a) omit from the update payload + comment with audit reference; (b) tooltip at the Edit surface using the canonical pattern; (c) source-string regression test pinning omission + tooltip presence.
+
+**Tests (+5 → 2869 from 2866 baseline):** new `src/app/admin/catalog/services/[id]/__tests__/pricing-model-tooltip.test.ts` (5 source-string pins — mirrors the `services-summary-adoption.test.ts` precedent rather than mounting the 2200-line Edit Service page with disproportionate Supabase + adminFetch + permission + Sale-pricing mocks). Pins: (1) `Info` lucide import; (2) tooltip wrapper presence + locked constraint wording + workaround wording; (3) keyboard-discoverability — `tabIndex={0}` + `aria-describedby` + matching `id` on the popover + `role="tooltip"` + `group-focus-within` reveal + `sr-only` accessible name; (4) PUT payload regression guard — assigning `pricing_model:` anywhere inside the `onSaveDetails` payload block fails the suite; (5) Q-Arch-D + audit reference comment present at the PUT site.
+
+**Scope:** 1 prod file modified (`src/app/admin/catalog/services/[id]/page.tsx` — `Info` import + comment + tooltip JSX). 1 new test file. 3 doc files (CLAUDE.md Rule 22, CATALOG_CRUD_WIRING_AUDIT.md Q4 resolution row, this CHANGELOG entry). Plus ROADMAP-13-ITEMS.md ledger row. **No migrations, no new permission keys, no behavior change** — the PUT route still omits `pricing_model` exactly as before.
+
+**Gates:** tsc 0 errors, lint baseline preserved, 2869/2869 tests, build clean. **Not in scope** (Memory #29 Targeted discipline): catalog audit's other deferred items (S1 slug-on-rename, S2 sale-price CHECK trap, M5 racy slug pre-check, architectural admin-API vs browser-client refactor) — all separate sessions. Not a 13-item entry (catalog audit follow-up).
+
+**Operator manual verification:** Admin → Services → [pick any service] → Edit → Pricing tab → hover the `Info` icon next to the "{Model} Pricing" title → tooltip reveals the immutability explanation + delete-and-recreate workaround. Keyboard: Tab to the icon → focus-within reveals the same tooltip.
+
+---
+
 ## Session #143 — Fix: Step 1 classifier-output rules — refined exotic/classic-only pre-select + Mustang year propagation + stale comment (2026-06-02)
 
 Closes Finding 1 + Finding 2 from `docs/dev/STEP1_SIZE_CLASS_AND_MUSTANG_CLASSIC_AUDIT.md` (commit `e807f543`). Both findings were LATENT bugs surfaced (not introduced) by #142's classifier restoration — pre-#142 anonymous customers hit RLS-denied classifier returns and the auto-fill UX never appeared; post-#142 the classifier works correctly and the latent UI behavior became visible.

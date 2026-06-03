@@ -60,7 +60,7 @@ import {
   type SpecialtyTier,
 } from '@/components/service-pricing-form';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Pencil, Trash2, X, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Plus, Pencil, Trash2, X, Eye, EyeOff, Info } from 'lucide-react';
 import { adminFetch } from '@/lib/utils/admin-fetch';
 import {
   getSaleStatus,
@@ -501,6 +501,17 @@ export default function ServiceDetailPage() {
         if (newUrl) imageUrl = newUrl;
       }
 
+      // `pricing_model` is intentionally OMITTED from this update payload.
+      // Changing a service's pricing_model after creation would orphan its
+      // existing `service_pricing` tier rows (which are keyed to the original
+      // model's shape) and risk inconsistency in historical `quote_items` /
+      // `appointment_services` / `transaction_items` rows that reference the
+      // service at the old model. The supported operator workflow is to delete
+      // and recreate the service under the new model — which forces explicit
+      // tier-row re-entry and leaves prior history attached to the old
+      // service_id. The Pricing tab section header surfaces this constraint to
+      // the operator via an `Info` tooltip (see `:1342` below).
+      // Q-Arch-D LOCKED (KEEP-IMMUTABLE) — see CATALOG_CRUD_WIRING_AUDIT.md Q4.
       const payload: Record<string, unknown> = {
         name: formData.name,
         description: formData.description || null,
@@ -1340,6 +1351,46 @@ export default function ServiceDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {PRICING_MODEL_LABELS[service.pricing_model]} Pricing
+                {/*
+                  Q-Arch-D / catalog audit Q4: `pricing_model` is immutable
+                  after creation — see comment at `onSaveDetails` payload.
+                  Mirrors the canonical admin tooltip pattern from
+                  `marketing/coupons/new/page.tsx:1555-1564` with a small
+                  keyboard-accessibility extension (focusable wrapper,
+                  group-focus-within reveal, aria-describedby).
+                */}
+                <span
+                  className="group relative inline-flex"
+                  tabIndex={0}
+                  aria-describedby="pricing-model-immutable-tip"
+                  data-testid="pricing-model-immutable-info"
+                >
+                  <Info
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 cursor-help text-gray-400 outline-none focus:outline-none"
+                  />
+                  <span className="sr-only">
+                    Pricing model help — cannot be changed after creation.
+                  </span>
+                  <span
+                    id="pricing-model-immutable-tip"
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 w-64 -translate-x-1/2 rounded-md bg-gray-900 px-3 py-2 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  >
+                    <span className="block font-medium">
+                      Cannot be changed after creation.
+                    </span>
+                    <span className="mt-0.5 block text-gray-300">
+                      To use a different pricing model, delete and recreate the
+                      service. This keeps tier rows, ticket history, and price
+                      calculations consistent.
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900"
+                    />
+                  </span>
+                </span>
                 {(() => {
                   const hasDbSale = hasAnySalePrice(pricing);
                   if (!hasDbSale) return null;
