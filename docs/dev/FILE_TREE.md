@@ -854,6 +854,8 @@ src/app/pos/jobs/components/schedule-pill-row.tsx  — Session #148 (N+1): POS S
 src/app/pos/jobs/components/__tests__/schedule-pill-row.test.tsx  — 18 tests for the pill row: render, active state, multi-select toggle, click-again-deselect, drawer show/hide, X1 floor + To<From validation, cascading `min` on To input.
 src/lib/utils/schedule-date-range.ts  — Session #148 (N+1): pure helper. computeScheduleDateRange(selectedPills, otherRange, todayYmd) → {from,to} envelope passed to /api/pos/jobs/schedule. Honors X1 future-only floor + X3 31-day ceiling. YYYY-MM-DD strings throughout.
 src/lib/utils/__tests__/schedule-date-range.test.ts  — 30 tests: per-pill range table + envelope reduction + edge cases (Sun this_week collapse, last-day this_month collapse, past-from other rejection, all-null fallback, X3 clipping).
+src/lib/utils/schedule-entry-matches.ts  — Session #149 (N+2): pure per-row predicate. entryMatchesFilters(entry, {search, status, detailerId}) → boolean. OR-within search (first/last name, phone digit-substring, vehicle make/model) + AND across categories. Empty/null filter = no constraint. Detailer sentinel 'unassigned' matches rows with detailer: null.
+src/lib/utils/__tests__/schedule-entry-matches.test.ts  — 27 tests: empty filters / status / detailer / search text / search phone digit-substring / AND-across-categories / OR-within-search.
 src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx  # 3 tests — pins Item 15g Layer 15g-i handleCheckout dispatch (RESTORE_TICKET coupon=null → SET_COUPON via /api/pos/coupons/validate) + idempotency
 src/app/pos/appointments/page.tsx        — Appointments view (Roadmap Item 12 — POS footer reschedule surface)
 src/app/pos/offline/page.tsx             — Offline fallback page

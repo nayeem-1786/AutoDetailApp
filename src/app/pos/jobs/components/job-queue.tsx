@@ -33,6 +33,12 @@ import {
   type SchedulePillId,
   type ScheduleDateRange,
 } from '@/lib/utils/schedule-date-range';
+// N+2 (Session #149) — search/status/detailer client-side filtering. Endpoint
+// unchanged per Target A; status/detailer/search are CLIENT-SIDE filters over
+// the date-window fetch (audit D.6/D.7 lock, mirrors admin appointments pattern).
+import { SearchInput } from '@/components/ui/search-input';
+import { Select } from '@/components/ui/select';
+import { entryMatchesFilters } from '@/lib/utils/schedule-entry-matches';
 import type { PosAppointment } from '../../components/appointments/types';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import type { AppointmentUpdateInput } from '@/lib/utils/validation';
@@ -317,6 +323,82 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     },
     [router, searchParams]
   );
+
+  // N+2 (Session #149) — search / status / detailer filter state.
+  // URL keys mirror N+1: `sched_search`, `sched_status`, `sched_detailer`. URL
+  // writes preserve other params via the setDate pattern (consistent with
+  // handleScheduleFilterChange above).
+  const [searchInput, setSearchInput] = useState<string>(() => searchParams.get('sched_search') ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(searchInput);
+  const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('sched_status') ?? '');
+  const [detailerFilter, setDetailerFilter] = useState<string>(() => searchParams.get('sched_detailer') ?? '');
+
+  // 300ms debounce on the search input — re-fetch/render fires after the last
+  // keystroke. No external lib; useTableState's debounce was the audit's
+  // suggestion but N+1 locked the file-local URL-state pattern instead.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  // URL write — single helper for the three N+2 dimensions. Empty string = no
+  // constraint = strip from URL.
+  const writeN2FilterUrl = useCallback(
+    (search: string, status: string, detailerId: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (search.trim()) params.set('sched_search', search.trim());
+      else params.delete('sched_search');
+      if (status) params.set('sched_status', status);
+      else params.delete('sched_status');
+      if (detailerId) params.set('sched_detailer', detailerId);
+      else params.delete('sched_detailer');
+      const qs = params.toString();
+      router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  // Persist the debounced search (not every keystroke — keeps URL history
+  // sane and re-fires only when the filter actually settles).
+  useEffect(() => {
+    writeN2FilterUrl(debouncedSearch, statusFilter, detailerFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, statusFilter, detailerFilter]);
+
+  // Bookable-detailer list for the dropdown (F.6 LOCKED — uses the existing
+  // /api/pos/staff/available endpoint that Phase 2B's card-tap already calls).
+  // Fetched ONCE on Schedule-scope mount + cached; no re-fetch on filter
+  // change. Loading/error states surface as a disabled dropdown / fallback
+  // option so the surface degrades gracefully.
+  type DetailerOption = { id: string; first_name: string; last_name: string };
+  const [availableDetailers, setAvailableDetailers] = useState<DetailerOption[] | null>(null);
+  const [detailersError, setDetailersError] = useState<boolean>(false);
+  useEffect(() => {
+    if (effectiveScope !== 'schedule') return;
+    if (availableDetailers !== null) return; // cached
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await posFetch('/api/pos/staff/available');
+        if (cancelled) return;
+        if (res.ok) {
+          const { data } = await res.json();
+          setAvailableDetailers((data ?? []) as DetailerOption[]);
+        } else {
+          setDetailersError(true);
+          setAvailableDetailers([]);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('[Schedule] detailer fetch failed:', err);
+        setDetailersError(true);
+        setAvailableDetailers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveScope, availableDetailers]);
 
   // ─── Item 15e Phase 2B — Schedule-scope appointment detail dialog ──────────
   // Tapping a Schedule card fetches the full appointment + bookable staff, then
@@ -642,6 +724,22 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     [...jobs].sort((a, b) => (STATUS_PRIORITY[a.status] ?? 99) - (STATUS_PRIORITY[b.status] ?? 99)),
   [jobs]);
 
+  // N+2 (Session #149) — client-side filter over the server's date-window
+  // fetch. AND across categories per audit D.6; helper at
+  // `lib/utils/schedule-entry-matches.ts` encapsulates the per-row predicate
+  // (incl. OR-within-search across first/last/phone/make/model).
+  const filteredScheduleEntries = useMemo(
+    () =>
+      scheduleEntries.filter((entry) =>
+        entryMatchesFilters(entry, {
+          search: debouncedSearch,
+          status: statusFilter || null,
+          detailerId: detailerFilter || null,
+        })
+      ),
+    [scheduleEntries, debouncedSearch, statusFilter, detailerFilter]
+  );
+
   // Daily summary stats
   const summary = useMemo(() => {
     const nonCancelled = jobs.filter((j) => j.status !== 'cancelled');
@@ -856,24 +954,68 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       {/* Content area */}
       {effectiveScope === 'schedule' ? (
         <>
-          {/* Schedule filter bar — N+1. Fixed above the list per F.4 (sits
-              outside the list's `flex-1 overflow-y-auto`). Row 1 (search) +
-              Row 3 (status, detailer) land in N+2. */}
+          {/* Schedule filter bar — fixed above the list per F.4. Three rows:
+              Row 1 search (N+2), Row 2 date pills (N+1), Row 3 status +
+              detailer (N+2). */}
           <div
             data-testid="schedule-filter-bar"
             className="space-y-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
           >
-            {/* N+2: <ScheduleSearchInput /> */}
+            {/* Row 1 — debounced search across customer/vehicle (N+2). */}
+            <SearchInput
+              value={searchInput}
+              onChange={setSearchInput}
+              placeholder="Search by customer or vehicle..."
+              className="h-11"
+              aria-label="Filter schedule by customer or vehicle"
+            />
+            {/* Row 2 — date pills (N+1). */}
             <SchedulePillRow
               selectedPills={scheduleFilter.selectedPills}
               otherRange={scheduleFilter.otherRange}
               todayYmd={today}
               onChange={handleScheduleFilterChange}
             />
-            {/* N+2: <ScheduleStatusSelect /> <ScheduleDetailerSelect /> */}
+            {/* Row 3 — status + detailer dropdowns (N+2). h-11 touch sizing
+                matches the search input. Wraps to stack vertically below sm.  */}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-11 flex-1"
+                aria-label="Filter by status"
+              >
+                <option value="">All Statuses</option>
+                {/* X2 LOCKED — only 3 valid Schedule statuses (server excludes
+                    cancelled/completed/no_show; offering them would be misleading). */}
+                <option value="pending">{APPOINTMENT_STATUS_LABELS.pending}</option>
+                <option value="confirmed">{APPOINTMENT_STATUS_LABELS.confirmed}</option>
+                <option value="in_progress">{APPOINTMENT_STATUS_LABELS.in_progress}</option>
+              </Select>
+              <Select
+                value={detailerFilter}
+                onChange={(e) => setDetailerFilter(e.target.value)}
+                className="h-11 flex-1"
+                aria-label="Filter by detailer"
+                disabled={availableDetailers === null}
+              >
+                <option value="">All Detailers</option>
+                <option value="unassigned">Unassigned</option>
+                {detailersError && (
+                  <option value="" disabled>
+                    Failed to load detailers
+                  </option>
+                )}
+                {(availableDetailers ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.first_name} {d.last_name}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
           <ScheduleScopeList
-            entries={scheduleEntries}
+            entries={filteredScheduleEntries}
             loading={scheduleLoading}
             onSelectAppointment={handleScheduleCardTap}
             busyAppointmentId={loadingAppointment ? selectedAppointmentId : null}
