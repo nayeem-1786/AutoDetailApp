@@ -6,6 +6,66 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #149 — Feat (N+2): POS Schedule filter — search input + status dropdown + detailer dropdown + filter-combination wiring (2026-06-03)
+
+Second build session in the POS Schedule filter UX plan (audit `d6984cb2`, N+1 `7ca301eb`). Fills the two empty placeholder rows from N+1: Row 1 debounced search input + Row 3 status dropdown + detailer dropdown. Wires AND-across-categories filtering through a pure per-row predicate. Endpoint untouched.
+
+**Target A finding (preceded design):** the Schedule endpoint at `src/app/api/pos/jobs/schedule/route.ts` accepts only `from`, `to`, `channel` query params today — no search, status, or detailer support server-side. The audit's design D.6 + D.7 (`POS_SCHEDULE_FILTER_UX_DESIGN.md`) **explicitly locks status/detailer/search as CLIENT-SIDE filters** operating on the date-window fetch (mirrors the admin > appointments page pattern; volume is bounded by the 31-day window). **Verdict: NO endpoint extension.** All N+2 filtering is client-side over `scheduleEntries`. Substantially narrows the surface vs. the prompt's section-1 conditional server extension.
+
+**Operator decisions LOCKED from N+1 and implemented:**
+
+- **F.2** Filter persistence = URL via the existing `setDate` pattern. New keys: `sched_search`, `sched_status`, `sched_detailer`. URL writes preserve other params (same convention as N+1's `sched_pills` / `sched_from` / `sched_to`).
+- **F.6** Detailer dropdown source = `/api/pos/staff/available` (bookable-only). Fetched ONCE on Schedule-scope mount + cached; no re-fetch on filter change.
+- F.1, F.3, F.4, F.5 unchanged (already shipped in N+1).
+
+**X1 / X2 / X3 constraints enforced:**
+
+- **X2** — status dropdown carries exactly 4 options: `All Statuses` + `Pending` + `Confirmed` + `In Progress`. A new test asserts the dropdown values do NOT include `cancelled`, `completed`, or `no_show` (they're server-excluded by Schedule endpoint design at `schedule/route.ts:12, :114`; offering them in the UI would be misleading).
+- X1 and X3 unchanged (already enforced in N+1's pill envelope).
+
+**Search semantics (locked from audit C1-C3):**
+
+- 5 fields: customer first_name, last_name, phone, vehicle make, vehicle model.
+- OR within (any field hits = match).
+- Case-insensitive, partial substring.
+- **Phone matching uses digit-substring** — strips non-digits from BOTH the query and the stored E.164, then substring-compares. So `"555-1234"` matches stored `"+14245551234"` without re-normalizing the partial query (`normalizePhone` at `format.ts:110-123` rejects partial input by design).
+- Debounced 300ms via inline `setTimeout` (no new debounce utility — useTableState's debounce was the audit's suggestion but N+1 locked the file-local pattern).
+
+**Filter combination logic (locked):** OR within category (search OR-within field hits) + AND across categories (search AND status AND detailer AND date pills). Implemented as a pure predicate `entryMatchesFilters(entry, filters)` in `src/lib/utils/schedule-entry-matches.ts`, consumed by a `useMemo` in `job-queue.tsx` that produces `filteredScheduleEntries` from `scheduleEntries`.
+
+**Files (2 prod + 2 test + 4 docs):**
+
+- `src/lib/utils/schedule-entry-matches.ts` (NEW, 89 lines) — pure per-row predicate. `entryMatchesFilters(entry, { search, status, detailerId })` returns true iff the row passes ALL active dimensions. Empty/null filters pass that dimension. Detailer sentinel `'unassigned'` matches rows with `detailer: null`.
+- `src/app/pos/jobs/components/job-queue.tsx` (MOD, +149 lines net) — adds `searchInput` + `debouncedSearch` + `statusFilter` + `detailerFilter` state, a 300ms debounce `useEffect`, a single `writeN2FilterUrl` URL-sync callback for the three new dimensions, the detailer fetch effect (once on Schedule-scope mount; cached; graceful fallback option on error), the `filteredScheduleEntries` useMemo, and the JSX wiring for Row 1 (`<SearchInput>`) + Row 3 (`<Select>` × 2 in `flex-col gap-2 sm:flex-row` so they stack vertically below `sm`).
+- `src/lib/utils/__tests__/schedule-entry-matches.test.ts` (NEW, 27 tests) — empty filters / status / detailer / search text / search phone (digit-substring) / AND-across-categories / OR-within-search.
+- `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` (MOD, +11 tests) — Row 1 search input renders; status dropdown has exactly 4 X2-locked options; status dropdown does NOT offer cancelled/completed/no_show; detailer dropdown fetches `/api/pos/staff/available` on mount + lists bookable detailers; default mount shows all entries; selecting status narrows; selecting `'unassigned'` detailer narrows to rows with `detailer: null`; search input narrows after 300ms debounce (via `vi.advanceTimersByTime`); AND-across all three filters; URL restoration mounts the restored values into the dropdowns; detailer fetch FAILURE leaves All / Unassigned / "Failed to load detailers" usable. Pre-existing test #8 status-pill regression-locked by `tagName === 'SPAN'` filter so the new dropdown options (`<option>`) don't collide with card pill `<span>` lookups.
+
+**Reused primitives (Memory #2):**
+
+- `<SearchInput>` from `@/components/ui/search-input` — has built-in clear-button + placeholder; debounce added inline at the host (no wrapper component needed; the prompt's section 2 carve-out said "if SearchInput supports these via props, just consume inline").
+- `<Select>` from `@/components/ui/select` — h-11 sized inline per N+1's iPad touch convention.
+- `/api/pos/staff/available` — already used by Phase 2B's card-tap (`job-queue.tsx:495-524`).
+- N+1's `setDate` URL-write pattern — `URLSearchParams(searchParams.toString())` + selective set/delete + `router.replace('/pos/jobs?'+qs)` — mirrored byte-for-byte for the three new dimensions.
+
+**Deviations from audit (captured here per Memory #11):**
+
+None substantive. The audit's D.7 specified `useTableState` for URL persistence; N+1 already locked the file-local pattern as the deviation. N+2 follows N+1's deviation, not the audit literal.
+
+**Memory #8 status (within budget):** target ≤450 prod lines / ≤6 files. Actual **238 prod lines net** (89 helper + 149 job-queue) / **4 files** (2 prod + 2 test). Endpoint-untouched verdict (Target A) made this a much smaller surface than the prompt's section-1 conditional server extension would have. N+1's 150-over-budget pattern not repeated.
+
+**Gates:**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (baseline)
+- `npm run build` → clean
+- `npx vitest run` → **2960/2960 pass** (2922 + 38 new = 27 helper + 11 integration)
+
+**NOT in scope (kept out per session lock):** new pills (date pills locked N+1); multi-select on status or detailer; statuses 4-6 (cancelled, completed, no_show — X2); refactoring N+1's pill code; Admin > Appointments retirement (N+4); `<Select>` / `<SearchInput>` refactors; new permission keys; migrations; Schedule endpoint extension (Target A verdict).
+
+**Operator next step:** deploy + smoke-test the POS Jobs Schedule scope on iPad — (a) Row 1 shows search input that debounces on type; (b) Row 3 shows status dropdown with 4 options and detailer dropdown with All + Unassigned + dynamic detailer list; (c) typing in search filters by customer name/phone/vehicle make/model; (d) selecting status filters list; (e) selecting "Unassigned" detailer filters to rows with no assigned detailer; (f) combinations work (date pill + search + status + detailer simultaneously); (g) URL reflects all four filter dimensions; (h) clearing controls (default values) restores unfiltered behavior. N+3 next: optional polish (a11y, channel pill, snapshot tests) OR skip directly to N+4 retirement of Admin > Appointments.
+
+---
+
 ## Session #148 — Feat (N+1): POS Schedule filter bar shell + date pills + envelope helper (2026-06-03)
 
 First build session in the 3-session POS Schedule filter UX implementation plan locked by the Session #147 design audit (merge `d6984cb2`, `docs/dev/POS_SCHEDULE_FILTER_UX_DESIGN.md`; that audit's own CHANGELOG entry was missed when it merged — see the design doc for the full Targets A-F surface). This session ships the filter-bar shell + the 6 date pills (Tomorrow / This Week / Next Week / This Month / Next 30 Days / Other) + the pure date-range envelope helper. Status dropdown, detailer dropdown, and search input land in N+2.

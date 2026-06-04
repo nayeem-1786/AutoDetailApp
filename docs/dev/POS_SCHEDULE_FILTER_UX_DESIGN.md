@@ -566,7 +566,9 @@ date-math is the bulk.
   version. Acceptable risk; falls back to manual typing if the
   picker misbehaves.
 
-### Session N+2 — Status dropdown + detailer dropdown + search wiring
+### Session N+2 — Status dropdown + detailer dropdown + search wiring — ✅ SHIPPED Session #149 (2026-06-03)
+
+> Implementation landed on branch `feat/pos-schedule-filter-n2-search-status-detailer`. **Target A endpoint check (preceded design): no endpoint extension needed.** The Schedule endpoint accepts only `from`/`to`/`channel` today; per audit D.6/D.7 (locked) status/detailer/search are client-side filters over the date-window fetch, mirroring the admin > appointments pattern. Files shipped: `src/lib/utils/schedule-entry-matches.ts` (pure per-row predicate, 89 lines), `src/app/pos/jobs/components/job-queue.tsx` (+149 net — state + 300ms debounce + URL sync + detailer fetch + filteredScheduleEntries useMemo + Row 1 + Row 3 JSX). +38 tests (27 helper + 11 integration). Gates green: tsc 0 errors, lint 97-warning baseline, full suite 2960/2960. Memory #8: 238 prod lines / 4 files — well under the 450/6 budget (Target A's endpoint-untouched verdict made the surface much smaller).
 
 **Scope:** add the two single-select dropdowns to the filter
 bar; wire the debounced search to client-side filtering of the

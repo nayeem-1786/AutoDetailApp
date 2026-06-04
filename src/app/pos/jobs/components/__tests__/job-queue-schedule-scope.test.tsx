@@ -375,9 +375,14 @@ describe('Item 15e Phase 2B — Schedule card tap mount + save flow', () => {
     setScope('schedule');
     renderQueue();
     await waitFor(() => expect(screen.getByText('Penny Pending')).toBeTruthy());
-    expect(screen.getByText('Pending')).toBeTruthy();
-    expect(screen.getByText('Confirmed')).toBeTruthy();
-    expect(screen.getByText('In Progress')).toBeTruthy();
+    // N+2 added a status `<Select>` with the same 3 labels — disambiguate the
+    // card pills (`<span>`) from the dropdown `<option>` rows by selecting on
+    // tag name. The card-pill rendering is the regression target here.
+    const pillSpan = (label: string) =>
+      screen.getAllByText(label).filter((el) => el.tagName === 'SPAN');
+    expect(pillSpan('Pending').length).toBe(1);
+    expect(pillSpan('Confirmed').length).toBe(1);
+    expect(pillSpan('In Progress').length).toBe(1);
   });
 });
 
@@ -441,5 +446,217 @@ describe('Item 15e N+1 (Session #148) — filter bar shell + default state', () 
     // Re-fetch fires because `fetchSchedule` is a useCallback dep of the
     // init effect, and its dep array (selectedPills, otherRange) changed.
     await waitFor(() => expect(scheduleCalls().length).toBeGreaterThan(before));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N+2 (Session #149) — search / status / detailer filter wiring.
+//
+// Per-row predicate behavior is exhaustively unit-tested in
+// `src/lib/utils/__tests__/schedule-entry-matches.test.ts`. The tests here lock
+// the WIRING: rows render in the right slots, dropdowns carry the locked
+// option sets, and changing a control narrows the rendered list (proving the
+// useMemo + entryMatchesFilters loop is connected). Endpoint stays unchanged
+// (Target A — status/detailer/search are client-side filters per audit D.6/D.7).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Item 15e N+2 (Session #149) — search input + status + detailer dropdowns', () => {
+  it('Row 1 renders the search input above the pill row', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByLabelText(/Filter schedule by customer or vehicle/i)).toBeTruthy();
+  });
+
+  it('Row 3 status dropdown carries exactly 4 options (All + 3 X2-locked statuses)', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    const statusSel = screen.getByLabelText(/Filter by status/i) as HTMLSelectElement;
+    const labels = Array.from(statusSel.options).map((o) => o.textContent);
+    expect(labels).toEqual(['All Statuses', 'Pending', 'Confirmed', 'In Progress']);
+  });
+
+  it('Row 3 status dropdown does NOT offer cancelled/completed/no_show (X2 lock)', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    const statusSel = screen.getByLabelText(/Filter by status/i) as HTMLSelectElement;
+    const values = Array.from(statusSel.options).map((o) => o.value);
+    expect(values).not.toContain('cancelled');
+    expect(values).not.toContain('completed');
+    expect(values).not.toContain('no_show');
+  });
+
+  it('Row 3 detailer dropdown fetches /api/pos/staff/available on mount + lists bookable detailers', async () => {
+    setScope('schedule');
+    renderQueue();
+    // Detailer fetch runs alongside the Schedule fetch on mount.
+    await waitFor(() => expect(staffCalls().length).toBeGreaterThanOrEqual(1));
+    const detSel = screen.getByLabelText(/Filter by detailer/i) as HTMLSelectElement;
+    const labels = Array.from(detSel.options).map((o) => o.textContent);
+    // The mock returns one detailer "Sam Staff" — preceded by "All Detailers"
+    // + "Unassigned" sentinels.
+    expect(labels[0]).toBe('All Detailers');
+    expect(labels[1]).toBe('Unassigned');
+    expect(labels).toContain('Sam Staff');
+  });
+
+  it('default mount: search empty, status "All Statuses", detailer "All Detailers" — all entries visible', async () => {
+    pushEntry({ id: 'apt-1', customer: { id: 'c1', first_name: 'Jane', last_name: 'Doe', phone: null, email: null } });
+    pushEntry({ id: 'apt-2', customer: { id: 'c2', first_name: 'Bob', last_name: 'Smith', phone: null, email: null } });
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeTruthy());
+    expect(screen.getByText('Bob Smith')).toBeTruthy();
+  });
+
+  it('selecting a status narrows the visible list to matches (client-side filter)', async () => {
+    pushEntry({ id: 'apt-pending', status: 'pending', customer: { id: 'c1', first_name: 'Penny', last_name: 'Pending', phone: null, email: null } });
+    pushEntry({ id: 'apt-confirmed', status: 'confirmed', customer: { id: 'c2', first_name: 'Conrad', last_name: 'Confirmed', phone: null, email: null } });
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(screen.getByText('Penny Pending')).toBeTruthy());
+    expect(screen.getByText('Conrad Confirmed')).toBeTruthy();
+
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/Filter by status/i), { target: { value: 'pending' } });
+    });
+
+    await waitFor(() => expect(screen.queryByText('Conrad Confirmed')).toBeNull());
+    expect(screen.getByText('Penny Pending')).toBeTruthy();
+  });
+
+  it('selecting a detailer narrows the list (and "Unassigned" surfaces entries with detailer: null)', async () => {
+    pushEntry({ id: 'apt-1', customer: { id: 'c1', first_name: 'WithStaff', last_name: 'A', phone: null, email: null }, detailer: { id: 'e1', first_name: 'Sam', last_name: 'Staff' } });
+    pushEntry({ id: 'apt-2', customer: { id: 'c2', first_name: 'NoStaff', last_name: 'B', phone: null, email: null }, detailer: null });
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(screen.getByText('WithStaff A')).toBeTruthy());
+    expect(screen.getByText('NoStaff B')).toBeTruthy();
+
+    // Wait for the detailer fetch to populate the dropdown before selecting.
+    await waitFor(() => {
+      const sel = screen.getByLabelText(/Filter by detailer/i) as HTMLSelectElement;
+      expect(sel.options.length).toBeGreaterThanOrEqual(3); // All / Unassigned / Sam
+    });
+
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/Filter by detailer/i), { target: { value: 'unassigned' } });
+    });
+
+    await waitFor(() => expect(screen.queryByText('WithStaff A')).toBeNull());
+    expect(screen.getByText('NoStaff B')).toBeTruthy();
+  });
+
+  it('search input narrows the list after the 300ms debounce', async () => {
+    pushEntry({ id: 'apt-1', customer: { id: 'c1', first_name: 'Jane', last_name: 'Doe', phone: null, email: null } });
+    pushEntry({ id: 'apt-2', customer: { id: 'c2', first_name: 'Bob', last_name: 'Smith', phone: null, email: null } });
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeTruthy());
+
+    // Fake timers ONLY for the debounce advance — real timers everywhere else
+    // (other waitFor calls expect promises to flush).
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        fireEvent.change(screen.getByLabelText(/Filter schedule by customer or vehicle/i), {
+          target: { value: 'jane' },
+        });
+      });
+      // Pre-debounce: both still visible.
+      expect(screen.getByText('Jane Doe')).toBeTruthy();
+      expect(screen.getByText('Bob Smith')).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await waitFor(() => expect(screen.queryByText('Bob Smith')).toBeNull());
+    expect(screen.getByText('Jane Doe')).toBeTruthy();
+  });
+
+  it('AND-across-categories: status + detailer + (post-debounce) search all narrow simultaneously', async () => {
+    pushEntry({ id: 'apt-match', status: 'pending', customer: { id: 'c1', first_name: 'Jane', last_name: 'Doe', phone: null, email: null }, detailer: { id: 'e1', first_name: 'Sam', last_name: 'Staff' } });
+    pushEntry({ id: 'apt-wrong-status', status: 'confirmed', customer: { id: 'c2', first_name: 'Jane', last_name: 'Smith', phone: null, email: null }, detailer: { id: 'e1', first_name: 'Sam', last_name: 'Staff' } });
+    pushEntry({ id: 'apt-wrong-det', status: 'pending', customer: { id: 'c3', first_name: 'Jane', last_name: 'Brown', phone: null, email: null }, detailer: null });
+    pushEntry({ id: 'apt-wrong-search', status: 'pending', customer: { id: 'c4', first_name: 'Bob', last_name: 'White', phone: null, email: null }, detailer: { id: 'e1', first_name: 'Sam', last_name: 'Staff' } });
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeTruthy());
+    await waitFor(() => {
+      const sel = screen.getByLabelText(/Filter by detailer/i) as HTMLSelectElement;
+      expect(sel.options.length).toBeGreaterThanOrEqual(3);
+    });
+
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/Filter by status/i), { target: { value: 'pending' } });
+    });
+    act(() => {
+      fireEvent.change(screen.getByLabelText(/Filter by detailer/i), { target: { value: 'e1' } });
+    });
+    vi.useFakeTimers();
+    try {
+      act(() => {
+        fireEvent.change(screen.getByLabelText(/Filter schedule by customer or vehicle/i), { target: { value: 'jane' } });
+      });
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    // Only apt-match passes ALL three constraints.
+    await waitFor(() => expect(screen.getByText('Jane Doe')).toBeTruthy());
+    expect(screen.queryByText('Jane Smith')).toBeNull(); // status mismatch
+    expect(screen.queryByText('Jane Brown')).toBeNull(); // detailer mismatch
+    expect(screen.queryByText('Bob White')).toBeNull(); // search mismatch
+  });
+
+  it('URL restoration: sched_status + sched_detailer mount with the restored values', async () => {
+    // Override the searchParams mock for this test to surface URL values.
+    const original = (await import('next/navigation')) as { useSearchParams: () => unknown };
+    const spy = vi
+      .spyOn(original, 'useSearchParams')
+      .mockReturnValue({
+        get: (k: string) => {
+          if (k === 'sched_status') return 'confirmed';
+          if (k === 'sched_detailer') return 'e1';
+          return null;
+        },
+        toString: () => 'sched_status=confirmed&sched_detailer=e1',
+      });
+
+    try {
+      setScope('schedule');
+      renderQueue();
+      await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+      expect((screen.getByLabelText(/Filter by status/i) as HTMLSelectElement).value).toBe('confirmed');
+      // Detailer value mounts immediately from URL even before the
+      // /api/pos/staff/available fetch resolves — the select carries the
+      // restored value; the matching option label appears once the fetch
+      // completes.
+      expect((screen.getByLabelText(/Filter by detailer/i) as HTMLSelectElement).value).toBe('e1');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('Detailer fetch FAILURE leaves the dropdown usable (All / Unassigned remain)', async () => {
+    staffState.ok = false;
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(staffCalls().length).toBeGreaterThanOrEqual(1));
+    const detSel = screen.getByLabelText(/Filter by detailer/i) as HTMLSelectElement;
+    const labels = Array.from(detSel.options).map((o) => o.textContent);
+    // All Detailers + Unassigned MUST still be present so the operator can
+    // filter by assignment even when the detailer roster failed to load.
+    expect(labels).toContain('All Detailers');
+    expect(labels).toContain('Unassigned');
+    expect(labels).toContain('Failed to load detailers');
   });
 });
