@@ -850,6 +850,10 @@ src/app/pos/login/page.tsx               — POS PIN login
 src/app/pos/end-of-day/page.tsx          — End-of-day cash count & reconciliation
 src/app/pos/jobs/page.tsx                — Jobs management
 src/app/pos/jobs/components/schedule-types.ts  — Item 15e Phase 1A: PosScheduleEntry type (future-appointment shape for the Jobs Schedule scope; scope:'schedule' discriminator vs JobListItem)
+src/app/pos/jobs/components/schedule-pill-row.tsx  — Session #148 (N+1): POS Schedule filter date-pill row (6 card-style pills + inline From/To drawer for "Other"). Reuses <Input> for native iOS date pickers; local DatePillButton avoids growing TogglePill's API.
+src/app/pos/jobs/components/__tests__/schedule-pill-row.test.tsx  — 18 tests for the pill row: render, active state, multi-select toggle, click-again-deselect, drawer show/hide, X1 floor + To<From validation, cascading `min` on To input.
+src/lib/utils/schedule-date-range.ts  — Session #148 (N+1): pure helper. computeScheduleDateRange(selectedPills, otherRange, todayYmd) → {from,to} envelope passed to /api/pos/jobs/schedule. Honors X1 future-only floor + X3 31-day ceiling. YYYY-MM-DD strings throughout.
+src/lib/utils/__tests__/schedule-date-range.test.ts  — 30 tests: per-pill range table + envelope reduction + edge cases (Sun this_week collapse, last-day this_month collapse, past-from other rejection, all-null fallback, X3 clipping).
 src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx  # 3 tests — pins Item 15g Layer 15g-i handleCheckout dispatch (RESTORE_TICKET coupon=null → SET_COUPON via /api/pos/coupons/validate) + idempotency
 src/app/pos/appointments/page.tsx        — Appointments view (Roadmap Item 12 — POS footer reschedule surface)
 src/app/pos/offline/page.tsx             — Offline fallback page

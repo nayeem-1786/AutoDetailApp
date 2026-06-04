@@ -26,6 +26,13 @@ import type { PosScheduleEntry } from './schedule-types';
 // POS cancel dialog (Item 15b). See docs/dev/ITEM_15E_PHASE_2_REUSE_VERIFICATION.md.
 import { AppointmentDetailDialog } from '@/app/admin/appointments/components/appointment-detail-dialog';
 import { CancelAppointmentDialog } from '../../components/appointments/cancel-appointment-dialog';
+// N+1 (Session #148) — Schedule filter bar + date pills. Status + detailer + search land in N+2.
+import { SchedulePillRow, type ScheduleFilterState } from './schedule-pill-row';
+import {
+  computeScheduleDateRange,
+  type SchedulePillId,
+  type ScheduleDateRange,
+} from '@/lib/utils/schedule-date-range';
 import type { PosAppointment } from '../../components/appointments/types';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import type { AppointmentUpdateInput } from '@/lib/utils/validation';
@@ -271,6 +278,46 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const [scheduleEntries, setScheduleEntries] = useState<PosScheduleEntry[]>([]);
   const [scheduleLoading, setScheduleLoading] = useState(false);
 
+  // N+1 (Session #148) — Schedule date-pill filter state. URL-persistent per
+  // F.2 LOCKED. Reads ?sched_pills + ?sched_from + ?sched_to on mount; defaults
+  // to F.1's ['next_30_days']. URL write mirrors the existing `setDate` pattern
+  // at :315-325 (preserve other params via `URLSearchParams(searchParams)` +
+  // selective set/delete) rather than `useTableState`, whose URL effect builds
+  // a fresh URLSearchParams and would clobber ?date / ?rebook. See CHANGELOG
+  // #148 for the deviation rationale.
+  const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilterState>(() => {
+    const pillsParam = searchParams.get('sched_pills');
+    const fromParam = searchParams.get('sched_from');
+    const toParam = searchParams.get('sched_to');
+    const selectedPills: SchedulePillId[] = pillsParam
+      ? (pillsParam.split(',').filter(Boolean) as SchedulePillId[])
+      : ['next_30_days'];
+    const otherRange: ScheduleDateRange | null =
+      fromParam && toParam ? { from: fromParam, to: toParam } : null;
+    return { selectedPills, otherRange };
+  });
+  const handleScheduleFilterChange = useCallback(
+    (next: ScheduleFilterState) => {
+      setScheduleFilter(next);
+      const params = new URLSearchParams(searchParams.toString());
+      // Strip ?sched_pills for the F.1 default so the URL stays clean.
+      const isDefault =
+        next.selectedPills.length === 1 && next.selectedPills[0] === 'next_30_days';
+      if (isDefault || next.selectedPills.length === 0) params.delete('sched_pills');
+      else params.set('sched_pills', next.selectedPills.join(','));
+      if (next.otherRange) {
+        params.set('sched_from', next.otherRange.from);
+        params.set('sched_to', next.otherRange.to);
+      } else {
+        params.delete('sched_from');
+        params.delete('sched_to');
+      }
+      const qs = params.toString();
+      router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
   // ─── Item 15e Phase 2B — Schedule-scope appointment detail dialog ──────────
   // Tapping a Schedule card fetches the full appointment + bookable staff, then
   // mounts the reused admin AppointmentDetailDialog. Cancel hands off to the
@@ -468,14 +515,18 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     }
   }, [fetchJobs]);
 
-  // Schedule scope data source (Item 15e Phase 1B). Reads upcoming
-  // appointments from the dedicated endpoint — a PURE READ that never
-  // materializes jobs. Window: tomorrow → tomorrow+30d (PST).
+  // Schedule scope data source (Item 15e Phase 1B). PURE READ — never
+  // materializes jobs. Window derived from the date-pill selection via
+  // `computeScheduleDateRange` (N+1 Session #148); helper mirrors the
+  // server's X1 future-only floor + X3 31-day ceiling.
   const fetchSchedule = useCallback(async () => {
     setScheduleLoading(true);
     try {
-      const from = addDays(getTodayPst(), 1);
-      const to = addDays(from, 30);
+      const { from, to } = computeScheduleDateRange(
+        scheduleFilter.selectedPills,
+        scheduleFilter.otherRange,
+        getTodayPst()
+      );
       const res = await posFetch(`/api/pos/jobs/schedule?from=${from}&to=${to}`);
       if (res.ok) {
         const { data } = await res.json();
@@ -486,7 +537,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     } finally {
       setScheduleLoading(false);
     }
-  }, []);
+  }, [scheduleFilter.selectedPills, scheduleFilter.otherRange]);
 
   // ─── Item 15e Phase 2B — Schedule card tap → fetch → mount dialog ──────────
   // Mirrors the change-time-button.tsx template (Rule 11 reuse): parallel-fetch
@@ -804,12 +855,30 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
       {/* Content area */}
       {effectiveScope === 'schedule' ? (
-        <ScheduleScopeList
-          entries={scheduleEntries}
-          loading={scheduleLoading}
-          onSelectAppointment={handleScheduleCardTap}
-          busyAppointmentId={loadingAppointment ? selectedAppointmentId : null}
-        />
+        <>
+          {/* Schedule filter bar — N+1. Fixed above the list per F.4 (sits
+              outside the list's `flex-1 overflow-y-auto`). Row 1 (search) +
+              Row 3 (status, detailer) land in N+2. */}
+          <div
+            data-testid="schedule-filter-bar"
+            className="space-y-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3"
+          >
+            {/* N+2: <ScheduleSearchInput /> */}
+            <SchedulePillRow
+              selectedPills={scheduleFilter.selectedPills}
+              otherRange={scheduleFilter.otherRange}
+              todayYmd={today}
+              onChange={handleScheduleFilterChange}
+            />
+            {/* N+2: <ScheduleStatusSelect /> <ScheduleDetailerSelect /> */}
+          </div>
+          <ScheduleScopeList
+            entries={scheduleEntries}
+            loading={scheduleLoading}
+            onSelectAppointment={handleScheduleCardTap}
+            busyAppointmentId={loadingAppointment ? selectedAppointmentId : null}
+          />
+        </>
       ) : viewMode === 'timeline' ? (
         <JobTimeline
           jobs={sortedJobs}

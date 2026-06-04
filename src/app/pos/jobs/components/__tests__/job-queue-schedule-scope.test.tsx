@@ -380,3 +380,66 @@ describe('Item 15e Phase 2B — Schedule card tap mount + save flow', () => {
     expect(screen.getByText('In Progress')).toBeTruthy();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N+1 (Session #148) — Schedule filter bar shell + date-pill row wiring.
+//
+// Lightweight integration checks. Detailed pill semantics + drawer behavior
+// are exercised in `schedule-pill-row.test.tsx`; range math in
+// `schedule-date-range.test.ts`. Here we lock the WIRING — the filter bar
+// appears in the right place, the default pill mounts active, and
+// fetchSchedule consumes the helper's envelope.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Item 15e N+1 (Session #148) — filter bar shell + default state', () => {
+  it('renders the filter bar above the Schedule list (data-testid wiring locked)', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    expect(screen.getByTestId('schedule-filter-bar')).toBeTruthy();
+  });
+
+  it('default mount has "Next 30 Days" pill active (F.1 LOCKED)', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    const pill = screen.getByRole('button', { name: /Next 30 Days/i });
+    expect(pill.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('Tomorrow / This Week / Next Week / This Month / Other start INACTIVE on default mount', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    for (const label of ['Tomorrow', 'This Week', 'Next Week', 'This Month', 'Other']) {
+      expect(screen.getByRole('button', { name: new RegExp(label, 'i') }).getAttribute('aria-pressed')).toBe('false');
+    }
+  });
+
+  it('fetchSchedule calls the endpoint with from/to derived from the helper (NOT empty)', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    const url = scheduleCalls()[0].url;
+    // Default = Next 30 Days = [tomorrow, today+30]. Don't pin specific
+    // dates (the suite runs against the real clock); just lock that BOTH
+    // params are present and look like YYYY-MM-DD.
+    expect(url).toMatch(/from=\d{4}-\d{2}-\d{2}/);
+    expect(url).toMatch(/to=\d{4}-\d{2}-\d{2}/);
+  });
+
+  it('clicking "Tomorrow" pill triggers a re-fetch with the new envelope', async () => {
+    setScope('schedule');
+    renderQueue();
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
+    const before = scheduleCalls().length;
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /Tomorrow/i }));
+    });
+
+    // Re-fetch fires because `fetchSchedule` is a useCallback dep of the
+    // init effect, and its dep array (selectedPills, otherRange) changed.
+    await waitFor(() => expect(scheduleCalls().length).toBeGreaterThan(before));
+  });
+});

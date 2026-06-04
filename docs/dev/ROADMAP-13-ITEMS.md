@@ -119,8 +119,12 @@ Sessions #110 → #144 (2026-05-27 → 2026-06-03) all ended with "Not a 13-item
 - **#125–#143** — Vehicle taxonomy / classifier / form-behavior audit + fix arc (4 audits #125–#128, #135; multi-session fixes #129–#134, #136, #142, #143; public-booking architectural audit `709befa5`; Path B sessions #140 / #141; Q-W*/E5 fix family — W1–W7, classification + mobile_eligible + staff_assessed + is_taxable + prereq vehicle_compat + addon vehicle_compat)
 - **#137–#139** — Quote-request SMS bundle (Pattern B per-`request_type` slug, `sendSms` self-send chokepoint, universal customer ack template)
 - **#144** — Q-D `services.pricing_model` immutability documentation + admin tooltip (Q-Arch-D LOCKED KEEP-IMMUTABLE; closes `CATALOG_CRUD_WIRING_AUDIT.md` Q4)
+- **#145** — ROADMAP-13-ITEMS audit + #118 ledger backfill + Roll-up/Status-Table drift reconciliation (doc-only, current session)
+- **#146** — `pos_jobs_unified_schedule` flag-flip — pre-flight audit + migration to enable the 15e POS Jobs Schedule scope toggle in production (`POS_JOBS_UNIFIED_SCHEDULE_FLAG_FLIP_PREFLIGHT.md`; flip migration `20260603000000_enable_pos_jobs_unified_schedule.sql`). Closes the dormant config decision left over from #109's 15e closure.
+- **#147** — POS Schedule filter UX design audit (doc-only, `POS_SCHEDULE_FILTER_UX_DESIGN.md`, merge `d6984cb2` — CHANGELOG row was missed at merge; this backfill row covers it). 806-line design spec for the filter bar (search + 6 date pills + status + detailer dropdowns) layered onto the 15e POS Jobs Schedule scope. 3 critical constraints (X1 future-only, X2 status-dropdown 3-value, X3 31-day range) + 6 operator decisions (F.1-F.6) locked. Implementation plan: 3 build sessions + 1 optional Admin > Appointments retirement.
+- **#148** — POS Schedule filter N+1: filter bar shell + 6 date pills + `computeScheduleDateRange` envelope helper (3 prod files + 3 test files + 4 docs; 483 prod lines net, over Memory #8's 330 target — see CHANGELOG for the trim rationale). Implements F.1-F.4 from #147's design; status/detailer dropdowns + search land in N+2.
 
-None of these promoted to a 13-item slot — they're either out-of-scope follow-up arcs (catalog, public-booking, SMS-AI v2) or polish on already-done items (15e Phase 2 corrections).
+None of these promoted to a 13-item slot — they're either out-of-scope follow-up arcs (catalog, public-booking, SMS-AI v2, 15e/POS Jobs Schedule UX) or polish on already-done items (15e Phase 2 corrections).
 
 ### Target C — Drift, missing rows, and items to surface for operator decision
 
