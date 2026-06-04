@@ -518,7 +518,9 @@ per session). Sequencing is linear — each session builds on the
 prior. Plus one optional retirement session for Admin >
 Appointments removal.
 
-### Session N+1 — Filter bar shell + date pills
+### Session N+1 — Filter bar shell + date pills — ✅ SHIPPED Session #148 (2026-06-03)
+
+> Implementation landed on branch `feat/pos-schedule-filter-n1-bar-shell-and-date-pills`. See CHANGELOG #148 for deviation notes: (a) URL-state pattern preferred over `useTableState` to avoid clobbering existing `?date=` / `?rebook=` params (same F.2 semantics, lower drift risk); (b) `<TogglePill>` reuse deferred — a local `<DatePillButton>` is scoped to the new component (multi-line label + date hint didn't fit the chip primitive's shape). Files shipped: `src/lib/utils/schedule-date-range.ts` (helper, 176 lines), `src/app/pos/jobs/components/schedule-pill-row.tsx` (UI + drawer, 238 lines), `src/app/pos/jobs/components/job-queue.tsx` (+69 net). +53 tests (30 helper + 18 pill-row + 5 integration). Gates green: tsc 0 errors, lint at 97-warning baseline, full suite 2922/2922.
 
 **Scope:** ship the visible filter bar with search input
 (unwired client-side filter for now), date-pill row with all

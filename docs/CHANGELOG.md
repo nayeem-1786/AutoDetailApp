@@ -6,6 +6,58 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #148 — Feat (N+1): POS Schedule filter bar shell + date pills + envelope helper (2026-06-03)
+
+First build session in the 3-session POS Schedule filter UX implementation plan locked by the Session #147 design audit (merge `d6984cb2`, `docs/dev/POS_SCHEDULE_FILTER_UX_DESIGN.md`; that audit's own CHANGELOG entry was missed when it merged — see the design doc for the full Targets A-F surface). This session ships the filter-bar shell + the 6 date pills (Tomorrow / This Week / Next Week / This Month / Next 30 Days / Other) + the pure date-range envelope helper. Status dropdown, detailer dropdown, and search input land in N+2.
+
+**6 operator decisions LOCKED from the audit (`d6984cb2`) — implemented exactly:**
+
+- **F.1** Default date pill on mount = `next_30_days` active. URL-clean: `?sched_pills` is stripped when the only selected pill is the default.
+- **F.2** Filter persistence = URL params `?sched_pills`, `?sched_from`, `?sched_to`.
+- **F.3** "Other" pill = From + To range (two native `<input type="date">` fields in an inline drawer below the pill row).
+- **F.4** Filter bar position = fixed above the Schedule list (sits outside the list's `flex-1 overflow-y-auto`; pill row never scrolls with content).
+- **F.5** "Pending" stat-card quick filter = NOT ported.
+- **F.6** Detailer dropdown source = `/api/pos/staff/available` (N+2; not wired this session).
+
+**3 constraints from the Schedule endpoint — mirrored client-side:**
+
+- **X1 — FUTURE-ONLY.** `schedule/route.ts:82-90` clamps `from` to tomorrow. The helper's per-pill logic returns `null` for any range that would include today/past; the "Other" drawer's `min` attribute on both inputs is tomorrow, hiding past dates in the iOS picker.
+- **X3 — 31-DAY MAX.** `schedule/route.ts:8, :75-79` rejects `to - from > 31`. The helper clips the envelope at `from + 30` (31-day inclusive — matches the server's own `DEFAULT_WINDOW_DAYS=30`).
+- The 3-value status dropdown (X2) lands in N+2.
+
+**Files (3 production + 3 test + 4 docs):**
+
+- `src/lib/utils/schedule-date-range.ts` (NEW, 176 lines) — pure `{from, to}` envelope helper. YYYY-MM-DD strings throughout (mirrors `getTodayPst()` + the endpoint's I/O; avoids `Date`-object timezone gotchas). Per-pill logic returns `null` on collapse (e.g., `this_week` on Sunday, `this_month` on the 30th/31st); all-null + empty-pills both fall through to the F.1 default rather than emit an invalid query. Multi-pill semantics LOCKED to gap-filling envelope `{min(from), max(to)}` — operators who need precise non-contiguous windows use "Other" alone.
+- `src/app/pos/jobs/components/schedule-pill-row.tsx` (NEW, 238 lines) — 6 card-style touch boxes (min-h 56px, min-w 100px per audit D.2's iPad touch target spec) + inline From/To drawer that opens below the pill row when "Other" is active. Drawer holds LOCAL state for the two input fields so partial typing (one field empty, From < tomorrow, To < From) propagates `null` upward without losing the typed-but-partial value. Inline error messages: "From must be tomorrow or later." / "To must be on or after From."
+- `src/app/pos/jobs/components/job-queue.tsx` (MOD, +81 / -12 = +69 net) — adds `scheduleFilter` state + URL sync + the filter-bar shell above `<ScheduleScopeList>` (also leaves placeholder comments at the Row 1 / Row 3 insertion points so N+2 does not have to re-trace the layout). `fetchSchedule` re-computes its envelope from the pill state on every change.
+- `src/lib/utils/__tests__/schedule-date-range.test.ts` (NEW, 30 tests) — per-pill range table + envelope reduction + X1 floor + X3 ceiling + edge cases (Sunday `this_week` collapse, last-day-of-month `this_month` collapse, past-`from` `other` rejection, all-null → default fallback, output-floor stress).
+- `src/app/pos/jobs/components/__tests__/schedule-pill-row.test.tsx` (NEW, 18 tests) — render, active state, multi-select toggle, click-again-to-deselect, drawer show/hide, drawer From/To valid → propagate, drawer past-`from` / inverted-range → error + null, cascading `min` on the To input.
+- `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` (MOD, +5 tests) — filter bar wiring: `data-testid="schedule-filter-bar"` renders, Next-30-Days pill is `aria-pressed=true` on mount, other 5 pills start inactive, `fetchSchedule` is called with `from=YYYY-MM-DD&to=YYYY-MM-DD` derived from the helper, clicking "Tomorrow" triggers a re-fetch.
+- `docs/dev/POS_SCHEDULE_FILTER_UX_DESIGN.md` — Target E updated: N+1 marked ✅ shipped, with the implementation-note carve-out below.
+- `docs/dev/ROADMAP-13-ITEMS.md` — Recent-activity row backfilled per the #145 audit's pattern (15e/POS-Jobs-Schedule follow-up arc, not a 13-item entry).
+- `docs/dev/FILE_TREE.md` — two new files listed.
+
+**Implementation deviation from the audit (rationale captured here per Memory #11):**
+
+The audit's D.7 specified `useTableState` for URL persistence. On implementation it became clear that `useTableState`'s URL-write effect (`useTableState.ts:152-179`) builds a FRESH `URLSearchParams` every change and writes it via `router.replace`, which would clobber the existing `?date=...` (`job-queue.tsx:315-325` setDate path) and `?rebook=...` params that job-queue already manages. Switching the file's URL-state owner from the existing manual `URLSearchParams(searchParams)` + selective set/delete pattern to `useTableState` is a wider refactor outside N+1's scope. The implementation instead replicates the existing setDate URL-write pattern for the new `sched_pills` / `sched_from` / `sched_to` params — same F.2 URL-persistence semantics, no clobber, no wider refactor. Memory #2 (match existing file conventions) overrides the audit's literal "useTableState" recommendation; the audit's intent (URL persistence) is preserved.
+
+**TogglePill note (Memory #2 deferral):** the audit suggested wrapping `<TogglePill>` with size overrides. Its `rounded-full px-4 py-1.5` chip shape with no children slot proved a poor fit for the card-style touch-box this surface needs (multi-line label + date hint). A small local `DatePillButton` is scoped to `schedule-pill-row.tsx`; if a second consumer of this shape appears we extract then.
+
+**Memory #8 status (over target, transparent report):** ≤5 files / ≤330 prod lines net target → actual 3 prod files (176 + 238 + 69 = 483 prod lines net) + 3 test files (~480 test lines new). Over the line ceiling by ~150. The audit's own estimate (250-340 lines) underestimated the local-state drawer pattern, the per-pill collapse-case handling, and the URL-deviation code. Functional + tested + within file-count target. Future N+2 / N+3 budgets should adjust upward for this family of work.
+
+**Gates:**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 warnings (baseline)
+- `npm run build` → clean
+- `npx vitest run` → 2922/2922 pass (2869 + 53 new = 30 helper + 18 pill-row + 5 integration)
+
+**NOT in scope (kept out per session lock):** status dropdown (N+2), detailer dropdown (N+2), search input (N+2), Schedule endpoint modifications, new permission keys, migrations, "Today" pill (X1 blocks), 6-status dropdown (X2), `<TogglePill>` / `useTableState` / other primitive refactors, Admin > Appointments retirement (N+4).
+
+**Operator next step:** deploy + smoke-test the POS Jobs page on iPad — (a) filter bar appears above Schedule list with 6 pills + 2 empty row placeholders; (b) "Next 30 Days" highlighted on mount; (c) clicking pills toggles additively; (d) "Other" expands the From/To drawer when active; (e) Schedule list refreshes when filter changes; (f) URL reflects selected pills. N+2 next: status dropdown + detailer dropdown + search wiring.
+
+---
+
 ## Session #146 — Chore: `pos_jobs_unified_schedule` flag-flip — pre-flight audit + flip migration (2026-06-03)
 
 Production config change. Closes a dormant config item from the #109 arc (Item 15e — POS Jobs Unified Operations View). The feature flag has been OFF in production since 15e closed on 2026-05-27 (~1 week + 35 unrelated sessions of drift). ROADMAP-13-ITEMS audit (Session #145) confirmed 15e is structurally CLOSED; this session closes the dormant on/off decision via a flag-flip migration.
