@@ -299,7 +299,17 @@ describe('Item 15e Phase 2B — Schedule card tap mount + save flow', () => {
     await waitFor(() => expect(screen.queryByTestId('detail-dialog')).toBeTruthy());
     expect(lastDetailProps?.mobileModalMode).toBe('pos');
     expect(lastDetailProps?.modifierVariant).toBe('pos');
-    expect(typeof lastDetailProps?.onEditInPos).toBe('function');
+    // Post-Phase-2B fix: the no-op `onEditInPos` was replaced by
+    // `returnToPath="/pos/jobs"` so Save Changes inside the POS Sale tab
+    // navigates back to Schedule. Regression-locks the no-op pattern:
+    // a reintroduced `onEditInPos` would be a TypeScript error (prop
+    // removed from the dialog interface), and a wrong returnToPath would
+    // fail this assertion. The semantic contract (click → router.push)
+    // is locked by the dialog's own tests in
+    // `appointment-detail-dialog`/edit-services-disabled.test.tsx; this
+    // assertion locks the prop hand-off.
+    expect(lastDetailProps?.returnToPath).toBe('/pos/jobs');
+    expect(lastDetailProps?.onEditInPos).toBeUndefined();
     // Never triggers populate while in Schedule scope (invariant holds in 2B).
     expect(populateCalls().length).toBe(0);
   });

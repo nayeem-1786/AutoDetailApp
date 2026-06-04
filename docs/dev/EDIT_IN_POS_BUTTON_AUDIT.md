@@ -10,6 +10,20 @@
 > operators pull an upcoming appointment INTO the active POS ticket
 > flow — for adding/removing services when the customer calls to
 > modify the appointment.
+>
+> **STATUS — ✅ RESOLVED (Session #150, 2026-06-03).** All 3 operator
+> decisions LOCKED + applied per Target F: Q1 Option 2 (parameterized
+> `returnToPath` prop replaces the `onEditInPos` no-op suppression);
+> Q2 (`no_show` added to `canEditServices` exclusion via the new
+> shared `isServiceEditableStatus` predicate in `status-transitions.ts`,
+> lockstep with the load-endpoint refusal set in `service-edit.ts`);
+> Q3 (POS Schedule scope test strengthened to assert
+> `returnToPath === '/pos/jobs'`; dialog-level tests added covering
+> render-gate + URL contract for both contexts). Fix scope: 4 prod
+> files / +26 net production lines (under Memory #8 ≤50 target),
+> 2 test files, +5 net test cases; tsc 0, lint 0err/97warn,
+> 2967/2967 tests, build clean. See `docs/CHANGELOG.md` Session #150
+> for the full file-by-file breakdown.
 
 ---
 

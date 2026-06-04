@@ -20,3 +20,26 @@ export const STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> 
   cancelled: [],
   no_show: [],
 };
+
+/**
+ * Statuses whose services CANNOT be edited via the shared cascade helper.
+ * Single source of truth — used by both the server cascade
+ * (`lib/appointments/service-edit.ts`) and the client "Edit in POS" render
+ * gate (`appointment-detail-dialog.tsx`'s `canEditServices`). The set
+ * mirrors the load-endpoint refusal at
+ * `src/app/api/pos/appointments/[id]/load/route.ts` so all three surfaces
+ * stay lockstep (per Item 15f Phase 1 Layer 8d-bis Audit Finding #5).
+ * Per the appointment + job status flow audit (2026-05-17) §6.4,
+ * `no_show` is terminal — the customer didn't arrive, so editing
+ * services is semantically nonsensical.
+ */
+export const SERVICE_EDIT_TERMINAL_STATUSES: ReadonlyArray<AppointmentStatus> = [
+  'completed',
+  'cancelled',
+  'no_show',
+];
+
+/** True when the appointment's services may be edited (status is not terminal). */
+export function isServiceEditableStatus(status: AppointmentStatus): boolean {
+  return !SERVICE_EDIT_TERMINAL_STATUSES.includes(status);
+}

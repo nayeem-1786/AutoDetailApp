@@ -37,12 +37,14 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { logAudit } from '@/lib/services/audit';
+import type { AppointmentStatus } from '@/lib/supabase/types';
 import {
   editServicesBodySchema,
   buildJobServicesJsonb,
   computeTotalsForServiceEdit,
   type EditServicesItem,
 } from './edit-services';
+import { isServiceEditableStatus } from './status-transitions';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -234,16 +236,14 @@ export async function editAppointmentServices(
 
   // Item 15f Phase 1 Layer 8d-bis (Audit Finding #5): refuse terminal
   // statuses — `completed` / `cancelled` / `no_show`. Lockstep with the
-  // load endpoint (`src/app/api/pos/appointments/[id]/load/route.ts`) so
-  // a successful drain implies the save can succeed on status. Per the
-  // appointment + job status flow audit (2026-05-17) §6.4, `no_show` is
-  // a terminal state — the customer didn't arrive, so editing services
-  // is semantically nonsensical.
-  if (
-    appointment.status === 'completed' ||
-    appointment.status === 'cancelled' ||
-    appointment.status === 'no_show'
-  ) {
+  // load endpoint (`src/app/api/pos/appointments/[id]/load/route.ts`) AND
+  // the dialog's "Edit in POS" render gate via the shared predicate in
+  // `status-transitions.ts` (single source of truth).
+  // `appointment.status` is typed as `string` on AppointmentRow (loose DB
+  // row shape); cast to the narrow union to satisfy the predicate. Any
+  // out-of-union value would fail the check anyway (predicate returns
+  // false on a status not in the editable set).
+  if (!isServiceEditableStatus(appointment.status as AppointmentStatus)) {
     throw new ServiceEditError(
       'INVALID_STATUS',
       400,

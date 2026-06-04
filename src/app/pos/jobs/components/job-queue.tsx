@@ -22,8 +22,11 @@ import type { PosScheduleEntry } from './schedule-types';
 // Item 15e Phase 2B — reuse the dual-context-safe admin dialog (parameterized
 // in Phase 2A) inside the POS Jobs Schedule scope. The dialog is the same
 // component admin mounts; POS passes the context props (mobileModalMode="pos",
-// modifierVariant="pos", onEditInPos no-op). Cancel hands off to the existing
-// POS cancel dialog (Item 15b). See docs/dev/ITEM_15E_PHASE_2_REUSE_VERIFICATION.md.
+// modifierVariant="pos", returnToPath="/pos/jobs" — sends the Edit-in-POS
+// deep-link's return navigation back to Schedule instead of admin). Cancel
+// hands off to the existing POS cancel dialog (Item 15b). See
+// docs/dev/ITEM_15E_PHASE_2_REUSE_VERIFICATION.md and the post-Phase-2B
+// fix in docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md.
 import { AppointmentDetailDialog } from '@/app/admin/appointments/components/appointment-detail-dialog';
 import { CancelAppointmentDialog } from '../../components/appointments/cancel-appointment-dialog';
 // N+1 (Session #148) — Schedule filter bar + date pills. Status + detailer + search land in N+2.
@@ -1230,9 +1233,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           canAddNotes={canAddNotes}
           mobileModalMode="pos"
           modifierVariant="pos"
-          onEditInPos={() => {
-            /* no-op: already in POS — suppresses the admin deep-link button */
-          }}
+          returnToPath="/pos/jobs"
         />
       )}
 
