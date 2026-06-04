@@ -6,6 +6,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #150 — Fix: "Edit in POS" button — wire deep-link with parameterized returnTo + exclude no_show + semantic regression test (2026-06-03)
+
+Closes the Day-1 UX gap surfaced by the Edit-in-POS audit (`d1eb1e24`, `docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md`). The Phase 2B POS Schedule mount (commit `ad4f6269`) passed `onEditInPos={() => { /* no-op */ }}` to "suppress the admin deep-link button because we're already in POS." The intent (don't navigate to admin) was right; the implementation (no-op the prop) left a visible-but-inert button on POS Schedule. The button has never functioned from POS Schedule — this is the fix.
+
+**All 3 audit decisions LOCKED + applied:**
+
+- **Q1 (Option 2)**: replace the `onEditInPos` no-op suppression prop with a parameterized `returnToPath?: string` (default `'/admin/appointments'`). Admin behavior byte-identical; POS Schedule host now passes `returnToPath="/pos/jobs"` so the deep-link's `returnTo` round-trips back to Schedule after Save Changes. Same drain hook (`use-edit-mode-drain.ts`), same Sale-tab edit flow.
+- **Q2 (no_show exclusion)**: the dialog's `canEditServices` render gate now uses the new shared predicate `isServiceEditableStatus(status)` from `src/lib/appointments/status-transitions.ts`. The predicate's terminal set `SERVICE_EDIT_TERMINAL_STATUSES = ['completed', 'cancelled', 'no_show']` is sourced once; `lib/appointments/service-edit.ts:236-247` (the server cascade) now consumes it too — single source of truth across (render gate, server cascade, load-endpoint refusal).
+- **Q3 (semantic regression locks)**: replaced the trivial `typeof onEditInPos === 'function'` POS-test assertion with `returnToPath === '/pos/jobs'` AND `onEditInPos === undefined`. The dialog's own test file (`edit-services-disabled.test.tsx`) now also asserts: (a) default returnToPath routes Save to `/admin/appointments`, (b) custom `returnToPath="/pos/jobs"` routes Save to Schedule, (c) the button RENDERS for `pending` / `confirmed` / `in_progress`, (d) the button does NOT RENDER for `completed` / `cancelled` / `no_show`. The combined three-axis lock — TS prop interface (no `onEditInPos`), dialog semantic tests (click → router.push), POS prop forwarding test — makes a reintroduction of the no-op pattern impossible without breaking visible tests.
+
+**Files (4 prod + 2 test + 1 audit-doc):**
+
+- `src/lib/appointments/status-transitions.ts` (MOD, +23 lines) — adds the shared predicate `isServiceEditableStatus(status)` + the `SERVICE_EDIT_TERMINAL_STATUSES` constant. Pure data + pure function; no UI coupling.
+- `src/lib/appointments/service-edit.ts` (MOD, +5 / -10 lines net) — server cascade replaces the inline `=== 'completed' || === 'cancelled' || === 'no_show'` chain with the predicate. Import added; the cast at the call site documents the loose-row-shape narrow.
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (MOD, +24 / -22 lines net) — `onEditInPos?: () => void` prop REMOVED; `returnToPath?: string` prop added with default `'/admin/appointments'`. Button onClick collapsed from `onEditInPos ? onEditInPos() : router.push(...)` to `router.push(...returnToPath...)` (always). `canEditServices` now calls the shared predicate. Updated the prop docstring + render-block comment to cite the audit.
+- `src/app/pos/jobs/components/job-queue.tsx` (MOD, +5 / -7 lines net) — `onEditInPos={() => {/* no-op */}}` removed; `returnToPath="/pos/jobs"` added. Header comment updated.
+
+**Tests (2 files, +5 cases net):**
+
+- `src/app/admin/appointments/components/__tests__/edit-services-disabled.test.tsx` — strengthens the dialog-level lock: existing test 2 renamed for clarity (default returnTo path), new test 3 (custom `/pos/jobs` returnToPath; the URL MUST NOT contain `/admin/appointments` — locks the no-op regression closed), new render-coverage tests via `it.each` for the 3 service-editable statuses + 3 terminal statuses (6 new cases total, one assertion each). `makeAppointment(status?)` factory parameterized.
+- `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` — Test 2 swaps the trivial `typeof onEditInPos === 'function'` for the semantic `returnToPath === '/pos/jobs'` AND `onEditInPos === undefined` assertions. Inline comment cites the audit + explains the three-axis regression-lock relationship with the dialog tests.
+
+**Deep-link mechanism verified before fix (Memory #11):** `use-edit-mode-drain.ts:14-67` reads `returnTo` from the URL query param (NOT sessionStorage / context), validates via `isSafeInternalPath` (rejects protocol-relative, scheme-bearing, absolute URLs), and uses it for the Save-Changes router.push downstream. `/pos/jobs` passes the validator (starts with `/`, no protocol-relative, fails `new URL()` parse without base → accepted). No drain-hook changes required.
+
+**Gates:** tsc 0 errors; lint 0 errors / 97 warnings (baseline unchanged); 179/179 test files / 2967/2967 tests; production build clean. Memory #8: 4 prod files, +26 net production lines (~50 target).
+
+**No follow-ons surfaced in scope** — per the audit's Q3 follow-up bucket, the comprehensive dialog parity audit (other admin/POS asymmetries in the shared dialog) is a separate session. Memory #29 Targeted respected.
+
+**Operator deploy verification (post-merge):** (a) POS > Jobs > Schedule, tap appointment card; (b) tap "Edit in POS" → navigates to Sale tab with appointment loaded; (c) edit services, Save returns to `/pos/jobs`; (d) for a `no_show` appointment, button is NOT rendered; (e) Admin > Appointments still routes Save to `/admin/appointments`.
+
+---
+
 ## Session #149 — Feat (N+2): POS Schedule filter — search input + status dropdown + detailer dropdown + filter-combination wiring (2026-06-03)
 
 Second build session in the POS Schedule filter UX plan (audit `d6984cb2`, N+1 `7ca301eb`). Fills the two empty placeholder rows from N+1: Row 1 debounced search input + Row 3 status dropdown + detailer dropdown. Wires AND-across-categories filtering through a pure per-row predicate. Endpoint untouched.

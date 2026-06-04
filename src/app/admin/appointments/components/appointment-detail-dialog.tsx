@@ -32,7 +32,7 @@ import { ModifierSummary } from '@/components/appointments/modifier-summary';
 // Item 15e Phase 2A — STATUS_TRANSITIONS + AppointmentWithRelations were
 // lifted to shared lib so this dialog can be reused dual-context (admin + POS
 // Schedule scope). Admin behavior is unchanged; the data is identical.
-import { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
+import { STATUS_TRANSITIONS, isServiceEditableStatus } from '@/lib/appointments/status-transitions';
 import { isEarlierState } from '@/lib/appointments/lifecycle-sync';
 import { UnMaterializeConfirmationDialog } from '@/components/appointments/un-materialize-confirmation-dialog';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
@@ -69,13 +69,17 @@ interface AppointmentDetailDialogProps {
   //   mobileModalMode — forwarded to <EditMobileModal> (switches its auth
   //     surface: posFetch + POS mobile-zones endpoint vs admin fetch).
   //   modifierVariant — forwarded to <ModifierSummary> (dark-aware pos styling).
-  //   onEditInPos — overrides the "Edit in POS" button behavior. When provided,
-  //     it is called instead of the admin router.push deep-link. When the prop
-  //     is explicitly set (even to a no-op) the default admin deep-link is not
-  //     used; pass a no-op to suppress the deep-link in a POS context.
+  //   returnToPath — destination for the "Edit in POS" deep-link's `returnTo`
+  //     param. After the operator saves changes inside the POS Sale tab,
+  //     Layer 8c's "Save Changes → router.push(returnTo)" navigates here.
+  //     Admin default returns to `/admin/appointments`; POS Schedule host
+  //     passes `/pos/jobs`. MUST be a same-origin internal path — validated
+  //     by `isSafeInternalPath` in `use-edit-mode-drain.ts`. Replaces the
+  //     Phase 2B `onEditInPos` no-op suppression (see audit
+  //     `docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md`).
   mobileModalMode?: 'admin' | 'pos';
   modifierVariant?: 'admin' | 'pos';
-  onEditInPos?: () => void;
+  returnToPath?: string;
 }
 
 export function AppointmentDetailDialog({
@@ -90,7 +94,7 @@ export function AppointmentDetailDialog({
   canAddNotes = true,
   mobileModalMode = 'admin',
   modifierVariant = 'admin',
-  onEditInPos,
+  returnToPath = '/admin/appointments',
 }: AppointmentDetailDialogProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -186,12 +190,12 @@ export function AppointmentDetailDialog({
   const displayedTotal = Number(appointment.total_amount);
   // Item 15a — service edit follows the reschedule role distribution
   // (admin/cashier/super_admin yes; detailer no). Server enforces too.
-  // Hidden once the appointment hits a terminal state; the API would
-  // reject those with a 400.
-  const canEditServices =
-    canReschedule &&
-    appointment.status !== 'completed' &&
-    appointment.status !== 'cancelled';
+  // Hidden once the appointment hits a terminal status; the API would
+  // reject those with a 400. The terminal set (completed / cancelled /
+  // no_show) lives in `status-transitions.ts` and is shared with the
+  // server cascade (`service-edit.ts`) so this render gate stays
+  // lockstep with the load-endpoint refusal.
+  const canEditServices = canReschedule && isServiceEditableStatus(appointment.status);
 
   async function onSubmit(data: AppointmentUpdateInput) {
     if (!appointment) return;
@@ -236,25 +240,23 @@ export function AppointmentDetailDialog({
         {/* Item 15f Phase 1 Layer 8d-bis — "Edit in POS" promoted to a
             top-right button styled to match the admin shell's "Open POS"
             header pattern (MonitorSmartphone icon + same bordered button
-            shape). Layer 8d shipped this as a small text link inside the
-            Services block; the dialog-header position is more discoverable
-            and matches the user's UX request. The in-Services Edit link
-            stays for now as a secondary entry point until UAT confirms
-            the top-right placement covers operator muscle memory. The
-            DialogClose component is positioned `absolute right-4 top-4`,
-            so this button sits inside the header flow with right-padding
-            reserved for the close icon. */}
+            shape). The DialogClose component is positioned
+            `absolute right-4 top-4`, so this button sits inside the header
+            flow with right-padding reserved for the close icon.
+            Click navigates to the POS deep-link drain
+            (`use-edit-mode-drain.ts`), parameterized by `returnToPath` so
+            both admin and POS Schedule hosts share one handler — admin
+            returns to `/admin/appointments`, POS Schedule returns to
+            `/pos/jobs`. Replaces the Phase 2B `onEditInPos` no-op
+            suppression that left the button visible-but-inert on POS
+            Schedule (see `docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md`). */}
         {canEditServices && appointment && (
           <button
             type="button"
             onClick={() =>
-              onEditInPos
-                ? onEditInPos()
-                : router.push(
-                    `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(
-                      '/admin/appointments'
-                    )}`
-                  )
+              router.push(
+                `/pos?source=appointment&id=${appointment.id}&returnTo=${encodeURIComponent(returnToPath)}`
+              )
             }
             className="absolute right-12 top-4 flex items-center gap-2 rounded-md border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
