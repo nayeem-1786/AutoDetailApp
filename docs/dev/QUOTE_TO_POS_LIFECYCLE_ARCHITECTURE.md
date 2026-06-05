@@ -949,6 +949,59 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 ---
 
+### Session 1.7 — Fix `convertQuote` unconditional `appointment_confirmed` webhook fire
+
+**Status:** `[x]` Complete — 2026-06-05 (PST), merge `f87aca58`
+**Source:** Phase 0.1 audit (`69b15b0f`, Target E.3 + F.4) + Phase 0.2 audit (`0b9684db`, F.4) — same bug surfaced independently by both audits
+**Estimated scope:** ~18 prod lines / ~110 test lines / 2 files (actual: 1 src + 1 test + CHANGELOG entry)
+**Memory #8 budget:** Tiny — within bounds
+
+**Issue:** `convertQuote` at `src/lib/quotes/convert-service.ts:240` fired the `appointment_confirmed` n8n webhook **unconditionally**, regardless of whether the resulting row landed at `status='confirmed'` or `status='pending'`. Voice-agent + SMS AI v2 invoke `convertQuote` with `appointmentStatus: 'pending'` (per `voice-agent/appointments/route.ts:290`'s hardcoded `{ appointmentStatus: 'pending', channel: 'phone' }`). Row landed at pending. Webhook fired anyway. Downstream n8n consumers sent "Your appointment is confirmed" notifications to customers whose appointments had **not** been confirmed (no payment received, no staff review).
+
+**Solution:** wrap the `fireWebhook` call in `if (appointment.status === 'confirmed') { … }`. Mirrors the public booking route's pattern at `src/app/api/book/route.ts:921-929` — single source of truth for the "status → webhook" tie. The condition reads the WRITTEN status on the appointment row (returned from the INSERT at `:128-158`), not the call-site's intent — so it correctly gates on the actual outcome regardless of caller default vs override. In-source comment block at the gate documents the bug history + the AC-11 scope boundary.
+
+**Why:**
+- Closes a customer-facing bug actively producing misleading "appointment confirmed" SMS for pending appointments
+- Stops the wire-layer semantic ambiguity (`appointment_confirmed` event for a `status='pending'` row) that Phase 0.1 Target E.3 flagged as one of the four sources that complicate the n8n idempotency question
+- Pattern-mirror to `book/route.ts:921-929` — no new architecture, just wiring consistency
+
+**Pre-tasks:**
+- `[x]` Phase 0.1 + 0.2 audits merged (provide the F.4 evidence)
+- No code dependency on Sessions 1.1–1.6 — this fix is at a different seam and runs in parallel with Phase 0.4
+
+**Primary files:**
+- `src/lib/quotes/convert-service.ts:240-258` (MOD, +17/−1 — conditional wrap + 15-line in-source comment block)
+- `src/lib/quotes/__tests__/convert-service.test.ts` (MOD, +~110 / +4 cases — pin conditional contract)
+- `docs/CHANGELOG.md` (Session 1.7 entry)
+
+**Evidence citations:**
+- Phase 0.1 audit (`69b15b0f`) Target E.3 row 1 + Target F.4 — *"`convertQuote` fires `appointment_confirmed` webhook UNCONDITIONALLY (`convert-service.ts:240`) regardless of resulting status"*
+- Phase 0.2 audit (`0b9684db`) F.4 — same finding, independently surfaced
+- `src/app/api/book/route.ts:921-929` — the mirrored conditional-fire pattern
+
+**Out of scope (Phase 3 work this session does NOT touch):**
+- Does NOT change the voice-agent hardcoded `'pending'` write at `voice-agent/appointments/route.ts:516`/`:290` — AC-11 enforcement requires the payment-link primitive
+- Does NOT change POS A.1's default `'confirmed'` write in `convertQuote:134` (Phase 0.2 F.1)
+- Does NOT add an `appointment_pending` webhook event
+- Does NOT modify `fireWebhook` itself — only the call site
+
+**Verification gates:**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 baseline warnings (Money-Unify + phone-display ongoing migrations, none on touched files)
+- `npm run build` → clean
+- `npx vitest run` → 2971/2971 passing across 179 files (+4 new in `convert-service.test.ts`, 24 total)
+- Post-merge verify on main: convert-service test file passes (24/24)
+
+**Related sessions:**
+- Independent of Sessions 1.1–1.6 (different seam)
+- Forward-compatible with Phase 3 AC-11 work — if a future session changes the operator default to `'pending'`, the gate continues to do the right thing automatically (it keys on the WRITTEN status)
+
+**Linked prompt:** Session prompt above this entry in conversation log (2026-06-05 PST)
+
+**Completion:** 2026-06-05 PST, merge `f87aca58`
+
+---
+
 ## Phase 2 — Lifecycle Architecture (STUB)
 
 **Pre-task:** Phase 0.3 audit must complete before this phase can be detailed.
