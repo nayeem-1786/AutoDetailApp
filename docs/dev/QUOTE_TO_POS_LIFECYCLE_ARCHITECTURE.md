@@ -571,9 +571,9 @@ Pre-tasks before Phases 2-4 can execute in detail. Each is read-only.
 
 ### Phase 0.2 — Quote → Appointment conversion architecture audit
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` Complete — 2026-06-05 (PST), merge `dcf511df`
 **Estimated time:** 30-45 minutes
-**Deliverable:** `docs/dev/QUOTE_TO_APPOINTMENT_CONVERSION_AUDIT.md`
+**Deliverable:** `docs/dev/QUOTE_TO_APPOINTMENT_CONVERSION_AUDIT.md` (~515 lines)
 
 **Questions to answer:**
 - What is the current "Convert to Appointment" flow in POS > Quotes? (file paths, endpoint, status writes)
@@ -586,9 +586,20 @@ Pre-tasks before Phases 2-4 can execute in detail. Each is read-only.
 **Why this audit:** Quote is a real lifecycle stage per [Stage 1](#stage-1-quote); the conversion is currently undocumented in any audit.
 
 **Pre-task checklist:**
-- `[ ]` Draft audit prompt
-- `[ ]` Audit executed, deliverable merged
+- `[x]` Draft audit prompt
+- `[x]` Audit executed, deliverable merged (`dcf511df`)
 - `[ ]` Findings reviewed; gaps surfaced for Phase 3 sessions
+
+**Headline findings:**
+- 6 wired conversion paths route through 2 architectural seams: canonical `convertQuote()` (POS A.1 + voice-agent A.5 + dormant admin A.6) and walk-in atomic-create (POS Create Job A.3 + walk-in builder A.4).
+- The two seams differ on 8 dimensions including channel (`phone` vs `walk_in`), appointment status (`confirmed`/`pending` vs `in_progress`), scheduled date (operator-picked vs today/now), webhook fired (`appointment_confirmed` vs none), and — critically — `quotes.converted_appointment_id` FK populated only by the canonical seam. Walk-in seam leaves it NULL and the quote-detail UI accommodates with a `"Converted to job"` badge branch (`quote-detail.tsx:493`).
+- Customer "Accept Quote" via SMS/email link does NOT create an appointment — it sets `quotes.status='accepted'` and routes staff to manually convert in POS via a staff SMS + email saying *"Next step: Convert this quote to an appointment in POS"* (literal copy at `accept/route.ts:196`).
+- Modifier carry-forward asymmetry: A.4 walk-in-builder forwards coupon/loyalty/manual; A.3 walk-in-from-quote omits them silently (surfaced as F.3).
+- `convertQuote` fires `appointment_confirmed` webhook unconditionally, even on voice-agent's `pending` path A.5 (F.4).
+- A.1 sets `confirmed` WITHOUT enforcing a payment check — surfaces an AC-11 alignment question (F.1).
+- A.1 vs A.3 cross-seam race possible: neither seam checks the other's idempotency signal (F.7).
+- Admin convert endpoint A.6 exists but has no caller in source (dormant; F.5).
+- 8 open operator decisions (F.1–F.8) surfaced for Phase 3 sessions on Quote → Appointment formalization, AC-10 (unified ticket number — `appointment_number` is greenfield), and AC-11 (payment-driven semantic).
 
 ---
 
