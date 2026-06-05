@@ -6,6 +6,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.7 — Fix: `convertQuote` `appointment_confirmed` webhook now fires conditionally on resulting status (2026-06-05)
+
+Surgical production bug fix. Phase 1 add-on entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` plan — added retroactively per the doc-maintenance rule for "new session identified."
+
+**The bug:** `convertQuote` in `src/lib/quotes/convert-service.ts` fired the `appointment_confirmed` n8n webhook **unconditionally** at the function's exit (`:240`), regardless of what `status` was actually written on the appointment row. Both Phase 0.1 (audit `69b15b0f`, F.4) and Phase 0.2 (audit `0b9684db`, F.4) independently surfaced this. The voice-agent + SMS AI v2 paths invoke `convertQuote` with `appointmentStatus: 'pending'` (per `voice-agent/appointments/route.ts:290`'s hardcoded `{ appointmentStatus: 'pending', channel: 'phone' }`), the row landed at pending, but the `appointment_confirmed` webhook fired anyway. Downstream n8n consumers received `appointment_confirmed` events for rows whose actual `status='pending'` — and (per F.4 audit framing) sent "Your appointment is confirmed" notifications to customers whose appointments had **not** been confirmed (no payment received yet, no staff review). Customer-facing impact for an unknown duration.
+
+**The fix (`src/lib/quotes/convert-service.ts:240-258`, +17 / −1 prod lines including a 15-line in-source comment block):** wrap the `fireWebhook` call in `if (appointment.status === 'confirmed') { … }`. Mirrors the public-booking route's status-conditional pattern at `src/app/api/book/route.ts:921-929` — the single source of truth for the "status → webhook" tie. The condition reads the WRITTEN status on the appointment row (the value returned from the INSERT at `:128-158`), not the call-site's intent — so it correctly gates on the actual outcome regardless of caller default vs override. In-source comment block at the gate documents the bug history with audit hashes + the AC-11 scope boundary (Phase 3 work that this session does NOT do).
+
+**Tests (`src/lib/quotes/__tests__/convert-service.test.ts`, +110 test lines / +4 cases):** new describe block `convertQuote — Session 1.7 conditional appointment_confirmed webhook fire` with four cases pinning the contract — (1) default `'confirmed'` writes still fire the webhook (POS A.1 happy path preserved), (2) explicit `appointmentStatus: 'confirmed'` still fires, (3) `appointmentStatus: 'pending'` (voice-agent / SMS v2 path) does **not** fire, (4) regression guard: when the gate is closed, the appointment INSERT + appointment_services INSERT + quote → `converted` update all still run (the gate must ONLY block the webhook send, not the underlying DB writes). Vitest mocks `fireWebhook` and asserts call counts via `mock.calls`.
+
+**What this session does NOT do:**
+- Does NOT change the voice-agent hardcoded `'pending'` write at `voice-agent/appointments/route.ts:516`/`:290` — that's Phase 3 (AC-11 enforcement, requires the payment-link primitive)
+- Does NOT change POS A.1's default `'confirmed'` write in `convertQuote` — that's Phase 3 (operator F.1 from Phase 0.2)
+- Does NOT add a new `appointment_pending` webhook event — current architecture has no such event; out of scope
+- Does NOT modify `fireWebhook` itself — only the call site
+
+**Files touched:** `src/lib/quotes/convert-service.ts` (MOD, +17/−1), `src/lib/quotes/__tests__/convert-service.test.ts` (MOD, +~110). 2 files — within Memory #8 tiny budget.
+
+**Verification:** `npx tsc --noEmit` → 0 errors. `npm run lint` → 0 errors / 97 baseline warnings (Money-Unify + phone-display ongoing migrations, none on touched files). `npm run build` → clean. `npx vitest run` → 2971/2971 passing across 179 test files (+4 from this session, 24 total in convert-service.test.ts). Memory #8 budget: tiny, within bounds.
+
+**Evidence citations:**
+- `docs/dev/SMS_PHONE_AGENT_BOOKING_FLOW_AUDIT.md` (Phase 0.1, merge `69b15b0f`) — Target E.3 + F.4 + Cross-path matrix row "n8n webhooks fired" called out the unconditional fire as the surfaced bug
+- `docs/dev/QUOTE_TO_APPOINTMENT_CONVERSION_AUDIT.md` (Phase 0.2, merge `0b9684db`) — F.4 finding
+- `src/app/api/book/route.ts:921-929` — the conditional-fire pattern mirrored here
+
+**Out of scope tracked:** Phase 3 sessions on AC-11 enforcement (`QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` lines 451-465) will need to revisit whether the operator default `'confirmed'` write in `convertQuote` (`:134`) is correct per AC-11's payment-driven semantic. This session's conditional gate is correct under either policy — if a future session changes the default to `'pending'`, the gate continues to do the right thing automatically.
+
+---
+
 ## Session #152 — Audit: appointment-to-job materialization lifecycle (2026-06-03)
 
 Read-only foundational Component Behavior audit (Memory #29 type 3). Sits BELOW the conceptual audit (#151, `26521e5a`) and the day's tactical pile (`b0efd95f`, `d3671c82`, `d1eb1e24`, `b346d34b`, `f73661b7`). Foundation work: everything else stacks on the materialization model — Today vs Schedule, the forward-arrow, dialog parity, state-machine asymmetry — and the operator needs the complete picture before deciding architectural direction.
