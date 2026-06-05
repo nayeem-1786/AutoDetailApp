@@ -549,9 +549,9 @@ Pre-tasks before Phases 2-4 can execute in detail. Each is read-only.
 
 ### Phase 0.1 — SMS / Phone agent booking flow audit
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` Complete — 2026-06-05 (PST), merge `69b15b0f`
 **Estimated time:** 60-90 minutes
-**Deliverable:** `docs/dev/SMS_PHONE_AGENT_BOOKING_FLOW_AUDIT.md`
+**Deliverable:** [`docs/dev/SMS_PHONE_AGENT_BOOKING_FLOW_AUDIT.md`](SMS_PHONE_AGENT_BOOKING_FLOW_AUDIT.md) (~530 lines)
 
 **Questions to answer:**
 - How do SMS agents (Twilio + AI) create appointments? Do they create Quotes that customers convert, or Appointments directly?
@@ -563,9 +563,20 @@ Pre-tasks before Phases 2-4 can execute in detail. Each is read-only.
 **Why this audit first:** [AC-11](#ac-11-pending-vs-confirmed-semantic-enforcement-payment-driven) requires alignment across all three booking paths. Phase 2 cannot implement enforcement until current state is known.
 
 **Pre-task checklist:**
-- `[ ]` Draft audit prompt
-- `[ ]` Audit executed, deliverable merged
-- `[ ]` Findings reviewed; gaps surfaced for Phase 2 sessions
+- `[x]` Draft audit prompt
+- `[x]` Audit executed, deliverable merged (`69b15b0f`)
+- `[ ]` Findings reviewed; gaps surfaced for Phase 3 sessions (AC-11 enforcement scope)
+
+**Headline findings:**
+- **Four** production booking paths exist, not three: online booking (`/api/book`), SMS agent legacy v1 (the `[GENERATE_QUOTE]`-block path in the Twilio inbound webhook), SMS AI v2 (Anthropic tool-use agent dispatched fire-and-forget from the same Twilio webhook), and Phone agent Tom (ElevenLabs). SMS v2 and Tom share the same **13-tool** backing surface at `/api/voice-agent/*` — the two LLMs are configured separately but converge on identical server-side primitives.
+- AC-11 verdict per path: **online ALIGNED** (`book/route.ts:559` ties status to `payment_intent_id`); **legacy v1 UNDEFINED at agent layer** (creates quotes only, never appointments) but **MISALIGNED downstream** at the operator-conversion seam (`convertQuote` default `'confirmed'` regardless of payment); **v2 and Tom both MISALIGNED** — `voice-agent/appointments/route.ts:516` hardcodes `'pending'` on the direct branch and `:290` forces `'pending'` on the quote branch; no condition can produce `'confirmed'`.
+- **Zero payment infrastructure** on agent paths. No `payment_intent_id` / payment-link primitive in `/api/voice-agent/*` or `src/lib/sms-ai/**`. Agents cannot produce a `'confirmed'` appointment under any condition — alignment work requires new payment-link tool, post-payment webhook tie-in, AND the status-pin swap.
+- `convertQuote` fires `appointment_confirmed` webhook **unconditionally** (`convert-service.ts:240`) regardless of actual row status — semantic ambiguity at the wire layer when called from voice-agent path with `appointmentStatus: 'pending'` (corroborates Phase 0.2 F.4).
+- Quote acceptance via `/api/quotes/[id]/accept` sets `quotes.status='accepted'` but does **NOT** create an appointment; customer is told *"Our team will reach out shortly to schedule"* (`accept/route.ts:97/101`). Operator-mediated conversion via `/api/quotes/[id]/convert` defaults to `'confirmed'` (matches Phase 0.2 A.1 finding).
+- v2 SMS bookings via the shared endpoint write `channel='phone'` (hardcoded at `voice-agent/appointments/route.ts:517`) — operator cannot distinguish v2 SMS bookings from Tom bookings at the row level.
+- **n8n idempotency verdict (AC-5 / Session 1.5 gate): BLOCKED** — operator must verify n8n receiver flows for `appointment_confirmed` and `appointment_completed` before Session 1.5 can fire. `fireWebhook` (`webhook.ts:20-52`) carries zero dedup tokens; re-fire structurally possible from 4+ sites enumerated in Target E.3. Session 1.4 (2 SAFE transitions) is unaffected.
+- Memory #30 boundary verified clean: no "Ashley" / "Retell AI" references in Smart Details code; `ELEVENLABS_AGENT_ID` is env-supplied (no literal agent ID in source); "Tom" persona is hardcoded only at `voice-agent/initiation/route.ts:314` (greeting) and `sms-ai/system-prompt.ts:41` (SMS persona).
+- 6 open operator decisions surfaced (F.1–F.6) covering: v2 appointment-creation philosophy, Phone agent payment-link timing, operator-facing pending→confirmed workflow, `appointment_confirmed` fire-condition split (status-tied vs unconditional), v2 `channel` write semantics, and quote-acceptance auto-create question.
 
 ---
 
