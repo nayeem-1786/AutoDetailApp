@@ -644,9 +644,9 @@ Pre-tasks before Phases 2-4 can execute in detail. Each is read-only.
 
 ### Phase 0.4 — Mobile detailer access architecture audit
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` Complete — 2026-06-05 (PST), merge `e10e23a5`
 **Estimated time:** 45-75 minutes
-**Deliverable:** `docs/dev/MOBILE_DETAILER_ACCESS_AUDIT.md`
+**Deliverable:** `docs/dev/MOBILE_DETAILER_ACCESS_AUDIT.md` (~504 lines)
 
 **Questions to answer:**
 - How does a mobile detailer currently access POS at the customer site? (Options to investigate: token-based hotlink, mobile-device PIN login, dedicated mobile app, pre-authorization before leaving shop)
@@ -657,9 +657,20 @@ Pre-tasks before Phases 2-4 can execute in detail. Each is read-only.
 **Why this audit:** Mobile flow is a known gap. [AC-3](#ac-3-start-intake-as-materialization-trigger) Start Intake design must account for mobile access; without this audit, Phase 4 cannot be detailed.
 
 **Pre-task checklist:**
-- `[ ]` Draft audit prompt
-- `[ ]` Audit executed, deliverable merged
+- `[x]` Draft audit prompt
+- `[x]` Audit executed, deliverable merged (`e10e23a5`)
 - `[ ]` Findings reviewed; Phase 4 sessions detailed
+
+**Headline findings:**
+- **There is essentially NO mobile-detailer-specific infrastructure.** Same PIN auth, same `/pos` surface, same role-permission matrix, same job-detail UI serve both shop-bench and at-customer-site detailers.
+- **Three pieces of infrastructure incidentally support mobile use, none designed for it:** PWA manifest scoped to `/pos` (`public/manifest.json`), camera-capture file input (`photo-capture.tsx:123-130` with `capture="environment"`), and the IndexedDB offline cash queue (`src/lib/pos/offline-queue.ts`).
+- **Production architecture actively works AGAINST off-shop mobile access:** IP whitelist enforced at middleware (`src/middleware.ts:31-42` for `app.` domain) gates ALL POS by IP when enabled; Stripe Terminal LAN-DNS dependency (CLAUDE.md Critical Rule) means in-person card swipe is NOT POSSIBLE off the shop's network.
+- **The detailer role's permission defaults (`src/lib/utils/role-defaults.ts:308-406`) already exclude card processing** — pre-implementing the "mobile detailer cannot close transaction" pattern. Natural mobile payment path is the existing `SendPaymentLinkDialog` flow (customer pays from their phone via Stripe Checkout URL).
+- **No "detailer dispatched" / "en route" / "arrived" state exists** in `jobs.status` enum or any column — `grep` found only React Redux vocabulary usage. Pattern C (Hybrid dispatch+arrived) in Target E would require new schema.
+- **Five Phase 4 architectural options enumerated evenhandedly in Target D** with codebase-feasibility evidence: (1) bring iPad, (2) personal device with same PIN, (3) job-specific hotlink, (4) dedicated mobile app, (5) hybrid shop-side + site-side.
+- **Three Start Intake firing patterns enumerated in Target E** (A: shop-side, B: detailer-side, C: hybrid with dispatch state) — locked AC-3 doesn't choose A/B/C, leaves it to Phase 4.
+- **7 open operator decisions surfaced (F.1–F.7):** device strategy, IP whitelist policy, job-specific access tokens, mobile checkout strategy, detailer-phone auth (PIN vs biometric vs per-device), photo bandwidth/compression, dispatch/en-route state addition.
+- **Architectural conclusion:** Phase 4 can be built on the existing surface with two anchor decisions to lock: (1) IP whitelist policy for off-shop access (F.2), (2) Start Intake firing location per AC-3 (E.1). NO new entity or auth flow is structurally required for the basic workflow.
 
 ---
 
