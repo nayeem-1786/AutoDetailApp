@@ -6,6 +6,78 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.2 — Admin/POS PATCH endpoint symmetry: jobs.assigned_staff_id cascade + employee_id audit log + normalization + adminFetch (2026-06-06)
+
+Surgical production drift-fix. Phase 1 entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1 plan (Session 1.2 block). Closes parity audit `b346d34b` Target C Drifts #9, #10, #11, #15 (Session B scope). All four are unintentional drifts between admin PATCH and POS PATCH — mechanical mirroring of POS as canonical, no philosophy.
+
+**Drifts closed:**
+
+1. **Drift #9 — `employee_id` missing from admin's audit-log diff:** admin's `buildChangeDetails` field list at the `logAudit` call site did not include `'employee_id'`; POS's did. Admin detailer reassignments produced no diff entry. **Fix:** added `'employee_id'` to the field list AND added `employee_id` to the `current` row's SELECT (so the from-value is available for the diff). Mirrors POS PATCH at `/api/pos/appointments/[id]/route.ts:444-452` (field list) + `:225` (SELECT).
+
+2. **Drift #10 — `jobs.assigned_staff_id` cascade missing on admin reassignment:** when admin PATCH changed `employee_id`, the linked `jobs` row's `assigned_staff_id` was NOT updated. The job kept the prior detailer's UUID indefinitely (until next populate, or never for walk-in-created jobs). **Fix:** added unconditional `jobs.update({ assigned_staff_id: newEmployeeId }).eq('appointment_id', id)` after the appointment UPDATE — mirrors POS PATCH at `:377-383` byte-for-byte. Cascade fires unconditionally on `employee_id !== undefined` (graceful no-op when no linked `jobs` row exists; matches 0 rows; Supabase returns `{ error: null, count: 0 }`).
+
+3. **Drift #11 — `employee_id: '' → null` normalization missing:** admin PATCH wrote `data.employee_id` directly to the UPDATE payload. A direct caller (script, future API consumer, or test) submitting `employee_id=''` would write the literal empty string to a UUID FK column. POS normalized at `:358`; admin didn't. **Fix:** added the canonical `data.employee_id === '' ? null : data.employee_id` pattern at the update-payload construction AND in the new cascade thread (so the jobs cascade carries the same normalization). Note: the page-level `handleSave` at `src/app/admin/appointments/page.tsx:250` already pre-normalizes `data.employee_id || null` for this surface's submit path, but the server is the canonical defense layer — non-page direct callers (scripts, tests, future API consumers) bypass the page boundary.
+
+4. **Drift #15 — raw `fetch()` instead of `adminFetch()`:** the admin appointments page's `handleSave` (line 253) and `handleCancelConfirm` (line 278) used bare `fetch()`. On a 401 (expired session) the operator saw a confusing "Failed to update appointment" toast with no recovery affordance instead of a redirect to `/login?reason=session_expired`. The canonical pattern (per CLAUDE.md key patterns) is `adminFetch` from `@/lib/utils/admin-fetch`, which wraps `fetch` and handles 401 → redirect. **Fix:** swapped both call sites + added the import with an in-source comment explaining the canonical pattern.
+
+**Memory #11 verification at execution time:** Sessions 1.1 + 1.5 modified both PATCH endpoints since the audit was written, so line numbers shifted. Verified:
+- POS PATCH `employee_id` normalization: audit cited `:304`, actually at `:358` ✓ (shifted by Session 1.5's `cascadeRan` block)
+- POS PATCH cascade: audit cited `:323-329`, actually at `:377-383` ✓
+- POS PATCH audit field list: audit cited `:386`, actually at `:444-452` ✓ (already includes `employee_id`)
+- Admin page raw fetch sites: audit cited `:253, :278`, confirmed at `:253, :278` ✓ (no shift — Session 1.1 touched dialog mounts in same file but at different line ranges)
+
+**Memory #29 surfaced finding (NOT fixed this session):** admin PATCH allows `employee_id`-only changes WITHOUT permission gating — admin's `isReschedule` predicate (route.ts:38-40) excludes `data.employee_id`, while POS's includes it (POS route.ts:160-164). This is a fifth drift in the same family (permission asymmetry on the reassignment axis) that the audit's Session B scope didn't include. Surfaced here for visibility; **fix deferred** per Memory #29 (targeted scope) and session brief's locked 4-drift scope. A follow-on micro-session could close it (~3 prod lines + 1 test).
+
+**Production changes (~12 prod-logic lines net across 2 prod files; gross +39 lines on route.ts because every drift fix carries an in-source citation to its parity-audit number + the POS line it mirrors):**
+
+1. **`src/app/api/appointments/[id]/route.ts`** (+34 / -5):
+   - `current` SELECT augmented with `employee_id` (Drift #9 prerequisite).
+   - Update payload: `employee_id` write now passes through `'' → null` normalization (Drift #11).
+   - New cascade block after the appointment UPDATE: `jobs.update({ assigned_staff_id }).eq('appointment_id', id)` when `data.employee_id !== undefined` (Drift #10).
+   - `buildChangeDetails` field list includes `'employee_id'` (Drift #9).
+
+2. **`src/app/admin/appointments/page.tsx`** (+8 / -2):
+   - `adminFetch` import added with an explanatory comment block.
+   - `handleSave`'s PATCH call: `fetch` → `adminFetch` (Drift #15).
+   - `handleCancelConfirm`'s POST call: `fetch` → `adminFetch` (Drift #15).
+
+**Tests (+4 cases / +82 test lines, 1 file modified):**
+
+1. **`src/app/api/appointments/[id]/__tests__/patch.test.ts`** (Session 1.5 created this file; Session 1.2 extends it):
+   - Mock infrastructure: `state.jobUpdates` array now captures `jobs.update({ ... }).eq('appointment_id', X)` calls. `state.appointment` shape gains `employee_id`. The `jobs` table mock branch now exposes both `select().eq().maybeSingle()` (existing cascade-check path from Session 1.5) AND `update().eq()` (new cascade-write path).
+   - Drift #10 happy path: detailer reassignment with active linked job → cascade fires with correct filter + payload, plus appointment UPDATE.
+   - Drift #10 graceful no-op: detailer reassignment with no linked job → cascade UPDATE still fires (unconditional; matches 0 rows at the DB layer; mirrors POS shape).
+   - Drift #9 audit-log diff: detailer reassignment surfaces `employee_id: {from, to}` in the audit_log diff.
+   - Drift #11 normalization: empty-string `employee_id` written as NULL on appointment UPDATE AND on cascade UPDATE.
+
+**Verification gates (all green):**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 baseline warnings (unchanged)
+- `npm run build` → clean
+- `npm test -- --run` → 183 test files / 3012 tests passing (was 3008 — +4 new drift-fix cases)
+
+**Memory #8 status:** Comfortable budget honored — 2 prod files (within "≤2"), ~12 prod-logic lines net (within "≤30" and the doc's "~12-25" estimate). Gross route.ts diff inflated by intentional in-source citation comments (every drift fix block cites its audit-drift number + the POS line it mirrors — explicit symmetry pointer for future readers).
+
+**What this session does NOT do (per locked scope):**
+- Does NOT touch state-machine logic — Session 1.5 territory
+- Does NOT touch un-materialize cascade work — Session 1.5
+- Does NOT touch dialog props or `readOnly` — Session 1.1
+- Does NOT add the parity contract test (broader `sale-vs-quotes-shared-prop-parity.test.tsx`-style assertion) — Session 1.3 deliverable
+- Does NOT touch POS PATCH — POS is the reference; admin mirrors to it
+- Does NOT modify the `adminFetch` helper itself — only the callers
+- Does NOT close Drift #5 (employee_id permission gating) — Memory #29 surfaced finding, not in locked scope
+
+**Unblocks:** Session 1.3 (parity contract test — the `employee_id` cascade + audit-log diff + normalization symmetry are now asserted-equal-on-both-endpoints behaviors and can be referenced by name in the contract test's expectations).
+
+**Files touched:**
+- `src/app/api/appointments/[id]/route.ts` (MOD — drifts #9, #10, #11)
+- `src/app/admin/appointments/page.tsx` (MOD — drift #15)
+- `src/app/api/appointments/[id]/__tests__/patch.test.ts` (MOD — +4 cases + mock extension)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (Session 1.2 block status `[ ]` → `[x]` with merge hash + PST timestamp)
+
+---
+
 ## Session 1.5 — Wire un-materialize cascade into PATCH for backward reverts + admin/POS state-machine symmetry
 
 Production code change closing the second half of AC-5 ("2 SAFE + 2 with cascade") locked in `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1. Wave 2 of the Phase 1 conservative wave plan. Sessions 1.4 + 1.5 together open the four AC-5 transitions; 1.4 shipped the SAFE pair (`pending → in_progress`, `in_progress → no_show`) at `44c8ea05`; this session ships the with-cascade pair.
