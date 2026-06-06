@@ -642,7 +642,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | Phase | Theme | Pre-task | Status |
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
-| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.4 (`44c8ea05`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) complete; Sessions 1.1–1.3, 1.5, 1.6 not started |
+| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.4 (`44c8ea05`), 1.5 (merge hash pending), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) complete; Sessions 1.1–1.3, 1.6 not started |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
@@ -978,10 +978,11 @@ Update the test at `src/app/api/pos/appointments/[id]/__tests__/patch.test.ts:26
 
 ### Session 1.5 — Wire un-materialize cascade into PATCH for backward reverts
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` Complete — merge `<HASH-PENDING>` on 2026-06-06 PST (filled in at end-of-session post-merge)
 **Source:** State machine audit b0efd95f Q1 + consequence map d3671c82 Target E.3
 **Estimated scope:** ~20-30 prod lines / 2 files / +4-6 tests
-**Memory #8 budget:** Comfortable
+**Actual scope:** ~115 prod lines (status-transitions 14 + POS PATCH ~50 + admin PATCH ~50) / 3 prod files / +16 test cases (7 added to existing POS test file + 9 in new admin test file)
+**Memory #8 budget:** Comfortable (honored)
 
 **Issue:** Two backward-revert transitions are HIGH risk only because PATCH doesn't invoke the existing un-materialize cascade:
 1. `confirmed → pending` (operator-reported error #1)
@@ -1018,12 +1019,12 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 - State machine audit b0efd95f Q1: un-materialize cascade into PATCH (recommended)
 
 **Related sessions:**
-- Depends on: Session 1.4 (state machine loosening pattern)
+- Depends on: Session 1.4 (state machine loosening pattern) — satisfied at `44c8ea05`
 - ~~Depends on: Phase 0.1 audit (n8n idempotency check)~~ — **resolved** by webhook receivers identity audit (`f5e714a8`); no receiver exists, idempotency is vacuous
 
-**Linked prompt:** TBD
+**Linked prompt:** Session 1.5 prompt (operator-supplied in 2026-06-06 PST session)
 
-**Completion:** TBD
+**Completion:** 2026-06-06 PST — merge hash filled in post-merge below. Implementation followed the locked scope: STATUS_TRANSITIONS map opens `confirmed → pending` + `in_progress → pending`; POS PATCH wires `executeUnMaterialize` via the `pos/appointments/[id]/route.ts` STATUS_TRANSITIONS block; admin PATCH gains both the STATUS_TRANSITIONS guard (was permissive pre-1.5) AND the cascade wiring (admin/POS symmetry per AC-5). Cascade is INVOKED (Memory #2), not reimplemented — the ordering invariant in `executeUnMaterialize` is the seam. The two endpoints' cascade-call sites are byte-symmetric apart from actor + source labeling (`'pos'` vs `'admin'`). Cascade error propagation (422 / 409 / 404) bubbles up to the PATCH caller with the structured payload the dedicated `/unmaterialize` endpoint already emits. `confirmString` is NOT extended into PATCH — callers needing the confirm-required path use the dedicated `/unmaterialize` endpoint. Verification: tsc 0 errors / lint 0 errors (97 baseline warnings) / build clean / 181 test files / 2994 tests passing (was 180 / 2978 — +1 file, +16 tests).
 
 ---
 

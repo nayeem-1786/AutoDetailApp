@@ -265,7 +265,8 @@ src/app/api/admin/stripe/readers/route.ts
 src/app/api/appointments/[id]/cancel/route.ts                       # POST cancel — Session 1.8 added direct sendSms dispatch loop for waitlist-notified customers (replaces dead fireWebhook; webhook fire retained alongside for forward-compat); audit f5e714a8 Target D.4
 src/app/api/appointments/[id]/__tests__/cancel.test.ts              # Session 1.8 — 5 cases pinning waitlist SMS dispatch / no-phone skip / inactive-template skip / forward-compat webhook
 src/app/api/appointments/[id]/notify/route.ts
-src/app/api/appointments/[id]/route.ts
+src/app/api/appointments/[id]/route.ts                              # PATCH admin appointment edit — Session 1.5 added STATUS_TRANSITIONS guard (closes pre-1.5 permissive hole) + executeUnMaterialize cascade for `confirmed → pending` / `in_progress → pending` backward reverts when an active job exists. Admin/POS symmetry per AC-5.
+src/app/api/appointments/[id]/__tests__/patch.test.ts               # Session 1.5 — 9 cases pinning admin PATCH state-machine guard + cascade invocation with admin source + pre-1.5 happy-path regressions
 ```
 
 ### Auth
@@ -398,7 +399,7 @@ src/app/api/migration/vehicles/route.ts
 ```
 src/app/api/pos/appointments/route.ts                         # GET list (date range, default today+tomorrow) — Roadmap Item 12
 src/app/api/pos/appointments/__tests__/list.test.ts
-src/app/api/pos/appointments/[id]/route.ts                     # GET single appointment (Item 15c) + PATCH combined edit (Item 15e Phase 2A — HMAC + per-field perms + STATUS_TRANSITIONS enforced + webhooks fire; backs the reused admin dialog in POS Schedule scope)
+src/app/api/pos/appointments/[id]/route.ts                     # GET single appointment (Item 15c) + PATCH combined edit (Item 15e Phase 2A — HMAC + per-field perms + STATUS_TRANSITIONS enforced + webhooks fire; backs the reused admin dialog in POS Schedule scope). Session 1.5 added executeUnMaterialize cascade for `confirmed → pending` / `in_progress → pending` backward reverts when an active job exists; cascade error propagation bubbles 422 confirm_required / 409 transaction_linked / 409 terminal up to the caller.
 src/app/api/pos/appointments/[id]/__tests__/get.test.ts
 src/app/api/pos/appointments/[id]/__tests__/patch.test.ts      # Item 15e Phase 2A — 17 cases: auth/per-field perms/transition validation/overlap/webhook firing/response shape
 src/app/api/pos/appointments/[id]/cancel/route.ts              # POST cancel — POS-specific, notify_customer flag default false (Roadmap Item 15b)

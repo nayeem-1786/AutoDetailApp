@@ -13,17 +13,30 @@ import type { AppointmentStatus } from '@/lib/supabase/types';
  * (`/api/appointments/[id]`) and the POS PATCH (`/api/pos/appointments/[id]`).
  */
 export const STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  // `pending → in_progress` and `in_progress → no_show` are SAFE per the
-  // per-transition consequence map (d3671c82) Target E.1: no PATCH-side
-  // webhook fires for `in_progress` or `no_show`, and no cron/reminder
-  // eligibility flip requires a compensating cascade. Opened in Session 1.4
-  // of the lifecycle architecture (AC-5 — 2 SAFE + 2 with cascade). The
-  // remaining backward-revert pair (`confirmed → pending`,
-  // `in_progress → pending`) is Session 1.5 territory and stays blocked
-  // here until the un-materialize cascade is wired into PATCH.
+  // Session 1.4 — 2 SAFE transitions opened per AC-5 (consequence map
+  // d3671c82 Target E.1): `pending → in_progress` and `in_progress → no_show`.
+  // No PATCH-side webhook fires for `in_progress` or `no_show`, and no
+  // cron/reminder eligibility flip requires a compensating cascade.
+  //
+  // Session 1.5 — 2 BACKWARD-REVERT transitions opened per AC-5 (consequence
+  // map d3671c82 Target E.3 + state machine audit b0efd95f Q1):
+  // `confirmed → pending` (operator-reported error #1) and
+  // `in_progress → pending`. These two are the "with cascade" half of AC-5's
+  // "2 SAFE + 2 with cascade" — both POS and admin PATCH endpoints invoke
+  // `executeUnMaterialize` from `lifecycle-sync.ts` before completing the
+  // status revert when a materialized job exists. The cascade's ordering
+  // invariant (appointment status → pending FIRST, then DELETE job) is
+  // documented at `executeUnMaterialize` lines 197-202 and guarantees the
+  // dangerous "materializable appointment + absent job" state never exists,
+  // so the populate endpoint cannot re-materialize a half-deleted pair.
+  //
+  // Admin/POS symmetry (AC-5 commitment): both PATCH endpoints share this
+  // map AND share the cascade. The admin PATCH was previously permissive
+  // (no STATUS_TRANSITIONS guard at all); Session 1.5 added the guard to
+  // close that asymmetry alongside the cascade wiring.
   pending: ['confirmed', 'in_progress', 'cancelled', 'no_show'],
-  confirmed: ['in_progress', 'cancelled', 'no_show'],
-  in_progress: ['completed', 'cancelled', 'no_show'],
+  confirmed: ['pending', 'in_progress', 'cancelled', 'no_show'],
+  in_progress: ['pending', 'completed', 'cancelled', 'no_show'],
   completed: [],
   cancelled: [],
   no_show: [],
