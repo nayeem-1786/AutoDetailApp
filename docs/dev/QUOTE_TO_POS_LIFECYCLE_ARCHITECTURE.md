@@ -881,6 +881,42 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 
 ---
 
+### Session 1.2.1 — Admin PATCH `employee_id` permission symmetry
+
+**Status:** `[x]` **Complete — merged to main at `90a3f4e9` on 2026-06-06 14:08 PDT**
+**Source:** Session 1.2's Memory #29 surfaced finding (deferred per that session's locked 4-drift scope)
+**Estimated scope:** ~3-5 prod lines / 1 file / +1-2 tests
+**Actual scope:** ~1 prod-logic line + 12 doc-comment lines / 1 prod file (`route.ts`) / +2 test cases / +1 CHANGELOG entry / +1 doc status flip
+**Memory #8 budget:** Tiny (honored)
+
+**Issue:** Admin PATCH's `isReschedule` predicate at `src/app/api/appointments/[id]/route.ts:38-40` excluded `data.employee_id`, so an admin user without `appointments.reschedule` permission could still reassign a detailer via this endpoint. POS PATCH's predicate at `/api/pos/appointments/[id]/route.ts:160-164` correctly included it; the POS in-source comment *"mirrors admin route's grouping; employee_id is gated under reschedule"* was aspirational — admin diverged in practice.
+
+**Solution:** +1 line on the predicate (`|| data.employee_id !== undefined`). Mirrors POS exactly. No new gate, no new permission key — `appointments.reschedule` is the same key POS uses on the same axis.
+
+**Pre-tasks:**
+- `[x]` Verify Session 1.2 merged (`412a404b`, 2026-06-06 13:48 PDT) — predicate location stable
+
+**Primary files:**
+- `src/app/api/appointments/[id]/route.ts` (extend `isReschedule` predicate)
+- `src/app/api/appointments/[id]/__tests__/patch.test.ts` (+2 cases — denied 403 + granted regression guard)
+
+**Evidence citations:**
+- Session 1.2 CHANGELOG entry (Memory #29 surfaced finding paragraph): *"admin PATCH allows employee_id-only changes WITHOUT permission gating — admin's isReschedule predicate excludes data.employee_id, while POS's includes it. A fifth drift in the same family"*
+- Admin route.ts:38-40 — `isReschedule` predicate
+- POS route.ts:160-164 — POS `isReschedule` predicate (includes `employee_id`)
+
+**Related sessions:**
+- Surfaced from: Session 1.2 (`412a404b`)
+- Unblocks: Session 1.3 (`a7a57949`) — permission-axis symmetry now actually true across all three gates (reschedule, update_status, add_notes), so the parity contract test can assert per-field-group permission parity without conditional logic for the `employee_id` quirk
+
+**Linked prompt:** session-1-2-1.md
+
+**Completion:** Merged at `90a3f4e9` on 2026-06-06 14:08 PDT. Drift #5 (the 5th in the admin/POS PATCH symmetry family) closed. Predicate now includes `data.employee_id !== undefined` — admin user without `appointments.reschedule` permission can no longer reassign a detailer via PATCH. Tests: Drift #5 denied (403 + zero updates/cascade/audit when `rescheduleDenied=true`) + Drift #5 granted regression guard (200 + all side effects when `rescheduleDenied=false`; closes the over-broad-gate door). Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings, unchanged) / build clean / pre-merge 3014 tests passing; post-merge 185 test files / 3027 tests passing (includes Session 1.3's +13 cases). **Parallel-merge handling:** Session 1.2.1 ran alongside Session 1.3 in a separate worktree; merge order to main was Session 1.3 first, Session 1.2.1 second. The published merge commit `90a3f4e9` for this branch (its `Merge:` line resolves to `a7a57949 689cf3ce` — Session 1.3 merge + Session 1.2.1 docs branch tip) ALSO bundles Session 1.3's lifecycle-architecture-doc status flip in the same diff because of an accidental MERGE_MSG carry-over (the commit message reads as Session 1.3's doc closeout). The CHANGELOG entries are correctly distinct and chronologically ordered (1.3 first, 1.2.1 second on top). Memory note for future readers: `90a3f4e9` serves as both Session 1.3's doc-closeout commit AND Session 1.2.1's merge — non-cleanly labeled but content-correct.
+
+**Drift #5 is the LAST known permission-axis asymmetry between admin and POS PATCH on the appointment-edit surface.** The `appointments.update_status` and `appointments.add_notes` gates are now symmetric across both endpoints (same key, same field set, same scope).
+
+---
+
 ### Session 1.3 — Cross-cutting parity contract + status permission gate
 
 **Status:** `[x]` **Complete — merged to main at `a7a57949` on 2026-06-06 14:05 PDT**
