@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Plus, RefreshCw, User, Clock, Calendar, Footprints, ShoppingCart, Check,
-  ChevronLeft, ChevronRight, Camera, Timer, DollarSign, AlertTriangle,
+  ChevronLeft, ChevronRight, Camera, Timer, DollarSign, AlertTriangle, Archive,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { usePosAuth } from '../../context/pos-auth-context';
@@ -186,10 +186,28 @@ function getAppointmentStatusPillClasses(status: AppointmentStatus): string {
       return `${base} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300`;
     case 'in_progress':
       return `${base} bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300`;
+    // Session 2.4 (AC-7) — terminal statuses, surfaced only with the operator's
+    // include-terminal toggle. Distinct hues so the operator can scan the list
+    // and spot recovery candidates at a glance.
+    case 'cancelled':
+      return `${base} bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300`;
+    case 'completed':
+      return `${base} bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300`;
+    case 'no_show':
+      return `${base} bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300`;
     default:
       return `${base} bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200`;
   }
 }
+
+// Session 2.4 (AC-7) — terminal-state predicates for the per-card visual-mute
+// treatment. Predicate scope is asymmetric by design:
+// - JOBS axis: only `cancelled` is gated behind the toggle (completed/closed
+//   jobs are part of the default Today view via the existing exclude list).
+// - APPOINTMENTS axis: all three (cancelled/completed/no_show) are gated.
+// Cards rendered behind the toggle get an opacity-60 visual mute so the
+// operator's eye can distinguish review/recovery entries from active work.
+const TERMINAL_APPT_STATUSES = new Set<AppointmentStatus>(['cancelled', 'completed', 'no_show']);
 
 // ─── Date helpers ───────────────────────────────────────────────
 
@@ -346,6 +364,26 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const [debouncedSearch, setDebouncedSearch] = useState<string>(searchInput);
   const [statusFilter, setStatusFilter] = useState<string>(() => searchParams.get('sched_status') ?? '');
   const [detailerFilter, setDetailerFilter] = useState<string>(() => searchParams.get('sched_detailer') ?? '');
+
+  // Session 2.4 (AC-7) — terminal-state opt-in toggle. Scope-shared: a single
+  // boolean URL key (`?include_terminal=1`) read by BOTH the Today fetch and
+  // the Schedule fetch, so toggling on either scope honors the operator's
+  // choice on the other (and on page refresh). The URL key is intentionally
+  // separate from `?sched_*` because the gate applies to both scopes.
+  const [includeTerminal, setIncludeTerminal] = useState<boolean>(
+    () => searchParams.get('include_terminal') === '1' || searchParams.get('include_terminal') === 'true'
+  );
+  const handleIncludeTerminalChange = useCallback(
+    (next: boolean) => {
+      setIncludeTerminal(next);
+      const params = new URLSearchParams(searchParams.toString());
+      if (next) params.set('include_terminal', '1');
+      else params.delete('include_terminal');
+      const qs = params.toString();
+      router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
 
   // 300ms debounce on the search input — re-fetch/render fires after the last
   // keystroke. No external lib; useTableState's debounce was the audit's
@@ -513,7 +551,10 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const fetchJobs = useCallback(async (date: string) => {
     setLoading(true);
     try {
-      const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${date}`);
+      // Session 2.4 (AC-7) — `include_terminal=1` flips the Today endpoint to
+      // surface cancelled jobs AND terminal-state un-started appointments.
+      const terminalQs = includeTerminal ? '&include_terminal=1' : '';
+      const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${date}${terminalQs}`);
       if (res.ok) {
         const payload = (await res.json()) as {
           data?: JobListItem[];
@@ -534,7 +575,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, includeTerminal]);
 
   // Silent poll — no loading spinner, with change detection
   const pollJobs = useCallback(async () => {
@@ -545,7 +586,8 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     if (timelineInteracting) return;
 
     try {
-      const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${selectedDate}`);
+      const terminalQs = includeTerminal ? '&include_terminal=1' : '';
+      const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${selectedDate}${terminalQs}`);
       if (!res.ok) {
         failCountRef.current++;
         if (failCountRef.current >= 3) setPollStatus('error');
@@ -614,7 +656,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       failCountRef.current++;
       if (failCountRef.current >= 3) setPollStatus('error');
     }
-  }, [filter, selectedDate, timelineInteracting, jobs]);
+  }, [filter, includeTerminal, selectedDate, timelineInteracting, jobs]);
 
   // Polling interval
   useEffect(() => {
@@ -676,7 +718,9 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         scheduleFilter.otherRange,
         getTodayPst()
       );
-      const res = await posFetch(`/api/pos/jobs/schedule?from=${from}&to=${to}`);
+      // Session 2.4 (AC-7) — schedule endpoint same toggle, same URL key.
+      const terminalQs = includeTerminal ? '&include_terminal=1' : '';
+      const res = await posFetch(`/api/pos/jobs/schedule?from=${from}&to=${to}${terminalQs}`);
       if (res.ok) {
         const { data } = await res.json();
         setScheduleEntries(data ?? []);
@@ -686,7 +730,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     } finally {
       setScheduleLoading(false);
     }
-  }, [scheduleFilter.selectedPills, scheduleFilter.otherRange]);
+  }, [scheduleFilter.selectedPills, scheduleFilter.otherRange, includeTerminal]);
 
   // ─── Item 15e Phase 2B — Schedule card tap → fetch → mount dialog ──────────
   // Mirrors the change-time-button.tsx template (Rule 11 reuse): parallel-fetch
@@ -969,7 +1013,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       )}
 
       {/* Filter pills */}
-      <div className="flex gap-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 py-2">
         {(['all', 'mine', 'unassigned'] as const)
           .filter((f) => f !== 'mine' || isBookable)
           .map((f) => (
@@ -986,6 +1030,26 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
               {f === 'mine' ? 'My Jobs' : f === 'all' ? 'All Jobs' : 'Unassigned'}
             </button>
           ))}
+        {/* Session 2.4 (AC-7) — terminal-state opt-in. Scope-shared toggle:
+            URL-persistent via `?include_terminal=1`. Adds cancelled jobs +
+            terminal-state un-started appointments (cancelled/completed/no_show)
+            to the visible list. Off by default per AC-7. */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={includeTerminal}
+          data-testid="include-terminal-toggle-today"
+          onClick={() => handleIncludeTerminalChange(!includeTerminal)}
+          className={cn(
+            'ml-auto inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+            includeTerminal
+              ? 'bg-blue-600 dark:bg-blue-500 text-white'
+              : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+          )}
+        >
+          <Archive className="h-3.5 w-3.5" />
+          {includeTerminal ? 'Showing terminal' : 'Show terminal'}
+        </button>
       </div>
 
       {/* View toggle */}
@@ -1053,11 +1117,21 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                 aria-label="Filter by status"
               >
                 <option value="">All Statuses</option>
-                {/* X2 LOCKED — only 3 valid Schedule statuses (server excludes
-                    cancelled/completed/no_show; offering them would be misleading). */}
+                {/* X2 LOCKED — by default only 3 valid Schedule statuses (server
+                    excludes cancelled/completed/no_show). Session 2.4 (AC-7):
+                    when the terminal-state toggle is on, the three terminal
+                    options are appended so the status filter can narrow into
+                    just-cancelled or just-completed views. */}
                 <option value="pending">{APPOINTMENT_STATUS_LABELS.pending}</option>
                 <option value="confirmed">{APPOINTMENT_STATUS_LABELS.confirmed}</option>
                 <option value="in_progress">{APPOINTMENT_STATUS_LABELS.in_progress}</option>
+                {includeTerminal && (
+                  <>
+                    <option value="cancelled">{APPOINTMENT_STATUS_LABELS.cancelled}</option>
+                    <option value="completed">{APPOINTMENT_STATUS_LABELS.completed}</option>
+                    <option value="no_show">{APPOINTMENT_STATUS_LABELS.no_show}</option>
+                  </>
+                )}
               </Select>
               <Select
                 value={detailerFilter}
@@ -1079,6 +1153,27 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                   </option>
                 ))}
               </Select>
+            </div>
+            {/* Session 2.4 (AC-7) — terminal-state toggle, scope-shared. Same
+                URL key + handler as the Today chrome; toggling either surface
+                updates the other on the next mount. */}
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeTerminal}
+                data-testid="include-terminal-toggle-schedule"
+                onClick={() => handleIncludeTerminalChange(!includeTerminal)}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  includeTerminal
+                    ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                    : 'bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                )}
+              >
+                <Archive className="h-3.5 w-3.5" />
+                {includeTerminal ? 'Showing terminal' : 'Show terminal'}
+              </button>
             </div>
           </div>
           <ScheduleScopeList
@@ -1178,6 +1273,11 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
               const showTimer = job.status === 'in_progress' || (job.status === 'completed' && job.timer_seconds > 0) || (job.status === 'closed' && job.timer_seconds > 0);
               const elapsed = showTimer ? computeElapsedSeconds(job) : 0;
 
+              // Session 2.4 (AC-7) — mute cancelled jobs so the toggle-surfaced
+              // entries read visually as review/recovery candidates, not
+              // active work. Completed/closed jobs were already in the default
+              // Today view; muting them would change unrelated UX.
+              const isTerminalCard = job.status === 'cancelled';
               return (
                 <div
                   key={job.id}
@@ -1189,7 +1289,8 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                     'w-full cursor-pointer rounded-lg border bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-all hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800',
                     highlightedJobs.has(job.id)
                       ? 'border-blue-400 dark:border-blue-500 ring-1 ring-blue-400/50 dark:ring-blue-500/30'
-                      : 'border-gray-200 dark:border-gray-700'
+                      : 'border-gray-200 dark:border-gray-700',
+                    isTerminalCard && 'opacity-60'
                   )}
                 >
                   <div className="flex items-start justify-between">
@@ -1409,6 +1510,9 @@ function ScheduleScopeList({ entries, loading, onSelectAppointment, busyAppointm
             day: 'numeric',
           });
           const isBusy = busyAppointmentId === entry.id;
+          // Session 2.4 (AC-7) — mute terminal-state appointments so they read
+          // visually as review/recovery candidates, not actionable bookings.
+          const isTerminal = TERMINAL_APPT_STATUSES.has(entry.status);
           return (
             <div
               key={entry.id}
@@ -1419,7 +1523,8 @@ function ScheduleScopeList({ entries, loading, onSelectAppointment, busyAppointm
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectAppointment(entry.id); } }}
               className={cn(
                 'w-full cursor-pointer rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 text-left shadow-sm dark:shadow-gray-950/30 transition-all hover:shadow-md dark:hover:shadow-gray-950/40 active:bg-gray-50 dark:active:bg-gray-800',
-                isBusy && 'opacity-60 pointer-events-none'
+                isBusy && 'opacity-60 pointer-events-none',
+                isTerminal && !isBusy && 'opacity-60'
               )}
             >
               <div className="flex items-start justify-between">

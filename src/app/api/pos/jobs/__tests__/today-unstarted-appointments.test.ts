@@ -55,6 +55,13 @@ const state = {
   serviceDurations: [] as Array<{ id: string; base_duration_minutes: number }>,
   // captures
   capturedAppointmentQueries: [] as Array<{ filters: Record<string, unknown> }>,
+  // Session 2.4 (AC-7) — captures the status array passed to .in('status', [...])
+  // on the un-started wide-SELECT query. Used to assert the toggle expands
+  // the candidate-status set to include terminal values.
+  capturedUnstartedStatusFilter: [] as string[],
+  // Session 2.4 — captures the .not(status, 'in', '(cancelled)') string the
+  // jobs queries pass when the toggle is off; empty when the toggle is on.
+  capturedJobsNotFilter: [] as string[],
 };
 
 vi.mock('@/lib/pos/api-auth', () => ({
@@ -112,12 +119,26 @@ function makeBuilder(table: string) {
       filters[col] = val;
       return b;
     },
-    in() { return b; },
+    in(col, vals) {
+      // Session 2.4 capture — the wide-SELECT un-started query passes a
+      // status array we need to assert on.
+      if (table === 'appointments' && col === 'status' && Array.isArray(vals)) {
+        state.capturedUnstartedStatusFilter = vals.map(String);
+      }
+      return b;
+    },
     is(col, val) {
       filters[col] = val;
       return b;
     },
-    not() { return b; },
+    not(_col, _op, val) {
+      // Session 2.4 capture — the jobs queries `.not('status', 'in', '(cancelled)')`
+      // when the toggle is off; the call is skipped when the toggle is on.
+      if (table === 'jobs' && typeof val === 'string') {
+        state.capturedJobsNotFilter.push(val);
+      }
+      return b;
+    },
     gte() { return b; },
     lte() { return b; },
     order() { return b; },
@@ -203,6 +224,8 @@ beforeEach(() => {
   state.existingJobsForDedup = [];
   state.serviceDurations = [];
   state.capturedAppointmentQueries = [];
+  state.capturedUnstartedStatusFilter = [];
+  state.capturedJobsNotFilter = [];
 });
 
 afterEach(() => {
@@ -310,5 +333,66 @@ describe('GET /api/pos/jobs — un-started appointments (Session 2.2 / AC-3)', (
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.unstarted_appointments).toEqual([]);
+  });
+
+  // ─── Session 2.4 (AC-7) — terminal-state opt-in ──────────────────────────
+  describe('include_terminal opt-in', () => {
+    it('default: un-started query filters to confirmed/in_progress only', async () => {
+      state.unstartedCandidates = [];
+      await GET(makeReq({ date: PINNED_TODAY }));
+      // Two-element array; terminal statuses absent.
+      expect(state.capturedUnstartedStatusFilter).toEqual(['confirmed', 'in_progress']);
+    });
+
+    it('default: jobs query attaches the cancelled-exclude .not() filter', async () => {
+      state.jobsDateApts = [{ id: 'apt-1' }];
+      state.unstartedCandidates = [];
+      await GET(makeReq({ date: PINNED_TODAY }));
+      // The jobs queries (both apt-linked and legacy walk-in) call
+      // `.not('status','in','(cancelled)')` → one or two captures expected.
+      expect(state.capturedJobsNotFilter.length).toBeGreaterThan(0);
+      expect(state.capturedJobsNotFilter[0]).toContain('cancelled');
+    });
+
+    it('include_terminal=true: un-started query expands to all 5 statuses', async () => {
+      state.unstartedCandidates = [];
+      await GET(makeReq({ date: PINNED_TODAY, include_terminal: 'true' }));
+      // Expanded set: the two materialization-eligible + the three terminal.
+      expect(state.capturedUnstartedStatusFilter).toEqual([
+        'confirmed',
+        'in_progress',
+        'cancelled',
+        'completed',
+        'no_show',
+      ]);
+    });
+
+    it('include_terminal=1 alias: un-started query expands the same way', async () => {
+      state.unstartedCandidates = [];
+      await GET(makeReq({ date: PINNED_TODAY, include_terminal: '1' }));
+      expect(state.capturedUnstartedStatusFilter).toContain('cancelled');
+      expect(state.capturedUnstartedStatusFilter).toContain('completed');
+      expect(state.capturedUnstartedStatusFilter).toContain('no_show');
+    });
+
+    it('include_terminal=true: jobs query DOES NOT attach the .not() filter', async () => {
+      state.jobsDateApts = [{ id: 'apt-1' }];
+      state.unstartedCandidates = [];
+      await GET(makeReq({ date: PINNED_TODAY, include_terminal: 'true' }));
+      // Neither the apt-linked nor the legacy walk-in branch should pass a
+      // .not('status', 'in', ...) filter — the toggle drops the exclusion.
+      expect(state.capturedJobsNotFilter).toEqual([]);
+    });
+
+    it('returns terminal-state un-started appointment when toggle on', async () => {
+      state.unstartedCandidates = [
+        appt({ id: 'apt-cancelled', status: 'cancelled' }),
+      ];
+      const res = await GET(makeReq({ date: PINNED_TODAY, include_terminal: 'true' }));
+      const body = await res.json();
+      expect(body.unstarted_appointments).toHaveLength(1);
+      expect(body.unstarted_appointments[0].status).toBe('cancelled');
+      expect(body.unstarted_appointments[0].scope).toBe('today_unstarted');
+    });
   });
 });

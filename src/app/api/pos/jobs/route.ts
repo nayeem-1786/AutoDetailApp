@@ -24,6 +24,14 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter') || 'mine';
 
+    // Session 2.4 (AC-7) — terminal-state opt-in. When `include_terminal=true`
+    // the jobs query stops excluding `cancelled` AND the un-started query
+    // expands to surface terminal-state appointments for today (cancelled /
+    // completed / no_show). Default behavior (no param) is unchanged: cancelled
+    // jobs hidden, only confirmed/in_progress un-started apps surfaced.
+    const includeTerminalRaw = searchParams.get('include_terminal');
+    const includeTerminal = includeTerminalRaw === 'true' || includeTerminalRaw === '1';
+
     // Use date param or default to today PST
     const dateParam = searchParams.get('date');
     const targetDate = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
@@ -44,8 +52,10 @@ export async function GET(request: NextRequest) {
       appointment:appointments!jobs_appointment_id_fkey(scheduled_start_time, channel),
       photos:job_photos(id, zone, phase)
     `;
-    // Only exclude cancelled — include closed for daily summary + list visibility
-    const excludeStatuses = ['cancelled'];
+    // Only exclude cancelled — include closed for daily summary + list visibility.
+    // Session 2.4 (AC-7): when `include_terminal=true`, the operator opts in to
+    // see cancelled jobs too; the exclusion list collapses to empty.
+    const excludeStatuses = includeTerminal ? [] : ['cancelled'];
 
     // Step 1: Get target date's appointment IDs
     // (Supabase .or() on related tables doesn't work — query appointments first)
@@ -61,8 +71,10 @@ export async function GET(request: NextRequest) {
           .from('jobs')
           .select(jobSelect)
           .in('appointment_id', dateAptIds)
-          .not('status', 'in', `(${excludeStatuses.join(',')})`)
       : null;
+    if (aptJobsQuery && excludeStatuses.length > 0) {
+      aptJobsQuery = aptJobsQuery.not('status', 'in', `(${excludeStatuses.join(',')})`);
+    }
 
     // Step 2b: LEGACY — pre-Phase 0a walk-ins (appointment_id IS NULL) created
     // on target date in PST. Post-Phase 0a, walk-ins eagerly create a synthetic
@@ -75,9 +87,11 @@ export async function GET(request: NextRequest) {
       .from('jobs')
       .select(jobSelect)
       .is('appointment_id', null)
-      .not('status', 'in', `(${excludeStatuses.join(',')})`)
       .gte('created_at', startUtc!)
       .lte('created_at', endUtc!);
+    if (excludeStatuses.length > 0) {
+      walkInQuery = walkInQuery.not('status', 'in', `(${excludeStatuses.join(',')})`);
+    }
 
     // Apply staff filter to both queries
     if (filter === 'mine') {
@@ -150,6 +164,14 @@ export async function GET(request: NextRequest) {
       // Step 1: candidate appointments for today, in materialization-eligible
       // statuses (mirrors `populate/route.ts:65` exactly — confirmed +
       // in_progress; pending requires confirmation; terminal states excluded).
+      // Session 2.4 (AC-7): when `include_terminal=true`, the operator opts in
+      // to see today's terminal-state un-started appointments (cancelled,
+      // completed, no_show) — useful for review/recovery action. Pending stays
+      // excluded because it never reaches "un-started" semantics on Today
+      // scope (un-confirmed appointments don't surface as actionable here).
+      const unstartedStatuses = includeTerminal
+        ? ['confirmed', 'in_progress', 'cancelled', 'completed', 'no_show']
+        : ['confirmed', 'in_progress'];
       let unstartedQuery = supabase
         .from('appointments')
         .select(`
@@ -167,7 +189,7 @@ export async function GET(request: NextRequest) {
           appointment_services(id, service_id, price_at_booking, tier_name, quantity, service:services!service_id(id, name))
         `)
         .eq('scheduled_date', todayPst)
-        .in('status', ['confirmed', 'in_progress'])
+        .in('status', unstartedStatuses)
         .order('scheduled_start_time');
 
       if (filter === 'mine') {
