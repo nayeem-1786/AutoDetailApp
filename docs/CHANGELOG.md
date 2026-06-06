@@ -6,6 +6,113 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 2.2 — Today scope absorbs un-started appointments + Start Intake client wiring (2026-06-06)
+
+Second half of [AC-3](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-3-start-intake-as-materialization-trigger). AC-3 is now complete with both halves landed. Builds the operator-facing UI for the materialization seam Session 2.1 created at the server: confirmed appointments for TODAY surface in the POS Jobs Today scope with a Start Intake button, and pressing it calls the Session 2.1 endpoint and replaces the appointment card with a job card.
+
+**Change shape:** Today endpoint extension + new client component + job-queue integration + tests. Populate stays for now (Session 2.5 retires it).
+
+**1. Today endpoint extension at `src/app/api/pos/jobs/route.ts`:**
+
+`GET /api/pos/jobs` now returns an additional `unstarted_appointments` field alongside the existing `data` array. New shape:
+
+```typescript
+{
+  data: JobListItem[],               // unchanged — materialized jobs
+  unstarted_appointments: PosUnstartedAppointment[]  // NEW — confirmed/in_progress appointments for TODAY without jobs
+}
+```
+
+Implementation:
+- Only fires when `targetDate === today_pst` — past dates are historical review, future dates belong to the Schedule scope (mirrors the Schedule endpoint's symmetric `effectiveFrom > today` floor at `schedule/route.ts:86`)
+- Status filter `.in('status', ['confirmed', 'in_progress'])` — mirrors populate at `populate/route.ts:65` exactly
+- Dedup against existing jobs via `SELECT appointment_id FROM jobs WHERE appointment_id IN (...)` — mirrors populate's pattern at `populate/route.ts:76-90` and Schedule's pattern at `schedule/route.ts:131-141`. The `jobs.appointment_id` UNIQUE constraint (migration `20260329000002`) is the load-bearing safety net
+- Staff filter parity: `filter=mine` → `employee_id = posEmployee.employee_id`; `filter=unassigned` → `employee_id IS NULL`; `filter=all` → no filter (mirrors the existing jobs-query switch at `:82-88`)
+- Non-fatal error path: if the un-started query fails, the endpoint still ships the jobs payload with `unstarted_appointments: []` rather than 500-ing the whole response. The 5xx path is reserved for jobs-list failures (the operator's primary work surface)
+
+**Backward compatibility:** the `data` field is unchanged. Older clients reading only `data` see identical behavior (the new field is silently ignored). The client gracefully defaults to `[]` when the field is absent (covers downgrade scenarios).
+
+**2. New type `PosUnstartedAppointment` in `src/app/pos/jobs/components/schedule-types.ts`:**
+
+Sibling of `PosScheduleEntry` (Schedule scope's future-appointment type). Same field shape — Memory #2 reuse — with `scope: 'today_unstarted'` as the discriminator literal (vs. `'schedule'` for the Schedule scope). Reusing the same shape lets the existing schedule card render primitives (customer / vehicle / services / time formatters) apply without translation.
+
+**3. New component `src/app/pos/jobs/components/unstarted-appointment-card.tsx`:**
+
+Self-contained appointment card with Start Intake button + future-date popup. Distinct visual treatment from job cards (dashed blue border, "Not Started" badge, no timer / no photo progress / no addon badge — none apply pre-materialization) to make the operator's "this hasn't started yet" affordance unmistakable.
+
+Click handler flow:
+- POST `/api/pos/jobs/start-intake` with `{ appointment_id }`
+- **201/200:** success toast + invoke `onMaterialized()` callback (parent refetches → card disappears, new job card appears)
+- **422 future_date:** open popup with `appointment_date` so the message is specific
+- **422 invalid_status:** specific error toast naming the current status
+- **Other 4xx/5xx:** generic error toast
+
+Future-date popup (defense-in-depth path):
+- The Today endpoint already filters to today's date, so this should never fire in steady state
+- Surfaces only for race cases (date shift between fetch and click, or operator's clock skews around PST midnight) — keeping the popup wired hardens the surface against those races
+- Confirm path: PATCH `appointments/{id}` with `{ scheduled_date: today_pst }` (uses the existing Session 1.5 PATCH endpoint — no state machine work since date-only changes don't trigger the cascade), then retries the Start Intake call. Success toast: "Moved to today + intake started"
+- Cancel path: closes popup, no action
+
+**4. Job-queue integration at `src/app/pos/jobs/components/job-queue.tsx`:**
+
+- New state `unstartedAppointments: PosUnstartedAppointment[]` and extraction in `fetchJobs` + `pollJobs` (poll keeps the strip in sync; no change-detection animation needed since cards either appear/disappear/unchanged — the jobs list carries the visual-highlight semantics)
+- New "Not Started — Confirmed for today" strip rendered above BOTH timeline and list views in Today scope. Suppressed when empty (no visual noise on a quiet day) and suppressed for past dates (the server omits the field, so the empty default doubles as the past-date suppression). Today-only via the existing `isToday` derived bool
+- `onMaterialized` callback re-fetches Today scope (mirrors the existing Refresh-button path); `markLocalUpdate('__intake_${id}__')` suppresses the highlight animation on the resulting job card (operator just authored the materialization, no need to draw attention)
+
+**Walk-in flow unchanged.** The new strip surfaces only the un-materialized-appointment case; walk-ins (`channel='walk_in'`, atomically created) flow through the existing Today list at `status='scheduled'` with no behavior change.
+
+**Coexistence with populate (until Session 2.5):** in production today, populate still runs on Today-scope mount, materializing today's confirmed appointments at `status='scheduled'` BEFORE the un-started query fires. So the un-started strip is practically empty in steady state. Session 2.5 retires populate; from then on, the strip becomes the canonical surface for un-started appointments and operators rely on Start Intake to materialize.
+
+**5. Tests added (25 new tests across 3 files):**
+
+`src/app/api/pos/jobs/__tests__/today-unstarted-appointments.test.ts` — 10 tests:
+- Confirmed appointment returned (1); in_progress returned (1)
+- Dedup against materialized jobs (1)
+- Past-date / future-date today-only gate (2)
+- Backward compat: existing `data` field preserved (1)
+- `filter=mine` → `employee_id` filter (1); `filter=unassigned` → `employee_id IS NULL` (1)
+- 401 unauthenticated (1)
+- Graceful empty default (1)
+
+`src/app/pos/jobs/components/__tests__/unstarted-appointment-card.test.tsx` — 11 tests:
+- Rendering: customer/vehicle/services/time/button (1); Not Started badge (1); detailer line shown/hidden (2)
+- Happy path: 201 → POST shape + onMaterialized + success toast (1)
+- 422 future_date: popup opens with date (1); cancel closes popup, no action (1); confirm → PATCH + retry + onMaterialized + success toast (1); confirm → PATCH fail → error toast + no retry (1)
+- 422 invalid_status: error toast + no popup (1)
+- 500: generic error toast + no popup (1)
+
+`src/app/pos/jobs/components/__tests__/job-queue-today-unstarted.test.tsx` — 4 tests:
+- Empty array → no strip (1)
+- 1 row → strip + "1 appointment" + card (1)
+- 3 rows → "3 appointments" + 3 cards (1)
+- Backward compat: server omits field → no strip, no crash (1)
+
+Full suite: 3074 / 3074 pass (was 3049 / 3049 — +3 files, +25 tests).
+
+**Pre-flight verifications (Memory #11):**
+- `pos/jobs/route.ts:15-141` GET handler boundaries — verified ✓
+- `populate/route.ts:42-47, :65, :169-171` — verified ✓
+- `schedule/route.ts:131-141` dedup pattern — verified ✓
+- `job-queue.tsx` Today render branch (lines 1059-1287) — verified, restructured to inject the strip above both views ✓
+- `/api/pos/jobs/start-intake` endpoint contract (Session 2.1) — verified ✓
+- `/api/pos/appointments/[id]` PATCH supports date-only updates (Session 1.5) — verified ✓
+
+**Memory #8 status — BUDGET PUSHED:** estimated ≤150 prod lines / ≤5 files; actual ~500 prod lines / 4 prod files. The overrun is concentrated in the new component (275 lines = render JSX + popup modal + 3 fetch paths + error branching). Memory #2 was honored (reused `PosScheduleEntry` shape via the new `PosUnstartedAppointment` sibling type rather than inventing parallel primitives), but a self-contained appointment card with popup + 4 distinct response branches simply takes more code than the budget allowed. Surfacing transparently per Memory #8 discipline. No scope creep — every line traces to the locked AC-3 second-half scope.
+
+**Out of scope (per session prompt):**
+- ❌ Removing populate (Session 2.5)
+- ❌ Daily summary semantic change (Session 2.6)
+- ❌ Forward-arrow disposition (Session 2.3)
+- ❌ Terminal-state filters (Session 2.4)
+- ❌ Walk-in flow modifications
+- ❌ Timeline-mode lane integration — the un-started strip renders above the timeline view (not as in-lane blocks). Reason: timeline expects `JobListItem[]` with timer/work_started_at semantics; injecting un-started appointments as pseudo-jobs would break invariants. The strip-above approach gives operators visibility on both list and timeline views without a type union refactor.
+
+**Findings surfaced:**
+- The `pollJobs` change-detection animation is intentionally NOT applied to un-started cards. The operator authoring a Start Intake action triggers the card-to-job transition directly via `onMaterialized`; un-started appointments appearing via poll are either pre-existing (already visible on prior poll) or freshly created via a different path (a new booking landing as confirmed mid-shift, rare). The jobs list carries the visual-highlight semantics; un-started cards don't need them.
+- The `data-testid` IDs on cards (`unstarted-appointment-card-{id}`, `start-intake-btn-{id}`) and the popup (`future-date-prompt`, `future-date-prompt-cancel`, `future-date-prompt-confirm`) lock the test surface for the regression-prevention contract.
+
+---
+
 ## Session 2.1 — Start Intake server-side materialization endpoint (2026-06-06)
 
 First half of [AC-3](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-3-start-intake-as-materialization-trigger) (the biggest architectural shift in Phase 2). Implements the server primitive that powers operator-initiated job materialization. Session 2.2 builds the client-side wiring on top of this endpoint; Session 2.5 retires the implicit `populate`-on-Today-scope-mount behavior.

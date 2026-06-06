@@ -3,10 +3,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
-import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15 } from '@/lib/utils/pst-date';
+import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15, getTodayPst } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
+import type { PosUnstartedAppointment } from '@/app/pos/jobs/components/schedule-types';
 
 /**
  * GET /api/pos/jobs — List jobs for a date
@@ -133,11 +134,131 @@ export async function GET(request: NextRequest) {
       return { ...job, estimated_duration_minutes: totalMinutes };
     });
 
-    return NextResponse.json({ data: enrichedJobs });
+    // ── Session 2.2 (AC-3 second half) — un-started appointments ──────────────
+    // Today scope ALSO surfaces confirmed/in_progress appointments for TODAY
+    // that have not yet been materialized into a job. The operator presses
+    // Start Intake on these cards to invoke the Session 2.1 materialization
+    // endpoint. Only returned when `targetDate === today_pst` (past dates are
+    // historical review; future dates belong to the Schedule scope).
+    //
+    // Filter parity with the jobs query above: `mine` → assigned to me,
+    // `unassigned` → employee_id IS NULL, `all` → no filter. Mirrors the
+    // staff-filter switch at :82-88.
+    const todayPst = getTodayPst();
+    let unstartedAppointments: PosUnstartedAppointment[] = [];
+    if (targetDate === todayPst) {
+      // Step 1: candidate appointments for today, in materialization-eligible
+      // statuses (mirrors `populate/route.ts:65` exactly — confirmed +
+      // in_progress; pending requires confirmation; terminal states excluded).
+      let unstartedQuery = supabase
+        .from('appointments')
+        .select(`
+          id,
+          scheduled_date,
+          scheduled_start_time,
+          scheduled_end_time,
+          status,
+          channel,
+          total_amount,
+          deposit_amount,
+          customer:customers!customer_id(id, first_name, last_name, phone, email),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color),
+          detailer:employees!employee_id(id, first_name, last_name),
+          appointment_services(id, service_id, price_at_booking, tier_name, quantity, service:services!service_id(id, name))
+        `)
+        .eq('scheduled_date', todayPst)
+        .in('status', ['confirmed', 'in_progress'])
+        .order('scheduled_start_time');
+
+      if (filter === 'mine') {
+        unstartedQuery = unstartedQuery.eq('employee_id', posEmployee.employee_id);
+      } else if (filter === 'unassigned') {
+        unstartedQuery = unstartedQuery.is('employee_id', null);
+      }
+
+      const { data: candidateApts, error: candidateErr } = await unstartedQuery;
+      if (candidateErr) {
+        console.error('Unstarted appointments fetch error:', candidateErr.message);
+        // Non-fatal — the existing jobs payload still ships; an empty
+        // un-started array is a clean degraded state. The 5xx path is reserved
+        // for jobs-list failures (the operator's primary work surface).
+      } else if (candidateApts && candidateApts.length > 0) {
+        // Step 2: drop candidates that already have a materialized job (the
+        // dedup mirrors `populate/route.ts:76-90` and `schedule/route.ts:131-141`).
+        // jobs.appointment_id is UNIQUE so a single SELECT covers all dedup.
+        const candidateIds = candidateApts.map((a) => a.id);
+        const { data: existingJobs } = await supabase
+          .from('jobs')
+          .select('appointment_id')
+          .in('appointment_id', candidateIds);
+        const materialized = new Set(
+          (existingJobs ?? []).map((j) => (j as { appointment_id: string }).appointment_id)
+        );
+
+        const rawUnstartedRows = candidateApts as unknown as Array<UnstartedRawRow>;
+        unstartedAppointments = rawUnstartedRows
+          .filter((a) => !materialized.has(a.id))
+          .map((a) => ({
+            id: a.id,
+            scheduled_date: a.scheduled_date,
+            scheduled_start_time: a.scheduled_start_time,
+            scheduled_end_time: a.scheduled_end_time ?? null,
+            status: a.status,
+            channel: a.channel,
+            customer: a.customer ?? null,
+            vehicle: a.vehicle ?? null,
+            detailer: a.detailer ?? null,
+            appointment_services: (a.appointment_services ?? []).map((s) => ({
+              id: s.id,
+              service_id: s.service_id,
+              price_at_booking: Number(s.price_at_booking ?? 0),
+              tier_name: s.tier_name ?? null,
+              quantity: Number(s.quantity ?? 1),
+              service: s.service ?? null,
+            })),
+            total_amount: Number(a.total_amount ?? 0),
+            deposit_amount: a.deposit_amount == null ? null : Number(a.deposit_amount),
+            scope: 'today_unstarted' as const,
+          }));
+      }
+    }
+
+    return NextResponse.json({
+      data: enrichedJobs,
+      unstarted_appointments: unstartedAppointments,
+    });
   } catch (err) {
     console.error('Jobs list route error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+/**
+ * Session 2.2 — raw row shape for the un-started appointment query (mirrors
+ * `schedule/route.ts`'s `RawScheduleRow` pattern: Supabase embed cardinality
+ * is to-one for the joined FKs at runtime; the cast keeps the mapping
+ * tsc-clean).
+ */
+interface UnstartedRawRow {
+  id: string;
+  scheduled_date: string;
+  scheduled_start_time: string;
+  scheduled_end_time: string | null;
+  status: PosUnstartedAppointment['status'];
+  channel: PosUnstartedAppointment['channel'];
+  total_amount: number | string | null;
+  deposit_amount: number | string | null;
+  customer: PosUnstartedAppointment['customer'];
+  vehicle: PosUnstartedAppointment['vehicle'];
+  detailer: PosUnstartedAppointment['detailer'];
+  appointment_services: Array<{
+    id: string;
+    service_id: string;
+    price_at_booking: number | string | null;
+    tier_name: string | null;
+    quantity: number | string | null;
+    service: { id: string; name: string } | null;
+  }> | null;
 }
 
 /**
