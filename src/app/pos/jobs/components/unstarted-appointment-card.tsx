@@ -161,13 +161,24 @@ export function UnstartedAppointmentCard({
     }
   }, [appointment.id, callStartIntake, onMaterialized]);
 
+  // Session 2.4 (AC-7) — terminal-state appointments may appear in this strip
+  // when the operator opts in via the include-terminal toggle. They are not
+  // actionable here (Start Intake on a cancelled/completed/no_show appointment
+  // is structurally invalid — the server's invalid_status gate would reject
+  // it), so the button is suppressed and the card visually mutes.
+  const isTerminal =
+    appointment.status === 'cancelled' ||
+    appointment.status === 'completed' ||
+    appointment.status === 'no_show';
+
   return (
     <>
       <div
         data-testid={`unstarted-appointment-card-${appointment.id}`}
         className={cn(
           'w-full rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-900/10 p-3 text-left shadow-sm',
-          busy && 'opacity-60 pointer-events-none'
+          busy && 'opacity-60 pointer-events-none',
+          isTerminal && !busy && 'opacity-60'
         )}
       >
         <div className="flex items-start justify-between gap-3">
@@ -212,18 +223,20 @@ export function UnstartedAppointmentCard({
             Assigned: {appointment.detailer.first_name} {appointment.detailer.last_name}
           </p>
         )}
-        <div className="mt-2 flex justify-end">
-          <button
-            type="button"
-            onClick={handleStartIntake}
-            disabled={busy}
-            data-testid={`start-intake-btn-${appointment.id}`}
-            className="flex items-center gap-1.5 rounded-full bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 disabled:opacity-50"
-          >
-            <Play className="h-3.5 w-3.5" />
-            {busy ? 'Starting…' : 'Start Intake'}
-          </button>
-        </div>
+        {!isTerminal && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={handleStartIntake}
+              disabled={busy}
+              data-testid={`start-intake-btn-${appointment.id}`}
+              className="flex items-center gap-1.5 rounded-full bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 disabled:opacity-50"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {busy ? 'Starting…' : 'Start Intake'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Future-date popup. Defense-in-depth path: the Today endpoint only

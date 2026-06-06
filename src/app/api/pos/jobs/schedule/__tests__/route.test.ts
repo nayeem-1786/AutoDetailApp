@@ -249,4 +249,53 @@ describe('GET /api/pos/jobs/schedule', () => {
     expect(state.jobsWrites).toEqual([]);
     expect(state.captured.jobsInIds).toEqual(['a', 'b']);
   });
+
+  // ─── Session 2.4 (AC-7) — terminal-state opt-in ───────────────────────────
+  describe('include_terminal opt-in', () => {
+    it('drops the status-exclusion filter when include_terminal=true', async () => {
+      state.appointments = [appt()];
+      const res = await GET(makeReq('?include_terminal=true'));
+      expect(res.status).toBe(200);
+      // The .not(status, in, ...) filter never fires when the toggle is on, so
+      // captured.not retains its initial empty-string value.
+      expect(state.captured.not).toBe('');
+    });
+
+    it('accepts include_terminal=1 alias (URL-shape convenience)', async () => {
+      state.appointments = [appt()];
+      const res = await GET(makeReq('?include_terminal=1'));
+      expect(res.status).toBe(200);
+      expect(state.captured.not).toBe('');
+    });
+
+    it('keeps the status-exclusion filter active when include_terminal is absent', async () => {
+      state.appointments = [appt()];
+      const res = await GET(makeReq());
+      expect(res.status).toBe(200);
+      // Sanity: default behavior unchanged — the exclusion still names all
+      // three terminal statuses.
+      expect(state.captured.not).toContain('cancelled');
+      expect(state.captured.not).toContain('no_show');
+      expect(state.captured.not).toContain('completed');
+    });
+
+    it('returns terminal-state rows when include_terminal=true (mock filter off)', async () => {
+      // Mock doesn't filter on .not(), so include_terminal just controls
+      // whether the filter is appended. The test asserts behavior at the
+      // captured-filter layer (above) + that the response still shapes correctly
+      // with a terminal-status row in the state.
+      state.appointments = [appt({ id: 'apt-cancelled', status: 'cancelled' })];
+      const res = await GET(makeReq('?include_terminal=true'));
+      const body = await res.json();
+      expect(body.data).toHaveLength(1);
+      expect(body.data[0].status).toBe('cancelled');
+    });
+
+    it('include_terminal=false (explicit) is treated as off', async () => {
+      state.appointments = [appt()];
+      const res = await GET(makeReq('?include_terminal=false'));
+      expect(res.status).toBe(200);
+      expect(state.captured.not).toContain('cancelled');
+    });
+  });
 });

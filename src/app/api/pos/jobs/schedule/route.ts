@@ -62,6 +62,12 @@ export async function GET(request: NextRequest) {
     const from = url.searchParams.get('from') || defaultFrom;
     const to = url.searchParams.get('to') || defaultTo;
     const channel = url.searchParams.get('channel');
+    // Session 2.4 (AC-7) — terminal-state opt-in. Default behavior (no param)
+    // excludes cancelled/no_show/completed per `EXCLUDED_STATUSES`. When the
+    // operator sets `include_terminal=true`, the exclusion is bypassed so
+    // terminal-state appointments surface for review/recovery action.
+    const includeTerminalRaw = url.searchParams.get('include_terminal');
+    const includeTerminal = includeTerminalRaw === 'true' || includeTerminalRaw === '1';
 
     if (!isValidDate(from) || !isValidDate(to)) {
       return NextResponse.json(
@@ -111,9 +117,12 @@ export async function GET(request: NextRequest) {
       `)
       .gte('scheduled_date', effectiveFrom)
       .lte('scheduled_date', to)
-      .not('status', 'in', `(${EXCLUDED_STATUSES.join(',')})`)
       .order('scheduled_date')
       .order('scheduled_start_time');
+
+    if (!includeTerminal) {
+      query = query.not('status', 'in', `(${EXCLUDED_STATUSES.join(',')})`);
+    }
 
     if (channel) query = query.eq('channel', channel);
 

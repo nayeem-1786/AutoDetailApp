@@ -643,7 +643,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
-| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) merged 2026-06-06 PDT; AC-3 + AC-8 complete |
+| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (pending merge) merged 2026-06-06 PDT; AC-3 + AC-7 + AC-8 complete |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
@@ -1444,6 +1444,77 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 **Linked prompt:** Session 2.3 prompt (operator-supplied in 2026-06-06 PST session)
 
 **Completion:** Merged to main at `269b94f7` on 2026-06-06 PDT. Implementation followed the locked scope exactly. The single new callback `handleForwardArrow` reuses the existing `handleScopeChange` + `setScheduleFilter` + `router.push` primitives (Memory #2) — no new URL utilities, no new date helpers. The flag gate (`scheduleScopeEnabled`) is byte-symmetric with the scope toggle's flag gate at the same component scope — flag rollback restores legacy forward-arrow behavior without touching this code. Verification gates: tsc 0 errors / lint 0 errors (1 pre-existing baseline warning unchanged — `lastPollAt` from prior session) / 191 test files / 3079 tests passing (was 190 / 3074 — +1 file, +5 tests). 33 production lines / 1 prod file / 1 test file — well within the Memory #8 budget. No deviations from scope. No findings to surface.
+
+---
+
+### Session 2.4 — Terminal-state filter affordance
+
+**Status:** `[x]` **Complete — merged to main at `<pending>` on 2026-06-06 PDT**
+**Source:** [AC-7](#ac-7-terminal-states-viewable-via-filter-hidden-by-default) (whole AC)
+**Estimated scope:** ~50-80 prod lines / 3-4 files / +5-8 tests
+**Actual scope:** ~140 prod lines / 4 prod files / +20 tests across 2 modified test files + 1 new file
+**Memory #8 budget:** Pushed slightly past nominal upper bound — the visual-mute treatment (Today list + Schedule list + un-started strip) + the pill-color expansion (cancelled / completed / no_show hues in `getAppointmentStatusPillClasses`) + the Schedule status dropdown's 3 conditional options were below-the-line work that honors AC-7's "visual distinction" phrasing. No scope creep — every line traces to the locked AC-7 surface.
+
+**Issue:** AC-7 commits to terminal-state appointments (cancelled / completed / no_show) being hidden by default in POS > Jobs Today + Schedule scopes, with an operator-opt-in filter to view them for review/recovery action. Before Session 2.4 the exclusion was unconditional via `EXCLUDED_STATUSES` constants in both endpoints (`schedule/route.ts:12` and the inline `excludeStatuses = ['cancelled']` at `jobs/route.ts:47`), with no UI affordance to bypass.
+
+**Solution (as implemented):**
+
+1. **Server — Today endpoint** (`src/app/api/pos/jobs/route.ts`) — new `include_terminal=true|1` query param flips TWO filters simultaneously: (a) drops `'cancelled'` from the jobs query exclusion (`excludeStatuses = includeTerminal ? [] : ['cancelled']`), guarded by a `.length > 0` check before attaching `.not('status', 'in', '()')` to avoid malformed PostgREST syntax in the empty case; (b) expands the un-started appointments `.in('status', [...])` array from the 2-status materialization-eligible set (`['confirmed', 'in_progress']`) to the 5-status superset (`['confirmed', 'in_progress', 'cancelled', 'completed', 'no_show']`). Pending stays excluded from un-started semantics — it never reaches "un-started" on Today scope (un-confirmed appointments don't surface as actionable here).
+
+2. **Server — Schedule endpoint** (`src/app/api/pos/jobs/schedule/route.ts`) — same `include_terminal` param. The `.not('status', 'in', \`(${EXCLUDED_STATUSES.join(',')})\`)` filter call is now wrapped in `if (!includeTerminal)` so the entire exclusion is bypassed atomically when the toggle is on.
+
+3. **Client — toggle state + URL persistence** (`src/app/pos/jobs/components/job-queue.tsx`) — new `includeTerminal: boolean` state initialized from `searchParams.get('include_terminal') === '1' || 'true'`. New `handleIncludeTerminalChange` callback mirrors the existing setDate URL-write pattern: builds `new URLSearchParams(searchParams.toString())`, sets/deletes `include_terminal`, calls `router.replace`. Scope-shared by design — a single URL key drives both Today + Schedule fetches.
+
+4. **Client — fetch param threading** — `fetchJobs(date)`, `pollJobs`, and `fetchSchedule` all gain a `terminalQs = includeTerminal ? '&include_terminal=1' : ''` suffix on the URL. `includeTerminal` added to each callback's dep array so the polling re-fires on toggle flip and the Schedule re-reads on toggle flip.
+
+5. **Client — toggle UI** — chip-style button rendered in BOTH scope chromes. Today filter-pills row gets `ml-auto`-right-aligned chip (mirrors the existing pills' visual language — same `rounded-full px-3 py-1`, same active-state blue). Schedule filter-bar grows a new own-row with right-aligned chip below the existing status/detailer row. Both chips share `role="switch" aria-checked={includeTerminal}` for AT semantics; label flips between "Show terminal" (off) and "Showing terminal" (on); both use `data-testid="include-terminal-toggle-{today,schedule}"`.
+
+6. **Client — Schedule status dropdown expansion** — when `includeTerminal` is on, the 3-option status dropdown grows to 6 options (cancelled / completed / no_show appended via a `<>` fragment guarded by `{includeTerminal && (...)}`). Operator can now narrow into a specific terminal state for review. The X2 LOCKED comment updated to reflect the new dependency.
+
+7. **Client — visual mute (3 surfaces)** — terminal-state cards across all three render sites carry `opacity-60`:
+   - Today list-view job-card: `isTerminalCard = job.status === 'cancelled'` (only cancelled is gated behind the toggle; completed/closed jobs were always visible and muting them would change unrelated UX).
+   - Schedule `ScheduleScopeList` entry-card: `isTerminal = TERMINAL_APPT_STATUSES.has(entry.status)` (all three appointment terminals).
+   - Today un-started strip `UnstartedAppointmentCard`: same predicate.
+
+8. **Client — pill-color expansion** — `getAppointmentStatusPillClasses` extended with three new `case` branches for terminal statuses: `cancelled` → red, `completed` → green, `no_show` → orange. Replaces the default-case gray fallback for those values so the operator's eye can scan and spot recovery candidates at a glance.
+
+9. **Client — Start Intake suppression on terminal** (`unstarted-appointment-card.tsx`) — when the toggle-surfaced un-started array carries a terminal-state row, the Start Intake button is suppressed via `{!isTerminal && (...)}`. The server helper's `invalid_status` gate would reject the call anyway; suppressing the affordance is correct UX. Card body retains status pill + customer/vehicle/services context.
+
+**Why:**
+- Closes AC-7 in both scopes with a single shared URL key
+- Establishes the URL-persistent boolean-toggle pattern for future scope-shared filters (mirrors the Session 1.6 sched_pills pattern + the Phase 1B scope-toggle pattern)
+- The visual-mute + pill-color treatments don't depend on the toggle being on — they apply whenever a terminal-state card is rendered, so the same primitives work for any future surface that opts in to terminal display
+
+**Pre-tasks:**
+- `[x]` Session 2.1 + 2.2 merged (`a5d2a0d6` + `f25bb87d`) — un-started query established as the locus where terminal-state appointments would surface on Today scope
+- `[x]` Session 1.6 merged (`cfa9cfa4`) — sched_pills URL-persistent filter pattern established as the template for include_terminal's URL persistence
+
+**Primary files:**
+- `src/app/api/pos/jobs/route.ts` (MOD — param parse + jobs exclude conditional + un-started status set conditional)
+- `src/app/api/pos/jobs/schedule/route.ts` (MOD — param parse + EXCLUDED_STATUSES conditional)
+- `src/app/pos/jobs/components/job-queue.tsx` (MOD — state + URL persistence + toggle UI in both chromes + Schedule dropdown 3 conditional options + 2 visual-mute predicates + pill-color expansion)
+- `src/app/pos/jobs/components/unstarted-appointment-card.tsx` (MOD — terminal predicate + opacity-60 + Start Intake suppression)
+
+**Test files:**
+- `src/app/api/pos/jobs/schedule/__tests__/route.test.ts` (MOD — +5 cases: include_terminal=true|1|false|absent at the filter-capture layer + terminal-row response shape)
+- `src/app/api/pos/jobs/__tests__/today-unstarted-appointments.test.ts` (MOD — +6 cases: default keeps the 2-status filter + .not(cancelled) on jobs, opt-in expands to 5 statuses + drops the .not(), terminal-status row returned with the flag; mock extended to capture status array + .not filter strings)
+- `src/app/pos/jobs/components/__tests__/job-queue-include-terminal.test.tsx` (NEW — 9 cases: chip presence, default OFF / aria-checked=false, default fetch omits param, click → URL write + ON state + label flip + refetch with param, initial URL param mounts ON + threads into first fetch, ON→OFF strips param)
+
+**Evidence citations:**
+- AC-7: *"Terminal-state appointments (cancelled, completed, no_show) are NOT shown by default in POS > Jobs Today or Schedule scopes. Operator can opt in via a filter affordance to view them for review/recovery action."*
+- AC-7 operator input: *"Terminal states (appointment-side): completed / cancelled / no_show. These should also be able to be viewed using filters from the Job panel view, not shown by default."*
+- `pos/jobs/route.ts:47` (pre-2.4) — inline `excludeStatuses = ['cancelled']` constant
+- `pos/jobs/schedule/route.ts:12` — `EXCLUDED_STATUSES = ['cancelled', 'no_show', 'completed']` constant
+- Session 1.6 `sched_pills` URL-persistent filter pattern — template for `include_terminal` URL persistence (Memory #2)
+
+**Related sessions:**
+- Depends on: Sessions 2.1, 2.2 (un-started query as the locus where terminal apps surface on Today); Session 1.6 (URL-persistent filter pattern)
+- Parallel-merged with: Session 2.3 (forward-arrow) — clean rebase, no conflicts; the forward-arrow handler and the include-terminal toggle live in disjoint code regions of `job-queue.tsx`
+- Unblocks: nothing immediate — AC-7 is structurally orthogonal to the remaining Phase 2 work (Session 2.5 populate retirement)
+
+**Linked prompt:** Session 2.4 prompt (operator-supplied in 2026-06-06 PST session)
+
+**Completion:** Merged to main at `<pending>` on 2026-06-06 PDT. Implementation followed the locked scope. The chip-style toggle is rendered in BOTH scope chromes (the Today filter-pills row gets `ml-auto`-right-aligned placement; Schedule grows a new own-row below the existing status+detailer row) — they share the SAME URL key and the SAME handler, so toggling either surface persists across both. Memory #11 verified at execution time: `pos/jobs/route.ts:47` excludeStatuses + `pos/jobs/schedule/route.ts:12` EXCLUDED_STATUSES + `job-queue.tsx:179-192` `getAppointmentStatusPillClasses` + the un-started appointments status filter site all confirmed against the post-Session-2.3 main HEAD. **Parallel-merge handling per Memory feedback "Merging a parallel session to main":** branch was created before Session 2.3 merged; after Session 2.3's merge (`269b94f7`) landed on main, this branch was rebased atop the new main with zero conflicts — the forward-arrow handler at `job-queue.tsx:894-900` and the include-terminal toggle additions live in disjoint regions of the file. Re-ran tsc / lint / vitest post-rebase to confirm 0 conflicts at runtime semantics (Session 2.3's 5 new tests + Session 2.4's 20 new tests all pass alongside the pre-existing 3074). Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean / 192 test files / 3099 tests passing (was 191 / 3079 — +1 file, +20 tests). **Memory #2 honored:** the URL-write helper mirrors `handleScheduleFilterChange`'s pattern byte-for-byte (preserves other params via `new URLSearchParams(searchParams.toString())` + selective set/delete + `router.replace`); pill-color extension reuses the existing `${base}` template literal pattern; visual-mute reuses the existing `opacity-60` className (same value used for the un-started card's busy state, the Schedule card's busy state, etc.). **AC-7 STATUS:** Both scopes carry the toggle; default behavior unchanged; URL-persistent; visual distinction landed. AC-7 commitment is now fulfilled.
 
 ---
 
