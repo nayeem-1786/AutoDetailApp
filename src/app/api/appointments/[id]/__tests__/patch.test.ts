@@ -33,11 +33,15 @@ const state = {
     scheduled_date: string;
     scheduled_start_time: string;
     scheduled_end_time: string;
+    employee_id: string | null;
     job_notes: string | null;
     internal_notes: string | null;
   },
   overlapping: [] as Array<{ id: string }>,
   appointmentUpdates: [] as Array<Record<string, unknown>>,
+  // Session 1.2 — Drift #10 fix capture: every `jobs.update({ ... }).eq('appointment_id', X)`
+  // call lands here so the cascade test can assert exactly what was written.
+  jobUpdates: [] as Array<{ filter: string; payload: Record<string, unknown> }>,
   auditCalls: [] as Array<Record<string, unknown>>,
   webhookFires: [] as Array<{ event: string; payload: unknown }>,
   linkedJob: null as null | { id: string },
@@ -144,6 +148,14 @@ vi.mock('@/lib/supabase/admin', () => ({
               maybeSingle: async () => ({ data: state.linkedJob, error: null }),
             }),
           }),
+          // Session 1.2 — Drift #10 fix surface: PATCH's new
+          // `jobs.update({ assigned_staff_id }).eq('appointment_id', id)` cascade.
+          update: (payload: Record<string, unknown>) => ({
+            eq: async (_col: string, val: string) => {
+              state.jobUpdates.push({ filter: val, payload });
+              return { error: null };
+            },
+          }),
         };
       }
       return {};
@@ -180,11 +192,13 @@ beforeEach(() => {
     scheduled_date: '2026-05-15',
     scheduled_start_time: '10:00:00',
     scheduled_end_time: '11:00:00',
+    employee_id: null,
     job_notes: null,
     internal_notes: null,
   };
   state.overlapping = [];
   state.appointmentUpdates = [];
+  state.jobUpdates = [];
   state.auditCalls = [];
   state.webhookFires = [];
   state.linkedJob = null;
@@ -287,5 +301,73 @@ describe('PATCH /api/appointments/[id] — Session 1.5 admin/POS symmetry', () =
     expect(state.appointmentUpdates).toHaveLength(1);
     expect(state.appointmentUpdates[0].job_notes).toBe('wax on');
     expect(state.appointmentUpdates[0].internal_notes).toBe('vip');
+  });
+
+  // Session 1.2 — Drift fixes from parity audit b346d34b Target C. Mirror the
+  // POS PATCH symmetry for `employee_id` handling so admin no longer diverges.
+  // Four locked drifts: #9 (audit-log includes employee_id), #10 (cascade to
+  // jobs.assigned_staff_id), #11 (empty-string → null normalization), and
+  // #15 (page-level adminFetch — covered in a separate page-level smoke).
+
+  it('Session 1.2 Drift #10: detailer reassignment with active job cascades to jobs.assigned_staff_id', async () => {
+    state.appointment!.employee_id = null;
+    state.linkedJob = { id: 'job-1' };
+    const newDetailer = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+
+    const res = await PATCH(makeReq({ employee_id: newDetailer }), { params });
+    expect(res.status).toBe(200);
+
+    // Cascade fires unconditionally on employee_id presence — the .eq filter
+    // matches the linked job and writes the new assigned_staff_id.
+    expect(state.jobUpdates).toHaveLength(1);
+    expect(state.jobUpdates[0].filter).toBe('appt-1');
+    expect(state.jobUpdates[0].payload.assigned_staff_id).toBe(newDetailer);
+    expect(state.appointmentUpdates[0].employee_id).toBe(newDetailer);
+  });
+
+  it('Session 1.2 Drift #10: detailer reassignment with NO active job is a graceful no-op (cascade fires but matches 0 rows)', async () => {
+    state.appointment!.employee_id = null;
+    state.linkedJob = null;
+    const newDetailer = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+
+    const res = await PATCH(makeReq({ employee_id: newDetailer }), { params });
+    expect(res.status).toBe(200);
+
+    // The cascade UPDATE statement still fires (cheap idempotent no-op on a
+    // 0-row match), mirroring POS PATCH's unconditional shape at
+    // `pos/appointments/[id]/route.ts:377-383`. The appointment UPDATE runs
+    // regardless. Test asserts the cascade call shape — DB layer handles
+    // the 0-row case silently.
+    expect(state.jobUpdates).toHaveLength(1);
+    expect(state.jobUpdates[0].payload.assigned_staff_id).toBe(newDetailer);
+    expect(state.appointmentUpdates[0].employee_id).toBe(newDetailer);
+  });
+
+  it('Session 1.2 Drift #9: detailer reassignment surfaces employee_id in the audit-log diff', async () => {
+    state.appointment!.employee_id = 'old-emp-uuid';
+    const newDetailer = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+
+    const res = await PATCH(makeReq({ employee_id: newDetailer }), { params });
+    expect(res.status).toBe(200);
+
+    const audit = state.auditCalls[0];
+    const changes = (audit.details as { changes: Record<string, { from: unknown; to: unknown }> }).changes;
+    expect(changes.employee_id).toEqual({ from: 'old-emp-uuid', to: newDetailer });
+    expect(audit.source).toBe('admin');
+  });
+
+  it('Session 1.2 Drift #11: empty-string employee_id is normalized to NULL on the appointment write', async () => {
+    state.appointment!.employee_id = 'some-existing-uuid';
+    // Direct-PATCH caller (script, future API consumer, or test) submits ''
+    // — without the normalization, '' would be written as the literal empty
+    // string into a UUID FK column, causing a 22P02 invalid_text_representation
+    // error or silent FK acceptance depending on the row. Normalization at
+    // payload-construction time is the defensive layer.
+    const res = await PATCH(makeReq({ employee_id: '' }), { params });
+    expect(res.status).toBe(200);
+
+    expect(state.appointmentUpdates[0].employee_id).toBeNull();
+    // And the cascade thread propagates the same normalization to jobs.
+    expect(state.jobUpdates[0].payload.assigned_staff_id).toBeNull();
   });
 });

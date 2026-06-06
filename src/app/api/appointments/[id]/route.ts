@@ -59,9 +59,13 @@ export async function PATCH(
     const supabase = createAdminClient();
 
     // Fetch current appointment
+    // Session 1.2 — Drift #9 fix (parity audit b346d34b Target C): `employee_id`
+    // added to the SELECT so buildChangeDetails can record from→to detailer
+    // reassignments in the admin audit_log. POS PATCH at
+    // `/api/pos/appointments/[id]/route.ts:225` already selects it.
     const { data: current, error: fetchErr } = await supabase
       .from('appointments')
-      .select('id, status, scheduled_date, scheduled_start_time, scheduled_end_time, job_notes, internal_notes')
+      .select('id, status, scheduled_date, scheduled_start_time, scheduled_end_time, employee_id, job_notes, internal_notes')
       .eq('id', id)
       .single();
 
@@ -170,7 +174,15 @@ export async function PATCH(
     if (data.scheduled_date !== undefined) update.scheduled_date = data.scheduled_date;
     if (data.scheduled_start_time !== undefined) update.scheduled_start_time = data.scheduled_start_time;
     if (data.scheduled_end_time !== undefined) update.scheduled_end_time = data.scheduled_end_time;
-    if (data.employee_id !== undefined) update.employee_id = data.employee_id;
+    // Session 1.2 — Drift #11 fix (parity audit b346d34b Target C): empty-string
+    // `employee_id` normalized to NULL before write. The page-level `handleSave`
+    // at `src/app/admin/appointments/page.tsx` already pre-normalizes for this
+    // surface's submit path, but the server is the canonical defense layer —
+    // any direct PATCH caller (scripts, tests, future API consumers) that sends
+    // `employee_id=''` would otherwise write an empty string to a UUID FK column.
+    // Mirrors POS PATCH at `/api/pos/appointments/[id]/route.ts:358`.
+    if (data.employee_id !== undefined)
+      update.employee_id = data.employee_id === '' ? null : data.employee_id;
     if (data.job_notes !== undefined) update.job_notes = data.job_notes;
     if (data.internal_notes !== undefined) update.internal_notes = data.internal_notes;
 
@@ -187,6 +199,23 @@ export async function PATCH(
         { error: 'Failed to update appointment' },
         { status: 500 }
       );
+    }
+
+    // Session 1.2 — Drift #10 fix (parity audit b346d34b Target C): keep
+    // `jobs.assigned_staff_id` in sync on a detailer reassignment. Without this
+    // cascade, an admin-side reassignment leaves the linked job's
+    // `assigned_staff_id` stale until the next populate run (or never, if the
+    // job was walk-in-created). Mirrors POS PATCH at
+    // `/api/pos/appointments/[id]/route.ts:377-383` byte-for-byte. The cascade
+    // is unconditional on employee_id presence — graceful no-op when no linked
+    // jobs row exists (the `.eq('appointment_id', id)` filter matches 0 rows
+    // and Supabase returns `{ error: null, count: 0 }`).
+    if (data.employee_id !== undefined) {
+      const newEmployeeId = data.employee_id === '' ? null : data.employee_id;
+      await supabase
+        .from('jobs')
+        .update({ assigned_staff_id: newEmployeeId })
+        .eq('appointment_id', id);
     }
 
     // Fire webhooks based on status changes
@@ -236,7 +265,11 @@ export async function PATCH(
       entityType: 'booking',
       entityId: id,
       entityLabel: `Appointment #${id.slice(0, 8)}`,
-      details: buildChangeDetails(current, auditPayload, ['status', 'scheduled_date', 'scheduled_start_time', 'scheduled_end_time', 'job_notes', 'internal_notes']),
+      // Session 1.2 — Drift #9 fix: `employee_id` added to the audit-log diff
+      // field list. Detailer reassignments via admin now surface in audit
+      // history. Mirrors POS PATCH's field list at
+      // `/api/pos/appointments/[id]/route.ts:444-452`.
+      details: buildChangeDetails(current, auditPayload, ['status', 'scheduled_date', 'scheduled_start_time', 'scheduled_end_time', 'employee_id', 'job_notes', 'internal_notes']),
       ipAddress: getRequestIp(request),
       source: 'admin',
     });
