@@ -927,10 +927,11 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 
 ### Session 1.4 — Open SAFE state machine transitions
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` **Complete — merged to main at `44c8ea05` on 2026-06-06 11:03 PDT**
 **Source:** State machine audit b0efd95f + consequence map d3671c82 Target E.1
 **Estimated scope:** ~10 prod lines / 2 files / +2-3 tests
-**Memory #8 budget:** Tiny
+**Actual scope:** ~12 prod lines / 2 prod files (`status-transitions.ts` + PATCH test) / +2 test cases / +1 CHANGELOG entry / +1 doc status flip
+**Memory #8 budget:** Tiny (honored)
 
 **Issue:** `STATUS_TRANSITIONS` at `src/lib/appointments/status-transitions.ts:15-22` blocks two transitions that the consequence map (d3671c82) classified SAFE:
 1. `pending → in_progress` — no PATCH-side effects; no idempotency concerns
@@ -967,11 +968,11 @@ Update the test at `src/app/api/pos/appointments/[id]/__tests__/patch.test.ts:26
 
 **Related sessions:**
 - Independent — can ship anytime
-- Unblocks: Session 1.5 (state machine loosening pattern established)
+- Unblocks: Session 1.5 (state machine loosening pattern established + in-source comment style at `STATUS_TRANSITIONS` documents AC-5 citations for future readers)
 
-**Linked prompt:** TBD
+**Linked prompt:** session-1-4.md
 
-**Completion:** TBD
+**Completion:** Merged at `44c8ea05` on 2026-06-06 11:03 PDT. Both SAFE transitions opened in the map; +2 PATCH test cases pin the new behavior; existing `completed → pending` terminal regression test preserved as the over-loosening sanity check. Memory #11 note: the brief identified line 261-264 of `patch.test.ts` as asserting `in_progress → no_show` blocked, but on inspection that test asserts `completed → pending` blocked — the `in_progress → no_show`-blocked assertion was not in the file pre-session; surfaced and resolved by adding +2 NEW positive-case tests rather than flipping a non-existent one. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings) / build clean / 179 test files / 2973 tests passing (was 2971). Admin PATCH symmetry deliberately NOT touched — that's Session 1.5's territory per the locked plan.
 
 ---
 
@@ -1004,7 +1005,7 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 **Pre-tasks:**
 - `[x]` Phase 0.1 audit complete (`69b15b0f`, 2026-06-05) — surfaced the BLOCKED verdict
 - `[x]` Webhook receivers identity audit complete (`f5e714a8`, 2026-06-05) — **UNBLOCKED** per [AC-5](#ac-5-state-machine-loosening-2-safe-2-with-cascade) pre-task resolution. No n8n receiver exists; `fireWebhook` is silently no-op; duplicate-customer-SMS via webhook chain cannot occur. Session 1.5 may proceed without source-side idempotency work for the webhook concern specifically.
-- `[ ]` Verify Session 1.4 merged (state machine loosening pattern in place)
+- `[x]` Verify Session 1.4 merged (state machine loosening pattern in place) — merged at `44c8ea05` on 2026-06-06 11:03 PDT
 
 **Primary files:**
 - `src/lib/appointments/status-transitions.ts` (open the 2 transitions)
