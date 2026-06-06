@@ -20,6 +20,12 @@ import type { AppointmentWithRelations } from './types';
 import { withHasActiveJob } from './has-active-job';
 import type { Employee } from '@/lib/supabase/types';
 import type { AppointmentUpdateInput, AppointmentCancelInput } from '@/lib/utils/validation';
+// Session 1.2 — Drift #15 fix (parity audit b346d34b Target C): the
+// canonical admin-page network call pattern. `adminFetch` wraps `fetch` and
+// auto-redirects to `/login?reason=session_expired` on a 401 so an expired
+// session lands the operator on a login screen rather than a silent
+// "Failed to update appointment" toast with no recovery affordance.
+import { adminFetch } from '@/lib/utils/admin-fetch';
 
 interface AppointmentStatsData {
   today: { count: number; revenue: number };
@@ -250,7 +256,7 @@ export default function AppointmentsPage() {
         employee_id: data.employee_id || null,
       };
 
-      const res = await fetch(`/api/appointments/${id}`, {
+      const res = await adminFetch(`/api/appointments/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -275,7 +281,7 @@ export default function AppointmentsPage() {
 
   async function handleCancelConfirm(id: string, data: AppointmentCancelInput): Promise<boolean> {
     try {
-      const res = await fetch(`/api/appointments/${id}/cancel`, {
+      const res = await adminFetch(`/api/appointments/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
