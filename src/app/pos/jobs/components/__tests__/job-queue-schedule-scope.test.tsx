@@ -297,8 +297,12 @@ describe('Item 15e Phase 2B — Schedule card tap mount + save flow', () => {
   it('2. a successful fetch mounts the detail dialog with POS context props', async () => {
     await tapFirstCard();
     await waitFor(() => expect(screen.queryByTestId('detail-dialog')).toBeTruthy());
-    expect(lastDetailProps?.mobileModalMode).toBe('pos');
-    expect(lastDetailProps?.modifierVariant).toBe('pos');
+    // Session 1.1 — legacy `mobileModalMode` + `modifierVariant` props were
+    // unified into a single `hostContext` prop (parity audit b346d34b
+    // Concern 2 + Memory #2). Assertion updated to lock the new shape.
+    expect(lastDetailProps?.hostContext).toBe('pos');
+    expect(lastDetailProps?.mobileModalMode).toBeUndefined();
+    expect(lastDetailProps?.modifierVariant).toBeUndefined();
     // Post-Phase-2B fix: the no-op `onEditInPos` was replaced by
     // `returnToPath="/pos/jobs"` so Save Changes inside the POS Sale tab
     // navigates back to Schedule. Regression-locks the no-op pattern:

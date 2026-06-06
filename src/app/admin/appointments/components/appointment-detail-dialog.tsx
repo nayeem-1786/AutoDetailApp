@@ -59,26 +59,50 @@ interface AppointmentDetailDialogProps {
   onOpenChange: (open: boolean) => void;
   appointment: AppointmentWithRelations | null;
   employees: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'>[];
-  onSave: (id: string, data: AppointmentUpdateInput) => Promise<boolean>;
-  onCancel: (appointment: AppointmentWithRelations) => void;
+  // Session 1.1 — `onSave` and `onCancel` are optional ONLY when
+  // `readOnly={true}`. The dashboard quick-peek surface omits both
+  // and passes `readOnly={true}`; every other caller MUST pass real
+  // handlers. The form-submit path is statically unreachable in
+  // read-only mode (the form + Save button aren't rendered), so
+  // optional here is safe; a runtime guard at the submit site
+  // protects against future regressions if a caller forgets both.
+  onSave?: (id: string, data: AppointmentUpdateInput) => Promise<boolean>;
+  onCancel?: (appointment: AppointmentWithRelations) => void;
   canReschedule: boolean;
   canCancel: boolean;
   canAddNotes?: boolean;
-  // Item 15e Phase 2A — context-mode props. Default to admin behavior so the
-  // admin surface is byte-identical; POS callers (Phase 2B) override them.
-  //   mobileModalMode — forwarded to <EditMobileModal> (switches its auth
-  //     surface: posFetch + POS mobile-zones endpoint vs admin fetch).
-  //   modifierVariant — forwarded to <ModifierSummary> (dark-aware pos styling).
-  //   returnToPath — destination for the "Edit in POS" deep-link's `returnTo`
-  //     param. After the operator saves changes inside the POS Sale tab,
-  //     Layer 8c's "Save Changes → router.push(returnTo)" navigates here.
-  //     Admin default returns to `/admin/appointments`; POS Schedule host
-  //     passes `/pos/jobs`. MUST be a same-origin internal path — validated
-  //     by `isSafeInternalPath` in `use-edit-mode-drain.ts`. Replaces the
-  //     Phase 2B `onEditInPos` no-op suppression (see audit
-  //     `docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md`).
-  mobileModalMode?: 'admin' | 'pos';
-  modifierVariant?: 'admin' | 'pos';
+  // Session 1.1 — unified host-divergence prop. Replaces the legacy trio
+  // (`mobileModalMode`, `modifierVariant`, and a would-be
+  // `unmaterializeContext`) per parity audit b346d34b Concern 2 and
+  // Memory #2 (one prop per dimension of host divergence). Default
+  // `'admin'` preserves byte-identical admin behavior; POS Schedule host
+  // passes `'pos'`. Threaded down to:
+  //   - <EditMobileModal mode={...}> — auth surface (posFetch + POS mobile
+  //     zones endpoint vs admin fetch)
+  //   - <ModifierSummary variant={...}> — dark-aware POS styling
+  //   - <UnMaterializeConfirmationDialog context={...}> — endpoint URL +
+  //     auth (closes Target D Finding 1 — was hardcoded 'admin' literal,
+  //     a no-op-equivalent that 401'd POS un-materialize → admin login
+  //     redirect)
+  hostContext?: 'admin' | 'pos';
+  // Session 1.1 — view-only mode. When true (dashboard quick-peek mount):
+  //   - Save button hidden (visible-but-disabled is itself misleading)
+  //   - Cancel Appointment button hidden (no destructive action in view mode)
+  //   - All editable form fields disabled
+  //   - `onSave` / `onCancel` may be omitted (statically unreachable)
+  // Default false — every other caller is read/write. Per parity audit
+  // b346d34b Q1 (operator confirmed view-only over wire-real-handlers).
+  readOnly?: boolean;
+  // `returnToPath` — destination for the "Edit in POS" deep-link's `returnTo`
+  // param. After the operator saves changes inside the POS Sale tab,
+  // Layer 8c's "Save Changes → router.push(returnTo)" navigates here.
+  // Admin default returns to `/admin/appointments`; POS Schedule host
+  // passes `/pos/jobs`. MUST be a same-origin internal path — validated
+  // by `isSafeInternalPath` in `use-edit-mode-drain.ts`. Replaces the
+  // Phase 2B `onEditInPos` no-op suppression (see audit
+  // `docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md`). Kept separate from
+  // `hostContext` per parity audit Concern 2 — it parameterizes a URL,
+  // not a host.
   returnToPath?: string;
 }
 
@@ -92,8 +116,8 @@ export function AppointmentDetailDialog({
   canReschedule,
   canCancel,
   canAddNotes = true,
-  mobileModalMode = 'admin',
-  modifierVariant = 'admin',
+  hostContext = 'admin',
+  readOnly = false,
   returnToPath = '/admin/appointments',
 }: AppointmentDetailDialogProps) {
   const router = useRouter();
@@ -199,11 +223,16 @@ export function AppointmentDetailDialog({
 
   async function onSubmit(data: AppointmentUpdateInput) {
     if (!appointment) return;
+    // Session 1.1 — defense-in-depth guard. The Save button isn't rendered
+    // when `readOnly={true}`, so this submit handler is statically
+    // unreachable in view-only mode. The guard is here in case a future
+    // caller forgets `onSave` AND `readOnly={true}` simultaneously.
+    if (!onSave) return;
 
     // If status is being changed to cancelled, redirect to cancel dialog
     if (data.status === 'cancelled' && appointment.status !== 'cancelled') {
-      if (!canCancel) {
-        // User doesn't have permission to cancel
+      if (!canCancel || !onCancel) {
+        // User doesn't have permission to cancel, or no cancel handler wired
         return;
       }
       onOpenChange(false);
@@ -368,7 +397,7 @@ export function AppointmentDetailDialog({
             loyalty_discount={appointment.loyalty_discount}
             manual_discount_value={appointment.manual_discount_value}
             manual_discount_label={appointment.manual_discount_label}
-            variant={modifierVariant}
+            variant={hostContext}
           />
         </div>
 
@@ -384,7 +413,7 @@ export function AppointmentDetailDialog({
                 <MapPin className="h-3.5 w-3.5" />
                 <span>Mobile Service</span>
               </div>
-              {canAddNotes && (
+              {canAddNotes && !readOnly && (
                 <button
                   type="button"
                   onClick={() => setEditingMobile('edit')}
@@ -434,7 +463,7 @@ export function AppointmentDetailDialog({
             admin can convert it. Opens the same modal with is_mobile
             defaulting to true. Gated on `appointments.add_notes`, same
             as the edit pencil. */}
-        {!(mobileOverride?.is_mobile ?? appointment.is_mobile) && canAddNotes && (
+        {!(mobileOverride?.is_mobile ?? appointment.is_mobile) && canAddNotes && !readOnly && (
           <button
             type="button"
             onClick={() => setEditingMobile('enable')}
@@ -477,7 +506,7 @@ export function AppointmentDetailDialog({
         <form id="detail-edit-form" onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
           <div className={canReschedule ? 'grid grid-cols-2 gap-3' : ''}>
             <FormField label="Status" error={errors.status?.message} htmlFor="detail-status">
-              <Select id="detail-status" {...register('status')}>
+              <Select id="detail-status" disabled={readOnly} {...register('status')}>
                 {recommendedStatuses.map((s) => (
                   <option key={s} value={s}>
                     {APPOINTMENT_STATUS_LABELS[s]}
@@ -528,7 +557,7 @@ export function AppointmentDetailDialog({
               id="detail-job-notes"
               {...register('job_notes')}
               rows={2}
-              disabled={!canAddNotes}
+              disabled={!canAddNotes || readOnly}
               className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-800"
             />
           </FormField>
@@ -538,14 +567,19 @@ export function AppointmentDetailDialog({
               id="detail-internal-notes"
               {...register('internal_notes')}
               rows={2}
-              disabled={!canAddNotes}
+              disabled={!canAddNotes || readOnly}
               className="flex w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-800"
             />
           </FormField>
         </form>
       </DialogContent>
       <DialogFooter>
-        {showCancelButton && (
+        {/* Session 1.1 — view-only mode (dashboard quick-peek) hides both
+            the destructive Cancel Appointment button AND the Save Changes
+            button. Visible-but-disabled is itself misleading; we render
+            only the Close affordance. Editable mounts (admin appointments,
+            POS Schedule) keep the existing tri-button footer. */}
+        {!readOnly && showCancelButton && onCancel && (
           <Button
             variant="destructive"
             size="sm"
@@ -561,9 +595,11 @@ export function AppointmentDetailDialog({
         <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
           Close
         </Button>
-        <Button type="submit" form="detail-edit-form" disabled={saving}>
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
+        {!readOnly && (
+          <Button type="submit" form="detail-edit-form" disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        )}
       </DialogFooter>
       <DialogClose onClose={() => onOpenChange(false)} />
       {/* Phase Mobile-1.9 full mobile picker modal. Rendered alongside
@@ -576,7 +612,7 @@ export function AppointmentDetailDialog({
       {editingMobile && (
         <EditMobileModal
           open
-          mode={mobileModalMode}
+          mode={hostContext}
           appointmentId={appointment.id}
           initial={
             editingMobile === 'enable'
@@ -607,11 +643,16 @@ export function AppointmentDetailDialog({
           onSaved={handleMobileEditSaved}
         />
       )}
-      {/* Item 15e Phase 2C-β-2 — un-materialize confirmation (admin context).
-          Opened by the Save intercept when an earlier-status revert targets an
-          appointment with an active job. On success the job is deleted + the
-          appointment reverted to pending; close the detail dialog so the parent
-          page refetches. */}
+      {/* Item 15e Phase 2C-β-2 — un-materialize confirmation. Opened by the
+          Save intercept when an earlier-status revert targets an appointment
+          with an active job. On success the job is deleted + the appointment
+          reverted to pending; close the detail dialog so the parent page
+          refetches.
+          Session 1.1 (parity audit b346d34b Target D Finding 1, HIGH): the
+          `context` prop now threads from `hostContext` instead of the
+          hardcoded `'admin'` literal that previously routed POS Schedule
+          un-materialize through `adminFetch` → 401 → admin-login redirect,
+          booting the POS operator. */}
       {showUnMaterializeModal && pendingFormData && (
         <UnMaterializeConfirmationDialog
           open={showUnMaterializeModal}
@@ -622,7 +663,7 @@ export function AppointmentDetailDialog({
             }
           }}
           appointment={appointment}
-          context="admin"
+          context={hostContext}
           onSuccess={() => {
             setShowUnMaterializeModal(false);
             setPendingFormData(null);

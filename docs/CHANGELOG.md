@@ -107,6 +107,79 @@ The template introduced by Session 1.8 (`waitlist_slot_available`) is reused unc
 
 ---
 
+## Session 1.1 — Close no-op suppression patterns + HIGH parity finding + unify host-divergence props into `hostContext` (2026-06-06)
+
+Surgical production fix + prop-shape unification. Phase 1 entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1 plan (Session 1.1 block, lines 789–830). Closes parity audit `b346d34b` Target D Findings 1 + 2 (Session A scope).
+
+**Finding 1 closed (HIGH-severity bug):** `<UnMaterializeConfirmationDialog context="admin" />` was hardcoded at `src/app/admin/appointments/components/appointment-detail-dialog.tsx:625`. When a POS Schedule operator triggered an earlier-status revert on an appointment with an active job, the un-materialize modal routed through `adminFetch` → admin endpoint → 401 → admin-login redirect → **operator booted from POS**. The hardcoded literal acted exactly like the pre-#150 `onEditInPos` no-op suppression: it ignored the host axis. Fixed by threading `context={hostContext}` instead. POS un-materialize now correctly routes through `posFetch` to the POS endpoint with POS auth.
+
+**Finding 2 closed (no-op anti-pattern):** The `/admin` dashboard quick-peek mount at `src/app/admin/page.tsx:683-692` passed `onSave={async () => false}` and `onCancel={() => {}}` — two literal no-op handlers wired into a visible-but-inert Save Changes button. Mirror of the Phase 2B `onEditInPos` no-op fixed in #150. Q1 LOCKED Option A (operator preference per parity audit Session A recommendation): added a `readOnly?: boolean` prop to the dialog and changed the dashboard mount to `readOnly`, omitting both handlers entirely. The Save Changes button is hidden (visible-but-disabled is itself misleading); the Cancel Appointment button is hidden; editable fields (Status select, Job Notes textarea, Internal Notes textarea, mobile-service pencil, "Enable Mobile" button) are disabled or unrendered.
+
+**Prop unification (Q2 LOCKED, Memory #2):** The dialog had three props all switching on the same admin-vs-POS axis — `mobileModalMode` (forwarded to `<EditMobileModal>`), `modifierVariant` (forwarded to `<ModifierSummary>`), and a would-be `unmaterializeContext` axis exposed by Finding 1. Per parity audit `b346d34b` Concern 2: collapsed into ONE `hostContext?: 'admin' | 'pos'` prop (default `'admin'`). Now threaded to all three sub-components from a single source. `returnToPath` stays separate (it parameterizes a URL, not a host).
+
+**The legacy props were removed cleanly (option (a) of the prompt's two paths)** — no backward-compat aliases. Only two call sites used them (admin appointments page, which relied on defaults, and POS Schedule's `job-queue.tsx`); the migration is trivial and aliases would carry permanent technical debt against Memory #2.
+
+**Memory #11 verification at execution time:**
+- Dialog `context="admin"` hardcode confirmed at line 625 ✓
+- Dashboard no-ops confirmed at lines 688-689 ✓
+- POS Schedule mount confirmed at `job-queue.tsx:1234-1236` ✓
+- `UnMaterializeConfirmationDialog`'s `context` prop already accepts `'admin' | 'pos'` (line 40 of that file) — no upstream extension needed ✓
+
+**Production changes (~29 prod lines net across 3 prod files):**
+
+1. **`src/app/admin/appointments/components/appointment-detail-dialog.tsx`** (+68 / -27, most expansions are doc comments):
+   - Interface: `onSave` + `onCancel` made optional (statically unreachable in `readOnly` mode; runtime guard at submit site for defense-in-depth); add `hostContext?: 'admin' | 'pos'` (default `'admin'`); add `readOnly?: boolean` (default `false`); remove `mobileModalMode` + `modifierVariant`. Doc comment block on `hostContext` enumerates the three sub-component threads.
+   - Sub-component threads: `<ModifierSummary variant={hostContext}>`, `<EditMobileModal mode={hostContext}>`, `<UnMaterializeConfirmationDialog context={hostContext}>` (the HIGH fix).
+   - Footer: hide Save Changes button when `readOnly`; hide Cancel Appointment button when `readOnly`; Close button always visible.
+   - Form fields: Status select carries `disabled={readOnly}`; Job Notes + Internal Notes textareas now use `disabled={!canAddNotes || readOnly}`; mobile-service pencil + "Enable Mobile" button hidden via `!readOnly` gate alongside the existing `canAddNotes` gate.
+   - `onSubmit` guard: returns early if `onSave` is undefined (the statically-unreachable case is now also runtime-safe).
+
+2. **`src/app/admin/page.tsx`** (+11 / -3):
+   - Removed `onSave={async () => false}` + `onCancel={() => {}}` no-ops.
+   - Added `readOnly` flag and a comment block citing the parity audit + the rationale ("operators who need to edit open it from `/admin/appointments` or `/pos/jobs` Schedule scope where real handlers are wired").
+
+3. **`src/app/pos/jobs/components/job-queue.tsx`** (+7 / -6):
+   - Replaced `mobileModalMode="pos"` + `modifierVariant="pos"` with `hostContext="pos"`.
+   - Updated the in-source comment block above the import to reference Session 1.1's unified prop pattern + Concern 2 + Memory #2.
+
+**Tests (+13 cases / +2 files, 1 test file modified):**
+
+1. **`src/app/admin/appointments/components/__tests__/appointment-detail-dialog-readonly.test.tsx`** (NEW, +163 lines / +7 cases): Locks the readOnly contract — Save Changes hidden, Cancel Appointment hidden even when `canCancel=true`, Close affordances still present (footer "Close" button + `<DialogClose>` X icon), Status select disabled, Job Notes + Internal Notes textareas disabled, omitted `onSave`/`onCancel` don't crash (regression-locks against re-introducing the no-op handlers at the call site), and editable mode (default `readOnly={false}`) preserved.
+
+2. **`src/app/admin/appointments/components/__tests__/appointment-detail-dialog-unmaterialize.test.tsx`** (+26 lines / +1 case): New test `'with hostContext="pos" → un-materialize modal receives context="pos" (Session 1.1 HIGH fix)'` — renders the dialog with `hostContext="pos"` and asserts that the mocked `UnMaterializeConfirmationDialog` receives `context: 'pos'`. Regression-locks the HIGH bug fix. Existing 5 cases preserved.
+
+3. **`src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx`** (+5 / -3, +0 cases): Existing test #2 ("a successful fetch mounts the detail dialog with POS context props") updated — was asserting `mobileModalMode='pos'` + `modifierVariant='pos'`; now asserts `hostContext='pos'` + that both legacy props are `undefined`. Locks the unification so a future regression that re-introduces either legacy prop fails this test immediately.
+
+**Verification gates (all green):**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 baseline warnings (back to baseline)
+- `npm run build` → clean
+- `npm test -- --run` → 181 test files / 2986 tests passing (was 179 / 2973 — +2 files / +13 cases)
+
+**Memory #8 status:** Comfortable budget honored — 3 prod files (within "≤4"), ~29 prod lines net (within "≤50" and the doc's "~20-35" estimate). The dialog file's gross diff (+68 / -27) is inflated by doc-comment expansion explaining the unified prop pattern + cross-references to the parity audit; the real prod-logic delta is small.
+
+**What this session does NOT do (per locked scope):**
+- Does NOT add the `canUpdateStatus` prop — Session 1.3 territory
+- Does NOT create the parity contract test (the broader `sale-vs-quotes-shared-prop-parity.test.tsx`-style assertion) — Session 1.3 deliverable
+- Does NOT fix admin PATCH endpoint drift — Session 1.2 territory
+- Does NOT touch the dashboard's other functionality — only the dialog mount changed
+
+**Unblocks:** Session 1.2 (PATCH symmetry — prop shape stable now) and Session 1.3 (parity contract test — `hostContext` is the asserted prop name).
+
+**Files touched:**
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (MOD)
+- `src/app/admin/page.tsx` (MOD — dashboard mount)
+- `src/app/pos/jobs/components/job-queue.tsx` (MOD — POS Schedule mount)
+- `src/app/admin/appointments/components/__tests__/appointment-detail-dialog-readonly.test.tsx` (NEW)
+- `src/app/admin/appointments/components/__tests__/appointment-detail-dialog-unmaterialize.test.tsx` (MOD)
+- `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` (MOD — adjust prop assertions)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (Session 1.1 block status `[ ]` → `[x]` with merge hash + PST timestamp)
+
+**Parallel-merge note (Memory `feedback_parallel_merge_session_number_collision`):** Session 1.1 (this entry) ran in a separate git worktree on 2026-06-06 PST alongside Sessions 1.5 + 1.8.1 (which themselves ran in parallel). Merge order to main: Session 1.8.1 first, Session 1.5 second, Session 1.1 third. CHANGELOG conflict on the 1.1 merge resolved by keeping ALL THREE entries — Session 1.1 placed below the already-merged 1.5 + 1.8.1 entries (minimal-diff resolution; the three are clearly grouped as same-day Phase 1 work, and reshuffling would touch unrelated lines beyond scope per Memory #29). Lifecycle architecture doc auto-merge: see post-merge Phase 1 status row update.
+
+---
+
 ## Session 1.8 — Waitlist notification silent-drop fix
 
 Production code change closing the customer-facing silent-drop bug surfaced by the webhook receivers identity audit (`f5e714a8`, Target D.4).

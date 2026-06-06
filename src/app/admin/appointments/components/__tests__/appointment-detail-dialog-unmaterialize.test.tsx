@@ -107,6 +107,32 @@ describe('AppointmentDetailDialog — un-materialize Save intercept', () => {
     expect(lastModalProps?.context).toBe('admin');
   });
 
+  // Session 1.1 — fixes HIGH-severity parity audit b346d34b Target D Finding 1.
+  // Pre-fix, `<UnMaterializeConfirmationDialog context="admin" />` was hardcoded,
+  // so the POS Schedule mount routed un-materialize through `adminFetch` → 401 →
+  // admin-login redirect (operator booted from POS). After Session 1.1 the
+  // `context` threads from `hostContext`.
+  it('with hostContext="pos" → un-materialize modal receives context="pos" (Session 1.1 HIGH fix)', async () => {
+    render(
+      <AppointmentDetailDialog
+        open
+        onOpenChange={onOpenChange}
+        appointment={makeAppointment({ status: 'confirmed', has_active_job: true })}
+        employees={[]}
+        onSave={onSave}
+        onCancel={onCancel}
+        canReschedule
+        canCancel
+        canAddNotes
+        hostContext="pos"
+      />
+    );
+    setStatus('pending');
+    clickSave();
+    await waitFor(() => expect(screen.queryByTestId('unmaterialize-modal')).toBeTruthy());
+    expect(lastModalProps?.context).toBe('pos');
+  });
+
   it('reverting status to earlier state WITHOUT active job → normal save, no modal', async () => {
     renderDialog(makeAppointment({ status: 'confirmed', has_active_job: false }));
     setStatus('pending');
