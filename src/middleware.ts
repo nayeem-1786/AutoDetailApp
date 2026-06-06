@@ -8,6 +8,19 @@ const PUBLIC_ROUTES = ['/login', '/signin', '/signup', '/book', '/quote', '/unsu
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Session 1.6 — POS > Appointments tab retired per AC-4 (POS > Jobs as
+  // unified surface; conceptual audit `26521e5a` Target G.4). Permanent 308
+  // redirect to /pos/jobs?scope=schedule preserves bookmarks, browser history,
+  // and any saved links. 308 (not 302) so browsers cache and don't add latency.
+  // Placed before host-routing so the redirect short-circuits regardless of
+  // which host the request arrives on.
+  if (pathname === '/pos/appointments' || pathname.startsWith('/pos/appointments/')) {
+    const target = new URL('/pos/jobs', request.url);
+    target.searchParams.set('scope', 'schedule');
+    return NextResponse.redirect(target, 308);
+  }
+
   const host = request.headers.get('host') || '';
   const hostType = getHostType(host);
 
