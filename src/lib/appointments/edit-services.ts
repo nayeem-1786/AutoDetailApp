@@ -9,9 +9,12 @@
  *
  * Naming + JSONB-shape decisions mirror existing primitives:
  *   - `JobServiceSnapshot` shape (`{ id, name, price, is_mobile_fee? }`)
- *     matches what `/api/pos/jobs/populate/route.ts` writes at job-create
- *     time. We rebuild from scratch on every edit so a stale mobile-fee
- *     row or removed service can never linger.
+ *     matches what `materializeJobFromAppointment` in
+ *     `src/lib/appointments/lifecycle-sync.ts` writes at job-create time
+ *     (Session 2.1 — the canonical materialization writer; pre-Session-2.5
+ *     the writer of record was `/api/pos/jobs/populate/route.ts`, retired
+ *     in Session 2.5 per AC-3). We rebuild from scratch on every edit so
+ *     a stale mobile-fee row or removed service can never linger.
  *   - Recompute-from-scratch (not delta) for totals because services are a
  *     bigger lever than the mobile-fee toggle — old subtotal isn't safely
  *     adjustable with a single delta when N items are added/removed.
@@ -138,8 +141,10 @@ export interface BuildJobServicesInput {
 /**
  * Rebuild the `jobs.services` JSONB from the current service list +
  * mobile state. Matches the shape produced by
- * `/api/pos/jobs/populate/route.ts:128-142` — the canonical writer this
- * file mirrors.
+ * `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts`
+ * (Session 2.1's `buildJobServiceSnapshot` block) — the canonical writer
+ * this file mirrors post-Session-2.5. Pre-2.5 the canonical writer was
+ * `/api/pos/jobs/populate/route.ts:128-142`; that endpoint retired in 2.5.
  */
 export function buildJobServicesJsonb(
   input: BuildJobServicesInput

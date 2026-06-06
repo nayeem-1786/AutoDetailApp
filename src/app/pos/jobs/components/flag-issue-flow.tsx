@@ -46,8 +46,10 @@ interface FlagIssueFlowProps {
     id: string;
     // Phase Mobile-1.8: `services` widened to allow null `id` (the
     // mobile-fee row materialized into `jobs.services` JSONB by
-    // /api/pos/jobs/populate carries `id: null` + `is_mobile_fee:
-    // true`). Real catalog rows still have string ids.
+    // `materializeJobFromAppointment` (`src/lib/appointments/lifecycle-sync.ts`)
+    // post-Session-2.5 carries `id: null` + `is_mobile_fee: true`; pre-2.5
+    // the same row was written by `/api/pos/jobs/populate`, retired in 2.5).
+    // Real catalog rows still have string ids.
     services: { id: string | null; name: string; price: number; is_mobile_fee?: boolean }[];
     estimated_pickup_at: string | null;
     customer: {

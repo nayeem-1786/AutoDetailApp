@@ -243,7 +243,9 @@ describe('composeLineItems', () => {
 
   // Phase Mobile-1.8 — idempotency: composer must not duplicate the
   // mobile-fee row when the upstream items already carry it (notably the
-  // `jobs.services` JSONB, materialized by /api/pos/jobs/populate).
+  // `jobs.services` JSONB, materialized by `materializeJobFromAppointment`
+  // in `src/lib/appointments/lifecycle-sync.ts` post-Session-2.5; pre-2.5
+  // by `/api/pos/jobs/populate`, retired in 2.5).
 
   it('jobs.services JSONB shape WITH is_mobile_fee=true: composer does NOT append duplicate', () => {
     // Shape mirrors `JobServiceSnapshot` from jobs.services JSONB

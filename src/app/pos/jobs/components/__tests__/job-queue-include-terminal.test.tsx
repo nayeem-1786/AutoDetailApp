@@ -58,8 +58,9 @@ vi.mock('sonner', () => ({
 vi.mock('../../../lib/pos-fetch', () => ({
   posFetch: vi.fn(async (url: string) => {
     fetchCalls.push({ url });
+    // Session 2.5 — populate retired; surface any reintroduced caller as 404.
     if (url.includes('/api/pos/jobs/populate')) {
-      return { ok: true, json: async () => ({ data: { created: 0, jobs: [] } }) };
+      return { ok: false, status: 404, json: async () => ({ error: 'populate retired (Session 2.5)' }) };
     }
     if (url.match(/\/api\/pos\/jobs(\?|$)/)) {
       return { ok: true, json: async () => todayResponse };

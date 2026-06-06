@@ -22,14 +22,21 @@ import { getTodayPst, pstStartOfDayLiteral } from '@/lib/utils/pst-date';
  * the remaining forward cases (`materialize`, `set_job_status`) and the reverse
  * mapping (`appointmentStatusForJobStatus`).
  *
- * LOAD-BEARING re-materialization invariant: `populate`
- * (`/api/pos/jobs/populate`) materializes appointments whose status is
- * `confirmed` or `in_progress` and dedups on the UNIQUE `jobs.appointment_id`.
- * Therefore un-materialize MUST leave the appointment in a NON-materializing
- * status (`pending`). `executeUnMaterialize` guarantees this by writing the
- * appointment status FIRST, then deleting the job (see ordering note there) —
- * so even without a multi-statement DB transaction, the dangerous state
- * (materializable appointment + absent job) never exists.
+ * LOAD-BEARING re-materialization invariant: pre-Session-2.5, `populate`
+ * (`/api/pos/jobs/populate`) auto-materialized confirmed / in-progress
+ * appointments on every POS-Today-scope mount, racing against operator
+ * status edits. Un-materialize had to leave the appointment in a NON-
+ * materializing status (`pending`) so the next mount wouldn't immediately
+ * re-create the job behind the operator's back. Session 2.5 retired
+ * populate; materialization is now operator-initiated via Start Intake
+ * (`POST /api/pos/jobs/start-intake`, the Session 2.1 endpoint that
+ * wraps `materializeJobFromAppointment` below). The re-materialization
+ * race is structurally gone — only an explicit operator action can
+ * re-materialize a reverted appointment. The pending-state invariant
+ * is still useful (it gates the Start Intake endpoint's status check)
+ * but it's no longer the load-bearing safety net it once was.
+ * `executeUnMaterialize` writes the appointment status FIRST, then
+ * deletes the job — defense-in-depth ordering preserved.
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -307,8 +314,11 @@ export async function executeUnMaterialize(
 
     if (jobDelErr) {
       // Appointment is already 'pending' (non-materializable) — the safe,
-      // recoverable partial state. The operator can retry; populate will NOT
-      // re-create the job because the appointment is no longer confirmed.
+      // recoverable partial state. The operator can retry; Start Intake
+      // (Session 2.1) and `materializeJobFromAppointment` below both gate
+      // on `confirmed|in_progress` so the partial state cannot silently
+      // re-materialize. (Pre-Session-2.5 the same invariant was enforced
+      // by `populate`'s status filter.)
       console.error(
         '[un_materialize] job delete failed after appointment revert (recoverable):',
         jobDelErr.message
@@ -437,12 +447,11 @@ export interface MaterializeOptions {
  *  1. **404 not_found** — appointment row does not exist.
  *  2. **422 future_date** — `appointment.scheduled_date > today` (PST). The
  *     materialization concept maps to "operator at site, about to start work";
- *     a future date violates that. Mirrors populate's future-date gate at
- *     `populate/route.ts:42-47`.
+ *     a future date violates that. (Pre-Session-2.5 the same gate lived in
+ *     `populate/route.ts`; this helper is now the canonical site.)
  *  3. **422 invalid_status** — `appointment.status NOT IN ('confirmed',
  *     'in_progress')`. Pending appointments must be confirmed first; terminal
  *     appointments (completed/cancelled/no_show) cannot be re-materialized.
- *     Mirrors populate's status filter at `populate/route.ts:65`.
  *
  * Idempotency:
  *  - Two concurrent callers pressing Start Intake on the same appointment must
@@ -452,18 +461,20 @@ export interface MaterializeOptions {
  *    `alreadyMaterialized: true` and the existing `jobId` (cheap fast path).
  *  - The INSERT uses `upsert({ ignoreDuplicates: true })` so a TOCTOU race
  *    silently no-ops at the DB layer; a follow-up SELECT recovers the row that
- *    won the race. Same pattern populate uses at `populate/route.ts:169-171`.
+ *    won the race.
  *
  * Ordering:
  *  - INSERT job FIRST (status='intake', work_started_at=NOW), then UPDATE
  *    `appointment.status='in_progress'`. Reverse of `executeUnMaterialize`'s
  *    ordering (which writes appointment FIRST then deletes the job). The
- *    populate re-materialization invariant doesn't apply here — we are
- *    materializing, not un-materializing — so the safe ordering is the one
- *    that leaves no partial state if the appointment UPDATE fails: a job row
- *    paired with a `confirmed` appointment is a benign, retryable state
- *    (the operator can re-press Start Intake; the idempotent path returns the
- *    same job and re-attempts the appointment update).
+ *    re-materialization race that populate created — and that drove
+ *    `executeUnMaterialize`'s reverse ordering — is gone post-Session-2.5
+ *    (materialization is operator-initiated, not mount-effect-initiated). The
+ *    safe ordering here is the one that leaves no partial state if the
+ *    appointment UPDATE fails: a job row paired with a `confirmed`
+ *    appointment is a benign, retryable state (the operator can re-press
+ *    Start Intake; the idempotent path returns the same job and re-attempts
+ *    the appointment update).
  */
 export async function materializeJobFromAppointment(
   supabase: SupabaseClient,
@@ -471,7 +482,8 @@ export async function materializeJobFromAppointment(
   options: MaterializeOptions
 ): Promise<MaterializeResult> {
   try {
-    // 1. Fetch appointment — same column set as populate (`populate/route.ts:50-65`).
+    // 1. Fetch appointment — column set kept narrow to what the snapshot needs
+    //    (this is the canonical SELECT for materialization post-Session-2.5).
     const { data: appt, error: apptErr } = await supabase
       .from('appointments')
       .select(
@@ -484,10 +496,11 @@ export async function materializeJobFromAppointment(
       return { ok: false, httpStatus: 404, error: 'not_found' };
     }
 
-    // 2. Future-date gate. Mirrors populate at `populate/route.ts:42-47`:
-    //    materialization is for TODAY or PAST work only; a future-dated
-    //    appointment must NEVER become a job row early. Client uses the
-    //    returned `appointmentDate` to render the "Move to today?" popup.
+    // 2. Future-date gate: materialization is for TODAY or PAST work only;
+    //    a future-dated appointment must NEVER become a job row early.
+    //    Client uses the returned `appointmentDate` to render the "Move to
+    //    today?" popup. (Pre-Session-2.5 the same gate lived in `populate`;
+    //    this helper is now the canonical site.)
     const today = getTodayPst();
     if (appt.scheduled_date > today) {
       return {
@@ -498,9 +511,9 @@ export async function materializeJobFromAppointment(
       };
     }
 
-    // 3. Status gate. Mirrors populate at `populate/route.ts:65`:
-    //    only confirmed/in_progress appointments can be materialized.
-    //    Pending requires confirmation first; terminal states are out of scope.
+    // 3. Status gate: only confirmed/in_progress appointments can be
+    //    materialized. Pending requires confirmation first; terminal states
+    //    are out of scope.
     const apptStatus = appt.status as AppointmentStatus;
     if (apptStatus !== 'confirmed' && apptStatus !== 'in_progress') {
       return {
@@ -528,8 +541,9 @@ export async function materializeJobFromAppointment(
       };
     }
 
-    // 5. Fetch appointment_services for the services JSONB snapshot.
-    //    Mirrors populate's join shape at `populate/route.ts:98-106`.
+    // 5. Fetch appointment_services for the services JSONB snapshot. Join
+    //    shape lifted from the retired `populate` endpoint (Session 2.5);
+    //    this is now the canonical join.
     const { data: aptServices } = await supabase
       .from('appointment_services')
       .select(
@@ -547,8 +561,9 @@ export async function materializeJobFromAppointment(
     });
 
     // Append mobile-fee entry to the JSONB snapshot when the appointment is
-    // mobile (Option D2 materialization — mirrors `populate/route.ts:138-152`
-    // and walk-in `pos/jobs/route.ts:458-468`).
+    // mobile (Option D2 materialization — mirrors the walk-in pattern at
+    // `pos/jobs/route.ts:458-468`; pre-Session-2.5 the same append also
+    // lived in `populate/route.ts`, retired in 2.5).
     const mobileSurchargeNum = Number(appt.mobile_surcharge ?? 0);
     const services: JobServiceSnapshot[] =
       appt.is_mobile && mobileSurchargeNum > 0
@@ -564,7 +579,8 @@ export async function materializeJobFromAppointment(
         : baseServices;
 
     // 6. Compute estimated_pickup_at from scheduled_end_time + scheduled_date
-    //    in PST/PDT context. Mirrors populate's calc at `populate/route.ts:126-136`.
+    //    in PST/PDT context. (Calc lifted from the retired `populate`
+    //    endpoint at Session 2.5; this is now the canonical site.)
     let estimatedPickup: string | null = null;
     if (appt.scheduled_end_time) {
       const dateTimeStr = `${appt.scheduled_date}T${appt.scheduled_end_time}`;
@@ -578,7 +594,9 @@ export async function materializeJobFromAppointment(
     // 7. INSERT job (idempotent via upsert + UNIQUE constraint on appointment_id).
     //    Start Intake lands DIRECTLY at status='intake' with work_started_at=NOW
     //    — operator pressing Start Intake IS the start of work tracking (skips
-    //    the legacy `scheduled` intermediate state that populate used).
+    //    the legacy `scheduled` intermediate state the retired `populate`
+    //    endpoint used). Walk-in atomic create still lands at `scheduled`
+    //    for its own transient pre-stage flow.
     const nowIso = new Date().toISOString();
     const jobInsert = {
       appointment_id: appointmentId,

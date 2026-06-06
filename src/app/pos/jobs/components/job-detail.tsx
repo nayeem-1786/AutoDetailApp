@@ -841,7 +841,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   // Phase Mobile-1.8: pass raw `job.services` (the `jobs.services` JSONB)
   // directly — the composer handles the `price`-vs-`unit_price` field
   // aliasing and preserves the `is_mobile_fee=true` flag on the entry
-  // materialized by /api/pos/jobs/populate. That flag signals the
+  // materialized by `materializeJobFromAppointment`
+  // (`src/lib/appointments/lifecycle-sync.ts`) post-Session-2.5; pre-2.5
+  // by `/api/pos/jobs/populate`, retired in 2.5. That flag signals the
   // composer to skip its synthetic-row append, preventing the duplicate
   // mobile-fee line that surfaced before this fix.
   const displayServices = composeLineItems(

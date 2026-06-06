@@ -440,8 +440,7 @@ src/app/api/pos/jobs/[id]/reschedule/route.ts
 src/app/api/pos/jobs/[id]/route.ts
 src/app/api/pos/jobs/[id]/start-work/route.ts
 src/app/api/pos/jobs/[id]/timer/route.ts
-src/app/api/pos/jobs/populate/route.ts                          # POST — auto-materialize today's confirmed/in_progress appointments into jobs. Item 15e Phase 1A: future-date gate (never materializes scheduled_date > today). Session 2.5 will retire in favor of Start Intake.
-src/app/api/pos/jobs/populate/__tests__/route.test.ts           # 8 tests — Item 15e Phase 1A populate gate: future date → zero DB touch / zero upsert; today/past → materializes; defensive log
+# src/app/api/pos/jobs/populate/{route.ts, __tests__/route.test.ts}  RETIRED Session 2.5 (AC-3 finalization). The endpoint was the pre-2.5 auto-materialization seam on Today-scope mount; Start Intake (the start-intake/ sibling below) is now the canonical operator-initiated materialization trigger. The walk-in atomic create at src/app/api/pos/jobs/route.ts is the only other materialization path. See docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md Session 2.5 block for the retirement audit trail.
 src/app/api/pos/jobs/start-intake/route.ts                      # POST — Session 2.1 (AC-3): operator-initiated job materialization. Confirmed/in_progress appointment + Start Intake → job @ status='intake' + work_started_at=NOW + appointment.status='in_progress'. 422 future_date / 422 invalid_status. Idempotent via jobs.appointment_id UNIQUE constraint.
 src/app/api/pos/jobs/start-intake/__tests__/route.test.ts       # 19 tests — Session 2.1: auth + validation + gates (404/422 future_date/422 invalid_status × 4) + successful materialization (job INSERT shape, mobile-fee append, no-op when already in_progress, audit shape) + idempotency (fast path + race-recovery) + error handling (upsert fail, appt-update fail recoverable)
 src/app/api/pos/jobs/route.ts
@@ -1519,7 +1518,7 @@ Session 1.6 (Retire POS > Appointments tab) additions:
 Roadmap Item 15c ("Change Time" affordance on Jobs Card) additions:
 - `src/app/pos/jobs/components/change-time-button.tsx`
 - `src/app/pos/jobs/components/__tests__/change-time-button.test.tsx`
-- `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` — Item 15e Phase 1B. 9 tests: 6 load-bearing invariant (Schedule scope never triggers populate on mount/toggle/refresh; Schedule→Today DOES populate; date-nav hidden in Schedule; flag-OFF pins Today) + 3 scope-toggle UI tests.
+- `src/app/pos/jobs/components/__tests__/job-queue-schedule-scope.test.tsx` — Item 15e Phase 1B + Session 2.5. 10 tests: 7 regression-locked invariants (Session 2.5 — no scope triggers populate; the endpoint is retired but `populateCalls()` stays as a permanent probe for stray callers; Today-scope mount probe is now `jobsCalls()` not the deleted populate; the "Refresh in Today scope re-fetches jobs and never calls populate" test is the new Session 2.5 regression-lock) + 3 scope-toggle UI tests.
 
 Roadmap Item 15e Phase 2A (shared lift for dual-context AppointmentDetailDialog) additions:
 - `src/lib/appointments/status-transitions.ts` — `STATUS_TRANSITIONS` (valid next-states per appointment status). Lifted from admin `appointments/types.ts`; re-exported there for backward compat. Enforced server-side by both the admin and POS PATCH routes.

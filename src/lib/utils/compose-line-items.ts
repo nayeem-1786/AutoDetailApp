@@ -59,8 +59,11 @@ export interface MobileFeeSource {
  *
  * Phase Mobile-1.8: accepts `is_mobile_fee` so upstreams that have already
  * materialized a mobile-fee row (notably `jobs.services` JSONB — populated
- * by /api/pos/jobs/populate per Phase Mobile-1) can flag it. The composer
- * uses this signal to skip appending a duplicate synthetic row.
+ * by `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts`
+ * or by the walk-in atomic create at `src/app/api/pos/jobs/route.ts`;
+ * pre-Session-2.5 also by `/api/pos/jobs/populate`, retired in 2.5) can
+ * flag it. The composer uses this signal to skip appending a duplicate
+ * synthetic row.
  */
 export interface RawLineItem {
   item_name?: string | null;
@@ -93,12 +96,13 @@ const FALLBACK_MOBILE_FEE_NAME = 'Mobile Service Fee';
  * (falls back to `"Mobile Service Fee"` when null/empty).
  *
  * Phase Mobile-1.8 idempotency: `jobs.services` JSONB already contains
- * the mobile entry (materialized by /api/pos/jobs/populate at job
- * creation). Without the pre-existence check the composer would append
- * a duplicate row, double-counting the surcharge on the POS jobs detail
- * screen. The strict `=== true` check leaves `quote_items` /
- * `appointment_services` callers (which never carry the flag) on the
- * append path.
+ * the mobile entry (materialized by `materializeJobFromAppointment` in
+ * `src/lib/appointments/lifecycle-sync.ts` post-Session-2.5; pre-2.5 by
+ * `/api/pos/jobs/populate`, retired in 2.5). Without the pre-existence
+ * check the composer would append a duplicate row, double-counting the
+ * surcharge on the POS jobs detail screen. The strict `=== true` check
+ * leaves `quote_items` / `appointment_services` callers (which never
+ * carry the flag) on the append path.
  */
 export function composeLineItems(
   source: MobileFeeSource,
