@@ -642,7 +642,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | Phase | Theme | Pre-task | Status |
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
-| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.1 (`1658914a`), 1.2 (`412a404b`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) complete; Session 1.6 not started |
+| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
@@ -1070,18 +1070,18 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 ### Session 1.6 — Retire POS > Appointments tab
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` **Complete — merged to main at `cfa9cfa4` on 2026-06-06 14:21 PDT**
 **Source:** Item 15e Phase 3 (never shipped) + conceptual audit 26521e5a Target G.4
 **Estimated scope:** ~10-20 prod lines (mostly removal) / 2-3 files / minimal test changes
-**Memory #8 budget:** Comfortable
+**Memory #8 budget:** Comfortable — actual: 20 prod lines added (middleware redirect block) + 7 lines removed (bottom-nav entry + CalendarDays import), plus 404 lines of deletions (page.tsx + appointments-view.tsx + its test)
 
 **Issue:** POS bottom nav still renders both `Jobs` and `Appointments` tabs at `src/app/pos/components/bottom-nav.tsx:195-206`. The Appointments tab is a third near-duplicate surface alongside Today + Schedule scopes within POS > Jobs. Item 15e Phase 3 (retire and absorb POS Appointments tab) was scoped but never shipped.
 
-**Solution:**
-1. Remove the Appointments tab nav entry from `pos/components/bottom-nav.tsx`
-2. Route `/pos/appointments` → `/pos/jobs?scope=schedule` (backward compat for any bookmarks/deep-links)
-3. Verify no other route or code path depends on `/pos/appointments` rendering
-4. Optionally: delete the `/pos/appointments` page if it becomes truly orphaned (or keep redirect-only for safety)
+**Solution (as implemented):**
+1. Removed the Appointments tab nav entry from `pos/components/bottom-nav.tsx` (lines 201-206 — the `label: 'Appointments'` array entry) + the now-unused `CalendarDays` lucide-react import
+2. Added permanent 308 redirect for `/pos/appointments` (and `/pos/appointments/*` sub-paths) → `/pos/jobs?scope=schedule` in `src/middleware.ts` (placed before host-routing so it short-circuits regardless of host). 308 not 302 because the relocation is permanent and browser-cacheable.
+3. **Option a (page deletion):** Deleted `src/app/pos/appointments/page.tsx` + its empty parent dir; deleted `src/app/pos/components/appointments/appointments-view.tsx` + its test + emptied `__tests__` dir. Verified `AppointmentsView` had no other consumers.
+4. **Sibling dialogs KEPT** — `cancel-appointment-dialog.tsx`, `reschedule-appointment-dialog.tsx`, `types.ts` are imported by `pos/jobs/components/{job-queue,change-time-button,job-detail}.tsx` and stay.
 
 **Why:**
 - Eliminates the third overlap surface per [AC-4](#ac-4-pos--jobs-as-unified-surface-pos--appointments-tab-retires)
@@ -1089,23 +1089,41 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 - Reduces operator surface confusion (operator's stated concern: too many surfaces overlap)
 
 **Pre-tasks:**
-- `[ ]` Verify Sessions 1.1-1.3 merged (dialog stability)
-- `[ ]` Grep verify: any code outside `/pos/appointments` references it directly?
+- `[x]` Verify Sessions 1.1-1.3 merged (dialog stability) — 1.1 at `1658914a`, 1.2 at `412a404b`, 1.2.1 at `7d4d815a`, 1.3 at `a7a57949` — all confirmed at session start
+- `[x]` Grep verify: any code outside `/pos/appointments` references it directly? — `grep -rln "/pos/appointments" src/ --include="*.tsx" --include="*.ts"` returned 53 matches; after filtering `/api/pos/appointments/*` (out of scope — API surface, not page surface), only **2 page-route references remained**, both in `bottom-nav.tsx`. Both removed.
 
-**Primary files:**
-- `src/app/pos/components/bottom-nav.tsx:195-206` (remove tab entry)
-- `src/app/pos/appointments/page.tsx` (delete or redirect)
-- `next.config.js` or middleware (redirect rule, if needed)
+**Primary files (actuals):**
+- `src/app/pos/components/bottom-nav.tsx` — MOD. −7 prod lines (tab entry + CalendarDays import)
+- `src/middleware.ts` — MOD. +13 prod lines (redirect block + comment block citing AC-4 + audit hash)
+- `src/app/pos/appointments/page.tsx` — DELETED (12-line Suspense wrapper around `<AppointmentsView />`)
+- `src/app/pos/appointments/` — empty dir REMOVED
+- `src/app/pos/components/appointments/appointments-view.tsx` — DELETED (392 lines; only consumer was the deleted page)
+- `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx` — DELETED (129 lines / 4 tests; tied to deleted view)
+- `src/app/pos/components/appointments/__tests__/` — empty dir REMOVED
+
+**Tests added:**
+- `src/__tests__/middleware.test.ts` — NEW (78 lines, 4 cases): exact `/pos/appointments` → 308 with `?scope=schedule` + `updateSession` never called (proves redirect short-circuits before auth); sub-paths `/pos/appointments/123` → same target; false-prefix `/pos/appointmentsfoo` does NOT redirect; adjacent POS routes (`/pos/jobs`, `/pos/jobs?scope=schedule`, `/pos/transactions`, `/pos`) do NOT redirect. Uses `vi.hoisted` for the `updateSession` mock to avoid factory-hoisting reference errors.
+- `src/app/pos/components/__tests__/bottom-nav.test.tsx` — NEW (71 lines, 3 cases): regression-locks the absence of the Appointments label + the `/pos/appointments` href + asserts the four canonical tabs (Transactions, Quotes, Sale, Jobs) still render. Stubs `window.matchMedia` for the BottomNav's PWA-standalone + fullscreen capability detection effect (jsdom doesn't implement it).
 
 **Evidence citations:**
 - Conceptual audit 26521e5a Target C.5: *"POS bottom nav still renders both Jobs and Appointments tabs"*
 - Item 15e Phase 3 scope (referenced in conceptual audit but never shipped)
+- Bottom-nav source location at session start: `src/app/pos/components/bottom-nav.tsx:201-206` (the brief cited :195-206 — the array entry was actually at :201-206 with the array start at :176; non-material drift per Memory #11)
+
+**Out of scope (explicit):**
+- Did NOT refactor `pos/components/appointments/` directory naming (still hosts the dialogs used by Jobs; rename is cosmetic and risks import churn across `job-queue.tsx`, `change-time-button.tsx`, `job-detail.tsx` — out of scope per brief)
+- Did NOT touch Admin > Appointments (stays per locked architecture)
+- Did NOT modify `pos/jobs/` to compensate for the removed tab (Schedule scope already absorbs the functionality)
+- Did NOT touch the `/api/pos/appointments/*` API routes (those serve cancel/reschedule/load flows still used by POS > Jobs and admin)
+- Sub-path `/pos/appointments/123` (legacy deep links) — redirect drops the ID and routes to bare `?scope=schedule`. No per-appointment surface on Schedule today; users can search/filter on Jobs. Deemed acceptable per brief's silence on per-ID preservation.
 
 **Related sessions:**
-- Depends on: Sessions 1.1-1.3 (dialog work stable; Schedule scope is the absorbing surface)
+- Depends on: Sessions 1.1-1.3 (dialog work stable; Schedule scope is the absorbing surface) — all merged before this session
 - Unblocks: Phase 2 sessions on unified Jobs surface
 
-**Linked prompt:** TBD
+**Linked prompt:** Session 1.6 prompt (operator-supplied in 2026-06-06 PST session)
+
+**Completion:** Merged to main at `cfa9cfa4` on 2026-06-06 14:21 PDT. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — unchanged in modified files) / build clean (middleware bundle 82 kB) / 186 test files / 3030 tests passing (net +3 vs pre-1.6 — +4 middleware + 3 bottom-nav − 4 deleted appointments-view).
 
 **Completion:** TBD
 
