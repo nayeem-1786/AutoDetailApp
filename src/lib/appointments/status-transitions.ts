@@ -13,9 +13,17 @@ import type { AppointmentStatus } from '@/lib/supabase/types';
  * (`/api/appointments/[id]`) and the POS PATCH (`/api/pos/appointments/[id]`).
  */
 export const STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
-  pending: ['confirmed', 'cancelled', 'no_show'],
+  // `pending → in_progress` and `in_progress → no_show` are SAFE per the
+  // per-transition consequence map (d3671c82) Target E.1: no PATCH-side
+  // webhook fires for `in_progress` or `no_show`, and no cron/reminder
+  // eligibility flip requires a compensating cascade. Opened in Session 1.4
+  // of the lifecycle architecture (AC-5 — 2 SAFE + 2 with cascade). The
+  // remaining backward-revert pair (`confirmed → pending`,
+  // `in_progress → pending`) is Session 1.5 territory and stays blocked
+  // here until the un-materialize cascade is wired into PATCH.
+  pending: ['confirmed', 'in_progress', 'cancelled', 'no_show'],
   confirmed: ['in_progress', 'cancelled', 'no_show'],
-  in_progress: ['completed', 'cancelled'],
+  in_progress: ['completed', 'cancelled', 'no_show'],
   completed: [],
   cancelled: [],
   no_show: [],

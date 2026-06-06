@@ -267,6 +267,30 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(state.webhookFires).toHaveLength(0);
   });
 
+  // Session 1.4 — the two SAFE transitions opened per AC-5 (consequence map
+  // d3671c82 Target E.1). Both carry zero PATCH-side effects beyond the
+  // universal status UPDATE + audit row — no webhook, no cron flip that
+  // requires compensating logic.
+  it('accepts pending → in_progress (Session 1.4 SAFE transition) with no webhook', async () => {
+    state.appointment!.status = 'pending';
+    const res = await PATCH(makeReq({ status: 'in_progress' }), { params });
+    expect(res.status).toBe(200);
+    expect(state.appointmentUpdates).toHaveLength(1);
+    expect(state.appointmentUpdates[0].status).toBe('in_progress');
+    // No appointment_in_progress webhook exists in the WebhookEvent union.
+    expect(state.webhookFires).toHaveLength(0);
+  });
+
+  it('accepts in_progress → no_show (Session 1.4 SAFE transition) with no webhook', async () => {
+    state.appointment!.status = 'in_progress';
+    const res = await PATCH(makeReq({ status: 'no_show' }), { params });
+    expect(res.status).toBe(200);
+    expect(state.appointmentUpdates).toHaveLength(1);
+    expect(state.appointmentUpdates[0].status).toBe('no_show');
+    // appointment_no_show is not in the WebhookEvent union → no fire.
+    expect(state.webhookFires).toHaveLength(0);
+  });
+
   it('accepts a valid status transition (confirmed → in_progress) with no confirmed/completed webhook', async () => {
     const res = await PATCH(makeReq({ status: 'in_progress' }), { params });
     expect(res.status).toBe(200);
