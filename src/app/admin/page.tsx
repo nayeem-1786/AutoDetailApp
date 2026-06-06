@@ -696,6 +696,7 @@ export default function AdminDashboard() {
         employees={[]}
         canReschedule={false}
         canCancel={false}
+        canUpdateStatus={false}
         readOnly
       />
     </div>

@@ -6,6 +6,60 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.3 — `canUpdateStatus` permission gate + admin/POS dialog parity contract test (2026-06-06)
+
+Wave 4 of the Phase 1 conservative wave plan. Closes the two parity audit (b346d34b) findings that Sessions 1.1 + 1.2 deliberately deferred:
+
+1. **Missing permission gate on the status dropdown** (Target B.12) — the dialog accepted `canReschedule`, `canCancel`, `canAddNotes` props but NOT `canUpdateStatus`. An operator without `appointments.update_status` saw a fully-rendered status dropdown, picked a value, hit Save → 403 toast. Useless action surface for that operator class.
+
+2. **No parity contract test** to assert admin + POS hosts pass equivalent prop sets to the shared `<AppointmentDetailDialog>` (Concern 1). Sessions 1.1 (no-op suppression + `hostContext` unification) and 1.2 (PATCH endpoint symmetry) closed the runtime drift; this session adds the durable regression-net that pins the contract going forward.
+
+**Three layers of change:**
+
+1. **Dialog component (`src/app/admin/appointments/components/appointment-detail-dialog.tsx`):** added `canUpdateStatus?: boolean` (default `true` for backward compat with all existing callers). When `false`, the status `<Select>` is replaced by a read-only `<dd>` block that shows the current `APPOINTMENT_STATUS_LABELS[appointment.status]`. The `<Select>` is unregistered with react-hook-form so `data.status` stays `undefined` on submit and the optional PATCH schema field is omitted by the server — the operator can still edit other fields they have permission for (notes, schedule if `canReschedule`), and only the status axis is locked. `readOnly={true}` (Session 1.1) remains the broader gate that keeps the `<Select>` rendered-but-disabled across the whole dialog; the two props compose orthogonally.
+
+2. **Host mounts — permission wiring:**
+   - `src/app/admin/appointments/page.tsx` — added `const { granted: canUpdateStatus } = usePermission('appointments.update_status');` alongside the existing trio; threaded into BOTH dialog mounts (the detailer-degraded "Today only" mount at the `!canViewFullCalendar` branch and the canonical full-perms mount in the Day/Week view).
+   - `src/app/pos/jobs/components/job-queue.tsx` — same shape via `usePosPermission('appointments.update_status')`; threaded into the Schedule-scope dialog mount.
+   - `src/app/admin/page.tsx` (dashboard quick-peek) — passes `canUpdateStatus={false}` for defense-in-depth even though `readOnly={true}` already dominates. Keeps the dashboard mount internally consistent: every gate-prop is explicitly closed in view-only mode.
+
+3. **Parity contract test (`src/app/__tests__/admin-pos-dialog-parity.test.tsx`, NEW):** mirrors the canonical Smart Details precedent at `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx` — a source-parsing structural guard (not a render-introspection test), which is what works when the dialog is conditionally mounted deep inside a page's context tree. The test reads admin + POS host source via `fs.readFileSync`, extracts the opening tag of `<AppointmentDetailDialog>` at the canonical index per host (admin = LAST occurrence — the full-perms mount; POS = first/only occurrence), parses the prop set, and asserts the two sets are equal except for a small documented divergence allowlist. The two intentional divergences are `hostContext` (admin defaults to `'admin'`, POS passes `'pos'`) and `returnToPath` (Edit-in-POS deep-link destination); both are explicitly listed in `DOCUMENTED_HOST_DIVERGENCE_PROPS` with `prop` + `why` for any future divergence to be added the same way. Five named regression tests beyond the parity check pin: (a) `canUpdateStatus` is wired in both hosts (the Session 1.3 net), (b) `hostContext` is POS-only, (c) `returnToPath` is POS-only, (d) neither canonical mount carries `readOnly` (the dashboard mount is the documented exception, excluded from this contract), (e) neither canonical mount re-introduces `async () => false` / `() => {}` no-op handler shapes Session 1.1 closed.
+
+**Parser handles string-literal values correctly.** The naive boolean-shorthand extractor (precedent at `sale-vs-quotes-shared-prop-parity.test.tsx` for the simpler case where shared components have only `{expr}` values) trips on `returnToPath="/pos/jobs"` — the `/` between `pos` and `jobs` looks like the end of a boolean-shorthand identifier. Session 1.3's extractor explicitly skips string-literal values (`"..."` and `'...'`) verbatim after `=`; the brace/paren depth bookkeeping already handles `{expr}` values. Sanity-checked: temporarily removing `canUpdateStatus={canUpdateStatus}` from the POS host produced the expected 2 test failures (the parity equivalence test + the explicit `canUpdateStatus` regression test).
+
+**Dialog unit tests added (`appointment-detail-dialog-can-update-status.test.tsx`, NEW, 6 cases):**
+1. `canUpdateStatus` omitted (defaults `true`) → status renders as editable `<select>`.
+2. `canUpdateStatus={true}` explicit → same as default.
+3. `canUpdateStatus={false}` → status renders as read-only block (no `<select>`); current label visible.
+4. `canUpdateStatus={false}` does NOT hide Save Changes — operator can still edit other fields they have permission for.
+5. `canUpdateStatus={false}` + `readOnly={true}` compose orthogonally — neither prop fights the other.
+6. `canUpdateStatus={true}` + `readOnly={true}` — `readOnly` dominates: `<select>` rendered but disabled (parity with the existing `appointment-detail-dialog-readonly.test.tsx` behavior).
+
+**Files touched:**
+
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — MOD. +13 prop/comment lines + ~18 lines for the conditional read-only `<dd>` block branch.
+- `src/app/admin/appointments/page.tsx` — MOD. +6 lines (one permission hook + 2 prop pass-throughs + 5-line comment).
+- `src/app/pos/jobs/components/job-queue.tsx` — MOD. +5 lines (one permission hook + 1 prop pass + 3-line comment).
+- `src/app/admin/page.tsx` — MOD. +1 line (`canUpdateStatus={false}` for defense-in-depth on the dashboard quick-peek mount).
+- `src/app/__tests__/admin-pos-dialog-parity.test.tsx` — NEW. 7 test cases, ~220 lines. First test under `src/app/__tests__/`; mirrors the canonical Smart Details parity-contract pattern.
+- `src/app/admin/appointments/components/__tests__/appointment-detail-dialog-can-update-status.test.tsx` — NEW. 6 test cases, ~150 lines.
+
+**Verification gates:** `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors, 97 baseline warnings unchanged in modified files), `npm run build` (clean), `npm test` (185 files / 3025 tests pass; was 183/3012 — +2 test files, +13 tests).
+
+**What this session does NOT do (per session prompt):**
+
+- Does NOT touch state machine logic (Session 1.5 closed that).
+- Does NOT touch admin PATCH endpoint drift (Session 1.2 closed that).
+- Does NOT touch the un-materialize cascade (Session 1.5).
+- Does NOT extend the parity test to other shared components — narrowly scoped to `<AppointmentDetailDialog>`.
+- Does NOT change the permission system architecture.
+
+**Audit findings remaining:** Concern 2 (`hostContext` / `returnToPath` separation) was closed in Session 1.1. Target D Finding 1 (un-materialize context drift) was closed in Session 1.1. Target D Finding 2 (no-op suppression) was closed in Session 1.1. All four parity audit findings + both concerns are now closed across Sessions 1.1, 1.2, 1.3.
+
+**Lifecycle architecture doc:** `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` Session 1.3 entry status `[ ]` → `[x]` with merge hash + PST timestamp.
+
+---
+
 ## Session 1.2 — Admin/POS PATCH endpoint symmetry: jobs.assigned_staff_id cascade + employee_id audit log + normalization + adminFetch (2026-06-06)
 
 Surgical production drift-fix. Phase 1 entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1 plan (Session 1.2 block). Closes parity audit `b346d34b` Target C Drifts #9, #10, #11, #15 (Session B scope). All four are unintentional drifts between admin PATCH and POS PATCH — mechanical mirroring of POS as canonical, no philosophy.
