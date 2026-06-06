@@ -71,6 +71,17 @@ interface AppointmentDetailDialogProps {
   canReschedule: boolean;
   canCancel: boolean;
   canAddNotes?: boolean;
+  // Session 1.3 — permission gate for the status dropdown. Parity audit
+  // b346d34b Target B.12 found the dialog accepted `canReschedule`,
+  // `canCancel`, `canAddNotes` but NOT `canUpdateStatus` — an operator
+  // without `appointments.update_status` saw a fully-rendered status
+  // dropdown, picked a value, hit Save, and got a 403 toast (useless
+  // action surface). When `canUpdateStatus === false`, the status field
+  // renders as a read-only `<dd>` block instead of a `<Select>` — the
+  // form-submit path leaves `data.status` undefined and the PATCH
+  // schema's optional status field is simply omitted. Default `true`
+  // preserves byte-identical behavior for existing callers.
+  canUpdateStatus?: boolean;
   // Session 1.1 — unified host-divergence prop. Replaces the legacy trio
   // (`mobileModalMode`, `modifierVariant`, and a would-be
   // `unmaterializeContext`) per parity audit b346d34b Concern 2 and
@@ -116,6 +127,7 @@ export function AppointmentDetailDialog({
   canReschedule,
   canCancel,
   canAddNotes = true,
+  canUpdateStatus = true,
   hostContext = 'admin',
   readOnly = false,
   returnToPath = '/admin/appointments',
@@ -505,24 +517,40 @@ export function AppointmentDetailDialog({
         {/* Editable fields */}
         <form id="detail-edit-form" onSubmit={handleSubmit(onSubmit)} className="mt-4 space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700">
           <div className={canReschedule ? 'grid grid-cols-2 gap-3' : ''}>
-            <FormField label="Status" error={errors.status?.message} htmlFor="detail-status">
-              <Select id="detail-status" disabled={readOnly} {...register('status')}>
-                {recommendedStatuses.map((s) => (
-                  <option key={s} value={s}>
-                    {APPOINTMENT_STATUS_LABELS[s]}
-                  </option>
-                ))}
-                {overrideStatuses.length > 0 && (
-                  <optgroup label="Override">
-                    {overrideStatuses.map((s) => (
-                      <option key={s} value={s}>
-                        {APPOINTMENT_STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </Select>
-            </FormField>
+            {canUpdateStatus ? (
+              <FormField label="Status" error={errors.status?.message} htmlFor="detail-status">
+                <Select id="detail-status" disabled={readOnly} {...register('status')}>
+                  {recommendedStatuses.map((s) => (
+                    <option key={s} value={s}>
+                      {APPOINTMENT_STATUS_LABELS[s]}
+                    </option>
+                  ))}
+                  {overrideStatuses.length > 0 && (
+                    <optgroup label="Override">
+                      {overrideStatuses.map((s) => (
+                        <option key={s} value={s}>
+                          {APPOINTMENT_STATUS_LABELS[s]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </Select>
+              </FormField>
+            ) : (
+              // Session 1.3 — when canUpdateStatus is false, render the current
+              // status as a read-only `<dd>` block (mirrors the
+              // customer/vehicle/total readonly pattern in the upper dl). No
+              // Select is registered with react-hook-form, so `data.status`
+              // stays undefined on submit and the PATCH schema's optional
+              // status field is omitted by the server. The operator can still
+              // edit other fields they have permission for.
+              <div>
+                <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Status</dt>
+                <dd className="text-gray-900 dark:text-gray-100">
+                  {APPOINTMENT_STATUS_LABELS[appointment.status]}
+                </dd>
+              </div>
+            )}
 
             {canReschedule && (
               <FormField label="Assigned Detailer" error={errors.employee_id?.message} htmlFor="detail-employee">

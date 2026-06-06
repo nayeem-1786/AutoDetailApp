@@ -43,6 +43,11 @@ export default function AppointmentsPage() {
   const { granted: canReschedule } = usePermission('appointments.reschedule');
   const { granted: canCancel } = usePermission('appointments.cancel');
   const { granted: canAddNotes } = usePermission('appointments.add_notes');
+  // Session 1.3 — parity audit b346d34b Target B.12: gate the status dropdown
+  // on `appointments.update_status` so an operator without the permission
+  // sees the current status as a read-only block instead of a dropdown that
+  // 403s on Save.
+  const { granted: canUpdateStatus } = usePermission('appointments.update_status');
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -349,6 +354,7 @@ export default function AppointmentsPage() {
           canReschedule={false}
           canCancel={false}
           canAddNotes={canAddNotes}
+          canUpdateStatus={canUpdateStatus}
         />
       </div>
     );
@@ -547,6 +553,7 @@ export default function AppointmentsPage() {
         canReschedule={canReschedule}
         canCancel={canCancel}
         canAddNotes={canAddNotes}
+        canUpdateStatus={canUpdateStatus}
       />
 
       {/* Cancel dialog — only rendered if user has cancel permission */}

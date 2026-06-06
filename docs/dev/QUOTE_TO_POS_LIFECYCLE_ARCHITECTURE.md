@@ -642,7 +642,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | Phase | Theme | Pre-task | Status |
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
-| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) complete; Sessions 1.1–1.3, 1.6 not started |
+| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.1 (`1658914a`), 1.2 (`412a404b`), 1.3 (merge hash pending), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) complete; Session 1.6 not started |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
@@ -883,10 +883,11 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 
 ### Session 1.3 — Cross-cutting parity contract + status permission gate
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` Complete — merge `<HASH-PENDING>` on 2026-06-06 PST (filled in at end-of-session post-merge)
 **Source:** Parity audit b346d34b Session C
 **Estimated scope:** ~15-25 prod lines + ~30-40 test lines / 4-5 files / +6-8 tests
-**Memory #8 budget:** Comfortable
+**Actual scope:** ~25 prod lines + ~370 test lines / 4 prod files / 2 new test files / +13 test cases
+**Memory #8 budget:** Comfortable (honored)
 
 **Issue:**
 1. Dialog accepts `canReschedule`, `canCancel`, `canAddNotes` props but NOT a `canUpdateStatus` prop. Operator without `appointments.update_status` permission sees the status dropdown, picks a new status, hits Save → 403 toast. Useless action surface.
@@ -903,27 +904,28 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 - Precedent exists at `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx` (parity audit b346d34b Concern 1)
 
 **Pre-tasks:**
-- `[ ]` Verify Sessions 1.1, 1.2 merged
-- `[ ]` Operator decision: Q5 status permission gate shape — explicit prop (recommended) OR always-read-only-unless-grant pattern
+- `[x]` Sessions 1.1 (`1658914a`), 1.2 (`412a404b`), 1.5 (`04921ad1`) merged
+- `[x]` Operator decision Q5 — explicit `canUpdateStatus` prop pattern (matches the existing `canReschedule` / `canCancel` / `canAddNotes` trio shape)
 
-**Primary files:**
-- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (add canUpdateStatus prop + render gate)
-- `src/app/admin/appointments/page.tsx` (wire permission)
-- `src/app/pos/jobs/components/job-queue.tsx` (wire permission)
-- `src/app/admin/page.tsx` (dashboard mount — pass false if readOnly)
-- NEW `src/app/__tests__/admin-pos-dialog-parity.test.tsx` (parity contract test)
+**Primary files (actuals):**
+- `src/app/admin/appointments/components/appointment-detail-dialog.tsx` — MOD. `+canUpdateStatus?: boolean` prop (default `true`); conditional render: editable `<Select>` when true, read-only `<dd>` block when false.
+- `src/app/admin/appointments/page.tsx` — MOD. `usePermission('appointments.update_status')`; threaded into BOTH dialog mounts (detailer-degraded + canonical full-perms).
+- `src/app/pos/jobs/components/job-queue.tsx` — MOD. `usePosPermission('appointments.update_status')`; threaded into the Schedule-scope dialog mount.
+- `src/app/admin/page.tsx` — MOD. `canUpdateStatus={false}` for defense-in-depth on the dashboard quick-peek mount (readOnly={true} already dominates).
+- `src/app/__tests__/admin-pos-dialog-parity.test.tsx` — NEW. 7 cases: parity equivalence (modulo documented divergences), `canUpdateStatus` regression net, `hostContext` POS-only, `returnToPath` POS-only, no-readOnly canonical regression, no-op-handler-shape regression, source readability sanity. Source-parsing test mirroring `sale-vs-quotes-shared-prop-parity.test.tsx`; string-literal-aware extractor handles `returnToPath="/pos/jobs"` correctly.
+- `src/app/admin/appointments/components/__tests__/appointment-detail-dialog-can-update-status.test.tsx` — NEW. 6 cases: defaults, explicit true, explicit false, save-button-still-visible-when-false, orthogonal composition with readOnly={true}, readOnly dominates.
 
 **Evidence citations:**
 - Parity audit b346d34b Target B.12 (status permission gate absent)
 - Parity audit Concern 1 (parity contract test pattern)
-- Precedent test: `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`
+- Precedent test mirrored: `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`
 
 **Related sessions:**
 - Depends on: Sessions 1.1, 1.2 (prop shape and endpoint symmetry stable) — 1.1 satisfied at `1658914a`, 1.2 satisfied at `412a404b`
 
-**Linked prompt:** TBD
+**Linked prompt:** Session 1.3 prompt (operator-supplied in 2026-06-06 PDT session)
 
-**Completion:** TBD
+**Completion:** 2026-06-06 PDT — merge hash filled in post-merge below. Both layers of the audit findings closed: (1) `canUpdateStatus` prop wired in both hosts, dialog renders the field as read-only when permission is denied (no 403-on-Save action surface); (2) source-parsing parity contract test at `src/app/__tests__/admin-pos-dialog-parity.test.tsx` mirrors the canonical Smart Details precedent and pins future drift. Sanity-checked: removing `canUpdateStatus` from the POS host triggers the expected 2 test failures (parity equivalence + explicit regression). Memory #2 honored — mirrored the precedent's source-parsing approach rather than inventing a render-introspection variant. Memory #11 honored — verified each line number / function signature against current main before editing. Memory #8 honored — 4 prod files, 2 test files, within budget. Verification: tsc 0 errors / lint 0 errors (97 baseline warnings unchanged) / build clean / 185 test files / 3025 tests passing (was 183 / 3012 — +2 test files, +13 tests).
 
 ---
 

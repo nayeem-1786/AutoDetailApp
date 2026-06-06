@@ -243,6 +243,10 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const { granted: canReschedule } = usePosPermission('appointments.reschedule');
   const { granted: canCancel } = usePosPermission('appointments.cancel');
   const { granted: canAddNotes } = usePosPermission('appointments.add_notes');
+  // Session 1.3 — mirror admin/appointments/page.tsx; gate the status
+  // dropdown on `appointments.update_status` (parity audit b346d34b Target
+  // B.12). The parity contract test asserts both hosts pass this prop.
+  const { granted: canUpdateStatus } = usePosPermission('appointments.update_status');
   const isBookable = employee?.bookable_for_appointments ?? false;
 
   // Date from URL or today
@@ -1233,6 +1237,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           canReschedule={canReschedule}
           canCancel={canCancel}
           canAddNotes={canAddNotes}
+          canUpdateStatus={canUpdateStatus}
           hostContext="pos"
           returnToPath="/pos/jobs"
         />
