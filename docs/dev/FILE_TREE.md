@@ -859,7 +859,6 @@ src/lib/utils/__tests__/schedule-date-range.test.ts  — 30 tests: per-pill rang
 src/lib/utils/schedule-entry-matches.ts  — Session #149 (N+2): pure per-row predicate. entryMatchesFilters(entry, {search, status, detailerId}) → boolean. OR-within search (first/last name, phone digit-substring, vehicle make/model) + AND across categories. Empty/null filter = no constraint. Detailer sentinel 'unassigned' matches rows with detailer: null.
 src/lib/utils/__tests__/schedule-entry-matches.test.ts  — 27 tests: empty filters / status / detailer / search text / search phone digit-substring / AND-across-categories / OR-within-search.
 src/app/pos/jobs/__tests__/handle-checkout-coupon.test.tsx  # 3 tests — pins Item 15g Layer 15g-i handleCheckout dispatch (RESTORE_TICKET coupon=null → SET_COUPON via /api/pos/coupons/validate) + idempotency
-src/app/pos/appointments/page.tsx        — Appointments view (Roadmap Item 12 — POS footer reschedule surface)
 src/app/pos/offline/page.tsx             — Offline fallback page
 src/app/pos/quotes/page.tsx              — Quote builder & list
 src/app/pos/transactions/page.tsx        — Transaction list
@@ -1497,13 +1496,17 @@ Track B — Quotes-panel parity (#120, G2/G3/G4) additions:
 - `src/app/pos/components/quotes/__tests__/quote-item-row-reprice-badge.test.tsx` # G3 — locks the amber "No <size> pricing" badge into the forked quote-item-row (parity with ticket-item-row) so a no-tier vehicle change can't silently keep a stale price on a customer-facing quote. 4 tests.
 
 Roadmap Item 12 (POS Appointments) additions:
-- `src/app/pos/components/appointments/appointments-view.tsx`
-- `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx`
-- `src/app/pos/components/appointments/types.ts`
+- ~~`src/app/pos/components/appointments/appointments-view.tsx`~~ — DELETED in Session 1.6 (POS > Appointments tab retired per AC-4; surface absorbed into POS > Jobs Schedule scope)
+- `src/app/pos/components/appointments/reschedule-appointment-dialog.tsx` — kept; reused by `pos/jobs/components/change-time-button.tsx`
+- `src/app/pos/components/appointments/types.ts` — kept; reused by `pos/jobs/components/{change-time-button,job-queue}.tsx`
 
 Roadmap Item 15b (Cancel from POS Appointments + This Month filter) additions:
-- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx`
-- `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx`
+- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx` — kept; reused by `pos/jobs/components/job-queue.tsx`
+- ~~`src/app/pos/components/appointments/__tests__/appointments-view.test.tsx`~~ — DELETED in Session 1.6 (test for deleted view)
+
+Session 1.6 (Retire POS > Appointments tab) additions:
+- `src/__tests__/middleware.test.ts` — 4 tests: pins the `/pos/appointments` → `/pos/jobs?scope=schedule` 308 redirect + adjacent-route safety
+- `src/app/pos/components/__tests__/bottom-nav.test.tsx` — 3 tests: regression-locks the absence of the Appointments tab label + `/pos/appointments` href in the rendered POS bottom nav
 
 Roadmap Item 15c ("Change Time" affordance on Jobs Card) additions:
 - `src/app/pos/jobs/components/change-time-button.tsx`

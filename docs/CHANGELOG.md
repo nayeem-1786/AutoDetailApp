@@ -6,6 +6,56 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.6 — Retire POS > Appointments tab (2026-06-06)
+
+Final Phase 1 session. Closes [AC-4](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-4-pos--jobs-as-unified-surface-pos-appointments-tab-retires): POS > Jobs is the unified appointments surface; the parallel POS > Appointments tab — a third near-duplicate alongside Jobs' Today + Schedule scopes — is removed. Conceptual audit `26521e5a` Target G.4 surfaced this; Item 15e Phase 3 scoped it but never shipped.
+
+**Change shape:** removal + permanent redirect — no architectural work, no new UI.
+
+**1. Bottom-nav entry removed:**
+`src/app/pos/components/bottom-nav.tsx` — deleted the Appointments tab entry (`label: 'Appointments'`, `href: '/pos/appointments'`, `icon: CalendarDays`) from the tabs array. `CalendarDays` was the sole lucide-react icon used only by this entry; removed from the import block. Remaining tabs: Transactions, Quotes, Sale, Jobs (+ More).
+
+**2. Permanent 308 redirect in middleware:**
+`src/middleware.ts` — added a top-of-handler redirect (placed before host-routing so it fires regardless of host context):
+```typescript
+if (pathname === '/pos/appointments' || pathname.startsWith('/pos/appointments/')) {
+  const target = new URL('/pos/jobs', request.url);
+  target.searchParams.set('scope', 'schedule');
+  return NextResponse.redirect(target, 308);
+}
+```
+**308 not 302** because the relocation is permanent (architectural retirement, not a temporary redirect) — 308 lets browsers cache the redirect and avoids the latency penalty of repeated 302 round-trips. Sub-paths like `/pos/appointments/123` (legacy deep links) are caught too and routed to the same Schedule scope; the original deep-link ID is dropped (no per-appointment surface on Schedule today; users can search/filter on Jobs).
+
+**3. Page + view component deleted (Option a — middleware redirect is reliable; orphan page files rot):**
+- `src/app/pos/appointments/page.tsx` — DELETED (12 lines; was just a `<Suspense>` wrapper around `<AppointmentsView />`)
+- `src/app/pos/appointments/` directory — REMOVED (empty after page deletion)
+- `src/app/pos/components/appointments/appointments-view.tsx` — DELETED (only consumer was the page; verified via grep — `AppointmentsView` not imported anywhere else)
+- `src/app/pos/components/appointments/__tests__/appointments-view.test.tsx` — DELETED (4 tests tied to the deleted view)
+- `src/app/pos/components/appointments/__tests__/` directory — REMOVED (empty after test deletion)
+
+**4. Sibling dialogs KEPT — re-used by POS > Jobs:**
+The `cancel-appointment-dialog.tsx`, `reschedule-appointment-dialog.tsx`, and `types.ts` in `src/app/pos/components/appointments/` are imported by `pos/jobs/components/{job-queue,change-time-button}.tsx`. Deleting them would break Jobs; they stay. The directory name `pos/components/appointments/` is now mildly misnamed (no view, only dialogs used by Jobs), but renaming is out of scope this session.
+
+**5. Tests added:**
+- `src/__tests__/middleware.test.ts` — NEW. 4 cases: exact `/pos/appointments` → 308 with `?scope=schedule`; sub-paths `/pos/appointments/123` → same target; false-prefix `/pos/appointmentsfoo` does NOT redirect; adjacent POS routes (`/pos/jobs`, `/pos/transactions`, `/pos`) do NOT redirect.
+- `src/app/pos/components/__tests__/bottom-nav.test.tsx` — NEW. 3 regression-locking cases pin the absence of the Appointments label + the `/pos/appointments` href in the rendered nav, and assert the four canonical tabs (Transactions, Quotes, Sale, Jobs) still render. Catches any future refactor that re-adds the tab. (Stubs `window.matchMedia` for the BottomNav's PWA-standalone + fullscreen capability detection effect; jsdom does not implement it.)
+
+**Audit findings (Memory #11):**
+- `grep -rln "/pos/appointments"` across `src/` returned 53 matches; after filtering out `/api/pos/appointments/...` API route matches (out of scope — those are the API surface, not the page surface), only **2 references** to the page route remained — both in `bottom-nav.tsx`. Both removed in (1) above.
+- `AppointmentsView` component referenced in 3 places (page, its own test, self-reference) — all deleted together.
+
+**Out of scope:**
+- Did NOT refactor `pos/components/appointments/` directory naming (still hosts the dialogs used by Jobs; rename is cosmetic and risks import churn across `job-queue.tsx`, `change-time-button.tsx`, `job-detail.tsx`)
+- Did NOT touch Admin > Appointments — stays per locked architecture
+- Did NOT modify `pos/jobs/` to compensate for the removed tab — Schedule scope already absorbs the functionality
+- Did NOT touch the `/api/pos/appointments/*` API routes — those serve cancel/reschedule/load/load-services flows still used by POS > Jobs and admin
+
+**Verification gates:** `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors, 97 baseline warnings — unchanged in modified files), `npm run build` (clean — middleware bundle 82 kB), `npx vitest run` (186 test files / 3030 tests pass; net +3 vs. pre-1.6 — +4 middleware + 3 bottom-nav, −4 deleted appointments-view).
+
+**Phase 1 completion:** With Session 1.6 merged, Phase 1 of the [QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md) plan is complete. All 10 sessions merged: 1.1, 1.2, 1.2.1, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.8.1.
+
+---
+
 ## Session 1.3 — `canUpdateStatus` permission gate + admin/POS dialog parity contract test (2026-06-06)
 
 Wave 4 of the Phase 1 conservative wave plan. Closes the two parity audit (b346d34b) findings that Sessions 1.1 + 1.2 deliberately deferred:

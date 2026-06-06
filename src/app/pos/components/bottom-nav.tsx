@@ -8,7 +8,6 @@ import {
   FileText,
   ShoppingCart,
   ClipboardList,
-  CalendarDays,
   MoreHorizontal,
   Vault,
   Sun,
@@ -197,12 +196,6 @@ export function BottomNav({ onOpenShortcuts }: BottomNavProps) {
       icon: ClipboardList,
       href: '/pos/jobs',
       active: pathname.startsWith('/pos/jobs'),
-    },
-    {
-      label: 'Appointments',
-      icon: CalendarDays,
-      href: '/pos/appointments',
-      active: pathname.startsWith('/pos/appointments'),
     },
   ];
 
