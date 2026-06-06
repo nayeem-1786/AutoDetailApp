@@ -834,10 +834,11 @@ These sessions are **philosophy-independent** — they're real drift bugs, safe 
 
 ### Session 1.2 — Admin/POS PATCH endpoint symmetry
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` **Complete — merged to main at `412a404b` on 2026-06-06 13:48 PDT**
 **Source:** Parity audit b346d34b Session B
 **Estimated scope:** ~12-18 prod lines / 2 files / +3-4 tests
-**Memory #8 budget:** Comfortable
+**Actual scope:** ~12 prod-logic lines / 2 prod files / +4 test cases + mock extension / +1 CHANGELOG entry / +1 doc status flip
+**Memory #8 budget:** Comfortable (honored)
 
 **Issue:** Admin PATCH endpoint at `src/app/api/appointments/[id]/route.ts` has 3 unintentional drifts vs POS PATCH:
 1. Missing `jobs.assigned_staff_id` cascade when `employee_id` changes (POS cascades at `pos/appointments/[id]/route.ts:323-329`)
@@ -871,12 +872,12 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 - Drift #15: raw `fetch()` usage at `admin/appointments/page.tsx:253, :278`
 
 **Related sessions:**
-- Depends on: Session 1.1 (prop shape stability)
-- Unblocks: Session 1.3 (parity contract test will assert endpoint symmetry)
+- Depends on: Session 1.1 (prop shape stability) ✓
+- Unblocks: Session 1.3 (parity contract test will assert endpoint symmetry — the four mirrored behaviors are now stable to reference by name in the contract test)
 
-**Linked prompt:** TBD
+**Linked prompt:** session-1-2.md
 
-**Completion:** TBD
+**Completion:** Merged at `412a404b` on 2026-06-06 13:48 PDT. All four locked drifts closed via mechanical mirroring of POS PATCH as canonical. Drift #9 closed by adding `employee_id` to admin's `current` SELECT (so the from-value is available) AND to the `buildChangeDetails` field list. Drift #10 closed by adding the unconditional `jobs.update({ assigned_staff_id }).eq('appointment_id', id)` cascade block after the appointment UPDATE — mirrors POS at :377-383 byte-for-byte. Drift #11 closed by `data.employee_id === '' ? null : data.employee_id` normalization at the update-payload construction AND in the cascade thread (defense layer for non-page direct callers; page-level `handleSave` already pre-normalizes). Drift #15 closed by swapping raw `fetch()` → `adminFetch()` at `handleSave` + `handleCancelConfirm` in the admin appointments page. Memory #11 verification at execution time: audit-cited line numbers shifted post-Sessions 1.1 + 1.5 (POS cascade now at :377-383 not :323-329; POS normalization at :358 not :304; POS field list at :444-452 not :386; admin page sites unchanged at :253 + :278). Memory #29 surfaced finding (NOT fixed this session): admin PATCH lacks permission gating on `employee_id`-only changes — admin's `isReschedule` predicate excludes `employee_id`, while POS's includes it. Fifth drift in the same family; deferred per locked 4-drift scope; flagged as potential follow-on micro-session. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings, unchanged) / build clean / 183 test files / 3012 tests passing (was 3008; +4 new drift-fix cases). Mock infrastructure extended: `state.jobUpdates` array now captures `jobs.update().eq()` calls; `state.appointment` shape gains `employee_id`; jobs mock branch now exposes both `select().eq().maybeSingle()` (existing cascade-check path) AND `update().eq()` (new cascade-write path).
 
 ---
 
@@ -918,7 +919,7 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 - Precedent test: `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx`
 
 **Related sessions:**
-- Depends on: Sessions 1.1, 1.2 (prop shape and endpoint symmetry stable)
+- Depends on: Sessions 1.1, 1.2 (prop shape and endpoint symmetry stable) — 1.1 satisfied at `1658914a`, 1.2 satisfied at `412a404b`
 
 **Linked prompt:** TBD
 
