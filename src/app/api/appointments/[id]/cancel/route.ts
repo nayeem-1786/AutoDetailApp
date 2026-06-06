@@ -8,6 +8,8 @@ import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { sendCancellationNotifications } from '@/lib/email/send-cancellation-email';
+import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 const TERMINAL_STATUSES = ['completed', 'cancelled'];
 
@@ -127,24 +129,75 @@ export async function POST(
       if (apptServices && apptDetail) {
         const serviceIds = apptServices.map((s: { service_id: string }) => s.service_id);
 
-        // Find waitlist entries matching any of these services + date (or no date preference)
+        // Find waitlist entries matching any of these services + date (or no date preference).
+        // service:services!service_id(name) is added for the per-row SMS template render
+        // (Session 1.8); customer phone/name fields stay for SMS dispatch.
         const { data: waitlistMatches } = await supabase
           .from('waitlist_entries')
-          .select('id, customer_id, service_id, customer:customers!customer_id(first_name, last_name, phone)')
+          .select('id, customer_id, service_id, customer:customers!customer_id(first_name, last_name, phone), service:services!service_id(name)')
           .in('service_id', serviceIds)
           .eq('status', 'waiting')
           .or(`preferred_date.eq.${apptDetail.scheduled_date},preferred_date.is.null`);
 
-        // Auto-notify matching waitlist entries (update status, fire webhook)
+        // Auto-notify matching waitlist entries (update status, dispatch SMS)
         if (waitlistMatches && waitlistMatches.length > 0) {
-          for (const entry of waitlistMatches) {
+          // Format the slot date once — matches /api/appointments/[id]/notify pattern.
+          const slotDateStr = new Date(apptDetail.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          });
+
+          // PostgREST infers many-to-one for waitlist_entries.customer_id (FK to PK)
+          // and waitlist_entries.service_id (FK to PK) — embeds resolve to a single
+          // object at runtime, NOT an array, despite database.types.ts generating an
+          // array shape. See CLAUDE.md "Supabase relation cardinality" — the
+          // `as unknown as` cast follows the canonical asRelationArray pattern at the
+          // point of use (each row's customer/service is consumed once below).
+          type WaitlistRow = {
+            id: string;
+            customer_id: string;
+            service_id: string;
+            customer: { first_name: string | null; last_name: string | null; phone: string | null } | null;
+            service: { name: string | null } | null;
+          };
+
+          for (const entry of waitlistMatches as unknown as WaitlistRow[]) {
             await supabase
               .from('waitlist_entries')
               .update({ status: 'notified', notified_at: new Date().toISOString() })
               .eq('id', entry.id);
+
+            // Session 1.8 — direct SMS dispatch (mirrors pos/jobs/[id]/complete:243-262).
+            // Replaces the pre-1.8 `fireWebhook('appointment_cancelled', { waitlist_notified })`
+            // call which was a customer-facing silent-drop bug — no n8n receiver is wired in
+            // prod (per webhook receivers identity audit f5e714a8), so waitlisted customers
+            // were marked `notified` in DB but never received the SMS.
+            const phone = entry.customer?.phone;
+            const serviceName = entry.service?.name ?? 'your requested service';
+            if (phone) {
+              const firstName = entry.customer?.first_name ?? undefined;
+              const smsFallback = `Hi ${firstName ?? 'there'}, good news — a spot just opened for ${serviceName} on ${slotDateStr}! Reply or call to book.`;
+              const smsResult = await renderSmsTemplate('waitlist_slot_available', {
+                service_name: serviceName,
+                appointment_date: slotDateStr,
+                first_name: firstName,
+                last_name: entry.customer?.last_name ?? undefined,
+              }, smsFallback);
+
+              if (smsResult.isActive) {
+                await sendSms(phone, smsResult.body, {
+                  logToConversation: true,
+                  customerId: entry.customer_id,
+                  notificationType: 'waitlist_slot_available',
+                  contextId: id,
+                });
+              }
+            }
           }
 
-          // Webhook for n8n to handle actual SMS sending
+          // Forward-compat webhook fire — kept per Session 1.8 prompt for future external
+          // receivers. Currently a silent no-op in prod (audit f5e714a8 confirmed no
+          // receiver is wired). The direct sendSms loop above is the actual notification
+          // channel; this is belt-and-suspenders for the day a receiver gets wired.
           fireWebhook('appointment_cancelled', {
             appointment_id: id,
             date: apptDetail.scheduled_date,

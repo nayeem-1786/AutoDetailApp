@@ -49,6 +49,7 @@ export const SMS_SLUGS = [
   "receipt_sms",
   "staff_notification",
   "staff_notification_inbound_specialty",
+  "waitlist_slot_available",
 ] as const;
 
 export type SmsSlug = (typeof SMS_SLUGS)[number];
@@ -91,6 +92,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   receipt_sms: { required: ["summary_line", "receipt_link"], optional: ["first_name", "last_name", "vehicle_description"] },
   staff_notification: { required: ["reason_label", "customer_name", "details", "customer_phone"], optional: ["customer_email", "last_name", "vehicle_description"] },
   staff_notification_inbound_specialty: { required: ["customer_name", "customer_phone", "vehicle_description"], optional: ["customer_email", "size_class", "customer_message_excerpt"] },
+  waitlist_slot_available: { required: ["service_name", "appointment_date"], optional: ["first_name", "last_name", "business_name", "business_phone"] },
 };
 
 // ── Per-slug render-vars types ─────────────────────────────────────────────
@@ -384,6 +386,15 @@ export interface RenderVarsBySlug {
     customer_email?: string | undefined;
     size_class?: string | undefined;
     customer_message_excerpt?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  waitlist_slot_available: {
+    service_name: string;
+    appointment_date: string;
+    first_name?: string | undefined;
+    last_name?: string | undefined;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;

@@ -278,6 +278,10 @@ export const SMS_CONTRACTS_SOURCE = {
       required: ['customer_name', 'customer_phone', 'vehicle_description'],
       optional: ['customer_email', 'size_class', 'customer_message_excerpt'],
     },
+    waitlist_slot_available: {
+      required: ['service_name', 'appointment_date'],
+      optional: ['first_name', 'last_name', 'business_name', 'business_phone'],
+    },
   },
 } as const;
 
