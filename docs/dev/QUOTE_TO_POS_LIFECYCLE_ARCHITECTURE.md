@@ -643,7 +643,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
-| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`<PENDING_MERGE_HASH>`) merged 2026-06-06 PDT; AC-3 + AC-8 complete |
+| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) merged 2026-06-06 PDT; AC-3 + AC-8 complete |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
@@ -1409,7 +1409,7 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 
 ### Session 2.3 — Forward-arrow routes to Schedule on today-crossing
 
-**Status:** `[x]` **Complete — merged to main at `<PENDING_MERGE_HASH>` on 2026-06-06 PDT**
+**Status:** `[x]` **Complete — merged to main at `269b94f7` on 2026-06-06 PDT**
 **Source:** [AC-8](#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today) (whole AC); Today vs Schedule conceptual audit `26521e5a` Targets G.1, E.1, A.4
 
 **Issue:** Under Item 15e Phase 1A's populate-future-date guard, Today's forward-arrow into future dates was structurally inert — `fetchJobs(date)` returns an empty list and the "Upcoming — [date]" banner shows above an empty content area. Schedule scope is the canonical surface for future-dated appointments. The arrow's pre-15e single-date-navigator behavior survived three sessions of Item 15e refactoring (Phase 1B scope toggle, N+1 pills, N+2 filters) without being redesigned — the conceptual audit identified it as "vestigial UI that the Item 15e arc made structurally redundant for future dates without removing." Operator perception: forward arrow invites navigation, the empty list reads as a bug.
@@ -1443,7 +1443,7 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 
 **Linked prompt:** Session 2.3 prompt (operator-supplied in 2026-06-06 PST session)
 
-**Completion:** Merged to main at `<PENDING_MERGE_HASH>` on 2026-06-06 PDT. Implementation followed the locked scope exactly. The single new callback `handleForwardArrow` reuses the existing `handleScopeChange` + `setScheduleFilter` + `router.push` primitives (Memory #2) — no new URL utilities, no new date helpers. The flag gate (`scheduleScopeEnabled`) is byte-symmetric with the scope toggle's flag gate at the same component scope — flag rollback restores legacy forward-arrow behavior without touching this code. Verification gates: tsc 0 errors / lint 0 errors (1 pre-existing baseline warning unchanged — `lastPollAt` from prior session) / 191 test files / 3079 tests passing (was 190 / 3074 — +1 file, +5 tests). 33 production lines / 1 prod file / 1 test file — well within the Memory #8 budget. No deviations from scope. No findings to surface.
+**Completion:** Merged to main at `269b94f7` on 2026-06-06 PDT. Implementation followed the locked scope exactly. The single new callback `handleForwardArrow` reuses the existing `handleScopeChange` + `setScheduleFilter` + `router.push` primitives (Memory #2) — no new URL utilities, no new date helpers. The flag gate (`scheduleScopeEnabled`) is byte-symmetric with the scope toggle's flag gate at the same component scope — flag rollback restores legacy forward-arrow behavior without touching this code. Verification gates: tsc 0 errors / lint 0 errors (1 pre-existing baseline warning unchanged — `lastPollAt` from prior session) / 191 test files / 3079 tests passing (was 190 / 3074 — +1 file, +5 tests). 33 production lines / 1 prod file / 1 test file — well within the Memory #8 budget. No deviations from scope. No findings to surface.
 
 ---
 
