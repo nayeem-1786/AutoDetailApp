@@ -643,7 +643,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
-| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
+| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`<MERGE_HASH>`) merged 2026-06-06 PDT |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
@@ -1284,20 +1284,66 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 ---
 
-## Phase 2 — Lifecycle Architecture (STUB)
+## Phase 2 — Lifecycle Architecture
 
-**Pre-task:** Phase 0.3 audit must complete before this phase can be detailed.
+**Pre-task:** Phase 0.3 audit complete (`98a5f30d`, 2026-06-05) — **CLEAN** migration verdict; only POS Jobs Today scope itself depends on populate.
 
 **Themes (high-level):**
 - Start Intake as materialization trigger (per [AC-3](#ac-3-start-intake-as-materialization-trigger))
 - Forward-arrow disposition (per [AC-8](#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today))
 - Terminal-state filter affordances (per [AC-7](#ac-7-terminal-states-viewable-via-filter-hidden-by-default))
-- Populate redesign or removal (gated by Phase 0.3 findings)
+- Populate redesign or removal (gated by Phase 0.3 findings — CLEAN verdict)
 - Unified Jobs surface refinement (post-tab-retirement)
 
 **Approximate session count:** 4-6 sessions, ~200-400 prod lines total.
 
-**To be detailed after Phase 0.3 audit.**
+---
+
+### Session 2.1 — Start Intake server-side materialization endpoint
+
+**Status:** `[x]` **Complete — merged to main at `<MERGE_HASH>` on 2026-06-06 PDT**
+**Source:** [AC-3](#ac-3-start-intake-as-materialization-trigger) (the biggest architectural shift in Phase 2)
+**Estimated scope:** ~80-120 prod lines / 3-4 files / +8-12 tests
+**Actual scope:** ~280 prod lines (helper 210 + endpoint 70) / 3 files (helper extended, endpoint new, test new) / +19 tests
+**Memory #8 budget:** Comfortable upper end (helper-extraction Option a + 19 tests pushed total above the estimate's nominal upper bound; honored intent — single seam, fully tested)
+
+**Issue:** AC-3 commits to operator-pressing-Start-Intake as the canonical materialization event, replacing the current implicit `populate`-on-Today-scope-mount behavior. The reverse direction (`executeUnMaterialize`) was implemented in Phase 2C; the forward direction (`materializeJobFromAppointment`) was the missing seam.
+
+**Solution (as implemented):**
+1. **New helper `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts`** — forward-direction counterpart to `executeUnMaterialize`. Gates: 404 not_found / 422 future_date / 422 invalid_status. INSERT job @ status='intake' + work_started_at=NOW FIRST, then UPDATE appointment→in_progress. Idempotent via fast-path SELECT + `upsert(ignoreDuplicates: true)` + race-recovery SELECT. Mirrors populate's column reads + walk-in's job INSERT shape (Memory #2).
+2. **New endpoint `POST /api/pos/jobs/start-intake`** — thin orchestration over the helper. Auth (`authenticatePosRequest`) → permission (`appointments.update_status`) → validate `appointment_id` body field → delegate to helper → shape response (201 first-time / 200 idempotent / 422 with `appointment_date` or `appointment_status` field / 4xx/5xx).
+3. **Walk-in atomic create unchanged** — `pos/jobs/route.ts:147-536` keeps inline implementation. The appointment+job atomic shape is structurally distinct from the appointment-already-exists shape; refactoring walk-in to share the helper is out of scope this session. Both paths converge at the `jobs.appointment_id` UNIQUE constraint.
+
+**Why:**
+- Foundation for Session 2.2 (client-side Start Intake button wiring + Today scope appointment visibility)
+- Establishes the forward seam in `lifecycle-sync.ts` (symmetry with `executeUnMaterialize`)
+- Unblocks Session 2.5 (populate retirement) — populate's behavior is now also available via the explicit materialization primitive
+
+**Pre-tasks:**
+- `[x]` Phase 0.3 audit complete (`98a5f30d`, 2026-06-05) — CLEAN migration verdict
+- `[x]` Sessions 1.4 + 1.5 merged (state machine + cascade pattern in place) — `44c8ea05` + `04921ad1`
+- `[x]` Session 1.6 merged (POS > Appointments tab retired) — `cfa9cfa4`
+
+**Primary files:**
+- `src/lib/appointments/lifecycle-sync.ts` (MOD — appended `materializeJobFromAppointment` helper + types)
+- `src/app/api/pos/jobs/start-intake/route.ts` (NEW — endpoint)
+- `src/app/api/pos/jobs/start-intake/__tests__/route.test.ts` (NEW — 19 tests)
+
+**Evidence citations:**
+- AC-3: *"Operator pressing 'Start Intake' on a confirmed (or in_progress) appointment is the canonical materialization event."*
+- Lifecycle audit `2293fb3d` Target B.2: *"the only call site in the repo is the init effect on Today scope mount and the Refresh button"* — establishes populate's current implicit role
+- Populate dependencies audit `98a5f30d`: CLEAN migration scope verdict
+- `pos/jobs/route.ts:470-490` walk-in job INSERT — Memory #2 reuse pattern
+- `populate/route.ts:42-47` future-date gate / `:65` status filter / `:169-171` upsert idempotency — Memory #2 reuse patterns
+
+**Related sessions:**
+- Depends on: Phase 0.3 audit (`98a5f30d`); Sessions 1.4/1.5 (state machine groundwork); Session 1.6 (tab retirement)
+- Unblocks: Session 2.2 (client-side wiring + appointment visibility in Today scope)
+- Unblocks: Session 2.5 (populate retirement)
+
+**Linked prompt:** Session 2.1 prompt (operator-supplied in 2026-06-06 PST session)
+
+**Completion:** Merged to main at `<MERGE_HASH>` on 2026-06-06 PDT. Implementation followed the locked scope with Option a chosen (helper extraction) — `materializeJobFromAppointment` lives in `lifecycle-sync.ts` alongside `executeUnMaterialize` as the forward/reverse seam pair. Helper signature: `(supabase, appointmentId, { trigger, actor, source, ipAddress })` returning `{ ok, httpStatus, error?, jobId?, appointmentId?, alreadyMaterialized?, appointmentDate?, appointmentStatus? }`. Gates byte-symmetric with `executeUnMaterialize`'s guard shape; ordering REVERSED (INSERT job first, then UPDATE appointment — the populate re-materialization invariant doesn't apply to the forward direction). Idempotency layered: fast-path SELECT returns 200 with `alreadyMaterialized: true`; upsert + recovery SELECT covers the TOCTOU race; the UNIQUE constraint on `jobs.appointment_id` is the load-bearing DB-layer safety net regardless. Endpoint permission `appointments.update_status` reuses the same key state-machine transitions use in PATCH. Memory #11 verified at execution time: `populate.ts:42-47, :65, :169-171` + `pos/jobs/route.ts:470-490` + `lifecycle-sync.ts:208-368` + `:59-72` all confirmed against current main. Memory #2 honored: services snapshot construction (incl. mobile-fee append) reuses populate's pattern verbatim; job column set mirrors walk-in's INSERT. No deviations from scope. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean (start-intake route registered at 1.24 kB) / 187 test files / 3049 tests passing (was 186 / 3030 — +1 file, +19 tests). No findings to surface — walk-in atomic create's behaviors all matched the Phase 0 audit's descriptions.
 
 ---
 
