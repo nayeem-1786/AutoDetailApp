@@ -6,6 +6,38 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.8.1 — Admin waitlist PATCH silent-drop fix
+
+Production code change closing the sibling sole-dispatch site surfaced by Session 1.8 but deliberately deferred per Memory #29 targeted-fix scope. Same customer-facing silent-drop bug class as Session 1.8; same fix shape.
+
+**Bug:** `src/app/api/waitlist/[id]/route.ts:80` — the admin waitlist PATCH endpoint, when an operator transitions an entry to `status='notified'` via the admin UI, fired `fireWebhook('appointment_cancelled', { event: 'waitlist_notified', ... })` as the SOLE dispatch channel for the customer notification. With no n8n receiver wired in production (per webhook receivers identity audit `f5e714a8`), the entry was marked `notified` + `notified_at=now()` in `waitlist_entries` but **the customer never received an SMS**. Operator-visible state looked correct; the customer side was silently dropped. Same shape as the cancel-route bug fixed by Session 1.8 — operator-initiated rather than cancel-triggered, so lower volume, but the customer-facing failure mode is identical.
+
+**Fix:** Mirrored Session 1.8's direct-dispatch pattern byte-for-byte. When the PATCH flips status to `notified`:
+
+1. Read the customer's phone + first/last name from the existing `customer:customers!customer_id(...)` embed (already in the select at `:37`).
+2. Read the waitlist entry's `preferred_date` (admin PATCH has no freed-appointment date; the customer's preferred date is the natural slot date — and is what the existing webhook payload already sent at `:90`).
+3. If phone OR `preferred_date` is missing → skip SMS (the row still flips to `notified`; the admin can follow up directly). Phone-null is the canonical Session 1.8 skip case; date-null is added because the `waitlist_slot_available` template's `appointment_date` chip is required (per `sms-contracts.source.ts:282`) — without it there's no coherent message to send.
+4. Otherwise, format the date with `toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })` (identical to Session 1.8 line 145-147) and render the existing `waitlist_slot_available` template via `renderSmsTemplate(slug, vars, fallback)`.
+5. Dispatch via `sendSms(phone, body, { logToConversation: true, customerId, notificationType: 'waitlist_slot_available', contextId: id })` — exactly the shape Session 1.8's cancel route uses.
+6. Pre-1.8.1 `fireWebhook` call retained alongside as forward-compat side-channel (per Session 1.8's same precedent).
+
+The template introduced by Session 1.8 (`waitlist_slot_available`) is reused unchanged — per Memory #2, same template, same SMS content, no need for a separate template. The codegen state from Session 1.8's `regen-sms-contracts.ts` run remains current; no migration, no source edit, no codegen this session.
+
+**Memory #29 audit:** Searched for any THIRD sole-dispatch `fireWebhook` site during this session. Grep across `src/app/api` for `fireWebhook(` paired with no parallel `sendSms` in the same handler — none found beyond the two already addressed. The customer-facing silent-drop bug class is closed across both surfaces with this session.
+
+**Files touched:**
+
+- `src/app/api/waitlist/[id]/route.ts` — MOD. +2 imports (`sendSms`, `renderSmsTemplate`), +~30 lines for the dispatch block + comments; pre-1.8.1 `fireWebhook` call retained.
+- `src/app/api/waitlist/[id]/__tests__/route.test.ts` — NEW. 6 cases (SMS dispatch on notify, no-phone silent skip, no-preferred-date silent skip, forward-compat webhook fires alongside SMS, inactive-template skips SMS, non-notified transitions cause no notify side effects).
+
+**Verification gates:** `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors, baseline 97 warnings unchanged), `npm run build` (clean), `npx vitest run` (181 test files / 2984 tests passing — was 2978; +6 new).
+
+**Out of scope:** Did not change the `waitlist_slot_available` template (reused unchanged from Session 1.8). Did not modify `fireWebhook` itself or the n8n receiver question. Did not change the PATCH endpoint's status-transition validation or any other code path. Did not touch the cancel-route fix from Session 1.8 (it's already correct).
+
+**Lifecycle architecture doc:** `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` Session 1.8.1 entry added to Phase 1 list with status `[x]`, merge hash, PST completion timestamp, and cross-reference to Session 1.8 (`3c118b2d`) as the precedent pattern.
+
+---
+
 ## Session 1.8 — Waitlist notification silent-drop fix
 
 Production code change closing the customer-facing silent-drop bug surfaced by the webhook receivers identity audit (`f5e714a8`, Target D.4).
