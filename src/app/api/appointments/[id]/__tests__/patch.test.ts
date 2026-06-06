@@ -370,4 +370,35 @@ describe('PATCH /api/appointments/[id] — Session 1.5 admin/POS symmetry', () =
     // And the cascade thread propagates the same normalization to jobs.
     expect(state.jobUpdates[0].payload.assigned_staff_id).toBeNull();
   });
+
+  // Session 1.2.1 — Drift #5 fix (surfaced from Session 1.2's Memory #29
+  // finding; deferred from 1.2 per locked 4-drift scope). `employee_id` now
+  // gates under `appointments.reschedule` to match POS PATCH at :160-164.
+  // Pre-fix an admin user without reschedule permission could reassign a
+  // detailer; POS correctly blocked the same operation.
+
+  it('Session 1.2.1 Drift #5: employee_id-only change with reschedule denied returns 403', async () => {
+    state.rescheduleDenied = true;
+    const res = await PATCH(
+      makeReq({ employee_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' }),
+      { params }
+    );
+    expect(res.status).toBe(403);
+    expect(state.appointmentUpdates).toHaveLength(0);
+    // Cascade must not fire when the permission check rejects upstream.
+    expect(state.jobUpdates).toHaveLength(0);
+    expect(state.auditCalls).toHaveLength(0);
+  });
+
+  it('Session 1.2.1 Drift #5: employee_id-only change with reschedule granted succeeds (regression guard)', async () => {
+    state.rescheduleDenied = false;
+    const newDetailer = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+    const res = await PATCH(makeReq({ employee_id: newDetailer }), { params });
+    expect(res.status).toBe(200);
+    expect(state.appointmentUpdates[0].employee_id).toBe(newDetailer);
+    // Cascade + audit run on the happy path — closes the regression door
+    // against an over-broad gate that blocks the granted case too.
+    expect(state.jobUpdates[0].payload.assigned_staff_id).toBe(newDetailer);
+    expect(state.auditCalls).toHaveLength(1);
+  });
 });

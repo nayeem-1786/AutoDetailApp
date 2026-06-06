@@ -34,10 +34,19 @@ export async function PATCH(
 
     const data = parsed.data;
 
-    // Permission check: reschedule requires appointments.reschedule
+    // Permission check: reschedule requires appointments.reschedule.
+    // Session 1.2.1 — Drift #5 fix (surfaced during Session 1.2 at `412a404b`
+    // as Memory #29 finding, deferred per that session's locked 4-drift scope).
+    // `employee_id` now gates under `appointments.reschedule` — mirrors POS
+    // PATCH at `/api/pos/appointments/[id]/route.ts:160-164` whose in-source
+    // comment had already promised this grouping ("mirrors admin route's
+    // grouping; employee_id is gated under reschedule") but admin diverged.
+    // Pre-fix, an admin user without reschedule permission could reassign a
+    // detailer via this endpoint; POS correctly blocked the same operation.
     const isReschedule = data.scheduled_date !== undefined ||
       data.scheduled_start_time !== undefined ||
-      data.scheduled_end_time !== undefined;
+      data.scheduled_end_time !== undefined ||
+      data.employee_id !== undefined;
     if (isReschedule) {
       const denied = await requirePermission(employee.id, 'appointments.reschedule');
       if (denied) return denied;
