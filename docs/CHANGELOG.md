@@ -6,6 +6,52 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.8 — Waitlist notification silent-drop fix
+
+Production code change closing the customer-facing silent-drop bug surfaced by the webhook receivers identity audit (`f5e714a8`, Target D.4).
+
+**Bug:** `src/app/api/appointments/[id]/cancel/route.ts:147-158` was the ONLY location in the codebase where `fireWebhook` was the SOLE dispatch channel for a customer-facing notification — the in-source comment said *"Webhook for n8n to handle actual SMS sending"*. With no n8n receiver wired in production (audit `f5e714a8` Target B verified `business_settings.n8n_webhook_urls` is seeded with all-null values and no admin UI populates it; `webhook.ts:40` silently no-ops every fire), waitlisted customers were marked `status='notified'` + `notified_at=now()` in `waitlist_entries` but **never received the SMS**. Customer-facing silent failure — operators saw it as "notified" in the admin, customers never knew a slot opened.
+
+**Fix:** Replaced the dead webhook with a direct `sendSms` dispatch loop mirroring the canonical pattern at `POST /api/pos/jobs/[id]/complete:243-262` (end-of-job customer SMS). For each matching `waitlist_entries` row:
+
+1. Flip status → `notified` + stamp `notified_at` (preserved, unchanged from pre-1.8).
+2. Render `waitlist_slot_available` SMS template via `renderSmsTemplate` (new template, seeded by this session's migration — see below). Required chips: `service_name`, `appointment_date`. Optional: `first_name`, `last_name`, `business_name`, `business_phone`. Required-vs-optional follows the customer-facing transactional principle in CLAUDE.md Rule 9 — `service_name` + `appointment_date` are incoherent if absent; greeting and business chips are prose-decoration optional.
+3. Dispatch via `sendSms(phone, body, { logToConversation: true, customerId, notificationType: 'waitlist_slot_available', contextId: appointment.id })` — exactly the shape the end-job SMS uses.
+4. Per CLAUDE.md SMS chokepoint guarantees, the `sendSms` helper normalizes `to` to E.164 and rejects unparseable input, so missing-phone rows silently skip without touching Twilio. The route also gates on `entry.customer?.phone` for explicit clarity.
+
+The pre-1.8 `fireWebhook('appointment_cancelled', { waitlist_notified: [...] })` call is **kept alongside** the new direct dispatch for forward-compat — if/when an external receiver is ever wired, the side-channel still fires correctly. A code comment at the fire site documents this is belt-and-suspenders, not the primary dispatch path.
+
+**Surface finding (Memory #29 — surface but DON'T fix):** The audit claimed the cancel route was the ONLY sole-dispatch site, but a grep audit during this session found `src/app/api/waitlist/[id]/route.ts:80` (admin PATCH waitlist entry → `notified` status) has the SAME shape — `fireWebhook('appointment_cancelled', { event: 'waitlist_notified', ... })` is the sole dispatch when an operator manually transitions a waitlist entry to `notified` via the admin UI. This is operator-initiated rather than cancel-triggered, but the customer-facing silent-drop pattern is identical. **NOT FIXED in Session 1.8 — targeted-fix scope per Memory #29.** Surface this for a follow-up session (Session 1.8.1 or fold into a wider audit). The cancel-triggered path was the higher-volume case (every appointment cancellation with matching waitlist entries triggers it); the admin PATCH is operator-initiated and lower-volume.
+
+**SMS template added (seeded via migration + sms-contracts.source.ts edit + codegen):**
+
+- Slug: `waitlist_slot_available`
+- Category: `booking`
+- Body: `Hi {first_name}, good news — a spot just opened for {service_name} on {appointment_date}! Reply or call {business_phone} to book. - {business_name}`
+- `can_silence: false` (matches `booking_confirmed` / `appointment_cancelled` policy — customer opted in to waitlist, expects notification; operator shouldn't silently disable).
+- `recipient_type: 'customer'`, `recipient_phones: NULL` (per-message customer phone).
+
+Source-edit + codegen workflow followed per CLAUDE.md Rule 9: hand-edit `src/lib/sms/sms-contracts.source.ts`, run `npx tsx scripts/regen-sms-contracts.ts`, commit both source + generated outputs alongside the migration.
+
+**Files touched:**
+
+- `src/app/api/appointments/[id]/cancel/route.ts` — MOD. +2 imports, +~50 lines for the dispatch loop + the embed-shape type + comments; the original `fireWebhook` call is retained.
+- `src/lib/sms/sms-contracts.source.ts` — MOD. +4 lines (new slug entry).
+- `src/lib/sms/generated-contracts.ts` — codegen output (auto-regenerated).
+- `src/lib/sms/palette.ts` — codegen output (auto-regenerated; no chip changes — slug reuses existing chips).
+- `supabase/migrations/20260606105901_seed_waitlist_slot_available_sms_template.sql` — NEW. Idempotent INSERT with `ON CONFLICT (slug) DO NOTHING`.
+- `src/app/api/appointments/[id]/__tests__/cancel.test.ts` — NEW. 5 test cases: per-customer SMS dispatch, empty-waitlist no-op, no-phone silent skip, forward-compat webhook fires alongside SMS, inactive-template skips SMS.
+
+**Verification gates:** `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors, baseline warnings unchanged in modified files), `npm run build` (clean), `npm test` (180 files / 2976 tests pass).
+
+**Out of scope (per session prompt):** Other `fireWebhook` call sites (each was spot-checked — the audit's claim was almost correct; only the admin waitlist PATCH at `src/app/api/waitlist/[id]/route.ts:80` shares the sole-dispatch shape, surfaced above). `fireWebhook` infrastructure itself is unchanged. Other cancel endpoints (POS appointment cancel at `src/app/api/pos/appointments/[id]/cancel/route.ts`, customer cancel at `src/app/api/customer/appointments/[id]/cancel/route.ts`, job cancel at `src/app/api/pos/jobs/[id]/cancel/route.ts`) all have their own dispatch paths; this session does not touch them.
+
+**Lifecycle architecture doc:** `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` Session 1.8 entry status `[ ]` → `[x]` with merge hash and PST completion timestamp.
+
+**Parallel session note (Memory `feedback_parallel_merge_session_number_collision`):** Session 1.4 (open SAFE state machine transitions) and Session 1.8 (this entry) ran in parallel git worktrees on 2026-06-06 PST. Session 1.4 merged to main first; Session 1.8 second. The CHANGELOG entries are preserved chronologically — both are present, neither was auto-merge-dropped (per the parallel-merge protocol in the named memory).
+
+---
+
 ## Session 1.4 — Open SAFE state machine transitions: `pending → in_progress` + `in_progress → no_show` (2026-06-06)
 
 Surgical production state-machine update. Phase 1 entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1 plan (Session 1.4 block, lines 928–974).
