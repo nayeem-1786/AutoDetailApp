@@ -6,6 +6,69 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.4 — Open SAFE state machine transitions: `pending → in_progress` + `in_progress → no_show` (2026-06-06)
+
+Surgical production state-machine update. Phase 1 entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1 plan (Session 1.4 block, lines 928–974).
+
+**The change:** Two transitions that the per-transition consequence map (audit `d3671c82` Target E.1) classified **SAFE** were unblocked in `STATUS_TRANSITIONS` at `src/lib/appointments/status-transitions.ts`:
+1. `pending → in_progress` — operator's natural workflow when starting work without a separate confirm step
+2. `in_progress → no_show` — operator-reported error #2 from state-machine audit `b0efd95f` (operator inadvertently moved an appointment to `in_progress` and needs to backtrack to `no_show`)
+
+Per AC-5 (state machine loosening — 2 SAFE + 2 with cascade), these are the 2 SAFE transitions; the remaining backward-revert pair (`confirmed → pending`, `in_progress → pending`) is Session 1.5 territory and stays blocked here until the `executeUnMaterialize` cascade is wired into PATCH.
+
+**Why these are SAFE (per consequence map `d3671c82` Target D.1, D.3, restated at file:307 and file:327):**
+- `pending → in_progress` — A.0 only (universal `appointments.status UPDATE + audit_log row`); no webhook (no `appointment_in_progress` branch in either POS or admin PATCH webhook switch, no event in `WebhookEvent` union); `booking-reminders` cron eligibility-OUT is benign (kicks the appointment out of the reminder set, no duplicate side effect); `lifecycle-engine` Phase 1D eligibility unchanged; `/api/pos/jobs/populate` eligibility-IN is idempotent on `jobs.appointment_id` UNIQUE.
+- `in_progress → no_show` — A.0 only; no webhook (`appointment_no_show` is NOT in `WebhookEvent` union — verified at audit time and re-verified at session execution via `grep` against `src/lib/utils/webhook.ts` + both PATCH routes; zero matches); no SMS/email; lifecycle Phase 1D eligibility-OUT is benign (in_progress is almost always past the 24h gate).
+
+**Production change (`src/lib/appointments/status-transitions.ts`, +9 / −3 prod lines including an 8-line in-source comment block):**
+```diff
+ export const STATUS_TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
+-  pending: ['confirmed', 'cancelled', 'no_show'],
++  // Session 1.4 — see in-source comment block for AC-5 + consequence-map citations
++  pending: ['confirmed', 'in_progress', 'cancelled', 'no_show'],
+   confirmed: ['in_progress', 'cancelled', 'no_show'],
+-  in_progress: ['completed', 'cancelled'],
++  in_progress: ['completed', 'cancelled', 'no_show'],
+   completed: [],
+   cancelled: [],
+   no_show: [],
+ };
+```
+
+The in-source comment documents AC-5 + the consequence map hash + the Session 1.5 boundary (the two `→ pending` reverts stay blocked here pending cascade-wiring) so future readers don't over-open the map.
+
+**Downstream UI consumers — no source change needed, but grouping shifts:**
+- `appointment-detail-dialog.tsx:185` builds the "recommended" status group as `[appointment.status, ...STATUS_TRANSITIONS[appointment.status]]`. After this change: for a `pending` appointment, the recommended group now includes `in_progress` (previously override); for an `in_progress` appointment, the recommended group now includes `no_show` (previously override). The "all 6 dropdown options" surface is unchanged — only the recommended-vs-override grouping reflects the audit's SAFE classification.
+- POS PATCH server enforcement at `src/app/api/pos/appointments/[id]/route.ts:236-251` is the same `STATUS_TRANSITIONS[current.status]?.includes(data.status)` lookup — no code touched there.
+- The admin PATCH endpoint has no STATUS_TRANSITIONS enforcement today (per Session brief, intentional — that's Session 1.5's symmetry work). This session does not change that.
+
+**Tests (`src/app/api/pos/appointments/[id]/__tests__/patch.test.ts`, +24 test lines / +2 cases):**
+- `accepts pending → in_progress (Session 1.4 SAFE transition) with no webhook` — asserts 200, single appointment UPDATE row, status payload `'in_progress'`, zero webhook fires.
+- `accepts in_progress → no_show (Session 1.4 SAFE transition) with no webhook` — asserts 200, single appointment UPDATE row, status payload `'no_show'`, zero webhook fires.
+- The existing `rejects an invalid status transition (completed → pending)` (file:261-268) is the Memory #29 regression-sanity check the session brief asked for and is **preserved unchanged** — confirms terminal states still 400 (didn't loosen too much).
+
+**Memory #11 note surfaced and resolved:** the brief identified line 261-264 as asserting `in_progress → no_show` blocked, but on inspection that test asserts `completed → pending` blocked instead. The `in_progress → no_show`-blocked assertion was *not* in the file previously — the brief slightly mischaracterized which test was at those line numbers. The test the brief intended to flip didn't exist; instead the +2 new positive-case tests above were added for the now-allowed transitions, and the existing terminal-state regression test was preserved (it correctly stays asserting blocked).
+
+**Verification gates (all green):** `npx tsc --noEmit` → 0 errors. `npm run lint` → 0 errors / 97 baseline phone/money warnings (pre-existing). `npm run build` → clean. `npm test -- --run` → 179 test files / 2973 tests passing (was 2971 — +2 new SAFE-transition cases).
+
+**Files touched:**
+- `src/lib/appointments/status-transitions.ts` (MOD — open 2 SAFE transitions + in-source comment block)
+- `src/app/api/pos/appointments/[id]/__tests__/patch.test.ts` (MOD — +2 positive-case tests for the newly-opened transitions; existing `completed → pending` terminal regression test preserved)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (Session 1.4 block status `[ ]` → `[x]` with merge hash + PST timestamp)
+
+**Memory #8 status:** Tiny scope budget honored — 2 prod files, 12 prod lines added (9 net to `status-transitions.ts`, 0 in PATCH route — server enforcement was already in place and lookup-based), 24 test lines added, 2 new test cases.
+
+**What this session does NOT do:**
+- Does NOT wire `executeUnMaterialize` cascade for `confirmed → pending` or `in_progress → pending` — Session 1.5 territory
+- Does NOT change admin PATCH (it has no STATUS_TRANSITIONS enforcement today — Session 1.5's symmetry work)
+- Does NOT change the dialog dropdown's 6-option list — only the recommended/override grouping shifts via the map update
+- Does NOT modify any other transition or any webhook firing logic
+
+**Unblocks:** Session 1.5 (state-machine-loosening pattern now established + canonical in-source comment style for AC-5 references).
+
+---
+
 ## Lifecycle Architecture doc v1.1 — comprehensive decision-lock from 2026-06-05 session
 
 Pure documentation update — no source / migration / test touches. Bumps `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` from v1.0 → v1.1, locking the next-phase architectural commitments operator approved after the four Phase 0 foundational audits (0.1–0.4) plus two targeted post-Phase-0 audits (webhook receivers identity `f5e714a8`, refund/credit/cancellation-fee `3e633156`) completed and merged.
