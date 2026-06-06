@@ -61,3 +61,35 @@ export interface PosScheduleEntry {
   deposit_amount: number | null;
   scope: 'schedule'; // discriminator for client narrowing vs. JobListItem
 }
+
+/**
+ * PosUnstartedAppointment — Session 2.2 (AC-3 second half).
+ *
+ * A confirmed/in_progress appointment for TODAY that has not yet been
+ * materialized into a job. Returned by `GET /api/pos/jobs` alongside the
+ * existing `data: jobs[]` array, as a NEW `unstarted_appointments: []` field.
+ *
+ * Distinct from `PosScheduleEntry` (future appointments) and from `JobListItem`
+ * (materialized jobs). The `scope: 'today_unstarted'` literal is the
+ * discriminator so the Today scope can render appointment cards (with a
+ * Start Intake button) alongside job cards without a type union conflict.
+ *
+ * Shape mirrors `PosScheduleEntry` field-for-field so the existing schedule
+ * card render primitives (customer / vehicle / services / time formatters)
+ * apply without translation — Memory #2 (reuse existing patterns).
+ */
+export interface PosUnstartedAppointment {
+  id: string;
+  scheduled_date: string;
+  scheduled_start_time: string;
+  scheduled_end_time: string | null;
+  status: AppointmentStatus;
+  channel: AppointmentChannel;
+  customer: PosScheduleEntry['customer'];
+  vehicle: PosScheduleEntry['vehicle'];
+  detailer: PosScheduleEntry['detailer'];
+  appointment_services: PosScheduleEntry['appointment_services'];
+  total_amount: number;
+  deposit_amount: number | null;
+  scope: 'today_unstarted';
+}

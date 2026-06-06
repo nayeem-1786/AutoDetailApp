@@ -18,7 +18,12 @@ import { List, CalendarDays } from 'lucide-react';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { FEATURE_FLAGS, APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
 import { toast } from 'sonner';
-import type { PosScheduleEntry } from './schedule-types';
+import type { PosScheduleEntry, PosUnstartedAppointment } from './schedule-types';
+// Session 2.2 (AC-3 second half) — Today scope absorbs un-started appointments.
+// The card encapsulates the Start Intake button + the 422 future_date popup
+// (defense-in-depth: server filters today's date, but the popup wires the
+// PATCH-date + retry affordance for race cases).
+import { UnstartedAppointmentCard } from './unstarted-appointment-card';
 // Item 15e Phase 2B — reuse the dual-context-safe admin dialog (parameterized
 // in Phase 2A) inside the POS Jobs Schedule scope. The dialog is the same
 // component admin mounts; POS passes `hostContext="pos"` (Session 1.1 unified
@@ -425,6 +430,12 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   const [cancelTarget, setCancelTarget] = useState<PosAppointment | null>(null);
 
   const [jobs, setJobs] = useState<JobListItem[]>([]);
+  // Session 2.2 — un-started confirmed/in_progress appointments for TODAY
+  // returned alongside `data` from /api/pos/jobs. Empty for past dates (and
+  // empty in practice while populate is still active per Session 2.5 — populate
+  // materializes today's confirmed appointments on Today-scope mount, so this
+  // array surfaces non-trivially only after populate retires).
+  const [unstartedAppointments, setUnstartedAppointments] = useState<PosUnstartedAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [populating, setPopulating] = useState(false);
   const populatedDates = useRef(new Set<string>());
@@ -472,9 +483,16 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     try {
       const res = await posFetch(`/api/pos/jobs?filter=${filter}&date=${date}`);
       if (res.ok) {
-        const { data } = await res.json();
-        const newJobs = data ?? [];
+        const payload = (await res.json()) as {
+          data?: JobListItem[];
+          unstarted_appointments?: PosUnstartedAppointment[];
+        };
+        const newJobs = payload.data ?? [];
         setJobs(newJobs);
+        // Session 2.2 — surface un-started appointments alongside jobs. Defaults
+        // to [] when the server omits the field (older clients / past-date
+        // requests / pre-Session-2.2 deployments).
+        setUnstartedAppointments(payload.unstarted_appointments ?? []);
         // Initialize snapshot for change detection
         const snapshot = JSON.stringify(newJobs.map((j: JobListItem) => j.id).sort());
         prevJobsRef.current = snapshot;
@@ -506,8 +524,16 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       setPollStatus('ok');
       setLastPollAt(Date.now());
 
-      const { data } = await res.json();
-      const newJobs: JobListItem[] = data ?? [];
+      const payload = (await res.json()) as {
+        data?: JobListItem[];
+        unstarted_appointments?: PosUnstartedAppointment[];
+      };
+      const newJobs: JobListItem[] = payload.data ?? [];
+      // Session 2.2 — keep un-started in sync with each poll. No
+      // change-detection animation needed: appointment cards either appear,
+      // disappear (after Start Intake), or unchanged — a plain replace is
+      // sufficient (the jobs list carries the visual-highlight semantics).
+      setUnstartedAppointments(payload.unstarted_appointments ?? []);
 
       // Build a comparable snapshot — sort by ID, include key fields
       const makeKey = (j: JobListItem) =>
@@ -1030,7 +1056,47 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
             busyAppointmentId={loadingAppointment ? selectedAppointmentId : null}
           />
         </>
-      ) : viewMode === 'timeline' ? (
+      ) : (
+        <>
+          {/* Session 2.2 (AC-3 second half) — un-started today appointments
+              strip. Rendered above BOTH timeline + list views so an operator
+              on either default mode sees the cards. Suppressed when empty so
+              there's no visual noise on a quiet day. Suppressed for past dates
+              too — the server omits the field unless `targetDate === today_pst`,
+              so the empty default doubles as the past-date suppression. */}
+          {isToday && unstartedAppointments.length > 0 && (
+            <div
+              data-testid="unstarted-strip"
+              className="border-b border-gray-200 dark:border-gray-700 bg-blue-50/30 dark:bg-blue-950/20 px-4 py-3"
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                  Not Started — Confirmed for today
+                </h2>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {unstartedAppointments.length} appointment{unstartedAppointments.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {unstartedAppointments.map((apt) => (
+                  <UnstartedAppointmentCard
+                    key={apt.id}
+                    appointment={apt}
+                    onMaterialized={() => {
+                      // Refresh the Today scope so the new job replaces this
+                      // card. Mirrors the existing Refresh-button path; the
+                      // localUpdates marker suppresses the highlight animation
+                      // (the operator just authored the materialization, no
+                      // need to draw attention to the resulting job card).
+                      markLocalUpdate(`__intake_${apt.id}__`);
+                      fetchJobs(selectedDate);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          {viewMode === 'timeline' ? (
         <JobTimeline
           jobs={sortedJobs}
           loading={loading}
@@ -1219,6 +1285,8 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           </div>
         )}
       </div>
+      )}
+        </>
       )}
       {/* Item 15e Phase 2B — Schedule-scope detail dialog. The reused admin
           AppointmentDetailDialog with POS context props. Only reachable in
