@@ -642,7 +642,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | Phase | Theme | Pre-task | Status |
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
-| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.7 (`f87aca58`) + 1.8 (merge hash pending) complete; Sessions 1.1–1.6 not started |
+| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.4 (`44c8ea05`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`) complete; Sessions 1.1–1.3, 1.5, 1.6 not started |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
@@ -1125,7 +1125,7 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 ### Session 1.8 — Waitlist notification silent-drop fix
 
-**Status:** `[x]` Complete — merge `<HASH-PENDING>` on 2026-06-06 PST (filled in at end-of-session post-merge)
+**Status:** `[x]` **Complete — merged to main at `3c118b2d` on 2026-06-06 11:11 PDT**
 **Source:** Webhook receivers identity audit (`f5e714a8`, post-Phase-0) — Target D.4 surfaced finding
 **Estimated scope:** ~10-20 prod lines / 2 files / +3-5 tests
 **Memory #8 budget:** Tiny
