@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { AppointmentStatus, JobStatus } from '@/lib/supabase/types';
+import type { AppointmentStatus, JobStatus, JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit } from '@/lib/services/audit';
+import { getTodayPst, pstStartOfDayLiteral } from '@/lib/utils/pst-date';
 
 /**
  * Appointment ↔ Job lifecycle-sync seam (Item 15e Phase 2C).
@@ -363,6 +364,315 @@ export async function executeUnMaterialize(
     };
   } catch (err) {
     console.error('[un_materialize] unexpected error:', err);
+    return { ok: false, httpStatus: 500, error: 'unknown' };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Forward materialization (Session 2.1 — AC-3 server primitive)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Errors `materializeJobFromAppointment` can return. `future_date` and
+ * `invalid_status` are 422 (gate violations the operator can resolve); the
+ * appointment-not-found case is 404. `unknown` is 500.
+ */
+export type MaterializeError =
+  | 'not_found'
+  | 'future_date'
+  | 'invalid_status'
+  | 'unknown';
+
+export interface MaterializeResult {
+  ok: boolean;
+  httpStatus: number;
+  error?: MaterializeError;
+  /** Present on success — the newly-created or pre-existing job id. */
+  jobId?: string;
+  /** Echoed for caller convenience. */
+  appointmentId?: string;
+  /** True on the idempotent re-call path (job already existed). */
+  alreadyMaterialized?: boolean;
+  /** Present on `future_date` — the appointment's scheduled_date, so the client
+   *  can render the "Move to today?" popup with the actual date. */
+  appointmentDate?: string;
+  /** Present on `invalid_status` — the appointment's current status, so the
+   *  client can render a specific message. */
+  appointmentStatus?: AppointmentStatus;
+}
+
+export interface MaterializeActor {
+  userId: string | null;
+  userEmail: string | null;
+  employeeName: string | null;
+  /** Required for `jobs.created_by`. */
+  employeeId: string;
+}
+
+export interface MaterializeOptions {
+  /** The materialization trigger. `start_intake` lands the job at status='intake'
+   *  with `work_started_at=NOW()`; future triggers (operator-initiated, lazy-mount)
+   *  can use this discriminator to pick their own initial status + audit detail. */
+  trigger: 'start_intake';
+  actor: MaterializeActor;
+  source: 'admin' | 'pos';
+  ipAddress: string | null;
+}
+
+/**
+ * Forward-direction materialization: given an existing appointment id, create
+ * the linked `jobs` row and advance `appointments.status='in_progress'`. The
+ * canonical counterpart to `executeUnMaterialize` (the reverse direction).
+ *
+ * AC-3 commitment (Session 2.1): operator pressing "Start Intake" is the
+ * canonical materialization event for a confirmed appointment. This helper is
+ * the server primitive that powers `POST /api/pos/jobs/start-intake`.
+ *
+ * Walk-in atomic create at `pos/jobs/route.ts:147-536` keeps its inline
+ * implementation — it creates the appointment AND the job in one transaction
+ * (a different structural shape than this helper). Both paths converge at the
+ * `jobs.appointment_id` UNIQUE constraint.
+ *
+ * Gates (return-before-mutation):
+ *  1. **404 not_found** — appointment row does not exist.
+ *  2. **422 future_date** — `appointment.scheduled_date > today` (PST). The
+ *     materialization concept maps to "operator at site, about to start work";
+ *     a future date violates that. Mirrors populate's future-date gate at
+ *     `populate/route.ts:42-47`.
+ *  3. **422 invalid_status** — `appointment.status NOT IN ('confirmed',
+ *     'in_progress')`. Pending appointments must be confirmed first; terminal
+ *     appointments (completed/cancelled/no_show) cannot be re-materialized.
+ *     Mirrors populate's status filter at `populate/route.ts:65`.
+ *
+ * Idempotency:
+ *  - Two concurrent callers pressing Start Intake on the same appointment must
+ *    result in ONE job, not two. The `jobs.appointment_id` UNIQUE constraint
+ *    (migration `20260329000002`) is the load-bearing safety net.
+ *  - First, a SELECT checks for an existing job — if found, returns 200 with
+ *    `alreadyMaterialized: true` and the existing `jobId` (cheap fast path).
+ *  - The INSERT uses `upsert({ ignoreDuplicates: true })` so a TOCTOU race
+ *    silently no-ops at the DB layer; a follow-up SELECT recovers the row that
+ *    won the race. Same pattern populate uses at `populate/route.ts:169-171`.
+ *
+ * Ordering:
+ *  - INSERT job FIRST (status='intake', work_started_at=NOW), then UPDATE
+ *    `appointment.status='in_progress'`. Reverse of `executeUnMaterialize`'s
+ *    ordering (which writes appointment FIRST then deletes the job). The
+ *    populate re-materialization invariant doesn't apply here — we are
+ *    materializing, not un-materializing — so the safe ordering is the one
+ *    that leaves no partial state if the appointment UPDATE fails: a job row
+ *    paired with a `confirmed` appointment is a benign, retryable state
+ *    (the operator can re-press Start Intake; the idempotent path returns the
+ *    same job and re-attempts the appointment update).
+ */
+export async function materializeJobFromAppointment(
+  supabase: SupabaseClient,
+  appointmentId: string,
+  options: MaterializeOptions
+): Promise<MaterializeResult> {
+  try {
+    // 1. Fetch appointment — same column set as populate (`populate/route.ts:50-65`).
+    const { data: appt, error: apptErr } = await supabase
+      .from('appointments')
+      .select(
+        'id, customer_id, vehicle_id, employee_id, scheduled_date, scheduled_end_time, status, is_mobile, mobile_surcharge, mobile_zone_name_snapshot'
+      )
+      .eq('id', appointmentId)
+      .single();
+
+    if (apptErr || !appt) {
+      return { ok: false, httpStatus: 404, error: 'not_found' };
+    }
+
+    // 2. Future-date gate. Mirrors populate at `populate/route.ts:42-47`:
+    //    materialization is for TODAY or PAST work only; a future-dated
+    //    appointment must NEVER become a job row early. Client uses the
+    //    returned `appointmentDate` to render the "Move to today?" popup.
+    const today = getTodayPst();
+    if (appt.scheduled_date > today) {
+      return {
+        ok: false,
+        httpStatus: 422,
+        error: 'future_date',
+        appointmentDate: appt.scheduled_date as string,
+      };
+    }
+
+    // 3. Status gate. Mirrors populate at `populate/route.ts:65`:
+    //    only confirmed/in_progress appointments can be materialized.
+    //    Pending requires confirmation first; terminal states are out of scope.
+    const apptStatus = appt.status as AppointmentStatus;
+    if (apptStatus !== 'confirmed' && apptStatus !== 'in_progress') {
+      return {
+        ok: false,
+        httpStatus: 422,
+        error: 'invalid_status',
+        appointmentStatus: apptStatus,
+      };
+    }
+
+    // 4. Idempotency fast path — return the existing job if one already exists.
+    const { data: existingJob } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('appointment_id', appointmentId)
+      .maybeSingle();
+
+    if (existingJob) {
+      return {
+        ok: true,
+        httpStatus: 200,
+        jobId: existingJob.id as string,
+        appointmentId,
+        alreadyMaterialized: true,
+      };
+    }
+
+    // 5. Fetch appointment_services for the services JSONB snapshot.
+    //    Mirrors populate's join shape at `populate/route.ts:98-106`.
+    const { data: aptServices } = await supabase
+      .from('appointment_services')
+      .select(
+        'service_id, price_at_booking, service:services!appointment_services_service_id_fkey(id, name)'
+      )
+      .eq('appointment_id', appointmentId);
+
+    const baseServices: JobServiceSnapshot[] = (aptServices ?? []).map((svc) => {
+      const service = svc.service as unknown as { id: string; name: string } | null;
+      return {
+        id: svc.service_id as string,
+        name: service?.name ?? 'Unknown Service',
+        price: Number(svc.price_at_booking),
+      };
+    });
+
+    // Append mobile-fee entry to the JSONB snapshot when the appointment is
+    // mobile (Option D2 materialization — mirrors `populate/route.ts:138-152`
+    // and walk-in `pos/jobs/route.ts:458-468`).
+    const mobileSurchargeNum = Number(appt.mobile_surcharge ?? 0);
+    const services: JobServiceSnapshot[] =
+      appt.is_mobile && mobileSurchargeNum > 0
+        ? [
+            ...baseServices,
+            {
+              id: null,
+              name: (appt.mobile_zone_name_snapshot as string) || 'Mobile Service Fee',
+              price: mobileSurchargeNum,
+              is_mobile_fee: true,
+            },
+          ]
+        : baseServices;
+
+    // 6. Compute estimated_pickup_at from scheduled_end_time + scheduled_date
+    //    in PST/PDT context. Mirrors populate's calc at `populate/route.ts:126-136`.
+    let estimatedPickup: string | null = null;
+    if (appt.scheduled_end_time) {
+      const dateTimeStr = `${appt.scheduled_date}T${appt.scheduled_end_time}`;
+      const offsetStr = pstStartOfDayLiteral(appt.scheduled_date as string).slice(-6);
+      const dt = new Date(dateTimeStr + offsetStr);
+      if (!isNaN(dt.getTime())) {
+        estimatedPickup = dt.toISOString();
+      }
+    }
+
+    // 7. INSERT job (idempotent via upsert + UNIQUE constraint on appointment_id).
+    //    Start Intake lands DIRECTLY at status='intake' with work_started_at=NOW
+    //    — operator pressing Start Intake IS the start of work tracking (skips
+    //    the legacy `scheduled` intermediate state that populate used).
+    const nowIso = new Date().toISOString();
+    const jobInsert = {
+      appointment_id: appointmentId,
+      customer_id: appt.customer_id,
+      vehicle_id: appt.vehicle_id,
+      assigned_staff_id: appt.employee_id,
+      services,
+      status: 'intake' as const,
+      work_started_at: nowIso,
+      intake_started_at: nowIso,
+      estimated_pickup_at: estimatedPickup,
+      created_by: options.actor.employeeId,
+    };
+
+    const { data: upserted, error: insertErr } = await supabase
+      .from('jobs')
+      .upsert([jobInsert], { onConflict: 'appointment_id', ignoreDuplicates: true })
+      .select('id');
+
+    if (insertErr) {
+      console.error('[materialize] job insert failed:', insertErr.message);
+      return { ok: false, httpStatus: 500, error: 'unknown' };
+    }
+
+    // Resolve the canonical job id. If upsert won the race, `upserted[0].id`
+    // is the new row. If a concurrent caller won, `upserted` is an empty array
+    // (ignoreDuplicates), so re-SELECT to recover the winner's row id.
+    let jobId: string | undefined = upserted?.[0]?.id as string | undefined;
+    let raceWinnerReturned = false;
+    if (!jobId) {
+      const { data: raceWinner } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('appointment_id', appointmentId)
+        .maybeSingle();
+      jobId = raceWinner?.id as string | undefined;
+      raceWinnerReturned = true;
+    }
+
+    if (!jobId) {
+      console.error('[materialize] job id missing after upsert + recovery select');
+      return { ok: false, httpStatus: 500, error: 'unknown' };
+    }
+
+    // 8. Advance appointment.status='in_progress' if it was 'confirmed'. The
+    //    'in_progress' branch is a no-op write (already in_progress — covers
+    //    the re-materialize-after-cancel-job edge case symmetrically).
+    if (apptStatus === 'confirmed') {
+      const { error: apptUpdErr } = await supabase
+        .from('appointments')
+        .update({ status: 'in_progress', updated_at: nowIso })
+        .eq('id', appointmentId);
+
+      if (apptUpdErr) {
+        // Recoverable partial state — the job row exists paired with a
+        // 'confirmed' appointment. The next Start Intake press hits the
+        // idempotent fast path, returns the same job, and retries the update.
+        console.error(
+          '[materialize] appointment status update failed (recoverable):',
+          apptUpdErr.message
+        );
+        return { ok: false, httpStatus: 500, error: 'unknown', jobId, appointmentId };
+      }
+    }
+
+    // 9. Audit (fire-and-forget; mirrors executeUnMaterialize's audit shape).
+    logAudit({
+      userId: options.actor.userId,
+      userEmail: options.actor.userEmail,
+      employeeName: options.actor.employeeName,
+      action: 'create',
+      entityType: 'job',
+      entityId: jobId,
+      entityLabel: `Job #${jobId.slice(0, 8)} (materialized)`,
+      details: {
+        trigger: options.trigger,
+        appointment_id: appointmentId,
+        previous_appointment_status: apptStatus,
+        services_count: baseServices.length,
+        race_winner_returned: raceWinnerReturned,
+      },
+      ipAddress: options.ipAddress,
+      source: options.source,
+    });
+
+    return {
+      ok: true,
+      httpStatus: 201,
+      jobId,
+      appointmentId,
+      alreadyMaterialized: false,
+    };
+  } catch (err) {
+    console.error('[materialize] unexpected error:', err);
     return { ok: false, httpStatus: 500, error: 'unknown' };
   }
 }

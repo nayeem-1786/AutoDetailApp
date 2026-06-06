@@ -6,6 +6,87 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 2.1 — Start Intake server-side materialization endpoint (2026-06-06)
+
+First half of [AC-3](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-3-start-intake-as-materialization-trigger) (the biggest architectural shift in Phase 2). Implements the server primitive that powers operator-initiated job materialization. Session 2.2 builds the client-side wiring on top of this endpoint; Session 2.5 retires the implicit `populate`-on-Today-scope-mount behavior.
+
+**Change shape:** new endpoint + new shared helper in lifecycle-sync.ts. No deletions; populate stays for now (Session 2.5 retires it).
+
+**1. New helper `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts`:**
+
+The forward-direction counterpart to `executeUnMaterialize`. lifecycle-sync.ts now hosts both seams — the reverse (`delete_job`) was Phase 2C; the forward (`materialize`) is Session 2.1. AC-3 commitment honored: this helper is the canonical materialization primitive.
+
+Signature: `materializeJobFromAppointment(supabase, appointmentId, { trigger, actor, source, ipAddress })`. The `trigger` discriminator (`'start_intake'` today; future values reserved for operator-initiated, lazy-mount, etc.) drives the audit detail and reserves a one-line extension point if Session 2.5 needs to differentiate paths.
+
+Gates (return-before-mutation, byte-symmetric with `executeUnMaterialize`'s guard shape):
+- **404 not_found** — appointment row absent
+- **422 future_date** — `appointment.scheduled_date > today (PST)`; response carries `appointmentDate` so the client (Session 2.2) can render the "Move to today?" popup. Mirrors populate's future-date gate at `populate/route.ts:42-47` — Memory #11 verified the line numbers against current main before mirroring.
+- **422 invalid_status** — `appointment.status NOT IN (confirmed, in_progress)`; response carries `appointmentStatus` for client messaging. Mirrors populate's status filter at `populate/route.ts:65`.
+
+Job INSERT shape mirrors walk-in atomic create at `pos/jobs/route.ts:470-490` (Memory #2 — reuse the existing pattern; don't invent new column shapes). Two intentional differences from walk-in: (a) `status = 'intake'` (walk-in lands at `'scheduled'`; Start Intake skips that intermediate state because the operator pressing Start Intake IS the start of work tracking — closes the lifecycle-architecture doc's TO-VERIFY note on `scheduled`'s post-redesign role); (b) `work_started_at = NOW()` + `intake_started_at = NOW()` (walk-in leaves these null; Start Intake captures the timer-start moment).
+
+Services JSONB snapshot construction (mobile-fee append on `is_mobile && surcharge > 0`) reuses populate's exact pattern at `populate/route.ts:138-152` — same column reads, same shape.
+
+Idempotency (load-bearing per session prompt's hard rule):
+- Fast path: `SELECT id FROM jobs WHERE appointment_id = X` — if exists, return 200 with `alreadyMaterialized: true` and the existing `jobId` (no INSERT, no audit row, no appointment update).
+- Race path: `upsert([...], { onConflict: 'appointment_id', ignoreDuplicates: true })` — same pattern populate uses at `populate/route.ts:169-171`. When upsert returns empty (concurrent caller won), a recovery SELECT recovers the winner's id; the audit row carries `race_winner_returned: true` so post-hoc analysis can distinguish "we won" from "concurrent caller won."
+- The `jobs.appointment_id` UNIQUE constraint (migration `20260329000002`) is the load-bearing DB-layer safety net regardless of the application-layer fast path.
+
+Ordering: INSERT job FIRST, then UPDATE `appointments.status='in_progress'`. Reverse of `executeUnMaterialize`'s ordering (which writes the appointment FIRST then deletes the job, to satisfy the populate re-materialization invariant). For the forward direction the invariant doesn't apply — a job paired with a `confirmed` appointment is a benign retryable state. The 500 path on update-failure returns `jobId` so the caller can surface "partial success, retry will recover" UX.
+
+Audit (`action: 'create'`, `entityType: 'job'`, `details.trigger: 'start_intake'`, `details.previous_appointment_status`, `details.services_count`, `details.race_winner_returned`) fires fire-and-forget after the job INSERT + appointment UPDATE succeed. The byte-symmetric counterpart to `executeUnMaterialize`'s audit at `lifecycle-sync.ts:336-354`.
+
+**2. New endpoint `POST /api/pos/jobs/start-intake`:**
+
+Thin orchestration over `materializeJobFromAppointment`. Auth (`authenticatePosRequest`) → permission (`appointments.update_status` — same key state-machine transitions use in PATCH because Start Intake conceptually advances the appointment lifecycle) → body validation (`appointment_id: string` non-empty) → delegate to helper → shape response.
+
+Response codes:
+- **201** on first materialization (`{ job_id, appointment_id, already_materialized: false }`)
+- **200** on idempotent re-call (`{ job_id, appointment_id, already_materialized: true }`)
+- **400** missing/invalid `appointment_id`
+- **401** unauthenticated
+- **403** permission denied
+- **404 not_found** appointment absent
+- **422 future_date** with `appointment_date` field
+- **422 invalid_status** with `appointment_status` field
+- **500 unknown** on insert/update failure (the recoverable partial-state case carries the `job_id` so the client can render specific retry UX)
+
+Walk-in atomic create at `pos/jobs/route.ts:147-536` keeps its inline implementation per session scope (the appointment+job atomic shape is structurally different from the appointment-already-exists shape; refactoring walk-in is out of scope this session). Both paths converge at the `jobs.appointment_id` UNIQUE constraint and the `materialize` action seam — Session 2.5 may unify them.
+
+**3. Tests added (19 new tests):**
+
+`src/app/api/pos/jobs/start-intake/__tests__/route.test.ts` — coverage matrix:
+- Auth/validation (5): 401 unauthenticated, 400 non-JSON body, 400 missing `appointment_id`, 400 empty `appointment_id`, 403 missing permission
+- Gates (6): 404 appointment absent, 422 future_date + body shape, 422 invalid_status × 4 (pending / completed / cancelled / no_show)
+- Successful materialization (4): 201 shape + job INSERT field-by-field assertions + appointment in_progress update, mobile-fee append into services snapshot, no-op appointment update when already `in_progress`, audit log shape
+- Idempotency (2): fast-path (200 already_materialized=true, no INSERT, no audit row), race-recovery path (upsert empty → SELECT winner → `race_winner_returned: true` in audit)
+- Error handling (2): 500 on upsert failure (no appointment update), 500 on appointment-update failure post-insert (recoverable, job exists)
+
+All 19 pass. Full suite: 3049 / 3049 pass.
+
+**Pre-flight verifications (Memory #11):**
+- `populate.ts:42-47` future-date gate — verified ✓
+- `populate.ts:65` status filter `.in('status', ['confirmed', 'in_progress'])` — verified ✓
+- `populate.ts:169-171` upsert idempotency pattern — verified ✓
+- `pos/jobs/route.ts:147-536` walk-in POST handler boundaries — verified ✓
+- `pos/jobs/route.ts:470-490` job INSERT field set — verified ✓
+- `lifecycle-sync.ts:208-368` `executeUnMaterialize` — verified ✓
+- `lifecycle-sync.ts:59-72` `jobStatusForAppointmentStatus` — verified ✓
+
+**Memory #8 budget:** 3 files touched (helper, endpoint, test); ~250 lines net production (helper ~210, endpoint ~70 — well within "comfortable upper end" for a session that adds both a new seam and a new endpoint with full byte-symmetric test coverage).
+
+**Out of scope (per session prompt):**
+- ❌ Client-side Start Intake button wiring (Session 2.2)
+- ❌ Populate endpoint removal (Session 2.5)
+- ❌ Walk-in atomic create modifications (separate path; intentionally not refactored to share the helper in this session)
+- ❌ Today scope rendering changes (Session 2.2 adds appointment visibility)
+- ❌ Schedule scope behavior
+- ❌ Cron logic
+
+**No findings to surface** — walk-in atomic create's behaviors all matched the Phase 0 audit's descriptions. The denormalized job columns (`customer_id`, `vehicle_id`, `assigned_staff_id`) and the services JSONB snapshot shape are the only fields the new helper reuses; both match exactly between populate and walk-in.
+
+---
+
 ## Session 1.6 — Retire POS > Appointments tab (2026-06-06)
 
 Final Phase 1 session. Closes [AC-4](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-4-pos--jobs-as-unified-surface-pos-appointments-tab-retires): POS > Jobs is the unified appointments surface; the parallel POS > Appointments tab — a third near-duplicate alongside Jobs' Today + Schedule scopes — is removed. Conceptual audit `26521e5a` Target G.4 surfaced this; Item 15e Phase 3 scoped it but never shipped.
