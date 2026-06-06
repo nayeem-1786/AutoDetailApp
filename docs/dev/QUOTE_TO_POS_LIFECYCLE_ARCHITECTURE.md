@@ -1,9 +1,11 @@
 # Quote → POS Lifecycle Architecture
 
-**Version:** 1.1
-**Locked:** 2026-06-04 10:30 PST (v1.0); 2026-06-05 21:30 PST (v1.1)
+**Version:** 1.2
+**Locked:** 2026-06-04 10:30 PST (v1.0); 2026-06-05 21:30 PST (v1.1); 2026-06-06 17:00 PST (v1.2)
 **Status:** LIVING — updated session-by-session
 **Scope:** POS lifecycle architecture (Quote → Appointment → Job → POS Transaction)
+
+**v1.2 captures the Phase 2 closure validation pass executed after all six Phase 2 sessions (2.1 through 2.6) merged to main on 2026-06-06. AC-3 is now FULLY OPERATIONAL in production (Start Intake is the canonical materialization seam; populate retired); AC-7 (terminal-state filter) and AC-8 (forward-arrow Schedule routing) are IMPLEMENTED. Phase 2 status row flipped from `[~] In progress` to `[x] Complete (6 sessions)`. Per-AC operational-state markers added to AC-3, AC-7, AC-8. Stale "TBD in Phase 2" / "Phase 2 will redesign or remove" / "Pre-task before Phase 2 execution" language replaced with shipped-implementation notes. Critical architectural code sites table reconciled against current main (`populate` endpoint references marked RETIRED Session 2.5; `materializeJobFromAppointment` added as the canonical materialization writer; Today endpoint reflects Session 2.2 + 2.6 extensions). Phase 3 and Phase 4 stub pre-task language reconciled (Phase 0 audits ARE complete; both phases ready to detail). Session 2.1.1 (walk-in helper-reuse refactor) added as a queued post-Phase-2 deferral per Memory #29. Document Maintenance Rules extended with a parallel-merge cosmetic-artifact note (Session 1.2.1 / 1.3 documented precedent). Phase 1 + Phase 2 = 16 architectural sessions shipped to production; 192 test files / 3100 cases passing.**
 
 **v1.1 captures the comprehensive operator decision-lock session of 2026-06-05, executed after all four Phase 0 foundational audits (0.1–0.4) and two targeted post-Phase-0 audits (webhook receivers identity, refund/credit/cancellation-fee) completed and merged. New ACs added: AC-12 through AC-15. ACs already refined in v1.0.x line via audit completions: AC-5 (pre-task RESOLVED by webhook receivers audit), AC-9 (verified implementation scope per refund audit). New Phase 1 session added: Session 1.8 (waitlist silent-drop fix). Phased Plan Overview status table updated to reflect Phase 0 completion. All six audit deliverables linked from Reference Index.**
 
@@ -19,7 +21,7 @@
 6. [Phased Plan Overview](#phased-plan-overview)
 7. [Phase 0 — Foundational Audits](#phase-0--foundational-audits)
 8. [Phase 1 — Foundation and Cleanup](#phase-1--foundation-and-cleanup)
-9. [Phase 2 — Lifecycle Architecture (STUB)](#phase-2--lifecycle-architecture-stub)
+9. [Phase 2 — Lifecycle Architecture](#phase-2--lifecycle-architecture)
 10. [Phase 3 — Cross-cutting Commitments (STUB)](#phase-3--cross-cutting-commitments-stub)
 11. [Phase 4 — Mobile Architecture (STUB)](#phase-4--mobile-architecture-stub)
 12. [Decisions Log](#decisions-log)
@@ -300,7 +302,9 @@ No other cross-table writes are permitted without an architectural-commitment up
 
 ### AC-3: Start Intake as materialization trigger
 
-**Commitment:** Operator pressing "Start Intake" on a confirmed (or in_progress) appointment is the canonical materialization event. This **replaces** the current implicit populate-on-Today-scope-mount behavior.
+**Status:** ✅ **FULLY OPERATIONAL in production.** Server endpoint (`POST /api/pos/jobs/start-intake`) shipped in Session 2.1 (`a5d2a0d6`); operator-facing un-started strip + click-wire shipped in Session 2.2 (`f25bb87d`); populate retirement in Session 2.5 (`9e29d058`) removed the racing pre-materialization path; daily summary cards aligned to the new materialization shape in Session 2.6 (`9212423f`, Shape α). Start Intake is the sole non-walk-in materialization trigger; the un-started strip is the canonical operator surface.
+
+**Commitment:** Operator pressing "Start Intake" on a confirmed (or in_progress) appointment is the canonical materialization event. This **replaces** the prior implicit populate-on-Today-scope-mount behavior.
 
 **Gates:**
 - Start Intake disabled for `appointment.scheduled_date > today` (future-dated). UI shows popup with two options:
@@ -308,11 +312,11 @@ No other cross-table writes are permitted without an architectural-commitment up
   - "Cancel — customer not yet here" (no action)
 - Start Intake disabled for `appointment.status NOT IN (confirmed, in_progress)` (e.g., pending requires confirmation first)
 
-**Walk-in path unchanged:** atomic appointment + job create stays as the parallel path.
+**Walk-in path unchanged:** atomic appointment + job create stays as the parallel path. Walk-in helper-reuse refactor (sharing `materializeJobFromAppointment` with the start-intake path) queued as Session 2.1.1 — see Phase 2 section.
 
-**Effect on `populate` endpoint:** Phase 2 will redesign or remove. The existing `populate` cron-less, init-effect-triggered model is engineering-convenient but architecturally implicit. Start Intake is product-design-explicit.
+**Effect on `populate` endpoint:** RETIRED Session 2.5. Endpoint deleted; pre-materialization is now operator-initiated only.
 
-**Pre-task before Phase 2 execution:** Phase 0.3 audit must verify what currently depends on populate having pre-materialized today's jobs (daily summary counts, list rendering, glance views).
+**Pre-task closure:** Phase 0.3 audit (`98a5f30d`) returned CLEAN verdict; 4 CLEAN-RE-POINTABLE dependencies absorbed by Sessions 2.2 + 2.6; 13 REQUIRES-JOB-EXISTENCE dependencies naturally preserved by AC-3's materialization shape.
 
 **Rationale:**
 - **Operator input:** *"When does an appointment become a Job? I believe it should be triggered when the detailer clicks on the 'Start Intake' button. This 'changes' the ticket from Confirmed to → active status 'in progress'."*
@@ -379,13 +383,15 @@ POS > Appointments tab is removed from POS bottom navigation. Existing routes re
 
 ### AC-7: Terminal states viewable via filter, hidden by default
 
+**Status:** ✅ **IMPLEMENTED** in Session 2.4 (`5aebe1f1`). Single URL-persistent toggle ("Show terminal") added to both POS > Jobs Today and Schedule scopes; shared URL key (`include_terminal=1`) so toggling either surface persists across both. Server endpoints accept the param and conditionally relax the exclude-list; default behavior unchanged when the toggle is off. Terminal entities render with a visual mute (`opacity-60`) to distinguish them from active work.
+
 **Commitment:** Terminal-state appointments (cancelled, completed, no_show) are NOT shown by default in POS > Jobs Today or Schedule scopes. Operator can opt in via a filter affordance to view them for review/recovery action.
 
-**Filter shape:** TBD in Phase 2 — likely an explicit toggle ("Show completed", "Show cancelled", "Show no-show") or a stage-specific filter pill.
+**Filter shape (shipped):** chip-style toggle rendered in both scope chromes. Today scope places it `ml-auto`-right-aligned in the filter-pills row; Schedule scope gets its own row below the existing status + detailer filter row. Both write to the same `?include_terminal=1` URL key via the canonical `handleScheduleFilterChange`-pattern URL writer (Session 1.6 precedent).
 
-**Default Today scope behavior:** unchanged (currently excludes `cancelled` per `src/app/api/pos/jobs/route.ts:47`).
+**Default Today scope behavior:** unchanged (excludes `cancelled` per `src/app/api/pos/jobs/route.ts`). Toggle-on relaxes the exclude.
 
-**Default Schedule scope behavior:** unchanged (excludes `cancelled, no_show, completed` per `src/app/api/pos/jobs/schedule/route.ts:12`).
+**Default Schedule scope behavior:** unchanged (excludes `cancelled, no_show, completed` per `src/app/api/pos/jobs/schedule/route.ts`). Toggle-on relaxes the exclude.
 
 **Rationale:**
 - **Operator input:** *"Terminal states (appointment-side): completed / cancelled / no_show. These should also be able to be viewed using filters from the Job panel view, not shown by default."*
@@ -393,6 +399,8 @@ POS > Appointments tab is removed from POS bottom navigation. Existing routes re
 ---
 
 ### AC-8: Forward-arrow in Today scope routes to Schedule when crossing today
+
+**Status:** ✅ **IMPLEMENTED** in Session 2.3 (`269b94f7`). Forward-arrow click in Today scope: when `nextDate > today`, the handler flips scope to `schedule`, pins the target date as a single-day "Other" range (`sched_pills=other&sched_from=X&sched_to=X`), and uses `router.push` so browser-back returns to Today scope. Past-date navigation routes through the legacy `setDate` path unchanged. Flag-gated on `pos_jobs_unified_schedule` so a rollback restores the legacy day-step behavior.
 
 **Commitment:** When operator presses the forward arrow on Today scope and navigation would cross into tomorrow or later, the UI routes to Schedule scope (preserving the date intent). The forward-arrow is no longer empty for future dates.
 
@@ -597,15 +605,18 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | jobStatusForAppointmentStatus | `src/lib/appointments/lifecycle-sync.ts:59-72` |
 | APPT_LIFECYCLE_RANK | `src/lib/appointments/lifecycle-sync.ts:81-86` |
 | isEarlierState | `src/lib/appointments/lifecycle-sync.ts:95-103` |
-| Populate endpoint | `src/app/api/pos/jobs/populate/route.ts:1-194` |
-| Populate future-date gate | `src/app/api/pos/jobs/populate/route.ts:42-47` |
-| Populate status filter | `src/app/api/pos/jobs/populate/route.ts:65` |
-| Populate idempotent upsert | `src/app/api/pos/jobs/populate/route.ts:169-171` |
+| Materialization helper (canonical writer) | `src/lib/appointments/lifecycle-sync.ts` — `materializeJobFromAppointment` |
+| Materialization helper future-date gate | `src/lib/appointments/lifecycle-sync.ts` — gate (2) in helper doc-block |
+| Materialization helper status gate | `src/lib/appointments/lifecycle-sync.ts` — gate (3) in helper doc-block |
+| Materialization idempotent upsert | `src/lib/appointments/lifecycle-sync.ts` — idempotency section in helper doc-block |
+| Start Intake endpoint (Session 2.1) | `src/app/api/pos/jobs/start-intake/route.ts` |
+| ~~Populate endpoint~~ | RETIRED Session 2.5 (`9e29d058`); see `materializeJobFromAppointment` above for the canonical replacement |
 | Schedule endpoint (PURE READ) | `src/app/api/pos/jobs/schedule/route.ts:24-27` |
 | Schedule EXCLUDED_STATUSES | `src/app/api/pos/jobs/schedule/route.ts:12, :114` |
 | Schedule materialization dedup | `src/app/api/pos/jobs/schedule/route.ts:131-141` |
-| Today endpoint | `src/app/api/pos/jobs/route.ts:15-141` |
-| Today excludeStatuses | `src/app/api/pos/jobs/route.ts:47` |
+| Today endpoint (jobs + un-started appointments — Session 2.2 extension) | `src/app/api/pos/jobs/route.ts:15-141` |
+| Today excludeStatuses (relaxed by `?include_terminal=1` per Session 2.4) | `src/app/api/pos/jobs/route.ts` |
+| Today daily summary Shape α aggregation (Session 2.6) | `src/app/pos/jobs/components/job-queue.tsx` — `summary` useMemo |
 | Walk-in atomic INSERT pair | `src/app/api/pos/jobs/route.ts:147-536` |
 | Booking-route initial status | `src/app/api/book/route.ts:559` |
 | Dialog component (shared) | `src/app/admin/appointments/components/appointment-detail-dialog.tsx` |
@@ -1286,16 +1297,20 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 ## Phase 2 — Lifecycle Architecture
 
-**Pre-task:** Phase 0.3 audit complete (`98a5f30d`, 2026-06-05) — **CLEAN** migration verdict; only POS Jobs Today scope itself depends on populate.
+**Status:** ✅ **COMPLETE** — 6 sessions shipped to main on 2026-06-06 PDT. AC-3 FULLY OPERATIONAL; AC-7 + AC-8 implemented; Shape α daily summary aligned.
 
-**Themes (high-level):**
-- Start Intake as materialization trigger (per [AC-3](#ac-3-start-intake-as-materialization-trigger))
-- Forward-arrow disposition (per [AC-8](#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today))
-- Terminal-state filter affordances (per [AC-7](#ac-7-terminal-states-viewable-via-filter-hidden-by-default))
-- Populate redesign or removal (gated by Phase 0.3 findings — CLEAN verdict)
-- Unified Jobs surface refinement (post-tab-retirement)
+**Pre-task closure:** Phase 0.3 audit (`98a5f30d`, 2026-06-05) returned **CLEAN** migration verdict. Phase 0.1 audit (`69b15b0f`) informed AC-3 + AC-11 scoping.
 
-**Approximate session count:** 4-6 sessions, ~200-400 prod lines total.
+**Themes (all delivered):**
+- Start Intake as materialization trigger (per [AC-3](#ac-3-start-intake-as-materialization-trigger)) — Sessions 2.1 + 2.2 + 2.5 + 2.6
+- Forward-arrow disposition (per [AC-8](#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today)) — Session 2.3
+- Terminal-state filter affordances (per [AC-7](#ac-7-terminal-states-viewable-via-filter-hidden-by-default)) — Session 2.4
+- Populate retirement (gated by Phase 0.3's CLEAN verdict) — Session 2.5
+- Daily summary cards Shape α — Session 2.6
+
+**Session ledger:** 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`9e29d058`) + 2.6 (`9212423f`). Net production lines: ~+700 / -540 (the -540 dominated by Session 2.5's endpoint deletion). Test files: 192 / 3100 cases passing post-2.6.
+
+**Queued post-Phase-2 deferral:** Session 2.1.1 (walk-in helper-reuse refactor) — see entry below.
 
 ---
 
@@ -1625,36 +1640,68 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 
 ---
 
+### Session 2.1.1 — Walk-in atomic create: share `materializeJobFromAppointment` helper (queued)
+
+**Status:** `[ ]` **Not started** — queued post-Phase-2 deferral per Memory #29 (surfaced in Session 2.5's notes; referenced from AC-3's "Walk-in path unchanged" clause)
+
+**Source:** Session 2.1 (`a5d2a0d6`) introduced `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts` as the canonical materialization writer. Session 2.5 (`9e29d058`) retired the populate endpoint, making `materializeJobFromAppointment` the sole non-walk-in materialization site. The walk-in atomic create at `src/app/api/pos/jobs/route.ts:147-536` still inlines its own job-INSERT pair (synthetic appointment + job in one transaction). The helper and the walk-in path now share enough shape that a reuse pass is worthwhile — but the structural difference (walk-in creates the appointment too; helper assumes an existing appointment) means it's a non-trivial refactor.
+
+**Scope (when fired):**
+- Extract the `jobs.services` JSONB build + the `estimated_pickup_at` PST calc + the mobile-fee append into shared utilities or extend `materializeJobFromAppointment` to accept a "synthetic appointment" mode
+- Walk-in atomic create then calls the shared utility for the job-INSERT half; keeps its own appointment-INSERT half (the shape difference)
+- No behavioral change — walk-ins still land at `status='scheduled'` (their transient pre-stage state); non-walk-in materialization still lands at `status='intake'`
+
+**Out of scope:**
+- Behavioral change of any kind. Walk-in's transient `scheduled` state is intentional UX (operator confirms walk-in registration → presses Start Intake when vehicle is staged) and must not be unified into the helper's `intake` start.
+- Reorganizing walk-in's appointment-INSERT half — that's its own structural concern, not a helper sharing concern.
+
+**Rationale:**
+- **Memory #2 (component reuse):** two materialization paths that share the JSONB-build shape and the PST calc shape are a smell. The Session 2.5 cleanup made `lifecycle-sync.ts:materializeJobFromAppointment`'s in-source documentation explicit that it is the canonical materialization writer — walk-in's inline copy is now the only siblings-in-shape duplicate.
+- **Memory #29 (targeted scope):** Session 2.5's prompt explicitly deferred this — "The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)." This entry honors that deferral by surfacing it as a tracked queued session rather than a buried follow-up note.
+
+**Estimated scope:** ~50-100 prod lines (mostly extraction), 1-2 files (`lifecycle-sync.ts` + `pos/jobs/route.ts`), no schema change, no DB migration. Pure refactor — same observable behavior pre/post.
+
+**Dependencies:**
+- Depends on: Sessions 2.1 + 2.5 (both must be in main — they ARE, post-Phase-2 closure)
+- Sequential after: nothing else; this is a standalone refactor session
+- Unblocks: nothing — pure cleanup
+
+**Trigger condition:** can run any time after Phase 2 closure. Not urgent — the duplication doesn't cause incorrect behavior, it just keeps two near-identical patterns alive. Fire when convenient (e.g., during a low-pressure window between Phase 3 sessions, or as part of a future broader lifecycle-sync.ts maintenance pass).
+
+---
+
 ## Phase 3 — Cross-cutting Commitments (STUB)
 
-**Pre-task:** Phase 0.1 + Phase 0.2 audits must complete before this phase can be detailed.
+**Pre-task closure:** Phase 0.1 (`69b15b0f`), Phase 0.2 (`dcf511df`), and the post-Phase-0 refund/credit audit (`3e633156`) all complete and merged 2026-06-05. **Phase 3 is ready to detail** — the audit deliverables that informed the AC-9 / AC-10 / AC-11 / AC-12 / AC-14 / AC-15 lock are in main; per-session planning can proceed.
 
 **Themes (high-level):**
 - Pending vs Confirmed semantic enforcement across all three booking paths (per [AC-11](#ac-11-pending-vs-confirmed-semantic-enforcement-payment-driven))
 - Unified ticket number scheme — implement `appointment_number` (A-XXXX) column + generation (per [AC-10](#ac-10-unified-ticket-number-scheme-tbd-detail-principle-locked))
-- Quote → Appointment conversion formalized (depends on Phase 0.2 findings)
+- Quote → Appointment conversion formalized — customer-accept auto-conversion + SLA alerting (per [AC-12](#ac-12-customer-accept-auto-conversion-to-pending-appointment-with-sla-alerting); informed by Phase 0.2)
 - Cancel-with-partial-payment pathways A and B (per [AC-9](#ac-9-cancel-with-partial-payment-decision-pathways))
-- SMS/Phone agent payment link integration (depends on Phase 0.1 findings)
+- Cancellation fee policy — `business_settings`-driven default + per-cancel toggle (per [AC-14](#ac-14-cancellation-fee-policy))
+- Customer credit infrastructure — `customer_credits` table greenfield (per [AC-15](#ac-15-customer-credit-infrastructure))
+- SMS/Phone agent payment link integration (informed by Phase 0.1)
 - Manual amount silent-drop fix — Option C cascade endpoint extension (manual amount audit f73661b7 Q2)
 
 **Approximate session count:** 5-8 sessions, ~300-500 prod lines total.
 
-**To be detailed after Phase 0.1 and 0.2 audits.**
+**To be detailed:** per-session planning to begin in a separate planning pass; no Phase 3 sessions queued in this document yet.
 
 ---
 
 ## Phase 4 — Mobile Architecture (STUB)
 
-**Pre-task:** Phase 0.4 audit must complete before this phase can be detailed.
+**Pre-task closure:** Phase 0.4 audit (`e10e23a5`) complete and merged 2026-06-05. **Phase 4 is ready to detail** — minimum-scope path locked as [AC-13](#ac-13-mobile-phase-4-minimum-scope-path).
 
 **Themes (high-level):**
-- Mobile detailer access mechanism (TBD per audit findings)
-- Mobile-specific Start Intake flow
-- Mobile photo capture / timer / addon handling
+- Mobile detailer access mechanism (per AC-13 minimum-scope path)
+- Mobile-specific Start Intake flow (composes on AC-3 + Session 2.1's helper)
+- Mobile photo capture / timer / addon handling (most infrastructure exists per Phase 0.4)
 
-**Approximate session count:** 2-4 sessions, scope unknown until audit returns.
+**Approximate session count:** 2-4 sessions, scope per AC-13 lock.
 
-**To be detailed after Phase 0.4 audit.**
+**To be detailed:** per-session planning to begin in a separate planning pass; no Phase 4 sessions queued in this document yet.
 
 ---
 
@@ -1703,6 +1750,34 @@ Following completion of all four Phase 0 audits (0.1 through 0.4) plus two targe
 
 ---
 
+### 2026-06-06 17:00 PST — Phase 2 closure validation + v1.2 lock
+
+Phase 2 complete (6 sessions: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6). All six sessions merged to main on 2026-06-06 PDT; pre-Phase-2 baseline was 187 test files / 3049 cases; post-2.6 is 192 / 3100 (+5 files, +51 cases).
+
+**AC operational state at v1.2:**
+- **AC-3** (Start Intake as materialization trigger): **FULLY OPERATIONAL in production.** Server endpoint shipped 2.1; operator UI shipped 2.2; populate retired 2.5; daily summary cards aligned to the new shape 2.6. The materialization seam architecture is complete.
+- **AC-7** (Terminal-state filter): **IMPLEMENTED.** URL-persistent toggle in both Today and Schedule scopes; server endpoints accept `include_terminal=1`.
+- **AC-8** (Forward-arrow Schedule routing): **IMPLEMENTED.** Forward-arrow click crossing into the future flips scope to Schedule with the target date pinned as a single-day "Other" range; flag-gated for rollback safety.
+
+**Doc reconciliation against current main:**
+- Stale "TBD in Phase 2" / "Phase 2 will redesign or remove" / "Pre-task before Phase 2 execution" language in AC-3, AC-7, AC-8 replaced with shipped-implementation notes.
+- Reference Index "Critical architectural code sites" table: 4 populate endpoint line-range references replaced with RETIRED Session 2.5 marker + `materializeJobFromAppointment` (`src/lib/appointments/lifecycle-sync.ts`) added as the canonical materialization writer; Today endpoint row notes the Session 2.2 + 2.6 extensions; new row for Session 2.4's `include_terminal` URL param.
+- TOC: "Phase 2 — Lifecycle Architecture (STUB)" anchor link repaired (it no longer has the STUB suffix, so the anchor changed).
+- Phase 2 section intro: "Approximate session count: 4-6 sessions" replaced with the actual 6-session ledger + status banner.
+- Phase 3 and Phase 4 stub pre-task language reconciled: both phases' Phase 0 pre-tasks are complete; both phases ready to detail.
+
+**New entry added:**
+- **Session 2.1.1:** Walk-in atomic create → share `materializeJobFromAppointment` helper (queued post-Phase-2 deferral per Memory #29). Pure refactor — no behavioral change. Can run any time post-Phase-2; not urgent.
+
+**Document Maintenance Rules extended:**
+- Parallel-merge cosmetic artifact subsection added. Documents the Session 1.2.1 / 1.3 precedent where Session 1.2.1's merge commit `90a3f4e9` was published with Session 1.3's docs-closeout MERGE_MSG (correct content; cosmetic label mismatch). Future readers should trust commit content + CHANGELOG entries over merge-commit message labels.
+
+**Phase 1 + Phase 2 = 16 architectural sessions shipped to production.** Net codebase impact: roughly +700 prod lines from Phase 2 (Sessions 2.1 + 2.2 + 2.3 + 2.4 + 2.6) − 340 from Session 2.5's populate retirement = +360 net Phase 2 production lines; plus substantial parallel test additions (+51 cases over Phase 2). Phase 1 totals tracked in each session's individual entry.
+
+**Phase 3 ready to detail.** Phase 4 ready to detail. No Phase 3 or Phase 4 sessions queued yet — per-session planning to begin in a separate planning pass.
+
+---
+
 ## Document Maintenance Rules
 
 ### Update triggers
@@ -1722,6 +1797,14 @@ This document is updated in the following situations:
 **Rule A — Architectural decisions (AC-N items):** if a session uncovers a finding that contradicts an architectural commitment, the session pauses, this document is updated, the decision is revisited with operator.
 
 **Rule B — Tactical implementation details:** if a session uncovers a finding that contradicts only the session's specifics (not an AC-N), the session may proceed with the new approach. The session block in this document is updated with deviation notes at completion.
+
+### Parallel-merge cosmetic artifacts
+
+When multiple sessions merge to main in close sequence — particularly when one session's docs-only commit lands between another session's feat commit and merge commit — the merge commit message of the second/later session may sometimes carry the prior session's `MERGE_MSG` label (the git default-template is mutated by intervening branch tip movement). **The commit content is always correct** (verifiable via parent hashes, the diff itself, and the CHANGELOG entries). Only the message string may mismatch.
+
+This is a known parallel-merge artifact, not an error. Future readers should trust commit content + CHANGELOG entries over merge commit message labels in cases of apparent inconsistency.
+
+**Documented precedent:** Session 1.2.1's merge commit `90a3f4e9` was published with Session 1.3's docs-closeout MERGE_MSG (because Session 1.3 merged first and its docs commit was the most-recent ref tip when Session 1.2.1's merge was prepared). The Session 1.2.1 entry explains this inline; the CHANGELOG chronology is correctly preserved. Treat this as the canonical example of the artifact.
 
 ### Session prompt requirements
 
