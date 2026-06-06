@@ -6,6 +6,98 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 2.6 — Daily summary cards semantic (Shape α) (2026-06-06)
+
+> **Phase 2 closes here.** All 6 sessions (2.1, 2.2, 2.3, 2.4, 2.5, 2.6) merged. AC-3 fully operational; AC-7 + AC-8 complete; Shape α aligned. The lifecycle architecture phase is done.
+
+Aligns the POS Jobs Today 4-card daily summary with the post-Session-2.5 reality. Pre-2.5 (and pre-2.6) the cards aggregated `jobs` rows only — accurate while populate auto-materialized today's confirmed appointments at every mount, but post-Session-2.5 (populate retired) confirmed appointments arrive in the `unstartedAppointments` array (Session 2.2's Today endpoint extension) and stay there until the operator presses Start Intake. Cards aggregating jobs-only would under-count by exactly the un-started population.
+
+Implements [Phase 0.3 F.1 LOCKED Shape α](docs/dev/POPULATE_DEPENDENCIES_AUDIT.md): cards reflect today's EXPECTED work (jobs + un-started appointments), not today's STARTED work. Operator's stated mental model — *"Jobs are Appointments, at least visually from the POS > Jobs page"* — aligns with this shape.
+
+**Change shape:** single `summary` useMemo extension in `job-queue.tsx` (the only daily-summary aggregation site) + new test file. +48 / −7 = +41 net production lines / 1 prod file / 1 test file. Memory #8 budget honored — within "comfortable" framing.
+
+**Per-card semantic (Shape α table):**
+
+| Card | Pre-2.6 (jobs-only) | Post-2.6 (expected = jobs + un-started) |
+|---|---|---|
+| **totalJobs** | `count(jobs WHERE today AND status != cancelled)` | `count(jobs WHERE today AND status != cancelled)` + `count(unstarted WHERE status NOT IN (cancelled, no_show))` |
+| **unassigned** | `count(jobs WHERE !assigned_staff)` | `count(jobs WHERE !assigned_staff)` + `count(unstarted WHERE !detailer)` |
+| **totalRevenue** | `sum(jobs.services[].price)` | `sum(jobs.services[].price)` + `sum(unstarted.total_amount)` |
+| **completedCount** | `count(jobs WHERE status IN (completed, closed))` | **unchanged** — operational metric, not expected; un-started contributes 0 |
+
+**Implementation (`src/app/pos/jobs/components/job-queue.tsx`):**
+
+The `summary` useMemo at the pre-2.6 lines 828-836 is extended to aggregate across both arrays:
+
+```typescript
+const summary = useMemo(() => {
+  const nonCancelled = jobs.filter((j) => j.status !== 'cancelled');
+  const expectedApts = unstartedAppointments.filter(
+    (a) => a.status !== 'cancelled' && a.status !== 'no_show'
+  );
+  const totalJobs = nonCancelled.length + expectedApts.length;
+  const unassigned =
+    nonCancelled.filter((j) => !j.assigned_staff).length +
+    expectedApts.filter((a) => !a.detailer).length;
+  const jobsRevenue = nonCancelled.reduce(
+    (sum, j) => sum + j.services.reduce((s, svc) => s + svc.price, 0),
+    0
+  );
+  const aptsRevenue = expectedApts.reduce(
+    (sum, a) => sum + (Number(a.total_amount) || 0),
+    0
+  );
+  const totalRevenue = jobsRevenue + aptsRevenue;
+  const completedCount = nonCancelled.filter(
+    (j) => j.status === 'completed' || j.status === 'closed'
+  ).length;
+  return { totalJobs, unassigned, totalRevenue, completedCount };
+}, [jobs, unstartedAppointments]);
+```
+
+Notes:
+- The summary bar's visibility gate (`!loading && summary.totalJobs > 0`) is unchanged, but `totalJobs > 0` now triggers on the un-started population too — so the bar renders for un-started-only days (pre-2.6 it would have stayed hidden in this case).
+- Excluded from "expected" on both sides: `cancelled` (always — preserves the pre-2.6 jobs `nonCancelled` semantic) + `no_show` (appointment-side terminal). When AC-7's `include_terminal` toggle is on, the endpoint returns these rows; the summary still treats them as "didn't / won't happen" — the toggle changes what's RETURNED, not what's COUNTED as expected work.
+- `completed` un-started appointments (possible via the include_terminal toggle) ARE included in `totalJobs` and `totalRevenue` — they're work that happened, just no job materialized. Mirrors the jobs-side semantic where `status='completed'` jobs ARE in `nonCancelled`.
+
+**Money math reconciliation:** both `jobs.services[].price` and `appointments.total_amount` are pre-Unify dollars at the same precision (the Money-Unify epic hasn't reached this family yet). The summary's `formatCurrency(totalRevenue)` rendering is byte-identical to pre-2.6 for the jobs-only contribution (regression-locked by test 2 in the new test file).
+
+**Test affordance:** added `data-testid="daily-summary-bar"` to the summary `<div>`. Both the un-started appointment card and the job-detail card render `formatCurrency(...)` strings of their own — without scoping, summary assertions would collide with card-internal renders. Test queries scope via `within(bar)`.
+
+**New test file `src/app/pos/jobs/components/__tests__/job-queue-summary-shape-alpha.test.tsx` (8 cases):**
+
+1. Empty Today scope (no jobs, no un-started) → summary bar hidden gracefully (visibility-gate regression-lock)
+2. Jobs-only (no un-started) → cards reflect jobs-only values (pre-2.6 byte-identical regression confirmation)
+3. Un-started-only (no jobs) → cards aggregate appointment values (Shape α visible — pre-2.6 would have shown no bar)
+4. Mixed jobs + un-started → cards sum across both arrays (totalJobs, unassigned, totalRevenue, completedCount all asserted)
+5. Cancelled job + cancelled un-started excluded from expected count
+6. no_show un-started appointment excluded from expected count
+7. Completed un-started appointment INCLUDED in expected (active-or-done)
+8. completedCount stays jobs-only (regression-lock against accidentally widening the operational metric to the expected dimension)
+
+**Verification:**
+- tsc: 0 errors
+- ESLint: 0 errors / 97 baseline warnings (0 new)
+- next build: clean
+- Vitest full suite: 192 test files / 3100 tests passing (was 191 / 3092 — +1 file, +8 tests)
+
+**Files touched:**
+- MOD: `src/app/pos/jobs/components/job-queue.tsx` (summary useMemo extension + testid attribute)
+- NEW: `src/app/pos/jobs/components/__tests__/job-queue-summary-shape-alpha.test.tsx` (8 regression-locking tests)
+
+**Cross-references:**
+- [AC-3](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-3-start-intake-as-materialization-trigger) — operator-initiated materialization (fully operational post-2.5; this session is the UX-alignment follow-up)
+- [Populate dependencies audit](docs/dev/POPULATE_DEPENDENCIES_AUDIT.md) `98a5f30d` Target A.2 — daily summary cards inventory
+- Sessions 2.2 (`f25bb87d`) + 2.5 (`9e29d058`) — the foundation this session aligns the summary UX to
+
+**Memory #29 surfaced (deferred):** Phase 0.3 audit Target A.4 (`staff/available` job_count_today) is the only sibling-aggregation candidate categorized as CLEAN-RE-POINTABLE. Not folded in this session — its existing semantic (counting only jobs that exist) still returns sensible numbers and a future session can extend it per the audit's recommendation. The reassign-detailer modal's "X jobs today" per detailer count is therefore slightly conservative (under-counts the detailer's pre-intake load) but not wrong.
+
+**Phase 2 closure:** All 6 sessions in Phase 2 merged. AC-3 (Start Intake materialization seam) fully operational in production; AC-7 (terminal-state filter affordance) complete; AC-8 (forward-arrow Schedule routing) complete; Shape α (daily summary semantic) aligned. The lifecycle architecture phase is done.
+
+**Memory updates:** none.
+
+---
+
 ## Session 2.5 — Populate endpoint disposition (AC-3 finalization) (2026-06-06)
 
 Retires the `/api/pos/jobs/populate` endpoint per [AC-3](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-3-start-intake-as-materialization-trigger) and the [populate dependencies audit](docs/dev/POPULATE_DEPENDENCIES_AUDIT.md) `98a5f30d` CLEAN-migration verdict (F.4 LOCKED Option (i) — remove entirely). With Sessions 2.1 (Start Intake server primitive) and 2.2 (un-started strip + Today endpoint extension) landed, populate became dead code. Session 2.5 completes the materialization seam architecture by removing the endpoint, its callers, and re-pointing 7 comment cross-references to the new canonical writer.
