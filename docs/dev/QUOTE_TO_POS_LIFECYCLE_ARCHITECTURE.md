@@ -788,10 +788,11 @@ These sessions are **philosophy-independent** — they're real drift bugs, safe 
 
 ### Session 1.1 — Close no-op suppression patterns + HIGH parity finding
 
-**Status:** `[ ]` Not started
+**Status:** `[x]` **Complete — merged to main at `1658914a` on 2026-06-06 12:53 PDT**
 **Source:** Parity audit b346d34b Session A
 **Estimated scope:** ~20-35 prod lines / 4 files / +5-8 tests
-**Memory #8 budget:** Comfortable
+**Actual scope:** ~29 prod lines / 3 prod files (dialog + admin dashboard + POS job-queue) / +13 test cases across 2 new + 1 modified test files / +1 CHANGELOG entry / +1 doc status flip
+**Memory #8 budget:** Comfortable (honored)
 
 **Issue:** Two `onEditInPos`-shaped no-op suppression patterns remain post-#150:
 1. **HIGH severity bug:** `<UnMaterializeConfirmationDialog context="admin" />` hardcoded at `appointment-detail-dialog.tsx:625`. When POS Schedule operator triggers un-materialize, modal hits admin endpoint via `adminFetch` → 401 → admin login redirect → operator booted from POS.
@@ -807,8 +808,8 @@ These sessions are **philosophy-independent** — they're real drift bugs, safe 
 - Establishes the `hostContext` unified-prop pattern for future host-divergence needs
 
 **Pre-tasks:**
-- `[ ]` Operator decision: Q1 dashboard mount fix shape — read-only prop (recommended) OR wire real handlers
-- `[ ]` Operator decision: Q2 prop unification — unify mobileModalMode + modifierVariant + unmaterializeContext into hostContext (recommended) OR keep separate
+- `[x]` Operator decision: Q1 dashboard mount fix shape — **read-only prop** (LOCKED Option A; in-prompt confirmation)
+- `[x]` Operator decision: Q2 prop unification — **unify into `hostContext`** (LOCKED Option A; clean removal of mobileModalMode + modifierVariant per Memory #2; only 2 call sites used the legacy props)
 
 **Primary files:**
 - `src/app/admin/appointments/components/appointment-detail-dialog.tsx` (line 625 hardcode + prop addition)
@@ -825,9 +826,9 @@ These sessions are **philosophy-independent** — they're real drift bugs, safe 
 - Unblocks: Session 1.2 (PATCH symmetry depends on dialog prop shape being stable)
 - Unblocks: Session 1.3 (parity contract test asserts hostContext forwarding)
 
-**Linked prompt:** TBD — drafted as Phase 1 begins
+**Linked prompt:** session-1-1.md
 
-**Completion:** TBD
+**Completion:** Merged at `1658914a` on 2026-06-06 12:53 PDT. Both findings closed. HIGH bug (un-materialize `context="admin"` hardcode at line 625) fixed by threading from new `hostContext` prop — POS Schedule un-materialize now correctly routes through `posFetch` to POS endpoint with POS auth. No-op anti-pattern (`onSave={async () => false}` + `onCancel={() => {}}` at dashboard mount) replaced by `readOnly={true}` flag (Q1 LOCKED Option A); dashboard quick-peek now hides Save Changes + Cancel Appointment buttons and disables editable fields (Status select, both notes textareas, mobile pencil, Enable Mobile button). Prop unification (Q2 LOCKED Option A — clean removal): legacy `mobileModalMode` + `modifierVariant` collapsed into single `hostContext?: 'admin' | 'pos'` prop, threaded to `<EditMobileModal mode>` + `<ModifierSummary variant>` + `<UnMaterializeConfirmationDialog context>`. `returnToPath` stays separate per Concern 2 (parameterizes URL, not host). Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings) / build clean / 181 test files / 2986 tests passing pre-merge (was 179 / 2973; +2 files / +13 cases); post-merge 183 files / 3008 tests passing (includes Session 1.5 + 1.8.1 increments). Memory #11 verification at execution time: line 625 hardcode + lines 688-689 no-ops + POS Schedule prop pass-through at job-queue.tsx:1234-1236 all confirmed; `UnMaterializeConfirmationDialog.context` prop already typed `'admin' | 'pos'` so no upstream extension required. Memory #29 surfaced finding: `src/app/admin/appointments/page.tsx` doesn't pass legacy props (relies on defaults); no source change needed there. Parallel-merge resolution: ran alongside Sessions 1.5 + 1.8.1; merge order 1.8.1 → 1.5 → 1.1; CHANGELOG conflict on Session 1.1 merge resolved by keeping all three entries (minimal-diff placement per Memory #29 — same-day batch grouping).
 
 ---
 
@@ -857,7 +858,7 @@ Plus admin uses raw `fetch()` instead of `adminFetch` at `admin/appointments/pag
 - Establishes adminFetch pattern usage per CLAUDE.md Rule [check current rule number for fetch pattern]
 
 **Pre-tasks:**
-- `[ ]` Verify Session 1.1 merged (prop shape stable)
+- `[x]` Verify Session 1.1 merged (prop shape stable) — merged at `1658914a` on 2026-06-06 12:53 PDT
 
 **Primary files:**
 - `src/app/api/appointments/[id]/route.ts` (3 drift fixes)
