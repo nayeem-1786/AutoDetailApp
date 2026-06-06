@@ -6,6 +6,35 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Lifecycle Architecture doc v1.1 — comprehensive decision-lock from 2026-06-05 session
+
+Pure documentation update — no source / migration / test touches. Bumps `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` from v1.0 → v1.1, locking the next-phase architectural commitments operator approved after the four Phase 0 foundational audits (0.1–0.4) plus two targeted post-Phase-0 audits (webhook receivers identity `f5e714a8`, refund/credit/cancellation-fee `3e633156`) completed and merged.
+
+**New architectural commitments added (AC-12 through AC-15):**
+- **AC-12** — Customer-accept auto-conversion to pending appointment with SLA alerting. Addresses Phase 0.2 audit F.8 (`dcf511df`); customer accept currently sets `quotes.status='accepted'` and notifies staff via *"Our team will reach out shortly to schedule"* (`accept/route.ts:97`/`:101`) without creating an appointment row — silent conversion drop. Phase 3 wires `convertQuote(supabase, id, …, { appointmentStatus: 'pending', channel: 'customer_accept' })` into the accept endpoint and adds a lifecycle-engine SLA rule (default 4 business hours) to alert operator when staff confirmation lags.
+- **AC-13** — Mobile Phase 4 minimum-scope path. Locks the Phase 4 scope: personal device + same PIN auth, IP whitelist disabled for `/pos/*`, same job-detail UI, payment-link checkout only, Start Intake fires from detailer's phone at customer site. Explicitly defers job-specific access tokens, dispatch-state enum, photo bandwidth optimization, biometric auth. Per Phase 0.4 audit `e10e23a5` Pattern B.
+- **AC-14** — Cancellation fee policy. Default $50 in `business_settings`; per-appointment override; operator-toggleable per cancel; semantically Pathway A (`refund_amount = paid_amount - fee`); Pathway B does not typically apply a fee; refund UI shows breakdown. Closes refund audit `3e633156` F.5 (`appointments.cancellation_fee` column is decorative — no money-movement reader).
+- **AC-15** — Customer credit infrastructure. New `customer_credits` table greenfield (`amount_cents`, `source_appointment_id`, `applied_to_transaction_id`, `applied_at`, `notes`); create-at-cancel (Pathway B); apply-at-checkout (POS register Apply Credit affordance); admin visibility tab + manual adjustments (audit-logged); expiration policy deferred to refinement after basic system ships. Closes the schema-level Pathway B gap surfaced by refund audit `3e633156` (no `customer_credits` table, no `customers.credit_balance` column today).
+
+**ACs refined by audit completion (already merged in pre-v1.1 doc updates `32b1e3d5` and `11dab806`; v1.1 documents the architectural shape change):**
+- **AC-5** — pre-task on n8n receiver idempotency RESOLVED. Webhook receivers identity audit (`f5e714a8`) verified `business_settings.n8n_webhook_urls` is seeded with all-null values; no admin UI populates it; `fireWebhook` is silently no-op at `webhook.ts:40` for every event. Session 1.5 UNBLOCKED for the webhook concern specifically (forward caveat preserved for future receiver wiring).
+- **AC-9** — implementation scope verified per refund audit `3e633156`. Pathway A is partially implemented (refund engine `/api/pos/refunds` 756 lines exists in isolation; NOT orchestrated with cancel endpoints; operator does 3 manual steps today). Pathway B is essentially unimplemented at the schema level. v1.1 adds cross-references to AC-14 (fee policy) + AC-15 (credit infrastructure) that close the gaps.
+
+**New Phase 1 session added:**
+- **Session 1.8** — Waitlist notification silent-drop fix. `appointments/[id]/cancel/route.ts:147-158` is the ONLY location where `fireWebhook` is the SOLE dispatch channel for customer-facing notification (no parallel `sendSms`); in-source comment says *"Webhook for n8n to handle actual SMS sending"*. With no n8n receiver wired (per webhook audit `f5e714a8` Target D.4), waitlisted customers are marked `notified` in DB but receive no SMS. Session 1.8 replaces the dead webhook with direct `sendSms` loop mirroring the `POST /api/pos/jobs/[id]/complete:243-262` end-of-job pattern. ~10-20 prod lines / 2 files / +3-5 tests. Independent of Sessions 1.1–1.6 or 1.7.
+
+**Reference Index** linked all 6 audit deliverables — 4 Phase 0 (`69b15b0f`, `dcf511df`, `98a5f30d`, `e10e23a5`) + 2 targeted post-Phase-0 (`f5e714a8`, `3e633156`).
+
+**Phased Plan Overview** status table updated: Phase 0 → `[x]` complete; Phase 1 → `[~]` in progress (Session 1.7 done at `f87aca58`); Phases 2–4 → `[ ]` ready to detail (all audit pre-tasks now satisfied; AC-13 locks Phase 4 detailing scope).
+
+**Files touched:** `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (MOD, +~290 doc lines: version stamp + 4 new ACs + 4 Reference Index entries + Phased Plan table refresh + Session 1.5 pre-task refresh + new Session 1.8 + AC-9 cross-references + Decisions Log entry + END OF DOCUMENT marker bump). `docs/CHANGELOG.md` (this entry).
+
+**Decisions Log preserves the full v1.1 lock rationale** including critical audit findings: no webhook receiver in production (Session 1.7 fix was correct discipline but produced no customer-visible change in current state); waitlist gap is the only real silent-drop bug (Session 1.8 addresses); customer credit infrastructure is greenfield (AC-15); cancellation fee column is decorative (AC-14 closes orchestration gap); AC-5 pre-task was vacuous (Session 1.5 unblocked); "end job" SMS uses direct `sendSms` and works correctly today (`POST /api/pos/jobs/[id]/complete:243-262`).
+
+**No behavior change.** No source / migration / test files touched. This is a pure documentation lock-in for the next phase of work.
+
+---
+
 ## Session 1.7 — Fix: `convertQuote` `appointment_confirmed` webhook now fires conditionally on resulting status (2026-06-05)
 
 Surgical production bug fix. Phase 1 add-on entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` plan — added retroactively per the doc-maintenance rule for "new session identified."
