@@ -7,6 +7,9 @@ import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
 import { requirePermission } from '@/lib/auth/require-permission';
 import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
+import { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
+import { executeUnMaterialize } from '@/lib/appointments/lifecycle-sync';
+import type { AppointmentStatus } from '@/lib/supabase/types';
 
 export async function PATCH(
   request: NextRequest,
@@ -69,6 +72,61 @@ export async function PATCH(
       );
     }
 
+    // Session 1.5 — STATUS_TRANSITIONS enforcement on the admin PATCH (was
+    // previously absent — admin/POS asymmetry per state machine audit b0efd95f).
+    // AC-5 commits both endpoints to the shared map; this closes that gap. The
+    // backward-revert cascade below uses the same canonical seam the POS PATCH
+    // uses; the only differences between the two endpoints are auth surface
+    // (cookie vs HMAC) and the audit's `source` label.
+    let cascadeRan = false;
+    if (data.status && data.status !== current.status) {
+      const allowed =
+        STATUS_TRANSITIONS[current.status as AppointmentStatus] ?? [];
+      if (!allowed.includes(data.status)) {
+        return NextResponse.json(
+          { error: `Cannot change status from "${current.status}" to "${data.status}"` },
+          { status: 400 }
+        );
+      }
+
+      // Un-materialize cascade for backward reverts (`confirmed → pending` and
+      // `in_progress → pending`). See the matching block in POS PATCH for the
+      // full rationale + ordering invariant citation. Callers requiring
+      // `confirmString` for at-or-above-threshold jobs should use the dedicated
+      // `/api/appointments/[id]/unmaterialize` endpoint.
+      const isBackwardRevert =
+        data.status === 'pending' &&
+        (current.status === 'confirmed' || current.status === 'in_progress');
+      if (isBackwardRevert) {
+        const { data: linkedJob } = await supabase
+          .from('jobs')
+          .select('id')
+          .eq('appointment_id', id)
+          .maybeSingle();
+
+        if (linkedJob) {
+          const cascadeResult = await executeUnMaterialize(supabase, id, {
+            actor: {
+              userId: employee.auth_user_id,
+              userEmail: employee.email,
+              employeeName:
+                [employee.first_name, employee.last_name].filter(Boolean).join(' ') || null,
+            },
+            source: 'admin',
+            ipAddress: getRequestIp(request),
+          });
+
+          if (!cascadeResult.ok) {
+            return NextResponse.json(
+              { error: cascadeResult.error, data: cascadeResult.data },
+              { status: cascadeResult.httpStatus }
+            );
+          }
+          cascadeRan = true;
+        }
+      }
+    }
+
     // Overlap check if date/time is changing
     const newDate = data.scheduled_date || current.scheduled_date;
     const newStart = data.scheduled_start_time || current.scheduled_start_time;
@@ -106,7 +164,9 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     };
 
-    if (data.status !== undefined) update.status = data.status;
+    // Session 1.5 — cascade already set status='pending'; skip the status field
+    // in this UPDATE so the appointment row isn't re-written for the status axis.
+    if (data.status !== undefined && !cascadeRan) update.status = data.status;
     if (data.scheduled_date !== undefined) update.scheduled_date = data.scheduled_date;
     if (data.scheduled_start_time !== undefined) update.scheduled_start_time = data.scheduled_start_time;
     if (data.scheduled_end_time !== undefined) update.scheduled_end_time = data.scheduled_end_time;
@@ -163,6 +223,11 @@ export async function PATCH(
       }, supabase).catch(err => console.error('Webhook fire failed:', err));
     }
 
+    // Session 1.5 — feed a synthetic payload to buildChangeDetails when cascade
+    // ran so the audit row records the operator's intent. The cascade itself
+    // writes a separate job-delete audit row; the two together describe the
+    // full PATCH effect.
+    const auditPayload = cascadeRan ? { ...update, status: data.status } : update;
     logAudit({
       userId: employee.auth_user_id,
       userEmail: employee.email,
@@ -171,7 +236,7 @@ export async function PATCH(
       entityType: 'booking',
       entityId: id,
       entityLabel: `Appointment #${id.slice(0, 8)}`,
-      details: buildChangeDetails(current, update, ['status', 'scheduled_date', 'scheduled_start_time', 'scheduled_end_time', 'job_notes', 'internal_notes']),
+      details: buildChangeDetails(current, auditPayload, ['status', 'scheduled_date', 'scheduled_start_time', 'scheduled_end_time', 'job_notes', 'internal_notes']),
       ipAddress: getRequestIp(request),
       source: 'admin',
     });

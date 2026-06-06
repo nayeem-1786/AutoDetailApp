@@ -4,6 +4,7 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { appointmentUpdateSchema } from '@/lib/utils/validation';
 import { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
+import { executeUnMaterialize } from '@/lib/appointments/lifecycle-sync';
 import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { APPOINTMENT } from '@/lib/utils/constants';
@@ -237,6 +238,7 @@ export async function PATCH(
     // (status unchanged) is always allowed; otherwise the target must be in the
     // current status's allowed-next set. Terminal states (completed/cancelled/
     // no_show) have an empty set, so any change away from them is rejected.
+    let cascadeRan = false;
     if (data.status && data.status !== current.status) {
       const allowed =
         STATUS_TRANSITIONS[current.status as AppointmentStatus] ?? [];
@@ -247,6 +249,53 @@ export async function PATCH(
           },
           { status: 400 }
         );
+      }
+
+      // Session 1.5 — Un-materialize cascade for the 2 backward-revert transitions
+      // opened in this session: `confirmed → pending` and `in_progress → pending`.
+      // The cascade is invoked ONLY when a job has been materialized for this
+      // appointment (lazy populate or walk-in); otherwise the status flip is a
+      // plain UPDATE with no cross-table work. Mirrors the canonical seam used
+      // by the dedicated `/unmaterialize` endpoints — never reimplemented.
+      // Trust `executeUnMaterialize`'s ordering invariant (appointment status →
+      // `pending` FIRST, then DELETE job) and its guards (transaction_linked →
+      // 409; terminal → 409; confirm_required → 422 with data enumeration).
+      // Callers that need to pass `confirmString` for at-or-above-threshold jobs
+      // (in_progress / pending_approval) should use the dedicated
+      // `/api/pos/appointments/[id]/unmaterialize` endpoint — PATCH only carries
+      // status + edit fields, not the un-materialize confirm protocol.
+      const isBackwardRevert =
+        data.status === 'pending' &&
+        (current.status === 'confirmed' || current.status === 'in_progress');
+      if (isBackwardRevert) {
+        const { data: linkedJob } = await supabase
+          .from('jobs')
+          .select('id')
+          .eq('appointment_id', id)
+          .maybeSingle();
+
+        if (linkedJob) {
+          const cascadeResult = await executeUnMaterialize(supabase, id, {
+            actor: {
+              userId: posEmployee.auth_user_id,
+              userEmail: posEmployee.email,
+              employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+            },
+            source: 'pos',
+            ipAddress: getRequestIp(request),
+          });
+
+          if (!cascadeResult.ok) {
+            return NextResponse.json(
+              { error: cascadeResult.error, data: cascadeResult.data },
+              { status: cascadeResult.httpStatus }
+            );
+          }
+          // Cascade already set appointments.status='pending' (Step 5a). Mark so
+          // the subsequent UPDATE payload omits `status` and the change-details
+          // builder still records the from-status for the audit row.
+          cascadeRan = true;
+        }
       }
     }
 
@@ -294,7 +343,12 @@ export async function PATCH(
       updated_at: new Date().toISOString(),
     };
 
-    if (data.status !== undefined) update.status = data.status;
+    // Session 1.5 — cascade already set status='pending'; skip the status field
+    // in this UPDATE so the appointment row isn't re-written for the status axis.
+    // Audit's buildChangeDetails(current, update, ['status', ...]) still records
+    // the from→to status change because `current.status` was the pre-cascade
+    // value and the canonical written value matches the requested data.status.
+    if (data.status !== undefined && !cascadeRan) update.status = data.status;
     if (data.scheduled_date !== undefined) update.scheduled_date = data.scheduled_date;
     if (data.scheduled_start_time !== undefined)
       update.scheduled_start_time = data.scheduled_start_time;
@@ -370,6 +424,15 @@ export async function PATCH(
       ).catch((err) => console.error('Webhook fire failed:', err));
     }
 
+    // Session 1.5 — when cascade ran, the appointment.status was set by
+    // executeUnMaterialize (it's now `pending`). `update.status` was
+    // intentionally omitted to avoid a double-write, but the audit row should
+    // still record the operator's intent + the actual state change, so feed a
+    // synthetic payload that surfaces `status: data.status` into
+    // buildChangeDetails. The cascade also writes its own job-delete audit row
+    // (`action: 'delete'`, `entityType: 'job'`) — the two audits together
+    // describe the full effect of this PATCH.
+    const auditPayload = cascadeRan ? { ...update, status: data.status } : update;
     logAudit({
       userId: posEmployee.auth_user_id,
       userEmail: posEmployee.email,
@@ -378,7 +441,7 @@ export async function PATCH(
       entityType: 'booking',
       entityId: id,
       entityLabel: `Appointment #${id.slice(0, 8)}`,
-      details: buildChangeDetails(current, update, [
+      details: buildChangeDetails(current, auditPayload, [
         'status',
         'scheduled_date',
         'scheduled_start_time',

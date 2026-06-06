@@ -46,6 +46,10 @@ const state = {
   jobUpdates: [] as Array<{ filter: string; payload: Record<string, unknown> }>,
   auditCalls: [] as Array<Record<string, unknown>>,
   webhookFires: [] as Array<{ event: string; payload: unknown }>,
+  // Session 1.5 — cascade integration test surface.
+  linkedJob: null as null | { id: string },
+  cascadeCalls: [] as Array<{ appointmentId: string; options: Record<string, unknown> }>,
+  cascadeResult: { ok: true, httpStatus: 200, data: { jobId: 'job-1' } } as Record<string, unknown>,
 };
 
 vi.mock('@/lib/pos/api-auth', () => ({
@@ -90,6 +94,18 @@ vi.mock('@/lib/utils/webhook', () => ({
   fireWebhook: vi.fn(async (event: string, payload: unknown) => {
     state.webhookFires.push({ event, payload });
   }),
+}));
+
+vi.mock('@/lib/appointments/lifecycle-sync', () => ({
+  // Session 1.5 — cascade is the canonical seam; tests assert on call args +
+  // honor the configurable result so the PATCH error-propagation path can be
+  // exercised without standing up the full executor.
+  executeUnMaterialize: vi.fn(
+    async (_supabase: unknown, appointmentId: string, options: Record<string, unknown>) => {
+      state.cascadeCalls.push({ appointmentId, options });
+      return state.cascadeResult;
+    }
+  ),
 }));
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -154,6 +170,15 @@ vi.mock('@/lib/supabase/admin', () => ({
       }
       if (table === 'jobs') {
         return {
+          // Session 1.5 — the linked-job lookup before invoking cascade.
+          // Returns the configured `linkedJob` (or null) for the maybeSingle()
+          // path; falls through to the existing update path for the
+          // assigned-staff sync the PATCH does on employee_id change.
+          select: (_cols: string) => ({
+            eq: (_col: string, _val: string) => ({
+              maybeSingle: async () => ({ data: state.linkedJob, error: null }),
+            }),
+          }),
           update: (payload: Record<string, unknown>) => ({
             eq: async (_col: string, val: string) => {
               state.jobUpdates.push({ filter: val, payload });
@@ -206,6 +231,9 @@ beforeEach(() => {
   state.jobUpdates = [];
   state.auditCalls = [];
   state.webhookFires = [];
+  state.linkedJob = null;
+  state.cascadeCalls = [];
+  state.cascadeResult = { ok: true, httpStatus: 200, data: { jobId: 'job-1' } };
 });
 
 describe('PATCH /api/pos/appointments/[id]', () => {
@@ -380,5 +408,126 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(res.status).toBe(200);
     expect(state.appointmentUpdates[0].employee_id).toBeNull();
     expect(state.jobUpdates[0].payload.assigned_staff_id).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Session 1.5 — un-materialize cascade for backward reverts. The 2 with-
+  // cascade transitions per AC-5 (`confirmed → pending` + `in_progress →
+  // pending`). The map opens these in the same commit; the cascade is invoked
+  // by PATCH when a job has already been materialized for the appointment.
+  // Tests pin the wiring (cascade IS called, with correct actor/source), the
+  // skip path (no linked job → no cascade), and error propagation.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it('Session 1.5: confirmed → pending with active job invokes executeUnMaterialize cascade', async () => {
+    state.appointment!.status = 'confirmed';
+    state.linkedJob = { id: 'job-1' };
+
+    const res = await PATCH(makeReq({ status: 'pending' }), { params });
+    expect(res.status).toBe(200);
+
+    // Cascade was invoked with the appointment id + pos source label.
+    expect(state.cascadeCalls).toHaveLength(1);
+    expect(state.cascadeCalls[0].appointmentId).toBe('appt-1');
+    expect(state.cascadeCalls[0].options.source).toBe('pos');
+    expect((state.cascadeCalls[0].options.actor as Record<string, unknown>).userEmail).toBe('pat@example.com');
+
+    // PATCH UPDATE must NOT include `status` — cascade owned that write
+    // (avoiding the double-write per the in-source comment).
+    expect(state.appointmentUpdates).toHaveLength(1);
+    expect(state.appointmentUpdates[0].status).toBeUndefined();
+
+    // Backward-revert to `pending` does NOT fire `appointment_confirmed` or
+    // `appointment_completed` — neither branch matches the target status.
+    expect(state.webhookFires).toHaveLength(0);
+
+    // Audit still records the status change via the synthetic payload.
+    expect(state.auditCalls).toHaveLength(1);
+    const audit = state.auditCalls[0];
+    const changes = (audit.details as { changes: Record<string, { from: unknown; to: unknown }> }).changes;
+    expect(changes.status).toEqual({ from: 'confirmed', to: 'pending' });
+  });
+
+  it('Session 1.5: in_progress → pending with active job invokes cascade', async () => {
+    state.appointment!.status = 'in_progress';
+    state.linkedJob = { id: 'job-2' };
+
+    const res = await PATCH(makeReq({ status: 'pending' }), { params });
+    expect(res.status).toBe(200);
+
+    expect(state.cascadeCalls).toHaveLength(1);
+    expect(state.appointmentUpdates[0].status).toBeUndefined();
+    expect(state.webhookFires).toHaveLength(0);
+  });
+
+  it('Session 1.5: confirmed → pending WITHOUT active job is a plain status flip (no cascade)', async () => {
+    state.appointment!.status = 'confirmed';
+    state.linkedJob = null;
+
+    const res = await PATCH(makeReq({ status: 'pending' }), { params });
+    expect(res.status).toBe(200);
+
+    // No cascade — appointment never materialized, no job to delete.
+    expect(state.cascadeCalls).toHaveLength(0);
+    // Status flip went through the regular PATCH UPDATE path.
+    expect(state.appointmentUpdates).toHaveLength(1);
+    expect(state.appointmentUpdates[0].status).toBe('pending');
+  });
+
+  it('Session 1.5: cascade 422 confirm_required propagates to PATCH caller', async () => {
+    state.appointment!.status = 'in_progress';
+    state.linkedJob = { id: 'job-3' };
+    state.cascadeResult = {
+      ok: false,
+      httpStatus: 422,
+      error: 'confirm_required',
+      data: { jobId: 'job-3', confirmRequired: true, photoCount: 0 },
+    };
+
+    const res = await PATCH(makeReq({ status: 'pending' }), { params });
+    expect(res.status).toBe(422);
+    expect((await res.json()).error).toBe('confirm_required');
+
+    // Cascade fired, but PATCH did NOT proceed past the error.
+    expect(state.cascadeCalls).toHaveLength(1);
+    expect(state.appointmentUpdates).toHaveLength(0);
+    expect(state.auditCalls).toHaveLength(0);
+  });
+
+  it('Session 1.5: cascade 409 transaction_linked propagates to PATCH caller', async () => {
+    state.appointment!.status = 'confirmed';
+    state.linkedJob = { id: 'job-4' };
+    state.cascadeResult = { ok: false, httpStatus: 409, error: 'transaction_linked' };
+
+    const res = await PATCH(makeReq({ status: 'pending' }), { params });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('transaction_linked');
+    expect(state.appointmentUpdates).toHaveLength(0);
+  });
+
+  it('Session 1.5: backward-revert is NOT triggered for non-pending targets', async () => {
+    // confirmed → in_progress is a FORWARD transition (opened in Session 1.4
+    // semantics — already valid pre-1.5). The cascade must NOT fire.
+    state.appointment!.status = 'confirmed';
+    state.linkedJob = { id: 'job-5' };
+
+    const res = await PATCH(makeReq({ status: 'in_progress' }), { params });
+    expect(res.status).toBe(200);
+
+    expect(state.cascadeCalls).toHaveLength(0);
+    expect(state.appointmentUpdates[0].status).toBe('in_progress');
+  });
+
+  it('Session 1.5: pending → cancelled is NOT a backward-revert (cancel is a different axis)', async () => {
+    // `cancelled` is not ranked in APPT_LIFECYCLE_RANK and is not in the
+    // backward-revert set. Cascade must not fire.
+    state.appointment!.status = 'pending';
+    state.linkedJob = { id: 'job-6' };
+
+    const res = await PATCH(makeReq({ status: 'cancelled' }), { params });
+    expect(res.status).toBe(200);
+
+    expect(state.cascadeCalls).toHaveLength(0);
+    expect(state.appointmentUpdates[0].status).toBe('cancelled');
   });
 });

@@ -6,6 +6,73 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.5 — Wire un-materialize cascade into PATCH for backward reverts + admin/POS state-machine symmetry
+
+Production code change closing the second half of AC-5 ("2 SAFE + 2 with cascade") locked in `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1. Wave 2 of the Phase 1 conservative wave plan. Sessions 1.4 + 1.5 together open the four AC-5 transitions; 1.4 shipped the SAFE pair (`pending → in_progress`, `in_progress → no_show`) at `44c8ea05`; this session ships the with-cascade pair.
+
+**The bug class this closes:** the dialog Save intercept at `appointment-detail-dialog.tsx:219-228` routes an "earlier-state save with `has_active_job=true`" to the dedicated `/unmaterialize` endpoint. But raw PATCH callers (scripts, tests, future API integrations, the voice agent path, ANY caller bypassing the dialog) hitting `confirmed → pending` or `in_progress → pending` would leave an orphan job — the appointment flipped to `pending`, the linked `jobs` row still alive with its `appointment_id`. The state machine audit (`b0efd95f`) and consequence map (`d3671c82` Target E.3) explicitly flagged these two transitions as HIGH-only-because-PATCH-doesn't-invoke-cascade. The cascade was already coded in `lifecycle-sync.ts:59-72` (`jobStatusForAppointmentStatus` returns `{kind: 'delete_job'}` for these cases) and battle-tested by the dedicated `/unmaterialize` endpoints — just not invoked from PATCH.
+
+**Three layers of change:**
+
+1. **STATUS_TRANSITIONS map (`src/lib/appointments/status-transitions.ts`):** open `confirmed → pending` and `in_progress → pending` in the shared transition map. Comment block now documents both Session 1.4 (SAFE pair) and Session 1.5 (with-cascade pair) so future readers see the AC-5 picture in one place.
+
+2. **POS PATCH (`src/app/api/pos/appointments/[id]/route.ts`):** after the STATUS_TRANSITIONS allowed-check, detect backward-revert (`data.status === 'pending' && current.status ∈ {confirmed, in_progress}`); lookup the linked job via `jobs.select('id').eq('appointment_id', id).maybeSingle()`; if a job row exists, invoke `executeUnMaterialize(supabase, id, { actor: <pos>, source: 'pos', ipAddress })`. Propagate any non-ok cascade result with its `httpStatus` + `error` + `data` (so 422 `confirm_required`, 409 `transaction_linked`, 409 `terminal` all bubble up to the caller with the structured payload the dedicated `/unmaterialize` endpoint already emits). On cascade success, set a local `cascadeRan=true` flag — the subsequent UPDATE payload omits `status` to avoid double-writing what the cascade already wrote (the cascade's Step 5a wrote `appointments.status='pending'` per its ordering invariant). The audit-log call passes a synthetic payload (`{...update, status: data.status}`) into `buildChangeDetails` so the appointment audit row records the operator's intent + the state change; the cascade itself writes a separate `action: 'delete'`, `entityType: 'job'` audit row, and the two together describe the full PATCH effect.
+
+3. **Admin PATCH (`src/app/api/appointments/[id]/route.ts`):** previously had NO `STATUS_TRANSITIONS` guard at all — admin/POS asymmetry per audit `b0efd95f`. This session adds:
+   - The `STATUS_TRANSITIONS` import + the same allowed-next check the POS PATCH performs (closes the admin's pre-1.5 permissive hole — e.g., `completed → pending` was previously accepted; post-1.5 it returns 400).
+   - The cascade wiring (same shape as POS, only differences: cookie-auth actor `{ employeeName: [first, last].filter(Boolean).join(' ') || null }` and `source: 'admin'` for audit attribution).
+   - The same `cascadeRan` skip-status + synthetic audit-payload pattern.
+
+   Per AC-5's commitment to admin/POS symmetry, both endpoints now end Session 1.5 with byte-for-byte equivalent state-machine enforcement + cascade integration. The only deliberate residual difference is the auth surface (cookie via `getEmployeeFromSession` + `requirePermission` vs. HMAC via `authenticatePosRequest` + `checkPosPermission`) — those will never converge by design.
+
+**Cascade is INVOKED, never reimplemented (Memory #2).** All four cascade-relevant call sites (POS `/unmaterialize`, admin `/unmaterialize`, POS PATCH, admin PATCH) now route through the same `executeUnMaterialize` function in `lifecycle-sync.ts`. The ordering invariant (appointment status FIRST, then DELETE job — see `executeUnMaterialize` lines 197-202) is owned by the seam; PATCH callers trust it. The dialog Save intercept is the UI-layer guardrail; PATCH is the server-layer guardrail for non-dialog callers.
+
+**Confirm-required path:** PATCH does NOT extend the request body to accept `confirmString`. Operators / scripts hitting `confirmed → pending` or `in_progress → pending` with an at-or-above-threshold job (job status `in_progress` / `pending_approval`) receive `422 confirm_required` with the data enumeration; the dedicated `/api/[pos/]appointments/[id]/unmaterialize` endpoint is the canonical surface for those cases (already used by the dialog's type-to-confirm modal). The two-endpoint split is intentional — PATCH carries normal edit fields, `/unmaterialize` carries the un-materialize confirm protocol.
+
+**Tests added (+16 cases total, all pinning the new contract):**
+
+- `src/app/api/pos/appointments/[id]/__tests__/patch.test.ts` (MOD, +7 cases):
+  1. `confirmed → pending` with active job invokes cascade (asserts `cascadeCalls[0].appointmentId`, `options.source === 'pos'`, `options.actor.userEmail`, `appointmentUpdates[0].status === undefined`, audit changes record `{from: 'confirmed', to: 'pending'}`)
+  2. `in_progress → pending` with active job invokes cascade
+  3. `confirmed → pending` WITHOUT active job is a plain status flip (cascade NOT called; PATCH UPDATE includes `status: 'pending'`)
+  4. Cascade `422 confirm_required` propagates to PATCH caller (PATCH does not proceed past the cascade error)
+  5. Cascade `409 transaction_linked` propagates
+  6. Forward `confirmed → in_progress` does NOT trigger cascade (non-pending target)
+  7. `pending → cancelled` is NOT a backward-revert (cancel is a different axis)
+
+- `src/app/api/appointments/[id]/__tests__/patch.test.ts` (NEW, +9 cases — file didn't exist pre-1.5):
+  1. 401 without session
+  2. 403 when `appointments.update_status` denied for status change
+  3. `completed → pending` blocked by new STATUS_TRANSITIONS guard (was permissive pre-1.5 — the symmetry-locking regression test)
+  4. `cancelled → confirmed` blocked (terminal status has empty allowed-next set)
+  5. `confirmed → pending` with active job invokes cascade with `source: 'admin'` + correct `employeeName` formatting
+  6. `in_progress → pending` without active job is plain status flip (no cascade)
+  7. Cascade `409 transaction_linked` propagates to admin PATCH caller
+  8. `pending → confirmed` fires `appointment_confirmed` webhook (pre-1.5 happy-path regression)
+  9. Notes-only update passes without cascade or state-machine interference (pre-1.5 happy-path regression)
+
+**Files touched:**
+
+- `src/lib/appointments/status-transitions.ts` — MOD. +14 lines (Session 1.5 comment block + 2 transitions extended in the map).
+- `src/app/api/pos/appointments/[id]/route.ts` — MOD. +2 imports (`executeUnMaterialize`, `cascadeRan` local), ~+50 lines for the cascade block + the UPDATE-payload skip + the synthetic audit payload + comments.
+- `src/app/api/appointments/[id]/route.ts` — MOD. +3 imports (`STATUS_TRANSITIONS`, `executeUnMaterialize`, `AppointmentStatus` type), ~+50 lines for the state-machine guard + cascade block + the UPDATE-payload skip + the synthetic audit payload + comments.
+- `src/app/api/pos/appointments/[id]/__tests__/patch.test.ts` — MOD. +1 lifecycle-sync mock + +1 jobs-table query handler + +3 state fields + +7 test cases (~+130 test lines).
+- `src/app/api/appointments/[id]/__tests__/patch.test.ts` — NEW. 9 test cases, ~270 lines. First test file for admin PATCH.
+
+**Verification gates:** `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors, 97 baseline warnings unchanged in modified files), `npm run build` (clean), `npm test` (181 files / 2994 tests pass; was 180/2978 — +1 test file, +16 tests).
+
+**What this session does NOT do (per session prompt):**
+
+- Does NOT touch the dialog Save intercept (the existing UI working pattern stays; PATCH is the server-side safety net for non-dialog callers).
+- Does NOT add `appointment cancel cascades via un-materialize` (AC-2.1 — Phase 3 work, related but distinct concern: when an appointment is cancelled with an active job, should the job auto-delete or stay alive as a record of the work done?).
+- Does NOT modify `executeUnMaterialize` itself — just invokes it.
+- Does NOT change other state-machine transitions (the 4 AC-5 transitions are it; the 8 MEDIUM transitions per consequence map `d3671c82` stay closed pending future analysis).
+- Does NOT add `confirmString` to the PATCH request body — the dedicated `/unmaterialize` endpoint remains the canonical surface for the confirm-required path.
+
+**Lifecycle architecture doc:** `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` Session 1.5 entry status `[ ]` → `[x]` with merge hash + PST timestamp.
+
+---
+
 ## Session 1.8 — Waitlist notification silent-drop fix
 
 Production code change closing the customer-facing silent-drop bug surfaced by the webhook receivers identity audit (`f5e714a8`, Target D.4).
