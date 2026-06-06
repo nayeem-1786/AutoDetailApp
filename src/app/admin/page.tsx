@@ -679,16 +679,24 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Appointment detail dialog — opens when clicking a schedule item */}
+      {/* Appointment detail dialog — opens when clicking a schedule item.
+          Session 1.1 (parity audit b346d34b Target D Finding 2) — this is
+          the dashboard quick-peek surface; clicks open the dialog for
+          information-only viewing, not editing. `readOnly={true}` replaces
+          the prior `onSave={async () => false}` / `onCancel={() => {}}`
+          no-op suppression (a visible-but-inert Save button is itself
+          misleading; the dialog now hides Save / Cancel Appointment
+          buttons and disables all editable fields). Operators who need
+          to edit the appointment open it from /admin/appointments or
+          /pos/jobs (Schedule scope) where real handlers are wired. */}
       <AppointmentDetailDialog
         open={detailOpen}
         onOpenChange={setDetailOpen}
         appointment={activeAppointment}
         employees={[]}
-        onSave={async () => false}
-        onCancel={() => {}}
         canReschedule={false}
         canCancel={false}
+        readOnly
       />
     </div>
   );
