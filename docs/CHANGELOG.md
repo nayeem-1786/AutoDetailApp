@@ -6,6 +6,101 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 2.4 — Terminal-state filter affordance for POS Jobs (2026-06-06)
+
+Implements [AC-7](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-7-terminal-states-viewable-via-filter-hidden-by-default). POS > Jobs Today + Schedule scopes now carry a single URL-persistent toggle ("Show terminal") that opts in to terminal-state entities (cancelled / completed / no_show appointments + cancelled jobs). Default behavior unchanged — terminal states hidden until the operator explicitly toggles on. Closes AC-7 — the whole AC, both surfaces, single shared URL key.
+
+**Change shape:** server param + client URL state + chip-style toggle rendered in both scope chromes + visual mute on terminal cards. 4 prod files / ~140 prod lines / +20 tests across 2 modified + 1 new test file.
+
+**Server contract:**
+
+- `GET /api/pos/jobs?include_terminal=true|1` — flips TWO filters simultaneously: (a) drops `'cancelled'` from the jobs query exclusion (`excludeStatuses = includeTerminal ? [] : ['cancelled']`); (b) expands the un-started appointments `.in('status', [...])` array from the 2-status materialization-eligible set to the 5-status superset (`['confirmed', 'in_progress', 'cancelled', 'completed', 'no_show']`). The `excludeStatuses.length > 0` guard wraps the `.not('status', 'in', '(...)')` filter to avoid emitting `.not('status', 'in', '()')` when the array is empty (PostgREST would reject as malformed).
+- `GET /api/pos/jobs/schedule?include_terminal=true|1` — same param. The `.not('status', 'in', \`(${EXCLUDED_STATUSES.join(',')})\`)` filter call is wrapped in `if (!includeTerminal)` so the whole 3-status exclusion (cancelled/no_show/completed) is bypassed atomically when the toggle is on.
+
+Both endpoints accept `true` or `1`; treat any other value (including `false`) as off. Backward compatible — older clients omit the param and get the default behavior.
+
+**Client URL state (`src/app/pos/jobs/components/job-queue.tsx`):**
+
+```typescript
+const [includeTerminal, setIncludeTerminal] = useState<boolean>(
+  () => searchParams.get('include_terminal') === '1' || searchParams.get('include_terminal') === 'true'
+);
+const handleIncludeTerminalChange = useCallback(
+  (next: boolean) => {
+    setIncludeTerminal(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set('include_terminal', '1');
+    else params.delete('include_terminal');
+    const qs = params.toString();
+    router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+  },
+  [router, searchParams]
+);
+```
+
+Mirrors `handleScheduleFilterChange`'s pattern byte-for-byte (Memory #2): preserves other params via `new URLSearchParams(searchParams.toString())` + selective set/delete + `router.replace`. The URL key is intentionally `include_terminal` (NOT `sched_*`-prefixed) because the gate applies to BOTH scopes — a single key, two scopes, one operator preference.
+
+**Fetch param threading:** `fetchJobs`, `pollJobs`, and `fetchSchedule` all gain a `terminalQs = includeTerminal ? '&include_terminal=1' : ''` suffix. `includeTerminal` is added to each callback's dep array so polling re-fires on toggle flip and Schedule re-reads on toggle flip.
+
+**Toggle UI — chip-style button in BOTH chromes:**
+
+- **Today filter-pills row** — chip rendered right-aligned via `ml-auto` (the row is now `flex flex-wrap items-center gap-2`). Visual language matches the existing `all/mine/unassigned` pills (`rounded-full px-3 py-1`, blue active state, hover state). Same shape as the chip the operator's already conditioned to recognize.
+- **Schedule filter-bar — new own-row** below the existing status+detailer row. Right-aligned via `justify-end`. Slightly different idle styling (white background + bordered) to match the Schedule chrome's heavier-weight density.
+
+Both chips share `role="switch" aria-checked={includeTerminal}` for AT semantics. Label flips between "Show terminal" (off) and "Showing terminal" (on). Test IDs: `include-terminal-toggle-today` and `include-terminal-toggle-schedule`.
+
+**Schedule status dropdown expansion:** when `includeTerminal` is on, the 3-option dropdown grows to 6 options (cancelled / completed / no_show appended via a `<>` fragment guarded by `{includeTerminal && (...)}`). Operator can narrow into a specific terminal state for review. The X2 LOCKED comment was updated to reflect the conditional expansion.
+
+**Visual mute on 3 surfaces — `opacity-60`:**
+
+- Today list-view job-card — `isTerminalCard = job.status === 'cancelled'`. Only `cancelled` is gated behind the toggle; muting `completed`/`closed` would change unrelated UX because those jobs were always in the default Today view.
+- Schedule `ScheduleScopeList` entry-card — `isTerminal = TERMINAL_APPT_STATUSES.has(entry.status)`. All three appointment terminals get the mute.
+- Today un-started strip `UnstartedAppointmentCard` — same predicate. Plus: Start Intake button suppressed for terminal cards (the server helper's `invalid_status` gate would reject the call anyway; suppressing the affordance is the correct UX).
+
+**Pill-color expansion (`getAppointmentStatusPillClasses`):** three new `case` branches replace the default-case gray fallback for terminal statuses: `cancelled` → red, `completed` → green, `no_show` → orange. Distinct hues so the operator's eye can scan and spot recovery candidates at a glance.
+
+**Predicates declared once (top-level constants):**
+
+```typescript
+const TERMINAL_APPT_STATUSES = new Set<AppointmentStatus>(['cancelled', 'completed', 'no_show']);
+```
+
+Asymmetric by design — the jobs-axis mute predicate stays inline (`job.status === 'cancelled'`) because the jobs axis has different default-visibility semantics than the appointments axis. Inlining keeps the asymmetry visually obvious to a code reader.
+
+**Test files:**
+
+- MOD `src/app/api/pos/jobs/schedule/__tests__/route.test.ts` (+5 cases) — `include_terminal=true` drops the filter at the capture layer, `=1` alias works, `=false` (explicit) is off, absent param keeps the filter, terminal-status row returned in response shape.
+- MOD `src/app/api/pos/jobs/__tests__/today-unstarted-appointments.test.ts` (+6 cases) — default keeps the 2-status filter + `.not('status', 'in', '(cancelled)')` on jobs queries; opt-in expands to 5 statuses + drops the `.not()`; `=1` alias works; terminal-status row returned with the flag. Mock extended to capture status array on `.in()` + `.not()` filter strings on jobs touches.
+- NEW `src/app/pos/jobs/components/__tests__/job-queue-include-terminal.test.tsx` (9 cases) — chip presence, default OFF / `aria-checked=false` / label "Show terminal", default fetch omits param, click → URL write + ON state + label flip + refetch with param, initial URL param mounts ON state + threads into first fetch, ON→OFF strips param.
+
+**Verification:**
+- tsc: 0 errors
+- ESLint: 0 errors / 97 baseline warnings (unchanged)
+- Vitest full suite: 192 test files / 3099 tests passing (was 191 / 3079 — +1 file, +20 tests)
+- Build: clean compile
+
+**Files touched:**
+- MOD: `src/app/api/pos/jobs/route.ts` — param parse + jobs exclude conditional + un-started status set conditional
+- MOD: `src/app/api/pos/jobs/schedule/route.ts` — param parse + `EXCLUDED_STATUSES` conditional
+- MOD: `src/app/pos/jobs/components/job-queue.tsx` — state + URL persistence + toggle UI in both chromes + Schedule dropdown 3 conditional options + 2 visual-mute predicates + pill-color expansion
+- MOD: `src/app/pos/jobs/components/unstarted-appointment-card.tsx` — terminal predicate + `opacity-60` + Start Intake suppression
+- MOD: `src/app/api/pos/jobs/schedule/__tests__/route.test.ts` — +5 cases
+- MOD: `src/app/api/pos/jobs/__tests__/today-unstarted-appointments.test.ts` — +6 cases + mock extensions
+- NEW: `src/app/pos/jobs/components/__tests__/job-queue-include-terminal.test.tsx` — 9 cases
+
+**Parallel-merge handling:** ran in a `git worktree` alongside Session 2.3 per Memory feedback ("Parallel doc sessions must use a git worktree"). Session 2.3 (`269b94f7`) merged to main FIRST while this branch was still in flight; after Session 2.3 landed, this branch was rebased atop the new main with zero conflicts — the forward-arrow handler and the include-terminal toggle live in disjoint regions of `job-queue.tsx` (line 477-506 vs. the filter-pills row + Schedule row 3). Re-ran tsc / lint / vitest post-rebase to confirm 0 conflicts at runtime semantics; Session 2.3's 5 new tests + Session 2.4's 20 new tests all pass alongside the pre-existing 3074. Per Memory feedback ("Merging a parallel session to main: renumber + verify auto-merge"), explicitly diffed the lifecycle architecture doc + CHANGELOG against `origin/main` after rebase to confirm Session 2.3's entries survived intact (no auto-merge silent-drop) and Session 2.4's new entries land cleanly above them.
+
+**Memory #8 budget:** Pushed slightly past the nominal upper bound (~140 prod lines vs. ≤80 estimated). The visual-mute treatment (Today list + Schedule list + un-started strip) + the pill-color expansion + the Schedule status dropdown's 3 conditional options were below-the-line work that honors AC-7's "visual distinction" phrasing — surfaced transparently per Memory #8 discipline. No scope creep — every line traces to the locked AC-7 surface.
+
+**Cross-references:**
+- [AC-7](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-7-terminal-states-viewable-via-filter-hidden-by-default) — commitment text
+- [Today vs Schedule conceptual audit](docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md) — intentional non-overlap between scopes informs why the toggle is scope-shared rather than per-scope
+- Session 1.6 `sched_pills` URL-persistent filter pattern — template for `include_terminal` URL persistence (Memory #2 reuse)
+
+**Memory updates:** none (this session reuses existing patterns; no new conventions emerge).
+
+---
+
 ## Session 2.3 — Forward-arrow routes to Schedule on today-crossing (2026-06-06)
 
 Implements [AC-8](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today). When the operator presses the forward arrow on Today scope and navigation would cross from today/past into tomorrow or later, the UI now routes to Schedule scope with the target date pinned as a single-day "Other" range — closes the seam the [Today vs Schedule conceptual audit](docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md) identified at Targets G.1 / E.1 / A.4 where Today's forward-arrow inherited from the pre-Item-15e single-date-navigator and went structurally inert when Item 15e Phase 1A added the populate-future-date guard. Pre-Session-2.3 behavior: forward arrow into the future loaded `jobs?date=tomorrow`, returned empty, rendered "Upcoming — [date]" above an empty content area. Post-Session-2.3: same click flips scope, persists `pos-jobs-scope=schedule` to localStorage, and routes to `/pos/jobs?sched_pills=other&sched_from=<tomorrow>&sched_to=<tomorrow>` via `router.push`.
