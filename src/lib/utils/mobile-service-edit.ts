@@ -68,8 +68,10 @@ interface ApplyMobileEditInput {
  *
  * Stripping by flag means a stale entry (e.g. wrong name after a zone
  * change before this fix shipped) is replaced cleanly. The append
- * mirrors the shape that `/api/pos/jobs/populate` produces
- * (`{ id: null, name, price, is_mobile_fee: true }`).
+ * mirrors the shape that `materializeJobFromAppointment` in
+ * `src/lib/appointments/lifecycle-sync.ts` produces post-Session-2.5
+ * (`{ id: null, name, price, is_mobile_fee: true }`). Pre-2.5 the same
+ * shape was produced by `/api/pos/jobs/populate`, retired in 2.5.
  */
 export function applyMobileEditToJobServices(
   input: ApplyMobileEditInput

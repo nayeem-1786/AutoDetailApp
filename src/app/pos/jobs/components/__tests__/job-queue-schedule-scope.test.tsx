@@ -2,13 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act } from '@testing-library/react';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CRITICAL INVARIANT (Item 15e Phase 1B):
-// The POS Jobs "Schedule" scope must NEVER trigger populate. If any test in the
-// "populate gate" block below regresses, future appointments are being
-// prematurely materialized as job rows — breaking the retire-and-absorb
-// architecture (audit Risk matrix, HIGH severity). populate is only reachable
-// via POST /api/pos/jobs/populate, so asserting that call never fires in
-// Schedule scope is the observable proxy for the gate.
+// CRITICAL INVARIANT (Item 15e Phase 1B → Session 2.5):
+// Pre-2.5 invariant: the POS Jobs "Schedule" scope must NEVER trigger populate
+// (premature job materialization was a HIGH-severity Risk matrix entry).
+// Session 2.5 retired the populate endpoint entirely (per AC-3 + Phase 0.3's
+// CLEAN-migration verdict), so the invariant strengthens: NO scope may trigger
+// populate, because the endpoint no longer exists. `populateCalls()` is kept
+// as a regression-lock probe — any non-zero count here means a stray caller
+// has been re-introduced (and would 404 in production).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const flagState = { enabled: true };
@@ -77,8 +78,11 @@ vi.mock('../../../lib/pos-fetch', () => ({
     if (url.includes('/api/pos/jobs/schedule')) {
       return { ok: true, json: async () => ({ data: scheduleData }) };
     }
+    // Session 2.5 — populate retired. The mock branch is intentionally retained
+    // as a 404 to surface any reintroduced caller loud-and-fast in tests; the
+    // `populateCalls()` helper below remains the regression-lock probe.
     if (url.includes('/api/pos/jobs/populate')) {
-      return { ok: true, json: async () => ({ data: { created: 0, jobs: [] } }) };
+      return { ok: false, status: 404, json: async () => ({ error: 'populate retired (Session 2.5)' }) };
     }
     if (url.includes('/api/pos/jobs')) {
       return { ok: true, json: async () => ({ data: jobsData }) };
@@ -127,6 +131,9 @@ function renderQueue(overrides: { onSelectJob?: () => void } = {}) {
 
 const populateCalls = () => fetchCalls.filter((c) => c.url.includes('/api/pos/jobs/populate'));
 const scheduleCalls = () => fetchCalls.filter((c) => c.url.includes('/api/pos/jobs/schedule'));
+// Session 2.5 — Today-endpoint probe (matches `/api/pos/jobs?...` but not the
+// `/schedule`, `/populate`, `/start-intake`, or `/[id]/*` sibling routes).
+const jobsCalls = () => fetchCalls.filter((c) => /\/api\/pos\/jobs(\?|$)/.test(c.url));
 // Item 15e Phase 2B helpers — single-appointment GET (tap) vs PATCH (save).
 const apptGetCalls = () =>
   fetchCalls.filter((c) => /\/api\/pos\/appointments\/[^/]+$/.test(c.url) && c.init?.method !== 'PATCH');
@@ -183,35 +190,44 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('Item 15e Phase 1B — Schedule scope populate gate (load-bearing invariant)', () => {
-  it('1. Schedule scope mount does NOT trigger populate (and DOES fetch schedule)', async () => {
+describe('Session 2.5 — populate endpoint retired (regression-locked invariant)', () => {
+  it('1. Schedule scope mount fetches schedule and never calls populate', async () => {
     setScope('schedule');
     renderQueue();
     await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
     expect(populateCalls().length).toBe(0);
   });
 
-  it('2. Toggle Today → Schedule does NOT trigger a new populate', async () => {
+  it('2. Toggle Today → Schedule fetches schedule and never calls populate', async () => {
     setScope('today');
     renderQueue();
-    await waitFor(() => expect(populateCalls().length).toBeGreaterThanOrEqual(1));
-    const before = populateCalls().length;
+    // Session 2.5 — Today scope's mount probe is the jobs endpoint, not
+    // populate (populate retired). Pre-2.5 the precondition was `populateCalls
+    // >= 1`; post-2.5 it is `jobsCalls >= 1`.
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThanOrEqual(1));
 
     fireEvent.click(screen.getByRole('button', { name: 'Schedule' }));
 
     await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
-    expect(populateCalls().length).toBe(before); // no NEW populate during the transition
+    expect(populateCalls().length).toBe(0); // regression-lock: populate never called
   });
 
-  it('3. Toggle Schedule → Today DOES trigger populate (regression check)', async () => {
+  it('3. Toggle Schedule → Today fetches jobs and never calls populate', async () => {
+    // Session 2.5 — pre-2.5 this asserted populate fires after the toggle
+    // (the "DOES trigger populate" regression check). Post-2.5 the inverted
+    // assertion is canonical: the toggle triggers a Today-scope `fetchJobs`
+    // (which natively returns jobs + un-started appointments per Session 2.2),
+    // and populate is never reached.
     setScope('schedule');
     renderQueue();
     await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
     expect(populateCalls().length).toBe(0);
+    const jobsBefore = jobsCalls().length;
 
     fireEvent.click(screen.getByRole('button', { name: 'Today' }));
 
-    await waitFor(() => expect(populateCalls().length).toBeGreaterThanOrEqual(1));
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThan(jobsBefore));
+    expect(populateCalls().length).toBe(0);
   });
 
   it('4. Refresh in Schedule scope re-fetches schedule, never populate', async () => {
@@ -226,7 +242,7 @@ describe('Item 15e Phase 1B — Schedule scope populate gate (load-bearing invar
     expect(populateCalls().length).toBe(0);
   });
 
-  it('5. Date navigation is hidden in Schedule scope (no single-day nav to drive populate)', async () => {
+  it('5. Date navigation is hidden in Schedule scope (no single-day nav surface)', async () => {
     setScope('schedule');
     renderQueue();
     await waitFor(() => expect(scheduleCalls().length).toBeGreaterThanOrEqual(1));
@@ -238,11 +254,28 @@ describe('Item 15e Phase 1B — Schedule scope populate gate (load-bearing invar
     setScope('schedule');
     flagState.enabled = false;
     renderQueue();
-    // Behaves as Today: populate fires, schedule endpoint never called.
-    await waitFor(() => expect(populateCalls().length).toBeGreaterThanOrEqual(1));
+    // Session 2.5 — Today-scope mount probe is now jobsCalls (populate retired).
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThanOrEqual(1));
     expect(scheduleCalls().length).toBe(0);
+    expect(populateCalls().length).toBe(0); // regression-lock: populate never called
     // Date nav (a Today-scope affordance) is present.
     expect(screen.getByLabelText('Previous day')).toBeTruthy();
+  });
+
+  it('7. Refresh in Today scope re-fetches jobs and never calls populate (Session 2.5 regression-lock)', async () => {
+    // New test — pre-2.5 the Refresh button in Today scope explicitly invoked
+    // populate before re-fetching jobs (`populatedDates.current.delete` +
+    // `populateFromAppointments` + `fetchJobs`). Post-2.5 Refresh re-fetches
+    // jobs only; the un-started appointments arrive via that single payload.
+    setScope('today');
+    renderQueue();
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThanOrEqual(1));
+    const before = jobsCalls().length;
+
+    fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
+
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThan(before));
+    expect(populateCalls().length).toBe(0);
   });
 });
 
@@ -250,14 +283,16 @@ describe('Item 15e Phase 1B — scope toggle UI', () => {
   it('flag OFF → no Schedule scope toggle rendered', async () => {
     flagState.enabled = false;
     renderQueue();
-    await waitFor(() => expect(populateCalls().length).toBeGreaterThanOrEqual(1));
+    // Session 2.5 — mount probe is jobsCalls (Today endpoint), not populate.
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThanOrEqual(1));
     expect(screen.queryByRole('button', { name: 'Schedule' })).toBeNull();
   });
 
   it('flag ON → Today + Schedule toggle buttons render', async () => {
     setScope('today');
     renderQueue();
-    await waitFor(() => expect(populateCalls().length).toBeGreaterThanOrEqual(1));
+    // Session 2.5 — mount probe is jobsCalls (Today endpoint), not populate.
+    await waitFor(() => expect(jobsCalls().length).toBeGreaterThanOrEqual(1));
     expect(screen.getByRole('button', { name: 'Today' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Schedule' })).toBeTruthy();
   });

@@ -643,7 +643,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
-| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) merged 2026-06-06 PDT; AC-3 + AC-7 + AC-8 complete |
+| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters, populate retirement) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`<PENDING_MERGE_HASH>`) merged 2026-06-06 PDT; AC-3 **fully operational in production**, AC-7 + AC-8 complete |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
@@ -1515,6 +1515,65 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 **Linked prompt:** Session 2.4 prompt (operator-supplied in 2026-06-06 PST session)
 
 **Completion:** Merged to main at `5aebe1f1` on 2026-06-06 PDT. Implementation followed the locked scope. The chip-style toggle is rendered in BOTH scope chromes (the Today filter-pills row gets `ml-auto`-right-aligned placement; Schedule grows a new own-row below the existing status+detailer row) — they share the SAME URL key and the SAME handler, so toggling either surface persists across both. Memory #11 verified at execution time: `pos/jobs/route.ts:47` excludeStatuses + `pos/jobs/schedule/route.ts:12` EXCLUDED_STATUSES + `job-queue.tsx:179-192` `getAppointmentStatusPillClasses` + the un-started appointments status filter site all confirmed against the post-Session-2.3 main HEAD. **Parallel-merge handling per Memory feedback "Merging a parallel session to main":** branch was created before Session 2.3 merged; after Session 2.3's merge (`269b94f7`) landed on main, this branch was rebased atop the new main with zero conflicts — the forward-arrow handler at `job-queue.tsx:894-900` and the include-terminal toggle additions live in disjoint regions of the file. Re-ran tsc / lint / vitest post-rebase to confirm 0 conflicts at runtime semantics (Session 2.3's 5 new tests + Session 2.4's 20 new tests all pass alongside the pre-existing 3074). Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean / 192 test files / 3099 tests passing (was 191 / 3079 — +1 file, +20 tests). **Memory #2 honored:** the URL-write helper mirrors `handleScheduleFilterChange`'s pattern byte-for-byte (preserves other params via `new URLSearchParams(searchParams.toString())` + selective set/delete + `router.replace`); pill-color extension reuses the existing `${base}` template literal pattern; visual-mute reuses the existing `opacity-60` className (same value used for the un-started card's busy state, the Schedule card's busy state, etc.). **AC-7 STATUS:** Both scopes carry the toggle; default behavior unchanged; URL-persistent; visual distinction landed. AC-7 commitment is now fulfilled.
+
+---
+
+### Session 2.5 — Populate endpoint disposition (AC-3 finalization)
+
+**Status:** `[x]` **Complete — merged to main at `<PENDING_MERGE_HASH>` on 2026-06-06 PDT**
+**Source:** [AC-3](#ac-3-start-intake-as-materialization-trigger) finalization; [Populate dependencies audit (`98a5f30d`)](POPULATE_DEPENDENCIES_AUDIT.md) Target C CLEAN-migration verdict; F.4 LOCKED Option (i) (remove entirely)
+
+**Issue:** With Sessions 2.1 (Start Intake server primitive) + 2.2 (un-started strip + Today endpoint extension) landed, the `/api/pos/jobs/populate` endpoint became dead code. Pre-2.5 production behavior: populate ran on every Today-scope mount, racing ahead of operator action to pre-materialize today's confirmed/in_progress appointments at `status='scheduled'` — leaving the Session 2.2 un-started strip practically empty in steady state. AC-3 commits to Start Intake being the canonical operator-initiated materialization seam. Phase 0.3 audit Target C categorized 4 dependencies as CLEAN-RE-POINTABLE (all absorbed by Sessions 2.1/2.2) and 13 as REQUIRES-JOB-EXISTENCE (naturally preserved by Start Intake's materialization shape).
+
+**Scope:**
+- DELETE `src/app/api/pos/jobs/populate/route.ts` (194 lines) and `src/app/api/pos/jobs/populate/__tests__/route.test.ts` (198 lines)
+- MOD `src/app/pos/jobs/components/job-queue.tsx`:
+  - Remove `populateFromAppointments` function (the GATE C site)
+  - Remove `populating` state + `populatedDates` ref + dependent state writers
+  - Drop populate call from init effect (the GATE A site) — `fetchJobs` alone now covers today's jobs + un-started appointments via the Session 2.2 payload extension
+  - Drop populate call from Refresh button (the GATE B site) — same single-fetch shape; spinner state simplified (the populate-in-flight tracker is gone, so the disabled prop drops — double-click is benign on idempotent refetch)
+  - Update `scopeRef` comment to reflect post-2.5 sole consumer (`pollJobs`)
+- MOD test files:
+  - `job-queue-schedule-scope.test.tsx`: invert the pre-2.5 "Today scope DOES trigger populate" regression checks to post-2.5 "no scope triggers populate" (the endpoint no longer exists); add Session 2.5 regression-lock test ("Refresh in Today scope re-fetches jobs and never calls populate"); update describe-block name; rewrite top-of-file invariant comment; keep `populateCalls()` helper as a permanent regression-lock probe (any non-zero count = stray caller reintroduced)
+  - `job-queue-today-unstarted.test.tsx` / `job-queue-include-terminal.test.tsx` / `job-queue-forward-arrow.test.tsx`: dead `posFetch` mock branches for `/api/pos/jobs/populate` retained but flipped to return 404 + `'populate retired (Session 2.5)'` error — surfaces any reintroduced caller loud-and-fast in tests
+- MOD comment cross-references (7 files) that pointed at `populate/route.ts:N-M` line ranges as the canonical writer/mirror reference — re-pointed to `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts` (Session 2.1's canonical writer) AND/OR the walk-in atomic create at `src/app/api/pos/jobs/route.ts`. Each rewrite preserves a "pre-Session-2.5 / retired in 2.5" historical clause so a future reader following a doc trail to the audit can place the change in context. Files: `lifecycle-sync.ts` (self-references in the materialization helper's doc-block), `edit-services.ts`, `mobile-service-edit.ts`, `compose-line-items.ts` (+ its test file), `job-detail.tsx`, `flag-issue-flow.tsx`
+
+**Out of scope:**
+- Walk-in atomic create at `src/app/api/pos/jobs/route.ts:147-536` is unchanged — parallel materialization path that stays (Session 2.1.1 is queued for the helper-reuse refactor)
+- Start Intake endpoint (Session 2.1) unchanged
+- Today endpoint query (Session 2.2) unchanged
+- No DB schema touch — Phase 0.3 verified no triggers, RPCs, constraints, or crons reference populate. Re-verified at execution time: `grep -rln "populate" supabase/migrations` returns 7 false-positive matches (English-verb "populated" in column comments, e.g., `"only populated if status = 'failed'"`); `grep -rln "populate" src/lib/cron` returns no matches. CLEAN verdict still holds.
+- 4-card daily summary (Phase 0.3 audit A.2) — unchanged in this session; consumed Session 2.2's Today endpoint extension when it landed
+- `staff/available` job_count_today (Phase 0.3 audit A.4) — Phase 0.3 categorized as CLEAN-RE-POINTABLE; not modified in this session because the existing semantic still returns sensible numbers (jobs that exist); a future session can extend it to include un-started today-appointments per the audit's recommendation. Acceptable to defer — the count is now slightly conservative (under-counts the detailer's pre-intake load), not wrong
+
+**Pre-flight verified (Memory #11):**
+- Populate endpoint: `src/app/api/pos/jobs/populate/route.ts:1-194`
+- Populate tests: `src/app/api/pos/jobs/populate/__tests__/route.test.ts`
+- Caller sites in `job-queue.tsx` (verified at current HEAD post-Session-2.4):
+  - `populating` state at `:478`
+  - `populatedDates` ref at `:479`
+  - `populateFromAppointments` function at `:680-707` (the GATE C site)
+  - Init effect call at `:818-831` (the GATE A site)
+  - Refresh button call at `:870-887` (the GATE B site)
+- Comment cross-references (7 files): `lifecycle-sync.ts` (extensive — Session 2.1's helper documents itself as "mirroring populate"), `edit-services.ts:12,141`, `mobile-service-edit.ts:71`, `compose-line-items.ts:61-96`, `compose-line-items.test.ts:246`, `job-detail.tsx:844`, `flag-issue-flow.tsx:49`
+- Schema/cron verification: clean (no false negatives surfaced)
+
+**Memory #29 check:** No new dependencies surfaced beyond the Phase 0.3 audit. CLEAN verdict holds. Nothing to escalate.
+
+**Dependencies:**
+- Depends on: Session 2.1 (`a5d2a0d6`) for `materializeJobFromAppointment` as the canonical materialization writer; Session 2.2 (`f25bb87d`) for the Today endpoint's `unstarted_appointments` payload extension that makes the populate pre-stage redundant
+- Sequential after: Sessions 2.1 + 2.2 (both must land before this can fire)
+- Unblocks: Session 2.6 (daily summary refresh — operator-visible card semantics now reflect the new materialization architecture); Session 2.1.1 follow-up (walk-in helper-reuse refactor — `materializeJobFromAppointment` is the natural sharing seam now that it's the sole non-walk-in materialization site)
+
+**Production behavior shift (visible):**
+- **Pre-2.5:** Today scope mount triggers populate → today's confirmed appointments are pre-materialized as `jobs WHERE status='scheduled'` → the un-started strip is empty in steady state → operator sees a full Today list of `scheduled` job cards.
+- **Post-2.5:** Today scope mount calls only the Today endpoint → today's confirmed appointments arrive in the `unstarted_appointments` payload field → the un-started strip becomes the canonical surface → operator sees the strip ABOVE the jobs list with `Start Intake` buttons per appointment → pressing Start Intake materializes the job via Session 2.1's endpoint → the strip item disappears, a new job card appears.
+- **Walk-in path unchanged:** atomic create still lands at `status='scheduled'` for its own transient pre-stage flow (operator confirms walk-in → presses Start Intake when vehicle is staged).
+- **Cancellation path unchanged:** un-materialize (revert to pending) still writes appointment status FIRST, then deletes the job — defense-in-depth ordering preserved even though the populate-race that drove it is structurally gone.
+
+**Linked prompt:** Session 2.5 prompt (operator-supplied in 2026-06-06 PST session)
+
+**Completion:** Merged to main at `<PENDING_MERGE_HASH>` on 2026-06-06 PDT. Implementation followed the locked scope exactly. The endpoint deletion is the load-bearing change; everything else is dead-code cleanup or comment hygiene. Pre-2.5 the un-started strip (Session 2.2) was structurally present but practically empty because populate ran first on every mount; post-2.5 it is the canonical operator surface. The schedule-scope test file's "populate gate" describe-block — historically a HIGH-severity-Risk-matrix regression-lock — was reframed as "Session 2.5 — populate endpoint retired (regression-locked invariant)" and its assertions inverted from "Today DOES trigger populate" to "no scope triggers populate". `populateCalls()` is kept as a permanent probe — any non-zero count = stray caller reintroduced. Comment cross-references in 7 lib/component files were re-pointed to `materializeJobFromAppointment` (the new canonical writer) with a "pre-Session-2.5 / retired in 2.5" historical clause preserved so audit-trail readers can place the change. Schema + cron grep verified at execution time — Phase 0.3's CLEAN verdict still holds; no surprises surfaced. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean (verified `/api/pos/jobs/populate` absent, `/schedule` + `/start-intake` present) / 191 test files / 3092 tests passing (was 192 / 3099 — -1 file [populate tests deleted], -7 net tests [-8 populate cases + 1 new regression-lock]). Net diff: 519 lines deleted, 179 lines inserted = **−340 net lines** across 14 files (2 deleted + 12 modified). Of the 12 modifications, only 1 is production logic (`job-queue.tsx`); the other 11 are comment hygiene + test mock updates. **Memory #8 budget honored** — within "tiny-comfortable removal" framing. **AC-3 STATUS:** Now FULLY operational in production. Start Intake is the sole non-walk-in materialization trigger; the un-started strip is the canonical operator surface. The materialization seam architecture is complete.
 
 ---
 

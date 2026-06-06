@@ -307,9 +307,11 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     setScope(s);
     localStorage.setItem('pos-jobs-scope', s);
   }, []);
-  // Mirror effectiveScope into a ref so the populate guard (defense layer 3)
-  // reads the latest scope without `scope` entering populate's dep array
-  // (avoids stale-closure churn on the dedup set).
+  // Mirror effectiveScope into a ref so `pollJobs` reads the latest scope
+  // without `scope` entering its dep array (avoids stale-closure churn on
+  // the 5-second polling interval). Pre-2.5 this also served the populate
+  // gate's defense-layer-3 short-circuit; populate retired in Session 2.5
+  // but `pollJobs` still uses it (poll only fires in Today scope).
   const scopeRef = useRef<ScopeMode>(effectiveScope);
   useEffect(() => { scopeRef.current = effectiveScope; }, [effectiveScope]);
 
@@ -469,14 +471,14 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   // Session 2.2 — un-started confirmed/in_progress appointments for TODAY
-  // returned alongside `data` from /api/pos/jobs. Empty for past dates (and
-  // empty in practice while populate is still active per Session 2.5 — populate
-  // materializes today's confirmed appointments on Today-scope mount, so this
-  // array surfaces non-trivially only after populate retires).
+  // returned alongside `data` from /api/pos/jobs. Empty for past dates. Pre-2.5
+  // this was also empty in steady state because populate raced ahead and
+  // materialized confirmed appointments at status='scheduled' on Today-scope
+  // mount; Session 2.5 retired populate, so the strip is now the canonical
+  // surface for un-materialized today-appointments (operator presses Start
+  // Intake to materialize per AC-3).
   const [unstartedAppointments, setUnstartedAppointments] = useState<PosUnstartedAppointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [populating, setPopulating] = useState(false);
-  const populatedDates = useRef(new Set<string>());
 
   // Polling state
   const POLL_MS_ACTIVE = 5_000;  // 5s for today/future
@@ -677,35 +679,6 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [pollJobs, timelineInteracting]);
 
-  const populateFromAppointments = useCallback(async (date: string) => {
-    // GATE C (Item 15e Phase 1B, defense in depth): never materialize jobs in
-    // Schedule scope, even if invoked outside the gated init effect. This is
-    // the function-level half of the load-bearing populate gate — see the
-    // audit Risk matrix + the invariant tests in
-    // __tests__/job-queue-schedule-scope.test.tsx.
-    if (scopeRef.current !== 'today') return;
-    if (populatedDates.current.has(date)) return;
-    populatedDates.current.add(date);
-    setPopulating(true);
-    try {
-      const res = await posFetch('/api/pos/jobs/populate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date }),
-      });
-      if (res.ok) {
-        const { data } = await res.json();
-        if (data.created > 0) {
-          await fetchJobs(date);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to populate jobs:', err);
-    } finally {
-      setPopulating(false);
-    }
-  }, [fetchJobs]);
-
   // Schedule scope data source (Item 15e Phase 1B). PURE READ — never
   // materializes jobs. Window derived from the date-pill selection via
   // `computeScheduleDateRange` (N+1 Session #148); helper mirrors the
@@ -815,20 +788,21 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     []
   );
 
-  // Init: populate + fetch on mount and when date / scope changes
+  // Init: fetch on mount and when date / scope changes. Session 2.5 retired
+  // populate — Today endpoint now natively returns materialized jobs PLUS
+  // un-started appointments for today (Session 2.2's `unstarted_appointments`
+  // payload field), so `fetchJobs` alone covers what `populate + fetchJobs`
+  // used to. Schedule scope branch is unchanged from Item 15e Phase 1B.
   useEffect(() => {
     async function init() {
-      // GATE A (Item 15e Phase 1B): the Schedule scope NEVER triggers populate.
-      // It reads upcoming appointments via the dedicated endpoint instead.
       if (effectiveScope === 'schedule') {
         await fetchSchedule();
         return;
       }
-      await populateFromAppointments(selectedDate);
       await fetchJobs(selectedDate);
     }
     init();
-  }, [selectedDate, effectiveScope, populateFromAppointments, fetchJobs, fetchSchedule]);
+  }, [selectedDate, effectiveScope, fetchJobs, fetchSchedule]);
 
   // Sort by status priority
   const sortedJobs = useMemo(() =>
@@ -867,22 +841,27 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
       <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3">
         <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Jobs</h1>
         <div className="flex items-center gap-2">
+          {/* Session 2.5 — Refresh re-fetches the active scope's endpoint.
+              Schedule scope: pure read of upcoming appointments. Today scope:
+              re-fetches /api/pos/jobs which natively returns jobs +
+              un-started appointments (Session 2.2). Pre-2.5 the Today branch
+              also triggered populate via `populateFromAppointments`; that
+              path retired with AC-3. The pre-2.5 `disabled={populating}` +
+              spin state tracked populate's in-flight window; post-2.5 a
+              click triggers an idempotent re-fetch — double-click is benign,
+              and the existing `loading` / `scheduleLoading` body indicators
+              cover visible-progress UX. */}
           <button
             onClick={() => {
-              // GATE B (Item 15e Phase 1B): Refresh in Schedule scope re-fetches
-              // the read-only endpoint — it must NOT trigger populate.
               if (effectiveScope === 'schedule') {
                 fetchSchedule();
                 return;
               }
-              populatedDates.current.delete(selectedDate);
-              populateFromAppointments(selectedDate);
               fetchJobs(selectedDate);
             }}
-            disabled={populating}
-            className="flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           >
-            <RefreshCw className={cn('h-4 w-4', populating && 'animate-spin')} />
+            <RefreshCw className="h-4 w-4" />
             Refresh
           </button>
           {canCreateWalkIn && (
