@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { fireWebhook } from '@/lib/utils/webhook';
+import { sendSms } from '@/lib/utils/sms';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
   waiting: ['notified', 'booked', 'cancelled'],
@@ -75,8 +77,47 @@ export async function PATCH(
       );
     }
 
-    // Fire webhook when notifying a customer
+    // Notify the customer when the admin marks the entry as 'notified'.
     if (status === 'notified') {
+      // Session 1.8.1 — direct SMS dispatch (mirrors Session 1.8 cancel-route
+      // pattern at appointments/[id]/cancel/route.ts:174-194). Pre-1.8.1 the
+      // dispatch was via fireWebhook only — same customer-facing silent-drop
+      // bug class as Session 1.8 (no n8n receiver wired in prod per audit
+      // f5e714a8). The webhook fire is kept below for forward-compat.
+      const phone = current.customer?.phone;
+      const serviceName = current.service?.name ?? 'your requested service';
+      const preferredDate = current.preferred_date as string | null;
+      // Admin PATCH has no freed-appointment date; use the customer's
+      // preferred_date as the slot date (the existing webhook payload uses
+      // the same field). When phone OR preferred_date is missing, skip SMS —
+      // the row still flips to notified and the admin can follow up directly.
+      if (phone && preferredDate) {
+        const slotDateStr = new Date(preferredDate + 'T00:00:00').toLocaleDateString('en-US', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+        });
+        const firstName = current.customer?.first_name ?? undefined;
+        const smsFallback = `Hi ${firstName ?? 'there'}, good news — a spot just opened for ${serviceName} on ${slotDateStr}! Reply or call to book.`;
+        const smsResult = await renderSmsTemplate('waitlist_slot_available', {
+          service_name: serviceName,
+          appointment_date: slotDateStr,
+          first_name: firstName,
+          last_name: current.customer?.last_name ?? undefined,
+        }, smsFallback);
+
+        if (smsResult.isActive) {
+          await sendSms(phone, smsResult.body, {
+            logToConversation: true,
+            customerId: current.customer_id,
+            notificationType: 'waitlist_slot_available',
+            contextId: id,
+          });
+        }
+      }
+
+      // Forward-compat webhook fire — kept per Session 1.8.1 prompt for future
+      // external receivers. Currently a silent no-op in prod (audit f5e714a8
+      // confirmed no receiver is wired). The direct sendSms above is the
+      // actual notification channel.
       fireWebhook('appointment_cancelled', {
         event: 'waitlist_notified',
         waitlist_entry_id: id,
