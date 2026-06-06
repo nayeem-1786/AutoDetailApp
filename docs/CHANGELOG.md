@@ -6,6 +6,75 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 2.3 — Forward-arrow routes to Schedule on today-crossing (2026-06-06)
+
+Implements [AC-8](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today). When the operator presses the forward arrow on Today scope and navigation would cross from today/past into tomorrow or later, the UI now routes to Schedule scope with the target date pinned as a single-day "Other" range — closes the seam the [Today vs Schedule conceptual audit](docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md) identified at Targets G.1 / E.1 / A.4 where Today's forward-arrow inherited from the pre-Item-15e single-date-navigator and went structurally inert when Item 15e Phase 1A added the populate-future-date guard. Pre-Session-2.3 behavior: forward arrow into the future loaded `jobs?date=tomorrow`, returned empty, rendered "Upcoming — [date]" above an empty content area. Post-Session-2.3: same click flips scope, persists `pos-jobs-scope=schedule` to localStorage, and routes to `/pos/jobs?sched_pills=other&sched_from=<tomorrow>&sched_to=<tomorrow>` via `router.push`.
+
+**Change shape:** single new callback `handleForwardArrow` in `src/app/pos/jobs/components/job-queue.tsx` + button wire change + new test file. 33 production lines / 1 prod file / 1 test file — within Memory #8 budget.
+
+**Forward-arrow handler (`src/app/pos/jobs/components/job-queue.tsx:477-506`):**
+
+```typescript
+const handleForwardArrow = useCallback(() => {
+  const nextDate = addDays(selectedDate, 1);
+  if (scheduleScopeEnabled && nextDate > today) {
+    handleScopeChange('schedule');
+    setScheduleFilter({
+      selectedPills: ['other'],
+      otherRange: { from: nextDate, to: nextDate },
+    });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('date');
+    params.set('sched_pills', 'other');
+    params.set('sched_from', nextDate);
+    params.set('sched_to', nextDate);
+    const qs = params.toString();
+    router.push(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+    return;
+  }
+  setDate(nextDate);
+}, [handleScopeChange, router, scheduleScopeEnabled, searchParams, selectedDate, setDate, today]);
+```
+
+Reuses existing primitives (Memory #2): `handleScopeChange` (scope state + localStorage persistence, in place since Item 15e Phase 1B at `:288-291`), `setScheduleFilter` (state from N+1 Session #148 at `:308-318`), and `router.push` with the existing schedule-filter URL shape (`sched_pills=other&sched_from=X&sched_to=X`). No new URL utilities. No new date helpers. The "Other" pill is the right vehicle for a single-day range because `computeRangeForPill('other', today, { from: X, to: X })` in `src/lib/utils/schedule-date-range.ts:116-123` returns `{ from: X, to: X }` directly when `from >= tomorrow` and `from <= to` — both invariants hold by construction (the gate only fires when `nextDate > today`, i.e. `nextDate >= tomorrow`, and `from === to`).
+
+**Why `router.push` instead of `router.replace`:** crossing a scope boundary is a navigation event the operator may want to back-button out of. Push keeps Today scope in browser history; replace would overwrite it. All other URL writers in the file use `replace` (filter persistence, date stepping within Today) because those are state updates, not navigation. The forward-arrow's day-step is a state update inside Today scope (still `replace` via `setDate`); the forward-arrow's scope-cross is a navigation (`push`).
+
+**Flag gate:** the `scheduleScopeEnabled` guard means a `pos_jobs_unified_schedule` flag rollback restores legacy forward-arrow behavior (within-Today day-step into future dates, even though they produce empty lists). Without the gate, a rollback would leave a URL writer pushing to a scope the UI can't render (the scope toggle disappears, `effectiveScope` is pinned to `'today'`, the `?sched_*` params are ignored, and the user sees Today scope with the wrong `?date=` semantics).
+
+**Past-date forward navigation unchanged:** `selectedDate=yesterday` + forward arrow → `setDate(today)` which strips `?date=` from the URL via `router.replace`. `selectedDate=-3 days` + forward arrow → `setDate(-2 days)` which sets `?date=-2d`. Back arrow handler at `:861-867` is byte-identical to pre-Session-2.3 — `setDate(addDays(selectedDate, -1))` directly.
+
+**Date-picker input unchanged:** the inline `<input type="date">` at `:909-912` accepts any operator-picked date directly via `setDate(e.target.value)`. AC-8 frames the forward-arrow as the seam (it's the "navigate by step" affordance that pre-Item-15e meant "scroll through days"); the date-picker is "jump to a specific day" with explicit intent and doesn't carry the same conceptual mismatch.
+
+**Test file `src/app/pos/jobs/components/__tests__/job-queue-forward-arrow.test.tsx` (5 tests):**
+
+1. Forward from TODAY → `router.push` to `?sched_pills=other&sched_from=<tomorrow>&sched_to=<tomorrow>` (no `?date=` preserved); scope flips to `'schedule'` in localStorage; no additional `router.replace` fires from the AC-8 branch (the only `replace`s observed are the N+2 schedule-filter mount-effect baseline).
+2. Forward from YESTERDAY → `router.replace` to strip `?date=` (= today); no `router.push`; scope unchanged.
+3. Forward from -3 days → `router.replace` to `?date=<-2 days>`; no `router.push`; scope unchanged.
+4. Back arrow from TODAY → `router.replace` to `?date=<yesterday>`; no `router.push`; scope unchanged (regression-lock that back arrow stays in Today scope).
+5. Flag OFF — forward from TODAY → `router.replace` to `?date=<tomorrow>` (legacy behavior); no `router.push`; flag rollback safety net.
+
+Tests use a controllable `searchParamsState` mock for `useSearchParams.get('date')` per-test and a fresh `pushCalls`/`replaceCalls` capture pair on `useRouter`. Baseline counts (snapshot before the click) are subtracted from post-click counts to isolate AC-8's effect from the N+2 schedule-filter mount-effect (which also writes URL on mount).
+
+**Verification:**
+- tsc: 0 errors
+- ESLint on touched files: 0 errors / 1 pre-existing baseline warning unchanged (`lastPollAt` from prior session at `:452:10`)
+- Vitest full suite: 191 test files / 3079 tests passing (was 190 / 3074 — +1 file, +5 tests)
+
+**Files touched:**
+- MOD: `src/app/pos/jobs/components/job-queue.tsx` — new `handleForwardArrow` callback + forward button `onClick` rewired
+- NEW: `src/app/pos/jobs/components/__tests__/job-queue-forward-arrow.test.tsx` — 5 regression-locking tests
+
+**Cross-references:**
+- [AC-8](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-8-forward-arrow-in-today-scope-routes-to-schedule-when-crossing-today) — commitment text
+- [Today vs Schedule conceptual audit](docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md) Targets A.4 (relationship), E.1 (existence question), G.1 (operator perception), E.5 option (b) (one-way bridge)
+- [Item 15e Phase 1A populate-future-date guard](docs/dev/ITEM_15E_POS_JOBS_UNIFIED_OPERATIONS_AUDIT.md) — the upstream guard that made the pre-Session-2.3 forward arrow inert
+- [Session #148 N+1 schedule pills](docs/dev/POS_SCHEDULE_FILTER_UX_DESIGN.md) — defines the `'other'` pill semantics this session reuses
+
+**Memory updates:** none (this session reuses existing patterns; no new conventions emerge).
+
+---
+
 ## Session 2.2 — Today scope absorbs un-started appointments + Start Intake client wiring (2026-06-06)
 
 Second half of [AC-3](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-3-start-intake-as-materialization-trigger). AC-3 is now complete with both halves landed. Builds the operator-facing UI for the materialization seam Session 2.1 created at the server: confirmed appointments for TODAY surface in the POS Jobs Today scope with a Start Intake button, and pressing it calls the Session 2.1 endpoint and replaces the appointment card with a job card.

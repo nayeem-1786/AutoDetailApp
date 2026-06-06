@@ -473,6 +473,38 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     router.replace(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
   }, [router, searchParams, today]);
 
+  // Session 2.3 — AC-8: forward-arrow routes to Schedule on today-crossing.
+  // When the operator presses the forward arrow and navigation would cross
+  // from today/past into tomorrow or later, route to Schedule scope with the
+  // target date pinned as a single-day "Other" range — preserves the date
+  // intent while moving to the surface that actually shows future work
+  // (Today's forward-arrow into future dates was structurally inert under
+  // Item 15e Phase 1A's populate-future-date guard, yielding empty lists).
+  // Past-date forward navigation stays within Today scope (the legacy
+  // "scroll through past jobs" affordance). Gated on `scheduleScopeEnabled`
+  // so a flag rollback restores legacy behavior. See AC-8 in
+  // docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md and Targets A.4 / E.1 /
+  // G.1 in docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md.
+  const handleForwardArrow = useCallback(() => {
+    const nextDate = addDays(selectedDate, 1);
+    if (scheduleScopeEnabled && nextDate > today) {
+      handleScopeChange('schedule');
+      setScheduleFilter({
+        selectedPills: ['other'],
+        otherRange: { from: nextDate, to: nextDate },
+      });
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('date');
+      params.set('sched_pills', 'other');
+      params.set('sched_from', nextDate);
+      params.set('sched_to', nextDate);
+      const qs = params.toString();
+      router.push(`/pos/jobs${qs ? `?${qs}` : ''}`, { scroll: false });
+      return;
+    }
+    setDate(nextDate);
+  }, [handleScopeChange, router, scheduleScopeEnabled, searchParams, selectedDate, setDate, today]);
+
   // Mark a job as locally updated (skip highlight animation on next poll)
   const markLocalUpdate = useCallback((jobId: string) => {
     localUpdatesRef.current.set(jobId, Date.now());
@@ -892,7 +924,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
         )}
 
         <button
-          onClick={() => setDate(addDays(selectedDate, 1))}
+          onClick={handleForwardArrow}
           className="flex h-11 w-11 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 active:bg-gray-100 dark:active:bg-gray-700"
           aria-label="Next day"
         >
