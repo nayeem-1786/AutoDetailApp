@@ -825,15 +825,56 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     [scheduleEntries, debouncedSearch, statusFilter, detailerFilter]
   );
 
-  // Daily summary stats
+  // Daily summary stats — Session 2.6 (AC-3 + Phase 0.3 F.1 LOCKED Shape α).
+  // Pre-2.6: cards aggregated `jobs` rows only — accurate when populate
+  // pre-materialized today's confirmed appointments at mount, but post-Session-
+  // 2.5 populate is retired and confirmed appointments arrive via the
+  // `unstartedAppointments` array until the operator presses Start Intake.
+  // Aggregating jobs only would under-count by exactly the un-started
+  // population. Shape α semantic: the summary reflects today's EXPECTED work
+  // (jobs + un-started appointments), not just today's STARTED work.
+  //
+  // Per-card semantic:
+  //   - totalJobs: jobs + un-started (both contribute to "expected today")
+  //   - unassigned: jobs with no assigned_staff + un-started with no detailer
+  //     (operator's "I need to assign someone" workflow applies to both)
+  //   - totalRevenue: sum(jobs.services[].price) + sum(unstarted.total_amount)
+  //     (both fields are dollars; no cents-vs-dollars mismatch — Money-Unify
+  //     epic hasn't reached this family yet, both are still the pre-Unify
+  //     dollar shape)
+  //   - completedCount: jobs-only (unchanged — operational metric, not
+  //     expected metric; an un-started appointment contributes 0 to work
+  //     actually completed; ratio reads "X completed / Y expected today")
+  //
+  // Excluded from "expected" on both sides: cancelled (always) + no_show
+  // (appointment-side only; jobs.status doesn't have no_show). Mirrors the
+  // pre-2.6 jobs `nonCancelled` filter on the appointment dimension; consistent
+  // even when AC-7's include_terminal toggle is on (the toggle changes what
+  // the endpoint RETURNS; the summary still treats cancelled/no_show as
+  // "didn't / won't happen" for the expected-work metric).
   const summary = useMemo(() => {
     const nonCancelled = jobs.filter((j) => j.status !== 'cancelled');
-    const totalJobs = nonCancelled.length;
-    const unassigned = nonCancelled.filter((j) => !j.assigned_staff).length;
-    const totalRevenue = nonCancelled.reduce((sum, j) => sum + j.services.reduce((s, svc) => s + svc.price, 0), 0);
-    const completedCount = nonCancelled.filter((j) => j.status === 'completed' || j.status === 'closed').length;
+    const expectedApts = unstartedAppointments.filter(
+      (a) => a.status !== 'cancelled' && a.status !== 'no_show'
+    );
+    const totalJobs = nonCancelled.length + expectedApts.length;
+    const unassigned =
+      nonCancelled.filter((j) => !j.assigned_staff).length +
+      expectedApts.filter((a) => !a.detailer).length;
+    const jobsRevenue = nonCancelled.reduce(
+      (sum, j) => sum + j.services.reduce((s, svc) => s + svc.price, 0),
+      0
+    );
+    const aptsRevenue = expectedApts.reduce(
+      (sum, a) => sum + (Number(a.total_amount) || 0),
+      0
+    );
+    const totalRevenue = jobsRevenue + aptsRevenue;
+    const completedCount = nonCancelled.filter(
+      (j) => j.status === 'completed' || j.status === 'closed'
+    ).length;
     return { totalJobs, unassigned, totalRevenue, completedCount };
-  }, [jobs]);
+  }, [jobs, unstartedAppointments]);
 
   return (
     <div className="flex h-full flex-col">
@@ -969,7 +1010,7 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
 
       {/* Daily Summary */}
       {!loading && summary.totalJobs > 0 && (
-        <div className="flex flex-wrap gap-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2">
+        <div data-testid="daily-summary-bar" className="flex flex-wrap gap-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-2">
           <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
             <Calendar className="h-3.5 w-3.5" />
             {summary.totalJobs} job{summary.totalJobs !== 1 ? 's' : ''}

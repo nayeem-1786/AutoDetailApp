@@ -643,7 +643,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
-| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters, populate retirement) | Phase 0.3 + 0.1 audits complete | `[~]` **In progress** — Session 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`9e29d058`) merged 2026-06-06 PDT; AC-3 **fully operational in production**, AC-7 + AC-8 complete |
+| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters, populate retirement, Shape α summary) | Phase 0.3 + 0.1 audits complete | `[x]` **Complete (6 sessions)** — 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`9e29d058`) + 2.6 (`<PENDING_MERGE_HASH>`) merged 2026-06-06 PDT; AC-3 **fully operational**, AC-7 + AC-8 complete; Shape α aligned |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
@@ -1574,6 +1574,54 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 **Linked prompt:** Session 2.5 prompt (operator-supplied in 2026-06-06 PST session)
 
 **Completion:** Merged to main at `9e29d058` on 2026-06-06 PDT. Implementation followed the locked scope exactly. The endpoint deletion is the load-bearing change; everything else is dead-code cleanup or comment hygiene. Pre-2.5 the un-started strip (Session 2.2) was structurally present but practically empty because populate ran first on every mount; post-2.5 it is the canonical operator surface. The schedule-scope test file's "populate gate" describe-block — historically a HIGH-severity-Risk-matrix regression-lock — was reframed as "Session 2.5 — populate endpoint retired (regression-locked invariant)" and its assertions inverted from "Today DOES trigger populate" to "no scope triggers populate". `populateCalls()` is kept as a permanent probe — any non-zero count = stray caller reintroduced. Comment cross-references in 7 lib/component files were re-pointed to `materializeJobFromAppointment` (the new canonical writer) with a "pre-Session-2.5 / retired in 2.5" historical clause preserved so audit-trail readers can place the change. Schema + cron grep verified at execution time — Phase 0.3's CLEAN verdict still holds; no surprises surfaced. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean (verified `/api/pos/jobs/populate` absent, `/schedule` + `/start-intake` present) / 191 test files / 3092 tests passing (was 192 / 3099 — -1 file [populate tests deleted], -7 net tests [-8 populate cases + 1 new regression-lock]). Net diff: 519 lines deleted, 179 lines inserted = **−340 net lines** across 14 files (2 deleted + 12 modified). Of the 12 modifications, only 1 is production logic (`job-queue.tsx`); the other 11 are comment hygiene + test mock updates. **Memory #8 budget honored** — within "tiny-comfortable removal" framing. **AC-3 STATUS:** Now FULLY operational in production. Start Intake is the sole non-walk-in materialization trigger; the un-started strip is the canonical operator surface. The materialization seam architecture is complete.
+
+---
+
+### Session 2.6 — Daily summary cards semantic (Shape α)
+
+**Status:** `[x]` **Complete — merged to main at `<PENDING_MERGE_HASH>` on 2026-06-06 PDT**
+**Source:** [AC-3](#ac-3-start-intake-as-materialization-trigger) post-finalization UX alignment; Phase 0.3 F.1 LOCKED Shape α decision (per [populate dependencies audit `98a5f30d`](POPULATE_DEPENDENCIES_AUDIT.md) Target A.2)
+
+**Issue:** With populate retired in Session 2.5, today's confirmed appointments no longer pre-materialize as `scheduled` jobs on Today-scope mount — they arrive in the `unstartedAppointments` array (Session 2.2's Today endpoint extension) and stay there until the operator presses Start Intake. The pre-2.6 4-card daily summary aggregated `jobs` rows only — accurate when populate ran but post-2.5 it under-counts by exactly the un-started population. Phase 0.3 F.1 LOCKED Shape α: cards reflect today's EXPECTED work (jobs + un-started), not today's STARTED work. Operator's stated mental model — *"Jobs are Appointments, at least visually from the POS > Jobs page"* — aligns with this shape.
+
+**Scope:**
+- MOD `src/app/pos/jobs/components/job-queue.tsx` — extend the existing `summary` useMemo (`:828-836` pre-2.6) to aggregate across BOTH `jobs` and `unstartedAppointments`:
+  - **totalJobs**: `jobs (non-cancelled).length + unstarted (non-cancelled, non-no_show).length` — "expected today" count, the natural Shape α denominator
+  - **unassigned**: `jobs WHERE !assigned_staff + unstarted WHERE !detailer` — operator's "I need to assign someone" workflow applies to both
+  - **totalRevenue**: `sum(jobs.services[].price) + sum(unstarted.total_amount)` — both fields are dollars (Money-Unify epic hasn't reached this family yet)
+  - **completedCount**: jobs-only (unchanged — operational metric, not expected metric; ratio reads "X completed / Y expected today" naturally)
+  - Excluded from "expected" on both sides: `cancelled` (always — preserves the pre-2.6 `j.status !== 'cancelled'` semantic) + `no_show` (appointment-side terminal; no jobs.status equivalent)
+- Add `data-testid="daily-summary-bar"` to the summary `<div>` so tests can scope queries via `within(bar)` — un-started appointment cards and job cards also render `formatCurrency(...)` strings, which would otherwise collide with summary assertions
+- NEW `src/app/pos/jobs/components/__tests__/job-queue-summary-shape-alpha.test.tsx` — 8 regression-locking tests covering: empty Today (bar hidden), jobs-only (pre-2.6 regression), un-started-only (Shape α visible — pre-2.6 this scenario would show no bar at all), mixed (sum across both), cancelled excluded on both sides, no_show excluded, completed included, completedCount stays jobs-only
+
+**Out of scope:**
+- Card visual design unchanged — same 4 spans in the same flex-wrap row
+- No new cards
+- "Completed count" card semantic intentionally unchanged (jobs-only — operational, not expected)
+- Today endpoint query (Session 2.2) unchanged — already returns both arrays
+- Schedule scope cards untouched — Schedule has a different conceptual semantic (forward-looking range, not single-day "expected today")
+- Un-started appointment card component (Session 2.2's work) unchanged
+- `staff/available` `job_count_today` deferred — Phase 0.3 categorized it as CLEAN-RE-POINTABLE but the existing semantic still returns sensible numbers (jobs that exist) and a future session can extend per the audit's recommendation. Surfacing in Memory #29 as deferred follow-up, not as a finding requiring escalation.
+
+**Pre-flight verified (Memory #11):**
+- Summary useMemo: `job-queue.tsx:828-836` (pre-2.6 location after Session 2.5's deletions shifted line numbers — verified against current main HEAD)
+- Summary bar JSX: `job-queue.tsx:970-992`
+- `unstartedAppointments` state + populate sites: `job-queue.tsx:480, :570, :612` (state, init fetch, poll refresh — all pre-existing from Session 2.2)
+- `PosUnstartedAppointment` type: `src/app/pos/jobs/components/schedule-types.ts:81-95` — fields used by aggregation (`status`, `detailer`, `total_amount`) all present
+- `formatCurrency` accepts `number` (dollars), returns "$X.XX" — `src/lib/utils/format.ts:25-30`
+
+**Memory #29 check:** No other places that aggregate jobs-only into operator-facing metrics surfaced. The audit's Target A.4 (`staff/available` `job_count_today`) is the only sibling-deferral candidate; surfaced as future work, not folded into this session.
+
+**Money math reconciliation:** both `jobs.services[].price` (number, JSONB-decoded from the materialization helper's snapshot) and `appointments.total_amount` (number, from the appointment-services price_at_booking sum at appointment creation) are pre-Unify dollars at the same precision. No cents-vs-dollars mismatch surfaced. The summary's `formatCurrency(totalRevenue)` rendering matches pre-2.6 byte-for-byte for the jobs-only contribution (regression-locked by test 2).
+
+**Dependencies:**
+- Depends on: Session 2.1 (`a5d2a0d6`) for the materialization helper; Session 2.2 (`f25bb87d`) for the `unstartedAppointments` payload + state; Session 2.5 (`9e29d058`) for the populate retirement that makes Shape α a NECESSARY shift rather than a cosmetic one
+- Sequential after: Sessions 2.1, 2.2, 2.5 (all must land before this can fire — 2.3 and 2.4 are independent)
+- Unblocks: nothing immediate — this is the **FINAL Phase 2 session**; Phase 2 closes after this lands
+
+**Linked prompt:** Session 2.6 prompt (operator-supplied in 2026-06-06 PST session)
+
+**Completion:** Merged to main at `<PENDING_MERGE_HASH>` on 2026-06-06 PDT. Implementation followed the locked scope exactly. The single useMemo edit is the load-bearing change; the testid addition is a 1-attribute affordance for test-scoping. The Shape α semantic mapping per the Phase 0.3 F.1 LOCKED table came through verbatim — `totalJobs` and `unassigned` and `totalRevenue` all aggregate across both arrays; `completedCount` stays jobs-only with the operational-vs-expected rationale documented in-source. Tests cover the 4 critical scenarios (jobs-only regression, un-started-only Shape α visible, mixed sum, exclusion semantics for cancelled/no_show/completed) plus 4 edge cases (empty bar hidden, completed un-started included, completedCount-jobs-only regression, un-started revenue contributes). Net diff: +48 / −7 = **+41 net lines** to 1 prod file + 1 new test file (231 lines). **Memory #8 budget honored** — within "comfortable" framing. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean / 192 test files / 3100 tests passing (was 191 / 3092 — +1 file, +8 tests). **Shape α STATUS:** the summary cards now reflect the post-AC-3 reality. Operator sees correct "X expected, Y completed" numbers regardless of whether materialization has happened yet. **PHASE 2 STATUS:** **COMPLETE** — all 6 sessions (2.1, 2.2, 2.3, 2.4, 2.5, 2.6) merged; AC-3 fully operational; AC-7 + AC-8 complete; Shape α aligned.
 
 ---
 
