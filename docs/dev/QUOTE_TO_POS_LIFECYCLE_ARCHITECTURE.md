@@ -642,7 +642,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | Phase | Theme | Pre-task | Status |
 |---|---|---|---|
 | **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
-| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.4 (`44c8ea05`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`) complete; Sessions 1.1–1.3, 1.5, 1.6 not started |
+| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Sessions 1.4 (`44c8ea05`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) complete; Sessions 1.1–1.3, 1.5, 1.6 not started |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
 | **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
@@ -1171,6 +1171,57 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 **Linked prompt:** Session 1.8 prompt (operator-supplied in 2026-06-06 PST session)
 
 **Completion:** 2026-06-06 PST — merge hash filled in post-merge below this entry
+
+---
+
+### Session 1.8.1 — Admin waitlist PATCH silent-drop fix
+
+**Status:** `[x]` **Complete — merged to main at `c2294d6b` on 2026-06-06 12:40 PDT**
+**Source:** Session 1.8 (`3c118b2d`) — surfaced finding ("NOT FIXED in 1.8 per Memory #29 targeted-fix scope") promoted to its own Phase 1 session per the Document Maintenance Rule "new session identified"
+**Estimated scope:** ~10-15 prod lines / 2 files / +3-4 tests
+**Memory #8 budget:** Tiny
+
+**Issue:** `src/app/api/waitlist/[id]/route.ts:80` — the admin waitlist PATCH endpoint fires `fireWebhook('appointment_cancelled', { event: 'waitlist_notified', ... })` as the SOLE dispatch channel for the customer notification when an operator manually transitions a waitlist entry to `status='notified'` via the admin UI. With no n8n receiver wired in production (per webhook receivers identity audit `f5e714a8`), the row is marked `notified` + `notified_at=now()` in `waitlist_entries` but **the customer never receives an SMS**. Same customer-facing silent-drop bug class as Session 1.8; lower volume (operator-initiated vs. cancel-triggered) but identical failure mode.
+
+**Solution:** Mirror Session 1.8's direct-dispatch pattern at `src/app/api/appointments/[id]/cancel/route.ts:174-194`:
+1. Read customer phone + first/last name from the existing `customer:customers!customer_id(...)` embed (already in the PATCH route's select at `:37`)
+2. Read the waitlist entry's `preferred_date` as the slot date (admin PATCH has no freed-appointment date; `preferred_date` is the natural value and is what the existing webhook payload already sends)
+3. Skip SMS gracefully if phone OR `preferred_date` is missing (row still flips to `notified`; admin can follow up directly). Phone-null is the canonical Session 1.8 skip; date-null is added because `appointment_date` is required by the template contract.
+4. Otherwise format the date with `toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })` (identical to Session 1.8 line 145-147), render via `renderSmsTemplate('waitlist_slot_available', vars, fallback)`, and dispatch via `sendSms(phone, body, { logToConversation: true, customerId, notificationType: 'waitlist_slot_available', contextId: id })`
+5. Retain the pre-1.8.1 `fireWebhook` call alongside as forward-compat side-channel (per Session 1.8's same precedent)
+
+**Why:**
+- Closes the sibling sole-dispatch site Session 1.8 surfaced but deferred per Memory #29 targeted-fix scope. The customer-facing silent-drop bug class is now closed across both surfaces (cancel-triggered + admin-initiated).
+- Reuses the `waitlist_slot_available` template introduced by Session 1.8 unchanged — per Memory #2, same SMS content, no need for a separate template. No migration, no `sms-contracts.source.ts` edit, no codegen this session.
+
+**Pre-tasks:**
+- `[x]` Session 1.8 merged to main (`3c118b2d`) — establishes the direct-dispatch pattern, the SMS template, and the codegen state this session reuses
+- `[x]` Verified `waitlist_slot_available` slug present in `src/lib/sms/sms-contracts.source.ts:281-284` and codegen output current
+
+**Primary files (actuals):**
+- `src/app/api/waitlist/[id]/route.ts` — MOD. +2 imports (`sendSms`, `renderSmsTemplate`), +~30 lines for the dispatch block + comments; pre-1.8.1 `fireWebhook` call retained
+- `src/app/api/waitlist/[id]/__tests__/route.test.ts` — NEW. 6 cases: SMS dispatch on notify, no-phone silent skip, no-`preferred_date` silent skip, forward-compat webhook fires alongside SMS, inactive-template skips SMS, non-notified transitions cause no notify side effects
+
+**Evidence citations:**
+- Session 1.8 `CHANGELOG.md` entry — explicit surface finding ("admin PATCH waitlist entry → notified has the SAME shape")
+- `src/app/api/appointments/[id]/cancel/route.ts:174-194` — the direct-dispatch pattern mirrored
+- `src/lib/sms/sms-contracts.source.ts:281-284` — `waitlist_slot_available` slug contract (required: `service_name`, `appointment_date`; optional: `first_name`, `last_name`, `business_name`, `business_phone`)
+
+**Out of scope:**
+- Did NOT modify the `waitlist_slot_available` template (reused unchanged from Session 1.8 — Memory #2)
+- Did NOT touch the cancel-route fix from Session 1.8
+- Did NOT modify `fireWebhook` itself or the n8n receiver question
+- Did NOT change the PATCH endpoint's status-transition validation or any other code path
+
+**Memory #29 audit (THIRD sole-dispatch site search):** Searched for any additional `fireWebhook` sole-dispatch site during this session. Grep across `src/app/api` for `fireWebhook(` paired with no parallel `sendSms` in the same handler — **none found beyond the two now addressed**. The customer-facing silent-drop bug class is closed across both surfaces with this session. No Session 1.8.2 surfaced.
+
+**Related sessions:**
+- Independent — could ship anytime; ran in parallel with Sessions 1.1 and 1.5 (different file scope; no conflicts)
+- Forward-compatible with any future n8n receiver wiring (the `fireWebhook` call is retained alongside `sendSms`)
+
+**Linked prompt:** Session 1.8.1 prompt (operator-supplied in 2026-06-06 PST session)
+
+**Completion:** 2026-06-06 12:40 PDT — merged at `c2294d6b`. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings unchanged) / build clean / 181 test files / 2984 tests passing (was 2978; +6 new).
 
 ---
 
