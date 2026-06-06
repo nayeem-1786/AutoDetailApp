@@ -6,6 +6,70 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 1.2.1 — Admin PATCH `employee_id` permission symmetry: mirror POS `isReschedule` predicate (2026-06-06)
+
+Surgical production drift-fix closing the 5th drift in the admin/POS PATCH symmetry family. Phase 1 sub-session under `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1, added retroactively per the Document Maintenance Rule for "new session identified" — the drift was **surfaced** during Session 1.2 (at `412a404b`) as a Memory #29 finding but **deferred** from that session per its locked 4-drift scope. This session closes it.
+
+**The bug:** admin's `isReschedule` predicate at `src/app/api/appointments/[id]/route.ts:38-40` excluded `data.employee_id`, so an admin user without `appointments.reschedule` permission could still reassign a detailer (change `employee_id`) via this endpoint. POS PATCH's equivalent predicate at `/api/pos/appointments/[id]/route.ts:160-164` correctly includes `employee_id`; the POS in-source comment had even read *"mirrors admin route's grouping; employee_id is gated under reschedule like the POS reschedule endpoint"* — aspirational, since admin diverged in practice.
+
+**The fix (`src/app/api/appointments/[id]/route.ts`, +13 / -2; +1 prod-logic line + 12 doc-comment lines):**
+
+```diff
+-    // Permission check: reschedule requires appointments.reschedule
++    // Permission check: reschedule requires appointments.reschedule.
++    // Session 1.2.1 — Drift #5 fix (surfaced during Session 1.2 at `412a404b`
++    // as Memory #29 finding, deferred per that session's locked 4-drift scope).
++    // `employee_id` now gates under `appointments.reschedule` — mirrors POS
++    // PATCH at `/api/pos/appointments/[id]/route.ts:160-164` whose in-source
++    // comment had already promised this grouping ("mirrors admin route's
++    // grouping; employee_id is gated under reschedule") but admin diverged.
++    // Pre-fix, an admin user without reschedule permission could reassign a
++    // detailer via this endpoint; POS correctly blocked the same operation.
+     const isReschedule = data.scheduled_date !== undefined ||
+       data.scheduled_start_time !== undefined ||
+-      data.scheduled_end_time !== undefined;
++      data.scheduled_end_time !== undefined ||
++      data.employee_id !== undefined;
+```
+
+Memory #2 satisfied: mirror POS exactly. No new abstraction, no new gate name, no new permission key — `appointments.reschedule` is the same key POS already uses for the same axis.
+
+**Memory #11 verification:** the session brief cited admin `:38-40` and POS `:160-164`. Both confirmed at execution time — Sessions 1.2 + 1.5 shifted other parts of these files (POS cascade now at :377-383, admin cascade block now around :180; CHANGELOG entries from those sessions document the shifts) but the predicate line numbers held.
+
+**Memory #29 — targeted scope.** While reading the admin route file end-to-end, no other admin/POS predicate asymmetries were spotted. The `appointments.update_status` and `appointments.add_notes` gates are symmetric across both endpoints (admin lines 47-50 / 52-57; POS lines 165-168 / 193-220 in the relevant blocks — same key, same field set). **Drift #5 is now the last known permission-axis asymmetry between admin and POS PATCH on the appointment-edit surface.**
+
+**Tests (`src/app/api/appointments/[id]/__tests__/patch.test.ts`, +31 lines / +2 cases):**
+
+1. **Drift #5 denied:** `employee_id`-only change with `rescheduleDenied=true` → 403, zero appointment updates, zero `jobs` cascade fires, zero audit rows. Pre-fix this returned 200 with all side effects firing.
+2. **Drift #5 granted (regression guard):** `employee_id`-only change with `rescheduleDenied=false` → 200, cascade fires, audit fires. Closes the over-broad-gate door against an accidental "always reject" implementation.
+
+Both cases mount on the existing Session 1.5 + 1.2 mock state — `rescheduleDenied` flag was already wired by Session 1.5; this session reuses it. No mock extension required.
+
+**Verification gates (all green):**
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 baseline warnings (unchanged)
+- `npm run build` → clean
+- `npm test -- --run` → 183 test files / 3014 tests passing (was 3012 — +2 new cases)
+
+**Memory #8 status:** Tiny budget honored. 1 prod file (within "≤1"). +1 prod-logic line (the predicate addition; within "≤8"). +12 doc-comment lines for the in-source citation block — every drift fix in this Phase 1 family carries an in-source pointer to its surfacing source so future readers can trace the audit/symmetry trail without re-reading external docs.
+
+**What this session does NOT do:**
+- Does NOT touch any other permission predicate (update_status, add_notes, view_today, view_all)
+- Does NOT touch POS PATCH (already correct — reference only)
+- Does NOT touch cascade logic from Session 1.5
+- Does NOT touch any drift outside this specific asymmetry
+- Does NOT add a parity contract test for permission gates (broader Session 1.3 territory)
+
+**Unblocks:** Session 1.3 (parity contract test) — the permission-axis symmetry between admin and POS PATCH is now actually true across all three gates (reschedule, update_status, add_notes), so the contract test can assert per-field-group permission parity without conditional logic for the `employee_id` quirk.
+
+**Files touched:**
+- `src/app/api/appointments/[id]/route.ts` (MOD — extend `isReschedule` predicate)
+- `src/app/api/appointments/[id]/__tests__/patch.test.ts` (MOD — +2 cases)
+- `docs/CHANGELOG.md` (this entry)
+- `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (NEW Session 1.2.1 entry added to Phase 1 list with status `[x]` + merge hash + PST timestamp)
+
+---
+
 ## Session 1.2 — Admin/POS PATCH endpoint symmetry: jobs.assigned_staff_id cascade + employee_id audit log + normalization + adminFetch (2026-06-06)
 
 Surgical production drift-fix. Phase 1 entry in the locked `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.1 plan (Session 1.2 block). Closes parity audit `b346d34b` Target C Drifts #9, #10, #11, #15 (Session B scope). All four are unintentional drifts between admin PATCH and POS PATCH — mechanical mirroring of POS as canonical, no philosophy.
