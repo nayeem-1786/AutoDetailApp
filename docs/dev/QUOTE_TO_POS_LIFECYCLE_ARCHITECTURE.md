@@ -352,7 +352,7 @@ POS > Appointments tab is removed from POS bottom navigation. Existing routes re
 
 **Admin/POS PATCH symmetry:** Both endpoints share the loosened map. Admin's current permissiveness is corrected; the two converge per Phase 1.2.
 
-**Pre-task before execution:** Phase 0.1 audit verifies n8n receiver idempotency for `appointment_confirmed` and `appointment_completed` webhooks. If receiver is not idempotent, opening MEDIUM transitions (currently 8 per consequence map) requires source-side idempotency guards added before loosening proceeds. The 2 SAFE transitions are unaffected by the n8n question.
+**Pre-task before execution:** ~~Phase 0.1 audit verifies n8n receiver idempotency for `appointment_confirmed` and `appointment_completed` webhooks. If receiver is not idempotent, opening MEDIUM transitions (currently 8 per consequence map) requires source-side idempotency guards added before loosening proceeds.~~ **RESOLVED** by the Webhook Receivers Identity audit (`f5e714a8`, 2026-06-05): no n8n receiver exists in production — `business_settings.n8n_webhook_urls` is seeded with all-null values and no admin UI populates it; `fireWebhook` is silently no-op at `webhook.ts:40` for every event. **Customer-facing duplicate-SMS risk via the webhook chain cannot occur** because the chain terminates with no HTTP request. Session 1.5 (un-materialize cascade in PATCH for `confirmed → pending` + `in_progress → pending`) and the 8 MEDIUM transitions per the consequence map are UNBLOCKED for the webhook concern specifically. **Forward caveat:** if Smart Details ever wires a receiver, source-side idempotency tokens will need to be added across the 25 fire sites — but that is contingent on future receiver configuration, not Session 1.5's structural change. The 2 SAFE transitions remain unaffected by any of this.
 
 **Rationale:**
 - **Consequence map d3671c82 Target E:** explicit risk classification per transition (2 SAFE, 8 MEDIUM, 11 HIGH, 0 CRITICAL)
@@ -475,6 +475,7 @@ Customer-facing identifier across the lifecycle: **A-XXXX**. Customer sees Q-XXX
 - **Today vs Schedule conceptual (26521e5a):** `docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md` — forward-arrow seam; intentional non-overlap between scopes
 - **Manual amount + no_show audit (f73661b7):** `docs/dev/MANUAL_AMOUNT_AND_NO_SHOW_AUDIT.md` — Sale-tab edit silent drop; no_show Schedule exclusion
 - **Materialization lifecycle audit (2293fb3d):** `docs/dev/APPOINTMENT_TO_JOB_MATERIALIZATION_LIFECYCLE_AUDIT.md` — foundational lifecycle model; 6 stages; 4 invariants
+- **Webhook receivers identity audit (`f5e714a8`, post-Phase-0):** `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` — resolves Phase 0.1 Target E.3 BLOCKED verdict; finds no webhook receiver exists in production (`business_settings.n8n_webhook_urls` all-null since seed); 25 `fireWebhook` sites silently no-op; customer SMS is direct via `sendSms`, not webhook-mediated; **AC-5 / Session 1.5 UNBLOCKED**
 
 ### Critical architectural code sites
 
