@@ -418,11 +418,18 @@ POS > Appointments tab is removed from POS bottom navigation. Existing routes re
 - Appointment marked cancelled with reference to retained credit
 - Customer notified of cancellation + credit balance
 
-**Implementation TBD:** Phase 3 session. Customer credit infrastructure may not exist yet — see Phase 0 pre-task.
+**Implementation TBD:** Phase 3 session. Customer credit infrastructure does not exist — verified by refund/credit audit `3e633156`.
+
+**Verified current state (refund/credit audit `3e633156`, 2026-06-05):**
+- **Pathway A — PARTIALLY IMPLEMENTED:** the refund engine exists at `/api/pos/refunds` (756 lines, full `stripe.refunds.create` integration, partial-amount support, LIFO close-out resolution) but is **NOT WIRED to any cancel endpoint**. Operator does 3 manual steps today: cancel appointment → un-materialize (via Revert button) → navigate to POS > Transactions and click Issue Refund separately. The un-materialize cascade gap is also the AC-2.1 orphan-gap. Cancel SMS template carries no refund-confirmation chip.
+- **Pathway B — ESSENTIALLY UNIMPLEMENTED at the schema level:** no `customer_credits` table, no `customers.credit_balance` column. The only "credit" is `transactions.deposit_credit` (per-transaction memo applied only at SAME-appointment close-out via `appointments.deposit_amount`). No cross-appointment transfer mechanism. Operator's stated "deposit-retained-as-credit" workflow works only when they EDIT the same appointment rather than truly cancelling it.
+- **Cancellation fee — DECORATIVE ONLY:** `appointments.cancellation_fee` column persisted by admin cancel (feature-flag + permission gated) but operator-typed per cancel (NO `$50` default, NO global config, NO `FEE_AMOUNT` constant — verified). NO code path reads it later to compute refund or deduct from deposit. The fee's pathway (A subtype / B subtype / its own Pathway C / reporting-only) is unresolved in the locked AC-9 text and surfaced as decision F.5 in the audit.
+- **Customer self-cancel within 24h window** does NOT auto-refund — status-flip only.
 
 **Rationale:**
 - **Operator input:** *"how do we handle partial payments for this scenario?"* — flagged as concern requiring design
 - **Architectural:** preserves the principle that money decisions are operator-explicit, not buried in cancel logic
+- **Audit-verified:** refund/credit audit `3e633156` confirmed components exist for Pathway A but require orchestration; Pathway B requires net-new `customer_credits` table + cancel-issue + checkout-apply logic + UI affordance + SMS chip. Six open operator decisions (F.1–F.6) await resolution before Phase 3 detailing.
 
 ---
 
@@ -476,6 +483,7 @@ Customer-facing identifier across the lifecycle: **A-XXXX**. Customer sees Q-XXX
 - **Manual amount + no_show audit (f73661b7):** `docs/dev/MANUAL_AMOUNT_AND_NO_SHOW_AUDIT.md` — Sale-tab edit silent drop; no_show Schedule exclusion
 - **Materialization lifecycle audit (2293fb3d):** `docs/dev/APPOINTMENT_TO_JOB_MATERIALIZATION_LIFECYCLE_AUDIT.md` — foundational lifecycle model; 6 stages; 4 invariants
 - **Webhook receivers identity audit (`f5e714a8`, post-Phase-0):** `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` — resolves Phase 0.1 Target E.3 BLOCKED verdict; finds no webhook receiver exists in production (`business_settings.n8n_webhook_urls` all-null since seed); 25 `fireWebhook` sites silently no-op; customer SMS is direct via `sendSms`, not webhook-mediated; **AC-5 / Session 1.5 UNBLOCKED**
+- **Refund / credit / cancellation-fee audit (`3e633156`, post-Phase-0):** `docs/dev/REFUND_CREDIT_CANCELLATION_FEE_AUDIT.md` — informs AC-9 implementation scoping; 4 cancel endpoints inventoried, NONE invoke refund/credit/fee-deduction; refund engine (`/api/pos/refunds`, 756 lines) exists in isolation but NOT wired to cancel; **`customer_credits` table DOES NOT EXIST** — Pathway B is unimplemented at the schema level; `cancellation_fee` column is decorative (no money-movement reader); 6 open operator decisions (F.1–F.6) including fee semantics (Pathway A subtype / B subtype / Pathway C)
 
 ### Critical architectural code sites
 
