@@ -1,9 +1,11 @@
 # Quote → POS Lifecycle Architecture
 
-**Version:** 1.0
-**Locked:** 2026-06-04 10:30 PST
+**Version:** 1.1
+**Locked:** 2026-06-04 10:30 PST (v1.0); 2026-06-05 21:30 PST (v1.1)
 **Status:** LIVING — updated session-by-session
 **Scope:** POS lifecycle architecture (Quote → Appointment → Job → POS Transaction)
+
+**v1.1 captures the comprehensive operator decision-lock session of 2026-06-05, executed after all four Phase 0 foundational audits (0.1–0.4) and two targeted post-Phase-0 audits (webhook receivers identity, refund/credit/cancellation-fee) completed and merged. New ACs added: AC-12 through AC-15. ACs already refined in v1.0.x line via audit completions: AC-5 (pre-task RESOLVED by webhook receivers audit), AC-9 (verified implementation scope per refund audit). New Phase 1 session added: Session 1.8 (waitlist silent-drop fix). Phased Plan Overview status table updated to reflect Phase 0 completion. All six audit deliverables linked from Reference Index.**
 
 ---
 
@@ -418,12 +420,12 @@ POS > Appointments tab is removed from POS bottom navigation. Existing routes re
 - Appointment marked cancelled with reference to retained credit
 - Customer notified of cancellation + credit balance
 
-**Implementation TBD:** Phase 3 session. Customer credit infrastructure does not exist — verified by refund/credit audit `3e633156`.
+**Implementation TBD:** Phase 3 session. Customer credit infrastructure does not exist — verified by refund/credit audit `3e633156`. See [AC-14](#ac-14-cancellation-fee-policy) for the cancellation fee policy locked in v1.1 and [AC-15](#ac-15-customer-credit-infrastructure) for the credit infrastructure build-from-scratch commitment locked in v1.1.
 
 **Verified current state (refund/credit audit `3e633156`, 2026-06-05):**
 - **Pathway A — PARTIALLY IMPLEMENTED:** the refund engine exists at `/api/pos/refunds` (756 lines, full `stripe.refunds.create` integration, partial-amount support, LIFO close-out resolution) but is **NOT WIRED to any cancel endpoint**. Operator does 3 manual steps today: cancel appointment → un-materialize (via Revert button) → navigate to POS > Transactions and click Issue Refund separately. The un-materialize cascade gap is also the AC-2.1 orphan-gap. Cancel SMS template carries no refund-confirmation chip.
-- **Pathway B — ESSENTIALLY UNIMPLEMENTED at the schema level:** no `customer_credits` table, no `customers.credit_balance` column. The only "credit" is `transactions.deposit_credit` (per-transaction memo applied only at SAME-appointment close-out via `appointments.deposit_amount`). No cross-appointment transfer mechanism. Operator's stated "deposit-retained-as-credit" workflow works only when they EDIT the same appointment rather than truly cancelling it.
-- **Cancellation fee — DECORATIVE ONLY:** `appointments.cancellation_fee` column persisted by admin cancel (feature-flag + permission gated) but operator-typed per cancel (NO `$50` default, NO global config, NO `FEE_AMOUNT` constant — verified). NO code path reads it later to compute refund or deduct from deposit. The fee's pathway (A subtype / B subtype / its own Pathway C / reporting-only) is unresolved in the locked AC-9 text and surfaced as decision F.5 in the audit.
+- **Pathway B — ESSENTIALLY UNIMPLEMENTED at the schema level:** no `customer_credits` table, no `customers.credit_balance` column. The only "credit" is `transactions.deposit_credit` (per-transaction memo applied only at SAME-appointment close-out via `appointments.deposit_amount`). No cross-appointment transfer mechanism. Operator's stated "deposit-retained-as-credit" workflow works only when they EDIT the same appointment rather than truly cancelling it. **Closed by [AC-15](#ac-15-customer-credit-infrastructure) (v1.1).**
+- **Cancellation fee — DECORATIVE ONLY:** `appointments.cancellation_fee` column persisted by admin cancel (feature-flag + permission gated) but operator-typed per cancel (NO `$50` default, NO global config, NO `FEE_AMOUNT` constant — verified). NO code path reads it later to compute refund or deduct from deposit. ~~The fee's pathway (A subtype / B subtype / its own Pathway C / reporting-only) is unresolved in the locked AC-9 text and surfaced as decision F.5 in the audit.~~ **Resolved by [AC-14](#ac-14-cancellation-fee-policy) (v1.1):** fee belongs to Pathway A by default; toggleable per cancel; default $50 in `business_settings`.
 - **Customer self-cancel within 24h window** does NOT auto-refund — status-flip only.
 
 **Rationale:**
@@ -471,6 +473,99 @@ Customer-facing identifier across the lifecycle: **A-XXXX**. Customer sees Q-XXX
 
 ---
 
+### AC-12: Customer-accept auto-conversion to pending appointment with SLA alerting
+
+**Commitment:** When a customer clicks "Accept" on a quote (via SMS/email link → `POST /api/quotes/[id]/accept`), the system automatically creates an appointment row at `status='pending'` and writes `quotes.status='converted'` + `quotes.converted_appointment_id=<new appointment id>`. Lifecycle engine adds an SLA rule: if a pending appointment originating from quote-accept has no staff confirmation (status not advanced beyond `pending`) within a configurable threshold (initial value: 4 business hours), alert operator via SMS/notification.
+
+**Current state (per Phase 0.2 audit `dcf511df` F.8):** customer accept sets `quotes.status='accepted'` and notifies staff via *"Our team will reach out shortly to schedule"* (literal copy at `src/app/api/quotes/[id]/accept/route.ts:97`/`:101`). **No appointment row is created.** Customer momentum is preserved only by manual operator follow-up; if staff misses the notification the conversion drops silently.
+
+**Implementation scope (Phase 3):**
+- Extend `POST /api/quotes/[id]/accept` to invoke `convertQuote` (per `src/lib/quotes/convert-service.ts:31-243`) with `{ appointmentStatus: 'pending', channel: 'customer_accept' }` after the status update at `:64-70`
+- Adopt a placeholder `scheduled_date` strategy at convert time (operator decision F.6 in Phase 0.2 audit applies — TBD: same-day, next-business-day, or NULL until operator schedules)
+- Add SLA rule to lifecycle engine: query `appointments WHERE channel='customer_accept' AND status='pending' AND created_at < NOW() - INTERVAL '4 hours'`; fire `staff_sla_alert` template
+- New `channel` enum value: `customer_accept` (or reuse existing — TBD at planning)
+
+**Rationale:**
+- **Operator input (2026-06-05 decision-locking session):** customer-accept staying manual creates a frictionless gap; auto-conversion preserves customer momentum while SLA alerting prevents dropped conversions.
+- **Audit finding (Phase 0.2 audit `dcf511df` F.8):** identified the current silent customer-accept behavior as a real product gap.
+- **Codebase fact:** `convertQuote` already accepts the `appointmentStatus: 'pending'` override path (`convert-service.ts:24-29`); no new architecture needed at the conversion layer.
+
+---
+
+### AC-13: Mobile Phase 4 minimum-scope path
+
+**Commitment:** Phase 4 implements the minimum-scope path identified in Phase 0.4. Specifically:
+
+- Mobile detailer uses personal device with same PIN auth (no separate mobile app)
+- IP whitelist policy: **disabled for `/pos/*` routes**; admin routes remain whitelisted
+- Same job-detail UI; no mobile-specific variant
+- Mobile checkout via payment link only (Stripe Terminal remains LAN-locked)
+- Start Intake fires from detailer's phone at customer site (Pattern B from Phase 0.4 Target E.1)
+
+**Explicitly deferred (NOT in initial Phase 4):**
+- Job-specific access tokens
+- Dispatch-state enum or assignment workflow
+- Photo bandwidth optimization
+- Biometric / separate auth path
+
+If real-world Phase 4 usage surfaces friction (dispatch coordination problems, photo upload latency, security incidents), revisit the deferred items as separate refinement sessions.
+
+**Rationale:**
+- **Audit finding (Phase 0.4 audit `e10e23a5`):** near-zero infrastructure exists for mobile detailers but most architecture incidentally works — PWA manifest scoped to `/pos`, camera capture already wired (`src/app/pos/jobs/components/photo-uploader.tsx`), offline cash queue already implemented.
+- **Operator input (2026-06-05 decision-locking session):** *"Lock in the minimum scope path, we can expand later."*
+- **Architectural principle:** avoids speculative scope; observation-driven refinement.
+
+---
+
+### AC-14: Cancellation fee policy
+
+**Commitment:**
+
+- **Default cancellation fee value** stored in `business_settings` (initial value: **$50**)
+- **Per-appointment override** available to admin/operator at cancel time via the existing `appointments.cancellation_fee` column
+- **Fee deduction is operator-toggleable per cancel** (default ON; operator can waive at cancel-time UI)
+- **Cancellation fee semantically belongs to Pathway A (Cancel & Refund):** `refund_amount = paid_amount - fee`
+- **Pathway B (Cancel & Retain credit) does not typically apply a fee** — customer is staying, so retention waives the fee by default (operator may toggle on for edge cases)
+- **Refund UI shows breakdown** before confirm: `Paid: $X | Fee: $Y | Refund: $Z`
+
+**Current state (per refund/credit/cancellation-fee audit `3e633156`):** `appointments.cancellation_fee` column is **decorative**. The admin cancel endpoint persists the operator-typed value but no code path reads it later to apply against refund amount. There is NO `$50` default, NO global config setting, NO `FEE_AMOUNT` constant — verified by the audit.
+
+**Implementation scope (Phase 3):**
+- New `business_settings` row `cancellation_fee_default_amount` (numeric, default $50)
+- Cancel-endpoint payload extension: `apply_fee?: boolean` (defaults to true), `fee_amount?: number` (defaults to setting)
+- Orchestration in cancel endpoint: when `payment_status IN ('partial', 'paid')` AND `apply_fee=true`, compute `refund_amount = paid_amount - fee_amount` and pass to refund engine
+- Cancel SMS template: add `cancellation_fee_amount` chip to existing `appointment_cancelled` template; render conditionally per `apply_fee`
+- Cancel dialog UI: surface "Apply cancellation fee" toggle + show breakdown preview
+
+**Rationale:**
+- **Audit finding (`3e633156`):** `appointments.cancellation_fee` exists but is decorative (gap #3 in the inventory; surfaced as decision F.5 in the audit).
+- **Operator input (2026-06-05 decision-locking session):** fixed default with per-appointment override; operator-toggleable; breakdown shown.
+- **Architectural cleanliness:** keeps fee policy in `business_settings` (consistent with deposit_default_amount, quote_validity_days), avoids per-call magic numbers.
+
+---
+
+### AC-15: Customer credit infrastructure
+
+**Commitment:** Customer credit system is Phase 3 build-from-scratch work. The current operator workflow ("deposit retained as credit, applied to new ticket") works only because the operator edits the SAME appointment rather than truly cancelling it — that's a workaround, not a credit system. Phase 3 closes this gap with real infrastructure:
+
+**Architectural shape (locked; schema details decided at implementation):**
+
+- New table: `customer_credits` (or equivalent) with columns including `id`, `customer_id`, `amount_cents`, `source_appointment_id` (FK to the cancelled appointment), `created_at`, `applied_to_transaction_id` (nullable), `applied_at` (nullable), `notes`
+- **Credit-creation logic** at cancel-time (Pathway B): when operator chooses "Cancel & Retain credit," compute credit amount from `paid_amount - cancellation_fee` (fee waived by default per AC-14), write `customer_credits` row, mark cancellation reason with credit reference, notify customer with credit balance
+- **Credit-application logic** at new-ticket checkout: query open credits for customer at POS register-tab load; allow operator to apply as discount line item; on apply, mark `applied_to_transaction_id` + `applied_at`
+- **Operator UI affordances:** Admin > Customer > Credits tab showing balance + history; POS register Apply Credit affordance during checkout
+- **Manual credit adjustments:** admin-only UI to add or revoke credit (audit-logged)
+- **Expiration policy DEFERRED to refinement** after basic system ships — initial implementation treats credits as non-expiring
+
+**Current state (per refund/credit/cancellation-fee audit `3e633156`):** customer-level credit infrastructure DOES NOT EXIST. No `customer_credits` table; no `customers.credit_balance` column. The only "credit" primitive is `transactions.deposit_credit` (per-transaction memo applied only at SAME-appointment close-out via `appointments.deposit_amount`). No cross-appointment transfer mechanism. Operator's stated "deposit-retained-as-credit" workflow works only when they EDIT the same appointment rather than truly cancelling it.
+
+**Rationale:**
+- **Audit finding (`3e633156`):** customer-level credit infrastructure does not exist; Pathway B is unimplemented at the schema level.
+- **Operator input (2026-06-05 decision-locking session):** *"lock the architectural shape now; expiration policy refinement after basic system ships."*
+- **Closes a real architectural gap** — Pathway B was committed in AC-9 (v1.0) but has no schema underpinning today.
+
+---
+
 ## Reference Index
 
 ### Primary audit documents (evidence base)
@@ -482,6 +577,10 @@ Customer-facing identifier across the lifecycle: **A-XXXX**. Customer sees Q-XXX
 - **Today vs Schedule conceptual (26521e5a):** `docs/dev/TODAY_VS_SCHEDULE_CONCEPTUAL_AUDIT.md` — forward-arrow seam; intentional non-overlap between scopes
 - **Manual amount + no_show audit (f73661b7):** `docs/dev/MANUAL_AMOUNT_AND_NO_SHOW_AUDIT.md` — Sale-tab edit silent drop; no_show Schedule exclusion
 - **Materialization lifecycle audit (2293fb3d):** `docs/dev/APPOINTMENT_TO_JOB_MATERIALIZATION_LIFECYCLE_AUDIT.md` — foundational lifecycle model; 6 stages; 4 invariants
+- **SMS / Phone agent booking flow audit (Phase 0.1, `69b15b0f`):** `docs/dev/SMS_PHONE_AGENT_BOOKING_FLOW_AUDIT.md` — 4 production booking paths (not 3); voice-agent + SMS-AI-v2 share the same 13-tool surface at `/api/voice-agent/*`; both hardcode `'pending'` at `voice-agent/appointments/route.ts:516`/`:290`; zero payment infrastructure on agent paths; informs AC-11 enforcement scope; 6 open operator decisions (F.1–F.6); Memory #30 boundary verified clean
+- **Quote → Appointment conversion audit (Phase 0.2, `dcf511df`):** `docs/dev/QUOTE_TO_APPOINTMENT_CONVERSION_AUDIT.md` — 6 wired conversion paths route through 2 architectural seams (canonical `convertQuote()` + walk-in atomic-create); 8 dimensions of seam divergence; customer accept does NOT auto-create appointment (informs AC-12); `convertQuote` fires `appointment_confirmed` unconditionally (fixed by Session 1.7 `f87aca58`); 8 open operator decisions (F.1–F.8)
+- **Populate dependencies audit (Phase 0.3, `98a5f30d`):** `docs/dev/POPULATE_DEPENDENCIES_AUDIT.md` — `populate` is the lazy materialization trigger today; informs AC-3 (Start Intake redesign) migration scope; identifies what currently depends on pre-materialized today's jobs vs what can read from `appointments` directly
+- **Mobile detailer access audit (Phase 0.4, `e10e23a5`):** `docs/dev/MOBILE_DETAILER_ACCESS_AUDIT.md` — near-zero infrastructure exists; most architecture incidentally works (PWA scoped to `/pos`, camera capture, offline cash queue); identifies minimum-scope path locked as [AC-13](#ac-13-mobile-phase-4-minimum-scope-path)
 - **Webhook receivers identity audit (`f5e714a8`, post-Phase-0):** `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` — resolves Phase 0.1 Target E.3 BLOCKED verdict; finds no webhook receiver exists in production (`business_settings.n8n_webhook_urls` all-null since seed); 25 `fireWebhook` sites silently no-op; customer SMS is direct via `sendSms`, not webhook-mediated; **AC-5 / Session 1.5 UNBLOCKED**
 - **Refund / credit / cancellation-fee audit (`3e633156`, post-Phase-0):** `docs/dev/REFUND_CREDIT_CANCELLATION_FEE_AUDIT.md` — informs AC-9 implementation scoping; 4 cancel endpoints inventoried, NONE invoke refund/credit/fee-deduction; refund engine (`/api/pos/refunds`, 756 lines) exists in isolation but NOT wired to cancel; **`customer_credits` table DOES NOT EXIST** — Pathway B is unimplemented at the schema level; `cancellation_fee` column is decorative (no money-movement reader); 6 open operator decisions (F.1–F.6) including fee semantics (Pathway A subtype / B subtype / Pathway C)
 
@@ -542,13 +641,13 @@ Customer-facing identifier across the lifecycle: **A-XXXX**. Customer sees Q-XXX
 
 | Phase | Theme | Pre-task | Status |
 |---|---|---|---|
-| **Phase 0** | Foundational audits | None — audits run first | `[ ]` Not started |
-| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement) | None — philosophy-independent | `[ ]` Not started |
-| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started |
-| **Phase 3** | Cross-cutting (pending/confirmed semantic, unified ticket number, Quote→Appointment formalized, cancel-with-payment) | Phase 0.1 + 0.2 audits complete | `[ ]` Not started |
-| **Phase 4** | Mobile detailer architecture | Phase 0.4 audit complete | `[ ]` Not started |
+| **Phase 0** | Foundational audits (0.1–0.4) + 2 targeted post-Phase-0 audits (webhook receivers, refund/credit/cancellation-fee) | None — audits run first | `[x]` **Complete** (all 4 Phase 0 audits + 2 targeted audits merged 2026-06-05) |
+| **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 waitlist silent-drop) | None — philosophy-independent | `[~]` In progress — Session 1.7 complete (`f87aca58`); Sessions 1.1–1.6 + 1.8 not started |
+| **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters) | Phase 0.3 + 0.1 audits complete | `[ ]` Not started — **ready to detail** (Phase 0.3 audit informed) |
+| **Phase 3** | Cross-cutting (pending/confirmed semantic [AC-11], unified ticket number [AC-10], Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 audits + refund/credit audit complete | `[ ]` Not started — **ready to detail** (Phase 0.1, 0.2, refund audits informed) |
+| **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
-**Phases 1 can ship in parallel with Phase 0 audits running.** Phases 2-4 are gated on Phase 0 completion.
+**Phase 1 ships in parallel with all other work.** Phases 2–4 are now unblocked for detailing.
 
 ---
 
@@ -903,7 +1002,8 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 - Uses existing `executeUnMaterialize` infrastructure — no new architecture, just wiring
 
 **Pre-tasks:**
-- `[ ]` Phase 0.1 audit complete (verifies n8n receiver idempotency — relevant for `appointment_confirmed` webhook re-fire if customer goes pending → confirmed → pending → confirmed)
+- `[x]` Phase 0.1 audit complete (`69b15b0f`, 2026-06-05) — surfaced the BLOCKED verdict
+- `[x]` Webhook receivers identity audit complete (`f5e714a8`, 2026-06-05) — **UNBLOCKED** per [AC-5](#ac-5-state-machine-loosening-2-safe-2-with-cascade) pre-task resolution. No n8n receiver exists; `fireWebhook` is silently no-op; duplicate-customer-SMS via webhook chain cannot occur. Session 1.5 may proceed without source-side idempotency work for the webhook concern specifically.
 - `[ ]` Verify Session 1.4 merged (state machine loosening pattern in place)
 
 **Primary files:**
@@ -918,7 +1018,7 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 **Related sessions:**
 - Depends on: Session 1.4 (state machine loosening pattern)
-- Depends on: Phase 0.1 audit (n8n idempotency check)
+- ~~Depends on: Phase 0.1 audit (n8n idempotency check)~~ — **resolved** by webhook receivers identity audit (`f5e714a8`); no receiver exists, idempotency is vacuous
 
 **Linked prompt:** TBD
 
@@ -1022,6 +1122,53 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 ---
 
+### Session 1.8 — Waitlist notification silent-drop fix
+
+**Status:** `[ ]` Not started
+**Source:** Webhook receivers identity audit (`f5e714a8`, post-Phase-0) — Target D.4 surfaced finding
+**Estimated scope:** ~10-20 prod lines / 2 files / +3-5 tests
+**Memory #8 budget:** Tiny
+
+**Issue:** `src/app/api/appointments/[id]/cancel/route.ts:147-158` is the ONLY location in the codebase where `fireWebhook` is the SOLE dispatch channel for a customer-facing notification (no parallel `sendSms`). The in-source comment at `:147` literally says *"Webhook for n8n to handle actual SMS sending"*. The webhook fires `fireWebhook('appointment_cancelled', { …, waitlist_notified: […] })` — **piggybacked on the `appointment_cancelled` event with a `waitlist_notified` array payload**. With no n8n receiver wired (per audit `f5e714a8`), waitlisted customers are marked `notified` in the DB (`waitlist_entries.status='notified'`, `notified_at=now()` at `:140-145`) but **receive no SMS**. Customer-facing silent-drop bug.
+
+**Solution:** Replace the dead webhook with direct `sendSms` calls to each waitlisted customer:
+1. After the `waitlist_entries` UPDATE at `:140-145`, iterate the `waitlistMatches` array and dispatch SMS per customer
+2. Use a new or existing `waitlist_slot_available` SMS template (verify `src/lib/sms/generated-contracts.ts` for an existing template; add via the canonical migration + `scripts/regen-sms-contracts.ts` workflow per CLAUDE.md Rule 9 if not present)
+3. Mirror the direct-dispatch pattern from `POST /api/pos/jobs/[id]/complete` `sendCompletionNotifications` (`:243-262`) — `renderSmsTemplate(slug, vars, fallback)` + `sendSms(phone, body, { logToConversation: true, customerId, notificationType: 'waitlist_slot_available', contextId: appointment.id })`
+4. Keep the existing `fireWebhook('appointment_cancelled', { waitlist_notified: … })` call as-is (it costs nothing in current state and remains correct semantics if a receiver is ever wired) OR delete it as cleanup — operator decision
+
+**Why:**
+- Closes a customer-facing silent-drop bug. Waitlist functionality currently appears to work from the operator perspective (`waitlist_entries.status='notified'`) but customers never receive the SMS.
+- The fix is small, mirrors an existing pattern, and is independent of Sessions 1.1–1.6 or 1.7.
+
+**Pre-tasks:**
+- `[x]` Webhook receivers identity audit complete (`f5e714a8`, 2026-06-05) — surfaces the gap
+- `[ ]` Verify whether a `waitlist_slot_available` SMS template exists in `src/lib/sms/generated-contracts.ts`; if not, add via migration + `npx tsx scripts/regen-sms-contracts.ts` per CLAUDE.md Rule 9
+
+**Primary files:**
+- `src/app/api/appointments/[id]/cancel/route.ts:140-159` (replace webhook-only dispatch with direct `sendSms` loop)
+- `src/lib/sms/sms-contracts.source.ts` + migration (if new template needed)
+- `src/app/api/appointments/[id]/cancel/__tests__/route.test.ts` (or new file) — verify SMS dispatch on each `waitlistMatch`
+
+**Evidence citations:**
+- Webhook receivers identity audit `f5e714a8`: Target D.4 — *"only case where the webhook fire is the SOLE dispatch channel for a customer-facing message"*
+- `src/app/api/appointments/[id]/cancel/route.ts:147-158` — the dead-webhook block
+- `src/app/api/pos/jobs/[id]/complete/route.ts:243-262` — the direct-dispatch pattern to mirror
+
+**Out of scope:**
+- Does NOT modify `fireWebhook` itself or the n8n receiver question (that's a separate architectural decision per [AC-5](#ac-5-state-machine-loosening-2-safe-2-with-cascade) forward caveat)
+- Does NOT change waitlist eligibility logic or the matching query at `route.ts:131-136`
+
+**Related sessions:**
+- Independent — can ship anytime
+- Forward-compatible with any future n8n receiver wiring
+
+**Linked prompt:** TBD
+
+**Completion:** TBD
+
+---
+
 ## Phase 2 — Lifecycle Architecture (STUB)
 
 **Pre-task:** Phase 0.3 audit must complete before this phase can be detailed.
@@ -1086,6 +1233,37 @@ Phase 0-1 plans detailed; Phases 2-4 stubbed.
 
 ---
 
+### 2026-06-05 21:30 PST — Comprehensive decision-lock session (v1.1)
+
+Following completion of all four Phase 0 audits (0.1 through 0.4) plus two targeted post-Phase-0 audits (webhook receivers identity, refund/credit/cancellation-fee), operator locked the next-phase architectural commitments. Document bumped from v1.0 to v1.1.
+
+**New architectural commitments added:**
+- **AC-12:** Customer-accept auto-conversion to pending appointment with SLA alerting (informs Phase 3; addresses Phase 0.2 audit F.8)
+- **AC-13:** Mobile Phase 4 minimum-scope path (locks Phase 4 detailing scope; per Phase 0.4 audit)
+- **AC-14:** Cancellation fee policy — default in `business_settings`, per-appointment override, operator-toggleable, semantically Pathway-A (per refund audit `3e633156` F.5)
+- **AC-15:** Customer credit infrastructure — `customer_credits` table greenfield, create-at-cancel + apply-at-checkout + admin visibility, expiration policy deferred (closes refund audit's schema-level Pathway B gap)
+
+**ACs refined by audit completion (already merged in pre-v1.1 doc updates):**
+- **AC-5:** Pre-task on n8n receiver idempotency RESOLVED — webhook receivers identity audit (`f5e714a8`) verified no receiver exists; `fireWebhook` is silently no-op; Session 1.5 UNBLOCKED for the webhook concern specifically (forward caveat preserved)
+- **AC-9:** Implementation scope verified — refund/credit/cancellation-fee audit (`3e633156`) confirmed Pathway A is partially implemented (refund engine exists in isolation, NOT orchestrated with cancel endpoints) and Pathway B is essentially unimplemented at the schema level (no `customer_credits`); cross-references to AC-14 (fee policy) + AC-15 (credit infrastructure) added
+
+**New Phase 1 session added:**
+- **Session 1.8:** Waitlist notification silent-drop fix — replaces dead `fireWebhook('appointment_cancelled', { waitlist_notified: … })` with direct `sendSms` loop; surfaced by webhook receivers identity audit Target D.4
+
+**Reference Index** linked all 6 audit deliverables (4 Phase 0 + 2 targeted post-Phase-0). **Phased Plan Overview** status table updated: Phase 0 → `[x]` complete; Phase 1 → `[~]` in progress (Session 1.7 done); Phases 2–4 → `[ ]` ready to detail.
+
+**Critical findings from audits informing the v1.1 locks:**
+- Webhook system has no receiver in production — `business_settings.n8n_webhook_urls` seeded with all-null values across 2 migrations; no admin UI populates it; 25 `fireWebhook` sites silently no-op. Session 1.7's conditional gate fix (`f87aca58`) was correct discipline but did not produce customer-visible change in current state.
+- **Waitlist notifications are the ONLY case** where `fireWebhook` is the SOLE dispatch channel — real customer-facing silent-drop bug (addressed by Session 1.8).
+- Customer credit infrastructure does not exist — operator's stated "credit retained" workflow is an edit-same-row workaround that does not survive a true cancel (AC-15 closes the schema gap).
+- `appointments.cancellation_fee` column exists but is decorative — no code path reads it to apply against refund (AC-14 closes the orchestration gap).
+- AC-5's pre-task on webhook idempotency was vacuous — no receiver to be non-idempotent (Session 1.5 UNBLOCKED).
+- Customer-facing "end job" SMS uses direct `sendSms` from `POST /api/pos/jobs/[id]/complete:243-262` — not webhook-mediated — so the operator-described flow works correctly in current production state.
+
+**Forward caveat:** if Smart Details ever wires a webhook receiver (n8n or otherwise), source-side idempotency tokens must be added across the 25 `fireWebhook` sites. This is contingent future work, not Phase 1–4 scope.
+
+---
+
 ## Document Maintenance Rules
 
 ### Update triggers
@@ -1140,6 +1318,6 @@ This document remains LIVING until all four phases are complete. After Phase 4 c
 
 ---
 
-**END OF DOCUMENT v1.0**
+**END OF DOCUMENT v1.1**
 
 *Next action: operator review. Once locked, Phase 0 audits can be drafted and fired. Phase 1 sessions can ship in parallel with Phase 0 audits running.*
