@@ -5,9 +5,10 @@ import { checkPosPermission } from '@/lib/pos/check-permission';
 import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15, getTodayPst } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
-import { logAudit, getRequestIp } from '@/lib/services/audit';
+import { getRequestIp } from '@/lib/services/audit';
 import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
 import { generateAppointmentNumber } from '@/lib/utils/appointment-number';
+import { materializeJobFromAppointment } from '@/lib/appointments/lifecycle-sync';
 import type { PosUnstartedAppointment } from '@/app/pos/jobs/components/schedule-types';
 
 /**
@@ -603,67 +604,77 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Append mobile entry to the services JSONB snapshot so POS ticket UI
-    // (which reads jobs.services) renders the mobile line alongside services.
-    // The id=null + is_mobile_fee flag distinguishes it from real catalog rows.
-    const jobServicesSnapshot = isMobile && mobileSurcharge > 0
-      ? [
-          ...services,
-          {
-            id: null,
-            name: mobileZoneNameSnapshot || 'Mobile Service Fee',
-            price: mobileSurcharge,
-            is_mobile_fee: true,
-          } as JobServiceSnapshot,
-        ]
-      : services;
+    // Session 2.1.1 (Memory #29 closure) — route the walk-in's job-creation
+    // step through the shared `materializeJobFromAppointment` helper rather
+    // than the inline jobs.insert(...) + logAudit(...) pair that lived here
+    // pre-2.1.1. `trigger: 'walk_in'` differentiates the initial job state
+    // (status='scheduled', NULL work_started_at/intake_started_at) from
+    // Start Intake's. The helper appends the mobile-fee entry from the
+    // appointment row (uniform behavior across both triggers); walk-in
+    // passes the base services snapshot via `servicesSnapshot` to bypass the
+    // appointment_services + services join (we already have the rows in
+    // memory from the request body). Gates pass naturally: the just-INSERTed
+    // appointment is on today's date (future-date gate) and in 'in_progress'
+    // state (status gate). Audit is emitted inside the helper with
+    // trigger='walk_in' + customer_id + services_count in details.
+    const materializeResult = await materializeJobFromAppointment(
+      supabase,
+      appointment.id,
+      {
+        trigger: 'walk_in',
+        actor: {
+          userId: posEmployee.auth_user_id,
+          userEmail: posEmployee.email,
+          employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+          employeeId: posEmployee.employee_id,
+        },
+        source: 'pos',
+        ipAddress: getRequestIp(request),
+        quoteId: quote_id || null,
+        intakeNotes: notes || null,
+        estimatedPickupAtOverride: pickupAt,
+        servicesSnapshot: services,
+      }
+    );
 
-    const { data: job, error } = await supabase
+    if (!materializeResult.ok || !materializeResult.jobId) {
+      // Roll back the synthetic appointment to avoid orphans.
+      // ON DELETE CASCADE on appointment_services.appointment_id cleans the
+      // join rows the appointment_services INSERT above committed.
+      console.error(
+        'Walk-in job materialize failed:',
+        materializeResult.error
+      );
+      await supabase.from('appointments').delete().eq('id', appointment.id);
+      return NextResponse.json(
+        { error: 'Failed to create job' },
+        { status: materializeResult.httpStatus }
+      );
+    }
+
+    // The helper returns only the new job id — fetch the row with the joins
+    // the POS client expects in the create-response shape (customer,
+    // vehicle, assigned_staff). A failure here leaves the job intact (no
+    // rollback): the row is fully consistent in the DB; only the
+    // response-shape SELECT failed. Client retries the list endpoint.
+    const { data: job, error: jobFetchErr } = await supabase
       .from('jobs')
-      .insert({
-        customer_id,
-        vehicle_id: vehicle_id || null,
-        assigned_staff_id: assignedStaffId,
-        appointment_id: appointment.id,
-        services: jobServicesSnapshot,
-        status: 'scheduled',
-        estimated_pickup_at: pickupAt,
-        created_by: posEmployee.employee_id,
-        quote_id: quote_id || null,
-        intake_notes: notes || null,
-      })
       .select(`
         *,
         customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),
         vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
         assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name)
       `)
+      .eq('id', materializeResult.jobId)
       .single();
 
-    if (error) {
-      console.error('Job create error:', error);
-      // Roll back the synthetic appointment to avoid orphans.
-      // ON DELETE CASCADE on appointment_services.appointment_id cleans the join rows.
-      await supabase.from('appointments').delete().eq('id', appointment.id);
-      return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
+    if (jobFetchErr || !job) {
+      console.error('Walk-in job response fetch failed:', jobFetchErr);
+      return NextResponse.json(
+        { error: 'Failed to fetch job after create' },
+        { status: 500 }
+      );
     }
-
-    const customerName = job.customer
-      ? `Job for ${job.customer.first_name} ${job.customer.last_name}`
-      : `Job #${job.id.slice(0, 8)}`;
-
-    logAudit({
-      userId: posEmployee.auth_user_id,
-      userEmail: posEmployee.email,
-      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
-      action: 'create',
-      entityType: 'job',
-      entityId: job.id,
-      entityLabel: customerName,
-      details: { services_count: services.length, customer_id },
-      ipAddress: getRequestIp(request),
-      source: 'pos',
-    });
 
     // Phase Mobile-1.1: compute save-to-customer action.
     // Returns null when mobile is off / no customer / empty address.

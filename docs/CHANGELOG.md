@@ -6,6 +6,50 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session 2.1.1 — walk-in atomic create → shares `materializeJobFromAppointment` helper (Phase 2 Memory #29 deferral CLOSED) (2026-06-07)
+
+Pure refactor. Closes the Memory #29 deferral from Session 2.5's prompt: "The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)." Walk-in atomic create at `src/app/api/pos/jobs/route.ts` previously inlined its own `jobs.insert(...)` + `logAudit(...)` pair — a Memory #2 duplication of the `materializeJobFromAppointment` helper that Session 2.1 canonicalized and Session 2.5 made the sole non-walk-in materialization site. This session widens the helper's `MaterializeOptions.trigger` to `'start_intake' | 'walk_in'` and routes walk-in's job-creation step through it. Zero behavioral change.
+
+**Change shape:** 2 prod files MOD + 1 new test file (9 tests) + 1 test file MOD (stateful mock update, assertions unchanged). Net +68 prod lines (161 ins / 93 del) — well under Memory #8 ≤120-line budget.
+
+**Helper extension (`src/lib/appointments/lifecycle-sync.ts`):**
+
+- `MaterializeOptions.trigger` widened to `'start_intake' | 'walk_in'` union
+- Four new walk-in-only optional fields: `quoteId`, `intakeNotes`, `estimatedPickupAtOverride`, `servicesSnapshot` — forwarders the walk-in caller already has in memory at create-call time
+- Helper body branches on trigger for job initial state:
+  - `start_intake`: `status='intake'` + `work_started_at=NOW` + `intake_started_at=NOW` (unchanged)
+  - `walk_in`: `status='scheduled'` + NULL timestamps (preserves walk-in's transient pre-intake state)
+- `servicesSnapshot` bypasses the appointment_services + services join when supplied; helper still appends the mobile-fee entry from the appointment row uniformly across both triggers
+- Appointment-status UPDATE naturally skipped for walk_in via the existing `if (apptStatus === 'confirmed')` guard (walk-in is already `in_progress` by construction)
+- Audit `details` extended with `customer_id` (parity with pre-2.1.1 walk-in audit shape); `entityLabel` is trigger-specific (`(walk-in)` vs `(materialized)`) for human-readable distinction in admin audit-log viewer
+
+**Walk-in route refactor (`src/app/api/pos/jobs/route.ts`):**
+
+- Inline `jobs.insert(...)`, inline `logAudit(...)`, and inline `jobServicesSnapshot` mobile-fee build all REMOVED
+- Replaced with single `materializeJobFromAppointment(supabase, appointment.id, { trigger: 'walk_in', actor, source, ipAddress, quoteId, intakeNotes, estimatedPickupAtOverride: pickupAt, servicesSnapshot: services })` call
+- Helper returns only `jobId` — added a separate response-shape SELECT-with-joins (customer + vehicle + assigned_staff) so the POS client receives the same response payload it did pre-2.1.1
+- Appointment-rollback-on-helper-failure preserved (CASCADE cleans the appointment_services join rows from the prior step)
+
+**Tests:**
+
+- NEW `src/lib/appointments/__tests__/materialize-walk-in-trigger.test.ts` — 9 tests pinning the walk_in trigger branch: scheduled+null-timestamps initial state, no appointment.status advance, quoteId/intakeNotes forwarding + defaults, estimatedPickupAtOverride honored, servicesSnapshot bypasses join, mobile-fee append still applied, audit shape with customer_id + entityLabel suffix, start_intake-branch differentiation guard
+- MOD `src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts` — mock builder made stateful to support the helper's appointment SELECT + jobs idempotency SELECT + jobs upsert. ALL 6 assertions unchanged — the Layer 15g-iv modifier-persistence contract holds byte-for-byte
+
+**Verification gates:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (0 new)
+- build: clean
+- tests: 194 files / 3116 tests pass (was 193 / 3107 — +1 file + 9 new walk_in trigger tests; 28 skipped baseline)
+
+**Memory #2 closure:** `materializeJobFromAppointment` is now the SOLE writer of materialization-path `jobs` rows. Both Start Intake AND walk-in flow through it.
+
+**Memory #29 closure:** Session 2.5's prompt deferral explicitly named Session 2.1.1 as the queued follow-up; this session is that closure. The `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` Session 2.1.1 entry status flipped from `[ ]` (queued) → `[x]` (complete); the AC-3 "Walk-in path unchanged" clause updated similarly.
+
+**Unblocks Theme F:** Theme F's F.2 quote-linkage logic is sequenced to fire after this session lands so it builds on the helper-refactored walk-in shape rather than the pre-2.1.1 inline form.
+
+---
+
 ## Phase 3 Theme A.1 — drop legacy receipt + PO identifier triggers (post-Theme-A cleanup; closes the Migration 6 deferral) (2026-06-07)
 
 Surgical follow-up to Phase 3 Theme A. Drops the two legacy BEFORE INSERT triggers (`tr_transaction_receipt_number` + `tr_po_number`) and their PL/pgSQL functions (`generate_receipt_number()` + `generate_po_number()`) that Theme A deliberately kept alive across its migration push to eliminate a post-migrate / pre-deploy outage window. Theme A's application-side code (in production since merge `133d4ee8`) issues receipt + PO numbers via `next_identifier('receipt')` / `next_identifier('purchase_order')` calls; the triggers' `WHEN (NEW.column IS NULL)` gates were already shadowed and never fired post-Theme-A. This session retires the stale safety net.

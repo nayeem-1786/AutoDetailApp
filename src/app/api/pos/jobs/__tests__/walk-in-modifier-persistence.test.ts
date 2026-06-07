@@ -81,57 +81,120 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }));
 
+// Session 2.1.1: walk-in route now calls `materializeJobFromAppointment` after
+// the appointment INSERT, so the mock has to be stateful — the helper SELECTs
+// the just-INSERTed appointment, checks for an existing job (returns null),
+// upserts the job row, then the route does a final SELECT-with-joins for the
+// response shape. The `committed` store survives across builders so reads see
+// previously-INSERTed rows.
+const committed = {
+  appointment: null as Record<string, unknown> | null,
+  job: null as Record<string, unknown> | null,
+};
+
 function makeBuilder(table: string): unknown {
-  let pendingInsert: Record<string, unknown> | null = null;
+  let pendingOp: 'insert' | 'upsert' | 'update' | 'delete' | 'select' | null = null;
+  let pendingPayload: Record<string, unknown> | Record<string, unknown>[] | null = null;
 
   async function resolveTerminal(): Promise<{ data: unknown; error: unknown }> {
-    if (table === 'jobs') {
-      if (pendingInsert) {
-        const row = {
-          id: state.jobId,
-          ...pendingInsert,
-          customer: { id: 'c-1', first_name: 'Wal', last_name: 'King', phone: null },
-          vehicle: null,
-          assigned_staff: null,
-        };
-        captured.push({ table, row: pendingInsert });
-        pendingInsert = null;
-        return { data: row, error: null };
+    // INSERT / UPSERT into jobs — capture + materialize a row id.
+    if (table === 'jobs' && (pendingOp === 'insert' || pendingOp === 'upsert')) {
+      const row = Array.isArray(pendingPayload)
+        ? (pendingPayload[0] as Record<string, unknown>)
+        : (pendingPayload as Record<string, unknown>);
+      captured.push({ table, row });
+      const materialized = {
+        id: state.jobId,
+        ...row,
+        customer: { id: 'c-1', first_name: 'Wal', last_name: 'King', phone: null },
+        vehicle: null,
+        assigned_staff: null,
+      };
+      committed.job = materialized;
+      pendingOp = null;
+      pendingPayload = null;
+      // Upsert path returns the new id-array; insert path single-row.
+      if (pendingOp === 'upsert') {
+        return { data: [{ id: state.jobId }], error: null };
       }
+      return { data: materialized, error: null };
+    }
+
+    // SELECT from jobs — idempotency check (returns null = no existing job)
+    // OR the response-shape fetch after helper success (returns the committed row).
+    if (table === 'jobs' && pendingOp === 'select') {
+      pendingOp = null;
+      // The helper's idempotency check runs BEFORE the upsert; at that point
+      // committed.job is still null. The response-shape SELECT runs AFTER
+      // the upsert; committed.job is populated. The same branch serves both.
+      return { data: committed.job, error: null };
+    }
+
+    // INSERT into appointments — capture + commit so subsequent SELECTs see it.
+    if (table === 'appointments' && pendingOp === 'insert') {
+      const row = pendingPayload as Record<string, unknown>;
+      captured.push({ table, row });
+      committed.appointment = { id: state.appointmentId, ...row };
+      pendingOp = null;
+      pendingPayload = null;
+      return { data: committed.appointment, error: null };
+    }
+
+    // SELECT from appointments — the helper reads the just-INSERTed row.
+    if (table === 'appointments' && pendingOp === 'select') {
+      pendingOp = null;
+      return { data: committed.appointment, error: null };
+    }
+
+    // UPDATE on appointments — walk-in's appointment is already in_progress
+    // so the helper's `if (apptStatus === 'confirmed')` skips the UPDATE; this
+    // branch should not fire in the walk-in flow but is here for safety.
+    if (table === 'appointments' && pendingOp === 'update') {
+      pendingOp = null;
+      pendingPayload = null;
       return { data: null, error: null };
     }
-    if (table === 'appointments') {
-      if (pendingInsert) {
-        const row = { id: state.appointmentId, ...pendingInsert };
-        captured.push({ table, row: pendingInsert });
-        pendingInsert = null;
-        return { data: row, error: null };
-      }
+
+    // INSERT into appointment_services — captured but no data needed back.
+    if (table === 'appointment_services' && pendingOp === 'insert') {
+      captured.push({ table, row: pendingPayload as Record<string, unknown> });
+      pendingOp = null;
+      pendingPayload = null;
       return { data: null, error: null };
     }
-    if (table === 'appointment_services') {
-      if (pendingInsert) {
-        captured.push({ table, row: pendingInsert });
-        pendingInsert = null;
-      }
-      return { data: null, error: null };
-    }
+
     return { data: null, error: null };
   }
 
   const builder: Record<string, unknown> = {
-    select: () => builder,
+    select: () => {
+      pendingOp = pendingOp ?? 'select';
+      return builder;
+    },
     eq: () => builder,
     is: () => builder,
     in: () => builder,
     limit: () => builder,
     order: () => builder,
     insert: (payload: Record<string, unknown> | Record<string, unknown>[]) => {
-      pendingInsert = Array.isArray(payload) ? { _array: payload } : payload;
+      pendingOp = 'insert';
+      pendingPayload = payload;
       return builder;
     },
-    update: () => builder,
-    delete: () => builder,
+    upsert: (payload: Record<string, unknown> | Record<string, unknown>[]) => {
+      pendingOp = 'upsert';
+      pendingPayload = payload;
+      return builder;
+    },
+    update: (payload: Record<string, unknown>) => {
+      pendingOp = 'update';
+      pendingPayload = payload;
+      return builder;
+    },
+    delete: () => {
+      pendingOp = 'delete';
+      return builder;
+    },
     single: () => resolveTerminal(),
     maybeSingle: () => resolveTerminal(),
     then: (
@@ -173,6 +236,8 @@ function getAppointmentInsert(): Record<string, unknown> {
 
 beforeEach(() => {
   captured.length = 0;
+  committed.appointment = null;
+  committed.job = null;
   state.authedEmployee = {
     employee_id: 'emp-1',
     auth_user_id: 'auth-1',
