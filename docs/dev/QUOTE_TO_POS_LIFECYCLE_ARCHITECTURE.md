@@ -2023,7 +2023,7 @@ Following v1.3 lock and operator review, operator observed `A-100000` reads as t
 
 ### 2026-06-07 PST — Phase 3 Theme A.1 complete (legacy receipt + PO triggers dropped — post-Theme-A cleanup)
 
-**Status:** Theme A.1 migration merged to `main` at `<MERGE_HASH>` (feature commit `<FEATURE_HASH>`, branch `fix/phase-3-theme-a-1-drop-old-identifier-triggers`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings; build clean; full test suite passes (193 files / 3107 tests when run without `.env.local`; 5 live-DB integration files + 4 new tests pass when env loaded; 4 unrelated SMS env-bleed failures are pre-existing and unrelated to this session).
+**Status:** Theme A.1 migration merged to `main` at `4db58acd` (feature commit `6640cb21`, branch `fix/phase-3-theme-a-1-drop-old-identifier-triggers`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings; build clean; full test suite passes (193 files / 3107 tests when run without `.env.local`; 5 live-DB integration files + 4 new tests pass when env loaded; 4 unrelated SMS env-bleed failures are pre-existing and unrelated to this session).
 
 **Pre-flight prerequisite (operator-confirmed):** Theme A (`133d4ee8`) was live in production AND at least one new `SD-XXXXX` receipt + one new `PO-XXXXX` had been issued via `next_identifier()` since the merge, confirming that all six INSERT callsites (5 receipt sites + 1 PO site) were exercising the application-side helpers rather than relying on the safety-net triggers. This was the locked precondition from the Theme A Decisions Log entry above ("Run after at least one production deploy cycle has confirmed the new application code is supplying these columns reliably").
 
