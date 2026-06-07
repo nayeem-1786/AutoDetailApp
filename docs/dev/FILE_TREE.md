@@ -919,6 +919,14 @@ src/lib/campaigns/ab-testing.ts
 src/lib/cron/scheduler.ts
 ```
 
+### Credits (customer_credits ledger — AC-15 foundation)
+```
+src/lib/credits/index.ts                                  # Phase 3 Theme E.1: barrel — re-exports types + repository
+src/lib/credits/types.ts                                  # Phase 3 Theme E.1: CustomerCreditReason union (5 values), CustomerCredit row, CreateCustomerCreditInput, CustomerCreditBalance
+src/lib/credits/repository.ts                             # Phase 3 Theme E.1: createCustomerCredit / getCustomerCreditBalance (sums + unapplied+unexpired sorted expires_at NULLS LAST then created_at) / getCustomerCreditById — accepts SupabaseClient param (mirrors quotes/refunds pattern)
+src/lib/credits/__tests__/repository.test.ts              # 16 tests — Phase 3 Theme E.1: live-DB integration (describeIfCreds) — create + balance + sorting + CHECK constraints + ENUM + updated_at trigger + migration integrity (all 5 ENUM values + 15 columns)
+```
+
 ### Data Access
 ```
 src/lib/data/booking.ts
@@ -1089,6 +1097,7 @@ supabase/migrations/20260527000000_pos_jobs_unified_schedule_flag.sql       # It
 supabase/migrations/20260603000000_enable_pos_jobs_unified_schedule.sql     # Session #146 — flag-flip companion: UPDATE feature_flags SET enabled=true WHERE key='pos_jobs_unified_schedule'. Idempotent. Pre-flight audit at docs/dev/POS_JOBS_UNIFIED_SCHEDULE_FLAG_FLIP_PREFLIGHT.md verified clean drift on the gated paths since 15e closed. Rollback is a one-line UPDATE flipping enabled=false.
 supabase/migrations/20260606105901_seed_waitlist_slot_available_sms_template.sql  # Session 1.8 — seed customer-facing `waitlist_slot_available` SMS template; replaces dead fireWebhook in appointments/[id]/cancel/route.ts. Idempotent INSERT ... ON CONFLICT (slug) DO NOTHING. Audit f5e714a8 Target D.4.
 supabase/migrations/20260607181649_drop_legacy_identifier_triggers.sql  # Phase 3 Theme A.1 (2026-06-07) — DROP TRIGGER `tr_transaction_receipt_number` ON `transactions` + DROP FUNCTION `generate_receipt_number()`; DROP TRIGGER `tr_po_number` ON `purchase_orders` + DROP FUNCTION `generate_po_number()`. Post-Theme-A cleanup: retires the BEFORE INSERT safety-net triggers that Theme A's Migration 6 deliberately kept alive to avoid a post-migrate / pre-deploy outage window. Application-side `generateReceiptNumber()` / `generatePoNumber()` helpers (wired in Theme A) supply the columns explicitly at all 6 INSERT callsites; the triggers' `WHEN (NEW.column IS NULL)` gates were already shadowed and never fired post-Theme-A.
+supabase/migrations/20260607184158_customer_credits_table.sql  # Phase 3 Theme E.1 (2026-06-07) — AC-15 foundation: CREATE TYPE `customer_credit_reason` (5-value ENUM: cancellation_refund, manual_adjustment, goodwill, promotional, refund_as_credit) + CREATE TABLE `customer_credits` (15 columns: id, customer_id [ON DELETE RESTRICT — protects audit trail], amount_cents [INTEGER >0 CHECK — Rule #20], reason, reason_note, source_appointment_id + source_transaction_id [ON DELETE SET NULL], applied_at + applied_to_appointment_id + applied_to_transaction_id + applied_amount_cents [partial-app supported], expires_at, created_at, created_by_employee_id [employees(id) — NOT staff; Memory #11], updated_at) + 4 partial/composite indexes (customer_id, source_appointment_id partial, applied_at partial, unapplied composite) + `customer_credits_applied_consistency` CHECK (applied rows require applied_at + applied_amount_cents non-NULL AND ≤ amount_cents) + BEFORE UPDATE trigger advancing `updated_at`. Greenfield work — no migration of existing data (no prior `customer_credits` table existed per audit `3e633156`). Foundation only; E.2 (credit application) and E.3 (operator UI) build on this schema.
 ```
 
 ### Search
