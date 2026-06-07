@@ -51,6 +51,65 @@ Test delta: +15 (3152 passed total / 44 skipped / 0 failed; 2 pre-existing uncau
 
 ---
 
+## Phase 3 Theme E.2 — Customer credit application at checkout (AC-15 application logic) (2026-06-07)
+
+Builds on Theme E.1's schema + repository foundation (`0cfd54e4`). Adds the headless application path operators (and, in future themes, customers) use to consume a customer's stored credit balance at checkout. No UI in this session — Theme E.3 owns that. No cancel-flow wiring — Theme D will call `applyCustomerCredit` for refund-as-credit issuance.
+
+**Mental model:** credits are NOT a payment method. They're a discount/adjustment that reduces the amount due BEFORE any payment processing. The checkout caller computes `target_amount_cents ≤ available balance`, calls the apply-credit endpoint, then collects cash/card for the REMAINING amount due. The transaction ledger records each application as a separate `customer_credits` row update (one ledger row per applied credit).
+
+**What landed:**
+
+- **Repository extensions** at `src/lib/credits/repository.ts`:
+  - `applyCustomerCredit(supabase, {credit_id, amount_cents, applied_to_transaction_id, applied_to_appointment_id?})` — single-row application. Race-safe via `.is('applied_at', null)` precondition on the UPDATE: concurrent attempts produce one winner + one `CreditAlreadyAppliedError`. Throws on `amount_cents <= 0` (caller-side validation) before round-tripping. The DB CHECK constraint `customer_credits_applied_consistency` backstops over-application at the schema layer.
+  - `applyCustomerCreditsToTransaction(supabase, {customer_id, target_amount_cents, applied_to_transaction_id, applied_to_appointment_id?})` — multi-credit walk. Fetches the customer's balance, walks `unapplied_credits` (already sorted by expires_at NULLS LAST then created_at ASC inside `getCustomerCreditBalance` — soonest-expiring consumed first), applies each in turn (full + a final partial) until `target_amount_cents` is reached. Race-loss recovery: if a credit was applied concurrently between balance-fetch and UPDATE, skip and try the next; if remaining > 0 after the walk, throw `InsufficientCreditBalanceError` with the gap. NO auto-rollback of partial applications — the caller decides.
+  - `unapplyCustomerCredit(supabase, creditId)` — reverses an application (clears all four `applied_*` columns). Returns `null` for both no-op cases (already unapplied; row doesn't exist). Symmetric `.not('applied_at', 'is', null)` precondition.
+  - Typed errors: `CreditAlreadyAppliedError` (race precondition failure), `InsufficientCreditBalanceError` (target > available, with `requestedCents` + `availableCents` fields for downstream error mapping).
+- **New API endpoint** `POST /api/pos/transactions/[id]/apply-credit`:
+  - Auth: `authenticatePosRequest` (POS HMAC token). 401 if missing.
+  - Permission: `pos.process_cash` — credits behave like a stored-value tender (consuming pre-existing customer balance), NOT a manual discount the operator is granting. Same gate as digital payments.
+  - Body: `{customer_id: string, amount_cents: positive_integer, appointment_id?: string}`. 400 on missing/non-positive/non-integer amounts.
+  - Calls `applyCustomerCreditsToTransaction`; writes one audit row per applied credit (`entity_type='customer_credit'`, `action='apply'`, `details={credit_id, customer_id, applied_amount_cents, credit_amount_cents, applied_to_transaction_id, applied_to_appointment_id, reason}`).
+  - Error mapping: `InsufficientCreditBalanceError` → 409 + `code: 'insufficient_credit_balance'` + `requested_cents` + `available_cents` fields the UI can surface. Other errors → 500 (a `CreditAlreadyAppliedError` bubbling to the endpoint represents a sustained race the operator should retry).
+- **Audit entity type extended** at `src/lib/supabase/types.ts`: `AuditEntityType` union now includes `'customer_credit'`. The `'apply'` action was already in the `AuditAction` union (pre-existing — used by coupons).
+
+**Race-safety design notes (load-bearing — do not simplify away):**
+
+The `.is('applied_at', null)` filter on the apply UPDATE is the entire correctness story for concurrent application. Two operators racing the same credit row produce exactly one matched-row UPDATE + one zero-row UPDATE (PGRST116 / no row → `CreditAlreadyAppliedError`). The walker's race-loss recovery (skip applied credit → try next) builds on this primitive: balance-fetch is a snapshot, but each UPDATE is an atomic point-in-time test. No DB transactions, no advisory locks — the precondition does the work.
+
+The `customer_credits_applied_consistency` CHECK constraint (E.1) backstops over-application: `applied_amount_cents <= amount_cents` is enforced at the DB layer, so even if the caller computed `applyAmountCents` wrong, the UPDATE rejects pre-commit.
+
+**Files touched:**
+
+Production:
+- MOD `src/lib/credits/repository.ts` — three application functions + two typed error classes + input/output type interfaces (`ApplyCustomerCreditInput`, `ApplyCustomerCreditsToTransactionInput`, `ApplyCustomerCreditsToTransactionResult`).
+- MOD `src/lib/supabase/types.ts` — one-line extension of `AuditEntityType` union.
+- NEW `src/app/api/pos/transactions/[id]/apply-credit/route.ts` — POST endpoint (~135 lines incl. types + comments).
+
+Tests:
+- MOD `src/lib/credits/__tests__/repository.test.ts` — 14 new tests for the application surface: partial/full single-credit application, already-applied race, CHECK over-application, zero/negative amount, concurrent `Promise.all` race (exactly one wins), single-credit-fills-target, multi-credit walk, expiry-first sort, insufficient-balance throw, zero/negative target reject, race-loss recovery via re-fetched balance, unapply reset, unapply no-op (never-applied + missing), apply → unapply → balance restored. Disposable transaction fixture added in `beforeAll` (FK requires a real `transactions` row).
+- NEW `src/app/api/pos/transactions/[id]/apply-credit/__tests__/route.test.ts` — 10 endpoint tests covering auth (200 / 401), permission (403), validation (400 × 4: missing customer_id, missing/non-integer amount, zero amount, negative amount), single + multi audit-row emission, 409 mapping for insufficient balance, appointment_id pass-through, 500 fallback.
+
+Total test delta: +24 tests (above the 15-20 estimate; +4 audit-emission + multi-credit coverage tests added during build).
+
+**Verification gates:**
+
+- `npx tsc --noEmit` — 0 errors.
+- `npm run lint` — 0 errors / 97 warnings (matches origin/main baseline; one new cents-naming warning resolved by renaming `remaining` → `remainingCents`).
+- `npm run build` — clean; new endpoint surface materialized at `.next/server/app/api/pos/transactions/[id]/apply-credit/route.js`.
+- Repository + endpoint test suites both green (42 tests passing in the new + extended files; 4 pre-existing SMS test failures unrelated to this session, identical on origin/main).
+
+**Out of scope (do not extend in this session):**
+
+- Operator UI in POS for credit application (Theme E.3).
+- Customer-facing credit visibility / portal (Theme E.3 or later).
+- Cancel-flow integration / refund-as-credit issuance (Theme D will call `applyCustomerCredit` for this).
+- Modifying the existing checkout POST endpoint to invoke credit application inline (deferred: the explicit per-step "apply credit, then checkout for the remainder" sequence keeps the audit trail clean and the failure modes isolated; Theme E.3's UI will drive this from the cashier surface).
+- Gift card / loyalty point logic (separate domains).
+
+**Unblocks:** Theme D (cancel orchestration with refund-as-credit option) — Theme D's cancel path can now issue a credit via `createCustomerCredit` and let E.2's application surface consume it at the customer's next visit; Theme E.3 (operator UI) — the data + API + audit are in place, only the React surface remains.
+
+---
+
 ## Phase 3 Theme F — Quote conversion cleanup bundle (Phase 0.2 audit F.2 / F.3 / F.5 / F.6 / F.7 closed) (2026-06-07)
 
 Five-finding cleanup bundle from the Phase 0.2 Quote → Appointment conversion audit (`dcf511df`). All five items are file-isolated from each other; bundled into one session because they share the same audit lineage and the same convertQuote + walk-in-seam surface area. Session 1.7 already closed F.1 (conditional `appointment_confirmed` webhook fire); Theme F closes the remaining five. F.4 (webhook-name-vs-status) and F.8 (accept-without-follow-through) are AC-12 / Theme C territory and stay deferred.

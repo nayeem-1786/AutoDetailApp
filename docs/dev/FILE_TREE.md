@@ -478,6 +478,7 @@ src/app/api/pos/stripe/capture-payment/route.ts
 src/app/api/pos/stripe/connection-token/route.ts
 src/app/api/pos/stripe/payment-intent/route.ts
 src/app/api/pos/sync-offline-transaction/route.ts
+src/app/api/pos/transactions/[id]/apply-credit/route.ts
 src/app/api/pos/transactions/[id]/route.ts
 src/app/api/pos/transactions/route.ts
 src/app/api/pos/transactions/search/route.ts
