@@ -6,6 +6,68 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Lifecycle Architecture Doc v1.4 — AC-10 5-digit revision (operator-queried production data confirms safe headroom) (2026-06-06)
+
+Documentation-only session. NO code, NO migrations, NO tests. Updates `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` from v1.3 → v1.4. Calibrates the v1.3 AC-10 width specification from 6-digit to 5-digit across all five identifier systems after operator queried production data and observed that `A-100000` reads as too long for customer-facing identifiers.
+
+**Change shape:** single doc modified — ~120 lines added / ~25 lines modified. v1.3 lock paragraphs preserved verbatim in Decisions Log as historical record; v1.4 appends a refinement entry alongside, not a strikethrough.
+
+**Operator-queried production data (post-v1.3 lock):**
+
+- `SELECT MAX(receipt_number) FROM transactions WHERE receipt_number ~ '^SD-\d+$'` → `SD-006365` (numeric value 6,365)
+- `SELECT COUNT(*) FROM transactions WHERE receipt_number IS NOT NULL` → 6,309 records
+- `SELECT MAX(po_number) FROM purchase_orders WHERE po_number ~ '^PO-\d+$'` → `PO-000002` (essentially unused — 2 records)
+
+5-digit format provides ~93,634 headroom between current SD max and the 99,999 ceiling — roughly 25–50 years at current usage rate. v1.3's 6-digit width provided ~80-year headroom which far exceeded business need at the cost of customer-facing readability.
+
+**AC-10 revisions (v1.4):**
+
+- **Format unification (REVISED):** all five identifiers — Quote (`Q-XXXXX`), Appointment (`A-XXXXX`), Receipt (`SD-XXXXX`), Work Order (`WO-XXXXX`), Purchase Order (`PO-XXXXX`) — converge on uniform 5-digit format.
+- **Starting values (REVISED):** new namespaces start at `10000` for Q/A/WO/PO; SD continues at current `MAX(receipt_number) + 1 = SD-06366` (numeric value 6,365 + 1 = 6,366, rendered at 5-digit pad width).
+- **NEW addition to migration scope — SD backfill:** existing 6,309 `transactions` records with `SD-00XXXX` format are backfilled to `SD-XXXXX` format via a single UPDATE statement (`UPDATE transactions SET receipt_number = 'SD-' || LPAD(SUBSTRING(receipt_number FROM 4)::INTEGER::TEXT, 5, '0') WHERE receipt_number ~ '^SD-\d+$'`). One leading zero trimmed; numeric value preserved; customer-facing receipt format becomes consistent across all records. Operator-locked decision: format consistency across customer-visible receipts wins over legacy preservation.
+- **Mechanism unchanged:** shared `identifier_sequences` table + `next_identifier(entity_type)` DB function with `SELECT ... FOR UPDATE` row-level lock. Z3 architecture preserved. Only `pad_width` flips from 6 to 5 and corresponding seed values from `100000` to `10000` for new namespaces.
+- **Eliminated patterns unchanged:** Quote γ generator + Receipt β trigger + PO β trigger + Order γ generator + dormant `generate_quote_number()` trigger — all five retired in the single Theme A landing session per v1.3.
+
+**Theme A scope (revised):** 300–550 prod lines + **~5 migrations** + 22–32 tests (slight increase from v1.3's 300–500 prod lines + 1 migration + 20–30 tests). The increase is concentrated in the SD backfill UPDATE migration + its 2 tests, kept as a **separate migration** from the schema-creation migration so the backfill can be rolled back independently if a production observation surfaces a problem.
+
+**No backfill of:**
+
+- Q legacy records (preserved as `Q-XXXX` in legacy namespace; new ones at `Q-XXXXX` from `Q-10001`)
+- WO legacy records (preserved as `WO-XXXXX` in legacy namespace at ≤ ~10042; new ones at `WO-XXXXX` from `WO-10001` — same rendered width, namespace-separated by the seed floor)
+- PO legacy records (only 2; preserved as `PO-000001`, `PO-000002`)
+
+**Backfill of:**
+
+- Appointments: `appointment_number` NEW column with `UNIQUE NOT NULL`; backfill assigns `A-10001+` to existing appointments ordered by `created_at`
+- Receipts (SD): existing 6,309 records UPDATE'd to remove one leading zero (`SD-006365` → `SD-06365`)
+
+**Why this is a refinement, not a reversal:** the v1.3 unification commitment (5 identifiers under a shared mechanism via audit option Z3) is preserved verbatim. v1.4 flips one number in the `identifier_sequences.pad_width` config (6→5) and the corresponding seed values for new namespaces (100000→10000). The Decisions Log preserves the v1.3 lock above the new v1.4 entry as historical record — no strikethrough — because v1.4 calibrates the v1.3 specification, it does not reverse it.
+
+**Phased Plan Overview status table:** Phase 3 pre-tasks row + Phase 3 themes row updated to mention v1.4 width revision (status checkboxes unchanged — both rows still `[x]` Complete + `[ ]` Not started respectively).
+
+**Verification:**
+
+- Markdown renders cleanly (no syntax errors introduced)
+- AC-10 heading anchor updated from `#ac-10-unified-ticket-number-scheme--6-digit-format-shared-sequences-all-five-identifiers-locked-v13` → `#ac-10-unified-ticket-number-scheme--5-digit-format-shared-sequences-all-five-identifiers-locked-v14`
+- Phase 3 themes inline reference at line 1785 updated to the new anchor
+- Width-consistency grep over the AC-10 spec section confirms no stray 6-digit / `XXXXXX` / `100000` references in the locked specification; every remaining 6-digit mention is intentional and historical (pad_width row's v1.3 callout, audit-fact references, version-history paragraphs, Decisions Log v1.3 entry)
+- Stage Definitions section (lines 100, 205, 217) intentionally describes the **current pre-Theme-A production state** (Q-XXXX, SD-XXXXXX) — those will only update after Theme A ships and rewrites the production data
+
+**Files touched:**
+
+- MOD: `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` — header bump, AC-10 heading + commitment + format spec table + generation mechanism table + seed values + migration approach (with SD backfill bullet) + rationale (with operator-queried data + v1.4 revision rationale) + Theme A scope estimate, Phased Plan Overview Phase 3 rows, Decisions Log v1.4 entry, AC-10 anchor reference repaired
+- MOD: `docs/CHANGELOG.md` — this entry
+
+**Cross-references:**
+
+- [AC-10 (LOCKED v1.4)](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-10-unified-ticket-number-scheme--5-digit-format-shared-sequences-all-five-identifiers-locked-v14)
+- v1.3 lock paragraphs preserved verbatim in the Decisions Log (`2026-06-06 22:20 PST` entry) as historical record alongside the new v1.4 entry (`2026-06-06 23:00 PST`)
+- Phase 3.0.1 audit: [`NUMBERING_STRATEGY_AUDIT.md`](docs/dev/NUMBERING_STRATEGY_AUDIT.md) (`249c2673`) — unchanged informant
+
+**Memory updates:** none (documentation-only refinement; no new conventions emerge).
+
+---
+
 ## Lifecycle Architecture Doc v1.3 — AC-10 comprehensive unification lock + AC-11 / AC-12 refinement (2026-06-06)
 
 Documentation-only session. NO code, NO migrations, NO tests. Updates `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` from v1.2 → v1.3 to capture the comprehensive AC-10 unification specification operator-locked at the 2026-06-06 evening decision-locking session, executed after Phase 3 pre-task audits 3.0.1 (numbering strategy, `249c2673`), 3.0.2 (Stripe webhook + payment-link, `10421f23`), and 3.0.3 (customer-accept seam, `54aa996a`) all merged earlier the same day. AC-11 and AC-12 receive audit-informed refinements that lock implementation framing for Theme B + Theme C planning.
