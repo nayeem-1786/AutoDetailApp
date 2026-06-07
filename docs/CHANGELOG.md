@@ -6,6 +6,59 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme F — Quote conversion cleanup bundle (Phase 0.2 audit F.2 / F.3 / F.5 / F.6 / F.7 closed) (2026-06-07)
+
+Five-finding cleanup bundle from the Phase 0.2 Quote → Appointment conversion audit (`dcf511df`). All five items are file-isolated from each other; bundled into one session because they share the same audit lineage and the same convertQuote + walk-in-seam surface area. Session 1.7 already closed F.1 (conditional `appointment_confirmed` webhook fire); Theme F closes the remaining five. F.4 (webhook-name-vs-status) and F.8 (accept-without-follow-through) are AC-12 / Theme C territory and stay deferred.
+
+**Bundle outcomes:**
+
+- **F.2 closed** — walk-in seam now populates `quotes.converted_appointment_id`. Pre-F.2 the walk-in path left this FK NULL even after a job was created, leaving the quote's converted state discoverable only via the reverse `jobs.quote_id` bridge (asymmetry vs the canonical `convertQuote` seam, which always wrote it). Server-side fix at `src/app/api/pos/jobs/route.ts` adds a post-helper `UPDATE quotes SET status='converted', converted_appointment_id=appointment.id, updated_at=NOW() WHERE id=quote_id AND converted_appointment_id IS NULL` — the `.is()` filter is idempotent against a concurrent seam already winning. Also feeds F.7 below: a subsequent convertQuote() call now sees the FK set and short-circuits to its `already_converted` return path instead of creating a duplicate appointment.
+- **F.3 closed** — A.3 path forwards the 7-field modifier snapshot (coupon_code, coupon_discount, loyalty_points_to_redeem, loyalty_discount, manual_discount_type, manual_discount_value, manual_discount_label). Client-side fix at `src/app/pos/components/quotes/quote-detail.tsx handleCreateJobFromQuote` — pre-F.3 the body was the minimal `{customer_id, vehicle_id, services, quote_id, notes}` set, silently dropping any modifier the quote carried (vs A.4's `buildModifiersPayload(q)` at `quote-ticket-panel.tsx:108-117` which DID forward them). Same quote, two paths, divergent appointment row. F.3 reads the modifier columns directly off the persisted quote (A.3 operates on saved quote, A.4 on in-memory reducer state) and lets the existing server payload handler do the rest.
+- **F.5 closed** — dormant admin endpoint `POST /api/quotes/[id]/convert` deleted. Pre-deletion verification (grep -rln across src/) confirmed zero callers — `QuoteBookDialog` is parameterized with `apiBasePath` but only the POS surface (`apiBasePath="/api/pos/quotes"`) ever instantiates it; no admin caller exists. The dormant endpoint conflicted with CLAUDE.md's "Quotes are READ-ONLY in admin" rule. One stale comment reference in `src/lib/quotes/__tests__/convert-service.test.ts:734` updated to point at the active POS sibling.
+- **F.6 closed** — converted-state quote views surface a "View Appointment" link to `/admin/appointments?id=<uuid>`. Three surfaces:
+  - `src/app/pos/components/quotes/quote-detail.tsx` (POS) — link renders next to the "Converted to appointment" badge, gated on `quote.converted_appointment_id != null` (historical walk-in pre-F.2 shape — converted without FK — still falls through to the plain badge; no appointment row exists to link to).
+  - `src/app/admin/quotes/components/quote-slide-over.tsx` (admin) — mirrors the same affordance.
+  - `src/app/admin/appointments/page.tsx` — receiver useEffect reads `?id=<uuid>` from the URL on mount, fetches the single appointment with the same joins the calendar fetcher uses, jumps `selectedDate` to its scheduled_date, opens the detail dialog, and strips `?id=` from the URL via `history.replaceState` so a browser refresh doesn't re-open. Single-shot empty-deps effect.
+- **F.7 closed** — `convertQuote()` race idempotency guard, two arms. Arm 1 (pre-INSERT): re-check `quote.converted_appointment_id` at function entry; if set, fetch the existing appointment fresh and return success with `already_converted: true`. Arm 2 (post-INSERT): the UPDATE chain now uses `.is('converted_appointment_id', null).select(...)` — if zero rows matched, our just-INSERTed appointment is an orphan (a sibling caller won between our pre-check and our UPDATE); roll back the orphan via `appointments.delete().eq(id)` (ON DELETE CASCADE cleans appointment_services), re-fetch the race-winner's row, and return success with `already_converted: true`. The `already_converted` discriminator is optional on the success variant — existing callers ignore it; voice-agent and Theme C can opt into checking it to suppress duplicate downstream side effects (e.g., a second confirmation SMS). The `status='converted' ∧ converted_appointment_id IS NULL` corner (pre-F.2 walk-in artifact) still falls through to the legacy 400 — that's a true gap, not a race, and loud surfacing is correct.
+
+**Foundational for Theme C (AC-12 customer-accept auto-conversion):** F.7's idempotency guard is what makes operator-vs-customer races on the same quote safe to collapse to one appointment. Theme C will call `convertQuote()` from the customer-accept handler; without F.7's guard, an operator manual-convert racing against a customer's accept would produce duplicate appointments. F.2's walk-in linkage is the other half: any seam touching a quote now writes the same `converted_appointment_id` signal, so F.7's pre-check catches the race regardless of which seam ran first.
+
+**Change shape:** 5 prod modifications + 1 prod deletion + 2 test extensions + 2 new test files. Net ~133 non-comment prod lines added / 47 deleted (-47 from the dormant endpoint removal).
+
+**Prod files:**
+
+- MOD `src/lib/quotes/convert-service.ts` — F.7 (both arms) + `already_converted` field on success result type.
+- MOD `src/app/api/pos/jobs/route.ts` — F.2 post-helper `quotes UPDATE` with idempotent `.is()` filter.
+- MOD `src/app/pos/components/quotes/quote-detail.tsx` — F.3 modifier-forwarding (7 fields) + F.6 "View Appointment" link block.
+- MOD `src/app/admin/quotes/components/quote-slide-over.tsx` — F.6 mirror link.
+- MOD `src/app/admin/appointments/page.tsx` — F.6 deep-link receiver useEffect.
+- DEL `src/app/api/quotes/[id]/convert/route.ts` — F.5.
+
+**Tests:**
+
+- MOD `src/lib/quotes/__tests__/convert-service.test.ts` — extended `makeSupabase` mock to handle the F.7 `.update().eq().is().select()` chain (legacy `await .update().eq()` still resolves identically via thenable); 4 new F.7 tests (pre-INSERT race-loss happy path, no-webhook-on-race-loss, legacy guard preserved for no-FK shape, non-race happy path unaffected). 28 total (24 prior + 4 new).
+- MOD `src/lib/quotes/__tests__/modifier-chain.test.ts` — extended the shared mock's `resolve()` to return a one-row array on `quotes` UPDATE so F.7's chain reads matched-one-row (pre-F.7 the mock returned `{ data: null }`, which the new F.7 chain reads as race-loss; updating to `[{converted_appointment_id}]` keeps the chain test on the happy path).
+- MOD `src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts` — added a `quotes` UPDATE capture branch + 2 new F.2 tests (quote_id-bridged walk-in writes the canonical converted triplet; pure walk-in writes nothing).
+- NEW `src/app/pos/components/quotes/__tests__/handle-create-job-modifier-forwarding.test.ts` — 12 source-string regression tests pinning the A.3 POST body field list (5 pre-F.3 fields + 7 F.3 modifier fields with the exact `quote.<field> ?? null` shape).
+- NEW `src/app/pos/components/quotes/__tests__/converted-view-appointment-link.test.ts` — 3 source-string regression tests pinning the F.6 link rendering on both quote surfaces + the deep-link useEffect contract on the admin appointments page.
+
+Total Theme F test delta: +21 (4 F.7 + 2 F.2 + 12 F.3 + 3 F.6).
+
+**Verification gates:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (unchanged from main pre-session)
+- build: clean
+- tests: 3177 passed (includes 21 new Theme F + all existing). The 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated to this session (documented in Theme A.1's CHANGELOG entry).
+
+**Memory #8 status:** 6 prod files / 4 test files / ~133 non-comment prod lines added / -47 lines from dormant endpoint deletion. Within budget.
+
+**Memory #11 corrections:** the session prompt's example pseudocode pointed at `src/app/api/admin/quotes/[id]/convert/route.ts` as the dormant endpoint — verified against current main and corrected to the actual path `src/app/api/quotes/[id]/convert/route.ts` (the `admin/quotes/[id]` subtree does not exist in main; the `admin/quotes/` namespace contains only the list page + slide-over + stats). Prompt's F.3 pseudocode described a separate `appointment_services_modifiers` table for modifier copying — verified against schema and refined: modifiers are stored as columns on the appointment row itself (coupon_code, coupon_discount, loyalty_*, manual_discount_*), and the audit's F.3 finding is about the A.3 client dropping these from the POST body, not about a separate join-table copy. Server-side `convert-service.ts` already propagates them on the canonical seam; the fix is client-side in the A.3 walk-in seam.
+
+**F.5 deletion verification:** `grep -rln` across `src/` for any of (`/api/quotes/[id]/convert`, `apiBasePath="/api/quotes"`, `admin convert`) returned zero callers. The shared `<QuoteBookDialog>` component is parameterized but every instantiation passes `apiBasePath="/api/pos/quotes"`. Safe deletion confirmed.
+
+---
+
 ## Session 2.1.1 — walk-in atomic create → shares `materializeJobFromAppointment` helper (Phase 2 Memory #29 deferral CLOSED) (2026-06-07)
 
 Pure refactor. Closes the Memory #29 deferral from Session 2.5's prompt: "The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)." Walk-in atomic create at `src/app/api/pos/jobs/route.ts` previously inlined its own `jobs.insert(...)` + `logAudit(...)` pair — a Memory #2 duplication of the `materializeJobFromAppointment` helper that Session 2.1 canonicalized and Session 2.5 made the sole non-walk-in materialization site. This session widens the helper's `MaterializeOptions.trigger` to `'start_intake' | 'walk_in'` and routes walk-in's job-creation step through it. Zero behavioral change.

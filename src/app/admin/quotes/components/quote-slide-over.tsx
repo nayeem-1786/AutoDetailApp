@@ -88,12 +88,26 @@ export function QuoteSlideOver({ quoteId, open, onClose }: QuoteSlideOverProps) 
       {/* Content */}
       {!loading && !error && quote && (
         <div className="space-y-6">
-          {/* Header: Quote number + Status */}
+          {/* Header: Quote number + Status. Phase 3 Theme F (F.6) — when
+              the quote is converted AND links to an appointment row, surface
+              a "View Appointment" link to /admin/appointments?id=... so the
+              admin operator can jump directly. Mirrors the same affordance
+              added to the POS quote-detail surface in this session. */}
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">{quote.quote_number}</h3>
-            <Badge variant={QUOTE_STATUS_BADGE_VARIANT[quote.status] ?? 'default'}>
-              {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {quote.status === 'converted' && quote.converted_appointment_id && (
+                <Link
+                  href={`/admin/appointments?id=${quote.converted_appointment_id}`}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  View Appointment
+                </Link>
+              )}
+              <Badge variant={QUOTE_STATUS_BADGE_VARIANT[quote.status] ?? 'default'}>
+                {QUOTE_STATUS_LABELS[quote.status] ?? quote.status}
+              </Badge>
+            </div>
           </div>
 
           {/* Customer card */}

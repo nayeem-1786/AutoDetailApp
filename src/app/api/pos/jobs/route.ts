@@ -676,6 +676,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Phase 3 Theme F (F.2) — unify the FK semantics across the two
+    // conversion seams. Pre-F.2 the walk-in seam left
+    // `quotes.converted_appointment_id = NULL` even when a job had been
+    // created from the quote (audit `dcf511df` finding F.2); the
+    // canonical convertQuote seam writes this column post-INSERT, so the
+    // asymmetry meant a quote's converted state was discoverable via
+    // jobs.quote_id only on the walk-in path and via
+    // quotes.converted_appointment_id only on the canonical path. Closing
+    // the asymmetry here also feeds the F.7 race guard on the OTHER seam:
+    // a subsequent convertQuote() call now sees converted_appointment_id
+    // set by this walk-in and short-circuits to its idempotent return
+    // path (returning this walk-in's appointment) rather than creating a
+    // duplicate appointment row. The `.is('converted_appointment_id',
+    // null)` filter mirrors convertQuote's second-arm race guard — if
+    // the canonical path raced ahead of us, we no-op rather than
+    // overwrite. Best-effort: a UPDATE failure leaves the walk-in
+    // intact and surfaces via console; the client retry path doesn't
+    // need to know.
+    if (quote_id) {
+      const { error: linkErr } = await supabase
+        .from('quotes')
+        .update({
+          status: 'converted',
+          converted_appointment_id: appointment.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', quote_id)
+        .is('converted_appointment_id', null);
+      if (linkErr) {
+        console.error(
+          'Walk-in quote linkage failed (non-fatal):',
+          linkErr.message
+        );
+      }
+    }
+
     // Phase Mobile-1.1: compute save-to-customer action.
     // Returns null when mobile is off / no customer / empty address.
     // Performs silent-save UPDATE atomically when customer has no existing

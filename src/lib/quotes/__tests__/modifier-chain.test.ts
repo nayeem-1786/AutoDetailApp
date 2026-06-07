@@ -73,8 +73,26 @@ function makeSharedSupabase() {
           if (sharedState.quote) {
             Object.assign(sharedState.quote, pendingUpdate);
           }
+          // Phase 3 Theme F (F.7): convertQuote now chains `.select()` on
+          // the quote UPDATE so the helper can detect a race-loss (UPDATE
+          // matches zero rows when a concurrent caller already won). Return
+          // a one-row array so the happy path here resolves to "won the
+          // race" (matched-one-row). Pre-F.7 the resolve() returned
+          // { data: null }; the legacy `await .update().eq()` shape only
+          // read `error` so it didn't notice — but the new chain reads
+          // `data` to count matched rows. Returning the row keeps the
+          // chain test on the happy path.
+          const appliedUpdate = pendingUpdate;
           pendingUpdate = null;
-          return { data: null, error: null };
+          return {
+            data: [
+              {
+                converted_appointment_id:
+                  appliedUpdate.converted_appointment_id ?? null,
+              },
+            ],
+            error: null,
+          };
         }
         return { data: sharedState.quote, error: sharedState.quote ? null : { message: 'not found' } };
       }

@@ -18,7 +18,21 @@ import type { ConvertQuoteInput } from '@/lib/utils/validation';
 export { resolveManualDiscountAmount } from './manual-discount';
 
 type ConvertQuoteResult =
-  | { success: true; appointment: unknown; serviceNames: string }
+  | {
+      success: true;
+      appointment: unknown;
+      serviceNames: string;
+      /**
+       * Phase 3 Theme F (F.7): true on the idempotent race-loss path — the
+       * quote was already linked to a converted appointment by a concurrent
+       * caller; the returned `appointment` is the race-winner's existing row
+       * fetched fresh (not a new INSERT). Existing callers that don't read
+       * this field continue to work; voice-agent + Theme C may opt into
+       * checking it to suppress duplicate downstream side effects (e.g., a
+       * second confirmation SMS).
+       */
+      already_converted?: boolean;
+    }
   | { success: false; error: string; status: number; details?: unknown };
 
 /** Options to customize conversion behavior for different callers (POS, admin, voice agent). */
@@ -52,6 +66,39 @@ export async function convertQuote(
 
   if (fetchErr || !quote) {
     return { success: false, error: 'Quote not found', status: 404 };
+  }
+
+  // Phase 3 Theme F (F.7) — race idempotency guard. If a concurrent caller
+  // already converted this quote (the canonical signal is the
+  // `converted_appointment_id` FK, set in the canonical post-INSERT UPDATE
+  // below AND now also by the walk-in seam per F.2), return success with
+  // the race-winner's appointment row instead of failing. This converts
+  // what was previously a 400 "already-converted" rejection into a
+  // transparent idempotent return — foundational for Theme C's
+  // customer-accept auto-conversion, where an operator-vs-customer race on
+  // the same quote must collapse to one appointment and both callers must
+  // get a non-error response. The `status === 'converted'` ∧
+  // `converted_appointment_id IS NULL` corner (the historical walk-in
+  // shape pre-F.2) still falls through to the legacy 400 — a converted
+  // quote with no FK is a true gap, not a race, and surfacing it loudly
+  // is the right behavior.
+  if (quote.converted_appointment_id) {
+    const { data: existingAppt } = await supabase
+      .from('appointments')
+      .select('*')
+      .eq('id', quote.converted_appointment_id)
+      .maybeSingle();
+    if (existingAppt) {
+      return {
+        success: true,
+        appointment: existingAppt,
+        serviceNames: '',
+        already_converted: true,
+      };
+    }
+    // The FK points at a row that no longer exists (very rare: appointment
+    // hard-deleted post-conversion). Fall through to the legacy guard;
+    // surfacing the inconsistency is safer than silently re-converting.
   }
 
   if (quote.status === 'expired' || quote.status === 'converted') {
@@ -197,18 +244,65 @@ export async function convertQuote(
     }
   }
 
-  // Update quote status to converted
-  const { error: updateErr } = await supabase
+  // Update quote status to converted. Phase 3 Theme F (F.7) — the
+  // `.is('converted_appointment_id', null)` filter is the second arm of the
+  // race guard (the first arm is the pre-INSERT check above): if a
+  // concurrent caller wrote `converted_appointment_id` between our pre-check
+  // and now, this UPDATE matches zero rows and our newly-inserted
+  // appointment becomes an orphan. Detect that by selecting the updated row
+  // and, if the FK now points elsewhere, roll back our INSERT and return
+  // the race-winner's appointment instead. Without this second arm the
+  // first arm only catches the easy case (already-converted at start).
+  const { data: updatedRows, error: updateErr } = await supabase
     .from('quotes')
     .update({
       status: 'converted',
       converted_appointment_id: appointment.id,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', quoteId);
+    .eq('id', quoteId)
+    .is('converted_appointment_id', null)
+    .select('converted_appointment_id');
 
   if (updateErr) {
     console.error('Error updating quote status:', updateErr.message);
+  }
+
+  if (!updateErr && (!updatedRows || updatedRows.length === 0)) {
+    // Race lost — another caller's INSERT + UPDATE landed first. Our
+    // appointment is now an orphan; delete it and return the race-winner.
+    // (ON DELETE CASCADE on appointment_services.appointment_id cleans up
+    // the join rows we just inserted; mirrors the rollback at
+    // pos/jobs/route.ts:648 for the walk-in helper failure path.)
+    await supabase.from('appointments').delete().eq('id', appointment.id);
+
+    const { data: raceWinner } = await supabase
+      .from('quotes')
+      .select('converted_appointment_id')
+      .eq('id', quoteId)
+      .maybeSingle();
+    if (raceWinner?.converted_appointment_id) {
+      const { data: winningAppt } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('id', raceWinner.converted_appointment_id)
+        .maybeSingle();
+      if (winningAppt) {
+        return {
+          success: true,
+          appointment: winningAppt,
+          serviceNames: '',
+          already_converted: true,
+        };
+      }
+    }
+    // The race winner doesn't have a recoverable appointment — surface
+    // the inconsistency instead of silently returning our just-deleted row.
+    return {
+      success: false,
+      error: 'Concurrent conversion detected; please retry',
+      status: 409,
+    };
   }
 
   // Build service names from quote items for caller use (SMS, logging).

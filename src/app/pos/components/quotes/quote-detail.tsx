@@ -239,7 +239,19 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
         tier_name: item.tier_name,
       }));
 
-      // Create the job
+      // Create the job. Phase 3 Theme F (F.3): forward the modifier snapshot
+      // (coupon / loyalty / manual-discount) from the quote so the synthetic
+      // walk-in appointment row carries the same persistence A.4 produces —
+      // pre-F.3 this path silently dropped any modifier on the quote because
+      // the body shape here was the minimal {customer_id, vehicle_id,
+      // services, quote_id, notes} set. The server already accepts these
+      // fields (the A.4 path at quote-ticket-panel.tsx:108-117 forwards the
+      // same shape); reading them off the persisted quote here is the
+      // canonical pattern because the A.3 path operates on an EXISTING
+      // saved quote (A.4 operates on the in-memory reducer state, hence
+      // its `buildModifiersPayload(q)` helper). NULL coalescing keeps
+      // pre-modifier-era quotes (writable before Layer 15g-ii landed)
+      // sending the same all-null payload as before.
       const jobRes = await posFetch('/api/pos/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -249,6 +261,13 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
           services: jobServices,
           quote_id: quote.id,
           notes: quote.notes || undefined,
+          coupon_code: quote.coupon_code ?? null,
+          coupon_discount: quote.coupon_discount ?? null,
+          loyalty_points_to_redeem: quote.loyalty_points_to_redeem ?? null,
+          loyalty_discount: quote.loyalty_discount ?? null,
+          manual_discount_type: quote.manual_discount_type ?? null,
+          manual_discount_value: quote.manual_discount_value ?? null,
+          manual_discount_label: quote.manual_discount_label ?? null,
         }),
       });
 
@@ -487,10 +506,31 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
             </Button>
           )}
 
-          {/* Converted: View conversion info */}
+          {/* Converted: View conversion info + jump to appointment.
+              Phase 3 Theme F (F.6): when the quote carries a
+              converted_appointment_id (canonical convertQuote seam OR
+              walk-in seam post-F.2), surface a "View Appointment" link to
+              `/admin/appointments?id=…` so the operator can navigate
+              directly instead of hunting through the calendar. The
+              walk-in pre-F.2 shape (`status=converted` AND
+              `converted_appointment_id=NULL`) still falls through to the
+              plain badge — those historical quotes have no appointment
+              row to link to. */}
           {quote.status === 'converted' && (
-            <div className="rounded-md bg-teal-50 px-3 py-1.5 text-sm text-teal-700">
-              {quote.converted_appointment_id ? 'Converted to appointment' : 'Converted to job'}
+            <div className="flex items-center gap-2">
+              <div className="rounded-md bg-teal-50 px-3 py-1.5 text-sm text-teal-700">
+                {quote.converted_appointment_id ? 'Converted to appointment' : 'Converted to job'}
+              </div>
+              {quote.converted_appointment_id && (
+                <a
+                  href={`/admin/appointments?id=${quote.converted_appointment_id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex items-center gap-1 rounded-md border border-teal-300 bg-white px-3 py-1.5 text-sm font-medium text-teal-700 hover:bg-teal-50"
+                >
+                  View Appointment
+                </a>
+              )}
             </div>
           )}
         </div>
