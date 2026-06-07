@@ -6,6 +6,51 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme B.1 — Stripe webhook flips appointments.status pending→confirmed on payment-link receipt (AC-11 webhook gap closed) (2026-06-07)
+
+Surgical extension of the existing `appointment_payment_link` metadata sub-branch in `src/app/api/webhooks/stripe/route.ts`. Closes the AC-11 webhook gap identified in Phase 3.0.2 audit (`10421f23`) Target B.6 — pre-Theme-B.1 the branch wrote `payment_status`, `payment_link_paid_at`, `payment_link_amount_cents=NULL`, and conditionally `stripe_payment_intent_id`, but never read or wrote `appointments.status`. A customer who paid a pay-link on a pending appointment left the appointment at `status='pending'` while `payment_status='paid'` — the exact state mismatch AC-11 was written to forbid (`confirmed = deposit OR full payment received`).
+
+**Behavior change:** when `payment_intent.succeeded` fires with `metadata.type='appointment_payment_link'` AND the appointment is at `status='pending'`, the webhook now:
+
+1. Flips `appointments.status` to `'confirmed'` via a race-protected UPDATE (`.eq('id', appt.id).eq('status', 'pending')` — operator manual-confirms win concurrently; the UPDATE no-ops)
+2. Writes an `audit_log` row via `logAudit({ entityType: 'booking', action: 'update', source: 'api', details: { trigger: 'webhook_payment_link', stripe_payment_intent_id, previous_status: 'pending', new_status: 'confirmed' } })`
+3. Fires `fireWebhook('appointment_confirmed', ...)` outbound to n8n (mirrors the admin PATCH + POS PATCH + convertQuote canonical cascade — making the webhook handler the 4th call site for the pending → confirmed cascade)
+
+Idempotency inherits from the pre-existing per-PI dedup at `:96-112` — Stripe retries of the same event short-circuit before reaching the status flip, so audit + outbound webhook fire exactly once per real payment receipt. Partial-payment deposit links flip the appointment to confirmed just as full-payment links do, per AC-11's locked `confirmed = deposit OR full payment` semantic (audit F.3 Branch A, lifecycle doc line 553).
+
+**What B.1 does NOT do:**
+
+- No `send_payment_link` voice-agent tool — that's Theme B.2 scope
+- No removal of hardcoded `'pending'` at `voice-agent/appointments/route.ts:516`/`:290` — that's Theme B.3 scope (may be folded into B.2)
+- No e-commerce order branch idempotency dedup (audit F.4 territory — operator decision still pending)
+- No `charge.refunded` event subscription (audit F.4 territory)
+- No `stripe_events` dedup table (audit F.5 territory)
+- No Stripe API version pinning (general hygiene, not AC-11 specific)
+- No `payment_link_paid` customer SMS template (the `TODO(payment-link-session-3)` marker stays untouched)
+
+AC-11 status: webhook gap CLOSED. Voice-agent tool gap (B.2) + voice-agent status-pin removal (B.3) still pending for full AC-11 coverage.
+
+**Prod files:**
+
+- MOD `src/app/api/webhooks/stripe/route.ts` — extended appointment SELECT to include `status`; added the status-flip block + audit log + outbound `appointment_confirmed` webhook after the existing `apptUpdate` UPDATE; added imports for `logAudit` from `@/lib/services/audit` and `fireWebhook` from `@/lib/utils/webhook`. ~71 net non-comment prod lines added (under the ≤80 Memory #8 budget).
+
+**Tests:**
+
+- NEW `src/app/api/webhooks/stripe/__tests__/payment-link-status-flip.test.ts` — 15 tests with self-contained mock infrastructure tailored to the pay-link branch's multi-table writes. Covers: (1) happy path pending → confirmed with audit + webhook, (2) already-confirmed no-op (no flip, no audit, no webhook), (3) four non-pending statuses via `it.each` (`cancelled`/`no_show`/`completed`/`in_progress` — payment fields still write but status untouched), (4) idempotency on retry (second event short-circuits at per-PI dedup), (5) race protection on concurrent operator confirm (UPDATE matches 0 rows; audit + webhook still fire because SELECTed status was pending — acceptable benign double-event), (6) missing `appointment_id` in metadata, (7) appointment not found (500 rethrow), (8) non-pay-link PI (e-commerce branch unaffected), (9) DB error on status flip (500 rethrow BEFORE cascades fire), (10) signature failure regression lock, (11) partial-payment still flips per AC-11, (12) outbound webhook fire-and-forget under n8n failure.
+
+Test delta: +15 (3152 passed total / 44 skipped / 0 failed; 2 pre-existing uncaught exceptions in `pos/components/__tests__/bottom-nav.test.tsx` reproduce on main and are unrelated — known window-not-defined env-bleed).
+
+**Verification gates:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (unchanged from main)
+- build: clean
+- vitest: 3152 passed / 44 skipped / 0 failed
+
+**Memory #8 status:** 1 prod file / 1 test file / ~71 non-comment prod lines / 15 new tests. Well within budget.
+
+---
+
 ## Phase 3 Theme F — Quote conversion cleanup bundle (Phase 0.2 audit F.2 / F.3 / F.5 / F.6 / F.7 closed) (2026-06-07)
 
 Five-finding cleanup bundle from the Phase 0.2 Quote → Appointment conversion audit (`dcf511df`). All five items are file-isolated from each other; bundled into one session because they share the same audit lineage and the same convertQuote + walk-in-seam surface area. Session 1.7 already closed F.1 (conditional `appointment_confirmed` webhook fire); Theme F closes the remaining five. F.4 (webhook-name-vs-status) and F.8 (accept-without-follow-through) are AC-12 / Theme C territory and stay deferred.
