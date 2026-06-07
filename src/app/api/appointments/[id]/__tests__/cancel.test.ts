@@ -45,7 +45,6 @@ const state = {
   waitlistMatches: [] as WaitlistEntryFixture[] | null,
   waitlistUpdates: [] as Array<{ id: string; payload: Record<string, unknown> }>,
   appointmentUpdates: [] as Array<Record<string, unknown>>,
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
   smsSends: [] as Array<{ to: string; body: string; options: Record<string, unknown> | undefined }>,
   renderCalls: [] as Array<{ slug: string; vars: Record<string, unknown>; fallback: string }>,
   renderResult: { body: 'rendered-body', isActive: true } as { body: string; isActive: boolean },
@@ -84,12 +83,6 @@ vi.mock('@/lib/email/send-cancellation-email', () => ({
   sendCancellationNotifications: vi.fn(async (id: string, reason: string | undefined) => {
     state.cancellationNotificationCalls.push({ id, reason });
     return { emailSent: true, smsSent: true, usedTemplate: true };
-  }),
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
   }),
 }));
 
@@ -225,7 +218,6 @@ beforeEach(() => {
   state.waitlistMatches = [];
   state.waitlistUpdates = [];
   state.appointmentUpdates = [];
-  state.webhookFires = [];
   state.smsSends = [];
   state.renderCalls = [];
   state.renderResult = { body: 'rendered-body', isActive: true };
@@ -297,12 +289,9 @@ describe('POST /api/appointments/[id]/cancel — Session 1.8 waitlist direct-dis
     expect(state.waitlistUpdates).toHaveLength(0);
     expect(state.smsSends).toHaveLength(0);
 
-    // The unconditional cancellation webhook still fires (line 102 of route),
-    // but the waitlist_notified webhook (line 201) does not.
-    const waitlistNotifiedFires = state.webhookFires.filter(
-      (f) => (f.payload as Record<string, unknown>).waitlist_notified !== undefined
-    );
-    expect(waitlistNotifiedFires).toHaveLength(0);
+    // Theme G removed both the unconditional cancellation webhook AND the
+    // waitlist_notified forward-compat webhook from this route; the prod
+    // code has no outbound webhook to assert here anymore.
   });
 
   it('skips sendSms for a waitlist entry whose customer has no phone (silent skip — no Twilio call)', async () => {
@@ -350,15 +339,8 @@ describe('POST /api/appointments/[id]/cancel — Session 1.8 waitlist direct-dis
     // SMS fired.
     expect(state.smsSends).toHaveLength(1);
 
-    // AND the waitlist_notified webhook also fired (forward-compat for an
-    // external receiver wired in the future).
-    const waitlistFires = state.webhookFires.filter(
-      (f) => (f.payload as Record<string, unknown>).waitlist_notified !== undefined
-    );
-    expect(waitlistFires).toHaveLength(1);
-    const payload = waitlistFires[0].payload as { waitlist_notified: Array<{ id: string }> };
-    expect(payload.waitlist_notified).toHaveLength(1);
-    expect(payload.waitlist_notified[0].id).toBe('wl-5');
+    // Theme G removed the forward-compat waitlist_notified webhook fire;
+    // the SMS dispatch assertion above is now the entire notification contract.
   });
 
   it('does not call sendSms when renderSmsTemplate returns isActive=false (template disabled)', async () => {

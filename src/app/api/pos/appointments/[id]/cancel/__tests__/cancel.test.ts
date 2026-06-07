@@ -27,7 +27,6 @@ const state = {
   auditCalls: [] as Array<Record<string, unknown>>,
   smsSends: [] as unknown[],
   emailSends: [] as unknown[],
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
   cancellationNotificationCalls: [] as Array<{ id: string; reason: string | undefined }>,
 };
 
@@ -72,12 +71,6 @@ vi.mock('@/lib/utils/email', () => ({
   sendEmail: vi.fn(async (...args: unknown[]) => {
     state.emailSends.push(args);
     return { ok: true };
-  }),
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
   }),
 }));
 
@@ -160,7 +153,6 @@ beforeEach(() => {
   state.auditCalls = [];
   state.smsSends = [];
   state.emailSends = [];
-  state.webhookFires = [];
   state.cancellationNotificationCalls = [];
 });
 
@@ -182,7 +174,6 @@ describe('POST /api/pos/appointments/[id]/cancel', () => {
     // Notification-suppression invariant — even when 403, nothing fires.
     expect(state.smsSends).toHaveLength(0);
     expect(state.emailSends).toHaveLength(0);
-    expect(state.webhookFires).toHaveLength(0);
     expect(state.cancellationNotificationCalls).toHaveLength(0);
   });
 
@@ -235,7 +226,6 @@ describe('POST /api/pos/appointments/[id]/cancel', () => {
     // Notification-suppression invariant — the headline assertion for Item 15b.
     expect(state.smsSends).toHaveLength(0);
     expect(state.emailSends).toHaveLength(0);
-    expect(state.webhookFires).toHaveLength(0);
     expect(state.cancellationNotificationCalls).toHaveLength(0);
 
     // Audit log records suppression + POS source for traceability.
@@ -271,8 +261,6 @@ describe('POST /api/pos/appointments/[id]/cancel', () => {
     });
 
     // Webhook fired with the canonical event name.
-    expect(state.webhookFires).toHaveLength(1);
-    expect(state.webhookFires[0].event).toBe('appointment_cancelled');
 
     // Audit log records notification_suppressed=false on the notify path.
     expect(state.auditCalls).toHaveLength(1);

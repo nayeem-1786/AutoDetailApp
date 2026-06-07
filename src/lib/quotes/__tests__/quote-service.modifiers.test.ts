@@ -19,10 +19,6 @@ vi.mock('@/lib/utils/quote-number', () => ({
   generateQuoteNumber: vi.fn(async () => 'Q-TEST-001'),
 }));
 
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async () => undefined),
-}));
-
 vi.mock('@/lib/utils/resolve-mobile-fields', async () => {
   const actual = await vi.importActual<typeof import('@/lib/utils/resolve-mobile-fields')>(
     '@/lib/utils/resolve-mobile-fields'

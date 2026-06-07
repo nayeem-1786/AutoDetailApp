@@ -11,7 +11,6 @@ import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { logAudit } from '@/lib/services/audit';
-import { fireWebhook } from '@/lib/utils/webhook';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -254,12 +253,13 @@ export async function POST(request: NextRequest) {
             // other) status. Concurrent operator manual-flips win → this is a
             // no-op. Idempotency is also free: this block is INSIDE the
             // per-PI dedup guard at :96-112 — Stripe retries of the same
-            // event short-circuit before reaching here, so the audit + the
-            // outbound webhook fire exactly once per real payment.
+            // event short-circuit before reaching here, so the audit fires
+            // exactly once per real payment.
             //
-            // Downstream cascades mirror the admin PATCH + POS PATCH +
-            // convertQuote pattern (all three sites fire `appointment_confirmed`
-            // outbound on a status → confirmed write).
+            // Theme G — outbound `appointment_confirmed` n8n webhook removed
+            // alongside the three sibling sites (admin PATCH, POS PATCH,
+            // convertQuote). Smart Details has no n8n receiver wired (audit
+            // f5e714a8); audit_log is the canonical state-change record.
             if (appt.status === 'pending') {
               const { error: statusErr } = await admin
                 .from('appointments')
@@ -287,22 +287,6 @@ export async function POST(request: NextRequest) {
                 },
                 source: 'api',
               });
-
-              // Fire-and-forget outbound n8n webhook — mirrors admin PATCH
-              // (`api/appointments/[id]/route.ts:239`) + POS PATCH
-              // (`api/pos/appointments/[id]/route.ts:395`) + convertQuote
-              // (`lib/quotes/convert-service.ts:357`) byte-for-byte.
-              fireWebhook(
-                'appointment_confirmed',
-                {
-                  event: 'appointment.confirmed',
-                  timestamp: new Date().toISOString(),
-                  appointment: { id: appt.id, status: 'confirmed' },
-                },
-                admin
-              ).catch((err) =>
-                console.error('[Stripe Webhook] appointment_confirmed webhook fire failed:', err)
-              );
             }
 
             // TODO(payment-link-session-3): send payment_link_paid notification

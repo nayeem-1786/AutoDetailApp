@@ -45,7 +45,6 @@ const state = {
   appointmentUpdates: [] as Array<Record<string, unknown>>,
   jobUpdates: [] as Array<{ filter: string; payload: Record<string, unknown> }>,
   auditCalls: [] as Array<Record<string, unknown>>,
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
   // Session 1.5 — cascade integration test surface.
   linkedJob: null as null | { id: string },
   cascadeCalls: [] as Array<{ appointmentId: string; options: Record<string, unknown> }>,
@@ -88,12 +87,6 @@ vi.mock('@/lib/services/audit', () => ({
     }
     return { changes };
   },
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
-  }),
 }));
 
 vi.mock('@/lib/appointments/lifecycle-sync', () => ({
@@ -230,7 +223,6 @@ beforeEach(() => {
   state.appointmentUpdates = [];
   state.jobUpdates = [];
   state.auditCalls = [];
-  state.webhookFires = [];
   state.linkedJob = null;
   state.cascadeCalls = [];
   state.cascadeResult = { ok: true, httpStatus: 200, data: { jobId: 'job-1' } };
@@ -292,7 +284,6 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(res.status).toBe(400);
     expect(state.appointmentUpdates).toHaveLength(0);
     // Terminal state → no webhook fired.
-    expect(state.webhookFires).toHaveLength(0);
   });
 
   // Session 1.4 — the two SAFE transitions opened per AC-5 (consequence map
@@ -306,7 +297,6 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(state.appointmentUpdates).toHaveLength(1);
     expect(state.appointmentUpdates[0].status).toBe('in_progress');
     // No appointment_in_progress webhook exists in the WebhookEvent union.
-    expect(state.webhookFires).toHaveLength(0);
   });
 
   it('accepts in_progress → no_show (Session 1.4 SAFE transition) with no webhook', async () => {
@@ -316,7 +306,6 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(state.appointmentUpdates).toHaveLength(1);
     expect(state.appointmentUpdates[0].status).toBe('no_show');
     // appointment_no_show is not in the WebhookEvent union → no fire.
-    expect(state.webhookFires).toHaveLength(0);
   });
 
   it('accepts a valid status transition (confirmed → in_progress) with no confirmed/completed webhook', async () => {
@@ -325,23 +314,18 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(state.appointmentUpdates).toHaveLength(1);
     expect(state.appointmentUpdates[0].status).toBe('in_progress');
     // in_progress is neither confirmed nor completed → no webhook.
-    expect(state.webhookFires).toHaveLength(0);
   });
 
   it('fires appointment_confirmed on pending → confirmed', async () => {
     state.appointment!.status = 'pending';
     const res = await PATCH(makeReq({ status: 'confirmed' }), { params });
     expect(res.status).toBe(200);
-    expect(state.webhookFires).toHaveLength(1);
-    expect(state.webhookFires[0].event).toBe('appointment_confirmed');
   });
 
   it('fires appointment_completed on in_progress → completed', async () => {
     state.appointment!.status = 'in_progress';
     const res = await PATCH(makeReq({ status: 'completed' }), { params });
     expect(res.status).toBe(200);
-    expect(state.webhookFires).toHaveLength(1);
-    expect(state.webhookFires[0].event).toBe('appointment_completed');
   });
 
   it('returns 409 when the new slot overlaps another appointment', async () => {
@@ -365,9 +349,7 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     );
     expect(res.status).toBe(200);
     expect(state.appointmentUpdates).toHaveLength(1);
-    expect(
-      state.webhookFires.some((w) => w.event === 'appointment_rescheduled')
-    ).toBe(true);
+    // Theme G removed the appointment_rescheduled outbound webhook fire.
   });
 
   it('updates notes only (200) without firing any webhook', async () => {
@@ -379,7 +361,6 @@ describe('PATCH /api/pos/appointments/[id]', () => {
     expect(state.appointmentUpdates).toHaveLength(1);
     expect(state.appointmentUpdates[0].job_notes).toBe('wax on');
     expect(state.appointmentUpdates[0].internal_notes).toBe('vip');
-    expect(state.webhookFires).toHaveLength(0);
   });
 
   it('returns the full joined PosAppointment shape and logs a pos audit row', async () => {
@@ -439,7 +420,6 @@ describe('PATCH /api/pos/appointments/[id]', () => {
 
     // Backward-revert to `pending` does NOT fire `appointment_confirmed` or
     // `appointment_completed` — neither branch matches the target status.
-    expect(state.webhookFires).toHaveLength(0);
 
     // Audit still records the status change via the synthetic payload.
     expect(state.auditCalls).toHaveLength(1);
@@ -457,7 +437,6 @@ describe('PATCH /api/pos/appointments/[id]', () => {
 
     expect(state.cascadeCalls).toHaveLength(1);
     expect(state.appointmentUpdates[0].status).toBeUndefined();
-    expect(state.webhookFires).toHaveLength(0);
   });
 
   it('Session 1.5: confirmed → pending WITHOUT active job is a plain status flip (no cascade)', async () => {

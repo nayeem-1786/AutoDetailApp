@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { sendSms } from '@/lib/utils/sms';
 import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
 
@@ -114,24 +113,9 @@ export async function PATCH(
         }
       }
 
-      // Forward-compat webhook fire — kept per Session 1.8.1 prompt for future
-      // external receivers. Currently a silent no-op in prod (audit f5e714a8
-      // confirmed no receiver is wired). The direct sendSms above is the
-      // actual notification channel.
-      fireWebhook('appointment_cancelled', {
-        event: 'waitlist_notified',
-        waitlist_entry_id: id,
-        customer_id: current.customer_id,
-        service_id: current.service_id,
-        customer_name: current.customer
-          ? `${current.customer.first_name} ${current.customer.last_name}`
-          : null,
-        customer_phone: current.customer?.phone ?? null,
-        service_name: current.service?.name ?? null,
-        preferred_date: current.preferred_date,
-      }, supabase).catch((err) =>
-        console.error('Waitlist notification webhook failed:', err)
-      );
+      // Theme G — forward-compat webhook fire removed. Direct sendSms above
+      // is the actual customer notification channel; no n8n receiver is
+      // wired in Smart Details (audit f5e714a8).
     }
 
     return NextResponse.json({ entry: updated });

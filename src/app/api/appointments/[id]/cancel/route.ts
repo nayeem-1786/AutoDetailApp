@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { appointmentCancelSchema } from '@/lib/utils/validation';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { getEmployeeFromSession } from '@/lib/auth/get-employee';
@@ -98,16 +97,8 @@ export async function POST(
       console.error('Cancellation notifications failed (non-blocking):', err)
     );
 
-    // Fire cancellation webhook
-    fireWebhook('appointment_cancelled', {
-      event: 'appointment.cancelled',
-      timestamp: new Date().toISOString(),
-      appointment: {
-        id,
-        cancellation_reason: data.cancellation_reason,
-        cancellation_fee: fee,
-      },
-    }, supabase).catch(err => console.error('Webhook fire failed:', err));
+    // Theme G — `appointment_cancelled` outbound webhook removed. Customer SMS
+    // + email already dispatched inline above via `sendCancellationNotifications`.
 
     // --- Waitlist notification on cancellation ---
     // Check if waitlist feature is enabled
@@ -167,10 +158,10 @@ export async function POST(
               .eq('id', entry.id);
 
             // Session 1.8 — direct SMS dispatch (mirrors pos/jobs/[id]/complete:243-262).
-            // Replaces the pre-1.8 `fireWebhook('appointment_cancelled', { waitlist_notified })`
-            // call which was a customer-facing silent-drop bug — no n8n receiver is wired in
-            // prod (per webhook receivers identity audit f5e714a8), so waitlisted customers
-            // were marked `notified` in DB but never received the SMS.
+            // Pre-1.8 the only dispatch was via a `fireWebhook` call — a
+            // customer-facing silent-drop bug because no n8n receiver is wired in
+            // prod (audit f5e714a8). Theme G completes the phase-out by removing
+            // the residual forward-compat `fireWebhook` fire that followed this loop.
             const phone = entry.customer?.phone;
             const serviceName = entry.service?.name ?? 'your requested service';
             if (phone) {
@@ -194,21 +185,8 @@ export async function POST(
             }
           }
 
-          // Forward-compat webhook fire — kept per Session 1.8 prompt for future external
-          // receivers. Currently a silent no-op in prod (audit f5e714a8 confirmed no
-          // receiver is wired). The direct sendSms loop above is the actual notification
-          // channel; this is belt-and-suspenders for the day a receiver gets wired.
-          fireWebhook('appointment_cancelled', {
-            appointment_id: id,
-            date: apptDetail.scheduled_date,
-            waitlist_notified: waitlistMatches.map((w: { id: string; customer_id: string; service_id: string }) => ({
-              id: w.id,
-              customer_id: w.customer_id,
-              service_id: w.service_id,
-            })),
-          }, supabase).catch((err) =>
-            console.error('Waitlist notification webhook failed:', err)
-          );
+          // Theme G — forward-compat `appointment_cancelled` webhook fire
+          // removed. The sendSms loop above IS the customer notification path.
         }
       }
     }

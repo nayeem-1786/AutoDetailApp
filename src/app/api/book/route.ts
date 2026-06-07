@@ -25,7 +25,6 @@ import {
   addonVehicleIncompatibleErrorMessage,
 } from './_addon-vehicle-compat';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { updateSmsConsent } from '@/lib/utils/sms-consent';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
@@ -303,7 +302,6 @@ export async function POST(request: NextRequest) {
 
     // 4. Find-or-create customer (match by phone, fallback to email)
     let customerId: string;
-    let isNewCustomer = false;
 
     const { data: existingByPhone } = await supabase
       .from('customers')
@@ -401,7 +399,6 @@ export async function POST(request: NextRequest) {
           );
         }
         customerId = newCustomer.id;
-        isNewCustomer = true;
 
         // Send welcome email for new customers (non-blocking)
         if (data.customer?.email) {
@@ -870,73 +867,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 9. Fire n8n webhook (non-blocking)
-    const webhookPayload = {
-      event: 'booking.created',
-      timestamp: new Date().toISOString(),
-      appointment: {
-        id: appointment.id,
-        scheduled_date: appointment.scheduled_date,
-        scheduled_start_time: appointment.scheduled_start_time,
-        scheduled_end_time: appointment.scheduled_end_time,
-        status: appointment.status,
-        channel: appointment.channel,
-        is_mobile: appointment.is_mobile,
-        mobile_address: appointment.mobile_address,
-        mobile_surcharge: Number(appointment.mobile_surcharge),
-        subtotal: Number(appointment.subtotal),
-        total_amount: Number(appointment.total_amount),
-      },
-      customer: {
-        id: customerId,
-        first_name: data.customer.first_name,
-        last_name: data.customer.last_name,
-        phone: e164Phone,
-        email: data.customer.email,
-        is_new: isNewCustomer,
-      },
-      services: [
-        {
-          id: data.service_id,
-          name: serviceRow.name as string,
-          price: data.price,
-          tier_name: data.tier_name || null,
-          is_primary: true,
-        },
-        ...data.addons.map((addon) => ({
-          id: addon.service_id,
-          name: addon.name,
-          price: addon.price,
-          tier_name: addon.tier_name || null,
-          is_primary: false,
-        })),
-      ],
-      vehicle: data.vehicle
-        ? {
-            type: data.vehicle.vehicle_type || 'standard',
-            size_class: data.vehicle.size_class || null,
-            year: data.vehicle.year || null,
-            make: data.vehicle.make || null,
-            model: data.vehicle.model || null,
-            color: data.vehicle.color || null,
-          }
-        : null,
-    };
-
-    // Fire-and-forget: don't await, don't block the response
-    fireWebhook('booking_created', webhookPayload, supabase).catch((err) =>
-      console.error('Webhook fire failed:', err)
-    );
-
-    // If auto-confirmed (paid online), also fire appointment_confirmed webhook
-    if (initialStatus === 'confirmed') {
-      fireWebhook('appointment_confirmed', {
-        ...webhookPayload,
-        event: 'appointment.confirmed',
-      }, supabase).catch((err) =>
-        console.error('Confirmed webhook fire failed:', err)
-      );
-    }
+    // Theme G — outbound `booking_created` + `appointment_confirmed` webhook
+    // fires removed (no n8n receiver wired in Smart Details; audit f5e714a8).
+    // Pre-Theme-G this block built a ~50-line `webhookPayload` for the n8n
+    // POST; with no receiver wired the payload was never read. Customer +
+    // staff confirmation dispatch is the inline SMS/email block below.
 
     // 10. Send booking confirmation + staff notification (fire-and-forget)
     try {

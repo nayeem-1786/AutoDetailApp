@@ -86,7 +86,6 @@ const state = {
   auditCalls: [] as Array<Record<string, unknown>>,
   smsSends: [] as unknown[],
   emailSends: [] as unknown[],
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
 };
 
 vi.mock('@/lib/auth/get-employee', () => ({
@@ -124,12 +123,6 @@ vi.mock('@/lib/utils/email', () => ({
   sendEmail: vi.fn(async (...args: unknown[]) => {
     state.emailSends.push(args);
     return { ok: true };
-  }),
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
   }),
 }));
 
@@ -319,7 +312,6 @@ beforeEach(() => {
   state.auditCalls = [];
   state.smsSends = [];
   state.emailSends = [];
-  state.webhookFires = [];
 });
 
 describe('PUT /api/admin/appointments/[id]/services', () => {
@@ -570,7 +562,6 @@ describe('PUT /api/admin/appointments/[id]/services', () => {
     );
     expect(state.smsSends).toEqual([]);
     expect(state.emailSends).toEqual([]);
-    expect(state.webhookFires).toEqual([]);
   });
 
   it('writes an audit log entry tagged notification_suppressed', async () => {

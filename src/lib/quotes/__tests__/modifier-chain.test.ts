@@ -42,9 +42,6 @@ vi.mock('@/lib/utils/assign-detailer', async () => {
     findAvailableDetailer: vi.fn(async () => 'emp-detailer-1'),
   };
 });
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async () => undefined),
-}));
 vi.mock('@/lib/pos/api-auth', () => ({
   authenticatePosRequest: async () => sharedState.posEmployee,
 }));

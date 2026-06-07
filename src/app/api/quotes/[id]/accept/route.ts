@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
@@ -73,9 +72,6 @@ export async function POST(
       console.error('Error accepting quote:', updateErr.message);
       return NextResponse.json({ error: 'Failed to accept quote' }, { status: 500 });
     }
-
-    // Fire webhook
-    fireWebhook('quote_accepted', { ...quote, status: 'accepted', accepted_at: updated.accepted_at }, supabase).catch(() => {});
 
     // Send SMS confirmation to customer
     const customer = quote.customer as { id: string; first_name: string; last_name: string; phone: string | null; email: string | null } | null;

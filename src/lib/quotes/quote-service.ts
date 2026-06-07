@@ -1,6 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { TAX_RATE } from '@/lib/utils/constants';
 import {
   resolveMobileFields,
@@ -228,9 +227,6 @@ export async function createQuote(
   }
 
   const createdQuote = { ...quote, items: insertedItems };
-
-  // Fire webhook (fire-and-forget)
-  fireWebhook('quote_created', createdQuote, supabase).catch(() => {});
 
   return { quote: createdQuote };
 }

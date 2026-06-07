@@ -1,6 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getBusinessInfo } from '@/lib/data/business';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { createShortLink } from '@/lib/utils/short-link';
 import { sendSms } from '@/lib/utils/sms';
@@ -434,9 +433,6 @@ export async function sendQuote(
       }
     }
   }
-
-  // Fire webhook with quote data + link
-  fireWebhook('quote_sent', { ...quote, link: quoteLink }, supabase).catch(() => {});
 
   // success: true when at least one channel landed (full or partial).
   // success: false when no channels succeeded — route maps this to HTTP 422.

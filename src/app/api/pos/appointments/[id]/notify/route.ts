@@ -5,7 +5,6 @@ import { getBusinessInfo } from '@/lib/data/business';
 import { sendEmail } from '@/lib/utils/email';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { formatCurrency } from '@/lib/utils/format';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { attachTierMetaToItems } from '@/lib/quotes/attach-tier-meta';
@@ -342,7 +341,9 @@ Thank you for choosing ${business.name}!`;
       }
     }
 
-    fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
+    // Theme G — `appointment_confirmed` outbound webhook removed (no n8n
+    // receiver in Smart Details; audit f5e714a8). Customer + detailer SMS
+    // dispatched inline above.
 
     return NextResponse.json({
       success: true,

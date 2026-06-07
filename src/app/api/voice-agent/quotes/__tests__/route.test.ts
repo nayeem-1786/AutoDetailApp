@@ -148,11 +148,6 @@ vi.mock('@/lib/utils/quote-number', () => ({
   generateQuoteNumber: async () => 'Q-1001',
 }));
 
-// --- webhook (non-blocking) ---
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async () => undefined),
-}));
-
 // --- combo resolver mock ---
 const applyCombosToQuoteItemsMock = vi.fn();
 vi.mock('@/lib/services/combo-resolver', () => ({

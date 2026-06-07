@@ -43,7 +43,6 @@ const state = {
   // call lands here so the cascade test can assert exactly what was written.
   jobUpdates: [] as Array<{ filter: string; payload: Record<string, unknown> }>,
   auditCalls: [] as Array<Record<string, unknown>>,
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
   linkedJob: null as null | { id: string },
   cascadeCalls: [] as Array<{ appointmentId: string; options: Record<string, unknown> }>,
   cascadeResult: { ok: true, httpStatus: 200, data: { jobId: 'job-1' } } as Record<string, unknown>,
@@ -86,12 +85,6 @@ vi.mock('@/lib/services/audit', () => ({
     }
     return { changes };
   },
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
-  }),
 }));
 
 vi.mock('@/lib/appointments/lifecycle-sync', () => ({
@@ -200,7 +193,6 @@ beforeEach(() => {
   state.appointmentUpdates = [];
   state.jobUpdates = [];
   state.auditCalls = [];
-  state.webhookFires = [];
   state.linkedJob = null;
   state.cascadeCalls = [];
   state.cascadeResult = { ok: true, httpStatus: 200, data: { jobId: 'job-1' } };
@@ -253,7 +245,6 @@ describe('PATCH /api/appointments/[id] — Session 1.5 admin/POS symmetry', () =
     // status omitted from the PATCH UPDATE — cascade owned that write.
     expect(state.appointmentUpdates).toHaveLength(1);
     expect(state.appointmentUpdates[0].status).toBeUndefined();
-    expect(state.webhookFires).toHaveLength(0);
 
     // Audit records the status change through the synthetic payload.
     const audit = state.auditCalls[0];
@@ -290,8 +281,6 @@ describe('PATCH /api/appointments/[id] — Session 1.5 admin/POS symmetry', () =
     state.appointment!.status = 'pending';
     const res = await PATCH(makeReq({ status: 'confirmed' }), { params });
     expect(res.status).toBe(200);
-    expect(state.webhookFires).toHaveLength(1);
-    expect(state.webhookFires[0].event).toBe('appointment_confirmed');
   });
 
   it('passes the pre-1.5 happy paths (notes-only update) without cascade or state-machine interference', async () => {
