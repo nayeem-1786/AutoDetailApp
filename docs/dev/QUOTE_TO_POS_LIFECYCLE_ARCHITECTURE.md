@@ -315,7 +315,7 @@ No other cross-table writes are permitted without an architectural-commitment up
   - "Cancel — customer not yet here" (no action)
 - Start Intake disabled for `appointment.status NOT IN (confirmed, in_progress)` (e.g., pending requires confirmation first)
 
-**Walk-in path unchanged:** atomic appointment + job create stays as the parallel path. Walk-in helper-reuse refactor (sharing `materializeJobFromAppointment` with the start-intake path) queued as Session 2.1.1 — see Phase 2 section.
+**Walk-in path unchanged:** atomic appointment + job create stays as the parallel path. ~~Walk-in helper-reuse refactor (sharing `materializeJobFromAppointment` with the start-intake path) queued as Session 2.1.1~~ Session 2.1.1 (`TBD-MERGE-HASH`, 2026-06-07) refactored walk-in's job-INSERT half to share the helper via `trigger: 'walk_in'`; walk-in's appointment-INSERT half stays inline (deeply walk-in-specific shape). Both paths now converge on the same audit writer + the same `jobs.appointment_id` UNIQUE constraint.
 
 **Effect on `populate` endpoint:** RETIRED Session 2.5. Endpoint deleted; pre-materialization is now operator-initiated only.
 
@@ -1437,7 +1437,7 @@ The cascade is ALREADY CODED — `lifecycle-sync.ts:59-72`'s `jobStatusForAppoin
 
 **Session ledger:** 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`9e29d058`) + 2.6 (`9212423f`). Net production lines: ~+700 / -540 (the -540 dominated by Session 2.5's endpoint deletion). Test files: 192 / 3100 cases passing post-2.6.
 
-**Queued post-Phase-2 deferral:** Session 2.1.1 (walk-in helper-reuse refactor) — see entry below.
+**Closed post-Phase-2 deferral:** Session 2.1.1 (walk-in helper-reuse refactor) merged 2026-06-07 PDT — see entry below. Memory #29 deferral CLOSED.
 
 ---
 
@@ -1681,7 +1681,7 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 - MOD comment cross-references (7 files) that pointed at `populate/route.ts:N-M` line ranges as the canonical writer/mirror reference — re-pointed to `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts` (Session 2.1's canonical writer) AND/OR the walk-in atomic create at `src/app/api/pos/jobs/route.ts`. Each rewrite preserves a "pre-Session-2.5 / retired in 2.5" historical clause so a future reader following a doc trail to the audit can place the change in context. Files: `lifecycle-sync.ts` (self-references in the materialization helper's doc-block), `edit-services.ts`, `mobile-service-edit.ts`, `compose-line-items.ts` (+ its test file), `job-detail.tsx`, `flag-issue-flow.tsx`
 
 **Out of scope:**
-- Walk-in atomic create at `src/app/api/pos/jobs/route.ts:147-536` is unchanged — parallel materialization path that stays (Session 2.1.1 is queued for the helper-reuse refactor)
+- Walk-in atomic create at `src/app/api/pos/jobs/route.ts:147-536` is unchanged — parallel materialization path that stays (Session 2.1.1, merged 2026-06-07 PDT, subsequently refactored the job-INSERT half to share `materializeJobFromAppointment`; appointment-INSERT half stays inline)
 - Start Intake endpoint (Session 2.1) unchanged
 - Today endpoint query (Session 2.2) unchanged
 - No DB schema touch — Phase 0.3 verified no triggers, RPCs, constraints, or crons reference populate. Re-verified at execution time: `grep -rln "populate" supabase/migrations` returns 7 false-positive matches (English-verb "populated" in column comments, e.g., `"only populated if status = 'failed'"`); `grep -rln "populate" src/lib/cron` returns no matches. CLEAN verdict still holds.
@@ -1705,7 +1705,7 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 **Dependencies:**
 - Depends on: Session 2.1 (`a5d2a0d6`) for `materializeJobFromAppointment` as the canonical materialization writer; Session 2.2 (`f25bb87d`) for the Today endpoint's `unstarted_appointments` payload extension that makes the populate pre-stage redundant
 - Sequential after: Sessions 2.1 + 2.2 (both must land before this can fire)
-- Unblocks: Session 2.6 (daily summary refresh — operator-visible card semantics now reflect the new materialization architecture); Session 2.1.1 follow-up (walk-in helper-reuse refactor — `materializeJobFromAppointment` is the natural sharing seam now that it's the sole non-walk-in materialization site)
+- Unblocks: Session 2.6 (daily summary refresh — operator-visible card semantics now reflect the new materialization architecture); Session 2.1.1 (walk-in helper-reuse refactor — `materializeJobFromAppointment` was the natural sharing seam once Session 2.5 made it the sole non-walk-in materialization site; merged 2026-06-07 PDT)
 
 **Production behavior shift (visible):**
 - **Pre-2.5:** Today scope mount triggers populate → today's confirmed appointments are pre-materialized as `jobs WHERE status='scheduled'` → the un-started strip is empty in steady state → operator sees a full Today list of `scheduled` job cards.
@@ -1767,33 +1767,62 @@ Future-date popup is a defense-in-depth path: the Today endpoint already filters
 
 ---
 
-### Session 2.1.1 — Walk-in atomic create: share `materializeJobFromAppointment` helper (queued)
+### Session 2.1.1 — Walk-in atomic create: share `materializeJobFromAppointment` helper
 
-**Status:** `[ ]` **Not started** — queued post-Phase-2 deferral per Memory #29 (surfaced in Session 2.5's notes; referenced from AC-3's "Walk-in path unchanged" clause)
+**Status:** `[x]` **Complete — merged to main at `TBD-MERGE-HASH` on 2026-06-07 PDT** (Memory #29 deferral CLOSED)
+**Source:** Session 2.1 (`a5d2a0d6`) introduced `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts` as the canonical materialization writer; Session 2.5 (`9e29d058`) retired populate, leaving the helper as the sole non-walk-in materialization site. Walk-in atomic create at `src/app/api/pos/jobs/route.ts` still inlined its own job-INSERT pair pre-2.1.1 (the structural difference: walk-in creates the appointment too, helper assumes an existing appointment) — explicitly deferred per Memory #29 in Session 2.5's prompt: "The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)."
+**Estimated scope:** ~50-100 prod lines (mostly extraction), 1-2 files, pure refactor
+**Actual scope:** +68 net prod lines (161 ins / 93 del) across 2 prod files (`lifecycle-sync.ts` helper extended; `pos/jobs/route.ts` walk-in call-site refactored) + 1 new test file (365 lines, 9 tests) + 1 test mock update (walk-in-modifier-persistence test)
+**Memory #8 budget:** Comfortable — well under the ≤120-prod-line target. Refactor expanded by `(walk_in trigger)` audit detail differentiation + docstring depth + the 9-test regression-locking block for the new branch.
 
-**Source:** Session 2.1 (`a5d2a0d6`) introduced `materializeJobFromAppointment` in `src/lib/appointments/lifecycle-sync.ts` as the canonical materialization writer. Session 2.5 (`9e29d058`) retired the populate endpoint, making `materializeJobFromAppointment` the sole non-walk-in materialization site. The walk-in atomic create at `src/app/api/pos/jobs/route.ts:147-536` still inlines its own job-INSERT pair (synthetic appointment + job in one transaction). The helper and the walk-in path now share enough shape that a reuse pass is worthwhile — but the structural difference (walk-in creates the appointment too; helper assumes an existing appointment) means it's a non-trivial refactor.
+**Issue:** Memory #2 (component reuse) violation — two materialization paths shared the `jobs.services` JSONB build shape, the mobile-fee append shape, and the audit-write shape. The pre-2.1.1 walk-in inline copy at `pos/jobs/route.ts` duplicated logic that `materializeJobFromAppointment` already canonicalized in Session 2.1 (and that Session 2.5 then made the sole non-walk-in site for). Single-source-of-truth concern, not a behavioral bug.
 
-**Scope (when fired):**
-- Extract the `jobs.services` JSONB build + the `estimated_pickup_at` PST calc + the mobile-fee append into shared utilities or extend `materializeJobFromAppointment` to accept a "synthetic appointment" mode
-- Walk-in atomic create then calls the shared utility for the job-INSERT half; keeps its own appointment-INSERT half (the shape difference)
-- No behavioral change — walk-ins still land at `status='scheduled'` (their transient pre-stage state); non-walk-in materialization still lands at `status='intake'`
+**Solution (as implemented):**
+1. **`MaterializeOptions.trigger` widened** to `'start_intake' | 'walk_in'` union (was `'start_intake'`-only). New optional fields: `quoteId`, `intakeNotes`, `estimatedPickupAtOverride`, `servicesSnapshot` — all walk-in-only forwarders the caller already had in memory at the create-call moment.
+2. **Helper body branches on `trigger`** for job initial state:
+   - `start_intake`: `status='intake'`, `work_started_at=NOW`, `intake_started_at=NOW` (unchanged)
+   - `walk_in`: `status='scheduled'`, NULL timestamps (preserves the transient pre-intake state walk-in had pre-2.1.1)
+3. **Helper's appointment-status UPDATE naturally skipped for walk_in** — the existing `if (apptStatus === 'confirmed')` guard returns false for walk-in's already-`in_progress` appointment, so no special-casing needed.
+4. **`servicesSnapshot` bypasses the appointment_services + services join** — walk-in already has the services from the create-request body in memory; the join would be a redundant round-trip. Helper still appends the mobile-fee entry from the appointment row (uniform behavior across both triggers).
+5. **Walk-in route refactored** to call the helper after the appointment + appointment_services INSERTs commit. Removed the inline `jobs.insert(...)` block + the inline `logAudit(...)` call. Added a separate response-shape SELECT-with-joins (helper returns only `jobId`; the POS client needs customer+vehicle+assigned_staff embedded). Appointment-rollback on helper-failure preserved (CASCADE cleans the appointment_services rows).
+6. **Audit details extended** with `customer_id` for parity with the pre-2.1.1 walk-in audit shape (which carried it alongside services_count); also useful for cross-customer audit-row aggregation. `entityLabel` is trigger-specific (`(walk-in)` vs `(materialized)`) so the human-readable label distinguishes the two creation paths at a glance in the admin audit-log viewer.
 
-**Out of scope:**
-- Behavioral change of any kind. Walk-in's transient `scheduled` state is intentional UX (operator confirms walk-in registration → presses Start Intake when vehicle is staged) and must not be unified into the helper's `intake` start.
-- Reorganizing walk-in's appointment-INSERT half — that's its own structural concern, not a helper sharing concern.
+**Why:**
+- **Memory #2 closure** — `materializeJobFromAppointment` is now the SOLE writer of `jobs` rows from a materialization path (both Start Intake AND walk-in flow through it). The duplication audit can mark this row resolved.
+- **Memory #29 deferral closed** — Session 2.5's prompt deferral explicitly named Session 2.1.1 as the queued follow-up. This session is that closure.
+- **Behavioral preservation verified** — all 6 pre-existing walk-in tests pass with no assertion changes (only test-mock stateful-ness updates to support the helper's appointment SELECT). All 19 start_intake tests pass unchanged.
 
-**Rationale:**
-- **Memory #2 (component reuse):** two materialization paths that share the JSONB-build shape and the PST calc shape are a smell. The Session 2.5 cleanup made `lifecycle-sync.ts:materializeJobFromAppointment`'s in-source documentation explicit that it is the canonical materialization writer — walk-in's inline copy is now the only siblings-in-shape duplicate.
-- **Memory #29 (targeted scope):** Session 2.5's prompt explicitly deferred this — "The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)." This entry honors that deferral by surfacing it as a tracked queued session rather than a buried follow-up note.
+**Pre-tasks:**
+- `[x]` Session 2.1 merged (helper exists) — `a5d2a0d6`
+- `[x]` Phase 3 Theme A merged (walk-in writes `appointment_number` via `next_identifier('appointment')` before helper is invoked) — `133d4ee8`
+- `[x]` Phase 3 Theme A.1 merged (legacy identifier triggers retired) — `4db58acd`
 
-**Estimated scope:** ~50-100 prod lines (mostly extraction), 1-2 files (`lifecycle-sync.ts` + `pos/jobs/route.ts`), no schema change, no DB migration. Pure refactor — same observable behavior pre/post.
+**Primary files:**
+- `src/lib/appointments/lifecycle-sync.ts` (MOD — `MaterializeOptions` union widened, helper body trigger-branched, audit details + entityLabel trigger-aware, docstring extended)
+- `src/app/api/pos/jobs/route.ts` (MOD — inline jobs.insert + jobServicesSnapshot build + logAudit removed; replaced with helper call + result handling + response-shape SELECT)
 
-**Dependencies:**
-- Depends on: Sessions 2.1 + 2.5 (both must be in main — they ARE, post-Phase-2 closure)
-- Sequential after: nothing else; this is a standalone refactor session
-- Unblocks: nothing — pure cleanup
+**Test files:**
+- `src/lib/appointments/__tests__/materialize-walk-in-trigger.test.ts` (NEW — 9 regression tests pinning the `walk_in` trigger branch: scheduled+null-timestamps initial state, no appointment.status advance, quoteId/intakeNotes forwarding + defaults, estimatedPickupAtOverride honored, servicesSnapshot bypasses join, mobile-fee append still applied, audit shape, start_intake-branch differentiation guard)
+- `src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts` (MOD — mock builder made stateful to support the helper's appointment SELECT + jobs idempotency SELECT + jobs upsert; assertions unchanged — preserves the Layer 15g-iv modifier-persistence contract byte-for-byte)
 
-**Trigger condition:** can run any time after Phase 2 closure. Not urgent — the duplication doesn't cause incorrect behavior, it just keeps two near-identical patterns alive. Fire when convenient (e.g., during a low-pressure window between Phase 3 sessions, or as part of a future broader lifecycle-sync.ts maintenance pass).
+**Out of scope (held):**
+- Behavioral change of any kind. Walk-in's transient `scheduled` state is preserved (operator confirms walk-in registration → presses Start Intake on the resulting card to advance to `intake`).
+- Walk-in's appointment-INSERT half — deeply walk-in-specific shape (synthetic `channel='walk_in'`, modifier snapshot, mobile fields, payment_status defaults). Helper does NOT take this over; only the job-INSERT half is shared. Documented in helper's docstring.
+- Theme F's F.2 quote-linkage logic — this session sets up the helper-refactored walk-in shape that Theme F builds on, but does NOT add F.2 itself.
+
+**Evidence citations:**
+- AC-3: *"Operator pressing 'Start Intake' on a confirmed (or in_progress) appointment is the canonical materialization event."* — extends naturally to walk-in's just-INSERTed in_progress appointment via the helper's existing status gate
+- Session 2.5's prompt deferral: *"The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)."* — explicit closure marker
+- Pre-2.1.1 helper docstring (line 441-444 of `lifecycle-sync.ts`): *"Walk-in atomic create at `pos/jobs/route.ts:147-536` keeps its inline implementation — it creates the appointment AND the job in one transaction (a different structural shape than this helper)."* — replaced with Session 2.1.1's "both paths share this one writer" note
+
+**Related sessions:**
+- Depends on: Session 2.1 (`a5d2a0d6`) for the helper; Phase 3 Theme A (`133d4ee8`) for `appointment_number` generation; Phase 3 Theme A.1 (`4db58acd`) for legacy trigger cleanup
+- Sequential after: nothing — standalone refactor
+- Unblocks: Theme F (F.2 quote-linkage logic builds on the helper-refactored walk-in shape)
+
+**Linked prompt:** Session 2.1.1 prompt (operator-supplied in 2026-06-07 PST session)
+
+**Completion:** Merged to main at `TBD-MERGE-HASH` on 2026-06-07 PDT. Implementation followed the locked scope exactly. Net +68 prod lines (161 ins / 93 del across 2 files) — well under the Memory #8 ≤120-line budget. Helper's `MaterializeOptions` union widened to `'start_intake' | 'walk_in'` with four new walk-in-only forwarders (`quoteId`, `intakeNotes`, `estimatedPickupAtOverride`, `servicesSnapshot`). Helper body branches on trigger for job initial state (`status` + `work_started_at` + `intake_started_at`); appointment-status UPDATE naturally skipped for walk-in via existing `if (apptStatus === 'confirmed')` guard. Walk-in route's inline jobs.insert + logAudit replaced with helper call + response-shape SELECT; appointment-rollback-on-failure preserved. Audit details extended with `customer_id` and trigger-specific `entityLabel` suffix. Verification gates: tsc 0 errors / lint 0 errors (97 baseline warnings — 0 new) / build clean / 194 test files / 3116 tests passing (was 193 / 3107 — +1 test file, +9 walk_in trigger tests). All 6 pre-existing walk-in tests pass with NO assertion changes; all 19 start_intake tests pass unchanged. Memory #2 violation closed: `materializeJobFromAppointment` is now the SOLE writer of materialization-path job rows. Memory #29 deferral closed: Session 2.5's queued follow-up is now in main.
 
 ---
 
@@ -2088,6 +2117,48 @@ Following v1.3 lock and operator review, operator observed `A-100000` reads as t
 - Docs: this lifecycle architecture entry; `docs/CHANGELOG.md` (Theme A.1 entry)
 
 **Rationale recap (deferred-drop pattern):** Theme A's Migration 6 explicitly KEPT these two triggers alive to avoid a post-migrate / pre-deploy outage window. That sequencing concern is now resolved — the application code has been issuing identifiers via `next_identifier()` in production. The triggers' `WHEN (NEW.column IS NULL)` gates were already shadowed; dropping the triggers + functions retires a stale safety net rather than altering live behavior. This closes the Theme A.1 deferral noted in the entry above.
+
+---
+
+### 2026-06-07 PST — Session 2.1.1 complete (walk-in atomic create → shares `materializeJobFromAppointment` helper; Memory #29 deferral CLOSED)
+
+**Status:** Session 2.1.1 merged to `main` at `TBD-MERGE-HASH` (feature commit on branch `refactor/session-2-1-1-walk-in-helper-share`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (0 new); build clean; full test suite passes (194 files / 3116 tests — was 193 / 3107; +1 test file + 9 new walk_in trigger tests).
+
+**Scope:** pure refactor — Memory #29 deferral closure from Session 2.5's prompt. Walk-in atomic create at `src/app/api/pos/jobs/route.ts` previously inlined its own job-INSERT + audit pair (Memory #2 duplication of the `materializeJobFromAppointment` helper Session 2.1 canonicalized). This session widens `MaterializeOptions.trigger` to `'start_intake' | 'walk_in'` and routes walk-in's job-creation step through the helper.
+
+**Helper extension:**
+- `trigger` union widened to `'start_intake' | 'walk_in'` — branches initial job state (`status`, `work_started_at`, `intake_started_at`)
+- Four new walk-in-only optional fields: `quoteId`, `intakeNotes`, `estimatedPickupAtOverride`, `servicesSnapshot` — forwarders the walk-in caller already has in memory at create-call time
+- `servicesSnapshot` bypasses the appointment_services + services join (walk-in has the rows from the request body); helper still appends the mobile-fee entry from the appointment row uniformly across both triggers
+- Appointment-status UPDATE naturally skipped for walk_in — existing `if (apptStatus === 'confirmed')` guard returns false for walk-in's already-`in_progress` appointment
+- Audit details extended with `customer_id` (parity with pre-2.1.1 walk-in audit); `entityLabel` trigger-specific (`(walk-in)` vs `(materialized)`) for human-readable distinction in admin audit-log viewer
+
+**Walk-in route refactor:**
+- Inline `jobs.insert(...)` + inline `logAudit(...)` + inline `jobServicesSnapshot` mobile-fee build all REMOVED
+- Replaced with single `materializeJobFromAppointment(supabase, appointment.id, { trigger: 'walk_in', actor, source, ipAddress, quoteId, intakeNotes, estimatedPickupAtOverride: pickupAt, servicesSnapshot: services })` call
+- Helper returns only `jobId` — added a separate response-shape SELECT with the customer+vehicle+assigned_staff joins the POS client expects
+- Appointment-rollback-on-helper-failure preserved (CASCADE cleans the appointment_services join rows from the prior step)
+
+**Behavioral preservation verified:**
+- All 6 pre-existing walk-in modifier-persistence tests pass with NO assertion changes (only test-mock stateful-ness updates to support the helper's appointment SELECT + jobs idempotency SELECT + jobs upsert)
+- All 19 pre-existing start_intake route tests pass unchanged
+- Helper's start_intake-branch behavior pinned by Session 2.1's existing tests; new `materialize-walk-in-trigger.test.ts` adds 9 regression tests for the walk_in branch (scheduled+null-timestamps initial state, no appointment.status advance, quoteId/intakeNotes forwarding + defaults, estimatedPickupAtOverride honored, servicesSnapshot bypasses join, mobile-fee append still applied, audit shape, start_intake-branch differentiation guard)
+
+**Files touched:**
+
+- Production (2 MOD): `src/lib/appointments/lifecycle-sync.ts` (helper extension); `src/app/api/pos/jobs/route.ts` (walk-in call-site refactored)
+- Tests (1 NEW + 1 MOD): `src/lib/appointments/__tests__/materialize-walk-in-trigger.test.ts` (NEW — 9 tests); `src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts` (MOD — stateful mock builder; assertions unchanged)
+- Docs (2 MOD): this lifecycle architecture entry + previous Session 2.1.1 entry updated; `docs/CHANGELOG.md` (Session 2.1.1 entry)
+
+**Memory #8 budget:** Comfortable — +68 net prod lines (161 ins / 93 del across 2 files). Well under the ≤120-line target. Expansion concentrated in: helper docstring depth (walk_in branch documentation), trigger-branched job INSERT block, audit detail differentiation, and the 9-test regression-locking file.
+
+**Memory #2 closure:** `materializeJobFromAppointment` is now the SOLE writer of materialization-path `jobs` rows. Both Start Intake AND walk-in flow through it. The duplication audit can mark this row resolved.
+
+**Memory #29 closure:** Session 2.5's prompt explicitly deferred this — "The walk-in atomic create path stays exactly as-is. Don't refactor it to share helpers (Session 2.1.1 is queued for that)." This session is that closure. The deferral marker at the Phase 2 closure entry has been updated from "Queued post-Phase-2 deferral" → "Closed post-Phase-2 deferral".
+
+**Helper docstring updated** to remove the pre-2.1.1 clause that said walk-in stays inline; replaced with the new "both triggers converge at this one audit writer" note. AC-3's "Walk-in path unchanged" clause updated similarly (~~strikethrough~~ + post-2.1.1 explanation).
+
+**Unblocks Theme F:** Theme F's F.2 quote-linkage logic was sequenced to fire after this session lands so it builds on the helper-refactored walk-in shape rather than the pre-2.1.1 inline form.
 
 ---
 

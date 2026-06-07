@@ -420,28 +420,64 @@ export interface MaterializeActor {
 }
 
 export interface MaterializeOptions {
-  /** The materialization trigger. `start_intake` lands the job at status='intake'
-   *  with `work_started_at=NOW()`; future triggers (operator-initiated, lazy-mount)
-   *  can use this discriminator to pick their own initial status + audit detail. */
-  trigger: 'start_intake';
+  /** Materialization trigger — branches the initial job state + audit detail:
+   *   - 'start_intake' — operator pressed Start Intake on an EXISTING confirmed
+   *     appointment. Job lands at status='intake' with work_started_at=NOW(),
+   *     and the appointment advances from 'confirmed' to 'in_progress'.
+   *   - 'walk_in' — caller (POST /api/pos/jobs) JUST INSERTed a synthetic
+   *     `channel='walk_in'` appointment in 'in_progress' state on TODAY. Job
+   *     lands at status='scheduled' with no work_started_at/intake_started_at
+   *     (walk-in stays in a transient pre-intake stage until the operator
+   *     presses Start Intake on the resulting job card). Appointment status is
+   *     NOT advanced (already in_progress by construction); the existing
+   *     `if (apptStatus === 'confirmed')` check naturally skips the UPDATE.
+   *  Future triggers (lazy-mount, batch backfill) can extend this union. */
+  trigger: 'start_intake' | 'walk_in';
   actor: MaterializeActor;
   source: 'admin' | 'pos';
   ipAddress: string | null;
+  /** walk_in only — forwarded to jobs.quote_id when this walk-in came from a
+   *  quote conversion (quote-ticket-panel handleCreateJob). Unused / null for
+   *  start_intake (Start Intake operates on appointments that were never
+   *  attached to a quote at conversion time). */
+  quoteId?: string | null;
+  /** walk_in only — forwarded to jobs.intake_notes from the create-request
+   *  body. Unused / null for start_intake (the operator captures intake notes
+   *  inside the intake form, not at materialization time). */
+  intakeNotes?: string | null;
+  /** walk_in only — overrides the appointment-derived `estimated_pickup_at`
+   *  calc. Walk-in computes its own rounded-to-15-min NOW value (e.g.,
+   *  14:07 → 14:15) rather than deriving from scheduled_end_time the way
+   *  Start Intake does. */
+  estimatedPickupAtOverride?: string | null;
+  /** walk_in only — base services snapshot supplied by the caller (no
+   *  mobile-fee entry; the helper still appends a mobile-fee row from the
+   *  appointment row when applicable). Bypasses the appointment_services +
+   *  services join the helper would otherwise perform — walk-in already has
+   *  the services in memory from the create-request body, and using the join
+   *  would round-trip unnecessarily. */
+  servicesSnapshot?: JobServiceSnapshot[];
 }
 
 /**
  * Forward-direction materialization: given an existing appointment id, create
- * the linked `jobs` row and advance `appointments.status='in_progress'`. The
- * canonical counterpart to `executeUnMaterialize` (the reverse direction).
+ * the linked `jobs` row and (for `start_intake`) advance
+ * `appointments.status='in_progress'`. The canonical counterpart to
+ * `executeUnMaterialize` (the reverse direction).
  *
  * AC-3 commitment (Session 2.1): operator pressing "Start Intake" is the
  * canonical materialization event for a confirmed appointment. This helper is
  * the server primitive that powers `POST /api/pos/jobs/start-intake`.
  *
- * Walk-in atomic create at `pos/jobs/route.ts:147-536` keeps its inline
- * implementation — it creates the appointment AND the job in one transaction
- * (a different structural shape than this helper). Both paths converge at the
- * `jobs.appointment_id` UNIQUE constraint.
+ * Session 2.1.1 (Memory #29 closure): the walk-in atomic-create path at
+ * `pos/jobs/route.ts` now also routes its job-creation step through this
+ * helper, with `trigger: 'walk_in'`. Walk-in still inserts the synthetic
+ * appointment + `appointment_services` rows inline (deeply walk-in-specific
+ * shape: `channel='walk_in'`, synthetic time fields, mobile + modifier
+ * snapshots, payment_status defaults). After those INSERTs commit, the
+ * helper takes over for the job INSERT + audit emission. Both triggers
+ * converge at the `jobs.appointment_id` UNIQUE constraint and share this
+ * one audit-row writer (no inline `logAudit` at the walk-in call site).
  *
  * Gates (return-before-mutation):
  *  1. **404 not_found** — appointment row does not exist.
@@ -541,29 +577,36 @@ export async function materializeJobFromAppointment(
       };
     }
 
-    // 5. Fetch appointment_services for the services JSONB snapshot. Join
-    //    shape lifted from the retired `populate` endpoint (Session 2.5);
-    //    this is now the canonical join.
-    const { data: aptServices } = await supabase
-      .from('appointment_services')
-      .select(
-        'service_id, price_at_booking, service:services!appointment_services_service_id_fkey(id, name)'
-      )
-      .eq('appointment_id', appointmentId);
+    // 5. Resolve the base services snapshot. Two paths:
+    //    - walk_in: caller passes `servicesSnapshot` from the create-request
+    //      body (already in memory; bypasses the join round-trip).
+    //    - start_intake / fallback: fetch appointment_services + services name
+    //      via PostgREST join. (Shape lifted from the retired `populate`
+    //      endpoint (Session 2.5); this is the canonical join.)
+    let baseServices: JobServiceSnapshot[];
+    if (options.servicesSnapshot !== undefined) {
+      baseServices = options.servicesSnapshot;
+    } else {
+      const { data: aptServices } = await supabase
+        .from('appointment_services')
+        .select(
+          'service_id, price_at_booking, service:services!appointment_services_service_id_fkey(id, name)'
+        )
+        .eq('appointment_id', appointmentId);
 
-    const baseServices: JobServiceSnapshot[] = (aptServices ?? []).map((svc) => {
-      const service = svc.service as unknown as { id: string; name: string } | null;
-      return {
-        id: svc.service_id as string,
-        name: service?.name ?? 'Unknown Service',
-        price: Number(svc.price_at_booking),
-      };
-    });
+      baseServices = (aptServices ?? []).map((svc) => {
+        const service = svc.service as unknown as { id: string; name: string } | null;
+        return {
+          id: svc.service_id as string,
+          name: service?.name ?? 'Unknown Service',
+          price: Number(svc.price_at_booking),
+        };
+      });
+    }
 
     // Append mobile-fee entry to the JSONB snapshot when the appointment is
-    // mobile (Option D2 materialization — mirrors the walk-in pattern at
-    // `pos/jobs/route.ts:458-468`; pre-Session-2.5 the same append also
-    // lived in `populate/route.ts`, retired in 2.5).
+    // mobile (Option D2 materialization — uniform across both triggers;
+    // pre-2.1.1 the same append lived inline at the walk-in call site).
     const mobileSurchargeNum = Number(appt.mobile_surcharge ?? 0);
     const services: JobServiceSnapshot[] =
       appt.is_mobile && mobileSurchargeNum > 0
@@ -592,23 +635,31 @@ export async function materializeJobFromAppointment(
     }
 
     // 7. INSERT job (idempotent via upsert + UNIQUE constraint on appointment_id).
-    //    Start Intake lands DIRECTLY at status='intake' with work_started_at=NOW
-    //    — operator pressing Start Intake IS the start of work tracking (skips
-    //    the legacy `scheduled` intermediate state the retired `populate`
-    //    endpoint used). Walk-in atomic create still lands at `scheduled`
-    //    for its own transient pre-stage flow.
+    //    Trigger branches the initial state:
+    //    - start_intake: status='intake' + work_started_at=NOW + intake_started_at=NOW
+    //      (operator pressing Start Intake IS the start of work tracking;
+    //      skips the legacy 'scheduled' intermediate state the retired
+    //      `populate` endpoint used).
+    //    - walk_in: status='scheduled' + NULL timestamps (transient pre-intake
+    //      stage; the operator advances to 'intake' via Start Intake on the
+    //      resulting job card). estimated_pickup_at uses the caller-supplied
+    //      rounded-to-15-min NOW value rather than the scheduled_end_time calc.
+    //      quote_id + intake_notes forwarded from the create-request body.
     const nowIso = new Date().toISOString();
+    const isStartIntake = options.trigger === 'start_intake';
     const jobInsert = {
       appointment_id: appointmentId,
       customer_id: appt.customer_id,
       vehicle_id: appt.vehicle_id,
       assigned_staff_id: appt.employee_id,
       services,
-      status: 'intake' as const,
-      work_started_at: nowIso,
-      intake_started_at: nowIso,
-      estimated_pickup_at: estimatedPickup,
+      status: isStartIntake ? ('intake' as const) : ('scheduled' as const),
+      work_started_at: isStartIntake ? nowIso : null,
+      intake_started_at: isStartIntake ? nowIso : null,
+      estimated_pickup_at: options.estimatedPickupAtOverride ?? estimatedPickup,
       created_by: options.actor.employeeId,
+      quote_id: options.quoteId ?? null,
+      intake_notes: options.intakeNotes ?? null,
     };
 
     const { data: upserted, error: insertErr } = await supabase
@@ -663,6 +714,11 @@ export async function materializeJobFromAppointment(
     }
 
     // 9. Audit (fire-and-forget; mirrors executeUnMaterialize's audit shape).
+    //    `customer_id` is included for parity with the pre-2.1.1 inline
+    //    walk-in audit (which carried it alongside services_count); also
+    //    useful for cross-customer audit-row aggregation. The entityLabel
+    //    suffix is trigger-specific so the human-readable label distinguishes
+    //    the two creation paths at a glance in the admin audit-log viewer.
     logAudit({
       userId: options.actor.userId,
       userEmail: options.actor.userEmail,
@@ -670,13 +726,14 @@ export async function materializeJobFromAppointment(
       action: 'create',
       entityType: 'job',
       entityId: jobId,
-      entityLabel: `Job #${jobId.slice(0, 8)} (materialized)`,
+      entityLabel: `Job #${jobId.slice(0, 8)} (${isStartIntake ? 'materialized' : 'walk-in'})`,
       details: {
         trigger: options.trigger,
         appointment_id: appointmentId,
         previous_appointment_status: apptStatus,
         services_count: baseServices.length,
         race_winner_returned: raceWinnerReturned,
+        customer_id: appt.customer_id,
       },
       ipAddress: options.ipAddress,
       source: options.source,
