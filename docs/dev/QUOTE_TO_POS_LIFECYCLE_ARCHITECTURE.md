@@ -3,7 +3,7 @@
 **Version:** 1.4
 **Locked:** 2026-06-04 10:30 PST (v1.0); 2026-06-05 21:30 PST (v1.1); 2026-06-06 17:00 PST (v1.2); 2026-06-06 22:20 PST (v1.3); 2026-06-06 23:00 PST (v1.4)
 **Status:** LIVING — updated session-by-session
-**Implementation status (post-Theme A 2026-06-07):** AC-10 operational; β-trigger drops deferred to Theme A.1. See Decisions Log entry 2026-06-07 PST.
+**Implementation status (post-Theme A.1 2026-06-07):** AC-10 fully operational; β-triggers retired via Theme A.1 follow-up migration. See Decisions Log entries 2026-06-07 PST (Theme A) and 2026-06-07 PST (Theme A.1).
 **Scope:** POS lifecycle architecture (Quote → Appointment → Job → POS Transaction)
 
 **v1.4 captures the data-driven 5-digit revision of AC-10 identifier widths. Operator queried production data after v1.3 lock (`MAX(receipt_number)`=SD-006365 across 6,309 records; `MAX(po_number)`=PO-000002 across 2 records) and observed that A-100000 reads as too long for customer-facing identifiers. v1.3's 6-digit width was overcorrected: 5-digit format provides ~25–50 year headroom for SD at current production rate (~93K headroom between max and 99,999 ceiling) and reads cleaner for customer-facing entities. All five identifier systems (Quote, Appointment, Receipt, Work Order, Purchase Order) revise from 6-digit to 5-digit format with starting value `10000` for new namespaces. NEW addition to migration scope: existing 6,309 SD-00XXXX receipts are backfilled to SD-XXXXX format via single UPDATE statement (one leading zero trimmed) — operator-locked decision that format consistency across customer-visible receipts wins over legacy preservation. Mechanism unchanged: shared `identifier_sequences` table + `next_identifier(entity_type)` function with row-level lock (Z3 architecture preserved); only `pad_width` value flips from 6 to 5. Theme A scope nudges from 300–500 to 300–550 prod lines + 1 → 5 migrations (slight increase for SD backfill migration + tests). v1.3 lock paragraphs preserved verbatim in the Decisions Log as historical record; v1.4 appends a refinement entry alongside, not a strikethrough — this is a calibration of the locked v1.3 width specification, not a reversal of the v1.3 unification commitment itself.**
@@ -446,9 +446,9 @@ POS > Appointments tab is removed from POS bottom navigation. Existing routes re
 
 ---
 
-### AC-10: Unified ticket number scheme — 5-digit format, shared sequences, all five identifiers (LOCKED v1.4 — OPERATIONAL except β-trigger drops deferred to Theme A.1)
+### AC-10: Unified ticket number scheme — 5-digit format, shared sequences, all five identifiers (LOCKED v1.4 — FULLY OPERATIONAL post-Theme-A.1)
 
-**Status (post-Theme-A 2026-06-07):** `identifier_sequences` table seeded, `next_identifier()` function deployed, all 5 application-side generators wired (Q/A/SD/WO/PO), all 6,309 SD receipts reformatted to 5-digit, 35 existing appointments backfilled with A-XXXXX, dormant `tr_quote_number` trigger dropped. **Receipt + PO BEFORE INSERT triggers remain active as dormant safety net pending Theme A.1 follow-up session** that drops them once application-side code has been observed in production. New transactions / POs already use `next_identifier()`; the triggers' `WHEN (NEW.column IS NULL)` gates prevent them from firing because every callsite supplies the column explicitly.
+**Status (post-Theme-A.1 2026-06-07):** `identifier_sequences` table seeded, `next_identifier()` function deployed, all 5 application-side generators wired (Q/A/SD/WO/PO), all 6,309 SD receipts reformatted to 5-digit, 35 existing appointments backfilled with A-XXXXX, ALL THREE legacy triggers dropped (dormant `tr_quote_number` retired in Theme A's Migration 6; `tr_transaction_receipt_number` + `tr_po_number` retired in Theme A.1's follow-up migration `20260607181649_drop_legacy_identifier_triggers.sql`). `next_identifier()` is now the single mechanism — no β-trigger safety net remains.
 
 **Commitment:** The unified identifier strategy uses the **appointment as the spine** for customer-facing reference, but the unification is **broader than appointment_number alone**. All FIVE human-readable operator/customer identifiers in the codebase converge on a single shared generation mechanism with a uniform 5-digit format. Theme A is the foundational identifier infrastructure session for the entire codebase; no follow-up "circle back and clean up WO/PO" patch-work sessions.
 
@@ -782,7 +782,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters, populate retirement, Shape α summary) | Phase 0.3 + 0.1 audits complete | `[x]` **Complete (6 sessions)** — 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`9e29d058`) + 2.6 (`9212423f`) merged 2026-06-06 PDT; AC-3 **fully operational**, AC-7 + AC-8 complete; Shape α aligned |
 | **Phase 3 pre-tasks** | Theme-informant audits (3.0.1 numbering strategy, 3.0.2 Stripe webhook + payment-link, 3.0.3 customer-accept seam) | None — read-only audits | `[x]` **Complete (3 audits)** — 3.0.1 (`249c2673`) + 3.0.2 (`10421f23`) + 3.0.3 (`54aa996a`) all merged 2026-06-06; informs AC-10 / AC-11 / AC-12; v1.3 locks AC-10 comprehensive unification + AC-11 + AC-12 refinements; v1.4 revises AC-10 width spec from 6-digit to 5-digit (data-driven calibration per operator-queried production data) |
-| **Phase 3 themes** | Cross-cutting (Theme A unified identifiers [AC-10], Theme B pending/confirmed semantic [AC-11], Theme C Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 + refund/credit + 3.0.1 + 3.0.2 + 3.0.3 audits complete | `[~]` **Theme A merged** (2026-06-07 — AC-10 v1.4 implementation + 6 migrations applied to production; Theme A.1 follow-up needed to drop `tr_transaction_receipt_number` + `tr_po_number` triggers — deliberately deferred to eliminate the post-migrate / pre-deploy outage window); Theme B + C + AC-9 + AC-14 + AC-15 not started |
+| **Phase 3 themes** | Cross-cutting (Theme A unified identifiers [AC-10], Theme B pending/confirmed semantic [AC-11], Theme C Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 + refund/credit + 3.0.1 + 3.0.2 + 3.0.3 audits complete | `[~]` **Theme A merged** (2026-06-07 — AC-10 v1.4 implementation + 6 migrations applied to production) and **Theme A.1 follow-up merged** (2026-06-07 — `tr_transaction_receipt_number` + `tr_po_number` triggers dropped via 7th migration after production-verified next_identifier() adoption); Theme B + C + AC-9 + AC-14 + AC-15 not started |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
 **Phase 1 ships in parallel with all other work.** Phases 2–4 are now unblocked for detailing.
@@ -2018,6 +2018,32 @@ Following v1.3 lock and operator review, operator observed `A-100000` reads as t
 3. Two pre-existing pending migrations (`20260603000000_enable_pos_jobs_unified_schedule.sql` + `20260606105901_seed_waitlist_slot_available_sms_template.sql`) applied as part of this session's `supabase db push` (operator-approved Option 1). Both inspected as non-destructive before push: feature-flag toggle + SMS template seed.
 
 **Theme A.1 (next session) scope:** create 1 migration that drops `tr_transaction_receipt_number` + `generate_receipt_number()` + `tr_po_number` + `generate_po_number()`. Run after at least one production deploy cycle has confirmed the new application code is supplying these columns reliably. Estimated scope: < 50 prod lines (single migration + 1-2 tests asserting probes return "function not found").
+
+---
+
+### 2026-06-07 PST — Phase 3 Theme A.1 complete (legacy receipt + PO triggers dropped — post-Theme-A cleanup)
+
+**Status:** Theme A.1 migration merged to `main` at `<MERGE_HASH>` (feature commit `<FEATURE_HASH>`, branch `fix/phase-3-theme-a-1-drop-old-identifier-triggers`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings; build clean; full test suite passes (193 files / 3107 tests when run without `.env.local`; 5 live-DB integration files + 4 new tests pass when env loaded; 4 unrelated SMS env-bleed failures are pre-existing and unrelated to this session).
+
+**Pre-flight prerequisite (operator-confirmed):** Theme A (`133d4ee8`) was live in production AND at least one new `SD-XXXXX` receipt + one new `PO-XXXXX` had been issued via `next_identifier()` since the merge, confirming that all six INSERT callsites (5 receipt sites + 1 PO site) were exercising the application-side helpers rather than relying on the safety-net triggers. This was the locked precondition from the Theme A Decisions Log entry above ("Run after at least one production deploy cycle has confirmed the new application code is supplying these columns reliably").
+
+**Scope:** single migration `supabase/migrations/20260607181649_drop_legacy_identifier_triggers.sql` (26 lines, 4 DROP statements) + 1 new live-DB integration test file `src/lib/utils/__tests__/identifier-legacy-triggers-dropped.test.ts` (4 tests asserting (a) `generate_receipt_number()` returns PGRST202 via PostgREST, (b) `generate_po_number()` returns PGRST202, (c) `next_identifier('receipt')` continues to issue `SD-NNNNN`, (d) `next_identifier('purchase_order')` continues to issue `PO-NNNNN`). Zero application-code changes — the helpers were already wired in Theme A.
+
+**Production-data verification (post-migration 2026-06-07):**
+
+- Migration `20260607181649` applied via `supabase db push --linked` (CLI v2.84.2), confirmed in remote migration list with `applied_version = 20260607181649`
+- `generate_receipt_number()` + `generate_po_number()` no longer exposed via PostgREST (smoke tests return PGRST202)
+- `next_identifier('receipt')` returns valid `SD-NNNNN` (smoke test passes)
+- `next_identifier('purchase_order')` returns valid `PO-NNNNN` (smoke test passes)
+- All 31 existing identifier-* tests still pass
+
+**Files touched:**
+
+- Migration (1 new): `supabase/migrations/20260607181649_drop_legacy_identifier_triggers.sql`
+- Test (1 new): `src/lib/utils/__tests__/identifier-legacy-triggers-dropped.test.ts`
+- Docs: this lifecycle architecture entry; `docs/CHANGELOG.md` (Theme A.1 entry)
+
+**Rationale recap (deferred-drop pattern):** Theme A's Migration 6 explicitly KEPT these two triggers alive to avoid a post-migrate / pre-deploy outage window. That sequencing concern is now resolved — the application code has been issuing identifiers via `next_identifier()` in production. The triggers' `WHEN (NEW.column IS NULL)` gates were already shadowed; dropping the triggers + functions retires a stale safety net rather than altering live behavior. This closes the Theme A.1 deferral noted in the entry above.
 
 ---
 
