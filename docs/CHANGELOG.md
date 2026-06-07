@@ -6,6 +6,72 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Lifecycle Architecture Doc v1.3 — AC-10 comprehensive unification lock + AC-11 / AC-12 refinement (2026-06-06)
+
+Documentation-only session. NO code, NO migrations, NO tests. Updates `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` from v1.2 → v1.3 to capture the comprehensive AC-10 unification specification operator-locked at the 2026-06-06 evening decision-locking session, executed after Phase 3 pre-task audits 3.0.1 (numbering strategy, `249c2673`), 3.0.2 (Stripe webhook + payment-link, `10421f23`), and 3.0.3 (customer-accept seam, `54aa996a`) all merged earlier the same day. AC-11 and AC-12 receive audit-informed refinements that lock implementation framing for Theme B + Theme C planning.
+
+**Change shape:** single doc modified — ~150 lines added, ~30 lines modified. No CHANGELOG of this kind exists as a precedent; treat this entry as the canonical example of "documentation-only architectural lock" framing for future v1.X bumps.
+
+**AC-10 substantially upgraded** from v1.2's "TBD detail, principle locked" framing to a comprehensive locked specification covering all five identifier systems:
+
+- **Format unification (LOCKED):** all five identifiers — Quote (`Q-XXXXXX`), Appointment (`A-XXXXXX`), Receipt (`SD-XXXXXX`), Work Order (`WO-XXXXXX`), Purchase Order (`PO-XXXXXX`) — use uniform 6-digit format. Q expands from 4-digit, WO expands from 5-digit, A is greenfield, SD + PO continue from current `MAX(...) + 1` (already 6-digit per Phase 3.0.1 audit `249c2673`).
+- **Generation mechanism (LOCKED — audit option Z3):** shared `identifier_sequences` table + `next_identifier(entity_type TEXT) RETURNS TEXT` database function with `SELECT ... FOR UPDATE` row-level lock. Schema sketch lifted from Phase 3.0.1 audit Target B.3.a (lines 409–434): `entity_type TEXT PK`, `current_value BIGINT`, `prefix TEXT`, `pad_width INT`, `updated_at TIMESTAMPTZ`. The DB function returns the formatted display string (e.g., `'Q-100001'`) — format-rendering lives at the DB layer, not in application code.
+- **Eliminated patterns (LOCKED):** four existing divergent generators + one dormant trigger all retired in the single Theme A landing session:
+  - Quote γ at `src/lib/utils/quote-number.ts:6–28` — DELETED
+  - Receipt β at `supabase/migrations/20260201000037:35–54` — DROPPED
+  - PO β at `supabase/migrations/20260201000037:57–76` — DROPPED
+  - Order γ at `src/lib/utils/order-number.ts:9–32` — DELETED
+  - Dormant `generate_quote_number()` at `supabase/migrations/20260201000037:79–98` (never fires, format-drift hazard) — DROPPED per Phase 3.0.1 F.6 and operator: *"delete as part of Theme A."*
+- **Starting values (LOCKED):** Q-100000, A-100000, WO-100000 for the three that change format or are greenfield; SD + PO continue from current max+1. No backfill of historical rows — forward-only migration.
+- **Race safety (LOCKED):** row-level lock inside `next_identifier()` is the locked mechanism. Gaps are tolerated (the value-not-reused property is more important than value-never-skipped — consistent with SQL-sequence philosophy). The Quote items-error cleanup path's number-REUSE risk window at `quote-service.ts:218–228` is structurally closed because the DELETE-on-items-error path no longer rewinds `current_value`.
+- **Operator framing (preserved):** *"best-in-class, no patch work. Future-guard all paths."* WO + PO included in unification on operator review (initially scoped narrower; corrected to 5-system). Theme A is a single landing session for the entire codebase.
+
+**AC-11 refined** with v1.3 lock paragraphs that consolidate Phase 3.0.2 audit's scope verdict:
+
+- Scope is **SMALL-to-MEDIUM** (audit line 29), NOT the multi-session framing Phase 0.1 initially inferred. Payment-link infrastructure is end-to-end product-shipped; AC-11 extends it surgically.
+- AC-11 gap precisely identified: webhook's `appointment_payment_link` branch at `src/app/api/webhooks/stripe/route.ts:63–244` writes `payment_status` + `payment_link_paid_at` + `payment_link_amount_cents=NULL` + conditionally `stripe_payment_intent_id` at lines 213–225 but **never reads or writes `appointments.status`** (audit Target B.6, lines 268–289). The fix is a status flip inside the existing handler.
+- 14th voice-agent tool `send_payment_link` added to the 13-tool surface at `src/lib/sms-ai/tools.ts:66–289`. Wrapper-pattern (F.1) and flip-semantic (F.3 — deposit-or-full / full-only / channel-conditional) are picked at Theme B session detailing.
+- Voice-agent status-pin removal: hardcoded `'pending'` at `voice-agent/appointments/route.ts:516` + `:290` becomes a 2-line swap once the 14th tool exists.
+
+**AC-12 refined** with v1.3 lock paragraphs that lock Theme C's framing on top of audit's pending decisions:
+
+- **G.1 placeholder strategy: PENDING at Theme C** — forward signal: Option ζ (placeholder + `scheduled_date_placeholder BOOLEAN` flag column) is the audit's lowest-risk recommendation; Theme C evaluates α/β/γ against ζ for default-vs-flag tradeoff.
+- **G.2 convertQuote integration: PENDING at Theme C** — forward signal: Option β (orchestrator helper wrapping `convertQuote`) is the likely cleanest separation of concerns.
+- **G.3 channel enum: LOCKED — add `'customer_accept'` value** via small additive migration on `appointment_channel` (`supabase/migrations/20260201000001_create_enums.sql:8`). Same "best-in-class, no patch work" principle applied as AC-10 — no overloading of `'online'` or `'portal'`.
+- **Race protection: LOCKED requirement.** Theme C must add an explicit idempotency guard (one of: row-level lock on `quotes.id`, optimistic concurrency on `quotes.status`, or appointment-per-quote constraint). The specific mechanism is picked at Theme C; the requirement is locked at v1.3. Pre-condition: `convertQuote` MUST reject re-entry on `quotes.status IN ('accepted', 'converted')` — currently rejects only on `('expired', 'converted')` per the audit.
+- **SLA query identification: LOCKED via channel enum.** SLA query relies on `channel = 'customer_accept'`. The audit does NOT propose a parallel `appointments.source_type` column; channel enum is the canonical axis at v1.3.
+- **Schema additions for SLA tracking: LOCKED.** Theme C migration adds `appointments.staff_acknowledged_at TIMESTAMPTZ` (nullable) per audit F.3 (line 352). Theme C session planning must enumerate every status-advance call site and add the write on the first staff-driven transition out of `pending`.
+
+**Phased Plan Overview status table updated:** Phase 3 row split into `Phase 3 pre-tasks` (`[x]` Complete — 3 audits: 3.0.1 + 3.0.2 + 3.0.3) and `Phase 3 themes` (`[ ]` Not started — ready to detail; all six informant audits merged). Phase 4 row unchanged.
+
+**Theme A scope upgraded:** from "appointment_number column add" framing to foundational identifier architecture for the entire codebase — estimated **300–500 prod lines + 1 migration + 20–30 tests** in a single landing session (call-site updates across quote / order / receipt / PO creation paths; new `identifier_sequences` table + `next_identifier()` function + `appointment_number` column add + backfill; dormant trigger drop; concurrency test coverage).
+
+**Reference Index:** the three Phase 3 informant audit entries (`NUMBERING_STRATEGY_AUDIT.md`, `STRIPE_WEBHOOK_PAYMENT_LINK_AUDIT.md`, `CUSTOMER_ACCEPT_SEAM_AUDIT.md`) were already linked from prior post-audit backfills. No new Reference Index additions needed in v1.3.
+
+**Decisions Log:** new `2026-06-06 22:20 PST — AC-10 comprehensive unification lock + AC-11 / AC-12 refinement (v1.3)` entry appended.
+
+**Verification:**
+- Markdown renders cleanly (no syntax errors introduced)
+- All three audit files exist and are linked from Reference Index
+- AC-10 anchor reference at line 1785 (Phase 3 themes block) updated to match the new heading slug
+- Diff: 146 insertions, 26 deletions; total doc now 1993 lines
+
+**Files touched:**
+- MOD: `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` — header bump, AC-10 rewrite, AC-11 v1.3 refinement appendix, AC-12 v1.3 refinement appendix, Phased Plan Overview row split, Decisions Log v1.3 entry, AC-10 anchor reference repaired
+- MOD: `docs/CHANGELOG.md` — this entry
+
+**Cross-references:**
+- [AC-10 (LOCKED v1.3)](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-10-unified-ticket-number-scheme--6-digit-format-shared-sequences-all-five-identifiers-locked-v13)
+- [AC-11 v1.3 refinement](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-11-pending-vs-confirmed-semantic-enforcement-payment-driven)
+- [AC-12 v1.3 refinement](docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md#ac-12-customer-accept-auto-conversion-to-pending-appointment-with-sla-alerting)
+- Phase 3.0.1 audit: [`NUMBERING_STRATEGY_AUDIT.md`](docs/dev/NUMBERING_STRATEGY_AUDIT.md) (`249c2673`)
+- Phase 3.0.2 audit: [`STRIPE_WEBHOOK_PAYMENT_LINK_AUDIT.md`](docs/dev/STRIPE_WEBHOOK_PAYMENT_LINK_AUDIT.md) (`10421f23`)
+- Phase 3.0.3 audit: [`CUSTOMER_ACCEPT_SEAM_AUDIT.md`](docs/dev/CUSTOMER_ACCEPT_SEAM_AUDIT.md) (`54aa996a`)
+
+**Memory updates:** none (documentation-only session; no new conventions emerge that aren't already captured in the doc itself).
+
+---
+
 ## Session 2.6 — Daily summary cards semantic (Shape α) (2026-06-06)
 
 > **Phase 2 closes here.** All 6 sessions (2.1, 2.2, 2.3, 2.4, 2.5, 2.6) merged. AC-3 fully operational; AC-7 + AC-8 complete; Shape α aligned. The lifecycle architecture phase is done.
