@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { generateReceiptNumber } from '@/lib/utils/receipt-number';
 
 interface TransactionItemPayload {
   item_name: string;
@@ -122,7 +123,13 @@ export async function POST(request: NextRequest) {
                 ? 'refunded'
                 : 'completed';
 
-        // Insert transaction
+        // Insert transaction.
+        // Phase 3 Theme A (AC-10 v1.4): receipt_number generated explicitly
+        // via next_identifier('receipt'). Historical Square imports get
+        // freshly-issued SD-XXXXX numbers from the unified sequence —
+        // identical to the pre-Theme-A trigger behavior, just sourced from
+        // the application layer now that the trigger is dropped.
+        const migrationReceiptNumber = await generateReceiptNumber(adminClient);
         const { data: txnRow, error: txnError } = await adminClient
           .from('transactions')
           .insert({
@@ -140,6 +147,7 @@ export async function POST(request: NextRequest) {
             loyalty_points_earned: 0,
             loyalty_points_redeemed: 0,
             loyalty_discount: 0,
+            receipt_number: migrationReceiptNumber,
           })
           .select('id')
           .single();

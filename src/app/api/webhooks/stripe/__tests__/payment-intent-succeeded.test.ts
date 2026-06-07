@@ -40,6 +40,10 @@ vi.mock('@/lib/utils/order-number', () => ({
   generateOrderNumber: async () => 'ORD-TEST-0001',
 }));
 
+vi.mock('@/lib/utils/receipt-number', () => ({
+  generateReceiptNumber: async () => 'SD-TEST-1',
+}));
+
 vi.mock('@/lib/utils/email', () => ({
   sendEmail: vi.fn(async () => undefined),
 }));

@@ -7,6 +7,7 @@ import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15, getTodayP
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
+import { generateAppointmentNumber } from '@/lib/utils/appointment-number';
 import type { PosUnstartedAppointment } from '@/app/pos/jobs/components/schedule-types';
 
 /**
@@ -523,9 +524,16 @@ export async function POST(request: NextRequest) {
     const totalDiscount = couponDiscount + loyaltyDiscount + (manualDiscountValue ?? 0);
     const appointmentTotal = Math.max(0, appointmentSubtotal - totalDiscount);
 
+    // Phase 3 Theme A (AC-10 v1.4): appointment_number is NOT NULL — generate
+    // it before the INSERT so the row can satisfy the constraint. The atomic
+    // appointment + job pair (this route's walk-in semantic) still commits
+    // together; if a downstream step fails the appointment is rolled back,
+    // and the counter advance leaves a gap (accepted per AC-10 race-safety).
+    const appointmentNumber = await generateAppointmentNumber(supabase);
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
+        appointment_number: appointmentNumber,
         customer_id,
         vehicle_id: vehicle_id || null,
         employee_id: assignedStaffId,

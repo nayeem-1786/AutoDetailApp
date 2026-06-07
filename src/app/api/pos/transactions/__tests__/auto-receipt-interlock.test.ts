@@ -62,6 +62,13 @@ vi.mock('@/lib/qbo/sync-transaction', () => ({
   syncTransactionToQbo: async () => {},
 }));
 
+// Phase 3 Theme A (AC-10): pos/transactions/route.ts now generates
+// receipt_number via next_identifier('receipt'). The supabase stub does
+// not implement .rpc(), so we short-circuit the helper.
+vi.mock('@/lib/utils/receipt-number', () => ({
+  generateReceiptNumber: vi.fn(async () => 'SD-TEST-10001'),
+}));
+
 vi.mock('@/lib/services/audit', () => ({
   logAudit: async () => {},
   getRequestIp: () => '127.0.0.1',

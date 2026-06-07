@@ -10,6 +10,7 @@ import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { categoryToCompatibilityKey } from '@/lib/utils/vehicle-categories';
+import { generateAppointmentNumber } from '@/lib/utils/appointment-number';
 
 // ---------------------------------------------------------------------------
 // GET — Look up upcoming appointments by customer phone
@@ -507,10 +508,17 @@ export async function POST(request: NextRequest) {
     // Voice agent appointments default to 'pending' — staff must manually
     // confirm after reviewing details. This differs from POS/admin conversion
     // which sets 'confirmed' because a staff member initiated it.
+    //
+    // Phase 3 Theme A (AC-10 v1.4): appointment_number is NOT NULL — generate
+    // it before the INSERT so the row can satisfy the constraint.
+    t = perf.now();
+    const appointmentNumber = await generateAppointmentNumber(supabase);
+    perf.mark('query:generateAppointmentNumber', t);
     t = perf.now();
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
+        appointment_number: appointmentNumber,
         customer_id: customerId,
         vehicle_id: vehicleId,
         status: 'pending',
