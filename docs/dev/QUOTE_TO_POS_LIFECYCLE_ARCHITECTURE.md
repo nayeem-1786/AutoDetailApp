@@ -2023,7 +2023,7 @@ Following v1.3 lock and operator review, operator observed `A-100000` reads as t
 
 ### 2026-06-07 PST — Phase 3 Theme E.1 complete (customer_credits schema + types + repository — AC-15 foundation)
 
-**Status:** Theme E.1 merged to `main` at `__MERGE_HASH_E1__` (feature commit `__FEATURE_HASH_E1__`, branch `feat/phase-3-theme-e-1-customer-credits-schema`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3147 passed including 16 new credit tests; 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated to this session — documented in Theme A.1's Decisions Log entry above).
+**Status:** Theme E.1 merged to `main` at `0cfd54e4` (feature commit `f74f93fe`, branch `feat/phase-3-theme-e-1-customer-credits-schema`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3147 passed including 16 new credit tests; 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated to this session — documented in Theme A.1's Decisions Log entry above).
 
 **Parallel execution:** Wave 2a of Phase 3. Ran in parallel with Session 2.1.1 (walk-in helper refactor) in an isolated `git worktree`. File-isolated; no overlap.
 
