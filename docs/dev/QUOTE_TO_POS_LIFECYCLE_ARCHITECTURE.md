@@ -3,7 +3,7 @@
 **Version:** 1.4
 **Locked:** 2026-06-04 10:30 PST (v1.0); 2026-06-05 21:30 PST (v1.1); 2026-06-06 17:00 PST (v1.2); 2026-06-06 22:20 PST (v1.3); 2026-06-06 23:00 PST (v1.4)
 **Status:** LIVING — updated session-by-session
-**Implementation status (post-Theme A.1 2026-06-07):** AC-10 fully operational; β-triggers retired via Theme A.1 follow-up migration. See Decisions Log entries 2026-06-07 PST (Theme A) and 2026-06-07 PST (Theme A.1).
+**Implementation status (post-Theme E.1 2026-06-07):** AC-10 fully operational; β-triggers retired via Theme A.1 follow-up migration. AC-15 schema foundation laid via Theme E.1 — `customer_credits` table + types + repository deployed; E.2 (apply logic) + E.3 (operator UI) still pending. See Decisions Log entries 2026-06-07 PST (Theme A), 2026-06-07 PST (Theme A.1), and 2026-06-07 PST (Theme E.1).
 **Scope:** POS lifecycle architecture (Quote → Appointment → Job → POS Transaction)
 
 **v1.4 captures the data-driven 5-digit revision of AC-10 identifier widths. Operator queried production data after v1.3 lock (`MAX(receipt_number)`=SD-006365 across 6,309 records; `MAX(po_number)`=PO-000002 across 2 records) and observed that A-100000 reads as too long for customer-facing identifiers. v1.3's 6-digit width was overcorrected: 5-digit format provides ~25–50 year headroom for SD at current production rate (~93K headroom between max and 99,999 ceiling) and reads cleaner for customer-facing entities. All five identifier systems (Quote, Appointment, Receipt, Work Order, Purchase Order) revise from 6-digit to 5-digit format with starting value `10000` for new namespaces. NEW addition to migration scope: existing 6,309 SD-00XXXX receipts are backfilled to SD-XXXXX format via single UPDATE statement (one leading zero trimmed) — operator-locked decision that format consistency across customer-visible receipts wins over legacy preservation. Mechanism unchanged: shared `identifier_sequences` table + `next_identifier(entity_type)` function with row-level lock (Z3 architecture preserved); only `pad_width` value flips from 6 to 5. Theme A scope nudges from 300–500 to 300–550 prod lines + 1 → 5 migrations (slight increase for SD backfill migration + tests). v1.3 lock paragraphs preserved verbatim in the Decisions Log as historical record; v1.4 appends a refinement entry alongside, not a strikethrough — this is a calibration of the locked v1.3 width specification, not a reversal of the v1.3 unification commitment itself.**
@@ -782,7 +782,7 @@ If real-world Phase 4 usage surfaces friction (dispatch coordination problems, p
 | **Phase 1** | Foundation + cleanup (drift fixes, safe state-machine openings, tab retirement, Session 1.7 webhook gate, Session 1.8 / 1.8.1 waitlist silent-drop) | None — philosophy-independent | `[x]` **Complete** — all 10 sessions merged: 1.1 (`1658914a`), 1.2 (`412a404b`), 1.2.1 (`7d4d815a`), 1.3 (`a7a57949`), 1.4 (`44c8ea05`), 1.5 (`04921ad1`), 1.6 (`cfa9cfa4`), 1.7 (`f87aca58`), 1.8 (`3c118b2d`), 1.8.1 (`c2294d6b`) |
 | **Phase 2** | Lifecycle architecture (Start Intake redesign, forward-arrow, terminal-state filters, populate retirement, Shape α summary) | Phase 0.3 + 0.1 audits complete | `[x]` **Complete (6 sessions)** — 2.1 (`a5d2a0d6`) + 2.2 (`f25bb87d`) + 2.3 (`269b94f7`) + 2.4 (`5aebe1f1`) + 2.5 (`9e29d058`) + 2.6 (`9212423f`) merged 2026-06-06 PDT; AC-3 **fully operational**, AC-7 + AC-8 complete; Shape α aligned |
 | **Phase 3 pre-tasks** | Theme-informant audits (3.0.1 numbering strategy, 3.0.2 Stripe webhook + payment-link, 3.0.3 customer-accept seam) | None — read-only audits | `[x]` **Complete (3 audits)** — 3.0.1 (`249c2673`) + 3.0.2 (`10421f23`) + 3.0.3 (`54aa996a`) all merged 2026-06-06; informs AC-10 / AC-11 / AC-12; v1.3 locks AC-10 comprehensive unification + AC-11 + AC-12 refinements; v1.4 revises AC-10 width spec from 6-digit to 5-digit (data-driven calibration per operator-queried production data) |
-| **Phase 3 themes** | Cross-cutting (Theme A unified identifiers [AC-10], Theme B pending/confirmed semantic [AC-11], Theme C Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 + refund/credit + 3.0.1 + 3.0.2 + 3.0.3 audits complete | `[~]` **Theme A merged** (2026-06-07 — AC-10 v1.4 implementation + 6 migrations applied to production) and **Theme A.1 follow-up merged** (2026-06-07 — `tr_transaction_receipt_number` + `tr_po_number` triggers dropped via 7th migration after production-verified next_identifier() adoption); Theme B + C + AC-9 + AC-14 + AC-15 not started |
+| **Phase 3 themes** | Cross-cutting (Theme A unified identifiers [AC-10], Theme B pending/confirmed semantic [AC-11], Theme C Quote→Appointment formalized [AC-12], cancellation fee [AC-14], customer credits [AC-15], cancel-with-payment [AC-9]) | Phase 0.1 + 0.2 + refund/credit + 3.0.1 + 3.0.2 + 3.0.3 audits complete | `[~]` **Theme A merged** (2026-06-07 — AC-10 v1.4 implementation + 6 migrations applied to production) and **Theme A.1 follow-up merged** (2026-06-07 — `tr_transaction_receipt_number` + `tr_po_number` triggers dropped via 7th migration after production-verified next_identifier() adoption); **Theme E.1 merged** (2026-06-07 — AC-15 schema foundation: `customer_credits` table + ENUM + types + repository deployed; E.2 credit-application + E.3 operator UI still pending); Theme B + C + AC-9 + AC-14 + remainder of AC-15 not started |
 | **Phase 4** | Mobile detailer architecture — minimum-scope path per [AC-13](#ac-13-mobile-phase-4-minimum-scope-path) | Phase 0.4 audit complete | `[ ]` Not started — **ready to detail** (Phase 0.4 audit informed; AC-13 locked) |
 
 **Phase 1 ships in parallel with all other work.** Phases 2–4 are now unblocked for detailing.
@@ -2018,6 +2018,50 @@ Following v1.3 lock and operator review, operator observed `A-100000` reads as t
 3. Two pre-existing pending migrations (`20260603000000_enable_pos_jobs_unified_schedule.sql` + `20260606105901_seed_waitlist_slot_available_sms_template.sql`) applied as part of this session's `supabase db push` (operator-approved Option 1). Both inspected as non-destructive before push: feature-flag toggle + SMS template seed.
 
 **Theme A.1 (next session) scope:** create 1 migration that drops `tr_transaction_receipt_number` + `generate_receipt_number()` + `tr_po_number` + `generate_po_number()`. Run after at least one production deploy cycle has confirmed the new application code is supplying these columns reliably. Estimated scope: < 50 prod lines (single migration + 1-2 tests asserting probes return "function not found").
+
+---
+
+### 2026-06-07 PST — Phase 3 Theme E.1 complete (customer_credits schema + types + repository — AC-15 foundation)
+
+**Status:** Theme E.1 merged to `main` at `__MERGE_HASH_E1__` (feature commit `__FEATURE_HASH_E1__`, branch `feat/phase-3-theme-e-1-customer-credits-schema`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3147 passed including 16 new credit tests; 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated to this session — documented in Theme A.1's Decisions Log entry above).
+
+**Parallel execution:** Wave 2a of Phase 3. Ran in parallel with Session 2.1.1 (walk-in helper refactor) in an isolated `git worktree`. File-isolated; no overlap.
+
+**Scope:** single greenfield migration `supabase/migrations/20260607184158_customer_credits_table.sql` (119 lines — extensively commented, ~59 non-comment SQL lines) + 3 new prod files (types + repository + barrel, ~124 non-comment TS lines combined) + 1 new live-DB integration test file (`src/lib/credits/__tests__/repository.test.ts`, 16 tests, 406 lines). NO application logic; NO operator UI; NO integration with cancel flow — those are the locked scope of Themes E.2 and E.3.
+
+**Schema decisions (locked):**
+
+- **Dedicated table, not per-customer JSONB column** — per AC-15 v1.1 lock. `customer_credits` (PK id, customer_id, amount_cents, reason, reason_note, source_appointment_id, source_transaction_id, applied_at, applied_to_appointment_id, applied_to_transaction_id, applied_amount_cents, expires_at, created_at, created_by_employee_id, updated_at) — 15 columns total.
+- **`customer_id` is the only ON DELETE RESTRICT FK** — protects audit trail; a customer with credit history cannot be hard-deleted. All other FKs (source + applied target + employee) are ON DELETE SET NULL so the credit row survives source/target removal.
+- **Money as integer cents** (Rule #20, Money-Unify) — `amount_cents` + `applied_amount_cents` are INTEGER with `> 0` CHECK on each. No NUMERIC(10,2) for new money columns.
+- **5-value ENUM `customer_credit_reason`** — `cancellation_refund` (primary driver per AC-9 Pathway B), `manual_adjustment`, `goodwill`, `promotional`, `refund_as_credit`. Adding a sixth value requires a migration + repository type extension.
+- **Applied-state CHECK invariant** — `customer_credits_applied_consistency` enforces: unapplied rows have ALL applied_* fields NULL; applied rows have applied_at + applied_amount_cents non-NULL AND applied_amount_cents <= amount_cents. Application targets (appointment / transaction) are individually optional in the applied state.
+- **Indexes for the E.2 hot path** — partial composite `(customer_id, expires_at) WHERE applied_at IS NULL` makes `getCustomerCreditBalance` cheap on customers with many historical applied credits.
+- **`updated_at` trigger** — canonical BEFORE UPDATE pattern (mirrors `customers` / `employees`).
+
+**Schema-vs-prompt corrections (Memory #11 + Memory #2):**
+
+- `created_by_staff_id UUID REFERENCES staff(id)` (prompt literal) → `created_by_employee_id UUID REFERENCES employees(id)`. There is NO `staff` table in this database; `employees` is the canonical table for the issuing-operator FK (verified against `docs/dev/DB_SCHEMA.md` lines 918-955).
+- Repository `createServiceClient` (prompt literal, does not exist) → `SupabaseClient` parameter injection (mirrors `src/lib/quotes/quote-service.ts` + `src/lib/refunds/source-plan.ts`). The repository accepts an externally-constructed client, which is canonically `createAdminClient()` from `@/lib/supabase/admin`.
+- Tests use the live-DB integration pattern from `src/lib/utils/__tests__/identifier-sequences.test.ts` (`describeIfCreds` env-gate; direct `createClient(url!, key!)` from `@supabase/supabase-js`) rather than mocked client — exercises real ENUM / CHECK / trigger / FK behavior, which a mock cannot.
+
+**Production-data verification (post-migration 2026-06-07):**
+
+- Migration `20260607184158` applied via `supabase db push --linked` (CLI v2.74.5), confirmed in remote migration list with `LOCAL = REMOTE = 20260607184158`
+- 16 new live-DB tests pass against live database
+- Existing test suite still passes (no regressions)
+- Test cleanup verified: `afterEach` clears credits + `afterAll` removes the test customer; no residue left in production
+
+**Files touched:**
+
+- Migration (1 new): `supabase/migrations/20260607184158_customer_credits_table.sql`
+- Prod (3 new): `src/lib/credits/types.ts`, `src/lib/credits/repository.ts`, `src/lib/credits/index.ts`
+- Test (1 new): `src/lib/credits/__tests__/repository.test.ts`
+- Docs: this lifecycle architecture entry; `docs/CHANGELOG.md` (Theme E.1 entry); `docs/dev/DB_SCHEMA.md` (regenerated); `docs/dev/FILE_TREE.md` (new file paths)
+
+**AC-15 status (partial):** schema + types + repository layer = foundation complete. E.2 (credit-application logic — apply-at-checkout, mark `applied_at` + `applied_amount_cents` + `applied_to_*`) and E.3 (operator UI — Admin > Customer > Credits tab, POS Apply Credit affordance) are still pending. The applied-state CHECK invariant locks the contract that E.2's update path must satisfy; the repository's `getCustomerCreditBalance` is the read surface both E.2 and E.3 will consume.
+
+**Memory #8 status:** 5 files / ~183 non-comment prod lines / 406 test lines. Within budget.
 
 ---
 

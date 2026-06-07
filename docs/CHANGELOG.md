@@ -6,6 +6,53 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme E.1 — customer_credits schema + types + repository layer (AC-15 foundation) (2026-06-07)
+
+Greenfield schema laying the AC-15 foundation. Creates the dedicated `customer_credits` table (operator-locked decision per v1.1 lock: dedicated table, NOT a per-customer JSONB column on customers), TypeScript types, and the minimal read/write repository surface. NO application logic, NO operator UI, NO integration with cancel flow — those land in Themes E.2 (credit application) and E.3 (operator UI).
+
+Parallel Wave 2a session, file-isolated from Session 2.1.1 (walk-in helper refactor) — different file scope; no overlap.
+
+**Change shape:** 1 new migration + 3 new prod files (types + repository + barrel) + 1 new test file. Net ~183 non-comment prod lines + ~406 test lines.
+
+**Migration (1 new, applied to production 2026-06-07 via `supabase db push --linked`):**
+
+- `20260607184158_customer_credits_table.sql` — creates ENUM `customer_credit_reason` (5 values: `cancellation_refund`, `manual_adjustment`, `goodwill`, `promotional`, `refund_as_credit`), `customer_credits` table with 15 columns + 4 partial/composite indexes + the `customer_credits_applied_consistency` CHECK + the `customer_credits_updated_at_trigger` BEFORE UPDATE trigger. `customer_id` is the only FK with ON DELETE RESTRICT (protects audit trail); all other FKs (`source_appointment_id`, `source_transaction_id`, `applied_to_appointment_id`, `applied_to_transaction_id`, `created_by_employee_id`) are ON DELETE SET NULL so the credit row outlives source/target entities. Money column `amount_cents` is integer-cents (Rule #20) with `> 0` CHECK.
+
+**Schema-vs-prompt corrections (Memory #11 — verified against `docs/dev/DB_SCHEMA.md`):**
+
+- `created_by_staff_id UUID REFERENCES staff(id)` → `created_by_employee_id UUID REFERENCES employees(id)`. There is NO `staff` table in this database; `employees` is the canonical table.
+- Repository uses `createAdminClient` (the existing canonical helper at `src/lib/supabase/admin.ts`), not the non-existent `createServiceClient` from the prompt.
+- Repository signature passes `SupabaseClient` as a parameter (matches the existing pattern in `src/lib/quotes/quote-service.ts` + `src/lib/refunds/source-plan.ts`) rather than constructing one internally — Memory #2 (mirror existing conventions).
+
+**Prod files (3 new):**
+
+- `src/lib/credits/types.ts` — `CustomerCreditReason` union, `CustomerCredit` row interface, `CreateCustomerCreditInput`, `CustomerCreditBalance`. All money fields are `number` representing integer cents.
+- `src/lib/credits/repository.ts` — 3 functions: `createCustomerCredit(client, input)`, `getCustomerCreditBalance(client, customerId)` (sums issued/applied and returns unapplied+unexpired credits sorted by `expires_at` NULLS LAST then `created_at` ASC — the hot path for E.2's checkout-apply), `getCustomerCreditById(client, creditId)`.
+- `src/lib/credits/index.ts` — barrel export.
+
+**Test (1 new live-DB integration file, 16 tests):**
+
+- `src/lib/credits/__tests__/repository.test.ts` — 16 tests across 5 buckets: (a) `createCustomerCredit` happy + amount_cents > 0 CHECK enforcement (2 tests); (b) `getCustomerCreditBalance` zero/multi-credit summing/applied-exclusion/expired-exclusion/sort-order (5 tests); (c) `getCustomerCreditById` found/null (2 tests); (d) schema invariants — `applied_amount_cents <= amount_cents`, `applied_at requires applied_amount_cents`, `applied_amount_cents > 0`, ENUM rejection of unknown values, `updated_at` trigger advances on UPDATE (5 tests); (e) migration integrity — all 5 ENUM values insertable, all 15 documented columns present (2 tests). Uses the same `describeIfCreds` env-gate pattern as `identifier-sequences.test.ts`; creates a disposable test customer in beforeAll + tears down in afterAll (afterEach clears credits so the ON DELETE RESTRICT customer_id FK doesn't block teardown).
+
+**Production-data verification (post-migration 2026-06-07):**
+
+- Migration confirmed applied via `supabase migration list --linked` (LOCAL = REMOTE = `20260607184158`)
+- 16 live-DB tests pass against the live database; no test residue (afterEach + afterAll cleanup)
+- Full existing test suite passes — no regressions
+
+**Verification gates:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (unchanged from main pre-session — no new warnings introduced)
+- build: clean
+- tests: 16 new tests pass with `.env.local` loaded; skip cleanly when creds absent (matches existing live-DB test pattern). Full suite: 3147 passed (includes the 16 new) + 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` (documented in Theme A.1's CHANGELOG entry below; reproduce on main and unrelated to this session).
+
+**Memory #8 status:** 5 files / ~183 non-comment prod lines / 406 test lines. Within budget.
+
+**Rationale recap (foundation pattern):** AC-15 commitment is build-from-scratch — refund/credit/cancellation-fee audit `3e633156` confirmed no `customer_credits` table or `customers.credit_balance` column exists. This session lands ONLY the schema + types + minimal read/write surface; E.2 will add credit-application logic (apply-at-checkout walking the unapplied_credits list expiry-first) and E.3 will add the operator UI (Admin > Customer > Credits tab + POS Apply Credit affordance). Subsequent themes depend on this schema being right; the `applied_consistency` CHECK enforces the contract that E.2's update path must satisfy.
+
+---
+
 ## Phase 3 Theme A.1 — drop legacy receipt + PO identifier triggers (post-Theme-A cleanup; closes the Migration 6 deferral) (2026-06-07)
 
 Surgical follow-up to Phase 3 Theme A. Drops the two legacy BEFORE INSERT triggers (`tr_transaction_receipt_number` + `tr_po_number`) and their PL/pgSQL functions (`generate_receipt_number()` + `generate_po_number()`) that Theme A deliberately kept alive across its migration push to eliminate a post-migrate / pre-deploy outage window. Theme A's application-side code (in production since merge `133d4ee8`) issues receipt + PO numbers via `next_identifier('receipt')` / `next_identifier('purchase_order')` calls; the triggers' `WHEN (NEW.column IS NULL)` gates were already shadowed and never fired post-Theme-A. This session retires the stale safety net.

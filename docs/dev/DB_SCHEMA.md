@@ -3,7 +3,7 @@
 # Smart Details Auto Spa — Database Schema Reference
 
 > Auto-generated from the live database (project: `zwvahzymzardmxixyfim`).
-> 108 tables in the `public` schema. Last regenerated: 2026-06-07.
+> 109 tables in the `public` schema. Last regenerated: 2026-06-07.
 >
 > **This file is not hand-edited.** Hand-curated notes (column descriptions, narrative paragraphs, receipt-system architecture, etc.) that previously lived here have been replaced with auto-derived metadata. To preserve cross-cutting documentation, write it in `docs/dev/ARCHITECTURE.md` or a topic-specific file under `docs/dev/`.
 
@@ -557,6 +557,41 @@ CREATE INDEX idx_coupons_status ON public.coupons USING btree (status)
 ```
 CREATE UNIQUE INDEX credentials_pkey ON public.credentials USING btree (id)
 CREATE INDEX idx_credentials_sort_order ON public.credentials USING btree (sort_order)
+```
+
+
+## customer_credits
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| id | UUID | PK, NOT NULL, DEFAULT gen_random_uuid() |  |
+| customer_id | UUID | NOT NULL, FK → customers(id) ON DELETE RESTRICT |  |
+| amount_cents | INTEGER | NOT NULL |  |
+| reason | customer_credit_reason (enum) | NOT NULL | enum values: cancellation_refund, manual_adjustment, goodwill, promotional, refund_as_credit |
+| reason_note | TEXT | — |  |
+| source_appointment_id | UUID | FK → appointments(id) ON DELETE SET NULL |  |
+| source_transaction_id | UUID | FK → transactions(id) ON DELETE SET NULL |  |
+| applied_at | TIMESTAMPTZ | — |  |
+| applied_to_appointment_id | UUID | FK → appointments(id) ON DELETE SET NULL |  |
+| applied_to_transaction_id | UUID | FK → transactions(id) ON DELETE SET NULL |  |
+| applied_amount_cents | INTEGER | — |  |
+| expires_at | TIMESTAMPTZ | — |  |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |  |
+| created_by_employee_id | UUID | FK → employees(id) ON DELETE SET NULL |  |
+| updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |  |
+
+**CHECK constraints:**
+- `customer_credits_amount_cents_check`: `CHECK ((amount_cents > 0))`
+- `customer_credits_applied_amount_cents_check`: `CHECK (((applied_amount_cents IS NULL) OR (applied_amount_cents > 0)))`
+- `customer_credits_applied_consistency`: `CHECK ((((applied_at IS NULL) AND (applied_to_appointment_id IS NULL) AND (applied_to_transaction_id IS NULL) AND (applied_amount_cents IS NULL)) OR ((applied_at IS NOT NULL) AND (applied_amount_cents IS NOT NULL) AND (applied_amount_cents <= amount_cents))))`
+
+**Indexes:**
+```
+CREATE INDEX customer_credits_applied_at_idx ON public.customer_credits USING btree (applied_at) WHERE (applied_at IS NOT NULL)
+CREATE INDEX customer_credits_customer_id_idx ON public.customer_credits USING btree (customer_id)
+CREATE UNIQUE INDEX customer_credits_pkey ON public.customer_credits USING btree (id)
+CREATE INDEX customer_credits_source_appointment_id_idx ON public.customer_credits USING btree (source_appointment_id) WHERE (source_appointment_id IS NOT NULL)
+CREATE INDEX customer_credits_unapplied_idx ON public.customer_credits USING btree (customer_id, expires_at) WHERE (applied_at IS NULL)
 ```
 
 
@@ -3252,6 +3287,7 @@ CREATE UNIQUE INDEX website_pages_slug_key ON public.website_pages USING btree (
 - `consent_channel`: `sms`, `email`
 - `consent_source`: `pos`, `online`, `portal`, `import`, `manual`
 - `coupon_status`: `draft`, `active`, `redeemed`, `expired`, `disabled`
+- `customer_credit_reason`: `cancellation_refund`, `manual_adjustment`, `goodwill`, `promotional`, `refund_as_credit`
 - `employee_status`: `active`, `inactive`, `terminated`
 - `lifecycle_action`: `sms`, `email`, `both`
 - `loyalty_action`: `earned`, `redeemed`, `adjusted`, `expired`, `welcome_bonus`
