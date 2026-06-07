@@ -5,7 +5,6 @@ import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
 import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { sendCancellationNotifications } from '@/lib/email/send-cancellation-email';
-import { fireWebhook } from '@/lib/utils/webhook';
 
 const TERMINAL_STATUSES = ['completed', 'cancelled'];
 
@@ -36,9 +35,11 @@ const cancelSchema = z.object({
  *      side-channel — keep POS strict "no customer contact" by construction
  *      when `notify_customer=false`).
  *  - `notify_customer` defaults to false. When false: skip
- *    `sendCancellationNotifications` AND `fireWebhook('appointment_cancelled')`.
- *    When true: fire both (parity with admin cancel for the customer-facing
- *    side effects).
+ *    `sendCancellationNotifications`. When true: fire it (parity with admin
+ *    cancel for the customer-facing side effects).
+ *    (Theme G — outbound n8n webhook removed; Smart Details has no receiver
+ *    wired, so the pre-Theme-G paired `fireWebhook('appointment_cancelled')`
+ *    has been deleted alongside its 22 sibling fire sites.)
  *  - Audit row always records `notification_suppressed: !notify_customer`
  *    + `source: 'pos'`.
  *
@@ -125,22 +126,12 @@ export async function POST(
     // notifications AND the cancellation webhook, since downstream n8n
     // flows on that event may also notify the customer).
     if (data.notify_customer) {
+      // Theme G — `appointment_cancelled` outbound webhook removed (no n8n
+      // receiver in Smart Details; audit f5e714a8). Customer SMS/email
+      // dispatch is inline via `sendCancellationNotifications`.
       sendCancellationNotifications(id, data.cancellation_reason).catch((err) =>
         console.error('Cancellation notifications failed (non-blocking):', err)
       );
-
-      fireWebhook(
-        'appointment_cancelled',
-        {
-          event: 'appointment.cancelled',
-          timestamp: new Date().toISOString(),
-          appointment: {
-            id,
-            cancellation_reason: data.cancellation_reason,
-          },
-        },
-        supabase
-      ).catch((err) => console.error('Webhook fire failed:', err));
     }
 
     logAudit({

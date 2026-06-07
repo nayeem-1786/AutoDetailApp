@@ -6,7 +6,6 @@ import { renderTemplate, cleanEmptyReviewLines, formatDollar, formatNumber } fro
 import { formatPhone } from '@/lib/utils/format';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { splitRecipients } from '@/lib/campaigns/ab-testing';
@@ -472,15 +471,9 @@ export async function POST(
       // and sent_at + auto_select_after_hours < now().
     }
 
-    // Fire webhook
-    fireWebhook('campaign_send', {
-      campaign_id: id,
-      name: campaign.name,
-      channel: campaign.channel,
-      recipient_count: customers?.length ?? 0,
-      delivered_count: deliveredCount,
-      is_ab_test: isABTest,
-    });
+    // Theme G — `campaign_send` outbound webhook removed (no n8n receiver
+    // in Smart Details; audit f5e714a8). Campaign send result is captured
+    // in the audit_log entry below + the per-recipient sms_delivery_log.
 
     logAudit({
       userId: user.id,

@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone, formatTime, normalizeTimeTo24h, formatCurrency } from '@/lib/utils/format';
 import { sendSms, buildAppointmentConfirmationSms } from '@/lib/utils/sms';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
@@ -424,7 +423,6 @@ export async function POST(request: NextRequest) {
     const { firstName, lastName } = splitName(customer_name);
 
     let customerId: string;
-    let isNewCustomer = false;
 
     // Session 2B: SELECT expanded with first_name/last_name/email/phone — only
     // first_name is consumed by the appointment_confirmed contract today, but
@@ -473,7 +471,6 @@ export async function POST(request: NextRequest) {
 
       customerId = newCustomer.id;
       customerFirstName = newCustomer.first_name || firstName || undefined;
-      isNewCustomer = true;
     }
 
     // Find or create vehicle — shared dedup by make + model + category
@@ -614,36 +611,9 @@ export async function POST(request: NextRequest) {
     // Log system message to conversation thread (non-blocking)
     logVoiceAction(supabase, e164Phone, `Appointment booked via phone: ${service.name} on ${formattedDate} at ${formattedTime}`).catch(() => {});
 
-    // Fire webhook (non-blocking)
-    fireWebhook(
-      'booking_created',
-      {
-        event: 'booking.created',
-        timestamp: new Date().toISOString(),
-        source: 'voice_agent',
-        appointment: {
-          id: appointment.id,
-          scheduled_date: appointment.scheduled_date,
-          scheduled_start_time: appointment.scheduled_start_time,
-          scheduled_end_time: appointment.scheduled_end_time,
-          status: appointment.status,
-          channel: appointment.channel,
-        },
-        customer: {
-          id: customerId,
-          first_name: firstName,
-          last_name: lastName,
-          phone: e164Phone,
-          is_new: isNewCustomer,
-        },
-        service: {
-          id: service.id,
-          name: service.name,
-          duration_minutes: service.base_duration_minutes,
-        },
-      },
-      supabase
-    ).catch((err) => console.error('Webhook fire failed:', err));
+    // Theme G — `booking_created` outbound webhook removed (no n8n receiver
+    // in Smart Details; audit f5e714a8). Customer + staff SMS already
+    // dispatched inline above; voice action logged to conversation thread.
 
     const responseData = {
       success: true,

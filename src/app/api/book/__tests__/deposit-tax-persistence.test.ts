@@ -96,7 +96,6 @@ vi.mock('@/lib/email/send-templated-email', () => ({
 vi.mock('@/lib/email/send-welcome-email', () => ({
   sendWelcomeEmail: vi.fn(async () => undefined),
 }));
-vi.mock('@/lib/utils/webhook', () => ({ fireWebhook: vi.fn(async () => undefined) }));
 vi.mock('@/lib/services/audit', () => ({
   logAudit: vi.fn(async () => undefined),
   getRequestIp: () => '127.0.0.1',

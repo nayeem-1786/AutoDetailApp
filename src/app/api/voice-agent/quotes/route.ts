@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validateApiKey } from '@/lib/auth/api-key';
 import { normalizePhone } from '@/lib/utils/format';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { generateQuoteNumber } from '@/lib/utils/quote-number';
 import { createPerfTimer } from '@/lib/utils/voice-perf';
 import { sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
@@ -298,38 +297,9 @@ const body = await request.json();
     const serviceNames = quoteItems.map((i) => i.item_name).join(', ');
     logVoiceAction(supabase, e164Phone, `Quote ${quote.quote_number} created via phone: ${serviceNames} — $${Number(quote.total_amount).toFixed(2)}`).catch(() => {});
 
-    // Fire webhook (non-blocking)
-    const webhookEvent = shouldSendSms ? 'quote_sent' : 'quote_created';
-    fireWebhook(
-      webhookEvent,
-      {
-        event: shouldSendSms ? 'quote.sent' : 'quote.created',
-        timestamp: now,
-        source: 'voice_agent',
-        quote: {
-          id: quote.id,
-          quote_number: quote.quote_number,
-          status: quote.status,
-          subtotal: Number(quote.subtotal),
-          total_amount: Number(quote.total_amount),
-          valid_until: quote.valid_until,
-          sent_at: quote.sent_at,
-        },
-        customer: {
-          id: customerId,
-          first_name: firstName,
-          last_name: lastName,
-          phone: e164Phone,
-        },
-        items: quoteItems.map((item) => ({
-          service_id: item.service_id,
-          name: item.item_name,
-          price: item.unit_price * item.quantity,
-          tier_name: item.tier_name,
-        })),
-      },
-      supabase
-    ).catch((err) => console.error('Webhook fire failed:', err));
+    // Theme G — `quote_created`/`quote_sent` outbound webhook removed (no n8n
+    // receiver in Smart Details; audit f5e714a8). Customer SMS dispatch on
+    // the `shouldSendSms` branch already happens upstream in the send path.
 
     const responseData = {
       success: true,

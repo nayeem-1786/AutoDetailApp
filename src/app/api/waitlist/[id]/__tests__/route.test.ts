@@ -23,17 +23,10 @@ const state = {
     service: { name: 'Ceramic Coating' },
   } as null | Record<string, unknown>,
   updateResult: null as null | Record<string, unknown>,
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
   smsSends: [] as Array<{ to: string; body: string; options: Record<string, unknown> | undefined }>,
   renderCalls: [] as Array<{ slug: string; vars: Record<string, unknown>; fallback: string }>,
   renderResult: { body: 'rendered-body', isActive: true } as { body: string; isActive: boolean },
 };
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
-  }),
-}));
 
 vi.mock('@/lib/utils/sms', () => ({
   sendSms: vi.fn(async (to: string, body: string, options?: Record<string, unknown>) => {
@@ -111,7 +104,6 @@ beforeEach(() => {
     service: { name: 'Ceramic Coating' },
   };
   state.updateResult = null;
-  state.webhookFires = [];
   state.smsSends = [];
   state.renderCalls = [];
   state.renderResult = { body: 'rendered-body', isActive: true };
@@ -187,13 +179,8 @@ describe('PATCH /api/waitlist/[id] — Session 1.8.1 admin notify direct-dispatc
     // SMS fired.
     expect(state.smsSends).toHaveLength(1);
 
-    // AND the waitlist_notified webhook also fired (forward-compat for an
-    // external receiver wired in the future).
-    expect(state.webhookFires).toHaveLength(1);
-    expect(state.webhookFires[0].event).toBe('appointment_cancelled');
-    const payload = state.webhookFires[0].payload as Record<string, unknown>;
-    expect(payload.event).toBe('waitlist_notified');
-    expect(payload.waitlist_entry_id).toBe('wl-1');
+    // Theme G removed the forward-compat webhook fire from this branch —
+    // the prod code now has no outbound webhook to assert here.
   });
 
   it('does not call sendSms when renderSmsTemplate returns isActive=false (template disabled)', async () => {
@@ -218,7 +205,6 @@ describe('PATCH /api/waitlist/[id] — Session 1.8.1 admin notify direct-dispatc
     expect(res.status).toBe(200);
 
     expect(state.smsSends).toHaveLength(0);
-    expect(state.webhookFires).toHaveLength(0);
     expect(state.renderCalls).toHaveLength(0);
   });
 });

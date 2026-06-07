@@ -5,7 +5,6 @@ import { renderTemplate, cleanEmptyReviewLines, formatDollar, formatNumber } fro
 import { formatPhone } from '@/lib/utils/format';
 import { sendMarketingSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { getBusinessInfo } from '@/lib/data/business';
 import { createShortLink } from '@/lib/utils/short-link';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
@@ -318,13 +317,9 @@ async function runProcessScheduled(): Promise<ProcessScheduledResult> {
       })
       .eq('id', campaign.id);
 
-    fireWebhook('campaign_send', {
-      campaign_id: campaign.id,
-      name: campaign.name,
-      channel: campaign.channel,
-      recipient_count: customers?.length ?? 0,
-      delivered_count: deliveredCount,
-    });
+    // Theme G — `campaign_send` outbound webhook removed (no n8n receiver
+    // in Smart Details; audit f5e714a8). Campaign delivery state persists
+    // on the campaigns row above and via per-recipient sms_delivery_log.
 
     results.push({
       campaign_id: campaign.id,

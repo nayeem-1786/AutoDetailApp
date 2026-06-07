@@ -1,7 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { addMinutesToTime, findAvailableDetailer } from '@/lib/utils/assign-detailer';
 import { APPOINTMENT } from '@/lib/utils/constants';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { resolveManualDiscountAmount } from './manual-discount';
 import {
   enrichItemsWithTierMeta,
@@ -337,25 +336,13 @@ export async function convertQuote(
   );
   const serviceNames = formatServicesSummary(enrichedSummary);
 
-  // Fire webhook for appointment confirmation — Session 1.7 (2026-06-05):
-  // gated on the RESULTING appointment status, not the call site's intent.
-  // Pre-#1.7 this fired UNCONDITIONALLY, which surfaced independently in
-  // Phase 0.1 (audit 69b15b0f, F.4) + Phase 0.2 (audit 0b9684db, F.4) as
-  // a customer-facing bug: voice-agent + SMS AI v2 invoke this helper with
-  // `appointmentStatus: 'pending'` (`voice-agent/appointments/route.ts:290`
-  // hardcodes pending on the quote-conversion branch per Phase 0.1
-  // finding), the row lands at pending, but the `appointment_confirmed`
-  // webhook fired anyway — downstream n8n consumers then sent "confirmed"
-  // notifications for a row whose actual status was pending. The condition
-  // mirrors the public booking route's pattern at
-  // `src/app/api/book/route.ts:921-929` (single source of truth for the
-  // status→webhook tie). This closes the immediate misleading-customer
-  // behavior; full AC-11 alignment (payment-driven semantic across all
-  // booking paths + payment-link primitive for agents) is separate
-  // Phase 3 work and not in scope here.
-  if (appointment.status === 'confirmed') {
-    fireWebhook('appointment_confirmed', appointment, supabase).catch(() => {});
-  }
+  // Theme G — Session 1.7's conditional `appointment_confirmed` outbound
+  // webhook fire is removed alongside the whole fireWebhook surface. Smart
+  // Details has no n8n receiver wired (audit f5e714a8). Session 1.7's
+  // bug-class (misleading-customer events fired for pending rows) is
+  // structurally prevented now: there is no outbound webhook to mis-fire.
+  // Customer-facing dispatch on actual confirmation lives at admin/POS
+  // PATCH + the Stripe webhook's pending → confirmed flip (Theme B.1).
 
   return { success: true, appointment, serviceNames };
 }

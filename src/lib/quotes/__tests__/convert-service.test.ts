@@ -13,9 +13,7 @@ vi.mock('@/lib/utils/assign-detailer', async () => {
   };
 });
 
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async () => undefined),
-}));
+// Theme G — fireWebhook removed from production; no longer needs mocking.
 
 // Phase 3 Theme A (AC-10): convertQuote now generates appointment_number via
 // next_identifier('appointment'). Mock the helper so the test's supabase
@@ -746,138 +744,16 @@ describe('convertQuote — D48 (Issue 42) appointment_services.quantity propagat
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Session 1.7 (2026-06-05) — appointment_confirmed webhook fires CONDITIONALLY
-// on the resulting appointment.status.
-//
-// Pre-#1.7, the call at `convert-service.ts:240` was unconditional. Both
-// Phase 0.1 (audit 69b15b0f, F.4) and Phase 0.2 (audit 0b9684db, F.4)
-// independently surfaced that the voice-agent + SMS AI v2 paths invoke
-// convertQuote with `appointmentStatus: 'pending'` (per
-// `voice-agent/appointments/route.ts:290` — hardcoded pending on the
-// quote-conversion branch), then n8n received `appointment_confirmed`
-// despite the row's actual `status='pending'`. Downstream consumers
-// sent misleading "confirmed" notifications to customers.
-//
-// These tests pin the conditional-fire contract: webhook fires when the
-// resulting row is `'confirmed'`; webhook does NOT fire when the resulting
-// row is `'pending'`. The condition keys on the WRITTEN status (the value
-// inserted on the appointments row), which mirrors the public booking
-// route's `:921-929` pattern. Architectural alignment to AC-11 (full
-// payment-driven semantic across all booking paths + payment-link primitive
-// for agents) is separate Phase 3 work and intentionally out of scope.
-// ──────────────────────────────────────────────────────────────────────────────
-
-describe('convertQuote — Session 1.7 conditional appointment_confirmed webhook fire', () => {
-  let inserts: InsertRecord[];
-
-  beforeEach(async () => {
-    inserts = [];
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    (fireWebhook as unknown as ReturnType<typeof vi.fn>).mockClear();
-  });
-
-  it('fires appointment_confirmed webhook when default (confirmed) status writes', async () => {
-    // Default-options path: callers like POS A.1 (`/api/pos/quotes/[id]/convert`)
-    // omit options entirely, so `appointmentStatus` defaults to 'confirmed'
-    // (the dormant `/api/quotes/[id]/convert` admin sibling was retired in
-    // Phase 3 Theme F per audit `dcf511df` finding F.5). This is the pre-#1.7
-    // happy path and must continue firing the webhook.
-    const quote = { ...BASE_QUOTE };
-    const supabase = makeSupabase({ quote, inserts });
-
-    await convertQuote(
-      supabase as unknown as Parameters<typeof convertQuote>[0],
-      'quote-1',
-      CONVERT_INPUT,
-    );
-
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    expect(fireWebhook).toHaveBeenCalledTimes(1);
-    const args = (fireWebhook as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(args[0]).toBe('appointment_confirmed');
-    expect((args[1] as { status?: string }).status).toBe('confirmed');
-  });
-
-  it('fires appointment_confirmed webhook when caller explicitly passes status=confirmed', async () => {
-    // Belt-and-suspenders: callers may pass `appointmentStatus: 'confirmed'`
-    // explicitly. The conditional must read the resulting row's status,
-    // which mirrors what the caller wrote.
-    const quote = { ...BASE_QUOTE };
-    const supabase = makeSupabase({ quote, inserts });
-
-    await convertQuote(
-      supabase as unknown as Parameters<typeof convertQuote>[0],
-      'quote-1',
-      CONVERT_INPUT,
-      { appointmentStatus: 'confirmed' },
-    );
-
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    expect(fireWebhook).toHaveBeenCalledTimes(1);
-    expect(
-      (fireWebhook as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0],
-    ).toBe('appointment_confirmed');
-  });
-
-  it('does NOT fire appointment_confirmed webhook when caller passes status=pending (voice-agent + SMS v2 path)', async () => {
-    // The bug-fix anchor: voice-agent appointments route at
-    // `voice-agent/appointments/route.ts:290` invokes convertQuote with
-    // `{ appointmentStatus: 'pending', channel: 'phone' }`. Pre-#1.7 this
-    // fired `appointment_confirmed` anyway; post-fix it must not fire.
-    const quote = { ...BASE_QUOTE };
-    const supabase = makeSupabase({ quote, inserts });
-
-    await convertQuote(
-      supabase as unknown as Parameters<typeof convertQuote>[0],
-      'quote-1',
-      CONVERT_INPUT,
-      { appointmentStatus: 'pending', channel: 'phone' },
-    );
-
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    expect(fireWebhook).not.toHaveBeenCalled();
-  });
-
-  it('appointment row is still written + quote still updated to converted regardless of webhook gate', async () => {
-    // Regression guard: the conditional must ONLY gate the webhook send.
-    // The appointment INSERT, appointment_services rows, and quote status
-    // update must still run on the pending branch — otherwise customers
-    // who book via voice-agent quote-conversion would have no DB record.
-    const quote = {
-      ...BASE_QUOTE,
-      items: [
-        {
-          service_id: 'svc-1',
-          unit_price: 100,
-          tier_name: null,
-          quantity: 1,
-        },
-      ],
-    };
-    const supabase = makeSupabase({ quote, inserts });
-
-    const result = await convertQuote(
-      supabase as unknown as Parameters<typeof convertQuote>[0],
-      'quote-1',
-      CONVERT_INPUT,
-      { appointmentStatus: 'pending', channel: 'phone' },
-    );
-
-    expect(result.success).toBe(true);
-    const apptInsert = inserts.find((i) => i.table === 'appointments');
-    expect(apptInsert).toBeDefined();
-    expect(apptInsert!.row.status).toBe('pending');
-    expect(apptInsert!.row.channel).toBe('phone');
-
-    const svcInsert = inserts.find((i) => i.table === 'appointment_services');
-    expect(svcInsert).toBeDefined();
-    expect(svcInsert!.row.service_id).toBe('svc-1');
-
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    expect(fireWebhook).not.toHaveBeenCalled();
-  });
-});
+// Theme G removed the entire `Session 1.7 conditional appointment_confirmed
+// webhook fire` describe block (4 tests). The conditional gate those tests
+// pinned has been deleted alongside the rest of the fireWebhook surface —
+// Smart Details has no n8n receiver wired (audit f5e714a8). The bug class
+// Session 1.7 closed (misleading-customer events fired against pending rows)
+// is now structurally prevented: there is no outbound webhook to mis-fire.
+// The "appointment row is still written + quote still updated to converted
+// regardless of webhook gate" assertion folds into the unconditional happy-path
+// tests above (the convertQuote contract for pending writes is verified by
+// the surrounding describe blocks).
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Phase 3 Theme F (F.7) — race idempotency guard
@@ -934,23 +810,9 @@ describe('convertQuote — Phase 3 Theme F (F.7) race idempotency guard', () => 
     expect(apptInsert).toBeUndefined();
   });
 
-  it('pre-INSERT: webhook does NOT fire on the already_converted path (race-winner already fired theirs)', async () => {
-    const quote = {
-      ...BASE_QUOTE,
-      status: 'converted',
-      converted_appointment_id: 'appt-existing',
-    };
-    const supabase = makeSupabase({ quote, inserts });
-
-    await convertQuote(
-      supabase as unknown as Parameters<typeof convertQuote>[0],
-      'quote-1',
-      CONVERT_INPUT,
-    );
-
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    expect(fireWebhook).not.toHaveBeenCalled();
-  });
+  // Theme G removed the `pre-INSERT: webhook does NOT fire on the
+  // already_converted path` test — fireWebhook no longer exists, so the
+  // race-winner-already-fired assertion is moot.
 
   it('legacy guard still rejects the converted-without-FK shape (walk-in pre-F.2 historical state)', async () => {
     // A quote that's status='converted' but has converted_appointment_id=NULL

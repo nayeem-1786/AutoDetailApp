@@ -5,7 +5,6 @@ import { checkPosPermission } from '@/lib/pos/check-permission';
 import { appointmentUpdateSchema } from '@/lib/utils/validation';
 import { STATUS_TRANSITIONS } from '@/lib/appointments/status-transitions';
 import { executeUnMaterialize } from '@/lib/appointments/lifecycle-sync';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
@@ -382,47 +381,10 @@ export async function PATCH(
         .eq('appointment_id', id);
     }
 
-    // Fire webhooks on status changes (Decision 2 — NOT suppressed). Mirrors
-    // the admin PATCH: confirmed/completed on status, rescheduled on date/time.
-    if (data.status && data.status !== current.status) {
-      const webhookPayload = {
-        event: '',
-        timestamp: new Date().toISOString(),
-        appointment: { id, status: data.status },
-      };
-
-      if (data.status === 'confirmed') {
-        fireWebhook(
-          'appointment_confirmed',
-          { ...webhookPayload, event: 'appointment.confirmed' },
-          supabase
-        ).catch((err) => console.error('Webhook fire failed:', err));
-      } else if (data.status === 'completed') {
-        fireWebhook(
-          'appointment_completed',
-          { ...webhookPayload, event: 'appointment.completed' },
-          supabase
-        ).catch((err) => console.error('Webhook fire failed:', err));
-      }
-    }
-
-    if (dateChanged || timeChanged) {
-      fireWebhook(
-        'appointment_rescheduled',
-        {
-          event: 'appointment.rescheduled',
-          timestamp: new Date().toISOString(),
-          appointment: {
-            id,
-            old_date: current.scheduled_date,
-            old_start_time: current.scheduled_start_time,
-            new_date: newDate,
-            new_start_time: newStart,
-          },
-        },
-        supabase
-      ).catch((err) => console.error('Webhook fire failed:', err));
-    }
+    // Theme G — outbound webhook fires removed (status-change confirmed/completed
+    // + date/time-change rescheduled). Smart Details has no n8n receiver wired
+    // (audit f5e714a8); customer-facing dispatch for these transitions is
+    // already covered by inline SMS/email + audit_log writes.
 
     // Session 1.5 — when cascade ran, the appointment.status was set by
     // executeUnMaterialize (it's now `pending`). `update.status` was

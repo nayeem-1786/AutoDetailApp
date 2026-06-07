@@ -1266,7 +1266,7 @@ src/lib/utils/__tests__/vehicle-categories.test.ts
 src/lib/utils/__tests__/sms-normalization.test.ts         # Phase Normalization-1: 8 cases — sendSms/sendMarketingSms rejection on invalid, normalization of (XXX) XXX-XXXX and 11-digit shapes, E.164 pass-through
 src/lib/utils/__tests__/sms-self-send.test.ts             # Session #139 (2026-06-02) — Concern 4 self-send chokepoint: sendSms refuses when normalize(to) == normalize(TWILIO_PHONE_NUMBER); skipped when env unset; backward-compatible failure shape. 10 tests.
 src/lib/utils/__tests__/conversation-helpers-normalization.test.ts # Phase Normalization-1: 4 cases — findOrCreateConversation rejection on invalid + normalized lookup/insert
-src/lib/utils/webhook.ts
+# src/lib/utils/webhook.ts — DELETED in Phase 3 Theme G (Smart Details has no n8n receiver; per webhook receivers identity audit f5e714a8)
 ```
 
 ### Other

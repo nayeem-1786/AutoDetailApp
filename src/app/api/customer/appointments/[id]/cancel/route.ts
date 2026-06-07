@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { APPOINTMENT } from '@/lib/utils/constants';
-import { fireWebhook } from '@/lib/utils/webhook';
 import { sendCancellationNotifications } from '@/lib/email/send-cancellation-email';
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
@@ -90,18 +89,6 @@ export async function POST(
     sendCancellationNotifications(id, 'Cancelled by customer').catch(err =>
       console.error('Cancellation notifications failed (non-blocking):', err)
     );
-
-    // Fire cancellation webhook
-    fireWebhook('appointment_cancelled', {
-      event: 'appointment.cancelled',
-      timestamp: new Date().toISOString(),
-      appointment: {
-        id,
-        cancellation_reason: 'Cancelled by customer',
-        cancelled_by: 'customer',
-        customer_id: customer.id,
-      },
-    }, admin).catch(err => console.error('Webhook fire failed:', err));
 
     return NextResponse.json({ success: true });
   } catch (err) {

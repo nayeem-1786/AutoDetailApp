@@ -77,7 +77,6 @@ const state = {
   auditCalls: [] as Array<Record<string, unknown>>,
   smsSends: [] as unknown[],
   emailSends: [] as unknown[],
-  webhookFires: [] as Array<{ event: string; payload: unknown }>,
 };
 
 vi.mock('@/lib/pos/api-auth', () => ({
@@ -119,12 +118,6 @@ vi.mock('@/lib/utils/email', () => ({
   sendEmail: vi.fn(async (...args: unknown[]) => {
     state.emailSends.push(args);
     return { ok: true };
-  }),
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    state.webhookFires.push({ event, payload });
   }),
 }));
 
@@ -263,7 +256,6 @@ beforeEach(() => {
   state.auditCalls = [];
   state.smsSends = [];
   state.emailSends = [];
-  state.webhookFires = [];
 });
 
 describe('PUT /api/pos/appointments/[id]/services', () => {
@@ -424,7 +416,6 @@ describe('PUT /api/pos/appointments/[id]/services', () => {
     );
     expect(state.smsSends).toEqual([]);
     expect(state.emailSends).toEqual([]);
-    expect(state.webhookFires).toEqual([]);
   });
 
   // ---- Modifier preservation (Item 15g Layer 15g-iii contract via shared helper) ----

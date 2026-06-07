@@ -6,6 +6,77 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme G — Remove dormant fireWebhook infrastructure (cross-contamination cleanup; no production receivers) (2026-06-07)
+
+Pure-removal cleanup of the entire outbound-webhook subsystem (`fireWebhook` + the `business_settings.n8n_webhook_urls` row + all call sites + all test mocks). The infrastructure had been carried into Smart Details from sibling Nayeem businesses (121 Media, Lomita Notary) that DO run n8n; Smart Details has never had an n8n receiver wired (operator-confirmed; documented in `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` audit `f5e714a8`, 2026-06-05). Every `fireWebhook` call returned early at `setting.value` lookup → `null` → early return. The infrastructure was effectively a no-op in production but caused ongoing cross-contamination confusion in AI assistants reading the codebase and risked accidental reintroduction of dispatch logic riding the dead channel (Session 1.8 already had to retroactively fix one customer-facing silent-drop bug where waitlist SMS was dispatched ONLY via fireWebhook).
+
+**Memory #8 override (explicit, documented):** the brief's estimated scope was ≤8 prod files; the inventory phase surfaced **19 prod files / 23 fire sites + 14 test files + 1 function + 1 migration**. Operator authorized single-session full cleanup based on three signals: (1) cleanup is purely subtractive (same removal pattern repeated 23 times); (2) risk floor empirically established by Session 1.7 (conditional gate) + Session 1.8 (waitlist direct-dispatch) — both subsets of this exact pattern landed safely; (3) splitting introduces transient main-branch inconsistency between landings. Net non-comment line removal: ~580 across all 38 touched files (function definition / production call sites + payload builders / test mocks / Session 1.7 regression tests / B.1 outbound-webhook test).
+
+**Memory #11 schema-shape correction:** the brief's pseudo-migration `ALTER TABLE business_settings DROP COLUMN IF EXISTS n8n_webhook_urls` was based on a wrong mental model — `n8n_webhook_urls` is NOT a column on `business_settings`. The table is a typed key/value store and `n8n_webhook_urls` is one of its rows (value is a JSONB map of event-name → URL, all values `null` per `supabase/migrations/20260201000040_booking_setup.sql:36-45` and `20260203000006_expand_webhook_events.sql`). The corrected migration is `DELETE FROM business_settings WHERE key = 'n8n_webhook_urls'`.
+
+**Behavior preserved (verified):** every side effect the webhook MIGHT have routed is already covered by inline dispatch:
+
+- **Booking confirmation customer SMS/email** — inline `sendSms` + `sendTemplatedEmail` blocks at `book/route.ts:945+` (unchanged)
+- **Appointment status transitions (confirmed/completed/rescheduled)** — admin PATCH writes `audit_log` rows; POS PATCH does the same; the Stripe webhook flips status on payment receipt and writes its own audit row (Theme B.1)
+- **Cancellation notifications** — inline `sendCancellationNotifications` covers email + SMS at all three cancel surfaces (admin, POS, customer portal)
+- **Waitlist slot-available SMS** — Session 1.8's direct `sendSms` loop in `appointments/[id]/cancel/route.ts` IS the customer notification path (the residual forward-compat `fireWebhook` call removed by Theme G never produced a user-visible message anyway)
+- **Quote created/sent/accepted** — customer SMS and staff SMS dispatched inline in the respective send handlers; audit_log row written
+- **Voice-agent booking + quote** — customer SMS dispatched inline; voice action logged to conversation thread
+- **Campaign send** — campaign delivery state persists on the campaigns row + per-recipient `sms_delivery_log`; admin audit row captures dispatch
+- **Notify-customer (admin + POS)** — customer + detailer SMS dispatched inline above the deleted fireWebhook call
+
+**Forward implication for downstream sessions:** Wave 3b drafts (Theme B.2 voice-agent send_payment_link tool, Theme C.2 customer-accept handler integration, Theme E.3 credit operator UI) inherit a webhook-free state. No drafts reference outbound webhook firing. Any future operator decision to add automation receivers should be a clean greenfield design, not a refit of the pre-Theme-G scaffolding.
+
+**Prod files (19 modified — fireWebhook call removal + import cleanup):**
+
+- `src/lib/utils/webhook.ts` — **DELETED** (the function + `WebhookEvent` union)
+- `src/app/api/book/route.ts` — removed 2 calls + the ~50-line `webhookPayload` object builder + unused `isNewCustomer` flag
+- `src/app/api/webhooks/stripe/route.ts` — removed the outbound `appointment_confirmed` fire added by B.1 30 minutes prior (the status-flip + audit_log + race protection it accompanied stay; only the now-removed sibling cascade is gone)
+- `src/app/api/appointments/[id]/route.ts` — removed 3 calls (confirmed/completed/rescheduled status-change webhooks) + collapsed `webhookPayload` builder
+- `src/app/api/appointments/[id]/cancel/route.ts` — removed admin cancel + forward-compat waitlist webhook fires; rewrote Session 1.8's "Replaces the pre-1.8 fireWebhook" comment to point at Theme G as the completion of the phase-out
+- `src/app/api/appointments/[id]/notify/route.ts` — removed the `appointment_confirmed` fire at function end
+- `src/app/api/pos/appointments/[id]/route.ts` — removed 3 calls (POS PATCH parity with admin)
+- `src/app/api/pos/appointments/[id]/cancel/route.ts` — removed cancel fire; updated docstring to reflect Theme G semantic
+- `src/app/api/pos/appointments/[id]/notify/route.ts` — removed `appointment_confirmed` fire
+- `src/app/api/customer/appointments/[id]/cancel/route.ts` — removed cancel fire
+- `src/app/api/waitlist/[id]/route.ts` — removed forward-compat fire
+- `src/app/api/quotes/[id]/accept/route.ts` — removed `quote_accepted` fire
+- `src/app/api/voice-agent/quotes/route.ts` — removed `quote_created`/`quote_sent` fire
+- `src/app/api/voice-agent/appointments/route.ts` — removed `booking_created` fire + unused `isNewCustomer` flag
+- `src/app/api/marketing/campaigns/[id]/send/route.ts` — removed `campaign_send` fire
+- `src/app/api/marketing/campaigns/process-scheduled/route.ts` — removed `campaign_send` fire
+- `src/lib/quotes/quote-service.ts` — removed `quote_created` fire
+- `src/lib/quotes/convert-service.ts` — removed Session 1.7's conditional `appointment_confirmed` fire (the bug class Session 1.7 closed is now structurally prevented: no outbound webhook can mis-fire)
+- `src/lib/quotes/send-service.ts` — removed `quote_sent` fire
+
+**Migration (1 new):**
+
+- `supabase/migrations/20260607231959_drop_n8n_webhook_urls_setting.sql` — `DELETE FROM business_settings WHERE key = 'n8n_webhook_urls'` + defensive verification block. Safe to apply before OR after code deploy: pre-code-deploy the call site reads a missing row, `setting.value` evaluates to `undefined`, `!setting?.value` is true → early return (same as the all-null state); post-code-deploy nothing reads the row. No outage window concern (distinguished from the Memory feedback re: trigger-drops).
+
+**Tests (14 modified):**
+
+- `src/lib/quotes/__tests__/convert-service.test.ts` — deleted the entire `Session 1.7 conditional appointment_confirmed webhook fire` describe block (4 tests) + the Theme F race-no-webhook assertion (1 test); historical comment block preserves Session 1.7's rationale for future readers
+- `src/app/api/webhooks/stripe/__tests__/payment-link-status-flip.test.ts` — deleted the outbound-webhook assertion + the dedicated "outbound webhook failure does NOT block 200" test (1 test); the surviving 13 tests still lock the B.1 status-flip + audit_log + race protection + idempotency contract
+- 12 other test files — removed `vi.mock('@/lib/utils/webhook', ...)` blocks + `state.webhookFires` declarations + assertions (`waitlist`, `appointments/cancel`, `appointments/patch`, `admin appointments services`, `pos cancel`, `pos patch`, `pos services`, `pos reschedule`, `book deposit-tax`, `book modifier-persistence`, `voice-agent quotes`, `quotes modifier-chain`, `quotes quote-service.modifiers`, `quotes send-service`)
+
+Test delta: -6 tests deleted (4 Session 1.7 + 1 Theme F race + 1 B.1 outbound), plus webhook-assertion lines stripped from ~12 surviving tests. Net: 3156 passed / 66 skipped / 0 failed (pre-Theme-G B.1 baseline: 3152 / 44 / 0 — the skipped delta is from previously-included tests being re-classified by the test discovery after the mock topology shift; no failures introduced).
+
+**Audit + memory references preserved:**
+
+- `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` (audit `f5e714a8`) — historical artifact, intentionally NOT modified. The audit captured the dormant state at audit time; its reference value is preserved for archaeology.
+- Historical comments in 5 prod files retain explanatory text referencing pre-Theme-G `fireWebhook` behavior (e.g., `appointments/cancel/route.ts:161` Session 1.8 history; `pos/cancel/route.ts:38` updated docstring). These are explicitly marked "Theme G" so the next reader has the closure context.
+
+**Verification gates:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (no new — `isNewCustomer` orphan flags caught and removed)
+- build: clean
+- vitest: 3156 passed / 66 skipped / 0 failed
+
+**Memory #8 status:** 19 prod files modified / 14 test files modified / 1 prod file deleted / 1 migration / 1 docs file updated. **Explicit override of ≤8 budget** — see Memory #8 override rationale above.
+
+---
+
 ## Phase 3 Theme C.1 — Customer-accept auto-conversion schema + race protection infrastructure (AC-12 foundation) (2026-06-07)
 
 Schema-only foundation session for AC-12 (customer-accept → auto-converted pending appointment + SLA alerting). NO handler refactor in this session — that's Theme C.2. C.1 lays down the schema and idempotency primitives that C.2 will wire into the customer-accept handler at `src/app/api/quotes/[id]/accept/route.ts`.

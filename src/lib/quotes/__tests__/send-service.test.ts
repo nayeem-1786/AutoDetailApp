@@ -10,7 +10,6 @@ vi.mock('@/lib/data/business', () => ({
     website: 'https://example.com',
   })),
 }));
-vi.mock('@/lib/utils/webhook', () => ({ fireWebhook: vi.fn(async () => undefined) }));
 vi.mock('@/lib/utils/short-link', () => ({
   createShortLink: vi.fn(async (u: string) => u),
 }));

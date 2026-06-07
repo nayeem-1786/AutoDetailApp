@@ -57,11 +57,6 @@ interface AuditCall {
   source: string;
 }
 
-interface WebhookCall {
-  event: string;
-  payload: unknown;
-}
-
 const state = {
   event: null as Record<string, unknown> | null,
   signatureValid: true,
@@ -84,7 +79,6 @@ const state = {
 const capturedUpdates: CapturedUpdate[] = [];
 const capturedInserts: CapturedInsert[] = [];
 const auditCalls: AuditCall[] = [];
-const webhookCalls: WebhookCall[] = [];
 
 // -----------------------------------------------------------------------------
 // Mocks
@@ -138,12 +132,6 @@ vi.mock('@/lib/services/audit', () => ({
       details: params.details ?? null,
       source: params.source,
     });
-  }),
-}));
-
-vi.mock('@/lib/utils/webhook', () => ({
-  fireWebhook: vi.fn(async (event: string, payload: unknown) => {
-    webhookCalls.push({ event, payload });
   }),
 }));
 
@@ -333,7 +321,6 @@ beforeEach(() => {
   capturedUpdates.length = 0;
   capturedInserts.length = 0;
   auditCalls.length = 0;
-  webhookCalls.length = 0;
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
 });
@@ -379,13 +366,9 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
       },
     });
 
-    // Outbound n8n webhook fire
-    expect(webhookCalls).toHaveLength(1);
-    expect(webhookCalls[0].event).toBe('appointment_confirmed');
-    expect(webhookCalls[0].payload).toMatchObject({
-      event: 'appointment.confirmed',
-      appointment: { id: APPT_ID, status: 'confirmed' },
-    });
+    // Theme G removed the outbound `appointment_confirmed` n8n webhook fire
+    // from the B.1 status-flip block; the audit_log assertion above is now
+    // the full side-effect contract.
   });
 
   it('already-confirmed appointment: status NOT re-flipped + no audit + no outbound webhook', async () => {
@@ -415,7 +398,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
     expect(paymentFieldUpdate?.payload.payment_status).toBe('paid');
 
     expect(auditCalls).toHaveLength(0);
-    expect(webhookCalls).toHaveLength(0);
   });
 
   it.each(['cancelled', 'no_show', 'completed', 'in_progress'] as const)(
@@ -444,7 +426,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
       expect(paymentFieldUpdate).toBeDefined();
 
       expect(auditCalls).toHaveLength(0);
-      expect(webhookCalls).toHaveLength(0);
     }
   );
 
@@ -461,7 +442,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
       )
     ).toHaveLength(1);
     expect(auditCalls).toHaveLength(1);
-    expect(webhookCalls).toHaveLength(1);
 
     // Simulate retry: payments dedup lookup returns the prior insert
     state.existingPaymentForPi = { id: 'payments-row-1' };
@@ -476,7 +456,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
       )
     ).toHaveLength(1);
     expect(auditCalls).toHaveLength(1);
-    expect(webhookCalls).toHaveLength(1);
 
     // No second transaction or payment insert
     expect(capturedInserts.filter((i) => i.table === 'transactions')).toHaveLength(1);
@@ -509,7 +488,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
     // This is intentional: we'd rather log a benign double-confirmation event
     // than miss a real flip.
     expect(auditCalls).toHaveLength(1);
-    expect(webhookCalls).toHaveLength(1);
   });
 
   it('missing appointment_id in metadata: branch skipped entirely, no DB writes, returns 200', async () => {
@@ -535,7 +513,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
     expect(capturedUpdates).toHaveLength(0);
     expect(capturedInserts).toHaveLength(0);
     expect(auditCalls).toHaveLength(0);
-    expect(webhookCalls).toHaveLength(0);
   });
 
   it('appointment not found: throws → 500 → Stripe retries; no side effects', async () => {
@@ -548,7 +525,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
       capturedUpdates.filter((u) => u.table === 'appointments')
     ).toHaveLength(0);
     expect(auditCalls).toHaveLength(0);
-    expect(webhookCalls).toHaveLength(0);
   });
 
   it('non-pay-link metadata: e-commerce order PI path unaffected by pay-link extension', async () => {
@@ -576,7 +552,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
       capturedUpdates.filter((u) => u.table === 'appointments')
     ).toHaveLength(0);
     expect(auditCalls).toHaveLength(0);
-    expect(webhookCalls).toHaveLength(0);
   });
 
   it('status-flip UPDATE returns DB error: throws → 500 → Stripe retries', async () => {
@@ -589,7 +564,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
     // Audit + webhook should NOT have fired because the throw happens
     // BEFORE those calls.
     expect(auditCalls).toHaveLength(0);
-    expect(webhookCalls).toHaveLength(0);
   });
 
   it('signature verification preserved: invalid signature returns 400 + zero DB writes (regression lock)', async () => {
@@ -603,7 +577,6 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
     expect(capturedUpdates).toHaveLength(0);
     expect(capturedInserts).toHaveLength(0);
     expect(auditCalls).toHaveLength(0);
-    expect(webhookCalls).toHaveLength(0);
   });
 
   it('partial-payment (deposit not full): still flips status to confirmed per AC-11 commitment', async () => {
@@ -632,30 +605,11 @@ describe('POST /api/webhooks/stripe — pay-link branch — AC-11 status flip', 
     );
     expect(statusFlipUpdates).toHaveLength(1);
     expect(auditCalls).toHaveLength(1);
-    expect(webhookCalls).toHaveLength(1);
   });
 
-  it('outbound webhook failure does NOT block the 200 response (fire-and-forget)', async () => {
-    state.event = payLinkEvent();
-    state.appointment = freshAppointment({ status: 'pending' });
-
-    // Re-stub fireWebhook to throw
-    const { fireWebhook } = await import('@/lib/utils/webhook');
-    (fireWebhook as unknown as { mockImplementationOnce: (fn: () => Promise<void>) => void })
-      .mockImplementationOnce(async () => {
-        throw new Error('n8n unreachable');
-      });
-
-    const res = await POST(req());
-    // Webhook fire is fire-and-forget; the 200 must still come back
-    expect(res.status).toBe(200);
-
-    // Status flip + audit still happened (the n8n outage doesn't block them)
-    expect(
-      capturedUpdates.filter(
-        (u) => u.table === 'appointments' && u.payload.status === 'confirmed'
-      )
-    ).toHaveLength(1);
-    expect(auditCalls).toHaveLength(1);
-  });
+  // Theme G removed the outbound `appointment_confirmed` webhook fire from the
+  // B.1 status-flip block (no n8n receiver wired in Smart Details; audit
+  // f5e714a8). The pre-Theme-G test "outbound webhook failure does NOT block
+  // the 200 response (fire-and-forget)" is deleted alongside the production
+  // path it guarded — no webhook fire means no fire-failure path to test.
 });
