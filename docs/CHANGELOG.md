@@ -6,6 +6,39 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme A.1 — drop legacy receipt + PO identifier triggers (post-Theme-A cleanup; closes the Migration 6 deferral) (2026-06-07)
+
+Surgical follow-up to Phase 3 Theme A. Drops the two legacy BEFORE INSERT triggers (`tr_transaction_receipt_number` + `tr_po_number`) and their PL/pgSQL functions (`generate_receipt_number()` + `generate_po_number()`) that Theme A deliberately kept alive across its migration push to eliminate a post-migrate / pre-deploy outage window. Theme A's application-side code (in production since merge `133d4ee8`) issues receipt + PO numbers via `next_identifier('receipt')` / `next_identifier('purchase_order')` calls; the triggers' `WHEN (NEW.column IS NULL)` gates were already shadowed and never fired post-Theme-A. This session retires the stale safety net.
+
+**Pre-flight prerequisite (operator-confirmed):** at least one new `SD-XXXXX` receipt + one new `PO-XXXXX` had been issued in production via the application-side `next_identifier()` path since Theme A merged, confirming all six INSERT callsites (5 receipt sites + 1 PO site) were exercising the helpers rather than relying on the trigger fallback.
+
+**Change shape:** 1 new migration + 1 new test file. Net ~30 prod lines + ~70 test lines. Zero application-code changes — the helpers were already wired in Theme A.
+
+**Migration (1 new, applied to production 2026-06-07 via `supabase db push --linked`):**
+
+- `20260607181649_drop_legacy_identifier_triggers.sql` — drops `tr_transaction_receipt_number` ON `transactions` + `generate_receipt_number()`, plus `tr_po_number` ON `purchase_orders` + `generate_po_number()`. Both function names verified against current main per Memory #11.
+
+**Test (1 new live-DB integration file, 4 tests):**
+
+- `src/lib/utils/__tests__/identifier-legacy-triggers-dropped.test.ts` — asserts (a) `generate_receipt_number()` returns PGRST202 via PostgREST (function gone), (b) `generate_po_number()` returns PGRST202 (function gone), (c) `next_identifier('receipt')` continues to issue `SD-NNNNN` values, (d) `next_identifier('purchase_order')` continues to issue `PO-NNNNN` values. Uses the same `describe.skip` env-gate pattern as `identifier-sequences.test.ts`.
+
+**Production-data verification (post-migration 2026-06-07):**
+
+- Migration confirmed applied via `supabase migration list --linked` (`applied_version = 20260607181649`)
+- 4 smoke tests pass against live database
+- Existing 31 identifier-* tests still pass (Theme A mechanism intact)
+
+**Verification gates:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (unchanged from main pre-session)
+- build: clean
+- tests: 193 files / 3107 tests pass when run without `.env.local` (the 5 live-DB files skip cleanly). With `.env.local` loaded, the 5 new live-DB tests pass + 31 existing identifier tests pass. The 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` (those tests assert behavior when `TWILIO_PHONE_NUMBER` is unset) reproduce on main and are unrelated to this session.
+
+**Rationale:** Theme A's Migration 6 SCOPE SPLIT note in the Decisions Log explicitly scoped this drop to a separate session "after at least one production deploy cycle has confirmed the new application code is supplying these columns reliably." Operator confirmed the prerequisite at session start; this session executes the deferred drop cleanly.
+
+---
+
 ## Phase 3 Theme A — 5-system identifier unification (Q / A / SD / WO / PO under shared `identifier_sequences` + `next_identifier()`; SD backfill to 5-digit; partial Migration 6 split → Theme A.1) (2026-06-07)
 
 Foundational architectural session. Implements AC-10 v1.4 (locked in the prior doc-only session). All five human-readable identifier systems converge on a single shared generation mechanism with a uniform 5-digit format. Largest single-session scope of Phase 3.
