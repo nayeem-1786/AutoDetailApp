@@ -6,6 +6,73 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme C.1 — Customer-accept auto-conversion schema + race protection infrastructure (AC-12 foundation) (2026-06-07)
+
+Schema-only foundation session for AC-12 (customer-accept → auto-converted pending appointment + SLA alerting). NO handler refactor in this session — that's Theme C.2. C.1 lays down the schema and idempotency primitives that C.2 will wire into the customer-accept handler at `src/app/api/quotes/[id]/accept/route.ts`.
+
+Per the locked architecture decisions in `QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` v1.4 (G.1 / G.3 / G.5 / race-protection / channel-as-SLA-identification axis) and Phase 3.0.3 audit (`CUSTOMER_ACCEPT_SEAM_AUDIT.md`, `54aa996a`, Target B.3.c / D.4 / E.2 / F.3 / G.5).
+
+**Three migrations applied:**
+
+- `20260607202558_appointment_channel_customer_accept.sql` — adds `'customer_accept'` value to `appointment_channel` enum. Per G.3 LOCKED: distinct value beats overloading `'online'`/`'portal'`. Must be its own transaction (Postgres ENUM constraint: new value cannot be read in the same transaction it was added).
+- `20260607202559_appointments_ac12_schema_additions.sql` — three columns + backfill + two indexes:
+  - `staff_acknowledged_at TIMESTAMPTZ` (nullable) — explicit acknowledgment timestamp distinct from `updated_at`; SLA query filter axis. Partial index `appointments_staff_acknowledged_at_idx WHERE staff_acknowledged_at IS NULL` for cron-query support.
+  - `scheduled_date_placeholder BOOLEAN NOT NULL DEFAULT FALSE` — per G.1 LOCKED option ζ; keeps `scheduled_date` / `scheduled_*_time` NOT NULL and adds a flag to distinguish placeholder rows. Theme C.2 picks the placeholder VALUE strategy among α/β/γ/δ from the audit.
+  - `quote_id UUID REFERENCES quotes(id) ON DELETE SET NULL` — new FK column; mirrors the existing `jobs.quote_id` pattern. Backfilled from the reverse `quotes.converted_appointment_id` link so every existing converted quote has the round-trip back-link populated. **UNIQUE partial index `appointments_quote_id_uniq ON appointments(quote_id) WHERE quote_id IS NOT NULL`** is the AC-12 race-protection contract — at most one appointment per quote (locked mechanism iii). Defense-in-depth on top of Theme F's F.7 application-level guard in `convertQuote()`.
+  - **Pre-check DO block** at the top of the migration aborts cleanly if any appointment is referenced by more than one `quotes.converted_appointment_id` (cross-quote inconsistency) — pre-migration data integrity protection. Production state: 0 violations, migration applied cleanly.
+- `20260607202560_seed_pending_appointment_sla_alert_template.sql` — seeds the staff-facing `pending_appointment_sla_alert` SMS template. Category `system`, recipient_type `staff`, four required chips (`quote_number`, `customer_name`, `services`, `accepted_at_human`), zero optional. `recipient_phones` NULL so the Session #139 self-send-safe pattern drops cleanly with `console.warn` when no staff phones are configured (vs self-sending to `TWILIO_PHONE_NUMBER`). Theme C.2 wires the dispatcher.
+
+**SMS contracts codegen refresh:**
+
+- `src/lib/sms/sms-contracts.source.ts` — new chip `accepted_at_human` (description "Humanized time-since-customer-accept (Theme C.1 SLA alerts)") + new slug `pending_appointment_sla_alert` with the four-required-zero-optional contract.
+- Regenerated `src/lib/sms/palette.ts` + `src/lib/sms/generated-contracts.ts` via `npx tsx scripts/regen-sms-contracts.ts` (90 chips / 32 slugs / 3 auto-injected).
+
+**What this session does NOT do (Theme C.2 scope):**
+
+- The customer-accept handler at `src/app/api/quotes/[id]/accept/route.ts` is UNCHANGED. It still pure-status-flips and does NOT invoke `convertQuote`. The schema is laid; the wiring is C.2.
+- The SLA cron logic is NOT implemented. `pending_appointment_sla_alert` is seeded but no caller exists yet. The `lifecycle_rules` table is the wrong shape (service-completion-driven) for AC-12's SLA query; C.2 implements the SLA scan inline in `lifecycle-engine/route.ts` or a new cron endpoint — that's a C.2 architectural decision.
+- The placeholder VALUE strategy is not selected. C.2 picks among α `quote.valid_until` / β `quote.created_at + N` / γ `NOW() + 1` / δ `quote.created_at`. C.1 only adds the FLAG column.
+- `convertQuote`'s `'accepted'` status-rejection refinement (architecture v1.4 line 618) is C.2 territory — Theme F's `converted_appointment_id` pre-check makes the status check semantically redundant for the convert path, but the explicit `'accepted'` add is the minimum prophylaxis at the convertQuote layer.
+
+**Live-DB schema verification (post-`db push`):**
+
+- All three migrations confirmed REMOTE = LOCAL via `supabase migration list --linked`.
+- DB_SCHEMA.md regenerated: `appointments` carries 3 new columns + 2 new indexes; `appointment_channel` enum lists 5 values (online, phone, walk_in, portal, customer_accept); `sms_templates` has the new row.
+- Pre-check passed cleanly (zero cross-quote inconsistencies in production).
+- Backfill effect: `appointments.quote_id` populated for every existing converted quote via the `quotes.converted_appointment_id` reverse link.
+
+**Files touched:**
+
+- Migrations (3 new): `20260607202558_appointment_channel_customer_accept.sql`, `20260607202559_appointments_ac12_schema_additions.sql`, `20260607202560_seed_pending_appointment_sla_alert_template.sql`
+- SMS contracts source (1 modified): `src/lib/sms/sms-contracts.source.ts` (1 new chip + 1 new slug entry)
+- SMS contracts generated (2 regen): `src/lib/sms/palette.ts`, `src/lib/sms/generated-contracts.ts`
+- Tests (1 new): `src/lib/__tests__/theme-c-1-schema.test.ts` (6 live-DB integration tests covering enum addition, column defaults, staff_acknowledged_at update, UNIQUE constraint rejection, backfill round-trip, SMS template seed shape)
+- Docs: this entry; `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (Theme C.1 Decisions Log entry); `docs/dev/DB_SCHEMA.md` (regenerated); `docs/dev/FILE_TREE.md` (new test file path)
+
+**Memory #11 schema-vs-prompt corrections:**
+
+- Session prompt assumed `appointments.quote_id` already existed and proposed only the UNIQUE index. Verified against current main: column does NOT exist. The session-plan-implied "appointment-per-quote constraint" requires adding the column first; this session does both in one migration (with backfill from `quotes.converted_appointment_id` so existing converted quotes get their back-link populated).
+- Prompt's `sms_templates` INSERT used legacy column names (`template_key`, `template_body`, `variables`). Verified against current schema: `slug`, `body_template` + `default_body`, `required_variables` + `optional_variables`. Mirrored the recent `waitlist_slot_available` seed pattern.
+- Prompt's `lifecycle_rules` INSERT used columns that don't exist on the current shape (`rule_key`, `query_template`, `alert_template`). Verified: the `lifecycle_rules` table is service-completion-driven (`trigger_service_id`, `trigger_condition`, `delay_*`, `sms_template`); it's the wrong shape for an appointment-status-based SLA query. Per prompt's explicit defer instruction: lifecycle rule seed deferred to Theme C.2 where the SLA logic is implemented inline rather than as a `lifecycle_rules` row.
+- Prompt's template body used `service_summary` chip; not in palette. Used existing `services` (comma-joined list) instead; locked decision noted in the migration comment.
+
+**Verification:**
+
+- typecheck: 0 errors
+- lint: 0 errors / 97 baseline warnings (unchanged from main)
+- build: clean
+- tests: 6 new Theme C.1 live-DB tests pass with env loaded; 3187 total tests when running with env; pre-existing 4 SMS env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated to this session (documented in Theme F + A.1 entries). The `identifier-race-closure.test.ts` test expects `next_identifier('quote')` counter to advance by EXACTLY +1 between two calls — flaky under parallel vitest runs when other tests consume `quote` sequence values; my Theme C.1 tests use `next_identifier('appointment')` (different entity_type, different lock row), so do not contribute to that flake.
+
+**Foundation laid for Theme C.2:**
+
+- `channel='customer_accept'` is INSERTable.
+- `staff_acknowledged_at` / `scheduled_date_placeholder` / `quote_id` columns are writeable.
+- UNIQUE constraint on `quote_id` enforces at-most-one-appointment-per-quote at the DB layer.
+- `pending_appointment_sla_alert` template is dispatchable via the standard `renderSmsTemplate` + `sendSms` pair.
+- Theme C.2 can now refactor the customer-accept handler to call `convertQuote({appointmentStatus: 'pending', channel: 'customer_accept'})` with a placeholder scheduled_date (G.1 sub-option), set `scheduled_date_placeholder=TRUE`, and rely on the schema + race-protection contract to handle operator-vs-customer races cleanly.
+
+---
+
 ## Phase 3 Theme F — Quote conversion cleanup bundle (Phase 0.2 audit F.2 / F.3 / F.5 / F.6 / F.7 closed) (2026-06-07)
 
 Five-finding cleanup bundle from the Phase 0.2 Quote → Appointment conversion audit (`dcf511df`). All five items are file-isolated from each other; bundled into one session because they share the same audit lineage and the same convertQuote + walk-in-seam surface area. Session 1.7 already closed F.1 (conditional `appointment_confirmed` webhook fire); Theme F closes the remaining five. F.4 (webhook-name-vs-status) and F.8 (accept-without-follow-through) are AC-12 / Theme C territory and stay deferred.

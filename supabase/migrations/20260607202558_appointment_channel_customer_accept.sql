@@ -1,0 +1,33 @@
+-- Phase 3 Theme C.1 — AC-12 foundation: add 'customer_accept' to
+-- appointment_channel enum.
+--
+-- Per the locked decision in QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md v1.4
+-- (line 617, G.3 LOCKED) and Phase 3.0.3 audit (`54aa996a`, Target B.3.c /
+-- C.3 / G.3). Customer-accept auto-conversion (AC-12, Theme C.2) needs a
+-- distinct channel value so the SLA query in the lifecycle engine can
+-- identify pending appointments created via the customer's quote-accept
+-- click (`channel = 'customer_accept' AND status = 'pending' AND
+-- staff_acknowledged_at IS NULL AND created_at < NOW() - INTERVAL '<...>')`.
+-- Overloading an existing value (`online`, `portal`) would create downstream
+-- reader ambiguity across analytics, reports, and lifecycle rules.
+--
+-- Existing 4 values stay: online, phone, walk_in, portal. New value: 5th.
+-- This is a strictly additive enum change — every existing reader continues
+-- to work unchanged because the new value is a Postgres-side label only
+-- and no existing row carries it.
+--
+-- POSTGRES CONSTRAINT: `ALTER TYPE ... ADD VALUE` cannot execute inside the
+-- same transaction that subsequently references the new value (the value is
+-- not visible to readers in the same transaction). Supabase's `db push`
+-- applies each migration in its own transaction, which satisfies this
+-- requirement — so this migration MUST NOT be combined with any DML/DDL
+-- that writes or reads the new value. Theme C.2's customer-accept handler
+-- (which writes `channel = 'customer_accept'`) lands in a separate session
+-- after this migration is in production.
+--
+-- The companion column additions (`staff_acknowledged_at`,
+-- `scheduled_date_placeholder`, `quote_id` + UNIQUE) ship in a separate
+-- migration (`20260607202559_…`) that does NOT reference the new enum
+-- value, so the two can land back-to-back in one `db push` invocation.
+
+ALTER TYPE appointment_channel ADD VALUE IF NOT EXISTS 'customer_accept';

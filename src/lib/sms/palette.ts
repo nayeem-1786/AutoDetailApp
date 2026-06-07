@@ -113,6 +113,7 @@ export const SMS_PALETTE: Record<string, ChipMetadata> = {
   issue_description: { key: "issue_description", description: "Free-text add-on issue description", sample: "Multiple coffee stains in driver seat", format: "plain" },
   friendly_name: { key: "friendly_name", description: "Humanized service name for add-on context", sample: "Stain Removal", format: "plain" },
   final_price: { key: "final_price", description: "Final add-on price", sample: "$65.00", format: "currency" },
+  accepted_at_human: { key: "accepted_at_human", description: "Humanized time-since-customer-accept (Theme C.1 SLA alerts)", sample: "12 minutes ago", format: "plain" },
   product_name: { key: "product_name", description: "Product display name", sample: "Carnauba Paste Wax", format: "plain" },
   product_slug: { key: "product_slug", description: "Product URL slug", sample: "carnauba-paste-wax", format: "plain" },
   category_name: { key: "category_name", description: "Category display name", sample: "Waxes & Sealants", format: "plain" },

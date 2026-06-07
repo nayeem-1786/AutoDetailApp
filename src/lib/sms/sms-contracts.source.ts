@@ -143,6 +143,7 @@ export const SMS_CONTRACTS_SOURCE = {
     issue_description: { description: 'Free-text add-on issue description', sample: 'Multiple coffee stains in driver seat', format: 'plain' },
     friendly_name: { description: 'Humanized service name for add-on context', sample: 'Stain Removal', format: 'plain' },
     final_price: { description: 'Final add-on price', sample: '$65.00', format: 'currency' },
+    accepted_at_human: { description: 'Humanized time-since-customer-accept (Theme C.1 SLA alerts)', sample: '12 minutes ago', format: 'plain' },
 
     // ────────── Product / Category / Service routing ──────────
     product_name: { description: 'Product display name', sample: 'Carnauba Paste Wax', format: 'plain' },
@@ -229,6 +230,10 @@ export const SMS_CONTRACTS_SOURCE = {
     payment_receipt: {
       required: ['transaction_greeting', 'receipt_link'],
       optional: ['first_name', 'last_name', 'business_name'],
+    },
+    pending_appointment_sla_alert: {
+      required: ['quote_number', 'customer_name', 'services', 'accepted_at_human'],
+      optional: [],
     },
     quote_accepted_multi: {
       required: [],

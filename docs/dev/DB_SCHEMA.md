@@ -154,7 +154,7 @@ CREATE INDEX idx_appointment_services_appt ON public.appointment_services USING 
 | vehicle_id | UUID | FK → vehicles(id) ON DELETE SET NULL |  |
 | employee_id | UUID | FK → employees(id) ON DELETE SET NULL |  |
 | status | appointment_status (enum) | NOT NULL, DEFAULT 'pending'::appointment_status | enum values: pending, confirmed, in_progress, completed, cancelled, no_show |
-| channel | appointment_channel (enum) | NOT NULL, DEFAULT 'walk_in'::appointment_channel | enum values: online, phone, walk_in, portal |
+| channel | appointment_channel (enum) | NOT NULL, DEFAULT 'walk_in'::appointment_channel | enum values: online, phone, walk_in, portal, customer_accept |
 | scheduled_date | DATE | NOT NULL |  |
 | scheduled_start_time | TIME | NOT NULL |  |
 | scheduled_end_time | TIME | NOT NULL |  |
@@ -191,6 +191,9 @@ CREATE INDEX idx_appointment_services_appt ON public.appointment_services USING 
 | manual_discount_value | NUMERIC(10,2) | — |  |
 | manual_discount_label | TEXT | — |  |
 | appointment_number | TEXT | NOT NULL |  |
+| staff_acknowledged_at | TIMESTAMPTZ | — |  |
+| scheduled_date_placeholder | BOOLEAN | NOT NULL, DEFAULT false |  |
+| quote_id | UUID | FK → quotes(id) ON DELETE SET NULL |  |
 
 **CHECK constraints:**
 - `appointments_manual_discount_coherent`: `CHECK ((((manual_discount_value IS NULL) AND (manual_discount_label IS NULL)) OR ((manual_discount_value IS NOT NULL) AND (manual_discount_value > (0)::numeric))))`
@@ -203,6 +206,8 @@ CREATE INDEX idx_appointment_services_appt ON public.appointment_services USING 
 CREATE UNIQUE INDEX appointments_appointment_number_key ON public.appointments USING btree (appointment_number) WHERE (appointment_number IS NOT NULL)
 CREATE UNIQUE INDEX appointments_payment_link_token_unique ON public.appointments USING btree (payment_link_token) WHERE (payment_link_token IS NOT NULL)
 CREATE UNIQUE INDEX appointments_pkey ON public.appointments USING btree (id)
+CREATE UNIQUE INDEX appointments_quote_id_uniq ON public.appointments USING btree (quote_id) WHERE (quote_id IS NOT NULL)
+CREATE INDEX appointments_staff_acknowledged_at_idx ON public.appointments USING btree (staff_acknowledged_at) WHERE (staff_acknowledged_at IS NULL)
 CREATE INDEX idx_appointments_customer ON public.appointments USING btree (customer_id)
 CREATE INDEX idx_appointments_date ON public.appointments USING btree (scheduled_date)
 CREATE INDEX idx_appointments_employee ON public.appointments USING btree (employee_id)
@@ -3279,7 +3284,7 @@ CREATE UNIQUE INDEX website_pages_slug_key ON public.website_pages USING btree (
 
 ## Enums
 
-- `appointment_channel`: `online`, `phone`, `walk_in`, `portal`
+- `appointment_channel`: `online`, `phone`, `walk_in`, `portal`, `customer_accept`
 - `appointment_status`: `pending`, `confirmed`, `in_progress`, `completed`, `cancelled`, `no_show`
 - `campaign_channel`: `sms`, `email`, `both`
 - `campaign_status`: `draft`, `scheduled`, `sending`, `sent`, `paused`, `cancelled`

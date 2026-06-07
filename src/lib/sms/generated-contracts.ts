@@ -37,6 +37,7 @@ export const SMS_SLUGS = [
   "loyalty_milestone",
   "payment_link_sent",
   "payment_receipt",
+  "pending_appointment_sla_alert",
   "quote_accepted_multi",
   "quote_accepted_single",
   "quote_accepted_staff_notify",
@@ -80,6 +81,7 @@ export const CONTRACTS_BY_SLUG: { readonly [S in SmsSlug]: SmsContract } = {
   loyalty_milestone: { required: ["loyalty_points_balance", "loyalty_cash_value", "booking_link"], optional: ["first_name", "last_name", "business_name"] },
   payment_link_sent: { required: ["amount_due", "pay_url"], optional: ["first_name"] },
   payment_receipt: { required: ["transaction_greeting", "receipt_link"], optional: ["first_name", "last_name", "business_name"] },
+  pending_appointment_sla_alert: { required: ["quote_number", "customer_name", "services", "accepted_at_human"], optional: [] },
   quote_accepted_multi: { required: [], optional: ["first_name", "last_name"] },
   quote_accepted_single: { required: ["item_name"], optional: ["first_name", "last_name", "vehicle_description"] },
   quote_accepted_staff_notify: { required: ["customer_name", "quote_number", "services", "service_total"], optional: ["customer_phone", "customer_email", "last_name", "vehicle_description"] },
@@ -275,6 +277,15 @@ export interface RenderVarsBySlug {
     receipt_link: string;
     first_name?: string | undefined;
     last_name?: string | undefined;
+    business_name?: string | undefined;
+    business_phone?: string | undefined;
+    business_address?: string | undefined;
+  };
+  pending_appointment_sla_alert: {
+    quote_number: string;
+    customer_name: string;
+    services: string;
+    accepted_at_human: string;
     business_name?: string | undefined;
     business_phone?: string | undefined;
     business_address?: string | undefined;
