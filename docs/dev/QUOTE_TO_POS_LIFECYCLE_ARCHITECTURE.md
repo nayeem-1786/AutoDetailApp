@@ -2099,7 +2099,7 @@ Test delta: +15.
 
 ### 2026-06-07 PST — Phase 3 Theme E.2 complete (customer credit application at checkout — AC-15 application logic)
 
-**Status:** Theme E.2 merged to `main` at `<MERGE_HASH>` (feature commit `<FEATURE_HASH>`, branch `feat/phase-3-theme-e-2-credit-application`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (matches main baseline; the one new cents-naming warning introduced during build was resolved by renaming `remaining` → `remainingCents`); build clean; the new + extended credit test files green at 42 tests; 4 pre-existing unrelated SMS env-bleed test failures reproduce on main and are unaffected by this session.
+**Status:** Theme E.2 merged to `main` at `9e8fa5df` (feature commit `4a72a32c`, branch `feat/phase-3-theme-e-2-credit-application`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (matches main baseline; the one new cents-naming warning introduced during build was resolved by renaming `remaining` → `remainingCents`); build clean; the new + extended credit test files green at 42 tests; 4 pre-existing unrelated SMS env-bleed test failures reproduce on main and are unaffected by this session.
 
 **Parallel execution:** Wave 3a of Phase 3 — sized to run alongside Theme B.1 (webhook status flip) and Theme C.1 (customer-accept schema). File-isolated worktree; no cross-session conflicts in scope. (Whether the parallel companions actually executed in lockstep is independent — E.2 stands on its own.)
 
