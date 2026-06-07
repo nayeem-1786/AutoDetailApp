@@ -504,7 +504,6 @@ src/app/api/public/specialty-callback/__tests__/route.test.ts   # Session #139 (
 ### Quotes
 ```
 src/app/api/quotes/[id]/accept/route.ts
-src/app/api/quotes/[id]/convert/route.ts
 src/app/api/quotes/[id]/pdf/route.ts
 src/app/api/quotes/[id]/route.ts
 src/app/api/quotes/[id]/send/route.ts
@@ -1521,6 +1520,11 @@ Phase Mobile-1.1 additions:
 Track B — Quotes-panel parity (#120, G2/G3/G4) additions:
 - `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx` # STRUCTURAL GUARD — source-contract test asserting every prop the Sale panel (ticket-panel.tsx) wires on a SHARED component is also wired in the Quotes panel (quote-ticket-panel.tsx), minus a documented Sale-only allowlist (`disabled`). Also pins CustomerTypePrompt mounted in both (G4) + repriceFailed surfaced in both (G3). Catches the NEXT omitted-prop gap at CI. 10 tests.
 - `src/app/pos/components/quotes/__tests__/quote-item-row-reprice-badge.test.tsx` # G3 — locks the amber "No <size> pricing" badge into the forked quote-item-row (parity with ticket-item-row) so a no-tier vehicle change can't silently keep a stale price on a customer-facing quote. 4 tests.
+
+Phase 3 Theme F additions (Phase 0.2 audit `dcf511df` F.2 / F.3 / F.5 / F.6 / F.7 cleanup):
+- `src/app/pos/components/quotes/__tests__/handle-create-job-modifier-forwarding.test.ts` # F.3 source-string regression — pins the A.3 path POST body field list (5 pre-F.3 fields + 7 F.3 modifier fields with exact `quote.<field> ?? null` shape). 12 tests.
+- `src/app/pos/components/quotes/__tests__/converted-view-appointment-link.test.ts` # F.6 source-string regression — pins the "View Appointment" link rendering on both POS quote-detail and admin quote-slide-over surfaces + the deep-link useEffect contract on admin appointments page. 3 tests.
+- ~~`src/app/api/quotes/[id]/convert/route.ts`~~ — DELETED in Theme F (F.5 dormant admin convert endpoint; no callers in source tree pre-deletion grep). The active POS-side convert sibling at `src/app/api/pos/quotes/[id]/convert/route.ts` remains.
 
 Roadmap Item 12 (POS Appointments) additions:
 - ~~`src/app/pos/components/appointments/appointments-view.tsx`~~ — DELETED in Session 1.6 (POS > Appointments tab retired per AC-4; surface absorbed into POS > Jobs Schedule scope)

@@ -163,6 +163,18 @@ function makeBuilder(table: string): unknown {
       return { data: null, error: null };
     }
 
+    // Phase 3 Theme F (F.2): capture the post-helper `quotes` UPDATE so
+    // the F.2 test can assert that the walk-in seam now populates
+    // converted_appointment_id + sets status='converted' for a quote-
+    // bridged walk-in. The shape is the canonical `.update().eq().is()`
+    // chain documented in convert-service.ts; mock returns ok.
+    if (table === 'quotes' && pendingOp === 'update') {
+      captured.push({ table, row: pendingPayload as Record<string, unknown> });
+      pendingOp = null;
+      pendingPayload = null;
+      return { data: null, error: null };
+    }
+
     return { data: null, error: null };
   }
 
@@ -368,5 +380,46 @@ describe('POST /api/pos/jobs — Item 15g Layer 15g-iv walk-in modifier persiste
     // any other 2-digit number that might happen to slip through.
     expect(start.slice(6)).toBe('00');
     expect(end.slice(6)).toBe('00');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Phase 3 Theme F (F.2) — walk-in seam populates quotes.converted_appointment_id
+//
+// Pre-F.2 the walk-in seam left this FK NULL, so a quote converted via the
+// walk-in path was discoverable only via the reverse `jobs.quote_id` bridge.
+// The audit `dcf511df` finding F.2 surfaced this asymmetry; F.2 closes it by
+// adding a post-helper `quotes UPDATE` that sets converted_appointment_id +
+// status='converted'.
+//
+// Also feeds F.7's cross-seam idempotency: a subsequent convertQuote() now
+// sees the FK set and short-circuits to its already_converted return path
+// instead of creating a duplicate appointment.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('POST /api/pos/jobs — Phase 3 Theme F (F.2) walk-in quote linkage', () => {
+  it('UPDATEs quotes.converted_appointment_id + status when quote_id is in the body', async () => {
+    const res = await POST(
+      makeReq(buildWalkInBody({ quote_id: 'quote-walkin-bridge-1' }))
+    );
+    expect(res.status).toBeLessThan(400);
+
+    const quotesUpdate = captured.find((c) => c.table === 'quotes');
+    expect(quotesUpdate).toBeDefined();
+    // The route writes the canonical converted-state triplet: status='converted',
+    // converted_appointment_id=<just-created appointment.id>, updated_at.
+    expect(quotesUpdate!.row.status).toBe('converted');
+    expect(quotesUpdate!.row.converted_appointment_id).toBe(state.appointmentId);
+    expect(quotesUpdate!.row.updated_at).toBeDefined();
+  });
+
+  it('does NOT UPDATE quotes for a pure walk-in (no quote_id in body)', async () => {
+    const res = await POST(makeReq(buildWalkInBody()));
+    expect(res.status).toBeLessThan(400);
+
+    // No quotes UPDATE should have fired — the path is `if (quote_id) {...}`.
+    // A pure walk-in has nothing to link to.
+    const quotesUpdate = captured.find((c) => c.table === 'quotes');
+    expect(quotesUpdate).toBeUndefined();
   });
 });

@@ -382,11 +382,15 @@ The canonical `convertQuote` defaults the new appointment to `status='confirmed'
 
 ### F.2 — A.3/A.4's missing `quotes.converted_appointment_id`
 
+**Status:** CLOSED 2026-06-07 by Phase 3 Theme F (merge `__MERGE_HASH_F__`). Walk-in seam (`src/app/api/pos/jobs/route.ts`) now writes the canonical converted triplet (`status='converted'` + `converted_appointment_id=appointment.id` + `updated_at`) after the materialize helper succeeds, with `.is('converted_appointment_id', null)` filter for cross-seam race idempotency. FK semantics unified across both seams; `jobs.quote_id` retained as the secondary bridge.
+
 The walk-in seam paths leave `quotes.converted_appointment_id = NULL` even when a job has been created and the quote is marked `converted`. The UI already accommodates this with a branch in the badge text (`quote-detail.tsx:493`). Whether this asymmetry is intentional or a drift gap is unresolved.
 
 **Question for operator:** Should the walk-in seam ALSO populate `quotes.converted_appointment_id` to unify the FK semantics, or is `jobs.quote_id` the canonical bridge for the walk-in path and `quotes.converted_appointment_id` exclusively for the staff-scheduled path?
 
 ### F.3 — A.3's modifier-payload omission vs A.4's forwarding
+
+**Status:** CLOSED 2026-06-07 by Phase 3 Theme F (merge `__MERGE_HASH_F__`). A.3 path (`quote-detail.tsx handleCreateJobFromQuote`) now forwards the same 7-field modifier snapshot as A.4 — coupon_code, coupon_discount, loyalty_points_to_redeem, loyalty_discount, manual_discount_type, manual_discount_value, manual_discount_label — read directly from the persisted quote row. Server side already accepted these (A.4 used them pre-F.3); fix was client-side only. The two seams now produce byte-identical appointment rows for the same quote.
 
 Path A.3 (Create Job from quote-detail) does NOT forward modifier columns (coupon/loyalty/manual) into the synthetic walk-in appointment — its request body at `quote-detail.tsx:243-253` includes only `{customer_id, vehicle_id, services, quote_id, notes}`. Path A.4 (New Walk-in via builder) DOES forward modifiers (`quote-ticket-panel.tsx:825-841` modifier payload comment). The asymmetry means a quote with a $20 manual discount converted via A.3 produces an appointment with `manual_discount_value=NULL`; the same quote converted via A.4 produces an appointment with `manual_discount_value=20`.
 
@@ -400,17 +404,23 @@ Path A.3 (Create Job from quote-detail) does NOT forward modifier columns (coupo
 
 ### F.5 — A.6 dormant admin endpoint
 
+**Status:** CLOSED 2026-06-07 by Phase 3 Theme F (merge `__MERGE_HASH_F__`). `src/app/api/quotes/[id]/convert/route.ts` deleted; pre-deletion grep across `src/` confirmed zero callers. Resolution path: DELETION (consistent with CLAUDE.md's "Quotes are READ-ONLY in admin" rule). The `<QuoteBookDialog>` apiBasePath parameterization remains in place (only POS instantiates it post-F.5; the parameterization is now vestigial but harmless to retain for future expansion if admin convert ever returns under different rules).
+
 `POST /api/quotes/[id]/convert` is fully implemented but has no caller in the source tree. The shared `<QuoteBookDialog>`'s parameterization (`apiBasePath="/api/quotes"` vs `/api/pos/quotes"`) suggests it was once wired or intended to be.
 
 **Question for operator:** Should A.6 be deleted (CLAUDE.md's "Quotes are READ-ONLY in admin" rule supports this), kept dormant for a future re-enablement, or wired into a new admin convert surface? Per the locked architecture's "Admin retains full power as the back-office surface" out-of-scope note at `:62-63`, dormancy may be inconsistent with the locked principle.
 
 ### F.6 — Quote → already-converted re-quote semantics
 
+**Status:** CLOSED (deep-link half) 2026-06-07 by Phase 3 Theme F (merge `__MERGE_HASH_F__`). "View Appointment" link added to POS `quote-detail.tsx` + admin `quote-slide-over.tsx` action bars on the `status='converted' AND converted_appointment_id != null` branch, routing to `/admin/appointments?id=<uuid>`; admin appointments page adds a single-shot `?id=<uuid>` deep-link receiver useEffect that fetches the row, jumps the calendar to its date, opens the detail dialog, and strips the param via `history.replaceState`. The Re-Quote-on-`converted` half of the question is DEFERRED (operator did not lock that behavior; the current empty-action-bar on the Re-Quote axis remains intentional pending product decision).
+
 When a quote is in status `converted`, the only operator action available is **Re-Quote** (per `quote-detail.tsx:482-488`, but this branch is gated to `expired` status only). On `converted` the action bar is empty (`:490-495` renders only the "Converted" badge). There is no "view the converted appointment" jump, no "copy this quote into a new draft" affordance.
 
 **Question for operator:** Should `converted` status surface a deep-link to the converted appointment? Should the **Re-Quote** affordance also apply to `converted` (for the "customer changed their mind, rebuild a quote" case)? Or is the current empty-action-bar intentional (forces operator to navigate via customer / appointments)?
 
 ### F.7 — Race between A.1 and A.3 on the same quote
+
+**Status:** CLOSED 2026-06-07 by Phase 3 Theme F (merge `__MERGE_HASH_F__`). `convertQuote()` carries a two-arm race idempotency guard: Arm 1 (pre-INSERT) refetches the quote and short-circuits to `already_converted: true` if `converted_appointment_id` is already set; Arm 2 (post-INSERT) uses `.is('converted_appointment_id', null).select(...)` on the UPDATE — zero matched rows triggers an orphan-rollback (`appointments.delete()` cleans appointment_services via ON DELETE CASCADE), then re-fetches and returns the race-winner. The cross-seam half is closed by F.2: any seam touching a quote now writes `converted_appointment_id`, so a subsequent convertQuote call sees the FK and routes through Arm 1 regardless of which seam (canonical or walk-in) raced first. The walk-in seam retains its own `jobs.quote_id` UNIQUE guard (409 reject) as a complementary stop. Foundational for AC-12 / Theme C customer-accept auto-conversion: the operator-vs-customer race is now safe to collapse to one appointment.
 
 A.1 (operator schedules via QuoteBookDialog) and A.3 (operator presses Create Job) are simultaneously available on the quote-detail action bar for the same statuses. Two staff on two POS tabs could fire both. A.1's `convertQuote` guard against `status='converted'` does NOT block A.3 (which doesn't call `convertQuote`); A.3's `jobs.quote_id` uniqueness does NOT block A.1 (no job is created on A.1). Result: an A.1 appointment with `quotes.converted_appointment_id` populated, plus an A.3 walk-in appointment+job with `jobs.quote_id` populated, both referencing the same quote.
 

@@ -49,6 +49,14 @@ function makeSupabase(opts: {
   quote: Record<string, unknown>;
   inserts: InsertRecord[];
 }) {
+  // Phase 3 Theme F (F.7): the convertQuote update path now chains
+  // `.update().eq().is().select()` so the mock's update builder needs
+  // both the legacy `await .eq()` behavior AND a `.is(...).select(...)`
+  // continuation. We model that with a thenable returned from `.eq()`:
+  // the existing tests `await` it and resolve to `{ error: null }`;
+  // the new F.7 paths chain `.is().select()` which then awaits to
+  // `{ data: [{converted_appointment_id: 'appt-1'}], error: null }` —
+  // simulating the happy-path "won the race" outcome (one row updated).
   const supabase = {
     from(table: string) {
       if (table === 'quotes') {
@@ -58,11 +66,36 @@ function makeSupabase(opts: {
               is: () => ({
                 single: vi.fn(async () => ({ data: opts.quote, error: null })),
               }),
+              // Used by F.7's race-loss path AND the F.7 pre-INSERT guard
+              // (when quote.converted_appointment_id is set, the helper
+              // re-reads from quotes to find the winning row).
+              maybeSingle: vi.fn(async () => ({
+                data: {
+                  converted_appointment_id:
+                    (opts.quote as { converted_appointment_id?: string | null })
+                      .converted_appointment_id ?? null,
+                },
+                error: null,
+              })),
             }),
           }),
-          update: () => ({
-            eq: vi.fn(async () => ({ error: null })),
-          }),
+          update: () => {
+            const eqBuilder = {
+              // Existing tests `await supabase.from('quotes').update().eq()`
+              // → must resolve to `{ error: null }`. Modeled by adding
+              // `then` so the object itself is a thenable.
+              then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
+              // New F.7 chain: `.eq().is().select()` returns rows.
+              is: () => ({
+                select: () =>
+                  Promise.resolve({
+                    data: [{ converted_appointment_id: 'appt-1' }],
+                    error: null,
+                  }),
+              }),
+            };
+            return { eq: vi.fn(() => eqBuilder) };
+          },
         };
       }
       if (table === 'appointments') {
@@ -78,6 +111,20 @@ function makeSupabase(opts: {
               }),
             };
           },
+          // F.7 race-winner fetch (also pre-INSERT existing-appointment
+          // probe when quote.converted_appointment_id is set on entry).
+          select: () => ({
+            eq: () => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id: 'appt-existing', status: 'confirmed' },
+                error: null,
+              })),
+            }),
+          }),
+          // F.7 orphan-rollback delete path.
+          delete: () => ({
+            eq: vi.fn(async () => ({ error: null })),
+          }),
         };
       }
       if (table === 'appointment_services') {
@@ -731,10 +778,11 @@ describe('convertQuote — Session 1.7 conditional appointment_confirmed webhook
   });
 
   it('fires appointment_confirmed webhook when default (confirmed) status writes', async () => {
-    // Default-options path: callers like POS A.1 (`/api/quotes/[id]/convert`)
+    // Default-options path: callers like POS A.1 (`/api/pos/quotes/[id]/convert`)
     // omit options entirely, so `appointmentStatus` defaults to 'confirmed'
-    // at `convert-service.ts:134`. This is the pre-#1.7 happy path and must
-    // continue firing the webhook.
+    // (the dormant `/api/quotes/[id]/convert` admin sibling was retired in
+    // Phase 3 Theme F per audit `dcf511df` finding F.5). This is the pre-#1.7
+    // happy path and must continue firing the webhook.
     const quote = { ...BASE_QUOTE };
     const supabase = makeSupabase({ quote, inserts });
 
@@ -828,5 +876,131 @@ describe('convertQuote — Session 1.7 conditional appointment_confirmed webhook
 
     const { fireWebhook } = await import('@/lib/utils/webhook');
     expect(fireWebhook).not.toHaveBeenCalled();
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Phase 3 Theme F (F.7) — race idempotency guard
+//
+// Two race surfaces, two test groups:
+//
+//   1. Pre-INSERT race-loss (the easy case): the quote already carries a
+//      `converted_appointment_id` at convertQuote entry — a concurrent caller
+//      (sibling convertQuote, OR the walk-in seam post-F.2) won. Return
+//      success with the winner's appointment fetched fresh; `already_converted`
+//      is true so downstream callers (voice-agent, Theme C) can suppress
+//      duplicate side effects.
+//
+//   2. Post-INSERT race-loss (the hard case): we passed the pre-check,
+//      INSERTed our appointment, but our UPDATE landed AFTER a sibling's
+//      UPDATE — so the `.is('converted_appointment_id', null)` filter matches
+//      zero rows. Our appointment is now an orphan; the helper rolls it
+//      back and re-reads the race-winner.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('convertQuote — Phase 3 Theme F (F.7) race idempotency guard', () => {
+  let inserts: InsertRecord[];
+
+  beforeEach(() => {
+    inserts = [];
+  });
+
+  it('pre-INSERT: returns the race-winner appointment with already_converted=true when the quote enters with converted_appointment_id set', async () => {
+    // Quote entered the helper already carrying the FK — pre-F.7 this hit
+    // the `status==='converted'` guard and returned the 400 "already
+    // converted" rejection. Post-F.7 the FK is the canonical signal: short-
+    // circuit with the existing appointment fetched fresh from the DB.
+    const quote = {
+      ...BASE_QUOTE,
+      status: 'converted',
+      converted_appointment_id: 'appt-existing',
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    const result = await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.already_converted).toBe(true);
+      expect((result.appointment as { id: string }).id).toBe('appt-existing');
+    }
+    // CRUCIAL: no new appointment INSERT happened — race-loss must not
+    // create a duplicate row.
+    const apptInsert = inserts.find((i) => i.table === 'appointments');
+    expect(apptInsert).toBeUndefined();
+  });
+
+  it('pre-INSERT: webhook does NOT fire on the already_converted path (race-winner already fired theirs)', async () => {
+    const quote = {
+      ...BASE_QUOTE,
+      status: 'converted',
+      converted_appointment_id: 'appt-existing',
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+    );
+
+    const { fireWebhook } = await import('@/lib/utils/webhook');
+    expect(fireWebhook).not.toHaveBeenCalled();
+  });
+
+  it('legacy guard still rejects the converted-without-FK shape (walk-in pre-F.2 historical state)', async () => {
+    // A quote that's status='converted' but has converted_appointment_id=NULL
+    // is the pre-F.2 walk-in artifact — there's no appointment row to
+    // race-return. Fall through to the legacy 400. After F.2 ships, fresh
+    // walk-ins always set the FK so this branch only protects historical data.
+    const quote = {
+      ...BASE_QUOTE,
+      status: 'converted',
+      converted_appointment_id: null,
+    };
+    const supabase = makeSupabase({ quote, inserts });
+
+    const result = await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.status).toBe(400);
+      expect(result.error).toMatch(/already-converted/i);
+    }
+  });
+
+  it('non-race happy path: no converted_appointment_id on entry → INSERT proceeds; success.already_converted is not true', async () => {
+    // Defensive: the F.7 changes must not regress the standard happy path.
+    // A fresh quote with no FK and status='sent' proceeds to the INSERT,
+    // appointment lands, success has the new appointment row (NOT the mock's
+    // 'appt-existing' row — that's only returned on the race-loss path).
+    const quote = { ...BASE_QUOTE };
+    const supabase = makeSupabase({ quote, inserts });
+
+    const result = await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // already_converted is omitted on the happy path (the optional field
+      // stays undefined). Existing callers that don't read it continue to
+      // work identically to pre-F.7 behavior.
+      expect(result.already_converted).toBeUndefined();
+      expect((result.appointment as { id: string }).id).toBe('appt-1');
+    }
+    // The fresh INSERT did fire.
+    const apptInsert = inserts.find((i) => i.table === 'appointments');
+    expect(apptInsert).toBeDefined();
   });
 });

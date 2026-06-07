@@ -219,6 +219,56 @@ export default function AppointmentsPage() {
     fetchEmployees();
   }, [fetchEmployees]);
 
+  // Phase 3 Theme F (F.6) — deep-link by `?id=<uuid>` query parameter.
+  // The converted-quote "View Appointment" link (from POS quote-detail
+  // and admin quote-slide-over) routes here. Fetch the single row with
+  // the same joins fetchAppointments uses (so the detail dialog sees the
+  // expected shape), jump the calendar to its scheduled_date, and open
+  // the detail dialog. Strip `?id=` from the URL after handling so a
+  // browser refresh doesn't re-open. Single-shot effect: the empty
+  // dependency array keeps this from firing on every re-render.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const apptId = params.get('id');
+    if (!apptId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          *,
+          customer:customers!customer_id(id, first_name, last_name, phone, email),
+          vehicle:vehicles!vehicle_id(id, year, make, model, color, size_class),
+          employee:employees!employee_id(id, first_name, last_name, role),
+          appointment_services(id, service_id, price_at_booking, tier_name, service:services!service_id(id, name)),
+          jobs:jobs!appointment_id(id, status)
+        `)
+        .eq('id', apptId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) {
+        toast.error('Appointment not found');
+        return;
+      }
+      const [withFlag] = withHasActiveJob([data]);
+      setActiveAppointment(withFlag as AppointmentWithRelations);
+      setDetailOpen(true);
+      // Jump the calendar to the appointment's date so the day-list
+      // context is correct after the dialog closes.
+      const dateStr = String((withFlag as AppointmentWithRelations).scheduled_date).split('T')[0];
+      const [y, m, d] = dateStr.split('-').map(Number);
+      if (y && m && d) setSelectedDate(new Date(y, m - 1, d));
+      // Clean the URL so a refresh doesn't re-open the dialog.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('id');
+      window.history.replaceState({}, '', url.toString());
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Permission gate: appointments.view_today is the minimum permission
   if (!viewTodayLoading && !canViewToday) {
     return (
