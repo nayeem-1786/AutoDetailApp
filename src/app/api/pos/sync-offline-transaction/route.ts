@@ -7,6 +7,7 @@ import { isQboSyncEnabled, getQboSetting } from '@/lib/qbo/settings';
 import { syncTransactionToQbo } from '@/lib/qbo/sync-transaction';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { toCents } from '@/lib/utils/money';
+import { generateReceiptNumber } from '@/lib/utils/receipt-number';
 
 /**
  * POST /api/pos/sync-offline-transaction
@@ -67,7 +68,10 @@ export async function POST(request: NextRequest) {
       linkedApptId = linkedJob?.appointment_id ?? null;
     }
 
-    // 1. Insert transaction
+    // 1. Insert transaction.
+    // Phase 3 Theme A (AC-10 v1.4): receipt_number generated via
+    // next_identifier('receipt') (no longer auto-supplied by trigger).
+    const receiptNumber = await generateReceiptNumber(supabase);
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .insert({
@@ -92,6 +96,7 @@ export async function POST(request: NextRequest) {
           : '[Offline transaction]',
         transaction_date: transactionDate,
         offline_id: offlineId,
+        receipt_number: receiptNumber,
       })
       .select('*')
       .single();

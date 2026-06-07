@@ -6,6 +6,72 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme A — 5-system identifier unification (Q / A / SD / WO / PO under shared `identifier_sequences` + `next_identifier()`; SD backfill to 5-digit; partial Migration 6 split → Theme A.1) (2026-06-07)
+
+Foundational architectural session. Implements AC-10 v1.4 (locked in the prior doc-only session). All five human-readable identifier systems converge on a single shared generation mechanism with a uniform 5-digit format. Largest single-session scope of Phase 3.
+
+**Change shape:** 6 new migrations + 4 new generator helpers + 5 caller refactors + 4 appointment-INSERT path updates + 31 new tests + doc updates. Net ~470 prod lines + ~600 test lines.
+
+**Migrations (6 new, all applied to production 2026-06-07 via `supabase db push --linked`):**
+
+1. `20260607061600_identifier_sequences_table.sql` — creates `identifier_sequences` table (entity_type PK, prefix, pad_width, current_value, updated_at) + `next_identifier(entity_type)` SQL function with `SELECT ... FOR UPDATE` row-level lock. Increment-then-return semantics.
+2. `20260607061601_identifier_sequences_seed.sql` — seeds 5 rows. `GREATEST(10000, MAX(legacy_numeric))` defensive pattern used for Q/WO/PO to prevent UNIQUE collisions (operator-verified production data 2026-06-07: WO max = WO-10002, would have collided with literal-spec seed of 10000).
+3. `20260607061602_appointments_appointment_number_column.sql` — adds `appointments.appointment_number TEXT` (nullable) + `UNIQUE INDEX WHERE appointment_number IS NOT NULL`.
+4. `20260607061603_appointments_appointment_number_backfill.sql` — backfills all 35 existing appointments (A-10001..A-10035 ordered by created_at ASC); reseeds `identifier_sequences.current_value` for appointment; flips column to `NOT NULL`.
+5. `20260607061604_transactions_receipt_number_5digit_backfill.sql` — reformats all 6,309 existing `SD-00XXXX` receipts to `SD-XXXXX` (single UPDATE, one leading zero trimmed); verification block asserts length = 8 + no duplicates.
+6. `20260607061605_drop_dormant_quote_trigger.sql` — drops `tr_quote_number` + `generate_quote_number()` (dormant since the active 4-digit γ generator shadows them; per Phase 3.0.1 audit F.6).
+
+**Migration 6 SCOPE SPLIT (operator-locked 2026-06-07):** the originally-planned drop of `tr_transaction_receipt_number` + `tr_po_number` triggers was REMOVED from this session to eliminate a production outage window between "migration applied" and "app code deployed". A separate Theme A.1 follow-up session drops these two triggers AFTER the application code that supplies `receipt_number` / `po_number` explicitly lands in production. The triggers remain alive but inert during the gap — every callsite in the new code supplies the column, so the trigger's `WHEN (NEW.column IS NULL)` gate prevents it from firing.
+
+**Code changes:**
+
+- `src/lib/utils/quote-number.ts` — refactored to thin wrapper around `supabase.rpc('next_identifier', { p_entity_type: 'quote' })`. Signature preserved; all callers unaffected.
+- `src/lib/utils/order-number.ts` — refactored to thin wrapper around `next_identifier('work_order')`. Signature preserved.
+- `src/lib/utils/receipt-number.ts` (NEW) — `generateReceiptNumber()` helper wrapping `next_identifier('receipt')`. Replaces the dropped BEFORE INSERT trigger pattern.
+- `src/lib/utils/po-number.ts` (NEW) — `generatePoNumber()` helper wrapping `next_identifier('purchase_order')`.
+- `src/lib/utils/appointment-number.ts` (NEW) — `generateAppointmentNumber()` helper wrapping `next_identifier('appointment')`.
+- **5 transaction-INSERT call sites updated** to call `generateReceiptNumber()` and supply `receipt_number` explicitly: `src/app/api/pos/transactions/route.ts`, `src/app/api/pos/sync-offline-transaction/route.ts`, `src/app/api/book/route.ts` (deposit), `src/app/api/webhooks/stripe/route.ts` (pay-link), `src/app/api/migration/transactions/route.ts` (Square import).
+- **1 purchase-order INSERT call site updated** to call `generatePoNumber()` and supply `po_number` explicitly: `src/app/api/admin/purchase-orders/route.ts`.
+- **4 appointment-INSERT call sites updated** to call `generateAppointmentNumber()` and supply `appointment_number` (NOT NULL column): `src/app/api/book/route.ts` (online booking), `src/app/api/pos/jobs/route.ts` (walk-in atomic create), `src/app/api/voice-agent/appointments/route.ts` (voice agent), `src/lib/quotes/convert-service.ts` (convertQuote).
+
+**Race-window closure (AC-10 LOCKED race-safety stance):** the row-level lock inside `next_identifier()` closes the pre-Theme-A Quote γ items-error cleanup REUSE window (`quote-service.ts:218-228`). The counter advances regardless of whether the surrounding INSERT commits, so a rolled-back INSERT leaves a gap — never a reuse. Gaps tolerated by design.
+
+**Defensive `GREATEST(10000, MAX(legacy))` seed pattern (deviation from literal spec, operator-safe interpretation):** the spec's literal `current_value = 10000` for Q/WO/PO would have produced WO-10001 on first call AND collided with existing WO-10001 (production has WO-10001 and WO-10002 from the pre-Theme-A γ generator that started at 10001). The GREATEST pattern preserves the spec's intent ("first new value > all legacy values") while guaranteeing no UNIQUE collision regardless of legacy data. Q max in production = 124, PO max = 2, so the GREATEST guard reduces to 10000 for those two; only WO is materially affected (seed = 10002, first call WO-10003).
+
+**Tests (31 new):**
+
+- `src/lib/utils/__tests__/identifier-generators.test.ts` (7 unit tests, run by default) — wrapper shape: rpc called with correct entity_type, returns data verbatim, throws on rpc error / null data
+- `src/lib/utils/__tests__/identifier-sequences.test.ts` (10 live-DB integration tests) — per-entity post-increment, concurrency (10 parallel calls return 10 distinct values), padding, seeded entity-types coverage
+- `src/lib/utils/__tests__/identifier-migration-integrity.test.ts` (8 live-DB integration tests) — table seeded, appointments backfilled non-null and format-compliant, SD reformatted to 8-char length, count preserved, no duplicates, receipt counter ≥ MAX, dormant quote trigger dropped
+- `src/lib/utils/__tests__/sd-backfill-format.test.ts` (4 live-DB integration tests) — no pre-backfill 6-digit rows, every row matches SD-NNNNN, numeric values preserved, baseline 6,309 count preserved
+- `src/lib/utils/__tests__/identifier-race-closure.test.ts` (2 live-DB integration tests) — sequential calls return strictly different values; counter advance is independent of quotes-table DELETE (the historical reuse vector)
+
+Live-DB tests use `describe.skip` when `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` env vars are absent (default `npm test`). To run them locally: `set -a && source .env.local && set +a && npx vitest run src/lib/utils/__tests__/identifier-*.test.ts src/lib/utils/__tests__/sd-backfill-format.test.ts`. All 24 live-DB tests pass against production database.
+
+**Existing tests updated** (mock the new helpers because their supabase stubs don't implement `.rpc()`): `convert-service.test.ts`, `modifier-chain.test.ts`, `modifier-persistence.test.ts`, `deposit-tax-persistence.test.ts`, `auto-receipt-interlock.test.ts`, `payment-intent-succeeded.test.ts`, `walk-in-modifier-persistence.test.ts`.
+
+**Operator-queried production verification (post-migration 2026-06-07):**
+
+- 5 `identifier_sequences` rows seeded, all `pad_width = 5`
+- `quote.current_value` = 10000 (then advanced to 10002 by verification probes)
+- `appointment.current_value` = 10035 (35 existing appointments backfilled to A-10001..A-10035)
+- `receipt.current_value` = 6365 (next call returns SD-06366)
+- `work_order.current_value` = 10002 (GREATEST guard kicked in; existing WO max was 10002)
+- `purchase_order.current_value` = 10000 (existing PO max was 2)
+- All 6,309 SD receipts reformatted: max length = 8 (`SD-` + 5 digits); no duplicates; count preserved
+- Dormant `generate_quote_number()` confirmed dropped (probe error: "function not found")
+- Active `generate_receipt_number()` + `generate_po_number()` triggers still present (Theme A.1 deferred)
+
+**Findings surfaced (Memory #29 — not folded in):**
+
+1. **SMS palette samples (`palette.ts`, `sms-contracts.source.ts`, `variables.ts`, `sms-templates/test/route.ts`)** still document `Q-001234` (6-digit) + `R-001234` (wrong prefix + 6-digit). Pre-existing documentation drift identified by Phase 3.0.1 audit; non-functional (operators see the actual column value in their admin UI, not the sample). Recommend follow-up cosmetic pass to update samples to `Q-10001` / `SD-06366` for accurate operator-facing documentation.
+2. **Voice-agent quotes `route.ts:213`** — `perf.mark('query:generateQuoteNumber', t)` label is now slightly stale (it's no longer a `quotes` table SELECT MAX query; it's an RPC). Cosmetic; label still useful for tracing.
+3. **W4 (Session #138) deposit-line-item `is_taxable` Q-C-1 LOCKED Option A** — unaffected by Theme A; the line-item persistence path is orthogonal to receipt-number generation.
+
+**Phase 3 progress:** Theme A complete (Wave 1). Theme A.1 (drop receipt + PO triggers) deferred to follow-up. Theme B (AC-11 pending/confirmed semantic), Theme C (AC-12 Quote→Appointment formalization), AC-14 (cancellation fee), AC-15 (customer credits), AC-9 (cancel-with-payment) remain unstarted.
+
+---
+
 ## Lifecycle Architecture Doc v1.4 — AC-10 5-digit revision (operator-queried production data confirms safe headroom) (2026-06-06)
 
 Documentation-only session. NO code, NO migrations, NO tests. Updates `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` from v1.3 → v1.4. Calibrates the v1.3 AC-10 width specification from 6-digit to 5-digit across all five identifier systems after operator queried production data and observed that `A-100000` reads as too long for customer-facing identifiers.

@@ -68,6 +68,13 @@ vi.mock('@/lib/utils/assign-detailer', async () => {
   };
 });
 
+// Phase 3 Theme A (AC-10): pos/jobs/route.ts now generates appointment_number
+// via next_identifier('appointment'). The supabase stub below does not
+// implement .rpc(), so we short-circuit the helper.
+vi.mock('@/lib/utils/appointment-number', () => ({
+  generateAppointmentNumber: vi.fn(async () => 'A-WALKIN-10001'),
+}));
+
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
     from: (table: string) => makeBuilder(table),

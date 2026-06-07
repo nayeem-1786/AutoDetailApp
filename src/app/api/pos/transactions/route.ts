@@ -16,6 +16,7 @@ import { createShortLink } from '@/lib/utils/short-link';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { getBusinessInfo } from '@/lib/data/business';
 import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
+import { generateReceiptNumber } from '@/lib/utils/receipt-number';
 
 export async function POST(request: NextRequest) {
   try {
@@ -172,7 +173,12 @@ export async function POST(request: NextRequest) {
     // visit). payment_method=null is intentional — receipts will skip the
     // payment-method line and the empty payments[] array means the public
     // receipt page hides the payment block entirely.
+    //
+    // Phase 3 Theme A (AC-10 v1.4): receipt_number generated via
+    // next_identifier('receipt') (no longer auto-supplied by a BEFORE INSERT
+    // trigger — see the trigger drop in migration 20260607061605).
     const closeOutNotes = 'Closed out — fully pre-paid';
+    const receiptNumber = await generateReceiptNumber(supabase);
     const { data: transaction, error: txError } = await supabase
       .from('transactions')
       .insert({
@@ -195,6 +201,7 @@ export async function POST(request: NextRequest) {
         loyalty_discount: data.loyalty_discount || 0,
         notes: isCloseOut ? closeOutNotes : (data.notes || null),
         transaction_date: new Date().toISOString(),
+        receipt_number: receiptNumber,
       })
       .select('*')
       .single();

@@ -178,6 +178,16 @@ vi.mock('@/lib/supabase/admin', () => ({
   }),
 }));
 
+// Phase 3 Theme A (AC-10): book/route.ts now generates appointment_number
+// and (for deposits) receipt_number via next_identifier(*). The supabase
+// stub above does not implement .rpc(), so we short-circuit the helpers.
+vi.mock('@/lib/utils/appointment-number', () => ({
+  generateAppointmentNumber: vi.fn(async () => 'A-TEST-10001'),
+}));
+vi.mock('@/lib/utils/receipt-number', () => ({
+  generateReceiptNumber: vi.fn(async () => 'SD-TEST-10001'),
+}));
+
 function makeBuilder(table: string): unknown {
   let pendingInsert: Record<string, unknown> | null = null;
   let pendingInsertArray: Record<string, unknown>[] | null = null;

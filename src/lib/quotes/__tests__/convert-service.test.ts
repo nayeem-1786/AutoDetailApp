@@ -17,6 +17,13 @@ vi.mock('@/lib/utils/webhook', () => ({
   fireWebhook: vi.fn(async () => undefined),
 }));
 
+// Phase 3 Theme A (AC-10): convertQuote now generates appointment_number via
+// next_identifier('appointment'). Mock the helper so the test's supabase
+// stub doesn't need to implement .rpc().
+vi.mock('@/lib/utils/appointment-number', () => ({
+  generateAppointmentNumber: vi.fn(async () => 'A-TEST-10001'),
+}));
+
 import { convertQuote } from '../convert-service';
 
 // ──────────────────────────────────────────────────────────────────────────────

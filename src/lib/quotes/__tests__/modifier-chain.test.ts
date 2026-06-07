@@ -52,6 +52,13 @@ vi.mock('@/lib/pos/check-permission', () => ({
   checkPosPermission: async () => true,
 }));
 
+// Phase 3 Theme A (AC-10): convertQuote now generates appointment_number via
+// next_identifier('appointment'). The shared in-memory supabase mock below
+// does not implement .rpc(), so we short-circuit the helper directly.
+vi.mock('@/lib/utils/appointment-number', () => ({
+  generateAppointmentNumber: vi.fn(async () => 'A-CHAIN-10001'),
+}));
+
 // One supabase mock services both the convert-service (direct call) and the
 // checkout-items route (via createAdminClient). Both query the same in-memory
 // state above so the chain stays consistent.

@@ -7,6 +7,7 @@ import {
   enrichItemsWithTierMeta,
   formatServicesSummary,
 } from './services-summary';
+import { generateAppointmentNumber } from '@/lib/utils/appointment-number';
 import type { ConvertQuoteInput } from '@/lib/utils/validation';
 
 // Item 15g Layer 15g-v — re-export for backward compatibility. The function
@@ -125,9 +126,15 @@ export async function convertQuote(
   // auto-save hashing modifier columns).
   const finalTotal = Math.max(0, Number(quote.total_amount ?? 0));
 
+  // Phase 3 Theme A (AC-10 v1.4): appointment_number is NOT NULL — generate
+  // it before the INSERT so the row can satisfy the constraint. The converted
+  // appointment gets its own A-XXXXX identifier (distinct from the source
+  // quote's Q-XXXXX); they remain linked via quotes.converted_appointment_id.
+  const appointmentNumber = await generateAppointmentNumber(supabase);
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
     .insert({
+      appointment_number: appointmentNumber,
       customer_id: quote.customer_id,
       vehicle_id: quote.vehicle_id,
       employee_id: assignedEmployeeId,

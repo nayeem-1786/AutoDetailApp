@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { generateOrderNumber } from '@/lib/utils/order-number';
+import { generateReceiptNumber } from '@/lib/utils/receipt-number';
 import { sendEmail } from '@/lib/utils/email';
 import { getBusinessInfo } from '@/lib/data/business';
 import { formatCurrency } from '@/lib/utils/format';
@@ -146,6 +147,10 @@ export async function POST(request: NextRequest) {
 
             // Mirror booking-deposit transaction shape (book/route.ts:381).
             // Webhook context has no employee actor → employee_id null.
+            //
+            // Phase 3 Theme A (AC-10 v1.4): receipt_number generated via
+            // next_identifier('receipt') (no longer auto-supplied by trigger).
+            const payLinkReceiptNumber = await generateReceiptNumber(admin);
             const { data: tx, error: txErr } = await admin
               .from('transactions')
               .insert({
@@ -162,6 +167,7 @@ export async function POST(request: NextRequest) {
                 payment_method: 'card',
                 notes: `Online payment link. PI: ${pi.id}.`,
                 transaction_date: new Date().toISOString(),
+                receipt_number: payLinkReceiptNumber,
               })
               .select('id')
               .single();
