@@ -927,6 +927,11 @@ src/lib/credits/repository.ts                             # Phase 3 Theme E.1: c
 src/lib/credits/__tests__/repository.test.ts              # 16 tests — Phase 3 Theme E.1: live-DB integration (describeIfCreds) — create + balance + sorting + CHECK constraints + ENUM + updated_at trigger + migration integrity (all 5 ENUM values + 15 columns)
 ```
 
+### Cross-cutting migration-integrity tests
+```
+src/lib/__tests__/theme-c-1-schema.test.ts                # 6 tests — Phase 3 Theme C.1: live-DB integration (describeIfCreds) — appointment_channel enum carries 'customer_accept'; scheduled_date_placeholder default FALSE; staff_acknowledged_at TIMESTAMPTZ update; appointments_quote_id_uniq UNIQUE constraint rejects duplicate; quote_id ↔ converted_appointment_id backfill round-trip; pending_appointment_sla_alert SMS template seed shape
+```
+
 ### Data Access
 ```
 src/lib/data/booking.ts
