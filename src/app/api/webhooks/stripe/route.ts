@@ -10,6 +10,8 @@ import { logStockAdjustment } from '@/lib/utils/stock-adjustments';
 import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
+import { logAudit } from '@/lib/services/audit';
+import { fireWebhook } from '@/lib/utils/webhook';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -72,9 +74,15 @@ export async function POST(request: NextRequest) {
           }
 
           try {
+            // Phase 3 Theme B.1 (AC-11): also fetch `status` so we can flip
+            // pending → confirmed below when payment is received. The flip is
+            // gated server-side via `.eq('status', 'pending')` (race-safe;
+            // operator manual-confirm wins concurrently), and the captured
+            // `status` is used to decide whether to fire downstream cascades
+            // (audit + `appointment_confirmed` outbound webhook).
             const { data: appt, error: apptErr } = await admin
               .from('appointments')
-              .select('id, customer_id, vehicle_id, total_amount, payment_status, payment_link_paid_at, stripe_payment_intent_id')
+              .select('id, customer_id, vehicle_id, total_amount, payment_status, payment_link_paid_at, stripe_payment_intent_id, status')
               .eq('id', apptIdFromMeta)
               .maybeSingle();
 
@@ -234,10 +242,73 @@ export async function POST(request: NextRequest) {
               throw new Error(`appointment update failed: ${apptUpdErr.message}`);
             }
 
+            // Phase 3 Theme B.1 (AC-11): flip appointments.status from
+            // pending → confirmed on payment receipt. The lifecycle commitment
+            // (QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md AC-11) defines
+            // `confirmed = deposit OR full payment received` — so any
+            // successful payment_intent.succeeded on the pay-link branch is a
+            // sufficient signal (not gated on full-payment-only).
+            //
+            // Race protection: the UPDATE filter `.eq('status', 'pending')`
+            // guarantees we never overwrite an operator-confirmed (or any
+            // other) status. Concurrent operator manual-flips win → this is a
+            // no-op. Idempotency is also free: this block is INSIDE the
+            // per-PI dedup guard at :96-112 — Stripe retries of the same
+            // event short-circuit before reaching here, so the audit + the
+            // outbound webhook fire exactly once per real payment.
+            //
+            // Downstream cascades mirror the admin PATCH + POS PATCH +
+            // convertQuote pattern (all three sites fire `appointment_confirmed`
+            // outbound on a status → confirmed write).
+            if (appt.status === 'pending') {
+              const { error: statusErr } = await admin
+                .from('appointments')
+                .update({ status: 'confirmed' })
+                .eq('id', appt.id)
+                .eq('status', 'pending');
+
+              if (statusErr) {
+                throw new Error(
+                  `appointment status flip failed: ${statusErr.message}`
+                );
+              }
+
+              // Fire-and-forget audit (never throws).
+              logAudit({
+                action: 'update',
+                entityType: 'booking',
+                entityId: appt.id,
+                entityLabel: `Appointment ${appt.id.slice(0, 8)}`,
+                details: {
+                  trigger: 'webhook_payment_link',
+                  stripe_payment_intent_id: pi.id,
+                  previous_status: 'pending',
+                  new_status: 'confirmed',
+                },
+                source: 'api',
+              });
+
+              // Fire-and-forget outbound n8n webhook — mirrors admin PATCH
+              // (`api/appointments/[id]/route.ts:239`) + POS PATCH
+              // (`api/pos/appointments/[id]/route.ts:395`) + convertQuote
+              // (`lib/quotes/convert-service.ts:357`) byte-for-byte.
+              fireWebhook(
+                'appointment_confirmed',
+                {
+                  event: 'appointment.confirmed',
+                  timestamp: new Date().toISOString(),
+                  appointment: { id: appt.id, status: 'confirmed' },
+                },
+                admin
+              ).catch((err) =>
+                console.error('[Stripe Webhook] appointment_confirmed webhook fire failed:', err)
+              );
+            }
+
             // TODO(payment-link-session-3): send payment_link_paid notification
 
             console.log(
-              `[Stripe Webhook] pay_link_processed (appointment: ${appt.id}, PI: ${pi.id}, amount: $${amountReceivedDollars.toFixed(2)}, status: ${newPaymentStatus})`
+              `[Stripe Webhook] pay_link_processed (appointment: ${appt.id}, PI: ${pi.id}, amount: $${amountReceivedDollars.toFixed(2)}, status: ${newPaymentStatus}${appt.status === 'pending' ? ', appointment_status: pending→confirmed' : ''})`
             );
           } catch (err) {
             console.error('[Stripe Webhook] pay_link processing failed', {
