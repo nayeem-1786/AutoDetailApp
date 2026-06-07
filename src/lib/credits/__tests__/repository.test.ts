@@ -19,6 +19,11 @@ import {
   createCustomerCredit,
   getCustomerCreditBalance,
   getCustomerCreditById,
+  applyCustomerCredit,
+  applyCustomerCreditsToTransaction,
+  unapplyCustomerCredit,
+  CreditAlreadyAppliedError,
+  InsufficientCreditBalanceError,
 } from '../repository';
 import type { CustomerCredit } from '../types';
 
@@ -30,6 +35,12 @@ const describeIfCreds = hasCreds ? describe : describe.skip;
 describeIfCreds('Theme E.1 — customer_credits schema + repository', () => {
   let supabase: SupabaseClient;
   let testCustomerId: string;
+  // Phase 3 Theme E.2 — disposable transaction row used as the target of
+  // application tests. The customer_credits.applied_to_transaction_id FK
+  // requires a real transactions row; using fixed sentinel UUIDs hits the
+  // FK constraint and the application UPDATE fails. One real tx is enough
+  // — all E.2 tests apply against this single tx.id.
+  let testTransactionId: string;
 
   beforeAll(async () => {
     supabase = createClient(url!, key!, {
@@ -51,6 +62,19 @@ describeIfCreds('Theme E.1 — customer_credits schema + repository', () => {
       throw new Error(`Failed to seed test customer: ${error?.message}`);
     }
     testCustomerId = customer.id as string;
+
+    // Disposable transaction. All defaults are fine; we never read from this
+    // row, only point applied_to_transaction_id at it. customer_id is
+    // ON DELETE SET NULL so deleting the customer last won't cascade-trip.
+    const { data: tx, error: txError } = await supabase
+      .from('transactions')
+      .insert({ customer_id: testCustomerId, status: 'completed' })
+      .select('id')
+      .single();
+    if (txError || !tx) {
+      throw new Error(`Failed to seed test transaction: ${txError?.message}`);
+    }
+    testTransactionId = tx.id as string;
   });
 
   afterEach(async () => {
@@ -60,6 +84,15 @@ describeIfCreds('Theme E.1 — customer_credits schema + repository', () => {
   });
 
   afterAll(async () => {
+    // Delete transaction BEFORE customer — applied_to_transaction_id FK is
+    // ON DELETE SET NULL so credits would survive a tx delete, but credits
+    // are already wiped in afterEach so order is moot. Customer must be last
+    // because customers.id is referenced by transactions.customer_id (SET NULL,
+    // so non-blocking) AND by customer_credits.customer_id (RESTRICT — but
+    // afterEach cleared those).
+    if (testTransactionId) {
+      await supabase.from('transactions').delete().eq('id', testTransactionId);
+    }
     if (testCustomerId) {
       await supabase.from('customers').delete().eq('id', testCustomerId);
     }
@@ -402,5 +435,359 @@ describeIfCreds('Theme E.1 — customer_credits schema + repository', () => {
     expect(data).toHaveProperty('created_at');
     expect(data).toHaveProperty('created_by_employee_id');
     expect(data).toHaveProperty('updated_at');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 3 Theme E.2 — applyCustomerCredit (single-row application)
+  // ---------------------------------------------------------------------------
+
+  it('applyCustomerCredit applies a partial amount and persists applied_* fields', async () => {
+    // $50 credit; apply $30. After: applied_at non-null, applied_amount_cents=30,
+    // applied_to_transaction_id matches. Remaining $20 stays consumable in theory
+    // BUT the CHECK constraint forbids re-applying the same row, so practical
+    // re-use of leftovers is a future-design concern, not E.2 scope.
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'cancellation_refund',
+    });
+    const applied = await applyCustomerCredit(supabase, {
+      credit_id: credit.id,
+      amount_cents: 3000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    expect(applied.id).toBe(credit.id);
+    expect(applied.applied_at).not.toBeNull();
+    expect(applied.applied_amount_cents).toBe(3000);
+    expect(applied.applied_to_transaction_id).toBe(testTransactionId);
+  });
+
+  it('applyCustomerCredit applies the full credit amount', async () => {
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'goodwill',
+    });
+    const applied = await applyCustomerCredit(supabase, {
+      credit_id: credit.id,
+      amount_cents: 5000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    expect(applied.applied_amount_cents).toBe(5000);
+    expect(applied.amount_cents).toBe(5000);
+  });
+
+  it('applyCustomerCredit throws CreditAlreadyAppliedError on already-applied row', async () => {
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'goodwill',
+    });
+    await applyCustomerCredit(supabase, {
+      credit_id: credit.id,
+      amount_cents: 5000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    // Second attempt — `.is('applied_at', null)` filter matches zero rows.
+    await expect(
+      applyCustomerCredit(supabase, {
+        credit_id: credit.id,
+        amount_cents: 5000,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toBeInstanceOf(CreditAlreadyAppliedError);
+  });
+
+  it('applyCustomerCredit rejects over-application via CHECK constraint', async () => {
+    // $50 credit; try to apply $60. customer_credits_applied_consistency fires.
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'goodwill',
+    });
+    await expect(
+      applyCustomerCredit(supabase, {
+        credit_id: credit.id,
+        amount_cents: 6000,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('applyCustomerCredit throws on amount_cents <= 0 (caller-side validation)', async () => {
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'goodwill',
+    });
+    await expect(
+      applyCustomerCredit(supabase, {
+        credit_id: credit.id,
+        amount_cents: 0,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toThrow();
+    await expect(
+      applyCustomerCredit(supabase, {
+        credit_id: credit.id,
+        amount_cents: -100,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('applyCustomerCredit is race-safe: concurrent attempts → exactly one wins', async () => {
+    // Promise.all of two applyCustomerCredit calls against the same row. The
+    // .is('applied_at', null) filter ensures one UPDATE matches the row + one
+    // matches zero rows (→ CreditAlreadyAppliedError). Verifies the DB-level
+    // race protection works end-to-end.
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'goodwill',
+    });
+    const results = await Promise.allSettled([
+      applyCustomerCredit(supabase, {
+        credit_id: credit.id,
+        amount_cents: 5000,
+        applied_to_transaction_id: testTransactionId,
+      }),
+      applyCustomerCredit(supabase, {
+        credit_id: credit.id,
+        amount_cents: 5000,
+        applied_to_transaction_id: testTransactionId,
+      }),
+    ]);
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r) => r.status === 'rejected');
+    expect(fulfilled.length).toBe(1);
+    expect(rejected.length).toBe(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+      CreditAlreadyAppliedError
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 3 Theme E.2 — applyCustomerCreditsToTransaction (multi-credit walk)
+  // ---------------------------------------------------------------------------
+
+  it('applyCustomerCreditsToTransaction: single credit fully consumes target', async () => {
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'cancellation_refund',
+    });
+    const result = await applyCustomerCreditsToTransaction(supabase, {
+      customer_id: testCustomerId,
+      target_amount_cents: 5000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    expect(result.total_applied_cents).toBe(5000);
+    expect(result.applied_credits.length).toBe(1);
+    expect(result.applied_credits[0]!.applied_amount_cents).toBe(5000);
+    expect(result.remaining_balance_cents).toBe(0);
+  });
+
+  it('applyCustomerCreditsToTransaction: walks multiple credits to reach target', async () => {
+    // Two $30 credits; target $50 → first credit fully consumed ($30), second
+    // partially ($20). total_applied = 50; remaining balance = 10.
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 3000,
+      reason: 'goodwill',
+    });
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 3000,
+      reason: 'goodwill',
+    });
+    const result = await applyCustomerCreditsToTransaction(supabase, {
+      customer_id: testCustomerId,
+      target_amount_cents: 5000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    expect(result.total_applied_cents).toBe(5000);
+    expect(result.applied_credits.length).toBe(2);
+    expect(result.applied_credits[0]!.applied_amount_cents).toBe(3000);
+    expect(result.applied_credits[1]!.applied_amount_cents).toBe(2000);
+    expect(result.remaining_balance_cents).toBe(1000);
+  });
+
+  it('applyCustomerCreditsToTransaction: expiry-first walk (soonest-expiring consumed first)', async () => {
+    const inOneWeek = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000
+    ).toISOString();
+    const inTwoWeeks = new Date(
+      Date.now() + 14 * 24 * 60 * 60 * 1000
+    ).toISOString();
+
+    // Three credits in scrambled INSERT order: $100 never-expires, $200
+    // expires-in-2-weeks, $300 expires-in-1-week. Target $400 — expiry-first
+    // sort consumes the $300 first (fully), then partially consumes the
+    // $200 ($100 applied; $100 leftover but the row is now "applied" and
+    // unavailable for further application). The $100 never-expires stays
+    // untouched.
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 10000,
+      reason: 'promotional',
+    });
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 20000,
+      reason: 'promotional',
+      expires_at: inTwoWeeks,
+    });
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 30000,
+      reason: 'promotional',
+      expires_at: inOneWeek,
+    });
+
+    const result = await applyCustomerCreditsToTransaction(supabase, {
+      customer_id: testCustomerId,
+      target_amount_cents: 40000,
+      applied_to_transaction_id: testTransactionId,
+    });
+
+    expect(result.total_applied_cents).toBe(40000);
+    expect(result.applied_credits.length).toBe(2);
+    // First applied = soonest-expiring ($300 in 1 week), fully consumed.
+    expect(result.applied_credits[0]!.amount_cents).toBe(30000);
+    expect(result.applied_credits[0]!.applied_amount_cents).toBe(30000);
+    // Second applied = $200-in-2-weeks, partially consumed ($100 of $200).
+    expect(result.applied_credits[1]!.amount_cents).toBe(20000);
+    expect(result.applied_credits[1]!.applied_amount_cents).toBe(10000);
+  });
+
+  it('applyCustomerCreditsToTransaction: throws when target > available balance', async () => {
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 1000,
+      reason: 'goodwill',
+    });
+    await expect(
+      applyCustomerCreditsToTransaction(supabase, {
+        customer_id: testCustomerId,
+        target_amount_cents: 5000,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toBeInstanceOf(InsufficientCreditBalanceError);
+  });
+
+  it('applyCustomerCreditsToTransaction: rejects zero/negative target', async () => {
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'goodwill',
+    });
+    await expect(
+      applyCustomerCreditsToTransaction(supabase, {
+        customer_id: testCustomerId,
+        target_amount_cents: 0,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toThrow();
+    await expect(
+      applyCustomerCreditsToTransaction(supabase, {
+        customer_id: testCustomerId,
+        target_amount_cents: -100,
+        applied_to_transaction_id: testTransactionId,
+      })
+    ).rejects.toThrow();
+  });
+
+  it('applyCustomerCreditsToTransaction: race-loss recovery (skip applied credit + use next)', async () => {
+    // Seed two credits; pre-apply ONE before invoking the walker. The walker
+    // re-reads the balance internally so it should only see the unapplied
+    // credit and complete successfully.
+    const preApplied = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 3000,
+      reason: 'goodwill',
+    });
+    await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 4000,
+      reason: 'goodwill',
+    });
+    await applyCustomerCredit(supabase, {
+      credit_id: preApplied.id,
+      amount_cents: 3000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    const result = await applyCustomerCreditsToTransaction(supabase, {
+      customer_id: testCustomerId,
+      target_amount_cents: 4000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    expect(result.total_applied_cents).toBe(4000);
+    expect(result.applied_credits.length).toBe(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 3 Theme E.2 — unapplyCustomerCredit (reverse application)
+  // ---------------------------------------------------------------------------
+
+  it('unapplyCustomerCredit resets applied_* fields to null', async () => {
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'cancellation_refund',
+    });
+    await applyCustomerCredit(supabase, {
+      credit_id: credit.id,
+      amount_cents: 5000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    const reversed = await unapplyCustomerCredit(supabase, credit.id);
+    expect(reversed).not.toBeNull();
+    expect(reversed!.applied_at).toBeNull();
+    expect(reversed!.applied_amount_cents).toBeNull();
+    expect(reversed!.applied_to_transaction_id).toBeNull();
+    expect(reversed!.applied_to_appointment_id).toBeNull();
+    // amount_cents + reason unchanged — ledger integrity preserved.
+    expect(reversed!.amount_cents).toBe(5000);
+    expect(reversed!.reason).toBe('cancellation_refund');
+  });
+
+  it('unapplyCustomerCredit returns null when credit was never applied', async () => {
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'cancellation_refund',
+    });
+    const result = await unapplyCustomerCredit(supabase, credit.id);
+    expect(result).toBeNull();
+  });
+
+  it('unapplyCustomerCredit returns null when credit id does not exist', async () => {
+    const result = await unapplyCustomerCredit(
+      supabase,
+      '00000000-0000-0000-0000-000000000000'
+    );
+    expect(result).toBeNull();
+  });
+
+  it('unapplied credit re-enters balance: apply → unapply → balance restored', async () => {
+    const credit = await createCustomerCredit(supabase, {
+      customer_id: testCustomerId,
+      amount_cents: 5000,
+      reason: 'cancellation_refund',
+    });
+    await applyCustomerCredit(supabase, {
+      credit_id: credit.id,
+      amount_cents: 5000,
+      applied_to_transaction_id: testTransactionId,
+    });
+    let balance = await getCustomerCreditBalance(supabase, testCustomerId);
+    expect(balance.available_balance_cents).toBe(0);
+
+    await unapplyCustomerCredit(supabase, credit.id);
+    balance = await getCustomerCreditBalance(supabase, testCustomerId);
+    expect(balance.available_balance_cents).toBe(5000);
+    expect(balance.unapplied_credits.length).toBe(1);
+    expect(balance.unapplied_credits[0]!.id).toBe(credit.id);
   });
 });
