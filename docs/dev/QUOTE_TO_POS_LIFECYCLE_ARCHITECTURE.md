@@ -2052,7 +2052,7 @@ Following v1.3 lock and operator review, operator observed `A-100000` reads as t
 
 ### 2026-06-07 PST — Phase 3 Theme F complete (Phase 0.2 audit `dcf511df` cleanup bundle — F.2 / F.3 / F.5 / F.6 / F.7 closed)
 
-**Status:** Theme F merged to `main` at `__MERGE_HASH_F__` (feature commit `__FEATURE_HASH_F__`, branch `feat/phase-3-theme-f-quote-conversion-cleanup`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3177 passed including 21 new Theme F tests; 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated — documented in Theme A.1's Decisions Log entry below).
+**Status:** Theme F merged to `main` at `69ed366d` (feature commit `815ac22f`, branch `feat/phase-3-theme-f-quote-conversion-cleanup`). All 4 verification gates green: typecheck 0 errors; lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3177 passed including 21 new Theme F tests; 4 pre-existing unrelated env-bleed failures in `sms-self-send.test.ts` / `sms-normalization.test.ts` reproduce on main and are unrelated — documented in Theme A.1's Decisions Log entry below).
 
 **Sequential execution:** Wave 2b of Phase 3 — fires after Wave 2a (Session 2.1.1 + Theme E.1) closes. No parallel companions; isolated `git worktree`.
 
