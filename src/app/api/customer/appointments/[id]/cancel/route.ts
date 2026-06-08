@@ -2,12 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { APPOINTMENT } from '@/lib/utils/constants';
-import { sendCancellationNotifications } from '@/lib/email/send-cancellation-email';
+import { getRequestIp } from '@/lib/services/audit';
+import { cancelAppointmentOrchestrated } from '@/lib/appointments/cancel-orchestration';
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
 
+/**
+ * POST /api/customer/appointments/[id]/cancel
+ *
+ * Customer self-serve cancel.
+ *
+ * Phase 3 Theme D.1 (AC-9 foundation, 2026-06-07): orchestration delegated to
+ * `cancelAppointmentOrchestrated`. Customer self-cancel ALWAYS uses Pathway A
+ * (Stripe refund); the customer cannot choose Pathway B (operator's decision
+ * since credit is a relational gesture that needs operator awareness — audit
+ * F.6 framing). No cancellation fee on this path; the 24-hour window is the
+ * fee-equivalent gate (cancellations within 24 hours are rejected entirely).
+ *
+ * Pre-D.1 this route only flipped status — leaving any deposit money stranded
+ * on the cancelled appointment with no automated refund. Post-D.1 the
+ * customer's deposit is automatically refunded via Stripe.
+ *
+ * Notification: always TRUE — the customer initiated; they get the
+ * confirmation SMS + email.
+ */
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -33,7 +53,10 @@ export async function POST(
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // Fetch appointment with ownership check
+    // Fetch appointment with ownership check + status + timing for the 24h
+    // window gate. The orchestrator does its own existence/cancellable check
+    // but this route owns the ownership gate (the customer must own the
+    // appointment).
     const { data: appointment, error: fetchErr } = await admin
       .from('appointments')
       .select('id, status, scheduled_date, scheduled_start_time, customer_id')
@@ -45,7 +68,6 @@ export async function POST(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
     }
 
-    // Status check
     if (!CANCELLABLE_STATUSES.includes(appointment.status)) {
       return NextResponse.json(
         { error: `Cannot cancel an appointment that is ${appointment.status}` },
@@ -53,12 +75,13 @@ export async function POST(
       );
     }
 
-    // 24-hour advance cancellation window
+    // 24-hour advance cancellation window — customer-portal-only gate.
     const appointmentDateTime = new Date(
       `${appointment.scheduled_date}T${appointment.scheduled_start_time}`
     );
     const now = new Date();
-    const hoursUntil = (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntil =
+      (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
 
     if (hoursUntil < APPOINTMENT.CANCELLATION_WINDOW_HOURS) {
       return NextResponse.json(
@@ -70,27 +93,43 @@ export async function POST(
       );
     }
 
-    // Cancel the appointment
-    const { error: updateErr } = await admin
-      .from('appointments')
-      .update({
-        status: 'cancelled',
-        cancellation_reason: 'Cancelled by customer',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
+    const result = await cancelAppointmentOrchestrated(admin, {
+      appointmentId: id,
+      pathway: 'refund',
+      reason: 'Cancelled by customer',
+      cancellation_fee_cents: null,
+      notifyCustomer: true,
+      cancelledBy: 'customer',
+      actor: {
+        userId: user.id,
+        userEmail: user.email ?? null,
+        employeeName: null,
+        // Customer self-cancel is not employee-attributed; refunds.processed_by
+        // is NULL on this path, which is acceptable per the existing refund
+        // engine's pattern for non-staff-driven refunds.
+        employeeId: null,
+      },
+      ipAddress: getRequestIp(request),
+    });
 
-    if (updateErr) {
-      console.error('Cancel appointment error:', updateErr.message);
-      return NextResponse.json({ error: 'Failed to cancel appointment' }, { status: 500 });
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          error: result.message,
+          error_code: result.error,
+          ...(result.partial_state ? { partial_state: result.partial_state } : {}),
+        },
+        { status: result.httpStatus }
+      );
     }
 
-    // Send cancellation notifications — email + SMS (non-blocking)
-    sendCancellationNotifications(id, 'Cancelled by customer').catch(err =>
-      console.error('Cancellation notifications failed (non-blocking):', err)
-    );
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      appointment_id: result.appointment_id,
+      refund_amount_cents: result.refund_amount_cents ?? 0,
+      stripe_refund_id: result.stripe_refund_id ?? null,
+      amount_paid_cents: result.amount_paid_cents,
+    });
   } catch (err) {
     console.error('Customer cancel appointment error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

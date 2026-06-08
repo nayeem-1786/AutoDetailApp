@@ -1,7 +1,23 @@
+/**
+ * POS /api/pos/appointments/[id]/cancel route tests.
+ *
+ * Phase 3 Theme D.1: this route is now a thin wrapper around
+ * `cancelAppointmentOrchestrated`. The orchestrator has its own deep test
+ * coverage at `src/lib/appointments/__tests__/cancel-orchestration.test.ts`;
+ * these tests verify the route's specific responsibilities:
+ *   - POS HMAC auth (401 on missing)
+ *   - `appointments.cancel` permission gate (403 on denied)
+ *   - Body validation (400 on missing reason)
+ *   - Orchestrator delegation with correct cancelledBy='staff_pos' actor
+ *   - Pathway + fee_cents pass-through
+ *   - notifyCustomer default = false (POS-specific)
+ *   - cancel_result surface in response
+ *   - Orchestrator failure → route returns the orchestrator's httpStatus
+ */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// Shared mock state — individual tests rewire behavior per scenario.
 const state = {
   posEmployee: {
     employee_id: 'emp-uuid-1',
@@ -19,15 +35,20 @@ const state = {
     email: string;
   },
   cancelGranted: true,
-  appointment: null as null | {
-    id: string;
-    status: string;
-  },
-  appointmentUpdates: [] as Array<Record<string, unknown>>,
-  auditCalls: [] as Array<Record<string, unknown>>,
-  smsSends: [] as unknown[],
-  emailSends: [] as unknown[],
-  cancellationNotificationCalls: [] as Array<{ id: string; reason: string | undefined }>,
+  // Orchestrator stub state
+  orchestratorResult: {
+    ok: true as const,
+    appointment_id: 'a1',
+    pathway: 'refund' as 'refund' | 'credit',
+    job_cancelled: false,
+    amount_paid_cents: 0,
+    refund_amount_cents: 0,
+    stripe_refund_id: null,
+    cancellation_fee_cents: 0,
+  } as unknown,
+  orchestratorCalls: [] as Array<Record<string, unknown>>,
+  // Refetch stub
+  refetchedAppt: { id: 'a1', status: 'cancelled' } as unknown,
 };
 
 vi.mock('@/lib/pos/api-auth', () => ({
@@ -39,101 +60,48 @@ vi.mock('@/lib/pos/check-permission', () => ({
     _supabase: unknown,
     _role: string,
     _employeeId: string,
-    permissionKey: string
-  ) => {
-    if (permissionKey === 'appointments.cancel') return state.cancelGranted;
-    return true;
-  },
+    _permissionKey: string
+  ) => state.cancelGranted,
 }));
 
 vi.mock('@/lib/services/audit', () => ({
-  logAudit: (entry: Record<string, unknown>) => {
-    state.auditCalls.push(entry);
-  },
   getRequestIp: () => '127.0.0.1',
 }));
 
-// Sentinels — three customer-facing notification channels. Each is module-
-// scope mocked so the suite can assert that all three remain untouched on
-// the suppression path.
-vi.mock('@/lib/utils/sms', () => ({
-  sendSms: vi.fn(async (...args: unknown[]) => {
-    state.smsSends.push(args);
-    return { ok: true };
-  }),
-  sendMarketingSms: vi.fn(async (...args: unknown[]) => {
-    state.smsSends.push(args);
-    return { ok: true };
-  }),
-}));
-
-vi.mock('@/lib/utils/email', () => ({
-  sendEmail: vi.fn(async (...args: unknown[]) => {
-    state.emailSends.push(args);
-    return { ok: true };
-  }),
-}));
-
-vi.mock('@/lib/email/send-cancellation-email', () => ({
-  sendCancellationNotifications: vi.fn(async (id: string, reason: string | undefined) => {
-    state.cancellationNotificationCalls.push({ id, reason });
-    return { emailSent: true, smsSent: true, usedTemplate: true };
-  }),
+vi.mock('@/lib/appointments/cancel-orchestration', () => ({
+  cancelAppointmentOrchestrated: async (
+    _client: unknown,
+    input: Record<string, unknown>
+  ) => {
+    state.orchestratorCalls.push(input);
+    return state.orchestratorResult;
+  },
 }));
 
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: () => ({
-    from: (table: string) => {
-      if (table === 'appointments') {
-        return {
-          select: (cols: string) => ({
-            eq: (_col: string, _val: string) => ({
-              single: async () => {
-                if (!state.appointment) return { data: null, error: { message: 'not found' } };
-                if (cols.includes('customer:customers')) {
-                  return {
-                    data: {
-                      ...state.appointment,
-                      cancellation_reason: 'reason here',
-                      customer: { id: 'cust-1', first_name: 'C', last_name: 'X', phone: '+13105551212', email: null },
-                      vehicle: null,
-                      employee: null,
-                      appointment_services: [],
-                    },
-                    error: null,
-                  };
-                }
-                return { data: state.appointment, error: null };
-              },
-            }),
-          }),
-          update: (payload: Record<string, unknown>) => ({
-            eq: async (_col: string, _val: string) => {
-              state.appointmentUpdates.push(payload);
-              return { error: null };
-            },
-          }),
-        };
-      }
-      return {};
-    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({ data: state.refetchedAppt, error: null }),
+        }),
+      }),
+    }),
   }),
 }));
 
-import { POST } from '../route';
-
-function makeReq(body: Record<string, unknown>): NextRequest {
-  return new NextRequest(
-    'http://localhost/api/pos/appointments/appt-1/cancel',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  );
+async function loadRoute() {
+  vi.resetModules();
+  return await import('../route');
 }
 
-const params = Promise.resolve({ id: 'appt-1' });
+function makeRequest(body: Record<string, unknown>) {
+  return new NextRequest('http://localhost/api/pos/appointments/a1/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
 
 beforeEach(() => {
   state.posEmployee = {
@@ -145,139 +113,209 @@ beforeEach(() => {
     email: 'pat@example.com',
   };
   state.cancelGranted = true;
-  state.appointment = {
-    id: 'appt-1',
-    status: 'confirmed',
+  state.orchestratorCalls = [];
+  state.orchestratorResult = {
+    ok: true,
+    appointment_id: 'a1',
+    pathway: 'refund',
+    job_cancelled: false,
+    amount_paid_cents: 0,
+    refund_amount_cents: 0,
+    stripe_refund_id: null,
+    cancellation_fee_cents: 0,
   };
-  state.appointmentUpdates = [];
-  state.auditCalls = [];
-  state.smsSends = [];
-  state.emailSends = [];
-  state.cancellationNotificationCalls = [];
+  state.refetchedAppt = { id: 'a1', status: 'cancelled' };
 });
 
-describe('POST /api/pos/appointments/[id]/cancel', () => {
-  it('returns 401 when not authenticated', async () => {
+describe('POST /api/pos/appointments/[id]/cancel — auth + permission', () => {
+  it('401 when POS auth missing', async () => {
     state.posEmployee = null;
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(401);
-    expect(state.appointmentUpdates).toHaveLength(0);
-  });
-
-  it('returns 403 when appointments.cancel permission denied (cashier role default)', async () => {
-    // Cashier role default per audit §9.1: appointments.cancel = false.
-    state.posEmployee = { ...state.posEmployee!, role: 'cashier' };
-    state.cancelGranted = false;
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(403);
-    expect(state.appointmentUpdates).toHaveLength(0);
-    // Notification-suppression invariant — even when 403, nothing fires.
-    expect(state.smsSends).toHaveLength(0);
-    expect(state.emailSends).toHaveLength(0);
-    expect(state.cancellationNotificationCalls).toHaveLength(0);
-  });
-
-  it('returns 400 when cancellation_reason is missing', async () => {
-    const res = await POST(makeReq({}), { params });
-    expect(res.status).toBe(400);
-    expect(state.appointmentUpdates).toHaveLength(0);
-  });
-
-  it('returns 400 when cancellation_reason is empty/whitespace', async () => {
-    const res = await POST(makeReq({ cancellation_reason: '   ' }), { params });
-    expect(res.status).toBe(400);
-    expect(state.appointmentUpdates).toHaveLength(0);
-  });
-
-  it('returns 404 when appointment does not exist', async () => {
-    state.appointment = null;
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(404);
-    expect(state.appointmentUpdates).toHaveLength(0);
-  });
-
-  it('returns 400 when appointment is already cancelled', async () => {
-    state.appointment!.status = 'cancelled';
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(400);
-    expect(state.appointmentUpdates).toHaveLength(0);
-  });
-
-  it('returns 400 when appointment is already completed', async () => {
-    state.appointment!.status = 'completed';
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(400);
-    expect(state.appointmentUpdates).toHaveLength(0);
-  });
-
-  it('cancels with notify_customer=false (default): 0 SMS, 0 email, 0 webhook, 0 cancellation-notification call', async () => {
-    const res = await POST(
-      makeReq({ cancellation_reason: 'Customer rescheduled offline' }),
-      { params }
-    );
-    expect(res.status).toBe(200);
-
-    // Status flipped + reason persisted.
-    expect(state.appointmentUpdates).toHaveLength(1);
-    const update = state.appointmentUpdates[0];
-    expect(update.status).toBe('cancelled');
-    expect(update.cancellation_reason).toBe('Customer rescheduled offline');
-
-    // Notification-suppression invariant — the headline assertion for Item 15b.
-    expect(state.smsSends).toHaveLength(0);
-    expect(state.emailSends).toHaveLength(0);
-    expect(state.cancellationNotificationCalls).toHaveLength(0);
-
-    // Audit log records suppression + POS source for traceability.
-    expect(state.auditCalls).toHaveLength(1);
-    const audit = state.auditCalls[0];
-    expect((audit.details as Record<string, unknown>).notification_suppressed).toBe(true);
-    expect((audit.details as Record<string, unknown>).reason).toBe(
-      'Customer rescheduled offline'
-    );
-    expect(audit.source).toBe('pos');
-    expect(audit.action).toBe('delete');
-    expect(audit.entityType).toBe('booking');
-  });
-
-  it('cancels with notify_customer=true: fires cancellation notifications + webhook, audit records notification_suppressed=false', async () => {
-    const res = await POST(
-      makeReq({
-        cancellation_reason: 'Weather cancellation',
-        notify_customer: true,
-      }),
-      { params }
-    );
-    expect(res.status).toBe(200);
-
-    expect(state.appointmentUpdates).toHaveLength(1);
-    expect(state.appointmentUpdates[0].status).toBe('cancelled');
-
-    // sendCancellationNotifications was called with the appointment id and reason.
-    expect(state.cancellationNotificationCalls).toHaveLength(1);
-    expect(state.cancellationNotificationCalls[0]).toEqual({
-      id: 'appt-1',
-      reason: 'Weather cancellation',
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
     });
-
-    // Webhook fired with the canonical event name.
-
-    // Audit log records notification_suppressed=false on the notify path.
-    expect(state.auditCalls).toHaveLength(1);
-    const audit = state.auditCalls[0];
-    expect((audit.details as Record<string, unknown>).notification_suppressed).toBe(false);
-    expect(audit.source).toBe('pos');
+    expect(res.status).toBe(401);
   });
 
-  it('trims whitespace from cancellation_reason before persisting + auditing', async () => {
+  it('403 when appointments.cancel permission denied', async () => {
+    state.cancelGranted = false;
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/pos/appointments/[id]/cancel — body validation', () => {
+  it('400 when cancellation_reason is missing', async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({}), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('400 when cancellation_reason is whitespace only', async () => {
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: '   ' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/pos/appointments/[id]/cancel — orchestrator delegation', () => {
+  it('delegates to orchestrator with cancelledBy=staff_pos', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({ cancellation_reason: 'operator decision' }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls).toHaveLength(1);
+    expect(state.orchestratorCalls[0].appointmentId).toBe('a1');
+    expect(state.orchestratorCalls[0].cancelledBy).toBe('staff_pos');
+    expect(state.orchestratorCalls[0].reason).toBe('operator decision');
+  });
+
+  it('notifyCustomer defaults to false (POS-specific behavior)', async () => {
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(state.orchestratorCalls[0].notifyCustomer).toBe(false);
+  });
+
+  it('notifyCustomer=true is forwarded when explicit', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({ cancellation_reason: 'x', notify_customer: true }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].notifyCustomer).toBe(true);
+  });
+
+  it('pathway defaults to refund when omitted', async () => {
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(state.orchestratorCalls[0].pathway).toBe('refund');
+  });
+
+  it('pathway=credit forwards through', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({ cancellation_reason: 'x', pathway: 'credit' }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].pathway).toBe('credit');
+  });
+
+  it('cancellation_fee_cents forwards through', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({
+        cancellation_reason: 'x',
+        cancellation_fee_cents: 5000,
+      }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].cancellation_fee_cents).toBe(5000);
+  });
+
+  it('actor employeeId is the pos employee id (drives refunds.processed_by)', async () => {
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    const actor = state.orchestratorCalls[0].actor as Record<string, unknown>;
+    expect(actor.employeeId).toBe('emp-uuid-1');
+  });
+});
+
+describe('POST /api/pos/appointments/[id]/cancel — response shape', () => {
+  it('200 includes cancel_result with refund pathway summary', async () => {
+    state.orchestratorResult = {
+      ok: true,
+      appointment_id: 'a1',
+      pathway: 'refund',
+      job_cancelled: true,
+      amount_paid_cents: 5000,
+      refund_amount_cents: 5000,
+      stripe_refund_id: 're_abc',
+      cancellation_fee_cents: 0,
+    };
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.cancel_result.pathway).toBe('refund');
+    expect(json.cancel_result.refund_amount_cents).toBe(5000);
+    expect(json.cancel_result.stripe_refund_id).toBe('re_abc');
+    expect(json.cancel_result.job_cancelled).toBe(true);
+  });
+
+  it('200 includes cancel_result with credit pathway summary', async () => {
+    state.orchestratorResult = {
+      ok: true,
+      appointment_id: 'a1',
+      pathway: 'credit',
+      job_cancelled: false,
+      amount_paid_cents: 7500,
+      credit_id: 'cred-x',
+      credit_amount_cents: 7500,
+    };
+    const { POST } = await loadRoute();
     const res = await POST(
-      makeReq({ cancellation_reason: '  Operator note  ' }),
-      { params }
+      makeRequest({ cancellation_reason: 'x', pathway: 'credit' }),
+      { params: Promise.resolve({ id: 'a1' }) }
     );
     expect(res.status).toBe(200);
-    expect(state.appointmentUpdates[0].cancellation_reason).toBe('Operator note');
-    expect((state.auditCalls[0].details as Record<string, unknown>).reason).toBe(
-      'Operator note'
-    );
+    const json = await res.json();
+    expect(json.cancel_result.pathway).toBe('credit');
+    expect(json.cancel_result.credit_id).toBe('cred-x');
+    expect(json.cancel_result.credit_amount_cents).toBe(7500);
+  });
+});
+
+describe('POST /api/pos/appointments/[id]/cancel — orchestrator failure pass-through', () => {
+  it('returns orchestrator httpStatus on failure', async () => {
+    state.orchestratorResult = {
+      ok: false,
+      httpStatus: 409,
+      error: 'already_cancelled',
+      message: 'Already cancelled',
+    };
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error).toBe('Already cancelled');
+    expect(json.error_code).toBe('already_cancelled');
+  });
+
+  it('surfaces partial_state when orchestrator returned it (Pathway A Stripe-succeeded-DB-failed)', async () => {
+    state.orchestratorResult = {
+      ok: false,
+      httpStatus: 500,
+      error: 'db_failed',
+      message: 'Manual reconciliation needed',
+      partial_state: { stripe_refund_id: 're_partial', refund_amount_cents: 5000 },
+    };
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.partial_state).toEqual({
+      stripe_refund_id: 're_partial',
+      refund_amount_cents: 5000,
+    });
   });
 });

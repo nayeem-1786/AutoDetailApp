@@ -505,6 +505,15 @@ export const appointmentUpdateSchema = z.object({
 });
 
 // Appointment cancel schema
+//
+// Phase 3 Theme D.1 (AC-9): extends pre-D.1 shape (cancellation_reason +
+// optional dollars-typed cancellation_fee) with three additive fields the
+// orchestrator consumes. Existing callers that pass only the original two
+// continue to work — `pathway` defaults to 'refund' (the pre-D.1 implicit
+// behavior), `cancellation_fee_cents` defaults to undefined (no fee), and
+// `notify_customer` is opt-in per-caller in the route handler (the admin
+// route defaults true, the POS route defaults false to match the pre-D.1
+// dialog UX).
 export const appointmentCancelSchema = z.object({
   cancellation_reason: z.string().min(1, 'Cancellation reason is required'),
   cancellation_fee: z.union([
@@ -513,6 +522,22 @@ export const appointmentCancelSchema = z.object({
     z.undefined(),
     z.null(),
   ]).optional().nullable(),
+  // D.1 — pathway selector. 'refund' = Pathway A (Stripe refund minus fee);
+  // 'credit' = Pathway B (full paid amount as customer credit, no refund).
+  // Defaults to 'refund' at route layer if omitted (BC with pre-D.1 callers).
+  pathway: z.enum(['refund', 'credit']).optional(),
+  // D.1 — integer-cents alternative to legacy `cancellation_fee` (dollars).
+  // Money-Unify Rule #20: new money-handling code uses cents. When both are
+  // provided, _cents wins; when only legacy is provided, route layer converts.
+  cancellation_fee_cents: z
+    .number()
+    .int('Must be an integer')
+    .min(0, 'Must be 0 or greater')
+    .optional()
+    .nullable(),
+  // D.1 — explicit notify flag. Routes carry their own default but pass it
+  // through unchanged when caller is explicit.
+  notify_customer: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------

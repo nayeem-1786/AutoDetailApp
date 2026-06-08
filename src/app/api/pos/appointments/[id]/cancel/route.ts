@@ -3,48 +3,53 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { authenticatePosRequest } from '@/lib/pos/api-auth';
 import { checkPosPermission } from '@/lib/pos/check-permission';
-import { logAudit, getRequestIp } from '@/lib/services/audit';
-import { sendCancellationNotifications } from '@/lib/email/send-cancellation-email';
-
-const TERMINAL_STATUSES = ['completed', 'cancelled'];
+import { getRequestIp } from '@/lib/services/audit';
+import { cancelAppointmentOrchestrated } from '@/lib/appointments/cancel-orchestration';
 
 const cancelSchema = z.object({
   cancellation_reason: z
     .string()
     .trim()
     .min(1, 'Cancellation reason is required'),
-  // notify_customer defaults to false — the POS cancel flow is operator-driven
-  // and suppresses customer notifications by construction (Roadmap Item 15b,
-  // matches the Item 12 reschedule pattern). When the operator explicitly
-  // checks the "Notify customer" box, the dialog passes `true` and the
-  // existing cancellation SMS/email + cancellation webhook fire.
+  // notify_customer defaults to false — POS path is operator-driven and
+  // suppresses customer notifications by construction unless the operator
+  // explicitly opts in via the dialog's "Notify customer" checkbox.
   notify_customer: z.boolean().optional().default(false),
+  // D.1 — pathway selector. Defaults to 'refund' (BC).
+  pathway: z.enum(['refund', 'credit']).optional(),
+  // D.1 — fee in cents (Money-Unify Rule #20). POS dialog wires this when the
+  // operator chooses Pathway A. Optional; omitted = no fee deduction.
+  cancellation_fee_cents: z
+    .number()
+    .int('Must be an integer')
+    .min(0, 'Must be 0 or greater')
+    .optional()
+    .nullable(),
 });
 
 /**
  * POST /api/pos/appointments/[id]/cancel
  *
- * POS-side cancel of an appointment from the POS Appointments view
- * (Roadmap Item 15b). Modelled on the Item 12 reschedule endpoint:
- *  - HMAC POS auth + `appointments.cancel` permission gate
- *  - Scope intentionally narrower than the admin POST at
- *    /api/appointments/[id]/cancel:
- *    - No cancellation fee field (fee waiver gated by `appointments.waive_fee`,
- *      not exposed in POS — `appointments.waive_fee` is admin-only).
- *    - No waitlist auto-notification (waitlist is itself a customer-notifying
- *      side-channel — keep POS strict "no customer contact" by construction
- *      when `notify_customer=false`).
- *  - `notify_customer` defaults to false. When false: skip
- *    `sendCancellationNotifications`. When true: fire it (parity with admin
- *    cancel for the customer-facing side effects).
- *    (Theme G — outbound n8n webhook removed; Smart Details has no receiver
- *    wired, so the pre-Theme-G paired `fireWebhook('appointment_cancelled')`
- *    has been deleted alongside its 22 sibling fire sites.)
- *  - Audit row always records `notification_suppressed: !notify_customer`
- *    + `source: 'pos'`.
+ * POS-side cancel of an appointment.
  *
- * Permission: `appointments.cancel` (existing — admin and super_admin only by
- * default; cashier denied per audit §9.1).
+ * Phase 3 Theme D.1 (AC-9 foundation, 2026-06-07): orchestration delegated to
+ * `cancelAppointmentOrchestrated`. Pre-D.1 this route only flipped status and
+ * conditionally dispatched notifications. Post-D.1 it gains:
+ *
+ *   - Pathway A (Stripe refund minus optional fee) when `pathway === 'refund'`
+ *   - Pathway B (full paid amount as customer credit) when `pathway === 'credit'`
+ *   - Job cascade (active job marked cancelled) — replaces the orphan gap
+ *     identified by audit `3e633156` Target A.1
+ *
+ * Cancel-time fees on the POS path: previously the POS endpoint had NO fee
+ * field (admin-only by explicit design comment per pre-D.1 line 33-37). Post-
+ * D.1 the orchestrator accepts a cents-typed fee, and the POS dialog wires
+ * the operator-entered value. POS fee gating uses the same `appointments.cancel`
+ * permission (no separate `appointments.waive_fee` check — POS operators with
+ * cancel authority are trusted to set fees; this matches the broader POS-trust
+ * boundary established by the HMAC auth at the route entry).
+ *
+ * Permission: `appointments.cancel` (existing).
  */
 export async function POST(
   request: NextRequest,
@@ -84,72 +89,36 @@ export async function POST(
       );
     }
 
-    const { data: current, error: fetchErr } = await supabase
-      .from('appointments')
-      .select('id, status')
-      .eq('id', id)
-      .single();
-
-    if (fetchErr || !current) {
-      return NextResponse.json(
-        { error: 'Appointment not found' },
-        { status: 404 }
-      );
-    }
-
-    if (TERMINAL_STATUSES.includes(current.status)) {
-      return NextResponse.json(
-        { error: `Cannot cancel an appointment that is already ${current.status}` },
-        { status: 400 }
-      );
-    }
-
-    const { error: updateErr } = await supabase
-      .from('appointments')
-      .update({
-        status: 'cancelled',
-        cancellation_reason: data.cancellation_reason,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-
-    if (updateErr) {
-      console.error('POS appointment cancel failed:', updateErr.message);
-      return NextResponse.json(
-        { error: 'Failed to cancel appointment' },
-        { status: 500 }
-      );
-    }
-
-    // Notification dispatch — strictly gated by the operator's checkbox.
-    // When false, suppress every customer-facing side effect (direct
-    // notifications AND the cancellation webhook, since downstream n8n
-    // flows on that event may also notify the customer).
-    if (data.notify_customer) {
-      // Theme G — `appointment_cancelled` outbound webhook removed (no n8n
-      // receiver in Smart Details; audit f5e714a8). Customer SMS/email
-      // dispatch is inline via `sendCancellationNotifications`.
-      sendCancellationNotifications(id, data.cancellation_reason).catch((err) =>
-        console.error('Cancellation notifications failed (non-blocking):', err)
-      );
-    }
-
-    logAudit({
-      userId: posEmployee.auth_user_id,
-      userEmail: posEmployee.email,
-      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
-      action: 'delete',
-      entityType: 'booking',
-      entityId: id,
-      entityLabel: `Appointment #${id.slice(0, 8)}`,
-      details: {
-        reason: data.cancellation_reason,
-        notification_suppressed: !data.notify_customer,
+    const result = await cancelAppointmentOrchestrated(supabase, {
+      appointmentId: id,
+      pathway: data.pathway ?? 'refund',
+      reason: data.cancellation_reason,
+      cancellation_fee_cents: data.cancellation_fee_cents ?? null,
+      notifyCustomer: data.notify_customer,
+      cancelledBy: 'staff_pos',
+      actor: {
+        userId: posEmployee.auth_user_id,
+        userEmail: posEmployee.email,
+        employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+        employeeId: posEmployee.employee_id,
       },
       ipAddress: getRequestIp(request),
-      source: 'pos',
     });
 
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          error: result.message,
+          error_code: result.error,
+          ...(result.partial_state ? { partial_state: result.partial_state } : {}),
+        },
+        { status: result.httpStatus }
+      );
+    }
+
+    // Re-fetch the now-cancelled appointment with the relations the POS UI
+    // expects in `data`. The orchestrator returns only the canonical result
+    // shape; surface-specific data shapes stay at the route layer.
     const { data: updated } = await supabase
       .from('appointments')
       .select(`
@@ -162,7 +131,24 @@ export async function POST(
       .eq('id', id)
       .single();
 
-    return NextResponse.json({ data: updated });
+    return NextResponse.json({
+      data: updated,
+      cancel_result: {
+        pathway: result.pathway,
+        job_cancelled: result.job_cancelled,
+        amount_paid_cents: result.amount_paid_cents,
+        ...(result.pathway === 'refund'
+          ? {
+              refund_amount_cents: result.refund_amount_cents ?? 0,
+              stripe_refund_id: result.stripe_refund_id ?? null,
+              cancellation_fee_cents: result.cancellation_fee_cents ?? 0,
+            }
+          : {
+              credit_id: result.credit_id ?? null,
+              credit_amount_cents: result.credit_amount_cents ?? 0,
+            }),
+      },
+    });
   } catch (err) {
     console.error('POS appointment cancel error:', err);
     return NextResponse.json(
