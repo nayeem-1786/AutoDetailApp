@@ -2,6 +2,8 @@ import type { QuoteState, QuoteAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
 import { resolveServicePriceWithSale } from '../utils/pricing';
 import { applyAddService } from '../utils/apply-add-service';
+import { applyAddProduct } from '../utils/apply-add-product';
+import { generateId } from '../utils/generate-id';
 
 export const initialQuoteState: QuoteState = {
   items: [],
@@ -32,17 +34,6 @@ export const initialQuoteState: QuoteState = {
   },
 };
 
-function generateId(): string {
-  if (typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 function recalculateTotals(state: QuoteState): QuoteState {
   const subtotal = state.items.reduce((sum, item) => sum + item.totalPrice, 0);
 
@@ -68,58 +59,12 @@ export function quoteReducer(
 ): QuoteState {
   switch (action.type) {
     case 'ADD_PRODUCT': {
-      const { product } = action;
-      const existing = state.items.find(
-        (i) => i.itemType === 'product' && i.productId === product.id
-      );
-
-      let items: TicketItem[];
-      if (existing) {
-        items = state.items.map((item) =>
-          item.id === existing.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-                totalPrice: item.unitPrice * (item.quantity + 1),
-                taxAmount: calculateItemTax(
-                  item.unitPrice * (item.quantity + 1),
-                  item.isTaxable
-                ),
-              }
-            : item
-        );
-      } else {
-        const totalPrice = product.retail_price;
-        const newItem: TicketItem = {
-          id: generateId(),
-          itemType: 'product',
-          productId: product.id,
-          serviceId: null,
-          categoryId: product.category_id ?? null,
-          itemName: product.name,
-          quantity: 1,
-          unitPrice: product.retail_price,
-          totalPrice,
-          taxAmount: calculateItemTax(totalPrice, product.is_taxable),
-          isTaxable: product.is_taxable,
-          tierName: null,
-          vehicleSizeClass: null,
-          notes: null,
-          perUnitQty: null,
-          perUnitLabel: null,
-          perUnitPrice: null,
-          perUnitMax: null,
-          parentItemId: null,
-          standardPrice: product.retail_price,
-          pricingType: 'standard',
-          comboSourcePrimaryId: null,
-          saleEffectivePrice: null,
-          prerequisiteNote: null,
-          prerequisiteForServiceId: null,
-        };
-        items = [...state.items, newItem];
-      }
-      return recalculateTotals({ ...state, items });
+      // C.1 step 2 — delegated to shared helper. ADD_PRODUCT always changes
+      // items[] (existing match → quantity++; no match → append new item), so
+      // the helper never returns reference-equal state and the delegator
+      // unconditionally calls recalculateTotals (no `next === state` check
+      // unlike ADD_SERVICE; this is structural, not optimization-related).
+      return recalculateTotals(applyAddProduct(state, action));
     }
 
     case 'ADD_SERVICE': {
