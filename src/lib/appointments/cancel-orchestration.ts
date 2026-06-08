@@ -85,6 +85,59 @@ import { toCents, fromCents } from '@/lib/utils/money';
 const TERMINAL_APPT_STATUSES = new Set(['completed', 'cancelled']);
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'closed', 'cancelled']);
 
+/** business_settings row key for the AC-14 default cancellation fee. Stored as
+ *  cents (JSON number) per Memory #20 — explicit `_cents` suffix prevents
+ *  dollars-vs-cents misinterpretation at read sites. See migration
+ *  `20260608015513_seed_cancellation_fee_default_setting.sql` for the seed
+ *  rationale and the architecture-doc-divergence note. */
+export const CANCELLATION_FEE_SETTING_KEY = 'cancellation_fee_default_cents';
+
+/**
+ * Read the configured default cancellation fee (in cents) from
+ * `business_settings`. Returns 0 (no fee) when the row is missing, the value
+ * is null, the value is non-numeric, or the read errors — never throws.
+ *
+ * Phase 3 Theme D.2 (AC-14): the orchestrator's contract is "`undefined` →
+ * use this default; explicit number-or-null → use the explicit value." This
+ * helper covers the default-read side. The graceful-zero fallback exists so
+ * a database hiccup or accidental row deletion cannot block a cancel — the
+ * operator can still cancel, just without the configured fee.
+ */
+export async function getDefaultCancellationFeeCents(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('business_settings')
+    .select('value')
+    .eq('key', CANCELLATION_FEE_SETTING_KEY)
+    .maybeSingle();
+
+  if (error) {
+    console.error(
+      '[cancel-orchestration] business_settings read failed for cancellation_fee_default_cents (defaulting to 0):',
+      error.message
+    );
+    return 0;
+  }
+  if (!data || data.value === null || data.value === undefined) return 0;
+
+  // business_settings.value is JSONB. The seed migration stores a JSON
+  // number (`5000`) but legacy double-serialization (per
+  // `src/lib/data/booking.ts:316`) means a string is also possible. Coerce
+  // permissively and discard non-finite results.
+  const raw = data.value as unknown;
+  let parsed: number;
+  if (typeof raw === 'number') {
+    parsed = raw;
+  } else if (typeof raw === 'string') {
+    parsed = Number(raw);
+  } else {
+    parsed = NaN;
+  }
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Math.floor(parsed);
+}
+
 export type CancelPathway = 'refund' | 'credit';
 
 export type CancelledBy =
@@ -108,8 +161,22 @@ export interface CancelOrchestrationInput {
   /** Operator-typed reason; surfaced into the audit log, the cancellation_reason
    *  column, and the customer SMS / email body. */
   reason: string;
-  /** Pathway A only. Operator-supplied; D.2 will introduce a `business_settings`
-   *  default. When omitted, no fee is deducted. Integer cents per Rule #20. */
+  /**
+   * Pathway A only. Integer cents per Rule #20.
+   *
+   * Resolution contract (Phase 3 Theme D.2 AC-14):
+   *   - `undefined` or `null` → read default from `business_settings`
+   *                             (`cancellation_fee_default_cents`)
+   *   - any explicit number   → use as-is (negatives clamped to 0; pass
+   *                             `0` to explicitly waive)
+   *
+   * Pre-D.2 the contract was `?? 0` — both `undefined` and `null` collapsed
+   * to "no fee." D.2 promotes the absent / nullish path to "use the
+   * configured default" (the AC-14 commitment); explicit waive is now `0`
+   * rather than `null`. Callers that intend "no fee" (e.g. the customer
+   * self-cancel route, where the 24h window is the fee-equivalent gate)
+   * must pass `0` explicitly; previously `null` covered that intent.
+   */
   cancellation_fee_cents?: number | null;
   /** Whether to dispatch the customer-facing cancellation SMS + email. Defaults
    *  to true on the admin path; the POS path explicitly opts in via the
@@ -306,7 +373,18 @@ export async function cancelAppointmentOrchestrated(
     | { kind: 'noop' };
 
   if (input.pathway === 'refund') {
-    const feeCents = Math.max(0, input.cancellation_fee_cents ?? 0);
+    // Phase 3 Theme D.2 (AC-14): fee resolution contract — `undefined` /
+    // `null` reads the business-settings default; any explicit number is
+    // used as-is (including `0` for explicit waive). Pre-D.2 the contract
+    // was `?? 0` (both nullish → no fee); D.2 promotes nullish to
+    // "use configured default" per AC-14. Callers that intend "no fee
+    // ever" (customer self-cancel — the 24h window is the fee gate) pass
+    // `0` explicitly.
+    const feeCents =
+      input.cancellation_fee_cents === undefined ||
+      input.cancellation_fee_cents === null
+        ? await getDefaultCancellationFeeCents(supabase)
+        : Math.max(0, input.cancellation_fee_cents);
     const refundTargetCents = Math.max(0, amountPaidCents - feeCents);
 
     if (amountPaidCents === 0) {

@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
+import { formatMoney } from '@/lib/utils/format';
 import { posFetch } from '../../lib/pos-fetch';
 import type { PosAppointment } from './types';
 
@@ -48,6 +49,7 @@ export function CancelAppointmentDialog({
   const [notifyCustomer, setNotifyCustomer] = useState(false);
   const [pathway, setPathway] = useState<Pathway>('refund');
   const [feeDollarsInput, setFeeDollarsInput] = useState('');
+  const [defaultFeeCents, setDefaultFeeCents] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Re-seed local state whenever the dialog is opened against a different
@@ -58,6 +60,46 @@ export function CancelAppointmentDialog({
     setPathway('refund');
     setFeeDollarsInput('');
   }, [appointment.id]);
+
+  // Phase 3 Theme D.2 (AC-14): fetch the configured default cancellation fee
+  // on dialog open and pre-fill the input. Mirrors the admin dialog's
+  // pattern; uses posFetch for HMAC auth against the POS-side endpoint at
+  // `/api/pos/settings/cancellation-fee-default`. Graceful: a fetch failure
+  // leaves the input empty + the orchestrator's own default-read covers
+  // the server side.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await posFetch('/api/pos/settings/cancellation-fee-default');
+        if (!res.ok) return;
+        const json = (await res.json()) as { default_cents?: number };
+        if (cancelled) return;
+        const cents = typeof json.default_cents === 'number' ? json.default_cents : 0;
+        setDefaultFeeCents(cents);
+        setFeeDollarsInput((cents / 100).toFixed(2));
+      } catch {
+        /* graceful */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, appointment.id]);
+
+  // Live breakdown — deposit_amount on the appointment is the paid proxy
+  // (multi-source actual comes back in the orchestrator's success response).
+  const depositPaidCents =
+    appointment.deposit_amount != null
+      ? Math.round(Number(appointment.deposit_amount) * 100)
+      : 0;
+  const feeInputCents = (() => {
+    const num = Number(feeDollarsInput);
+    if (!Number.isFinite(num) || num < 0) return 0;
+    return Math.round(num * 100);
+  })();
+  const refundPreviewCents = Math.max(0, depositPaidCents - feeInputCents);
 
   const vehicleSummary = appointment.vehicle
     ? cleanVehicleDescription({
@@ -233,19 +275,52 @@ export function CancelAppointmentDialog({
 
           {pathway === 'refund' && (
             <FormField
-              label="Cancellation Fee (optional)"
-              description="Deducted from the refund amount. Leave blank for no fee."
+              label="Cancellation Fee"
+              description={
+                defaultFeeCents !== null
+                  ? `Pre-filled from default (${formatMoney(defaultFeeCents)}). Adjust per-cancel or waive.`
+                  : 'Deducted from the refund amount.'
+              }
               htmlFor="pos-cancel-fee"
             >
-              <Input
-                id="pos-cancel-fee"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={feeDollarsInput}
-                onChange={(e) => setFeeDollarsInput(e.target.value)}
-              />
+              <div className="flex items-center gap-2">
+                <Input
+                  id="pos-cancel-fee"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={feeDollarsInput}
+                  onChange={(e) => setFeeDollarsInput(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFeeDollarsInput('0')}
+                >
+                  Waive
+                </Button>
+              </div>
+              {depositPaidCents > 0 && (
+                <div className="mt-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm">
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Deposit paid</span>
+                    <span className="tabular-nums">{formatMoney(depositPaidCents)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                    <span>Cancellation fee</span>
+                    <span className="tabular-nums">
+                      {feeInputCents > 0 ? `-${formatMoney(feeInputCents)}` : formatMoney(0)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <span>Refund to customer</span>
+                    <span className="tabular-nums">{formatMoney(refundPreviewCents)}</span>
+                  </div>
+                </div>
+              )}
             </FormField>
           )}
 

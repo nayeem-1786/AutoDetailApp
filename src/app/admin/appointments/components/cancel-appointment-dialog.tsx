@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -22,6 +22,7 @@ import {
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { useFeatureFlag } from '@/lib/hooks/use-feature-flag';
 import { usePermission } from '@/lib/hooks/use-permission';
+import { formatMoney } from '@/lib/utils/format';
 import type { AppointmentWithRelations } from '../types';
 
 interface CancelAppointmentDialogProps {
@@ -59,6 +60,7 @@ export function CancelAppointmentDialog({
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<AppointmentCancelInput>({
     resolver: zodResolver(appointmentCancelSchema),
@@ -69,6 +71,54 @@ export function CancelAppointmentDialog({
       notify_customer: true,
     },
   });
+
+  // Phase 3 Theme D.2 (AC-14): fetch the configured default cancellation fee
+  // on dialog open and pre-fill the fee input. The breakdown UI computes the
+  // refund amount client-side using `appointment.deposit_amount` as the paid
+  // proxy (most cancels are deposit-only); a multi-source actual is surfaced
+  // in the post-submit toast which the orchestrator computes authoritatively.
+  const [defaultFeeCents, setDefaultFeeCents] = useState<number | null>(null);
+  // Local mirror of the fee dollars value (UI-only) for the live breakdown
+  // computation. The form value still flows through `register()`; this state
+  // is synced via the Input's onChange below. Pattern mirrors the existing
+  // `selectedPathway` state at line 81 — `watch()` triggers React Compiler
+  // "Compilation Skipped" warnings that count against the lint baseline.
+  const [feeDollarsMirror, setFeeDollarsMirror] = useState<string>('');
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/settings/cancellation-fee-default');
+        if (!res.ok) return;
+        const json = (await res.json()) as { default_cents?: number };
+        if (cancelled) return;
+        const cents = typeof json.default_cents === 'number' ? json.default_cents : 0;
+        setDefaultFeeCents(cents);
+        const dollars = (cents / 100).toFixed(2);
+        setValue('cancellation_fee', cents / 100, { shouldDirty: false });
+        setFeeDollarsMirror(dollars);
+      } catch {
+        // Graceful: the orchestrator's own default-read covers the server side.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, setValue]);
+
+  // Live breakdown — depositAmount is the paid proxy. The mirror state drives
+  // real-time refund computation as operator edits or clicks Waive.
+  const depositPaidCents =
+    appointment && appointment.deposit_amount != null
+      ? Math.round(Number(appointment.deposit_amount) * 100)
+      : 0;
+  const feeInputCents = (() => {
+    const num = Number(feeDollarsMirror);
+    if (!Number.isFinite(num) || num < 0) return 0;
+    return Math.round(num * 100);
+  })();
+  const refundPreviewCents = Math.max(0, depositPaidCents - feeInputCents);
 
   // Local mirror of the radio's selected value drives the fee-input
   // visibility — fee deduction is a Pathway A concept (refund minus fee).
@@ -93,6 +143,7 @@ export function CancelAppointmentDialog({
     if (success) {
       reset();
       setSelectedPathway('refund');
+      setFeeDollarsMirror('');
       onOpenChange(false);
     }
   }
@@ -205,24 +256,79 @@ export function CancelAppointmentDialog({
             </div>
           </FormField>
 
-          {/* Fee input is Pathway A only — Pathway B issues the FULL paid
-              amount as credit, so a fee deduction here would be a usability
-              trap. Hidden when 'credit' selected. */}
+          {/* Fee input + breakdown — Pathway A only. Pathway B issues the
+              FULL paid amount as credit, so a fee deduction here would be a
+              usability trap. Hidden when 'credit' selected.
+
+              Phase 3 Theme D.2 (AC-14): pre-filled with the configured
+              default (fetched from /api/admin/settings/cancellation-fee-default
+              on dialog open); operator can override the input; "Waive fee"
+              button sets the fee to $0 explicitly. The breakdown line
+              renders only when the appointment has a deposit_amount,
+              showing the refund preview live as the fee changes. */}
           {feeEnabled && canWaiveFee && selectedPathway === 'refund' && (
             <FormField
               label="Cancellation Fee"
               error={errors.cancellation_fee?.message}
-              description="Optional fee deducted from the refund amount"
+              description={
+                defaultFeeCents !== null
+                  ? `Pre-filled from default (${formatMoney(defaultFeeCents)}). Adjust per-cancel or waive.`
+                  : 'Optional fee deducted from the refund amount'
+              }
               htmlFor="cancel-fee"
             >
-              <Input
-                id="cancel-fee"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                {...register('cancellation_fee', { valueAsNumber: true })}
-              />
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const feeReg = register('cancellation_fee', { valueAsNumber: true });
+                  return (
+                    <Input
+                      id="cancel-fee"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      className="flex-1"
+                      {...feeReg}
+                      onChange={(e) => {
+                        feeReg.onChange(e);
+                        setFeeDollarsMirror(e.target.value);
+                      }}
+                    />
+                  );
+                })()}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setValue('cancellation_fee', 0, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                    setFeeDollarsMirror('0');
+                  }}
+                >
+                  Waive
+                </Button>
+              </div>
+              {depositPaidCents > 0 && (
+                <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Deposit paid</span>
+                    <span className="tabular-nums">{formatMoney(depositPaidCents)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Cancellation fee</span>
+                    <span className="tabular-nums">
+                      {feeInputCents > 0 ? `-${formatMoney(feeInputCents)}` : formatMoney(0)}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex justify-between border-t border-gray-200 pt-1 text-sm font-semibold text-gray-900">
+                    <span>Refund to customer</span>
+                    <span className="tabular-nums">{formatMoney(refundPreviewCents)}</span>
+                  </div>
+                </div>
+              )}
             </FormField>
           )}
 
@@ -244,6 +350,7 @@ export function CancelAppointmentDialog({
           onClick={() => {
             reset();
             setSelectedPathway('refund');
+            setFeeDollarsMirror('');
             onOpenChange(false);
           }}
           disabled={saving}
@@ -263,6 +370,7 @@ export function CancelAppointmentDialog({
         onClose={() => {
           reset();
           setSelectedPathway('refund');
+          setFeeDollarsMirror('');
           onOpenChange(false);
         }}
       />

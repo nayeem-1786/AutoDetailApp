@@ -110,6 +110,12 @@ const state = {
   jobUpdateError: null as null | { message: string },
   refundInsertError: null as null | { message: string },
   txUpdateError: null as null | { message: string },
+  // Phase 3 Theme D.2 (AC-14): business_settings.cancellation_fee_default_cents
+  // row stub. `undefined` → row missing (helper returns 0). `null` value →
+  // explicit-null in DB (helper returns 0). Any number/string → value used by
+  // helper after coercion.
+  cancellationFeeSetting: undefined as unknown,
+  businessSettingsReadError: null as null | { message: string },
   // Captures
   apptUpdates: [] as Record<string, unknown>[],
   jobUpdates: [] as Array<{ id: string; payload: Record<string, unknown> }>,
@@ -162,6 +168,24 @@ function makeAdmin(): SupabaseClient {
         async maybeSingle() {
           if (this._table === 'appointments' && this._op === 'select') {
             return { data: state.appointment, error: null };
+          }
+          // Phase 3 Theme D.2 (AC-14): business_settings.value read for the
+          // default-cancellation-fee helper. The helper only ever looks up the
+          // `cancellation_fee_default_cents` key, so a single sticky stub
+          // suffices. `cancellationFeeSetting === undefined` → row missing
+          // (returns data:null). Any other value (number / string / null) →
+          // returns it as the `value` column.
+          if (this._table === 'business_settings' && this._op === 'select') {
+            if (state.businessSettingsReadError) {
+              return { data: null, error: state.businessSettingsReadError };
+            }
+            if (state.cancellationFeeSetting === undefined) {
+              return { data: null, error: null };
+            }
+            return {
+              data: { value: state.cancellationFeeSetting },
+              error: null,
+            };
           }
           return { data: null, error: null };
         },
@@ -304,6 +328,8 @@ beforeEach(() => {
   state.jobUpdateError = null;
   state.refundInsertError = null;
   state.txUpdateError = null;
+  state.cancellationFeeSetting = undefined;
+  state.businessSettingsReadError = null;
   state.apptUpdates = [];
   state.jobUpdates = [];
   state.refundInserts = [];
@@ -801,5 +827,236 @@ describe('cancelAppointmentOrchestrated — Theme G compliance (no fireWebhook)'
     expect(source).not.toMatch(/fireWebhook\s*\(/);
     expect(source).not.toMatch(/from\s+['"][^'"]*webhook['"]/);
     expect(source).not.toMatch(/n8n_webhook_urls/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 Theme D.2 (AC-14) — default cancellation fee from business_settings
+// ---------------------------------------------------------------------------
+//
+// Locks the fee-resolution contract:
+//   `undefined` or `null`  → read default from
+//                            `business_settings.cancellation_fee_default_cents`
+//   any explicit number    → use as-is (negatives clamped to 0; pass 0 to
+//                            explicitly waive)
+//
+// Pre-D.2 both undefined and null collapsed to 0; the test suite's existing
+// "happy path: paid deposit" assertion (`cancellation_fee_cents: 0` on
+// result) still passes here because `state.cancellationFeeSetting` defaults
+// to `undefined` per beforeEach → helper returns 0 → orchestrator uses 0.
+
+import { getDefaultCancellationFeeCents } from '../cancel-orchestration';
+
+describe('cancelAppointmentOrchestrated — Phase 3 Theme D.2 (AC-14) fee resolution', () => {
+  it('undefined fee + setting=5000 → orchestrator uses 5000 (default applied)', async () => {
+    state.cancellationFeeSetting = 5000; // $50
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: undefined })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(5000);
+      expect(result.refund_amount_cents).toBe(5000); // 10000 - 5000
+    }
+    expect(stripeCalls[0].amount).toBe(5000);
+  });
+
+  it('null fee + setting=5000 → orchestrator uses 5000 (null treated same as undefined per D.2 contract)', async () => {
+    state.cancellationFeeSetting = 5000;
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: null })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(5000);
+    }
+  });
+
+  it('explicit 0 fee + setting=5000 → orchestrator uses 0 (explicit waiver wins over default)', async () => {
+    state.cancellationFeeSetting = 5000;
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: 0 })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(0);
+      expect(result.refund_amount_cents).toBe(10000); // no fee deducted
+    }
+  });
+
+  it('explicit 2500 fee + setting=5000 → orchestrator uses 2500 (override wins over default)', async () => {
+    state.cancellationFeeSetting = 5000;
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: 2500 })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(2500);
+      expect(result.refund_amount_cents).toBe(7500);
+    }
+  });
+
+  it('undefined fee + setting missing → orchestrator uses 0 (graceful fallback)', async () => {
+    state.cancellationFeeSetting = undefined; // row absent
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: undefined })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(0);
+      expect(result.refund_amount_cents).toBe(10000);
+    }
+  });
+
+  it('undefined fee + setting=null in DB → orchestrator uses 0', async () => {
+    state.cancellationFeeSetting = null;
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: undefined })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(0);
+    }
+  });
+
+  it('undefined fee + setting is string "5000" (legacy double-serialization) → coerces to 5000', async () => {
+    state.cancellationFeeSetting = '5000';
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: undefined })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(5000);
+    }
+  });
+
+  it('undefined fee + business_settings read errors → orchestrator falls back to 0 (cancel still succeeds)', async () => {
+    state.cancellationFeeSetting = 5000;
+    state.businessSettingsReadError = { message: 'connection refused' };
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: undefined })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.cancellation_fee_cents).toBe(0);
+      expect(result.refund_amount_cents).toBe(10000);
+    }
+  });
+
+  it('Pathway B (credit) with setting=5000 → fee is irrelevant; full paid amount issued as credit', async () => {
+    state.cancellationFeeSetting = 5000;
+    seedAppointment({
+      transactions: [makeTx({ total_amount: 100 })],
+    });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({
+        pathway: 'credit',
+        cancellation_fee_cents: undefined,
+      })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.pathway).toBe('credit');
+      // Pathway B doesn't apply fees — credit = full paid amount.
+      expect(result.credit_amount_cents).toBe(10000);
+    }
+    // No Stripe call on credit path.
+    expect(stripeCalls).toHaveLength(0);
+  });
+});
+
+describe('getDefaultCancellationFeeCents — Phase 3 Theme D.2 (AC-14) reader helper', () => {
+  it('returns 0 when row missing', async () => {
+    state.cancellationFeeSetting = undefined;
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(0);
+  });
+
+  it('returns the number when row has a number value', async () => {
+    state.cancellationFeeSetting = 7500;
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(7500);
+  });
+
+  it('coerces string-typed values (legacy double-serialization)', async () => {
+    state.cancellationFeeSetting = '5000';
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(5000);
+  });
+
+  it('returns 0 on negative configured values (defensive)', async () => {
+    state.cancellationFeeSetting = -100;
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 on non-finite / unparseable values', async () => {
+    state.cancellationFeeSetting = 'not-a-number';
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 on DB read error', async () => {
+    state.cancellationFeeSetting = 5000;
+    state.businessSettingsReadError = { message: 'connection lost' };
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(0);
+  });
+
+  it('floors fractional configured values (cents must be integer)', async () => {
+    state.cancellationFeeSetting = 5000.7;
+    const result = await getDefaultCancellationFeeCents(makeAdmin());
+    expect(result).toBe(5000);
   });
 });
