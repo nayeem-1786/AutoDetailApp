@@ -5,10 +5,14 @@ import { checkPosPermission } from '@/lib/pos/check-permission';
 import { findAvailableDetailer, addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { dateToPstStartOfDay, dateToPstEndOfDay, getNowPstRoundedTo15, getTodayPst } from '@/lib/utils/pst-date';
 import type { JobServiceSnapshot } from '@/lib/supabase/types';
-import { getRequestIp } from '@/lib/services/audit';
+import { logAudit, getRequestIp } from '@/lib/services/audit';
 import { resolveMobileAddressAction } from '@/lib/utils/mobile-address-action';
 import { generateAppointmentNumber } from '@/lib/utils/appointment-number';
-import { materializeJobFromAppointment } from '@/lib/appointments/lifecycle-sync';
+// Architecture B (Stage 2): walk-in branch no longer materializes the job at
+// creation time. Materialization is now exclusively triggered by Start Intake
+// via `/api/pos/jobs/start-intake` → `materializeJobFromAppointment` (the
+// canonical helper in `src/lib/appointments/lifecycle-sync.ts`). No direct
+// import of that helper needed here post-Arch-B.
 import type { PosUnstartedAppointment } from '@/app/pos/jobs/components/schedule-types';
 
 /**
@@ -531,6 +535,16 @@ export async function POST(request: NextRequest) {
     // together; if a downstream step fails the appointment is rolled back,
     // and the counter advance leaves a gap (accepted per AC-10 race-safety).
     const appointmentNumber = await generateAppointmentNumber(supabase);
+    // Architecture B (Stage 2): walk-in lands at appointment status='confirmed'
+    // (was 'in_progress' pre-Arch-B). This aligns the walk-in lifecycle with
+    // the confirmed-appointment lifecycle so the Start Intake helper's
+    // `confirmed → in_progress` transition fires identically for both kinds.
+    // Pre-Arch-B, walk-in was 'in_progress' from creation because the linked
+    // job was atomically materialized in this same handler; post-Arch-B the
+    // job is deferred until Start Intake, so the appointment correctly
+    // represents "agreed-upon work, not yet started." See docs/dev/CHANGELOG
+    // entry 2026-06-08 (Architecture B walk-in retraction) for the full
+    // rationale.
     const { data: appointment, error: apptErr } = await supabase
       .from('appointments')
       .insert({
@@ -538,7 +552,7 @@ export async function POST(request: NextRequest) {
         customer_id,
         vehicle_id: vehicle_id || null,
         employee_id: assignedStaffId,
-        status: 'in_progress',
+        status: 'confirmed',
         channel: 'walk_in',
         scheduled_date: pstDate,
         scheduled_start_time: apptStartTime,
@@ -604,77 +618,43 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Session 2.1.1 (Memory #29 closure) — route the walk-in's job-creation
-    // step through the shared `materializeJobFromAppointment` helper rather
-    // than the inline jobs.insert(...) + logAudit(...) pair that lived here
-    // pre-2.1.1. `trigger: 'walk_in'` differentiates the initial job state
-    // (status='scheduled', NULL work_started_at/intake_started_at) from
-    // Start Intake's. The helper appends the mobile-fee entry from the
-    // appointment row (uniform behavior across both triggers); walk-in
-    // passes the base services snapshot via `servicesSnapshot` to bypass the
-    // appointment_services + services join (we already have the rows in
-    // memory from the request body). Gates pass naturally: the just-INSERTed
-    // appointment is on today's date (future-date gate) and in 'in_progress'
-    // state (status gate). Audit is emitted inside the helper with
-    // trigger='walk_in' + customer_id + services_count in details.
-    const materializeResult = await materializeJobFromAppointment(
-      supabase,
-      appointment.id,
-      {
-        trigger: 'walk_in',
-        actor: {
-          userId: posEmployee.auth_user_id,
-          userEmail: posEmployee.email,
-          employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
-          employeeId: posEmployee.employee_id,
-        },
-        source: 'pos',
-        ipAddress: getRequestIp(request),
-        quoteId: quote_id || null,
-        intakeNotes: notes || null,
-        estimatedPickupAtOverride: pickupAt,
-        servicesSnapshot: services,
-      }
-    );
-
-    if (!materializeResult.ok || !materializeResult.jobId) {
-      // Roll back the synthetic appointment to avoid orphans.
-      // ON DELETE CASCADE on appointment_services.appointment_id cleans the
-      // join rows the appointment_services INSERT above committed.
-      console.error(
-        'Walk-in job materialize failed:',
-        materializeResult.error
-      );
-      await supabase.from('appointments').delete().eq('id', appointment.id);
-      return NextResponse.json(
-        { error: 'Failed to create job' },
-        { status: materializeResult.httpStatus }
-      );
-    }
-
-    // The helper returns only the new job id — fetch the row with the joins
-    // the POS client expects in the create-response shape (customer,
-    // vehicle, assigned_staff). A failure here leaves the job intact (no
-    // rollback): the row is fully consistent in the DB; only the
-    // response-shape SELECT failed. Client retries the list endpoint.
-    const { data: job, error: jobFetchErr } = await supabase
-      .from('jobs')
-      .select(`
-        *,
-        customer:customers!jobs_customer_id_fkey(id, first_name, last_name, phone),
-        vehicle:vehicles!jobs_vehicle_id_fkey(id, year, make, model, color),
-        assigned_staff:employees!jobs_assigned_staff_id_fkey(id, first_name, last_name)
-      `)
-      .eq('id', materializeResult.jobId)
-      .single();
-
-    if (jobFetchErr || !job) {
-      console.error('Walk-in job response fetch failed:', jobFetchErr);
-      return NextResponse.json(
-        { error: 'Failed to fetch job after create' },
-        { status: 500 }
-      );
-    }
+    // Architecture B (Stage 2): walk-in NO LONGER materializes the linked job
+    // at creation time. Pre-Arch-B this site called
+    // `materializeJobFromAppointment(supabase, appointment.id, { trigger:
+    // 'walk_in' })` to atomically INSERT a job row at status='scheduled'.
+    // Post-Arch-B the walk-in appointment stays in 'confirmed' state until
+    // the operator presses Start Intake on the unstarted-appointment card,
+    // at which point `/api/pos/jobs/start-intake` invokes the same shared
+    // helper with `trigger: 'start_intake'` — unified materialization path
+    // for both walk-ins AND pre-scheduled confirmed appointments. This
+    // closes the dual-data-model drift Session 2.2/2.5 left behind. See
+    // docs/dev/CHANGELOG entry 2026-06-08 for the full architectural
+    // rationale.
+    //
+    // Audit emission — pre-Arch-B this was emitted inside the helper with
+    // entityType='job' + trigger='walk_in'. Post-Arch-B we emit an inline
+    // appointment-creation audit so the audit chain stays coherent across
+    // the deferred-materialization split. The eventual Start Intake call
+    // emits its own entityType='job' audit; together they form a two-step
+    // trail per walk-in lifecycle.
+    logAudit({
+      userId: posEmployee.auth_user_id,
+      userEmail: posEmployee.email,
+      employeeName: `${posEmployee.first_name} ${posEmployee.last_name}`,
+      action: 'create',
+      entityType: 'appointment',
+      entityId: appointment.id,
+      entityLabel: `Appointment ${appointmentNumber} (walk-in)`,
+      details: {
+        channel: 'walk_in',
+        customer_id,
+        services_count: services.length,
+        quote_id: quote_id ?? null,
+        appointment_number: appointmentNumber,
+      },
+      ipAddress: getRequestIp(request),
+      source: 'pos',
+    });
 
     // Phase 3 Theme F (F.2) — unify the FK semantics across the two
     // conversion seams. Pre-F.2 the walk-in seam left
@@ -723,8 +703,16 @@ export async function POST(request: NextRequest) {
       enteredAddress: mobileAddress,
     });
 
+    // Architecture B (Stage 2) — response shape returns the appointment
+    // instead of the job. The two consumers of this endpoint
+    // (`quote-ticket-panel.tsx:829` and `quote-detail.tsx:255`) only read
+    // `mobile_address_action` from the response, NOT the `data` field, so
+    // this shape change is internally safe. The `data` payload is preserved
+    // for REST symmetry (POST that creates an appointment returns the
+    // appointment) and for future consumers that may need to hydrate UI
+    // from the response without a follow-up GET.
     return NextResponse.json(
-      { data: job, mobile_address_action },
+      { data: appointment, mobile_address_action },
       { status: 201 }
     );
   } catch (err) {

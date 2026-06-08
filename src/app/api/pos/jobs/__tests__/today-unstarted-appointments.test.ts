@@ -268,6 +268,52 @@ describe('GET /api/pos/jobs — un-started appointments (Session 2.2 / AC-3)', (
     expect(body.unstarted_appointments[0].id).toBe('apt-B');
   });
 
+  // Architecture B (Stage 2, 2026-06-08): walk-in appointments post-Arch-B no
+  // longer atomically materialize a job at creation time — they sit at
+  // status='confirmed' with channel='walk_in' until the operator presses Start
+  // Intake. The unstarted-appointments query MUST surface them in the Today
+  // scope strip alongside pre-scheduled confirmed appointments. Pre-Arch-B
+  // every walk-in had a linked job and was filtered out by the dedup at
+  // route.ts:213-220; post-Arch-B walk-ins flow through the same channel='online'
+  // surfacing path because the dedup only excludes appointments that DO have
+  // a job. This test pins the unified-surfacing behavior.
+  it('surfaces walk-in appointment (channel=walk_in) with no materialized job — Architecture B', async () => {
+    state.unstartedCandidates = [
+      appt({
+        id: 'apt-walkin-1',
+        status: 'confirmed',
+        channel: 'walk_in',
+      }),
+    ];
+    // No job exists for this walk-in (Architecture B: job created at Start Intake)
+    state.existingJobsForDedup = [];
+    const res = await GET(makeReq({ date: PINNED_TODAY }));
+    const body = await res.json();
+    expect(body.unstarted_appointments).toHaveLength(1);
+    expect(body.unstarted_appointments[0]).toMatchObject({
+      id: 'apt-walkin-1',
+      status: 'confirmed',
+      channel: 'walk_in',
+      scope: 'today_unstarted',
+    });
+  });
+
+  it('surfaces walk-in AND pre-scheduled confirmed appointments together in unified strip — Architecture B', async () => {
+    state.unstartedCandidates = [
+      appt({ id: 'apt-online-1', channel: 'online' }),
+      appt({ id: 'apt-walkin-1', channel: 'walk_in' }),
+    ];
+    state.existingJobsForDedup = [];
+    const res = await GET(makeReq({ date: PINNED_TODAY }));
+    const body = await res.json();
+    // Operator's "1 appointment" → "2 appointments" — the regression-locking
+    // assertion that closes the Phase B screenshot evidence (walk-in was
+    // excluded from the count pre-Arch-B because the dedup filtered it out).
+    expect(body.unstarted_appointments).toHaveLength(2);
+    const ids = body.unstarted_appointments.map((a: { id: string }) => a.id).sort();
+    expect(ids).toEqual(['apt-online-1', 'apt-walkin-1']);
+  });
+
   it('returns EMPTY un-started array for a past date (today-only gate)', async () => {
     // Even if the mock returned candidate rows, the past-date branch must
     // never reach the un-started query.

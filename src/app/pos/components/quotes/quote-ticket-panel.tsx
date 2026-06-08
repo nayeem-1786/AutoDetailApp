@@ -858,7 +858,7 @@ export function QuoteTicketPanel({ onSaved, walkInMode }: QuoteTicketPanelProps)
         toast.info(`${parts.join(' and ')} will carry over at checkout`, { duration: 4000 });
       }
 
-      toast.success(`Walk-in job created for ${quote.customer.first_name} ${quote.customer.last_name}`);
+      toast.success(`Walk-in appointment created for ${quote.customer.first_name} ${quote.customer.last_name}`);
       if (action?.silently_saved) {
         toast.success('Address saved to customer profile');
       }
