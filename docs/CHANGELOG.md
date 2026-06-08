@@ -6,6 +6,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme D.3 — charge.refunded webhook subscription + reconciliation handler (AC-9 completion) (2026-06-07)
+
+Closes the refund-event-listener loop by subscribing the Stripe webhook to `charge.refunded` and reconciling Smart Details DB state with Stripe's source-of-truth. Pre-D.3, refunds initiated **outside** the D.1 cancel-orchestration layer (manual Stripe dashboard refunds, refunds via the Stripe API directly, dispute-resolution refunds) left the DB out-of-sync: the customer's bank statement showed the refund while the appointment + transaction still read "paid in full." Per Phase 3.0.2 audit `10421f23` Target F.4 (webhook scope expansion lock).
+
+**Scope (single new event branch; zero new business logic; zero schema changes):**
+
+- New `charge.refunded` case in the webhook handler's event switch (`src/app/api/webhooks/stripe/route.ts`).
+- New module-internal `handleChargeRefunded(admin, charge)` reconciliation function:
+  1. Extract refunds array from the Charge.
+  2. Resolve source transaction by `stripe_payment_intent_id`.
+  3. Loop over refunds, skip ones already recorded (per-Refund idempotency via `stripe_refund_id`), insert `refunds` row for each new one mirroring orchestrator + POS-refund shape.
+  4. Bump source transaction status (`completed` → `partial_refund` → `refunded`) using cumulative `charge.amount_refunded` against the source's max refundable; no-op when already at target status.
+  5. Write `audit_log` row with `action=refund`, `entity_type=transaction` (distinct from orchestrator's `entity_type=booking` so both events surface in operator UI without conflict).
+- **Appointment status is intentionally NEVER touched.** Refund alone is not a cancel signal; the operator's explicit cancel action via D.1 remains the only path that flips `appointment.status='cancelled'`. Test asserts this guarantee.
+
+**Idempotency model: per-Refund (not per-Event, not per-Charge).**
+
+- D.1 orchestrator's earlier refund insert is detected by the `stripe_refund_id` existence check and skipped.
+- Stripe-retry duplicates of the same `charge.refunded` event are skipped by the same check.
+- Multi-refund Charges (e.g., one partial recorded by D.1 + a later Stripe-dashboard top-up refund) process exactly the new Refund(s); existing rows are silently skipped.
+
+**Failure handling:** loud reconciliation failures throw → 500 → Stripe retries (matches the pay-link branch's pattern). Soft no-ops (unknown PI, empty refunds, missing payment_intent) log + skip + return 200 — these are legitimate non-Smart-Details events from a shared Stripe account or edge cases.
+
+**Files modified (1) + added (1):**
+
+- `src/app/api/webhooks/stripe/route.ts` — `+186 lines` (event branch + handler function + `SupabaseClient` type import)
+- `src/app/api/webhooks/stripe/__tests__/charge-refunded.test.ts` — `+462 lines` (12 test cases: happy path, partial, unknown PI, idempotent re-fire, multi-refund mixed idempotency, multi-refund full-threshold, already-at-target-status, empty refunds, missing PI, signature regression, insert failure throws, no-fireWebhook regression lock)
+
+**Gates green:** lint 0 errors / 97 baseline warnings (no new); build clean; vitest 3318 / 3318 pass (+12 new). TypeScript 5 pre-existing errors on `main` from Theme C.2's `sla-cron.test.ts` + `customer-accept-service.test.ts` (spread-tuple typing) are inherited unchanged — Theme D.3 adds **zero** new tsc errors. Flagged for a follow-up cleanup session.
+
+**AC-9 status:** **FULLY OPERATIONAL** — D.1 cancel orchestration (`9f45828a`) + D.3 charge.refunded reconciliation (this session) together close the AC-9 commitment from the locked lifecycle architecture v1.5. **D.2 (cancellation-fee `business_settings` default) remains pending** as an orthogonal policy enhancement — D.2 is not on the AC-9 critical path; the `cancellation_fee_cents` parameter already flows through the orchestrator as an operator-supplied per-cancel value, and D.2 just adds a default-policy fallback when the operator omits it.
+
+**Verification: no fireWebhook / n8n references introduced.** Test #12 asserts the audit details payload contains no webhook/n8n fields as a regression lock against re-introduction. Theme G's cross-contamination prevention holds.
+
+---
+
 ## Phase 3 Theme D.1 — Cancel orchestration layer (atomic Pathway A/B + job cascade + status flip; AC-9 foundation) (2026-06-07)
 
 Lands the canonical "cancel an appointment with money handling" primitive that bridges the three previously disjoint surfaces flagged by the refund/credit/cancellation-fee audit (`3e633156`): the four cancel endpoints, the standalone refund engine at `/api/pos/refunds`, and the customer-credits infrastructure (E.1/E.2/E.3 — AC-15 FULLY OPERATIONAL). Pre-D.1 a cancel only flipped `appointments.status='cancelled'`; the deposit money sat stranded on the cancelled row, the linked job stayed at its prior status (the AC-2.1 orphan gap), and the operator had to manually navigate to POS > Transactions > Issue Refund to actually return money — a multi-step workflow that audit Target D.1 verified was the source of the operator's stated uncertainty about "what works vs what needs building."
