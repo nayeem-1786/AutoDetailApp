@@ -866,3 +866,79 @@ describe('convertQuote — Phase 3 Theme F (F.7) race idempotency guard', () => 
     expect(apptInsert).toBeDefined();
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Phase 3 Theme C.2 (AC-12) — pins the convertQuote-side wiring that supports
+// customer-accept auto-conversion:
+//
+//   1. `appointments.quote_id` is ALWAYS written (every caller — operator POS,
+//      voice agent, admin, customer accept). The new column carries a UNIQUE
+//      partial index added by Theme C.1 — a missing write defeats DB-layer
+//      race protection.
+//   2. `scheduled_date_placeholder` defaults to `false` and follows the new
+//      `placeholderDate` option when set. The customer-accept orchestrator
+//      passes `true`; every other caller omits and gets `false`.
+//   3. `options.channel='customer_accept'` lands on the appointment row.
+//   4. `options.appointmentStatus='pending'` lands on the appointment row.
+//
+// These together pin the convertQuote contract that processCustomerAccept
+// depends on; the orchestrator's own tests live in customer-accept-service.test.ts.
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('convertQuote — Phase 3 Theme C.2 (AC-12) wiring', () => {
+  let inserts: InsertRecord[];
+
+  beforeEach(() => {
+    inserts = [];
+  });
+
+  it('writes appointments.quote_id on every conversion (no options)', async () => {
+    const quote = { ...BASE_QUOTE };
+    const supabase = makeSupabase({ quote, inserts });
+
+    const result = await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+    );
+
+    expect(result.success).toBe(true);
+    const apptInsert = inserts.find((i) => i.table === 'appointments');
+    expect(apptInsert).toBeDefined();
+    // Theme C.1 UNIQUE backstop requires this on EVERY conversion.
+    expect(apptInsert!.row.quote_id).toBe('quote-1');
+  });
+
+  it('defaults scheduled_date_placeholder to false when option not passed', async () => {
+    const quote = { ...BASE_QUOTE };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+    );
+
+    const apptInsert = inserts.find((i) => i.table === 'appointments');
+    expect(apptInsert!.row.scheduled_date_placeholder).toBe(false);
+  });
+
+  it('sets scheduled_date_placeholder=true when placeholderDate option is passed', async () => {
+    const quote = { ...BASE_QUOTE };
+    const supabase = makeSupabase({ quote, inserts });
+
+    await convertQuote(
+      supabase as unknown as Parameters<typeof convertQuote>[0],
+      'quote-1',
+      CONVERT_INPUT,
+      { placeholderDate: true, channel: 'customer_accept', appointmentStatus: 'pending' },
+    );
+
+    const apptInsert = inserts.find((i) => i.table === 'appointments');
+    expect(apptInsert!.row.scheduled_date_placeholder).toBe(true);
+    expect(apptInsert!.row.channel).toBe('customer_accept');
+    expect(apptInsert!.row.status).toBe('pending');
+    // quote_id still propagated.
+    expect(apptInsert!.row.quote_id).toBe('quote-1');
+  });
+});

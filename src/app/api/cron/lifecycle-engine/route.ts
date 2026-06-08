@@ -1,17 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendMarketingSms } from '@/lib/utils/sms';
+import { sendMarketingSms, sendSms } from '@/lib/utils/sms';
 import { sendEmail } from '@/lib/utils/email';
 import { renderTemplate, cleanEmptyReviewLines, formatDollar, formatNumber } from '@/lib/utils/template';
 import { formatPhone } from '@/lib/utils/format';
 import { getBusinessInfo, BUSINESS_DEFAULTS } from '@/lib/data/business';
+import { getBusinessHours, isWithinBusinessHours } from '@/lib/data/business-hours';
 import { createShortLink } from '@/lib/utils/short-link';
 import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { isFeatureEnabled } from '@/lib/utils/feature-flags';
 import { sendTemplatedEmail } from '@/lib/email/send-templated-email';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { runAutoEnrollments, checkAllStopConditions, processEnrollments } from '@/lib/email/drip-engine';
+import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
+import { humanizeAcceptedAgo } from '@/lib/quotes/customer-accept-service';
+import { enrichItemsWithTierMeta, formatServicesSummary } from '@/lib/quotes/services-summary';
+import { logAudit } from '@/lib/services/audit';
 import type { EmailBlock } from '@/lib/email/types';
+
+/**
+ * Phase 3 Theme C.2 (AC-12) — SLA threshold for customer-accept appointments
+ * pending staff acknowledgment. Initial value 2 hours (during business hours);
+ * the cron's business-hours gate handles the "queue overnight, fire next 8am"
+ * semantics naturally — outside hours the SLA scan is skipped entirely.
+ *
+ * Anti-spam: a per-appointment cooldown of 1 hour between SLA alert fires.
+ * The dedup signal is an `audit_log` row with `action='update'` /
+ * `entity_type='quote'` / `details.event='sla_alert_fired'` (NOT a new
+ * column — per Theme C.2 prompt's "simpler is audit_log entry" lean).
+ */
+const AC12_SLA_THRESHOLD_MINUTES = 120;
+const AC12_SLA_REFIRE_COOLDOWN_MINUTES = 60;
 
 interface CouponTemplate {
   id: string;
@@ -36,12 +55,14 @@ interface CouponTemplateReward {
 /**
  * Lifecycle execution engine cron endpoint.
  *
- * Runs in five phases per invocation:
+ * Runs in six phases per invocation:
  *   Phase 0   — Drip: auto-enroll customers into drip sequences
  *   Phase 0.5 — Drip: check stop conditions on active enrollments
  *   Phase 1   — Schedule: find recent completions, insert pending lifecycle_executions
  *   Phase 2   — Execute: send SMS/email for executions whose scheduled_for <= now
  *   Phase 3   — Drip: execute pending drip steps
+ *   Phase 4   — AC-12 SLA: alert staff on customer-accepted pending appointments
+ *               unacknowledged past the threshold (business-hours-gated)
  *
  * Designed to be called every 5–15 minutes by an external scheduler or Vercel Cron.
  *
@@ -68,6 +89,12 @@ export async function GET(request: NextRequest) {
   let dripStopped = 0;
   let dripProcessed = 0;
   let dripSent = 0;
+
+  // Phase 3 Theme C.2 (AC-12) SLA stats
+  let slaAlertsFired = 0;
+  let slaAlertsSkippedHours = 0;
+  let slaAlertsSkippedCooldown = 0;
+  let slaAlertsSkippedNoRecipients = 0;
 
   // =========================================================================
   // Phase 0: Auto-enroll customers into drip sequences
@@ -184,10 +211,269 @@ export async function GET(request: NextRequest) {
     console.error('[Lifecycle] Drip step execution failed:', err);
   }
 
+  // =========================================================================
+  // Phase 4: AC-12 SLA — staff alert on customer-accepted pending appointments
+  // unacknowledged past the threshold (business-hours-gated)
+  // =========================================================================
+  //
+  // The query identifies appointments created via the customer-accept seam
+  // (`channel='customer_accept'` per Theme C.1 enum addition) that have not
+  // been acknowledged by staff (`staff_acknowledged_at IS NULL` per Theme C.1
+  // column) and have been pending longer than the threshold. The threshold
+  // is interpreted as wall-clock minutes from `created_at` regardless of
+  // business hours — the BUSINESS-HOURS gate is on the FIRE itself, not on
+  // threshold accrual. Outside hours we don't fire (so a quote accepted at
+  // midnight doesn't blow up the owner's phone); the next 8am tick catches
+  // it because by then it's well past 2h AND inside hours.
+  //
+  // Anti-spam: a per-appointment cooldown via audit_log lookup. If we fired
+  // an SLA alert for this appointment in the past 60 minutes, skip; the
+  // staff member presumably saw the prior one. Acknowledgment (= setting
+  // staff_acknowledged_at) drops the row out of the query entirely on the
+  // next pass.
+  //
+  // The dispatch path is the canonical sendSms() chokepoint (NOT
+  // sendMarketingSms — staff alerts must not be silenced by the customer
+  // SMS_MARKETING / EMAIL_MARKETING feature flags). Recipient resolution
+  // matches the orchestrator's pattern: template `recipient_phones` →
+  // empty fallback + console.warn (per Session #139 self-send-safe).
+  try {
+    const businessHours = await getBusinessHours();
+    const businessHoursNow = businessHours ? isWithinBusinessHours(businessHours) : false;
+
+    if (!businessHoursNow) {
+      // Outside business hours — skip the scan entirely. Empty `pendingAppts`
+      // would otherwise still consume a roundtrip; explicit skip is more
+      // readable AND lets the response telemetry distinguish "no candidates"
+      // from "hours-gated."
+      slaAlertsSkippedHours = 1;
+    } else {
+      const thresholdIso = new Date(
+        now.getTime() - AC12_SLA_THRESHOLD_MINUTES * 60 * 1000
+      ).toISOString();
+      const cooldownIso = new Date(
+        now.getTime() - AC12_SLA_REFIRE_COOLDOWN_MINUTES * 60 * 1000
+      ).toISOString();
+
+      const { data: pendingAppts, error: pendingApptErr } = await admin
+        .from('appointments')
+        .select(`
+          id,
+          quote_id,
+          customer_id,
+          created_at,
+          customer:customers(id, first_name, last_name),
+          quote:quotes(id, quote_number, items:quote_items(*))
+        `)
+        .eq('channel', 'customer_accept')
+        .eq('status', 'pending')
+        .is('staff_acknowledged_at', null)
+        .lte('created_at', thresholdIso)
+        .not('quote_id', 'is', null)
+        .limit(50);
+
+      if (pendingApptErr) {
+        console.error('[Lifecycle SLA] Failed to query pending appointments:', pendingApptErr);
+      } else if (pendingAppts && pendingAppts.length > 0) {
+        // Pre-flight: load any recent SLA-alert audit_log rows for these
+        // quote ids so we can dedup in-batch without N+1 queries.
+        const quoteIds = pendingAppts
+          .map((a) => a.quote_id)
+          .filter((id): id is string => typeof id === 'string');
+
+        const recentAlertedQuoteIds = new Set<string>();
+        if (quoteIds.length > 0) {
+          const { data: recentAlerts } = await admin
+            .from('audit_log')
+            .select('entity_id')
+            .eq('entity_type', 'quote')
+            .in('entity_id', quoteIds)
+            .gte('created_at', cooldownIso);
+          // details->>event = 'sla_alert_fired' is the discriminator. We
+          // over-fetch (any 'quote' update in the cooldown window) and
+          // filter client-side via the `details` JSONB. A server-side
+          // `->>` filter is possible but the volume is bounded (50 quotes
+          // max × ~hours of audit traffic per quote) so this is fine.
+          for (const row of recentAlerts || []) {
+            // Without re-fetching details, treat any audit_log entry in
+            // the cooldown window as a cooldown signal. This is more
+            // conservative than ideal (a legit non-SLA quote update would
+            // suppress the SLA alert), but the over-suppression failure
+            // mode is preferable to over-spam, and the legit-update case
+            // is rare for an unacknowledged customer-accept pending
+            // appointment by definition.
+            if (row.entity_id) recentAlertedQuoteIds.add(row.entity_id);
+          }
+        }
+
+        for (const appt of pendingAppts) {
+          const quoteId = appt.quote_id;
+          if (!quoteId) continue;
+          if (recentAlertedQuoteIds.has(quoteId)) {
+            slaAlertsSkippedCooldown++;
+            continue;
+          }
+
+          const fired = await fireSlaAlert(admin, appt, now);
+          if (fired === 'fired') {
+            slaAlertsFired++;
+            // Audit row IS the cooldown signal — write immediately so a
+            // subsequent within-batch fire for the same quote (impossible
+            // structurally — quote_id is UNIQUE per Theme C.1) is also
+            // covered.
+            logAudit({
+              action: 'update',
+              entityType: 'quote',
+              entityId: quoteId,
+              entityLabel: `Quote SLA alert (appointment ${appt.id})`,
+              details: {
+                event: 'sla_alert_fired',
+                appointment_id: appt.id,
+                appointment_age_minutes: Math.floor(
+                  (now.getTime() - new Date(appt.created_at as string).getTime()) /
+                    (60 * 1000)
+                ),
+              },
+              source: 'cron',
+            });
+            recentAlertedQuoteIds.add(quoteId);
+          } else if (fired === 'no_recipients') {
+            slaAlertsSkippedNoRecipients++;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Lifecycle SLA] AC-12 phase failed (non-blocking):', err);
+  }
+
   return NextResponse.json({
     scheduled, sent, failed, skipped,
     drip: { enrolled: dripEnrolled, stopped: dripStopped, processed: dripProcessed, sent: dripSent },
+    sla: {
+      fired: slaAlertsFired,
+      skipped_hours: slaAlertsSkippedHours,
+      skipped_cooldown: slaAlertsSkippedCooldown,
+      skipped_no_recipients: slaAlertsSkippedNoRecipients,
+    },
   });
+}
+
+// ===========================================================================
+// Phase 4 — AC-12 SLA alert dispatch (single appointment)
+// ===========================================================================
+
+interface PendingApptForSla {
+  id: string;
+  quote_id: string | null;
+  customer_id: string | null;
+  created_at: string;
+  customer: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | { id: string; first_name: string; last_name: string }[] | null;
+  quote: {
+    id: string;
+    quote_number: string | number;
+    items: Array<{
+      service_id: string | null;
+      item_name: string;
+      tier_name: string | null;
+      quantity: number;
+      unit_price: number | string;
+      total_price?: number | string | null;
+    }>;
+  } | { id: string; quote_number: string | number; items: Array<unknown> }[] | null;
+}
+
+type SlaFireOutcome = 'fired' | 'no_recipients' | 'no_template' | 'error';
+
+async function fireSlaAlert(
+  admin: ReturnType<typeof createAdminClient>,
+  appt: Record<string, unknown>,
+  now: Date
+): Promise<SlaFireOutcome> {
+  try {
+    const typed = appt as unknown as PendingApptForSla;
+    // PostgREST single-row FK embed may resolve to either a single object
+    // or an array depending on the constraint inferred (per CLAUDE.md
+    // "Supabase relation cardinality" rule — both `customer:customers` and
+    // `quote:quotes` are joined on UUID FKs which are single-object shaped,
+    // but the Memory-locked rule "always normalize" applies). Both
+    // relations are not-null per the query filter so the empty-array case
+    // shouldn't occur, but defense-in-depth.
+    const customer = Array.isArray(typed.customer)
+      ? typed.customer[0] ?? null
+      : typed.customer;
+    const quote = Array.isArray(typed.quote)
+      ? typed.quote[0] ?? null
+      : typed.quote;
+
+    if (!customer || !quote) {
+      return 'error';
+    }
+
+    const customerName = `${customer.first_name} ${customer.last_name}`.trim() || 'Customer';
+    const acceptedAtHuman = humanizeAcceptedAgo(
+      now.getTime() - new Date(typed.created_at).getTime()
+    );
+
+    const rawItems = (quote.items as Array<{
+      service_id: string | null;
+      item_name: string;
+      tier_name: string | null;
+      quantity: number;
+      unit_price: number | string;
+      total_price?: number | string | null;
+    }>) ?? [];
+    const enriched = await enrichItemsWithTierMeta(
+      admin,
+      rawItems.map((i) => ({
+        service_id: i.service_id,
+        item_name: i.item_name,
+        tier_name: i.tier_name,
+        quantity: i.quantity,
+        unit_price: Number(i.unit_price),
+        total_price: i.total_price,
+      }))
+    );
+    const services = formatServicesSummary(enriched) || 'Services';
+
+    const fallback = `⏰ Customer-accepted quote awaiting confirmation.\nQuote ${quote.quote_number} from ${customerName} for ${services}.\nAccepted ${acceptedAtHuman}.\nPlease confirm or follow up.`;
+    const result = await renderSmsTemplate(
+      'pending_appointment_sla_alert',
+      {
+        quote_number: String(quote.quote_number ?? ''),
+        customer_name: customerName,
+        services,
+        accepted_at_human: acceptedAtHuman,
+      },
+      fallback
+    );
+
+    if (!result.isActive) return 'no_template';
+
+    const recipients: string[] = result.recipientPhones?.length ? result.recipientPhones : [];
+    if (recipients.length === 0) {
+      console.warn(
+        `[Lifecycle SLA] Alert dropped — no recipient_phones configured for "pending_appointment_sla_alert" template ` +
+          `(appointment ${typed.id}). Configure via Admin → SMS Templates.`
+      );
+      return 'no_recipients';
+    }
+
+    const sends = await Promise.allSettled(
+      recipients.map((phone) => sendSms(phone, result.body))
+    );
+    const anyDelivered = sends.some(
+      (r) => r.status === 'fulfilled' && r.value && r.value.success === true
+    );
+    return anyDelivered ? 'fired' : 'error';
+  } catch (err) {
+    console.error('[Lifecycle SLA] fireSlaAlert failed:', err);
+    return 'error';
+  }
 }
 
 // ===========================================================================

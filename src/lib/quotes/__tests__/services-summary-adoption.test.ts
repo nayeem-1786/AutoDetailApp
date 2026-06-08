@@ -49,21 +49,34 @@ describe('D45 adoption pins — chip-composing call sites import the shared help
     );
   });
 
-  it('quotes/[id]/accept/route.ts imports formatServicesSummary + enrichItemsWithTierMeta', () => {
-    const src = read('src/app/api/quotes/[id]/accept/route.ts');
+  it('customer-accept-service.ts imports formatServicesSummary + enrichItemsWithTierMeta (cascade: post-Phase-3-Theme-C.2 the accept route is a thin wrapper around processCustomerAccept; the chip composition moved to the orchestrator)', () => {
+    // Phase 3 Theme C.2 refactor moved the staff-notification side effects out
+    // of the route handler into `processCustomerAccept`. The D45 adoption
+    // requirement (single source of truth for the services chip) moved with
+    // it — this pin tracks the orchestrator instead of the now-thin route.
+    const src = read('src/lib/quotes/customer-accept-service.ts');
+    // Same-package relative import (orchestrator lives in src/lib/quotes/).
     expect(src).toMatch(
-      /from\s+['"]@\/lib\/quotes\/services-summary['"]/,
+      /from\s+['"](?:\.\/services-summary|@\/lib\/quotes\/services-summary)['"]/,
     );
     expect(src).toContain('formatServicesSummary');
     expect(src).toContain('enrichItemsWithTierMeta');
   });
 
-  it('quotes/[id]/accept/route.ts no longer composes serviceList via inline map().join(, )', () => {
-    const src = read('src/app/api/quotes/[id]/accept/route.ts');
+  it('customer-accept-service.ts no longer composes serviceList via inline map().join(, )', () => {
+    const src = read('src/lib/quotes/customer-accept-service.ts');
     // Pre-D45: const serviceList = items.map((i) => i.item_name).join(', ') || 'Services';
     expect(src).not.toMatch(
       /const\s+serviceList\s*=\s*items\.map\(\(i\)\s*=>\s*i\.item_name\)\.join/,
     );
+  });
+
+  it('quotes/[id]/accept/route.ts is a thin wrapper — no direct services-summary import (delegates via processCustomerAccept)', () => {
+    // The route now only validates the token and forwards to the orchestrator.
+    // A direct services-summary import here would be a smell (duplicate dispatch).
+    const src = read('src/app/api/quotes/[id]/accept/route.ts');
+    expect(src).not.toContain("from '@/lib/quotes/services-summary'");
+    expect(src).toContain('processCustomerAccept');
   });
 
   it('pos/jobs/[id]/cancel/route.ts imports formatServicesSummary + enrichItemsWithTierMeta', () => {

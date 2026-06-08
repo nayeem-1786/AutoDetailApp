@@ -6,6 +6,67 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme C.2 — Customer-accept handler refactor + SLA cron logic (AC-12 completion) (2026-06-07)
+
+Completes AC-12: customer-accepted quotes now auto-create a pending appointment with a staff-acknowledgment SLA. The pre-Theme-C.2 customer-accept handler (227 lines, pure-status-flip + inline staff SMS) is refactored into a thin route wrapper around a new orchestrator helper; the lifecycle engine gains a sixth phase (Phase 4 SLA) that fires `pending_appointment_sla_alert` to staff for pending unacknowledged customer-accept appointments past the 2-hour threshold during business hours.
+
+**Architectural decisions (operator-locked at session detailing):**
+
+- **G.1 placeholder strategy = Option α (`quote.valid_until`).** The customer accepts BEFORE picking a slot but the appointments table requires `scheduled_date`/`scheduled_start_time`/`scheduled_end_time` NOT NULL (per G.1 locked option ζ — keep NOT NULL + flag column rather than nullable migration). Using `valid_until` as the placeholder date is semantically meaningful (it's the deadline staff has to schedule before the quote expires); the 09:00 start time + 60-minute duration mirror the existing walk-in atomic-create at `pos/jobs/route.ts:328`. `scheduled_date_placeholder=TRUE` (Theme C.1 column) signals downstream calendar/scheduler readers to skip the row when computing availability.
+- **G.2 integration pattern = Option β (orchestrator helper).** New module `src/lib/quotes/customer-accept-service.ts` (`processCustomerAccept`) owns all side effects: status flip, convertQuote call, customer SMS, staff SLA SMS (business-hours-gated), staff email, audit log. The route handler keeps token validation only. Future callers (e.g., a future "operator accepts on customer's behalf" surface) can reuse the orchestrator directly.
+- **G.7 staff notification:** the new template `pending_appointment_sla_alert` (seeded in Theme C.1) REPLACES the prior `quote_accepted_staff_notify` inline fire. The new template reflects the new auto-conversion semantics ("Quote accepted — appointment awaiting confirmation") and is gated by `isWithinBusinessHours()` — outside the 8am–8pm window the orchestrator skips the inline fire and the lifecycle engine SLA pass catches up on the next business-hours tick. Staff email is preserved unchanged (async by nature, useful for record-keeping); the email CTA copy is updated to reflect that a pending appointment now exists rather than asking staff to create one.
+
+**SLA cron pattern (lifecycle engine Phase 4):**
+
+The cron runs every 10 minutes (per existing schedule). On each tick during business hours:
+
+1. Query `appointments` matching: `channel='customer_accept'` AND `status='pending'` AND `staff_acknowledged_at IS NULL` AND `created_at < NOW() - INTERVAL '2 hours'`. Limit 50.
+2. Pre-fetch any recent `audit_log` rows for the matched quotes within the past 60 minutes (anti-spam cooldown). Audit row IS the cooldown signal — no new column added per Memory #29 (targeted scope).
+3. For each appointment NOT in the cooldown set: render `pending_appointment_sla_alert` with `quote_number`/`customer_name`/`services`/`accepted_at_human` chips, dispatch via `sendSms()` to template-configured `recipient_phones`. Empty recipients → drop + console.warn (Session #139 self-send-safe pattern; matches the orchestrator's identical drop). On successful dispatch, write `audit_log` with `action='update'`, `entity_type='quote'`, `details.event='sla_alert_fired'`. This row becomes the cooldown signal for the next 60 minutes.
+
+Outside business hours: skip the scan entirely. A quote accepted at midnight stays pending until 8am PT, when the cron resumes firing inside hours — by then the appointment is well past the 2h threshold AND inside hours, so the first alert lands at the start of the business day.
+
+**Race protection unchanged from Theme F + C.1:**
+
+- Theme F's F.7 application-level guard in `convertQuote()` catches the operator-vs-customer convert race idempotently — the orchestrator surfaces `already_converted: true` and suppresses duplicate SMS/email side effects so neither path's user sees a double notification.
+- Theme C.1's `appointments_quote_id_uniq` UNIQUE partial index is the DB-layer backstop — `convertQuote` now writes `appointments.quote_id` on every conversion (operator POS, voice agent, admin, customer accept) per the same canonical seam. A second concurrent INSERT for the same quote raises a UNIQUE violation; F.7's pre-INSERT probe normally already handled this but the index is defense-in-depth.
+
+**convertQuote extension (targeted, not a refactor):**
+
+- New `ConvertQuoteOptions.placeholderDate?: boolean` (defaults `false`); the customer-accept orchestrator passes `true`; every other caller stays `false`.
+- INSERT writes `quote_id: quoteId` always (powers the C.1 UNIQUE backstop) and `scheduled_date_placeholder: options?.placeholderDate ?? false` (powers the calendar/scheduler "skip placeholder" semantics).
+
+**Operator workflow change for existing `after_quote_accepted` lifecycle rules:**
+
+Pre-Theme-C.2 the customer-accept handler flipped `quotes.status='accepted'` and stopped there; the lifecycle engine's `scheduleFromQuoteAccepted` pass queried `status='accepted'` and scheduled customer-marketing drips. Post-Theme-C.2 the status flips through 'accepted' → 'converted' inside a single HTTP request (a few hundred millis apart), so a cron tick landing between the two updates is vanishingly unlikely. Operators with `after_quote_accepted` rules should migrate them to `after_appointment_booked` — that handler filters `channel != 'walk_in'` and `customer_accept` channel passes the filter, so the lifecycle catches new auto-converted appointments naturally with no rule-shape change required.
+
+**Customer UX:**
+
+The accept-button success state copy is updated from "We will contact you shortly to schedule your appointment" → "Your appointment is being scheduled — we'll reach out shortly to confirm the date and time." Reflects that the slot is now provisionally reserved at quote-accept time (pending operator confirmation), not waiting on operator-initiated scheduling.
+
+**Smart Details has NO n8n receiver. Theme G removed the entire fireWebhook subsystem.** No webhook reintroduced. All staff alerts dispatch via inline `sendSms` to template-configured `recipient_phones`; empty config drops with `console.warn` instead of self-sending to TWILIO_PHONE_NUMBER.
+
+**Production files modified (5):**
+
+- `src/lib/quotes/convert-service.ts` (+27 lines) — `ConvertQuoteOptions.placeholderDate` field + INSERT now writes `quote_id` + `scheduled_date_placeholder`
+- `src/lib/quotes/customer-accept-service.ts` (NEW, ~565 lines incl. comments + helpers + dispatch modules) — `processCustomerAccept` orchestrator + `humanizeAcceptedAgo` helper + internal SMS/email dispatch helpers
+- `src/app/api/quotes/[id]/accept/route.ts` (refactor; 222 → 65 lines) — thin route wrapper, owns only token validation
+- `src/app/api/cron/lifecycle-engine/route.ts` (+~290 lines incl. comments) — new Phase 4 SLA block + helper `fireSlaAlert` + telemetry counters + extended response shape
+- `src/app/(public)/quote/[token]/accept-button.tsx` (+~7 lines copy) — success-state UX update reflecting auto-conversion
+
+**Tests modified/added (3 files; +23 new tests):**
+
+- `src/lib/quotes/__tests__/convert-service.test.ts` (+3 tests) — AC-12 wiring: `quote_id` always written; `scheduled_date_placeholder` defaults false; respects `placeholderDate=true` option
+- `src/lib/quotes/__tests__/customer-accept-service.test.ts` (NEW, 16 tests) — orchestrator: happy path, race-condition (F.7 already_converted), convertQuote DB failure, business-hours gate, recipient_phones empty, status guards (expired/converted/missing/idempotent re-call), `humanizeAcceptedAgo`
+- `src/app/api/cron/lifecycle-engine/__tests__/sla-cron.test.ts` (NEW, 4 tests) — Phase 4 SLA: business-hours skip, in-hours fire, cooldown dedup, no-recipients drop+warn
+- `src/lib/quotes/__tests__/services-summary-adoption.test.ts` (3 pins updated) — adoption pin migrated from `accept/route.ts` to `customer-accept-service.ts` (the chip composition moved with the side-effect dispatch)
+
+**Verification gates (all green):** typecheck 0 errors / lint 0 errors + 97 baseline warnings (unchanged from main) / build clean / full test suite 3243 passed + 4 pre-existing env-bleed failures (`sms-self-send.test.ts` ×3 + `sms-normalization.test.ts` ×1; reproduce on main; documented in Theme C.1 session notes as unrelated to this work).
+
+**AC-12 status: FULLY OPERATIONAL.** Theme C.1 laid the schema foundation (channel enum + columns + UNIQUE index + SMS template seed); Theme C.2 wires the handler refactor + SLA cron + customer-facing UX. The two themes together complete the AC-12 commitment.
+
+---
+
 ## Phase 3 Theme G — Remove dormant fireWebhook infrastructure (cross-contamination cleanup; no production receivers) (2026-06-07)
 
 Pure-removal cleanup of the entire outbound-webhook subsystem (`fireWebhook` + the `business_settings.n8n_webhook_urls` row + all call sites + all test mocks). The infrastructure had been carried into Smart Details from sibling Nayeem businesses (121 Media, Lomita Notary) that DO run n8n; Smart Details has never had an n8n receiver wired (operator-confirmed; documented in `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` audit `f5e714a8`, 2026-06-05). Every `fireWebhook` call returned early at `setting.value` lookup → `null` → early return. The infrastructure was effectively a no-op in production but caused ongoing cross-contamination confusion in AI assistants reading the codebase and risked accidental reintroduction of dispatch logic riding the dead channel (Session 1.8 already had to retroactively fix one customer-facing silent-drop bug where waitlist SMS was dispatched ONLY via fireWebhook).

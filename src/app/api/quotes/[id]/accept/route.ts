@@ -1,14 +1,27 @@
+// ──────────────────────────────────────────────────────────────────────────────
+// Phase 3 Theme C.2 — customer-accept endpoint thin wrapper.
+//
+// Per the locked AC-12 architecture, this endpoint owns ONLY the token
+// validation (auth boundary). All side effects — status flip, appointment
+// creation, customer SMS, staff SLA alert, staff email, audit log — live in
+// the `processCustomerAccept` orchestrator at `src/lib/quotes/customer-accept-service.ts`.
+//
+// The pre-Theme-C.2 handler (227 lines) inlined every side effect; the refactor
+// preserves byte-stable behavior for customer SMS + staff email and REPLACES
+// the prior `quote_accepted_staff_notify` inline staff SMS with the new
+// `pending_appointment_sla_alert` template (per G.7 / C.1 seed). The new
+// template reflects the new auto-conversion semantics ("appointment created,
+// awaiting confirmation") and is gated by business hours per the locked
+// 8am–8pm immediate / queue-overnight pattern.
+//
+// Race-loss path: on `already_converted=true` (Theme F's F.7 idempotency
+// guard) the response stays 200 + the existing appointment_id; the orchestrator
+// suppresses duplicate notifications.
+// ──────────────────────────────────────────────────────────────────────────────
+
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendSms } from '@/lib/utils/sms';
-import { sendEmail } from '@/lib/utils/email';
-import { getBusinessInfo } from '@/lib/data/business';
-import { formatCurrency } from '@/lib/utils/format';
-import { renderSmsTemplate } from '@/lib/sms/render-sms-template';
-import {
-  enrichItemsWithTierMeta,
-  formatServicesSummary,
-} from '@/lib/quotes/services-summary';
+import { processCustomerAccept } from '@/lib/quotes/customer-accept-service';
 
 export async function POST(
   request: NextRequest,
@@ -25,196 +38,36 @@ export async function POST(
 
     const supabase = createAdminClient();
 
-    // Fetch quote
-    const { data: quote, error: fetchErr } = await supabase
+    // Token validation — the only auth check this endpoint owns. The
+    // orchestrator assumes the caller has verified the customer owns the
+    // access token; never bypass this guard for any caller.
+    const { data: tokenRow, error: tokenErr } = await supabase
       .from('quotes')
-      .select(
-        `
-        *,
-        customer:customers(id, first_name, last_name, phone, email),
-        items:quote_items(*)
-      `
-      )
+      .select('id, access_token, status')
       .eq('id', id)
       .is('deleted_at', null)
       .single();
 
-    if (fetchErr || !quote) {
+    if (tokenErr || !tokenRow) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
     }
-
-    // Validate access token
-    if (quote.access_token !== access_token) {
+    if (tokenRow.access_token !== access_token) {
       return NextResponse.json({ error: 'Invalid access token' }, { status: 403 });
     }
 
-    // Only allow accept if status is 'sent' or 'viewed'
-    if (quote.status !== 'sent' && quote.status !== 'viewed') {
-      return NextResponse.json(
-        { error: `Cannot accept a quote with status "${quote.status}"` },
-        { status: 400 }
-      );
+    const result = await processCustomerAccept(supabase, { quoteId: id });
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    // Update status to accepted
-    const { data: updated, error: updateErr } = await supabase
-      .from('quotes')
-      .update({
-        status: 'accepted',
-        accepted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select('*')
-      .single();
-
-    if (updateErr) {
-      console.error('Error accepting quote:', updateErr.message);
-      return NextResponse.json({ error: 'Failed to accept quote' }, { status: 500 });
-    }
-
-    // Send SMS confirmation to customer
-    const customer = quote.customer as { id: string; first_name: string; last_name: string; phone: string | null; email: string | null } | null;
-    if (customer?.phone) {
-      const items = (quote.items as Array<{ item_name: string }>) ?? [];
-      // Session 2A.5: per-slug typed signature requires per-branch render calls.
-      // The single and multi slugs have different contracts (single: item_name
-      // required; multi: no required chips), so the literal-union shape can't
-      // satisfy both — split into two narrowed calls instead.
-      // Session 2D cheap-adds: last_name (loaded by customer SELECT). Vehicle
-      // not loaded here (quote.vehicle_id not joined) — vehicle_description
-      // stays undefined for quote_accepted_single.
-      const result = items.length === 1 && items[0]?.item_name
-        ? await renderSmsTemplate('quote_accepted_single', {
-            first_name: customer.first_name,
-            item_name: items[0].item_name,
-            last_name: customer.last_name || undefined,
-            vehicle_description: undefined,
-          }, `Thanks ${customer.first_name}! Your quote for ${items[0].item_name} has been accepted. Our team will reach out shortly to schedule your appointment.`)
-        : await renderSmsTemplate('quote_accepted_multi', {
-            first_name: customer.first_name,
-            last_name: customer.last_name || undefined,
-          }, `Thanks ${customer.first_name}! Your quote has been accepted. Our team will reach out shortly to schedule.`);
-
-      if (result.isActive) {
-        const smsResult = await sendSms(customer.phone, result.body, {
-          logToConversation: true,
-          customerId: customer.id,
-          notificationType: 'quote_accepted',
-          contextId: id,
-        });
-        await supabase.from('quote_communications').insert({
-          quote_id: id,
-          channel: 'sms',
-          sent_to: customer.phone,
-          status: smsResult.success ? 'sent' : 'failed',
-          error_message: smsResult.success ? null : 'SMS delivery failed',
-        });
-      }
-    }
-
-    // Notify staff — fire-and-forget, must not block customer response
-    try {
-      const biz = await getBusinessInfo();
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-      // D45 (Issue 39): compose services chip via the shared helper so
-      // multi-tier same-service quotes render as e.g.
-      // "Hot Shampoo Extraction (2 Rows + Floor Mats)" instead of
-      // "Hot Shampoo Extraction, Hot Shampoo Extraction".
-      // `quote.items` is the raw quote_items SELECT (no service_pricing
-      // join); enrichItemsWithTierMeta loads tier_label / qty_label /
-      // pricing_model in two batched queries (warn-only on failure so
-      // staff notification stays best-effort).
-      const rawItems = (quote.items as Array<{
-        service_id: string | null;
-        item_name: string;
-        tier_name: string | null;
-        quantity: number;
-        unit_price: number | string;
-        total_price?: number | string | null;
-      }>) ?? [];
-      const enrichedItems = await enrichItemsWithTierMeta(
-        supabase,
-        rawItems.map((i) => ({
-          service_id: i.service_id,
-          item_name: i.item_name,
-          tier_name: i.tier_name,
-          quantity: i.quantity,
-          unit_price: Number(i.unit_price),
-          total_price: i.total_price,
-        })),
-      );
-      const serviceList = formatServicesSummary(enrichedItems) || 'Services';
-      const customerName = customer
-        ? `${customer.first_name} ${customer.last_name}`.trim()
-        : 'Customer';
-
-      // Staff SMS via template
-      const staffFallback = `Quote accepted! ${customerName} — Q-${quote.quote_number} for ${formatCurrency(Number(quote.total_amount))}. Services: ${serviceList}. Schedule in POS.`;
-      const staffResult = await renderSmsTemplate('quote_accepted_staff_notify', {
-        customer_name: customerName,
-        quote_number: quote.quote_number,
-        service_total: formatCurrency(Number(quote.total_amount)),
-        services: serviceList,
-        customer_phone: customer?.phone || '',
-        // Session 2D cheap-adds: customer_email + last_name. Vehicle not
-        // loaded here (quote.vehicle_id not joined) — vehicle_description
-        // stays undefined.
-        customer_email: customer?.email || undefined,
-        last_name: customer?.last_name || undefined,
-        vehicle_description: undefined,
-      }, staffFallback);
-
-      if (staffResult.isActive) {
-        const phones = staffResult.recipientPhones?.length ? staffResult.recipientPhones : (biz.phone ? [biz.phone] : []);
-        for (const phone of phones) {
-          sendSms(phone, staffResult.body).catch((err) =>
-            console.error('[QuoteAccept] Staff SMS failed:', err)
-          );
-        }
-      }
-
-      // Staff email
-      if (biz.email) {
-        const adminUrl = `${appUrl}/admin/quotes/${id}`;
-        const subject = `Quote #${quote.quote_number} Accepted — ${customerName}`;
-        const textBody = [
-          `Quote #${quote.quote_number} has been accepted!`,
-          '',
-          `Customer: ${customerName}`,
-          customer?.phone ? `Phone: ${customer.phone}` : '',
-          customer?.email ? `Email: ${customer.email}` : '',
-          `Services: ${serviceList}`,
-          `Total: ${formatCurrency(Number(quote.total_amount))}`,
-          '',
-          `View in admin: ${adminUrl}`,
-          '',
-          'Next step: Convert this quote to an appointment in POS.',
-        ].filter(Boolean).join('\n');
-
-        const htmlBody = `<div style="font-family: sans-serif; max-width: 500px;">
-<h2 style="color: #1e3a5f;">Quote Accepted!</h2>
-<p><strong>Quote #${quote.quote_number}</strong></p>
-<p><strong>Customer:</strong> ${customerName}</p>
-${customer?.phone ? `<p><strong>Phone:</strong> ${customer.phone}</p>` : ''}
-${customer?.email ? `<p><strong>Email:</strong> ${customer.email}</p>` : ''}
-<p><strong>Services:</strong> ${serviceList}</p>
-<p><strong>Total:</strong> ${formatCurrency(Number(quote.total_amount))}</p>
-<br/>
-<a href="${adminUrl}" style="display: inline-block; padding: 12px 24px; background-color: #1e3a5f; color: #fff; text-decoration: none; border-radius: 6px;">View Quote in Admin</a>
-<br/><br/>
-<p style="color: #6b7280; font-size: 14px;">Next step: Convert this quote to an appointment in POS.</p>
-</div>`;
-
-        sendEmail(biz.email, subject, textBody, htmlBody).catch((err) =>
-          console.error('[QuoteAccept] Staff email failed:', err)
-        );
-      }
-    } catch (staffNotifyErr) {
-      console.error('[QuoteAccept] Staff notification failed (non-blocking):', staffNotifyErr);
-    }
-
-    return NextResponse.json({ success: true, quote: updated });
+    // On the F.7 race-loss path the existing accept-time response is the
+    // honest one; the caller still gets a 200 with the existing appointment_id.
+    return NextResponse.json({
+      success: true,
+      appointment_id: result.appointment_id,
+      already_converted: result.already_converted,
+    });
   } catch (err) {
     console.error('Quote accept error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
