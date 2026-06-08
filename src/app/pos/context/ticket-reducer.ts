@@ -1,6 +1,7 @@
 import type { TicketState, TicketAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
 import { resolveServicePriceWithSale } from '../utils/pricing';
+import { applyAddService } from '../utils/apply-add-service';
 
 export const initialTicketState: TicketState = {
   items: [],
@@ -178,172 +179,15 @@ export function ticketReducer(
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId, customPrice, customNote } = action;
-
-      // Duplicate guard: check if this service (same serviceId, same tier, same parent context) already exists
-      const useTierMatching = service.pricing_model === 'scope' || service.pricing_model === 'specialty';
-      const pricingTierName = pricing ? (pricing.tier_label || pricing.tier_name) : null;
-      const existing = state.items.find(
-        (i) =>
-          i.itemType === 'service' &&
-          i.serviceId === service.id &&
-          i.parentItemId === (parentItemId ?? null) &&
-          (!useTierMatching || !pricingTierName || i.tierName === pricingTierName)
-      );
-
-      if (existing) {
-        const isExistingPerUnit = existing.perUnitQty != null && existing.perUnitPrice != null;
-
-        if (isExistingPerUnit) {
-          const max = existing.perUnitMax ?? service.per_unit_max ?? 10;
-          if (existing.perUnitQty! >= max) {
-            // At max — no-op
-            return state;
-          }
-          // Increment per-unit quantity inline
-          const newQty = existing.perUnitQty! + 1;
-          const newStdPrice = existing.perUnitPrice! * newQty;
-          const salePPU = existing.pricingType === 'sale' && existing.saleEffectivePrice != null && existing.perUnitQty
-            ? existing.saleEffectivePrice / existing.perUnitQty
-            : null;
-          const unitPrice = salePPU != null ? salePPU * newQty : newStdPrice;
-          const newSaleEff = salePPU != null ? salePPU * newQty : null;
-          const items = state.items.map((item) =>
-            item.id === existing.id
-              ? {
-                  ...item,
-                  perUnitQty: newQty,
-                  unitPrice,
-                  standardPrice: newStdPrice,
-                  saleEffectivePrice: newSaleEff,
-                  totalPrice: unitPrice * item.quantity,
-                  taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
-                }
-              : item
-          );
-          return recalculateTotals({ ...state, items });
-        }
-
-        // Non-per-unit service already on ticket — no-op
-        return state;
-      }
-
-      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
-      const isScopeTierWithQty = !isPerUnit && !!perUnitQty && !!pricing?.max_qty && pricing.max_qty > 1;
-
-      // Custom price override from specialty gate modal — bypass normal pricing resolution
-      if (typeof customPrice === 'number') {
-        const totalPrice = customPrice;
-        const newItem: TicketItem = {
-          id: generateId(),
-          itemType: 'service',
-          productId: null,
-          serviceId: service.id,
-          categoryId: service.category_id ?? null,
-          itemName: service.name,
-          quantity: 1,
-          unitPrice: totalPrice,
-          totalPrice,
-          taxAmount: calculateItemTax(totalPrice, service.is_taxable),
-          isTaxable: service.is_taxable,
-          tierName: pricing.tier_label || pricing.tier_name,
-          vehicleSizeClass,
-          notes: customNote || null,
-          perUnitQty: null,
-          perUnitLabel: null,
-          perUnitPrice: null,
-          perUnitMax: null,
-          parentItemId: parentItemId ?? null,
-          standardPrice: totalPrice,
-          saleEffectivePrice: null,
-          pricingType: 'standard',
-          comboSourcePrimaryId: null,
-          isCustomPrice: true,
-          prerequisiteNote: prerequisiteNote ?? null,
-          prerequisiteForServiceId: prerequisiteForServiceId ?? null,
-        };
-        return recalculateTotals({ ...state, items: [...state.items, newItem] });
-      }
-
-      // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
-      const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
-      const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
-
-      // Determine effective price: lowest of sale vs combo wins
-      let effectivePrice = resolved.effectivePrice;
-      let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
-      let comboSourceId: string | null = null;
-      const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
-
-      if (!isPerUnit && !isScopeTierWithQty && comboPrice != null && comboPrice < resolved.standardPrice) {
-        if (comboPrice <= effectivePrice) {
-          // Combo price wins (or ties — prefer combo for display)
-          effectivePrice = comboPrice;
-          pricingType = 'combo';
-          comboSourceId = comboPrimaryServiceId ?? null;
-        }
-        // else sale price is lower, keep sale
-      }
-
-      // When scope tier has qty, multiply prices by quantity
-      const qtyMultiplier = isScopeTierWithQty ? perUnitQty! : 1;
-      const unitPrice = effectivePrice * qtyMultiplier;
-      const totalPrice = unitPrice;
-      const newItem: TicketItem = {
-        id: generateId(),
-        itemType: 'service',
-        productId: null,
-        serviceId: service.id,
-        categoryId: service.category_id ?? null,
-        itemName: service.name,
-        quantity: 1,
-        unitPrice,
-        totalPrice,
-        taxAmount: calculateItemTax(totalPrice, service.is_taxable),
-        isTaxable: service.is_taxable,
-        tierName: pricing.tier_label || pricing.tier_name,
-        vehicleSizeClass,
-        notes: null,
-        perUnitQty: isPerUnit ? perUnitQty
-          : isScopeTierWithQty ? perUnitQty
-          : null,
-        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null)
-          : isScopeTierWithQty ? (pricing.qty_label ?? pricing.tier_label ?? null)
-          : null,
-        perUnitPrice: isPerUnit ? service.per_unit_price!
-          : isScopeTierWithQty ? resolved.standardPrice
-          : null,
-        perUnitMax: isPerUnit ? (service.per_unit_max ?? null)
-          : isScopeTierWithQty ? pricing.max_qty
-          : null,
-        parentItemId: parentItemId ?? null,
-        standardPrice: resolved.standardPrice * qtyMultiplier,
-        pricingType,
-        comboSourcePrimaryId: comboSourceId,
-        saleEffectivePrice: saleEffective != null ? saleEffective * qtyMultiplier : null,
-        prerequisiteNote: prerequisiteNote ?? null,
-        prerequisiteForServiceId: prerequisiteForServiceId ?? null,
-      };
-
-      // If this is a child addon, insert immediately after the parent's last child
-      if (parentItemId) {
-        const items = [...state.items];
-        const parentIdx = items.findIndex((i) => i.id === parentItemId);
-        if (parentIdx >= 0) {
-          // Find the last consecutive child of this parent after parentIdx
-          let insertIdx = parentIdx + 1;
-          while (insertIdx < items.length && items[insertIdx].parentItemId === parentItemId) {
-            insertIdx++;
-          }
-          items.splice(insertIdx, 0, newItem);
-          return recalculateTotals({ ...state, items });
-        }
-      }
-
-      return recalculateTotals({
-        ...state,
-        items: [...state.items, newItem],
-      });
+      // C.1 step 1 — delegated to shared helper. Returns state reference-equal
+      // when no items change (duplicate non-per-unit-like no-op); otherwise a
+      // new state object that we wrap in recalculateTotals (which composes
+      // depositCredit + priorPaymentsTotal for Sale-side totals).
+      // `customPriceChildBehavior: 'append'` preserves Sale's pre-extraction
+      // byte-behavior for custom-priced child items — see ApplyAddServiceOptions
+      // docs for the operator-authorized divergence rationale.
+      const next = applyAddService(state, action, { customPriceChildBehavior: 'append' });
+      return next === state ? state : recalculateTotals(next);
     }
 
     case 'ADD_CUSTOM_ITEM': {
