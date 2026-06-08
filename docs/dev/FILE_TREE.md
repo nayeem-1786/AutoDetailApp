@@ -421,6 +421,8 @@ src/app/api/pos/card-customer/route.ts
 src/app/api/pos/coupons/validate/route.ts
 src/app/api/pos/customers/[id]/route.ts
 src/app/api/pos/customers/[id]/address/route.ts
+src/app/api/pos/customers/[id]/credits/route.ts
+src/app/api/pos/customers/[id]/credits/__tests__/route.test.ts
 src/app/api/pos/customers/[id]/type/route.ts
 src/app/api/pos/customers/[id]/vehicles/route.ts
 src/app/api/pos/customers/__tests__/route.test.ts
