@@ -59,11 +59,16 @@ export function ApplyCreditDialog({
   const loadBalance = useCallback(async () => {
     setLoadingBalance(true);
     try {
-      // The customer-credits balance endpoint sits on the admin surface
-      // because the read is identical from either context. POS already
-      // shares admin endpoints for similar look-ups (e.g. customer search).
+      // POS-auth variant of the customer-credits balance endpoint — mirrors
+      // D.2's parallel-route precedent (admin + POS variants of
+      // cancellation-fee-default, both delegating to the same repository
+      // helper). Pre-fix this hit `/api/admin/customers/[id]/credits` via
+      // posFetch and got 401 (admin endpoint uses session-cookie auth, not
+      // POS HMAC) → posFetch redirected to login on dialog open. The new
+      // `/api/pos/customers/[id]/credits` route uses authenticatePosRequest
+      // and returns the same CustomerCreditBalance shape.
       const res = await posFetch(
-        `/api/admin/customers/${customerId}/credits`
+        `/api/pos/customers/${customerId}/credits`
       );
       const json = await res.json();
       if (!res.ok) {

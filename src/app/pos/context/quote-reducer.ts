@@ -1,6 +1,15 @@
 import type { QuoteState, QuoteAction, TicketItem } from '../types';
 import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
 import { resolveServicePriceWithSale } from '../utils/pricing';
+import { applyAddService } from '../utils/apply-add-service';
+import { applyAddProduct } from '../utils/apply-add-product';
+import { applyAddCustomItem } from '../utils/apply-add-custom-item';
+import { applyUpdateItemQuantity } from '../utils/apply-update-item-quantity';
+import { applyUpdatePerUnitQty } from '../utils/apply-update-per-unit-qty';
+import { applyRemoveItem } from '../utils/apply-remove-item';
+import { applySetCustomer } from '../utils/apply-set-customer';
+import { applySetCoupon } from '../utils/apply-set-coupon';
+import { generateId } from '../utils/generate-id';
 
 export const initialQuoteState: QuoteState = {
   items: [],
@@ -31,17 +40,6 @@ export const initialQuoteState: QuoteState = {
   },
 };
 
-function generateId(): string {
-  if (typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 function recalculateTotals(state: QuoteState): QuoteState {
   const subtotal = state.items.reduce((sum, item) => sum + item.totalPrice, 0);
 
@@ -67,299 +65,56 @@ export function quoteReducer(
 ): QuoteState {
   switch (action.type) {
     case 'ADD_PRODUCT': {
-      const { product } = action;
-      const existing = state.items.find(
-        (i) => i.itemType === 'product' && i.productId === product.id
-      );
-
-      let items: TicketItem[];
-      if (existing) {
-        items = state.items.map((item) =>
-          item.id === existing.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-                totalPrice: item.unitPrice * (item.quantity + 1),
-                taxAmount: calculateItemTax(
-                  item.unitPrice * (item.quantity + 1),
-                  item.isTaxable
-                ),
-              }
-            : item
-        );
-      } else {
-        const totalPrice = product.retail_price;
-        const newItem: TicketItem = {
-          id: generateId(),
-          itemType: 'product',
-          productId: product.id,
-          serviceId: null,
-          categoryId: product.category_id ?? null,
-          itemName: product.name,
-          quantity: 1,
-          unitPrice: product.retail_price,
-          totalPrice,
-          taxAmount: calculateItemTax(totalPrice, product.is_taxable),
-          isTaxable: product.is_taxable,
-          tierName: null,
-          vehicleSizeClass: null,
-          notes: null,
-          perUnitQty: null,
-          perUnitLabel: null,
-          perUnitPrice: null,
-          perUnitMax: null,
-          parentItemId: null,
-          standardPrice: product.retail_price,
-          pricingType: 'standard',
-          comboSourcePrimaryId: null,
-          saleEffectivePrice: null,
-          prerequisiteNote: null,
-          prerequisiteForServiceId: null,
-        };
-        items = [...state.items, newItem];
-      }
-      return recalculateTotals({ ...state, items });
+      // C.1 step 2 — delegated to shared helper. ADD_PRODUCT always changes
+      // items[] (existing match → quantity++; no match → append new item), so
+      // the helper never returns reference-equal state and the delegator
+      // unconditionally calls recalculateTotals (no `next === state` check
+      // unlike ADD_SERVICE; this is structural, not optimization-related).
+      return recalculateTotals(applyAddProduct(state, action));
     }
 
     case 'ADD_SERVICE': {
-      const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId, customPrice, customNote } = action;
-      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
-
-      // Custom price override from specialty gate modal
-      if (typeof customPrice === 'number') {
-        const totalPrice = customPrice;
-        const newItem: TicketItem = {
-          id: generateId(),
-          itemType: 'service',
-          productId: null,
-          serviceId: service.id,
-          categoryId: service.category_id ?? null,
-          itemName: service.name,
-          quantity: 1,
-          unitPrice: totalPrice,
-          totalPrice,
-          taxAmount: calculateItemTax(totalPrice, service.is_taxable),
-          isTaxable: service.is_taxable,
-          tierName: pricing.tier_label || pricing.tier_name,
-          vehicleSizeClass,
-          notes: customNote || null,
-          perUnitQty: null,
-          perUnitLabel: null,
-          perUnitPrice: null,
-          perUnitMax: null,
-          parentItemId: parentItemId ?? null,
-          standardPrice: totalPrice,
-          pricingType: 'standard',
-          comboSourcePrimaryId: null,
-          saleEffectivePrice: null,
-          isCustomPrice: true,
-          prerequisiteNote: prerequisiteNote ?? null,
-          prerequisiteForServiceId: prerequisiteForServiceId ?? null,
-        };
-        if (parentItemId) {
-          const items = [...state.items];
-          const parentIdx = items.findIndex((i) => i.id === parentItemId);
-          if (parentIdx >= 0) {
-            let insertIdx = parentIdx + 1;
-            while (insertIdx < items.length && items[insertIdx].parentItemId === parentItemId) insertIdx++;
-            items.splice(insertIdx, 0, newItem);
-            return recalculateTotals({ ...state, items });
-          }
-        }
-        return recalculateTotals({ ...state, items: [...state.items, newItem] });
-      }
-
-      // Resolve pricing with sale awareness (always pass window — null dates = no time limit)
-      const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
-      const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
-
-      // Determine effective price: lowest of sale vs combo wins
-      let effectivePrice = resolved.effectivePrice;
-      let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
-      let comboSourceId: string | null = null;
-      const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
-
-      if (!isPerUnit && comboPrice != null && comboPrice < resolved.standardPrice) {
-        if (comboPrice <= effectivePrice) {
-          effectivePrice = comboPrice;
-          pricingType = 'combo';
-          comboSourceId = comboPrimaryServiceId ?? null;
-        }
-      }
-
-      const unitPrice = effectivePrice;
-      const totalPrice = unitPrice;
-      const newItem: TicketItem = {
-        id: generateId(),
-        itemType: 'service',
-        productId: null,
-        serviceId: service.id,
-        categoryId: service.category_id ?? null,
-        itemName: service.name,
-        quantity: 1,
-        unitPrice,
-        totalPrice,
-        taxAmount: calculateItemTax(totalPrice, service.is_taxable),
-        isTaxable: service.is_taxable,
-        tierName: pricing.tier_label || pricing.tier_name,
-        vehicleSizeClass,
-        notes: null,
-        perUnitQty: isPerUnit ? perUnitQty : null,
-        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
-        perUnitPrice: isPerUnit ? service.per_unit_price! : null,
-        perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
-        parentItemId: parentItemId ?? null,
-        standardPrice: resolved.standardPrice,
-        pricingType,
-        comboSourcePrimaryId: comboSourceId,
-        saleEffectivePrice: saleEffective,
-        prerequisiteNote: prerequisiteNote ?? null,
-        prerequisiteForServiceId: prerequisiteForServiceId ?? null,
-      };
-
-      // If this is a child addon, insert immediately after the parent's last child
-      if (parentItemId) {
-        const items = [...state.items];
-        const parentIdx = items.findIndex((i) => i.id === parentItemId);
-        if (parentIdx >= 0) {
-          let insertIdx = parentIdx + 1;
-          while (insertIdx < items.length && items[insertIdx].parentItemId === parentItemId) {
-            insertIdx++;
-          }
-          items.splice(insertIdx, 0, newItem);
-          return recalculateTotals({ ...state, items });
-        }
-      }
-
-      return recalculateTotals({
-        ...state,
-        items: [...state.items, newItem],
-      });
+      // C.1 step 1 — delegated to shared helper. Returns state reference-equal
+      // when no items change (duplicate non-per-unit-like no-op); otherwise a
+      // new state object that we wrap in recalculateTotals (which composes
+      // mobileSurcharge for Quote-side totals).
+      // `customPriceChildBehavior: 'after-parent'` preserves Quote's pre-extraction
+      // byte-behavior for custom-priced child items — see ApplyAddServiceOptions
+      // docs for the operator-authorized divergence rationale.
+      const next = applyAddService(state, action, { customPriceChildBehavior: 'after-parent' });
+      return next === state ? state : recalculateTotals(next);
     }
 
     case 'ADD_CUSTOM_ITEM': {
-      const { name, price, isTaxable } = action;
-      const newItem: TicketItem = {
-        id: generateId(),
-        itemType: 'custom',
-        productId: null,
-        serviceId: null,
-        categoryId: null,
-        itemName: name,
-        quantity: 1,
-        unitPrice: price,
-        totalPrice: price,
-        taxAmount: calculateItemTax(price, isTaxable),
-        isTaxable,
-        tierName: null,
-        vehicleSizeClass: null,
-        notes: null,
-        perUnitQty: null,
-        perUnitLabel: null,
-        perUnitPrice: null,
-        perUnitMax: null,
-        parentItemId: null,
-        standardPrice: price,
-        pricingType: 'standard',
-        comboSourcePrimaryId: null,
-        saleEffectivePrice: null,
-        prerequisiteNote: null,
-        prerequisiteForServiceId: null,
-      };
-      return recalculateTotals({
-        ...state,
-        items: [...state.items, newItem],
-      });
+      // C.1 step 3 — delegated to shared helper. ADD_CUSTOM_ITEM always
+      // appends a new item (no dedup — custom items have no stable identity
+      // to match), so the helper never returns reference-equal state.
+      return recalculateTotals(applyAddCustomItem(state, action));
     }
 
     case 'UPDATE_ITEM_QUANTITY': {
-      const { itemId, quantity } = action;
-      if (quantity < 1) {
-        const items = state.items.filter((i) => i.id !== itemId);
-        return recalculateTotals({ ...state, items });
-      }
-      const items = state.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              quantity,
-              totalPrice: item.unitPrice * quantity,
-              taxAmount: calculateItemTax(
-                item.unitPrice * quantity,
-                item.isTaxable
-              ),
-            }
-          : item
-      );
-      return recalculateTotals({ ...state, items });
+      // C.1 step 4 — delegated to shared helper. Items[] always changes
+      // (either filtered when quantity < 1, or mapped when quantity ≥ 1).
+      return recalculateTotals(applyUpdateItemQuantity(state, action));
     }
 
     case 'UPDATE_PER_UNIT_QTY': {
-      const { itemId, perUnitQty } = action;
-      if (perUnitQty < 1) {
-        const items = state.items.filter((i) => i.id !== itemId);
-        return recalculateTotals({ ...state, items });
-      }
-      const items = state.items.map((item) => {
-        if (item.id !== itemId || !item.perUnitPrice) return item;
-        const newStandardPrice = item.perUnitPrice * perUnitQty;
-        // Use sale per-unit price when on sale
-        const salePricePerUnit = item.pricingType === 'sale' && item.saleEffectivePrice != null && item.perUnitQty
-          ? item.saleEffectivePrice / item.perUnitQty
-          : null;
-        const unitPrice = salePricePerUnit != null ? salePricePerUnit * perUnitQty : newStandardPrice;
-        const newSaleEffective = salePricePerUnit != null ? salePricePerUnit * perUnitQty : null;
-        return {
-          ...item,
-          perUnitQty,
-          unitPrice,
-          standardPrice: newStandardPrice,
-          saleEffectivePrice: newSaleEffective,
-          totalPrice: unitPrice * item.quantity,
-          taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
-        };
-      });
-      return recalculateTotals({ ...state, items });
+      // C.1 step 5 — delegated to shared helper.
+      return recalculateTotals(applyUpdatePerUnitQty(state, action));
     }
 
     case 'REMOVE_ITEM': {
-      // Find any children of the removed item
-      const children = state.items.filter((i) => i.parentItemId === action.itemId);
-
-      // Combo-priced children get promoted to standalone; others are removed
-      const promotedChildren = children
-        .filter((child) => child.pricingType === 'combo')
-        .map((child) => {
-          const revertPrice = child.saleEffectivePrice ?? child.standardPrice;
-          const newPricingType: 'sale' | 'standard' = child.saleEffectivePrice != null ? 'sale' : 'standard';
-          const totalPrice = revertPrice * child.quantity;
-          return {
-            ...child,
-            parentItemId: null,
-            unitPrice: revertPrice,
-            totalPrice,
-            taxAmount: calculateItemTax(totalPrice, child.isTaxable),
-            pricingType: newPricingType,
-            comboSourcePrimaryId: null,
-          };
-        });
-
-      const removedChildIds = new Set(
-        children.filter((child) => child.pricingType !== 'combo').map((c) => c.id)
-      );
-
-      const items = state.items
-        .filter((i) => i.id !== action.itemId && !removedChildIds.has(i.id))
-        .map((i) => {
-          const promoted = promotedChildren.find((p) => p.id === i.id);
-          return promoted ?? i;
-        });
-
-      return recalculateTotals({ ...state, items });
+      // C.1 step 6 — delegated to shared helper. Combo children promoted to
+      // standalone; non-combo children removed alongside parent.
+      return recalculateTotals(applyRemoveItem(state, action));
     }
 
     case 'SET_CUSTOMER': {
-      return { ...state, customer: action.customer };
+      // C.1 step 7 — delegated to shared helper. Truly byte-identical extraction.
+      // Customer change has no totals impact, so no recalculateTotals wrap (mirrors
+      // pre-extraction behavior). No `next === state` ref-equal check — helper
+      // unconditionally returns a new object via spread.
+      return applySetCustomer(state, action);
     }
 
     case 'SET_VEHICLE': {
@@ -473,7 +228,11 @@ export function quoteReducer(
     }
 
     case 'SET_COUPON': {
-      return recalculateTotals({ ...state, coupon: action.coupon });
+      // C.1 step 8 — delegated to shared helper. Truly byte-identical extraction.
+      // Coupon affects discount totals, so the delegator wraps the helper's
+      // un-recalculated return in recalculateTotals (matching pre-extraction
+      // behavior + the locked C.1 step 4-6 delegator pattern).
+      return recalculateTotals(applySetCoupon(state, action));
     }
 
     case 'SET_LOYALTY_REDEEM': {

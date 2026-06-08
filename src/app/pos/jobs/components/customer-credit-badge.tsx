@@ -4,10 +4,17 @@
  * Phase 3 Theme E.3 — passive credit-balance badge for POS appointment view.
  *
  * At-a-glance display of unapplied credit balance on the customer card. Reads
- * via /api/admin/customers/[id]/credits (E.3 GET endpoint) and renders nothing
+ * via /api/pos/customers/[id]/credits (POS-auth variant of the E.3 GET
+ * endpoint — mirrors D.2's parallel-route precedent) and renders nothing
  * when the customer has zero balance — operators see the badge only when it's
  * actionable. Read-only; the actual apply path lives on the payment-complete
  * screen where a finalized transaction id exists.
+ *
+ * Bug history: pre-fix this fetched /api/admin/customers/[id]/credits via
+ * `posFetch`, which sent the X-POS-Session HMAC header. The admin endpoint
+ * uses session-cookie auth and returned 401 — `posFetch` cleared the POS
+ * session and redirected the operator to login on every JobDetail mount.
+ * Closed by introducing the parallel POS-auth route + swapping this URL.
  */
 
 import { useEffect, useState } from 'react';
@@ -22,7 +29,7 @@ export function CustomerCreditBadge({ customerId }: { customerId: string }) {
     let cancelled = false;
     async function load() {
       try {
-        const res = await posFetch(`/api/admin/customers/${customerId}/credits`);
+        const res = await posFetch(`/api/pos/customers/${customerId}/credits`);
         if (!res.ok) return;
         const json = await res.json();
         if (cancelled) return;

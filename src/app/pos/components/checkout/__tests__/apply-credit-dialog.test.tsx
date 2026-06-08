@@ -83,8 +83,12 @@ describe('ApplyCreditDialog', () => {
     );
 
     await waitFor(() => {
+      // POS-auth variant of the customer-credits endpoint — closes the
+      // cross-surface 401-loop bug. See `apply-credit-dialog.tsx:62-69` for
+      // the comment explaining the URL surface (and the new POS route at
+      // `src/app/api/pos/customers/[id]/credits/route.ts`).
       expect(posFetchMock).toHaveBeenCalledWith(
-        '/api/admin/customers/cust-1/credits'
+        '/api/pos/customers/cust-1/credits'
       );
     });
     await waitFor(() => {

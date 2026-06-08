@@ -421,6 +421,8 @@ src/app/api/pos/card-customer/route.ts
 src/app/api/pos/coupons/validate/route.ts
 src/app/api/pos/customers/[id]/route.ts
 src/app/api/pos/customers/[id]/address/route.ts
+src/app/api/pos/customers/[id]/credits/route.ts
+src/app/api/pos/customers/[id]/credits/__tests__/route.test.ts
 src/app/api/pos/customers/[id]/type/route.ts
 src/app/api/pos/customers/[id]/vehicles/route.ts
 src/app/api/pos/customers/__tests__/route.test.ts
@@ -449,6 +451,7 @@ src/app/api/pos/jobs/route.ts
 src/app/api/pos/jobs/schedule/route.ts                          # GET — Item 15e Phase 1A Schedule scope: future appointments (tomorrow→+30d), pure read, ZERO jobs writes, excludes materialized
 src/app/api/pos/jobs/schedule/__tests__/route.test.ts           # 12 tests — Item 15e Phase 1A schedule endpoint: future-only floor, status/materialized exclusion, channel filter, CRITICAL zero-jobs-writes invariant
 src/app/api/pos/jobs/__tests__/walk-in-modifier-persistence.test.ts  # 6 tests — pins Item 15g Layer 15g-iv Scenario C: walk-in synthetic appointment persists 7-field modifier snapshot, percent → dollar resolution, over-discount clamp; + Item 15f Phase 1 Layer 8e — `scheduled_*_time` minute-precision shape
+src/app/api/pos/jobs/__tests__/walk-in-no-job-pre-intake.test.ts     # 7 tests — Architecture B Stage 2 (2026-06-08): walk-in retraction. Pins: appointment status='confirmed', NO job INSERT at walk-in time, materializeJobFromAppointment NOT invoked from walk-in branch, audit entityType='appointment', response shape returns appointment, channel='walk_in' preserved, Theme F.2 quote linkage preserved.
 src/app/api/pos/jobs/settings/route.ts
 src/app/api/pos/loyalty/earn/route.ts
 src/app/api/pos/loyalty/redeem/route.ts

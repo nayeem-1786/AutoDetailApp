@@ -289,7 +289,7 @@ export function QuoteDetail({ quoteId, onBack, onEdit, onReQuote }: QuoteDetailP
         toast.info('Products will be added at checkout', { duration: 4000 });
       }
 
-      toast.success(`Job created from quote #${quote.quote_number}`);
+      toast.success(`Appointment created from quote #${quote.quote_number}`);
       router.push('/pos/jobs');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create job');

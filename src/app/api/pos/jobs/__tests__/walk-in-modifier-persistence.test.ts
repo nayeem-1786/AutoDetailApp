@@ -267,6 +267,10 @@ describe('POST /api/pos/jobs — Item 15g Layer 15g-iv walk-in modifier persiste
     expect(res.status).toBeLessThan(400);
 
     const appt = getAppointmentInsert();
+    // Architecture B (Stage 2): walk-in lands at status='confirmed' (not
+    // 'in_progress' pre-Arch-B). Cross-file redundancy with
+    // walk-in-no-job-pre-intake.test.ts on the highest-impact field change.
+    expect(appt.status).toBe('confirmed');
     expect(appt.coupon_code).toBeNull();
     expect(appt.coupon_discount).toBeNull();
     expect(appt.loyalty_points_redeemed).toBe(0);
