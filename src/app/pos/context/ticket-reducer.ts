@@ -4,6 +4,7 @@ import { resolveServicePriceWithSale } from '../utils/pricing';
 import { applyAddService } from '../utils/apply-add-service';
 import { applyAddProduct } from '../utils/apply-add-product';
 import { applyAddCustomItem } from '../utils/apply-add-custom-item';
+import { applyUpdateItemQuantity } from '../utils/apply-update-item-quantity';
 import { generateId } from '../utils/generate-id';
 
 export const initialTicketState: TicketState = {
@@ -142,26 +143,9 @@ export function ticketReducer(
     }
 
     case 'UPDATE_ITEM_QUANTITY': {
-      const { itemId, quantity } = action;
-      if (quantity < 1) {
-        // Remove item if quantity goes below 1
-        const items = state.items.filter((i) => i.id !== itemId);
-        return recalculateTotals({ ...state, items });
-      }
-      const items = state.items.map((item) =>
-        item.id === itemId
-          ? {
-              ...item,
-              quantity,
-              totalPrice: item.unitPrice * quantity,
-              taxAmount: calculateItemTax(
-                item.unitPrice * quantity,
-                item.isTaxable
-              ),
-            }
-          : item
-      );
-      return recalculateTotals({ ...state, items });
+      // C.1 step 4 — delegated to shared helper. Items[] always changes
+      // (either filtered when quantity < 1, or mapped when quantity ≥ 1).
+      return recalculateTotals(applyUpdateItemQuantity(state, action));
     }
 
     case 'UPDATE_PER_UNIT_QTY': {
