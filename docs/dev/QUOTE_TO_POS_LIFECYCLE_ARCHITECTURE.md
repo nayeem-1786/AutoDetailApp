@@ -2238,7 +2238,7 @@ Test delta: -6 tests deleted (4 Session 1.7 + 1 Theme F race-no-webhook + 1 B.1 
 
 ### 2026-06-07 PST — Phase 3 Theme D.1 complete (AC-9 foundation — cancel orchestration layer)
 
-**Status:** Theme D.1 merged to `main` at `<MERGE_HASH_PLACEHOLDER>` (feature commit `<FEAT_HASH_PLACEHOLDER>`, branch `feat/phase-3-theme-d-1-cancel-orchestration`). All 4 verification gates green: typecheck 0 errors from new/modified files (5 pre-existing Theme C.2 errors documented in B.2 session notes, unrelated); lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3306 passed | 66 skipped across 213 files; +25 new orchestration tests + 30 rewritten endpoint tests; pre-existing unrelated SMS env-bleed failures from prior themes are unaffected by this session).
+**Status:** Theme D.1 merged to `main` at `9f45828a` (feature commit `900479a9`, branch `feat/phase-3-theme-d-1-cancel-orchestration`). All 4 verification gates green: typecheck 0 errors from new/modified files (5 pre-existing Theme C.2 errors documented in B.2 session notes, unrelated); lint 0 errors / 97 baseline warnings (unchanged from main); build clean; full test suite passes (3306 passed | 66 skipped across 213 files; +25 new orchestration tests + 30 rewritten endpoint tests; pre-existing unrelated SMS env-bleed failures from prior themes are unaffected by this session).
 
 **Sequential execution:** Wave 4a of Phase 3 — the largest remaining session per the brief's own framing. Fires SOLO. D.2 (cancellation fee policy from `business_settings`) + D.3 (`charge.refunded` webhook listener) fire in parallel AFTER this lands.
 
