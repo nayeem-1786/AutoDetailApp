@@ -6,6 +6,7 @@ import { applyAddProduct } from '../utils/apply-add-product';
 import { applyAddCustomItem } from '../utils/apply-add-custom-item';
 import { applyUpdateItemQuantity } from '../utils/apply-update-item-quantity';
 import { applyUpdatePerUnitQty } from '../utils/apply-update-per-unit-qty';
+import { applyRemoveItem } from '../utils/apply-remove-item';
 import { generateId } from '../utils/generate-id';
 
 export const initialTicketState: TicketState = {
@@ -155,40 +156,9 @@ export function ticketReducer(
     }
 
     case 'REMOVE_ITEM': {
-      // Find any children of the removed item
-      const children = state.items.filter((i) => i.parentItemId === action.itemId);
-
-      // Combo-priced children get promoted to standalone; others are removed
-      const promotedChildren = children
-        .filter((child) => child.pricingType === 'combo')
-        .map((child) => {
-          // Revert to sale price if available, otherwise standard
-          const revertPrice = child.saleEffectivePrice ?? child.standardPrice;
-          const newPricingType: 'sale' | 'standard' = child.saleEffectivePrice != null ? 'sale' : 'standard';
-          const totalPrice = revertPrice * child.quantity;
-          return {
-            ...child,
-            parentItemId: null,
-            unitPrice: revertPrice,
-            totalPrice,
-            taxAmount: calculateItemTax(totalPrice, child.isTaxable),
-            pricingType: newPricingType,
-            comboSourcePrimaryId: null,
-          };
-        });
-
-      const removedChildIds = new Set(
-        children.filter((child) => child.pricingType !== 'combo').map((c) => c.id)
-      );
-
-      const items = state.items
-        .filter((i) => i.id !== action.itemId && !removedChildIds.has(i.id))
-        .map((i) => {
-          const promoted = promotedChildren.find((p) => p.id === i.id);
-          return promoted ?? i;
-        });
-
-      return recalculateTotals({ ...state, items });
+      // C.1 step 6 — delegated to shared helper. Combo children promoted to
+      // standalone; non-combo children removed alongside parent.
+      return recalculateTotals(applyRemoveItem(state, action));
     }
 
     case 'RESTORE_ITEM': {
