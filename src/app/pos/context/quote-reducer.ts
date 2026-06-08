@@ -123,9 +123,71 @@ export function quoteReducer(
 
     case 'ADD_SERVICE': {
       const { service, pricing, vehicleSizeClass, perUnitQty, parentItemId, comboPrice, comboPrimaryServiceId, prerequisiteNote, prerequisiteForServiceId, customPrice, customNote } = action;
-      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
 
-      // Custom price override from specialty gate modal
+      // Patch A — port ticket-reducer.ts:184-229 duplicate guard. Quote-builder.tsx:261
+      // does component-layer dedup for isPerUnit only, missing scope-tier-with-qty.
+      // This reducer-level guard is the canonical source of truth: same service +
+      // same tier (scope/specialty) + same parent context → increment perUnitQty
+      // (if applicable) or no-op. Mirrors ticket-reducer byte-for-byte so the two
+      // reducers agree on duplicate semantics.
+      const useTierMatching = service.pricing_model === 'scope' || service.pricing_model === 'specialty';
+      const pricingTierName = pricing ? (pricing.tier_label || pricing.tier_name) : null;
+      const existing = state.items.find(
+        (i) =>
+          i.itemType === 'service' &&
+          i.serviceId === service.id &&
+          i.parentItemId === (parentItemId ?? null) &&
+          (!useTierMatching || !pricingTierName || i.tierName === pricingTierName)
+      );
+
+      if (existing) {
+        const isExistingPerUnit = existing.perUnitQty != null && existing.perUnitPrice != null;
+
+        if (isExistingPerUnit) {
+          const max = existing.perUnitMax ?? service.per_unit_max ?? 10;
+          if (existing.perUnitQty! >= max) {
+            return state;
+          }
+          const newQty = existing.perUnitQty! + 1;
+          const newStdPrice = existing.perUnitPrice! * newQty;
+          const salePPU = existing.pricingType === 'sale' && existing.saleEffectivePrice != null && existing.perUnitQty
+            ? existing.saleEffectivePrice / existing.perUnitQty
+            : null;
+          const unitPrice = salePPU != null ? salePPU * newQty : newStdPrice;
+          const newSaleEff = salePPU != null ? salePPU * newQty : null;
+          const items = state.items.map((item) =>
+            item.id === existing.id
+              ? {
+                  ...item,
+                  perUnitQty: newQty,
+                  unitPrice,
+                  standardPrice: newStdPrice,
+                  saleEffectivePrice: newSaleEff,
+                  totalPrice: unitPrice * item.quantity,
+                  taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
+                }
+              : item
+          );
+          return recalculateTotals({ ...state, items });
+        }
+
+        // Non-per-unit service already on quote — no-op
+        return state;
+      }
+
+      const isPerUnit = service.pricing_model === 'per_unit' && perUnitQty && service.per_unit_price != null;
+      // Patch A — port ticket-reducer.ts:232. Scope-tier service with max_qty > 1
+      // (e.g., "per_row" interior shampoo). Treated as per-unit-like for storage:
+      // captures perUnitQty + perUnit metadata so the qty stepper in
+      // quote-item-row.tsx:149 renders and SET_VEHICLE preserves the qty across
+      // vehicle changes (see SET_VEHICLE skip-clause at quote-reducer.ts:384).
+      const isScopeTierWithQty = !isPerUnit && !!perUnitQty && !!pricing?.max_qty && pricing.max_qty > 1;
+
+      // Custom price override from specialty gate modal — bypass normal pricing
+      // resolution. Quote-reducer preserves parentItemId-insert-at-correct-index
+      // here (intentional divergence from ticket-reducer's custom-price branch,
+      // which appends to the end of the items array — preserved per Class (b)
+      // audit Finding 2; not part of the parity fix).
       if (typeof customPrice === 'number') {
         const totalPrice = customPrice;
         const newItem: TicketItem = {
@@ -173,13 +235,15 @@ export function quoteReducer(
       const saleWindow = { sale_starts_at: service.sale_starts_at, sale_ends_at: service.sale_ends_at };
       const resolved = resolveServicePriceWithSale(pricing, vehicleSizeClass, saleWindow);
 
-      // Determine effective price: lowest of sale vs combo wins
+      // Determine effective price: lowest of sale vs combo wins. Combo path is
+      // excluded for per-unit AND scope-tier-with-qty (mirror ticket-reducer:278) —
+      // combo prices are per-line-item fixed values and don't compose with per-row math.
       let effectivePrice = resolved.effectivePrice;
       let pricingType: 'standard' | 'sale' | 'combo' = resolved.isOnSale ? 'sale' : 'standard';
       let comboSourceId: string | null = null;
       const saleEffective = resolved.isOnSale ? resolved.effectivePrice : null;
 
-      if (!isPerUnit && comboPrice != null && comboPrice < resolved.standardPrice) {
+      if (!isPerUnit && !isScopeTierWithQty && comboPrice != null && comboPrice < resolved.standardPrice) {
         if (comboPrice <= effectivePrice) {
           effectivePrice = comboPrice;
           pricingType = 'combo';
@@ -187,7 +251,11 @@ export function quoteReducer(
         }
       }
 
-      const unitPrice = effectivePrice;
+      // Patch A — port ticket-reducer.ts:289-290. When scope-tier-with-qty, the
+      // tier price is per-row; multiply by qty to get the line-item total.
+      // For non-scope-tier-with-qty, multiplier is 1 (no-op).
+      const qtyMultiplier = isScopeTierWithQty ? perUnitQty! : 1;
+      const unitPrice = effectivePrice * qtyMultiplier;
       const totalPrice = unitPrice;
       const newItem: TicketItem = {
         id: generateId(),
@@ -204,15 +272,29 @@ export function quoteReducer(
         tierName: pricing.tier_label || pricing.tier_name,
         vehicleSizeClass,
         notes: null,
-        perUnitQty: isPerUnit ? perUnitQty : null,
-        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null) : null,
-        perUnitPrice: isPerUnit ? service.per_unit_price! : null,
-        perUnitMax: isPerUnit ? (service.per_unit_max ?? null) : null,
+        // Patch A — port ticket-reducer.ts:307-318. Scope-tier-with-qty captures
+        // per-unit metadata using the tier's qty_label/tier_label + standardPrice +
+        // max_qty so the stepper UI in quote-item-row.tsx:149 renders.
+        perUnitQty: isPerUnit ? perUnitQty
+          : isScopeTierWithQty ? perUnitQty
+          : null,
+        perUnitLabel: isPerUnit ? (service.per_unit_label ?? null)
+          : isScopeTierWithQty ? (pricing.qty_label ?? pricing.tier_label ?? null)
+          : null,
+        perUnitPrice: isPerUnit ? service.per_unit_price!
+          : isScopeTierWithQty ? resolved.standardPrice
+          : null,
+        perUnitMax: isPerUnit ? (service.per_unit_max ?? null)
+          : isScopeTierWithQty ? pricing.max_qty
+          : null,
         parentItemId: parentItemId ?? null,
-        standardPrice: resolved.standardPrice,
+        // Patch A — port ticket-reducer.ts:320,323. standardPrice and
+        // saleEffectivePrice both scale with qtyMultiplier so the line-item
+        // totals are coherent with display state.
+        standardPrice: resolved.standardPrice * qtyMultiplier,
         pricingType,
         comboSourcePrimaryId: comboSourceId,
-        saleEffectivePrice: saleEffective,
+        saleEffectivePrice: saleEffective != null ? saleEffective * qtyMultiplier : null,
         prerequisiteNote: prerequisiteNote ?? null,
         prerequisiteForServiceId: prerequisiteForServiceId ?? null,
       };
