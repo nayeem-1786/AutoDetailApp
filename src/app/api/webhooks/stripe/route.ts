@@ -11,6 +11,7 @@ import { SYSTEM_EMPLOYEE_ID } from '@/lib/utils/system-actors';
 import { toCents, fromCents } from '@/lib/utils/money';
 import { extractCardDetailsFromCharge } from '@/lib/utils/stripe-card-details';
 import { logAudit } from '@/lib/services/audit';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -441,9 +442,197 @@ export async function POST(request: NextRequest) {
       }
       break;
     }
+
+    // Phase 3 Theme D.3 (Phase 3.0.2 audit F.4) — reconcile refunds initiated
+    // outside the cancel-orchestration layer. Stripe dashboard refunds, manual
+    // refunds via the Stripe API, and dispute-resolution refunds all fire
+    // `charge.refunded` but never touch Smart Details otherwise; without this
+    // listener the customer's bank statement shows the refund while the
+    // appointment + transaction still read "paid in full." This branch closes
+    // the loop by inserting a `refunds` row that mirrors the orchestrator's
+    // shape and bumping the source transaction status. Idempotent at the
+    // `stripe_refund_id` lookup (per Refund, not per Charge — a charge can
+    // accumulate multiple refunds over its lifetime). NEVER changes the
+    // appointment's `status` — refund alone is not a cancel signal; the
+    // operator's explicit cancel action remains the only path that flips
+    // appointment.status='cancelled'.
+    case 'charge.refunded': {
+      const charge = event.data.object as Stripe.Charge;
+      await handleChargeRefunded(admin, charge);
+      break;
+    }
   }
 
   return NextResponse.json({ received: true });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 Theme D.3 — charge.refunded reconciliation handler.
+// ---------------------------------------------------------------------------
+
+async function handleChargeRefunded(
+  admin: SupabaseClient,
+  charge: Stripe.Charge
+): Promise<void> {
+  // Stripe's `charge.refunded` event fires whenever a Refund is created on a
+  // Charge. `charge.refunds.data` is the full list of Refund objects for this
+  // Charge ordered most-recent-first; we record EACH unrecorded refund. If
+  // the orchestrator (D.1) or a prior webhook fire already recorded a refund,
+  // its `stripe_refund_id` is in the DB and we skip it — true per-refund
+  // idempotency rather than per-event.
+  const refunds = charge.refunds?.data ?? [];
+  if (refunds.length === 0) {
+    console.warn(
+      `[Stripe Webhook] charge.refunded with empty refunds array (charge: ${charge.id})`
+    );
+    return;
+  }
+
+  const paymentIntentId =
+    typeof charge.payment_intent === 'string'
+      ? charge.payment_intent
+      : charge.payment_intent?.id ?? null;
+  if (!paymentIntentId) {
+    console.warn(
+      `[Stripe Webhook] charge.refunded with no payment_intent (charge: ${charge.id})`
+    );
+    return;
+  }
+
+  // Source transaction lookup is per-Charge (constant across all refunds in
+  // the array). Done once before the per-refund loop. We accept any status
+  // except `voided` so partially-refunded → full-refund transitions still
+  // reconcile correctly.
+  const { data: sourceTx, error: txErr } = await admin
+    .from('transactions')
+    .select('id, appointment_id, customer_id, total_amount, tip_amount, status')
+    .eq('stripe_payment_intent_id', paymentIntentId)
+    .maybeSingle();
+
+  if (txErr) {
+    console.error(
+      `[Stripe Webhook] charge.refunded transaction lookup failed (PI: ${paymentIntentId}): ${txErr.message}`
+    );
+    throw new Error(`transaction lookup failed: ${txErr.message}`);
+  }
+
+  if (!sourceTx) {
+    // Refund for a Stripe payment that doesn't link to any Smart Details
+    // transaction. Could be from a different system sharing the Stripe
+    // account, or a refund on an order whose Charge ID rather than PI ID is
+    // what we store. Log and skip — not a Smart Details event.
+    console.log(
+      `[Stripe Webhook] charge.refunded for unknown PI ${paymentIntentId}; skipping (charge: ${charge.id})`
+    );
+    return;
+  }
+
+  for (const refund of refunds) {
+    // Per-refund idempotency: skip if this exact Refund id already has a
+    // refunds row (either from D.1's orchestrator or a prior webhook fire).
+    const { data: existing, error: existingErr } = await admin
+      .from('refunds')
+      .select('id')
+      .eq('stripe_refund_id', refund.id)
+      .maybeSingle();
+
+    if (existingErr) {
+      console.error(
+        `[Stripe Webhook] existing-refund lookup failed (refund: ${refund.id}): ${existingErr.message}`
+      );
+      throw new Error(`existing-refund lookup failed: ${existingErr.message}`);
+    }
+    if (existing) {
+      console.log(
+        `[Stripe Webhook] charge.refunded already recorded for refund ${refund.id}; skipping`
+      );
+      continue;
+    }
+
+    // Insert the refunds row. Mirrors pos/refunds/route.ts:461-473 and
+    // cancel-orchestration.ts:378-394. `processed_by` is NULL — webhook has
+    // no employee actor; audit log carries the trigger context. `amount` is
+    // dollars per the existing column type (Money-Unify migration of the
+    // refunds.amount column is a future Family C/D task).
+    const { error: insertErr } = await admin.from('refunds').insert({
+      transaction_id: sourceTx.id,
+      status: 'processed',
+      amount: fromCents(refund.amount),
+      reason: refund.reason ?? 'Stripe dashboard / external refund',
+      processed_by: null,
+      stripe_refund_id: refund.id,
+      notes: JSON.stringify({
+        source: 'stripe_webhook_charge_refunded',
+        charge_id: charge.id,
+        refund_amount_cents: refund.amount,
+      }),
+    });
+
+    if (insertErr) {
+      console.error(
+        `[Stripe Webhook] refunds insert failed (refund: ${refund.id}): ${insertErr.message}`
+      );
+      throw new Error(`refunds insert failed: ${insertErr.message}`);
+    }
+
+    // Bump source transaction status. Mirrors pos/refunds/route.ts:644-678
+    // and cancel-orchestration.ts:440-450 — full vs partial decision uses the
+    // source's max refundable (total + tip). On a multi-refund Charge where
+    // earlier partial refunds already moved the transaction to
+    // `partial_refund`, the final full refund correctly transitions it to
+    // `refunded`.
+    const sourceMaxRefundableCents = toCents(
+      Number(sourceTx.total_amount) + Number(sourceTx.tip_amount ?? 0)
+    );
+    const cumulativeRefundedCents = charge.amount_refunded;
+    const sourceNewStatus =
+      cumulativeRefundedCents >= sourceMaxRefundableCents
+        ? 'refunded'
+        : 'partial_refund';
+    if (sourceTx.status !== sourceNewStatus) {
+      const { error: txUpdErr } = await admin
+        .from('transactions')
+        .update({ status: sourceNewStatus })
+        .eq('id', sourceTx.id);
+      if (txUpdErr) {
+        console.error(
+          `[Stripe Webhook] transaction status update failed (tx: ${sourceTx.id}): ${txUpdErr.message}`
+        );
+        throw new Error(
+          `transaction status update failed: ${txUpdErr.message}`
+        );
+      }
+    }
+
+    // Audit — distinct entity_type=transaction so the entry doesn't conflict
+    // with cancel-orchestration's entity_type=booking audit on the same
+    // appointment. Operators reading the audit log for an appointment see
+    // both: orchestration-driven cancellation refunds AND external
+    // reconciliation refunds.
+    await logAudit({
+      action: 'refund',
+      entityType: 'transaction',
+      entityId: sourceTx.id,
+      entityLabel: `External refund ${refund.id} on transaction ${sourceTx.id.slice(0, 8)}`,
+      details: {
+        trigger: 'stripe_webhook_charge_refunded',
+        stripe_refund_id: refund.id,
+        stripe_charge_id: charge.id,
+        stripe_payment_intent_id: paymentIntentId,
+        refund_amount_cents: refund.amount,
+        cumulative_refunded_cents: cumulativeRefundedCents,
+        source_transaction_status: sourceNewStatus,
+        appointment_id: sourceTx.appointment_id,
+        customer_id: sourceTx.customer_id,
+        reason: refund.reason ?? null,
+      },
+      source: 'api',
+    });
+
+    console.log(
+      `[Stripe Webhook] charge.refunded reconciled (refund: ${refund.id}, tx: ${sourceTx.id}, amount: ${refund.amount}c, new_tx_status: ${sourceNewStatus})`
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
