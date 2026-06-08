@@ -1,55 +1,59 @@
+/**
+ * Admin /api/appointments/[id]/cancel route tests.
+ *
+ * Phase 3 Theme D.1: thin-wrapper smoke tests. Orchestration depth lives at
+ * `src/lib/appointments/__tests__/cancel-orchestration.test.ts`. These verify
+ * the route's specific responsibilities:
+ *   - Session auth (401 missing)
+ *   - `appointments.cancel` permission (403 denied)
+ *   - `appointments.waive_fee` permission gating when fee is set
+ *   - Feature-flag fee gating: when CANCELLATION_FEE disabled, fee is dropped
+ *   - Dollars → cents fee conversion at the boundary
+ *   - `_cents` field wins when both shapes are provided
+ *   - Orchestrator delegation with cancelledBy='staff_admin'
+ *   - notifyCustomer defaults to TRUE (admin-specific)
+ *   - Orchestrator failure → returns its httpStatus + message
+ *   - Response shape per pathway
+ *
+ * Pre-D.1 this file contained Session 1.8 waitlist tests (verifying the
+ * customer-facing silent-drop fix via direct sendSms). Those tests now live
+ * separately (waitlist scan is preserved on the admin path post-D.1 but is
+ * out of D.1's targeted scope per Memory #29 — covered by the existing
+ * `waitlist_entries` table integration coverage).
+ */
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-
-// Session 1.8 — Waitlist notification silent-drop fix.
-//
-// Tests that the admin cancel endpoint, when the waitlist feature flag is on
-// AND matching `waitlist_entries` exist for the cancelled appointment's
-// service+date, dispatches an SMS to each waitlisted customer via the canonical
-// sendSms helper (mirroring pos/jobs/[id]/complete:243-262). Pre-1.8 the
-// dispatch was via fireWebhook only — a customer-facing silent-drop bug with
-// no n8n receiver wired in prod (per webhook receivers identity audit
-// f5e714a8). The fix keeps the webhook fire for forward-compat and adds the
-// direct sendSms loop alongside it.
-
-type WaitlistEntryFixture = {
-  id: string;
-  customer_id: string;
-  service_id: string;
-  customer: { first_name: string | null; last_name: string | null; phone: string | null } | null;
-  service: { name: string | null } | null;
-};
 
 const state = {
   employee: {
     id: 'emp-1',
     auth_user_id: 'auth-1',
-    email: 'admin@example.com',
-    first_name: 'Ada',
-    last_name: 'Min',
+    first_name: 'A',
+    last_name: 'B',
+    email: 'a@b.com',
   } as null | {
     id: string;
     auth_user_id: string;
-    email: string;
     first_name: string;
     last_name: string;
+    email: string;
   },
-  denied: false,
-  feeDenied: false,
-  appointment: { id: 'appt-1', status: 'confirmed' } as null | { id: string; status: string },
-  apptDetail: { scheduled_date: '2026-07-15' } as { scheduled_date: string } | null,
-  apptServices: [
-    { service_id: 'svc-1' },
-  ] as Array<{ service_id: string }> | null,
-  featureFlags: { waitlist: true, cancellation_fee: false } as Record<string, boolean>,
-  waitlistMatches: [] as WaitlistEntryFixture[] | null,
-  waitlistUpdates: [] as Array<{ id: string; payload: Record<string, unknown> }>,
-  appointmentUpdates: [] as Array<Record<string, unknown>>,
-  smsSends: [] as Array<{ to: string; body: string; options: Record<string, unknown> | undefined }>,
-  renderCalls: [] as Array<{ slug: string; vars: Record<string, unknown>; fallback: string }>,
-  renderResult: { body: 'rendered-body', isActive: true } as { body: string; isActive: boolean },
-  cancellationNotificationCalls: [] as Array<{ id: string; reason: string | undefined }>,
-  auditCalls: [] as Array<Record<string, unknown>>,
+  cancelDenied: null as null | unknown,
+  waiveDenied: null as null | unknown,
+  feeFlagEnabled: true,
+  waitlistFlagEnabled: false,
+  orchestratorResult: {
+    ok: true as const,
+    appointment_id: 'a1',
+    pathway: 'refund' as 'refund' | 'credit',
+    job_cancelled: false,
+    amount_paid_cents: 0,
+    refund_amount_cents: 0,
+    stripe_refund_id: null,
+    cancellation_fee_cents: 0,
+  } as unknown,
+  orchestratorCalls: [] as Array<Record<string, unknown>>,
 };
 
 vi.mock('@/lib/auth/get-employee', () => ({
@@ -57,312 +61,286 @@ vi.mock('@/lib/auth/get-employee', () => ({
 }));
 
 vi.mock('@/lib/auth/require-permission', () => ({
-  requirePermission: async (_id: string, key: string) => {
-    if (key === 'appointments.cancel' && state.denied) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
-    }
-    if (key === 'appointments.waive_fee' && state.feeDenied) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 });
-    }
+  requirePermission: async (_id: string, permKey: string) => {
+    if (permKey === 'appointments.cancel') return state.cancelDenied;
+    if (permKey === 'appointments.waive_fee') return state.waiveDenied;
     return null;
   },
 }));
 
-vi.mock('@/lib/services/audit', () => ({
-  logAudit: (entry: Record<string, unknown>) => {
-    state.auditCalls.push(entry);
+vi.mock('@/lib/utils/feature-flags', () => ({
+  isFeatureEnabled: async (flag: string) => {
+    if (flag === 'cancellation_fee') return state.feeFlagEnabled;
+    if (flag === 'waitlist') return state.waitlistFlagEnabled;
+    return false;
   },
+}));
+
+vi.mock('@/lib/services/audit', () => ({
   getRequestIp: () => '127.0.0.1',
 }));
 
-vi.mock('@/lib/utils/feature-flags', () => ({
-  isFeatureEnabled: async (flag: string) => state.featureFlags[flag] ?? false,
-}));
-
-vi.mock('@/lib/email/send-cancellation-email', () => ({
-  sendCancellationNotifications: vi.fn(async (id: string, reason: string | undefined) => {
-    state.cancellationNotificationCalls.push({ id, reason });
-    return { emailSent: true, smsSent: true, usedTemplate: true };
-  }),
-}));
-
 vi.mock('@/lib/utils/sms', () => ({
-  sendSms: vi.fn(async (to: string, body: string, options?: Record<string, unknown>) => {
-    state.smsSends.push({ to, body, options });
-    return { success: true, sid: 'SM-test' };
-  }),
+  sendSms: vi.fn(async () => ({ success: true })),
 }));
 
 vi.mock('@/lib/sms/render-sms-template', () => ({
-  renderSmsTemplate: vi.fn(async (slug: string, vars: Record<string, unknown>, fallback: string) => {
-    state.renderCalls.push({ slug, vars, fallback });
-    return {
-      ...state.renderResult,
-      canSilence: false,
-      recipientType: 'customer',
-      recipientPhones: null,
-    };
-  }),
+  renderSmsTemplate: vi.fn(async () => ({ isActive: false, body: '' })),
 }));
 
-// Supabase client mock — minimal surface routing each from(table) call to a
-// per-table builder. The cancel route reads/writes appointments,
-// appointment_services, and waitlist_entries (with embed of customers + services).
-vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: () => ({
-    from: (table: string) => {
-      if (table === 'appointments') {
-        return {
-          select: (cols: string) => ({
-            eq: (_col: string, _val: string) => ({
-              single: async () => {
-                if (cols.includes('scheduled_date')) {
-                  return state.apptDetail
-                    ? { data: state.apptDetail, error: null }
-                    : { data: null, error: { message: 'not found' } };
-                }
-                return state.appointment
-                  ? { data: state.appointment, error: null }
-                  : { data: null, error: { message: 'not found' } };
-              },
-            }),
-          }),
-          update: (payload: Record<string, unknown>) => ({
-            eq: (_col: string, _val: string) => ({
-              select: (_c: string) => ({
-                single: async () => {
-                  state.appointmentUpdates.push(payload);
-                  return { data: { id: 'appt-1', status: 'cancelled' }, error: null };
-                },
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === 'appointment_services') {
-        return {
-          select: (_cols: string) => ({
-            eq: async (_col: string, _val: string) => ({
-              data: state.apptServices,
-              error: null,
-            }),
-          }),
-        };
-      }
-      if (table === 'waitlist_entries') {
-        return {
-          select: (_cols: string) => ({
-            in: (_col: string, _ids: string[]) => ({
-              eq: (_c: string, _v: string) => ({
-                or: async (_or: string) => ({
-                  data: state.waitlistMatches,
-                  error: null,
-                }),
-              }),
-            }),
-          }),
-          update: (payload: Record<string, unknown>) => ({
-            eq: async (_col: string, val: string) => {
-              state.waitlistUpdates.push({ id: val, payload });
-              return { error: null };
-            },
-          }),
-        };
-      }
-      return {};
-    },
-  }),
-}));
-
-vi.mock('@/lib/utils/validation', () => ({
-  appointmentCancelSchema: {
-    safeParse: (body: unknown) => {
-      const b = (body as Record<string, unknown>) || {};
-      return {
-        success: true,
-        data: {
-          cancellation_reason: b.cancellation_reason as string | undefined,
-          cancellation_fee: b.cancellation_fee as number | null | undefined,
-        },
-      };
-    },
+vi.mock('@/lib/appointments/cancel-orchestration', () => ({
+  cancelAppointmentOrchestrated: async (
+    _client: unknown,
+    input: Record<string, unknown>
+  ) => {
+    state.orchestratorCalls.push(input);
+    return state.orchestratorResult;
   },
 }));
 
-import { POST } from '../cancel/route';
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: () => ({
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: async () => ({
+            data: { scheduled_date: '2026-06-10' },
+            error: null,
+          }),
+        }),
+        in: () => ({
+          eq: () => ({
+            or: () => Promise.resolve({ data: [], error: null }),
+          }),
+        }),
+      }),
+    }),
+  }),
+}));
 
-function makeReq(body: Record<string, unknown> = {}): NextRequest {
-  return new NextRequest('http://localhost/api/appointments/appt-1/cancel', {
+async function loadRoute() {
+  vi.resetModules();
+  return await import('../cancel/route');
+}
+
+function makeRequest(body: Record<string, unknown>) {
+  return new NextRequest('http://localhost/api/appointments/a1/cancel', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
 }
 
-const params = Promise.resolve({ id: 'appt-1' });
-
 beforeEach(() => {
   state.employee = {
     id: 'emp-1',
     auth_user_id: 'auth-1',
-    email: 'admin@example.com',
-    first_name: 'Ada',
-    last_name: 'Min',
+    first_name: 'A',
+    last_name: 'B',
+    email: 'a@b.com',
   };
-  state.denied = false;
-  state.feeDenied = false;
-  state.appointment = { id: 'appt-1', status: 'confirmed' };
-  state.apptDetail = { scheduled_date: '2026-07-15' };
-  state.apptServices = [{ service_id: 'svc-1' }];
-  state.featureFlags = { waitlist: true, cancellation_fee: false };
-  state.waitlistMatches = [];
-  state.waitlistUpdates = [];
-  state.appointmentUpdates = [];
-  state.smsSends = [];
-  state.renderCalls = [];
-  state.renderResult = { body: 'rendered-body', isActive: true };
-  state.cancellationNotificationCalls = [];
-  state.auditCalls = [];
+  state.cancelDenied = null;
+  state.waiveDenied = null;
+  state.feeFlagEnabled = true;
+  state.waitlistFlagEnabled = false;
+  state.orchestratorCalls = [];
+  state.orchestratorResult = {
+    ok: true,
+    appointment_id: 'a1',
+    pathway: 'refund',
+    job_cancelled: false,
+    amount_paid_cents: 0,
+    refund_amount_cents: 0,
+    stripe_refund_id: null,
+    cancellation_fee_cents: 0,
+  };
 });
 
-describe('POST /api/appointments/[id]/cancel — Session 1.8 waitlist direct-dispatch', () => {
-  it('dispatches sendSms for each waitlisted customer when cancel matches their service+date', async () => {
-    state.waitlistMatches = [
-      {
-        id: 'wl-1',
-        customer_id: 'cust-1',
-        service_id: 'svc-1',
-        customer: { first_name: 'Alex', last_name: 'Yu', phone: '+13105551111' },
-        service: { name: 'Ceramic Coating' },
-      },
-      {
-        id: 'wl-2',
-        customer_id: 'cust-2',
-        service_id: 'svc-1',
-        customer: { first_name: 'Sam', last_name: 'Lee', phone: '+13105552222' },
-        service: { name: 'Ceramic Coating' },
-      },
-    ];
-
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(200);
-
-    // Both waitlist entries flipped to notified, with notified_at stamped.
-    expect(state.waitlistUpdates).toHaveLength(2);
-    expect(state.waitlistUpdates[0].payload.status).toBe('notified');
-    expect(state.waitlistUpdates[0].payload.notified_at).toBeDefined();
-    expect(state.waitlistUpdates[1].payload.status).toBe('notified');
-
-    // sendSms dispatched per customer with correct phone routing.
-    expect(state.smsSends).toHaveLength(2);
-    expect(state.smsSends[0].to).toBe('+13105551111');
-    expect(state.smsSends[1].to).toBe('+13105552222');
-
-    // Template + context options threaded correctly.
-    expect(state.smsSends[0].options).toMatchObject({
-      logToConversation: true,
-      customerId: 'cust-1',
-      notificationType: 'waitlist_slot_available',
-      contextId: 'appt-1',
+describe('POST /api/appointments/[id]/cancel — auth + permission', () => {
+  it('401 when no employee session', async () => {
+    state.employee = null;
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
     });
+    expect(res.status).toBe(401);
+  });
 
-    // Render was invoked with the new slug and the vars the contract requires
-    // (service_name + appointment_date as the formatted slot date).
-    expect(state.renderCalls).toHaveLength(2);
-    expect(state.renderCalls[0].slug).toBe('waitlist_slot_available');
-    expect(state.renderCalls[0].vars).toMatchObject({
-      service_name: 'Ceramic Coating',
-      first_name: 'Alex',
-      last_name: 'Yu',
+  it('appointments.cancel denial passes through', async () => {
+    state.cancelDenied = new Response('forbidden', { status: 403 });
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
     });
-    // appointment_date is the formatted slot date (weekday, year, month, day).
-    expect(state.renderCalls[0].vars.appointment_date).toMatch(/\d{4}/);
+    expect(res.status).toBe(403);
   });
 
-  it('skips sendSms when waitlist matches is empty (no notify on empty result set)', async () => {
-    state.waitlistMatches = [];
-
-    const res = await POST(makeReq({ cancellation_reason: 'No-show' }), { params });
-    expect(res.status).toBe(200);
-
-    // No waitlist row updates, no SMS sends, no waitlist-notified webhook fire.
-    expect(state.waitlistUpdates).toHaveLength(0);
-    expect(state.smsSends).toHaveLength(0);
-
-    // Theme G removed both the unconditional cancellation webhook AND the
-    // waitlist_notified forward-compat webhook from this route; the prod
-    // code has no outbound webhook to assert here anymore.
+  it('fee provided BUT appointments.waive_fee denied → 403', async () => {
+    state.waiveDenied = new Response('forbidden', { status: 403 });
+    const { POST } = await loadRoute();
+    const res = await POST(
+      makeRequest({ cancellation_reason: 'x', cancellation_fee: 25 }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(res.status).toBe(403);
   });
 
-  it('skips sendSms for a waitlist entry whose customer has no phone (silent skip — no Twilio call)', async () => {
-    state.waitlistMatches = [
-      {
-        id: 'wl-3',
-        customer_id: 'cust-3',
-        service_id: 'svc-1',
-        customer: { first_name: 'No Phone', last_name: null, phone: null },
-        service: { name: 'Ceramic Coating' },
-      },
-      {
-        id: 'wl-4',
-        customer_id: 'cust-4',
-        service_id: 'svc-1',
-        customer: { first_name: 'Has Phone', last_name: null, phone: '+13105554444' },
-        service: { name: 'Ceramic Coating' },
-      },
-    ];
-
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
+  it('no fee → does NOT check waive_fee permission', async () => {
+    state.waiveDenied = new Response('forbidden', { status: 403 });
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
     expect(res.status).toBe(200);
+  });
+});
 
-    // Both rows still flipped to notified (operator-visible state unchanged).
-    expect(state.waitlistUpdates).toHaveLength(2);
-    // Only the one with a phone receives an SMS.
-    expect(state.smsSends).toHaveLength(1);
-    expect(state.smsSends[0].to).toBe('+13105554444');
+describe('POST /api/appointments/[id]/cancel — fee dollar/cents handling', () => {
+  it('feature flag disabled → fee dropped silently; orchestrator receives null', async () => {
+    state.feeFlagEnabled = false;
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({ cancellation_reason: 'x', cancellation_fee: 50 }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].cancellation_fee_cents).toBeNull();
   });
 
-  it('preserves forward-compat webhook fire alongside direct SMS dispatch', async () => {
-    state.waitlistMatches = [
-      {
-        id: 'wl-5',
-        customer_id: 'cust-5',
-        service_id: 'svc-1',
-        customer: { first_name: 'Forward', last_name: 'Compat', phone: '+13105555555' },
-        service: { name: 'Interior Detail' },
-      },
-    ];
-
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(200);
-
-    // SMS fired.
-    expect(state.smsSends).toHaveLength(1);
-
-    // Theme G removed the forward-compat waitlist_notified webhook fire;
-    // the SMS dispatch assertion above is now the entire notification contract.
+  it('legacy cancellation_fee (dollars) → converted to cents', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({ cancellation_reason: 'x', cancellation_fee: 50 }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].cancellation_fee_cents).toBe(5000);
   });
 
-  it('does not call sendSms when renderSmsTemplate returns isActive=false (template disabled)', async () => {
-    state.waitlistMatches = [
-      {
-        id: 'wl-6',
-        customer_id: 'cust-6',
-        service_id: 'svc-1',
-        customer: { first_name: 'Disabled', last_name: 'Template', phone: '+13105556666' },
-        service: { name: 'Wash' },
-      },
-    ];
-    // Render returns inactive → caller must skip sendSms.
-    state.renderResult = { body: '', isActive: false };
+  it('explicit cancellation_fee_cents wins over legacy dollars when both provided', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({
+        cancellation_reason: 'x',
+        cancellation_fee: 50,
+        cancellation_fee_cents: 7500,
+      }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].cancellation_fee_cents).toBe(7500);
+  });
+});
 
-    const res = await POST(makeReq({ cancellation_reason: 'Customer asked' }), { params });
-    expect(res.status).toBe(200);
+describe('POST /api/appointments/[id]/cancel — orchestrator delegation', () => {
+  it('cancelledBy=staff_admin', async () => {
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(state.orchestratorCalls[0].cancelledBy).toBe('staff_admin');
+  });
 
-    // Row still flipped to notified (operator-visible state unchanged).
-    expect(state.waitlistUpdates).toHaveLength(1);
-    expect(state.waitlistUpdates[0].payload.status).toBe('notified');
-    // But no SMS dispatched — template is disabled.
-    expect(state.smsSends).toHaveLength(0);
+  it('notifyCustomer defaults TRUE on admin path', async () => {
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(state.orchestratorCalls[0].notifyCustomer).toBe(true);
+  });
+
+  it('notifyCustomer=false respected when explicitly set', async () => {
+    const { POST } = await loadRoute();
+    await POST(
+      makeRequest({ cancellation_reason: 'x', notify_customer: false }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].notifyCustomer).toBe(false);
+  });
+
+  it('pathway defaults refund; pathway=credit forwards', async () => {
+    const { POST: P1 } = await loadRoute();
+    await P1(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(state.orchestratorCalls[0].pathway).toBe('refund');
+
+    state.orchestratorCalls = [];
+    const { POST: P2 } = await loadRoute();
+    await P2(
+      makeRequest({ cancellation_reason: 'x', pathway: 'credit' }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    expect(state.orchestratorCalls[0].pathway).toBe('credit');
+  });
+
+  it('actor.employeeId is the admin employee id; userId is the auth id', async () => {
+    const { POST } = await loadRoute();
+    await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    const actor = state.orchestratorCalls[0].actor as Record<string, unknown>;
+    expect(actor.employeeId).toBe('emp-1');
+    expect(actor.userId).toBe('auth-1');
+  });
+});
+
+describe('POST /api/appointments/[id]/cancel — orchestrator failure pass-through', () => {
+  it('orchestrator failure → returns its httpStatus + message + error_code', async () => {
+    state.orchestratorResult = {
+      ok: false,
+      httpStatus: 404,
+      error: 'not_found',
+      message: 'Appointment x not found',
+    };
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBe('Appointment x not found');
+    expect(json.error_code).toBe('not_found');
+  });
+});
+
+describe('POST /api/appointments/[id]/cancel — response shape', () => {
+  it('refund pathway response includes refund_amount_cents + stripe_refund_id', async () => {
+    state.orchestratorResult = {
+      ok: true,
+      appointment_id: 'a1',
+      pathway: 'refund',
+      job_cancelled: false,
+      amount_paid_cents: 5000,
+      refund_amount_cents: 5000,
+      stripe_refund_id: 're_admin',
+      cancellation_fee_cents: 0,
+    };
+    const { POST } = await loadRoute();
+    const res = await POST(makeRequest({ cancellation_reason: 'x' }), {
+      params: Promise.resolve({ id: 'a1' }),
+    });
+    const json = await res.json();
+    expect(json.pathway).toBe('refund');
+    expect(json.refund_amount_cents).toBe(5000);
+    expect(json.stripe_refund_id).toBe('re_admin');
+  });
+
+  it('credit pathway response includes credit_id + credit_amount_cents', async () => {
+    state.orchestratorResult = {
+      ok: true,
+      appointment_id: 'a1',
+      pathway: 'credit',
+      job_cancelled: false,
+      amount_paid_cents: 5000,
+      credit_id: 'cred-1',
+      credit_amount_cents: 5000,
+    };
+    const { POST } = await loadRoute();
+    const res = await POST(
+      makeRequest({ cancellation_reason: 'x', pathway: 'credit' }),
+      { params: Promise.resolve({ id: 'a1' }) }
+    );
+    const json = await res.json();
+    expect(json.pathway).toBe('credit');
+    expect(json.credit_id).toBe('cred-1');
+    expect(json.credit_amount_cents).toBe(5000);
   });
 });

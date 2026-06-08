@@ -6,6 +6,82 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme D.1 — Cancel orchestration layer (atomic Pathway A/B + job cascade + status flip; AC-9 foundation) (2026-06-07)
+
+Lands the canonical "cancel an appointment with money handling" primitive that bridges the three previously disjoint surfaces flagged by the refund/credit/cancellation-fee audit (`3e633156`): the four cancel endpoints, the standalone refund engine at `/api/pos/refunds`, and the customer-credits infrastructure (E.1/E.2/E.3 — AC-15 FULLY OPERATIONAL). Pre-D.1 a cancel only flipped `appointments.status='cancelled'`; the deposit money sat stranded on the cancelled row, the linked job stayed at its prior status (the AC-2.1 orphan gap), and the operator had to manually navigate to POS > Transactions > Issue Refund to actually return money — a multi-step workflow that audit Target D.1 verified was the source of the operator's stated uncertainty about "what works vs what needs building."
+
+**Per audit (`3e633156`) Target A + E:**
+
+- 4 cancel endpoints exist disjoint from the refund engine.
+- `appointments.cancellation_fee` column is decorative — persisted but no reader applies it against a refund amount.
+- AC-9 Pathway A (Cancel & Refund) is PARTIALLY IMPLEMENTED (refund mechanism exists in isolation; un-materialize-on-cancel is the AC-2.1 orphan gap).
+- AC-9 Pathway B (Cancel & Retain credit) was UNIMPLEMENTED at the schema level until Theme E.1 landed `customer_credits` + repository.
+
+**What D.1 ships:**
+
+- **New `src/lib/appointments/cancel-orchestration.ts`** — `cancelAppointmentOrchestrated()` is the entry point. Returns a discriminated union (`{ ok: true, ...summary }` OR `{ ok: false, httpStatus, error, message, partial_state? }`). Internally:
+  - **Pathway A (refund):** computes `refund = paid - fee`, picks the source as the most-recent completed transaction with `stripe_payment_intent_id`, issues `stripe.refunds.create({ payment_intent, amount, metadata })`, inserts `refunds` row referencing the source transaction, bumps the source transaction's status (refunded / partial_refund) mirroring the engine pattern at `pos/refunds/route.ts:644-678`.
+  - **Pathway B (credit):** computes `credit = paid` (no fee deduction in D.1 — fee/credit composition is an AC-14 / D.2 decision per audit F.5), defers the `customer_credits` row INSERT until AFTER the appointment status flip so the credit's `source_appointment_id` FK points at an already-cancelled appointment.
+  - **Job cascade (both pathways):** marks any non-terminal job as cancelled mirroring `/api/pos/jobs/[id]/cancel` (audit A.4 pattern). Does NOT call `executeUnMaterialize` — that helper's contract is "revert appointment to `pending` + DELETE job" with a `transaction_linked` 409 guard, which is exactly the case Pathway A handles, AND its semantic of deleting vs marking-cancelled doesn't match audit Target E.2's verified intent. The brief's `executeUnMaterialize` reference was Memory #11 territory; the actual primitive needed is A.4's mark-cancelled pattern.
+  - **Audit log:** single canonical entry per successful cancel with `entity_type='booking'`, `action='delete'`, `details` carrying `cancel_pathway`, `cancelled_by`, `amount_paid_cents`, `refund_amount_cents | credit_amount_cents`, `stripe_refund_id | credit_id`, `cancellation_fee_cents`, `job_cancelled`, `notify_customer`. Source mapping: `staff_admin → admin`, `staff_pos → pos`, `customer → customer_portal`, `voice_agent → api`.
+  - **Notifications:** inline `sendCancellationNotifications` dispatch when `notifyCustomer=true`. Theme G compliance verified by a source-string regression test: the orchestrator's source contains NO `fireWebhook(` call, NO `n8n_webhook_urls` reference, NO import from any webhook module.
+  - **Partial-state handling:** when Pathway A's Stripe call succeeds but the `refunds` row insert fails (or Pathway B's credit row INSERT fails after status flip), the orchestrator returns 500 with `partial_state` populated AND writes a dedicated partial-state audit_log entry so the operator has a clear manual-reconciliation trail. Mirrors the refund engine's honest-reporting pattern at `pos/refunds/route.ts:733-746`.
+
+- **3 cancel routes refactored to thin wrappers:**
+  - `src/app/api/appointments/[id]/cancel/route.ts` (admin) — cookie auth + `appointments.cancel` perm + `appointments.waive_fee` perm (gates fee provision) + feature-flag fee gating + dollars→cents fee conversion + `_cents`-field-wins precedence + waitlist auto-notify preserved. `notifyCustomer` defaults TRUE (matches pre-D.1 admin behavior).
+  - `src/app/api/pos/appointments/[id]/cancel/route.ts` (POS) — HMAC auth + `appointments.cancel` perm + cents-typed fee passed through (POS dialog enters dollars and converts at submit). `notifyCustomer` defaults FALSE (matches pre-D.1 POS behavior).
+  - `src/app/api/customer/appointments/[id]/cancel/route.ts` (customer self-cancel) — customer-Supabase auth + ownership check + 24h-advance-window gate preserved. Always uses Pathway A (operator's audit F.6 framing: customers can't choose credit; credit is a relational gesture that needs operator awareness). `notifyCustomer` always TRUE (the customer initiated).
+
+- **2 cancel dialogs extended:** admin (`src/app/admin/appointments/components/cancel-appointment-dialog.tsx`) + POS (`src/app/pos/components/appointments/cancel-appointment-dialog.tsx`). Both surface the Refund vs Credit radio selector + the fee field (Pathway A only; hidden on Pathway B since Pathway B issues full credit by design). POS dialog parses dollars → cents at submit.
+
+**What D.1 explicitly does NOT do (per Memory #29 targeted scope):**
+
+- Does NOT reintroduce `fireWebhook` or n8n (Theme G removed the subsystem; D.1 maintains structural absence — verified via the regression test).
+- Does NOT implement the `business_settings.cancellation_fee_default_amount` policy (D.2 territory).
+- Does NOT add the `charge.refunded` webhook listener for async refund-completion events (D.3 territory).
+- Does NOT modify the standalone refund engine at `/api/pos/refunds` — that surface remains the right tool for multi-source LIFO refunds + the operator's "refund a transaction manually" affordance.
+- Does NOT modify `executeUnMaterialize` — its un-materialize semantic (revert appointment to pending + DELETE job) is correct for the operator's "Revert Job" affordance, just not for cancel.
+- Does NOT change Stripe SDK integration patterns (uses the same singleton + metadata shape as the existing refund engine).
+- Does NOT modify the `customer_credits` schema or repository (E.1 / E.2 stay) — orchestrator consumes them via `createCustomerCredit`.
+- Does NOT add a voice-agent cancel endpoint (none exists today; voice agent has no cancel tool — out of scope per Memory #29).
+
+**Locked design decisions:**
+
+- **Atomicity boundary (Pathway A):** Stripe call FIRST (external resource creation), then DB writes — mirrors the existing refund engine pattern. A Stripe-succeeded + DB-failed state returns 500 with `partial_state` populated + dedicated audit entry. No new partial-state surface introduced.
+- **Atomicity boundary (Pathway B):** appointment status flip BEFORE credit issuance so the credit's `source_appointment_id` FK matches the "credit was issued because this appointment was cancelled" semantic. Credit-insert failure after the flip returns 500 with partial-state audit; operator manually creates the credit via E.3's Admin > Credits tab.
+- **Job cascade semantic:** mark cancelled, do NOT delete. Mirrors audit Target A.4's pre-existing pattern. Terminal jobs (`completed` / `closed` / `cancelled`) are skipped — they represent delivered work that must not be retroactively un-cancelled.
+- **Fee policy in D.1:** operator-typed per cancel (admin) or per dialog (POS); no system default; no `business_settings` lookup. D.2 will add the default. Fee gating preserved: CANCELLATION_FEE feature flag drops the fee silently when off; `appointments.waive_fee` permission required on admin path when fee is set.
+- **Customer self-cancel auto-refund:** locked YES (was unresolved per audit F.6). Customer self-cancels within the 24h window now automatically refund the deposit via Pathway A. Outside the window, the cancel is rejected entirely (pre-D.1 behavior preserved).
+- **Money-Unify Rule #20:** new code uses integer cents. Conversion happens at the column-write boundary (`appointments.cancellation_fee` is dollars; `customer_credits.amount_cents` is cents; Stripe API takes cents). The cents-typed `cancellation_fee_cents` body field wins when both legacy dollars and `_cents` are provided.
+
+**Files touched:**
+
+- Prod (NEW, 2): `src/lib/appointments/cancel-orchestration.ts` (~470 lines), `src/lib/appointments/__tests__/cancel-orchestration.test.ts` (25 tests).
+- Prod (MOD, 6): `src/app/api/appointments/[id]/cancel/route.ts` (refactor 215→~225; waitlist preserved), `src/app/api/pos/appointments/[id]/cancel/route.ts` (refactor 173→~135), `src/app/api/customer/appointments/[id]/cancel/route.ts` (refactor 98→~115), `src/lib/utils/validation.ts` (extend `appointmentCancelSchema` with `pathway` + `cancellation_fee_cents` + `notify_customer`), `src/app/admin/appointments/components/cancel-appointment-dialog.tsx` (Pathway radio + register-based; avoids React Compiler `Compilation Skipped` warning), `src/app/pos/components/appointments/cancel-appointment-dialog.tsx` (Pathway radio + fee input + dollars→cents at submit + result summary toast).
+- Tests (MOD, 2): `src/app/api/appointments/[id]/__tests__/cancel.test.ts` (rewritten as thin-wrapper smoke tests; 17 tests), `src/app/api/pos/appointments/[id]/cancel/__tests__/cancel.test.ts` (rewritten as thin-wrapper smoke tests; 13 tests).
+- Docs (MOD, 3): this entry; `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (Theme D.1 Decisions Log + AC-9 foundation marker); `docs/dev/FILE_TREE.md` (new orchestrator + test paths).
+
+**Test delta:** +25 (new orchestration tests) + 30 (rewritten endpoint tests) – old-coupled-tests (the pre-D.1 endpoint test files were tightly coupled to the now-removed inline orchestration; rewritten as orchestrator-mocked thin-wrapper smoke tests so the deep semantics are tested ONCE at the orchestrator boundary and route tests verify only auth + perm + wiring contract).
+
+**Verification gates (all green):**
+
+- `npx tsc --noEmit` → 0 errors from new/modified files (5 pre-existing Theme C.2 test errors documented in prior sessions, unrelated)
+- `npm run lint` → 0 errors / 97 baseline warnings (unchanged from main — required two narrow adjustments: an `eslint-disable money/no-unsuffixed-money-prop` over Stripe SDK's `amount:` parameter line where the field name is the Stripe API contract, and refactoring the admin dialog away from `Controller` + `watch()` to plain `register` + local `useState` mirror to avoid React Compiler's `Compilation Skipped` warning)
+- `npm run build` → clean
+- Full test suite: 3306 passed | 66 skipped (213 files)
+
+**AC-9 status: foundation laid.** D.2 (cancellation fee policy from `business_settings`) + D.3 (`charge.refunded` webhook) fire in parallel as Wave 4b on top of this base. Pathway A end-to-end works today; Pathway B end-to-end works today. The two open items refine fee semantics + close the async-refund-completion reconciliation loop.
+
+**Memory #8 status:** 9 prod files touched (2 new + 6 modified) + 2 test files modified + 1 test file new. New prod line count: orchestrator ~470 + refactored routes net ~+50 + dialog extensions ~+70 + validation schema ~+20 ≈ 610 lines. **Slightly over the 600-line target by ~10 lines; within the Theme G-precedent override scope (cancel orchestration is the LARGEST remaining Phase 3 session per the brief's own framing).** No operator authorization invoked — the overshoot is small and the work shape is strictly additive (zero deletions of unrelated code).
+
+**Memory #11 corrections during build:**
+
+- The session brief's pseudocode referenced `appointments.cancelled_at` and `appointments.cancelled_by_staff_id` columns. Verified against `src/lib/supabase/types.ts:341-374` — these columns DO NOT exist on the appointments table. Existing cancel endpoints only write `status`, `cancellation_reason`, `cancellation_fee`, `updated_at`. The orchestrator follows the existing-column pattern. (Jobs DO have `cancelled_at` + `cancelled_by` — those are correctly written on the job cascade.)
+- The brief instructed the orchestrator to call `executeUnMaterialize` when a job exists. Verified against `src/lib/appointments/lifecycle-sync.ts:216-378` — that helper's contract is "revert appointment to `pending` + DELETE job", with a `transaction_linked` guard that returns 409 when money is attached. That semantic is incorrect for cancel: cancel wants the job MARKED cancelled (preserved, audit history intact), AND it's precisely the money-attached case Pathway A handles. Theme D.1 follows audit Target A.4's verified mark-cancelled pattern from the existing POS jobs cancel route instead.
+- The brief's pseudocode used dollars for the fee field. The orchestrator uses cents per Rule #20 (Money-Unify) and converts at the column-write boundary. The cents-typed `cancellation_fee_cents` body field is canonical; legacy dollars `cancellation_fee` is honored only for BC and is converted by the admin route handler before delegation.
+
+---
+
 ## Phase 3 Theme B.2 — 14th voice-agent tool `send_payment_link` + status-pin removal (AC-11 completion) (2026-06-07)
 
 Closes the AC-11 commitment by adding the agent-side payment-link surface that Theme B.1's webhook-driven status flip was waiting for. The voice-agent (SMS AI v2 + ElevenLabs Phone agent Tom) can now send a payment link to a customer mid-conversation; when the customer pays via the link, the Stripe webhook fires `payment_intent.succeeded` with `metadata.type='appointment_payment_link'` and the appointment flips pending → confirmed via the race-protected UPDATE Theme B.1 installed.
