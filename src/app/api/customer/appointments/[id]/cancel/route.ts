@@ -97,7 +97,15 @@ export async function POST(
       appointmentId: id,
       pathway: 'refund',
       reason: 'Cancelled by customer',
-      cancellation_fee_cents: null,
+      // Phase 3 Theme D.2 (AC-14): customer self-cancel is explicit-waive
+      // (`0`), NOT default-from-business-settings. The 24h advance window
+      // gate above IS the fee policy for this surface — customers who
+      // cancel in time get a full refund; customers who try to cancel too
+      // late are rejected entirely. Pre-D.2 this field was `null` which
+      // collapsed to 0; D.2 promotes nullish to "read default", so the
+      // explicit `0` is now required to preserve the documented "no fee
+      // on this path" contract.
+      cancellation_fee_cents: 0,
       notifyCustomer: true,
       cancelledBy: 'customer',
       actor: {

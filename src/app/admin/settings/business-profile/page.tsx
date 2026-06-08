@@ -35,9 +35,14 @@ export default function BusinessProfilePage() {
   const [saving, setSaving] = useState(false);
   const [savingHours, setSavingHours] = useState(false);
   const [savingBooking, setSavingBooking] = useState(false);
+  // Phase 3 Theme D.2 (AC-14): cancellation_fee_default_dollars is the
+  // user-facing dollar string (input value). Stored in business_settings as
+  // CENTS (`cancellation_fee_default_cents`) per Memory #20 — conversion at
+  // the save boundary below.
   const [booking, setBooking] = useState({
     default_deposit_amount: '50',
     quote_validity_days: '10',
+    cancellation_fee_default_dollars: '50',
   });
   const [bookingDirty, setBookingDirty] = useState(false);
   const [savingSeo, setSavingSeo] = useState(false);
@@ -97,6 +102,7 @@ export default function BusinessProfilePage() {
           'business_name', 'business_phone', 'business_address', 'business_email', 'business_website', 'business_hours',
           'business_description', 'business_latitude', 'business_longitude', 'service_area_name', 'service_area_radius', 'price_range',
           'default_deposit_amount', 'quote_validity_days', 'og_image_url',
+          'cancellation_fee_default_cents',
         ]);
 
       if (error) {
@@ -137,10 +143,22 @@ export default function BusinessProfilePage() {
         }
       }
 
-      // Load booking & quote settings
+      // Load booking & quote settings. Cancellation fee is stored as cents;
+      // convert to dollars for the user-facing input. Permissive: a missing
+      // row or a string-wrapped cents value (legacy double-serialization) both
+      // fall back to $50 (the seed default).
+      const rawFeeCents = settings.cancellation_fee_default_cents;
+      let feeDollars = '50';
+      if (typeof rawFeeCents === 'number' && Number.isFinite(rawFeeCents)) {
+        feeDollars = (rawFeeCents / 100).toFixed(2);
+      } else if (typeof rawFeeCents === 'string') {
+        const parsed = Number(rawFeeCents);
+        if (Number.isFinite(parsed)) feeDollars = (parsed / 100).toFixed(2);
+      }
       setBooking({
         default_deposit_amount: String(settings.default_deposit_amount ?? '50'),
         quote_validity_days: String(settings.quote_validity_days ?? '10'),
+        cancellation_fee_default_dollars: feeDollars,
       });
 
       // Load SEO settings
@@ -276,6 +294,13 @@ export default function BusinessProfilePage() {
   async function saveBooking() {
     const depositNum = parseInt(booking.default_deposit_amount) || 50;
     const validityNum = parseInt(booking.quote_validity_days) || 10;
+    // Phase 3 Theme D.2 (AC-14): dollars → cents at the save boundary. We
+    // round to the nearest cent rather than truncate so $50.005 doesn't
+    // silently become $5000 cents (= $50.00).
+    const feeDollars = parseFloat(booking.cancellation_fee_default_dollars);
+    const feeCents = Number.isFinite(feeDollars) && feeDollars >= 0
+      ? Math.round(feeDollars * 100)
+      : 5000;
 
     if (depositNum < 0) {
       toast.error('Deposit amount cannot be negative');
@@ -285,6 +310,10 @@ export default function BusinessProfilePage() {
       toast.error('Quote validity must be between 1 and 365 days');
       return;
     }
+    if (!Number.isFinite(feeDollars) || feeDollars < 0) {
+      toast.error('Cancellation fee cannot be negative');
+      return;
+    }
 
     setSavingBooking(true);
     const supabase = createClient();
@@ -292,6 +321,12 @@ export default function BusinessProfilePage() {
     const entries = [
       { key: 'default_deposit_amount', value: depositNum },
       { key: 'quote_validity_days', value: validityNum },
+      // The `value` field is the canonical business_settings.value column
+      // name (JSONB k/v table) — it's the column, not a money-typed variable.
+      // The Money-Unify lint rule can't tell the difference because the cents
+      // value flows through it.
+      // eslint-disable-next-line money/no-unsuffixed-money-prop
+      { key: 'cancellation_fee_default_cents', value: feeCents },
     ];
 
     for (const entry of entries) {
@@ -633,6 +668,22 @@ export default function BusinessProfilePage() {
                 value={booking.quote_validity_days}
                 onChange={(e) => updateBookingField('quote_validity_days', e.target.value)}
                 placeholder="10"
+              />
+            </FormField>
+
+            <FormField
+              label="Cancellation Fee ($)"
+              description="Default fee deducted from refunds when an appointment is cancelled. Operator can override or waive at cancel time."
+              htmlFor="cancellation_fee"
+            >
+              <Input
+                id="cancellation_fee"
+                type="number"
+                min="0"
+                step="0.01"
+                value={booking.cancellation_fee_default_dollars}
+                onChange={(e) => updateBookingField('cancellation_fee_default_dollars', e.target.value)}
+                placeholder="50.00"
               />
             </FormField>
           </div>

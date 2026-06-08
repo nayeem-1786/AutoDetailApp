@@ -42,6 +42,50 @@ Closes the refund-event-listener loop by subscribing the Stripe webhook to `char
 
 ---
 
+## Phase 3 Theme D.2 — Cancellation fee policy from business_settings (AC-14 completion) (2026-06-08)
+
+Closes AC-14: the cancellation fee is now policy-driven from `business_settings` instead of operator-typed per cancel. Default value seeded at $50; operator can edit via Admin > Settings > Business Profile; the admin + POS cancel dialogs pre-fill the configured default into their fee input, render a live refund breakdown, and surface a one-click Waive button for per-cancel exceptions.
+
+**Operator-locked architectural decisions:**
+
+- **Storage key + units:** `business_settings.cancellation_fee_default_cents` stores the default as **integer cents** (JSON number; e.g. `5000` = $50). The architecture doc's AC-14 prose references `cancellation_fee_default_amount` as a dollars-style sketch — Theme D.2 diverges to cents for two reasons: (a) the D.1 orchestrator and both cancel dialogs already work in `cancellation_fee_cents` everywhere, so cents-native storage eliminates a dollars→cents conversion at every read site (Memory #20); (b) dollars-vs-cents misinterpretation in the JSONB k/v table is a real footgun that an explicit `_cents` suffix prevents. Admin UI converts dollars↔cents at the save/load boundary.
+- **Orchestrator fee resolution contract:** `cancellation_fee_cents: undefined | null` → read default from `business_settings`; explicit number (including `0`) → use as-is. Pre-D.2 the contract was `?? 0` (both nullish collapsed to "no fee"); D.2 promotes nullish to "apply the configured default" per AC-14 commitment. Callers that intend "no fee ever" (the customer self-cancel route, where the 24h advance window IS the fee policy) now pass `0` explicitly — the route comment documents this contract shift.
+- **Dialog UX = pre-fill + override + waive:** both cancel dialogs fetch the default on open via a dedicated GET endpoint and pre-populate the fee input. Operator can type any override; "Waive" button sets the input to `$0`; the breakdown panel renders Deposit-paid / Cancellation-fee / Refund live as the input changes. Breakdown uses `appointment.deposit_amount` as the paid proxy (the typical single-source-deposit case); multi-source actuals come back authoritatively in the orchestrator's success response, which the existing toast surfaces.
+- **Auth split for the GET endpoint:** two parallel routes, one under `/api/admin/...` (session-cookie auth) and one under `/api/pos/...` (HMAC auth), both delegating to the same canonical `getDefaultCancellationFeeCents` helper exported from `cancel-orchestration.ts`. Mirrors the existing `quote-defaults` precedent rather than introducing a dual-auth pattern.
+- **Customer self-cancel preserves the "no fee on this path" contract:** the customer-portal cancel route's pre-D.2 `cancellation_fee_cents: null` now translates to "apply default" under the new contract — would be a silent behavior change. The route is updated to send `0` explicitly, with an inline comment explaining the contract shift and why the 24h gate is the fee-equivalent policy for this surface.
+
+**Graceful degradation everywhere:**
+
+- `getDefaultCancellationFeeCents` returns `0` (no fee) on missing row, null value, non-numeric value, negative value, or DB read error — so a hiccup never blocks a cancel. Permissively coerces string-typed values (legacy double-serialization per `src/lib/data/booking.ts:316`).
+- Both GET endpoints return `{ default_cents: 0 }` on internal error rather than 5xx — the dialog still opens and the operator can manually type a fee.
+- Both dialogs fall back silently on a failed fetch; the orchestrator's own default-read covers the server side.
+
+**Production files (5 modified + 3 new = 8):**
+
+- `src/lib/appointments/cancel-orchestration.ts` (+84 lines) — new exported `getDefaultCancellationFeeCents` helper + `CANCELLATION_FEE_SETTING_KEY` constant + updated Pathway A fee resolution + JSDoc contract on the `cancellation_fee_cents` input field
+- `src/app/api/admin/settings/cancellation-fee-default/route.ts` (NEW, ~54 lines incl. comments) — admin-session GET endpoint
+- `src/app/api/pos/settings/cancellation-fee-default/route.ts` (NEW, ~33 lines incl. comments) — POS-HMAC GET endpoint
+- `src/app/api/customer/appointments/[id]/cancel/route.ts` (+10 lines) — preserves "no fee on this path" by passing explicit `0` post-D.2
+- `src/app/admin/settings/business-profile/page.tsx` (+53 lines) — Cancellation Fee dollar input alongside Default Deposit + Quote Validity in the Booking & Quotes card; dollars↔cents at save/load
+- `src/app/admin/appointments/components/cancel-appointment-dialog.tsx` (+134 lines) — fetch + pre-fill + breakdown panel + Waive button; UI-only mirror state pattern to avoid React Compiler `watch()` warnings
+- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx` (+97 lines) — same shape as admin dialog but with dark-mode classes
+- `supabase/migrations/20260608015513_seed_cancellation_fee_default_setting.sql` (NEW, ~49 lines incl. comments) — `INSERT … ON CONFLICT DO NOTHING` seeding the row at `5000` cents; preserves operator-customized values on re-run
+
+**Tests (1 modified + 1 new = 2 files; +21 new tests):**
+
+- `src/lib/appointments/__tests__/cancel-orchestration.test.ts` (+257 lines, +16 tests) — D.2 fee-resolution contract pinning: `undefined`/`null` reads default; explicit `0` waives; explicit number overrides; missing row → `0`; null DB value → `0`; legacy string coercion; DB-read error → `0`; Pathway B fee-irrelevant; helper-direct tests for missing/number/string/negative/non-finite/error/fractional cases
+- `src/app/api/admin/settings/cancellation-fee-default/__tests__/route.test.ts` (NEW, ~96 lines, +5 tests) — endpoint auth + helper-delegation + graceful-error contract
+
+**Memory #8 overage (documented):** session estimate was ≤8 files / ≤200 prod lines. Actual: 8 prod files / ~250 substantive prod lines (the GET-endpoint pair adds ~50 lines that weren't in the original brief's "Files expected to be touched" list, but are required because the dialogs use different auth surfaces). Comments dominate the diff stat; substantive code stays within the spirit of the budget. Consolidating to a single dual-auth endpoint would save ~30 lines at the cost of mixing auth concerns — judged not worth the trade.
+
+**No `fireWebhook` / no n8n.** Theme G removed that subsystem; no reintroduction here.
+
+**Verification gates (all green):** typecheck 0 errors introduced (5 pre-existing errors from Theme C.2 test files reproduce on main); lint 0 errors / 97 baseline warnings (unchanged from main; one Money-Unify warning on the cents-typed value-column write was suppressed with an inline comment + ESLint disable explaining that `value` is the canonical business_settings column name, not a money-typed variable); build clean; vitest 3389 passed + 4 pre-existing failures (`sms-self-send` ×3 / `sms-normalization` ×1 — env-bleed bugs reproducing on main; plus 1 flaky `identifier-sequences` parallel-run failure that passes in isolation, documented in Theme C.1 session notes).
+
+**AC-14 status: FULLY OPERATIONAL.** The fee policy is now policy-driven end-to-end: operator sets the default at Admin > Settings > Business Profile; dialogs pre-fill it for every cancel; orchestrator applies it on calls that omit the field; explicit per-cancel override and waive are both supported with clear UX affordances.
+
+---
+
 ## Phase 3 Theme D.1 — Cancel orchestration layer (atomic Pathway A/B + job cascade + status flip; AC-9 foundation) (2026-06-07)
 
 Lands the canonical "cancel an appointment with money handling" primitive that bridges the three previously disjoint surfaces flagged by the refund/credit/cancellation-fee audit (`3e633156`): the four cancel endpoints, the standalone refund engine at `/api/pos/refunds`, and the customer-credits infrastructure (E.1/E.2/E.3 — AC-15 FULLY OPERATIONAL). Pre-D.1 a cancel only flipped `appointments.status='cancelled'`; the deposit money sat stranded on the cancelled row, the linked job stayed at its prior status (the AC-2.1 orphan gap), and the operator had to manually navigate to POS > Transactions > Issue Refund to actually return money — a multi-step workflow that audit Target D.1 verified was the source of the operator's stated uncertainty about "what works vs what needs building."
