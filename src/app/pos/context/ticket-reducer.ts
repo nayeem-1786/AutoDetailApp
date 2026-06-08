@@ -7,6 +7,7 @@ import { applyAddCustomItem } from '../utils/apply-add-custom-item';
 import { applyUpdateItemQuantity } from '../utils/apply-update-item-quantity';
 import { applyUpdatePerUnitQty } from '../utils/apply-update-per-unit-qty';
 import { applyRemoveItem } from '../utils/apply-remove-item';
+import { applySetCustomer } from '../utils/apply-set-customer';
 import { generateId } from '../utils/generate-id';
 
 export const initialTicketState: TicketState = {
@@ -173,7 +174,11 @@ export function ticketReducer(
     }
 
     case 'SET_CUSTOMER': {
-      return { ...state, customer: action.customer };
+      // C.1 step 7 — delegated to shared helper. Truly byte-identical extraction.
+      // Customer change has no totals impact, so no recalculateTotals wrap (mirrors
+      // pre-extraction behavior). No `next === state` ref-equal check — helper
+      // unconditionally returns a new object via spread.
+      return applySetCustomer(state, action);
     }
 
     case 'SET_VEHICLE': {
