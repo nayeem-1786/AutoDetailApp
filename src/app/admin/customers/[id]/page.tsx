@@ -72,6 +72,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { useAuth } from '@/lib/auth/auth-provider';
 import { Play, Pause, XCircle } from 'lucide-react';
 import { ReceiptDialog } from '@/components/admin/receipt-dialog';
+import { CreditsTab } from './credits-tab';
 import type { ColumnDef } from '@tanstack/react-table';
 
 const US_STATES = [
@@ -924,6 +925,7 @@ export default function CustomerProfilePage() {
           <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="vehicles">Vehicles ({vehicles.length})</TabsTrigger>
           {canViewLoyalty && <TabsTrigger value="loyalty">Loyalty</TabsTrigger>}
+          <TabsTrigger value="credits">Credits</TabsTrigger>
           {canViewHistory && <TabsTrigger value="history">History ({transactions.length})</TabsTrigger>}
           <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
           <TabsTrigger value="service-history">Service History</TabsTrigger>
@@ -1636,6 +1638,11 @@ export default function CustomerProfilePage() {
             </DialogFooter>
           </Dialog>
         </TabsContent>}
+
+        {/* ===== CREDITS TAB ===== */}
+        <TabsContent value="credits">
+          <CreditsTab customerId={id} canIssue={canAdjustLoyalty} />
+        </TabsContent>
 
         {/* ===== HISTORY TAB ===== */}
         {canViewHistory && <TabsContent value="history">

@@ -53,6 +53,7 @@ import { ChangeTimeButton } from './change-time-button';
 import { UnMaterializeConfirmationDialog } from '@/components/appointments/un-materialize-confirmation-dialog';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import { CustomerLookup } from '../../components/customer-lookup';
+import { CustomerCreditBadge } from './customer-credit-badge';
 import { ModifierSummary } from '@/components/appointments/modifier-summary';
 import type { JobStatus, JobAddonStatus, Customer, JobServiceSnapshot } from '@/lib/supabase/types';
 import { composeLineItems } from '@/lib/utils/compose-line-items';
@@ -1407,6 +1408,9 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
                   {job.customer?.email && (
                     <p className="text-sm text-gray-400 dark:text-gray-500">{job.customer.email}</p>
                   )}
+                  {job.customer && (
+                    <CustomerCreditBadge customerId={job.customer.id} />
+                  )}
                 </div>
                 <Pencil className="h-4 w-4 text-gray-400 dark:text-gray-500" />
               </div>
@@ -1426,6 +1430,7 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
               {job.customer.email && (
                 <p className="text-sm text-gray-400 dark:text-gray-500">{job.customer.email}</p>
               )}
+              <CustomerCreditBadge customerId={job.customer.id} />
             </div>
           ) : null}
 
