@@ -1,16 +1,24 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { CheckCircle2, CloudOff } from 'lucide-react';
+import { CheckCircle2, CloudOff, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCheckout } from '../../context/checkout-context';
 import { ReceiptOptions } from '../receipt-options';
+import { ApplyCreditDialog } from './apply-credit-dialog';
 
 export function PaymentComplete() {
   const checkout = useCheckout();
   const router = useRouter();
   const pathname = usePathname();
   const isOfflineTx = checkout.transactionId?.startsWith('offline-');
+  const [creditDialogOpen, setCreditDialogOpen] = useState(false);
+  // Phase 3 Theme E.3 — credit application surfaces only for synced (non-offline)
+  // transactions with an attached customer. Offline transactions can't apply
+  // credit safely because the credit ledger lives server-side.
+  const canApplyCredit =
+    !isOfflineTx && !!checkout.transactionId && !!checkout.customerId;
 
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-8 px-8 py-12">
@@ -99,6 +107,29 @@ export function PaymentComplete() {
           transactionId={checkout.transactionId}
           customerEmail={checkout.customerEmail}
           customerPhone={checkout.customerPhone}
+        />
+      )}
+
+      {/* Phase 3 Theme E.3 — Apply customer credit (AC-15). Calls E.2's
+          endpoint, which records the credit consumption against this
+          transaction's ledger row. */}
+      {canApplyCredit && (
+        <Button
+          variant="outline"
+          onClick={() => setCreditDialogOpen(true)}
+          className="gap-2"
+        >
+          <Wallet className="h-4 w-4" />
+          Apply Customer Credit
+        </Button>
+      )}
+
+      {canApplyCredit && checkout.customerId && checkout.transactionId && (
+        <ApplyCreditDialog
+          open={creditDialogOpen}
+          onOpenChange={setCreditDialogOpen}
+          customerId={checkout.customerId}
+          transactionId={checkout.transactionId}
         />
       )}
 

@@ -26,6 +26,8 @@ src/app/api/admin/appointments/stats/route.ts
 src/app/api/admin/audit-log/export/route.ts
 src/app/api/admin/audit-log/route.ts
 src/app/api/admin/current-ip/route.ts
+src/app/api/admin/customers/[id]/credits/route.ts                          # Phase 3 Theme E.3 (AC-15 operator UI) — admin customer-credits endpoint: GET (balance fetch) + POST (manual issuance). Thin wrapper over createCustomerCredit + getCustomerCreditBalance (E.1 repository). POST gated under `customers.adjust_loyalty` (semantically identical to manual loyalty ledger writes); GET gated by admin session only. Reasons restricted to `manual_adjustment` / `goodwill` / `promotional` / `refund_as_credit` (cancellation_refund reserved for cancel flow).
+src/app/api/admin/customers/[id]/credits/__tests__/route.test.ts          # Phase 3 Theme E.3 — 10 endpoint tests: POST 201 + audit, 401 unauthed, 403 unpermitted, 400 negative/zero amount, 400 non-integer amount, 400 invalid/missing reason, expires_at passthrough; GET 200 balance, 401 unauthed, 500 on repo throw.
 src/app/api/admin/customers/[id]/photos/route.ts
 src/app/api/admin/customers/[id]/portal-access/route.ts
 src/app/api/admin/customers/[id]/reset-password/route.ts
@@ -616,6 +618,7 @@ src/app/admin/catalog/services/page.tsx
 
 ### Customers
 ```
+src/app/admin/customers/[id]/credits-tab.tsx                              # Phase 3 Theme E.3 (AC-15 operator UI) — admin Credits tab component: balance card + history table + manual Issue Credit dialog. Mirrors the Loyalty tab shape (balance + ledger + adjust dialog). Reads + writes via /api/admin/customers/[id]/credits. Reasons restricted to manual_adjustment/goodwill/promotional/refund_as_credit. Issue button hidden when canIssue=false (caller passes the customers.adjust_loyalty permission grant).
 src/app/admin/customers/[id]/page.tsx
 src/app/admin/customers/duplicates/page.tsx
 src/app/admin/customers/new/page.tsx
@@ -1522,6 +1525,11 @@ Phase Mobile-1.1 additions:
 - `src/app/pos/components/checkout/save-address-dialog.tsx`
 - `src/app/pos/components/checkout/__tests__/save-address-dialog.test.tsx`
 - `src/app/pos/components/quotes/__tests__/mobile-fee-picker.test.tsx`
+
+Phase 3 Theme E.3 additions (AC-15 operator UI — closes the AC-15 commitment alongside E.1 schema/repo + E.2 application logic):
+- `src/app/pos/components/checkout/apply-credit-dialog.tsx` # Reusable `<ApplyCreditDialog>` mounted on payment-complete. Fetches balance via GET /api/admin/customers/[id]/credits, captures amount, calls E.2's POST /api/pos/transactions/[id]/apply-credit. Supports optional `maxApplyCents` cap (e.g., amount due) so caller can prevent over-application; surfaces a toast error before fetch if amount exceeds balance/cap.
+- `src/app/pos/components/checkout/__tests__/apply-credit-dialog.test.tsx` # 6 tests — balance fetch on open, zero-balance disables Apply button + input, successful apply POSTs cents + customer_id to E.2 endpoint, client-side over-balance guard blocks fetch, maxApplyCents cap enforced, balance fetch failure sets state to 0 + toast.
+- `src/app/pos/jobs/components/customer-credit-badge.tsx` # Passive `<CustomerCreditBadge>` on POS job-detail customer card. Fetches balance via GET /api/admin/customers/[id]/credits. Renders nothing on zero balance (operators see badge only when actionable). Read-only; click-through deep-link out of scope this theme.
 
 Track B — Quotes-panel parity (#120, G2/G3/G4) additions:
 - `src/app/pos/__tests__/sale-vs-quotes-shared-prop-parity.test.tsx` # STRUCTURAL GUARD — source-contract test asserting every prop the Sale panel (ticket-panel.tsx) wires on a SHARED component is also wired in the Quotes panel (quote-ticket-panel.tsx), minus a documented Sale-only allowlist (`disabled`). Also pins CustomerTypePrompt mounted in both (G4) + repriceFailed surfaced in both (G3). Catches the NEXT omitted-prop gap at CI. 10 tests.

@@ -6,6 +6,46 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme E.3 — Customer credit operator UI (AC-15 completion) (2026-06-07)
+
+Operator UI surfaces over the E.1 schema/repository and E.2 application logic. With this session AC-15 is **fully operational** — credit issuance (manual + cancel flow), credit application (POS checkout), and operator visibility (admin Credits tab + POS at-a-glance badge) are all wired.
+
+**Scope (pure UI; no new behavioral logic):**
+
+- **Admin Credits tab** — new tab on the customer detail page (`/admin/customers/[id]`) showing available balance + history table + manual Issue Credit dialog. Mirrors the existing Loyalty tab's shape so the operator UX is consistent across loyalty + credit ledger surfaces.
+- **`/api/admin/customers/[id]/credits`** — new GET (balance fetch) + POST (manual issuance) endpoint. Thin wrapper over `createCustomerCredit` / `getCustomerCreditBalance` from `src/lib/credits/repository.ts` (E.1). Issuance gated under `customers.adjust_loyalty` — semantically identical operator action to a manual loyalty ledger write (operator-initiated balance adjustment with audit trail).
+- **POS Apply Credit dialog** — reusable `<ApplyCreditDialog>` mounted on the payment-complete screen. Fetches balance via the admin GET endpoint, captures amount, calls `POST /api/pos/transactions/[id]/apply-credit` (E.2's endpoint). Lives on payment-complete because E.2's endpoint requires a finalized transaction id; pre-tender "reduce amount due" UX is intentionally deferred to a future theme (would require routing credit application through the transaction-create POST).
+- **POS appointment view credit balance badge** — passive `<CustomerCreditBadge>` on the POS job-detail customer card. Renders nothing when balance is zero (operators see the badge only when actionable). Read-only at-a-glance affordance; click-through deep-link is out of scope.
+
+**Permission model (no new permission keys):**
+
+- `customers.view` (page-level, existing) — gates Credits tab visibility (same surface as Loyalty/History tabs)
+- `customers.adjust_loyalty` (existing) — gates Issue Credit button on the admin tab
+- `pos.process_cash` (existing, used by E.2's apply endpoint) — gates POS Apply Credit
+
+**Files added (5):**
+
+- `src/app/api/admin/customers/[id]/credits/route.ts` — GET + POST endpoint (~157 lines)
+- `src/app/api/admin/customers/[id]/credits/__tests__/route.test.ts` — endpoint contract tests (10 cases)
+- `src/app/admin/customers/[id]/credits-tab.tsx` — Credits tab component + Issue Credit dialog (~335 lines)
+- `src/app/pos/components/checkout/apply-credit-dialog.tsx` — reusable Apply Credit dialog (~213 lines)
+- `src/app/pos/components/checkout/__tests__/apply-credit-dialog.test.tsx` — dialog tests (6 cases: balance fetch, zero-balance disable, apply, over-balance guard, maxApplyCents cap, fetch-failure)
+- `src/app/pos/jobs/components/customer-credit-badge.tsx` — passive POS badge (~55 lines)
+
+**Files modified (3):**
+
+- `src/app/admin/customers/[id]/page.tsx` — added Credits tab trigger + content
+- `src/app/pos/components/checkout/payment-complete.tsx` — Apply Customer Credit button + dialog wiring
+- `src/app/pos/jobs/components/job-detail.tsx` — credit-balance badge in both customer card render sites (editable + read-only)
+
+**Memory #8 — over-target by ~430 prod lines:** session estimate was 200-350 prod lines / 6-10 files. Actual: ~760 prod lines / 6 new + 3 modified files. Every line traces to the spec's locked scope (3 distinct UI surfaces + new endpoint + 16 tests); compression options were exhausted before commit. Flagged here for retrospective calibration of future "operator UI" theme estimates — the floor for a tab + dialog + reusable dialog + badge is higher than 350.
+
+**Gates green:** `tsc 0 errors`, `lint 0 errors / 97 baseline warnings`, `build clean`, `3172 / 3172 tests pass (+16 new)`. No fireWebhook references introduced.
+
+**AC-15 status:** **FULLY OPERATIONAL** — E.1 schema + repository (`0cfd54e4`), E.2 application logic (`9e8fa5df`), E.3 operator UI (this session) together close the AC-15 commitment from the locked lifecycle architecture.
+
+---
+
 ## Phase 3 Theme G — Remove dormant fireWebhook infrastructure (cross-contamination cleanup; no production receivers) (2026-06-07)
 
 Pure-removal cleanup of the entire outbound-webhook subsystem (`fireWebhook` + the `business_settings.n8n_webhook_urls` row + all call sites + all test mocks). The infrastructure had been carried into Smart Details from sibling Nayeem businesses (121 Media, Lomita Notary) that DO run n8n; Smart Details has never had an n8n receiver wired (operator-confirmed; documented in `docs/dev/WEBHOOK_RECEIVERS_IDENTITY_AUDIT.md` audit `f5e714a8`, 2026-06-05). Every `fireWebhook` call returned early at `setting.value` lookup → `null` → early return. The infrastructure was effectively a no-op in production but caused ongoing cross-contamination confusion in AI assistants reading the codebase and risked accidental reintroduction of dispatch logic riding the dead channel (Session 1.8 already had to retroactively fix one customer-facing silent-drop bug where waitlist SMS was dispatched ONLY via fireWebhook).
