@@ -13,7 +13,18 @@ import type { Customer, Vehicle } from '@/lib/supabase/types';
 
 type View =
   | { mode: 'queue' }
-  | { mode: 'detail'; jobId: string };
+  | {
+      mode: 'detail';
+      jobId: string;
+      /** Session #145 Gap A — when true, the JobDetail mount auto-mounts
+       *  `<ZonePicker>` in intake mode on first job-load so the operator who
+       *  tapped Start Intake on the unstarted-strip card lands directly on
+       *  the photo UI. JobDetail's effect consumes the intent once via
+       *  `onAutoStartIntakeConsumed`, which clears this flag here — a
+       *  subsequent back-and-return to the same job lands on the JobDetail
+       *  header instead. */
+      autoStartIntake?: boolean;
+    };
 
 function JobsPageInner() {
   const router = useRouter();
@@ -314,6 +325,16 @@ function JobsPageInner() {
           setView({ mode: 'queue' });
         }}
         onCheckout={handleCheckout}
+        autoStartIntake={view.autoStartIntake}
+        // Session #145 Gap A — clear the autoStartIntake flag once JobDetail
+        // has consumed it so navigating away and back to the same job lands
+        // on the JobDetail header, not back in ZonePicker. The flag is a
+        // one-shot navigation intent, not a persistent mode.
+        onAutoStartIntakeConsumed={() => {
+          if (view.mode === 'detail' && view.autoStartIntake) {
+            setView({ mode: 'detail', jobId: view.jobId, autoStartIntake: false });
+          }
+        }}
       />
     );
   }
@@ -324,6 +345,13 @@ function JobsPageInner() {
       onNewWalkIn={() => router.push('/pos/quotes?mode=builder&walkIn=true')}
       onSelectJob={(jobId) => setView({ mode: 'detail', jobId })}
       onCheckout={handleCheckout}
+      // Session #145 Gap A — invoked when the strip's Start Intake fires
+      // a successful materialization. Transitions view-state to detail mode
+      // with autoStartIntake=true; JobDetail mounts ZonePicker on first
+      // render (Q1 locked: photosEnabled-gated, intake_completed_at guarded).
+      onOpenJobForIntake={(jobId) =>
+        setView({ mode: 'detail', jobId, autoStartIntake: true })
+      }
     />
   );
 }

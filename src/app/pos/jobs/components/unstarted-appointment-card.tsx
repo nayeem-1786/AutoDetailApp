@@ -1,26 +1,45 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Calendar, Clock, Play } from 'lucide-react';
+import { Calendar, Clock, Play, Send, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { formatCurrency } from '@/lib/utils/format';
 import { cleanVehicleDescription, sanitizeVehicleField } from '@/lib/utils/vehicle-helpers';
 import { posFetch } from '../../lib/pos-fetch';
 import { toast } from 'sonner';
 import { APPOINTMENT_STATUS_LABELS } from '@/lib/utils/constants';
+import { canSendPaymentLink } from '@/components/jobs/can-send-payment-link';
 import type { PosUnstartedAppointment } from './schedule-types';
 
 /**
  * Session 2.2 (AC-3 second half) — appointment card rendered in Today scope
  * for confirmed/in_progress appointments that have NOT yet been materialized
- * into a job. Includes a "Start Intake" button that calls the Session 2.1
- * endpoint at `POST /api/pos/jobs/start-intake`.
+ * into a job. Session #145 (Ian-Austria-unblock) extended the card from a
+ * single-pill ("Start Intake") footer to a three-pill row: [Cancel] (red),
+ * [Send Payment Link] (green), [Start Intake] (blue). All three pills route
+ * through EXISTING flows — Cancel uses the same `cancelAppointmentOrchestrated`
+ * path the AppointmentDetailDialog calls; Send Payment Link mounts the same
+ * `PaymentLinkAmountModal` + `SendPaymentLinkDialog` chain JobDetail uses;
+ * Start Intake hits the same `/api/pos/jobs/start-intake` endpoint. The card
+ * itself owns zero new business logic — every affordance is a thin parent
+ * callback dispatch.
  *
- * Visual treatment intentionally distinct from job cards (no timer, no photo
- * progress, no addon badge — none apply pre-materialization) but reuses the
- * same primitives as Schedule-scope `ScheduleScopeList` (Memory #2). The
- * "Start Intake" call-to-action is the visible affordance that distinguishes
- * an un-started today appointment from a Schedule-scope future one.
+ * Three button-level callbacks + one card-body tap callback:
+ *  - `onMaterialized(jobId)` — after a successful Start Intake, parent
+ *    routes to JobDetail with `autoStartIntake=true` so ZonePicker mounts
+ *    directly (Gap A — closes the "Start Intake button doesn't navigate to
+ *    intake" UX break that Stage 2 exposed).
+ *  - `onSendPaymentLink(appointmentId)` — parent mounts the existing
+ *    PaymentLinkAmountModal -> SendPaymentLinkDialog two-step flow.
+ *  - `onCancelAppointment(appointmentId)` — parent fetches the full
+ *    appointment + mounts the existing CancelAppointmentDialog (Pathway B
+ *    for never-materialized appointments).
+ *  - `onTapCardBody(appointmentId)` — parent fetches the full appointment
+ *    and mounts AppointmentDetailDialog (same wire-up Schedule scope uses).
+ *
+ * Each of the three action buttons stops event-propagation so the outer
+ * card-body click handler does NOT also fire. Card body becomes the "more
+ * info / edit" surface; pills become the action surface.
  *
  * Future-date popup: in normal operation the endpoint can't return 422
  * future_date for a today-scoped appointment (the Today endpoint filters by
@@ -33,9 +52,23 @@ import type { PosUnstartedAppointment } from './schedule-types';
 
 interface UnstartedAppointmentCardProps {
   appointment: PosUnstartedAppointment;
-  /** Called after a successful materialization so the parent can refetch the
-   *  Today scope — the new job replaces this card. */
-  onMaterialized: () => void;
+  /** Session #145 Gap A — called after a successful materialization WITH the
+   *  new `job_id` from the start-intake response. Parent routes to JobDetail
+   *  with `autoStartIntake=true` so the operator lands directly on the
+   *  ZonePicker (zero JobDetail-header detour). Pre-#145 this was zero-arg
+   *  and the parent only refetched the Today scope. */
+  onMaterialized: (jobId: string) => void;
+  /** Session #145 — parent mounts the existing PaymentLinkAmountModal +
+   *  SendPaymentLinkDialog chain for this appointment. Same shape JobDetail
+   *  has used since Pay-Link Session 5. */
+  onSendPaymentLink: (appointmentId: string) => void;
+  /** Session #145 — parent fetches the full appointment + mounts the
+   *  existing CancelAppointmentDialog (Pathway B for never-materialized
+   *  appointments per Phase 3 Theme D.1). */
+  onCancelAppointment: (appointmentId: string) => void;
+  /** Session #145 — parent mounts AppointmentDetailDialog (Schedule-scope
+   *  wire-up extended to also fire from the unstarted strip). */
+  onTapCardBody: (appointmentId: string) => void;
 }
 
 function formatTime12h(timeStr: string | null | undefined): string {
@@ -71,6 +104,9 @@ function getTodayPst(): string {
 export function UnstartedAppointmentCard({
   appointment,
   onMaterialized,
+  onSendPaymentLink,
+  onCancelAppointment,
+  onTapCardBody,
 }: UnstartedAppointmentCardProps) {
   const [busy, setBusy] = useState(false);
   const [futureDatePromptDate, setFutureDatePromptDate] = useState<string | null>(null);
@@ -82,44 +118,65 @@ export function UnstartedAppointmentCard({
   const serviceTotal = Number(appointment.total_amount ?? 0);
   const time = formatTime12h(appointment.scheduled_start_time);
 
-  const callStartIntake = useCallback(async (): Promise<boolean> => {
+  // Session #145 Gap A — `callStartIntake` now returns the materialized
+  // `job_id` on success (was: returned just `true`). The strip's Start Intake
+  // path hands the jobId to the parent's `onMaterialized` callback so the
+  // page-level view-state can route directly to JobDetail with
+  // `autoStartIntake=true`. The endpoint's `already_materialized` flag is
+  // handled transparently — the parent navigates identically either way.
+  const callStartIntake = useCallback(async (): Promise<
+    { ok: true; jobId: string } | { ok: false }
+  > => {
     const res = await posFetch('/api/pos/jobs/start-intake', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ appointment_id: appointment.id }),
     });
-    if (res.ok) return true;
 
     const body = (await res.json().catch(() => ({}))) as {
+      job_id?: string;
+      appointment_id?: string;
+      already_materialized?: boolean;
       error?: string;
       appointment_date?: string;
       appointment_status?: string;
     };
 
+    if (res.ok) {
+      if (typeof body.job_id !== 'string') {
+        // Defensive — endpoint contract guarantees `job_id` on 200/201, but
+        // a future server-side regression that omits the field would otherwise
+        // crash navigation. Surface as a generic failure; operator retries.
+        toast.error('Materialization succeeded but no job id returned. Please refresh.');
+        return { ok: false };
+      }
+      return { ok: true, jobId: body.job_id };
+    }
+
     if (res.status === 422 && body.error === 'future_date') {
       // Defense-in-depth — race between fetch and click. Surface the
       // "Move to today and start?" affordance.
       setFutureDatePromptDate(body.appointment_date ?? 'a future date');
-      return false;
+      return { ok: false };
     }
 
     if (res.status === 422 && body.error === 'invalid_status') {
       toast.error(`This appointment is "${body.appointment_status ?? 'not eligible'}" and cannot be started.`);
-      return false;
+      return { ok: false };
     }
 
     toast.error('Failed to start intake. Please refresh and try again.');
-    return false;
+    return { ok: false };
   }, [appointment.id]);
 
   const handleStartIntake = useCallback(async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const ok = await callStartIntake();
-      if (ok) {
+      const result = await callStartIntake();
+      if (result.ok) {
         toast.success('Intake started');
-        onMaterialized();
+        onMaterialized(result.jobId);
       }
     } catch (err) {
       console.error('[start-intake] failed:', err);
@@ -148,10 +205,10 @@ export function UnstartedAppointmentCard({
         return;
       }
       // Retry the Start Intake call now that the appointment is dated today.
-      const ok = await callStartIntake();
-      if (ok) {
+      const result = await callStartIntake();
+      if (result.ok) {
         toast.success('Moved to today + intake started');
-        onMaterialized();
+        onMaterialized(result.jobId);
       }
     } catch (err) {
       console.error('[start-intake/move-to-today] failed:', err);
@@ -165,20 +222,56 @@ export function UnstartedAppointmentCard({
   // when the operator opts in via the include-terminal toggle. They are not
   // actionable here (Start Intake on a cancelled/completed/no_show appointment
   // is structurally invalid — the server's invalid_status gate would reject
-  // it), so the button is suppressed and the card visually mutes.
+  // it), so the actions row is suppressed and the card visually mutes.
   const isTerminal =
     appointment.status === 'cancelled' ||
     appointment.status === 'completed' ||
     appointment.status === 'no_show';
 
+  // Session #145 — Send Payment Link pill visibility. Same predicate JobDetail
+  // and AppointmentDetailDialog use, via the shared `canSendPaymentLink`
+  // helper (Q5 extraction). No date gate — the helper's contract is
+  // explicitly date-agnostic (the "only day-of" behavior pre-#145 was a
+  // JobDetail-scope artifact, not a predicate).
+  const showSendPaymentLink = canSendPaymentLink({
+    appointmentId: appointment.id,
+    paymentStatus: appointment.payment_status,
+    appointmentStatus: appointment.status,
+    customerEmail: appointment.customer?.email ?? null,
+    customerPhone: appointment.customer?.phone ?? null,
+  });
+
+  // Card-body tap → parent mounts AppointmentDetailDialog. Buttons inside
+  // stopPropagation so their tap doesn't also fire the body handler. Mirrors
+  // the Schedule-scope card pattern (ScheduleScopeList in job-queue.tsx).
+  const handleCardBodyTap = useCallback(() => {
+    if (busy || isTerminal) return;
+    onTapCardBody(appointment.id);
+  }, [busy, isTerminal, onTapCardBody, appointment.id]);
+
+  const handleCardBodyKey = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleCardBodyTap();
+      }
+    },
+    [handleCardBodyTap]
+  );
+
   return (
     <>
       <div
         data-testid={`unstarted-appointment-card-${appointment.id}`}
+        role="button"
+        tabIndex={isTerminal ? -1 : 0}
+        onClick={handleCardBodyTap}
+        onKeyDown={handleCardBodyKey}
         className={cn(
-          'w-full rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-900/10 p-3 text-left shadow-sm',
+          'w-full rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-900/10 p-3 text-left shadow-sm transition-colors',
           busy && 'opacity-60 pointer-events-none',
-          isTerminal && !busy && 'opacity-60'
+          isTerminal && !busy && 'opacity-60 cursor-default',
+          !isTerminal && !busy && 'cursor-pointer hover:bg-blue-50/70 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-500'
         )}
       >
         <div className="flex items-start justify-between gap-3">
@@ -224,10 +317,48 @@ export function UnstartedAppointmentCard({
           </p>
         )}
         {!isTerminal && (
-          <div className="mt-2 flex justify-end">
+          // Three-pill action row — color hierarchy locked across surfaces
+          // (Q2): red Cancel, green Send Link, blue Start Intake. Mirrors the
+          // AppointmentDetailDialog footer pattern (Cancel left, Send Link
+          // middle, Save Changes right). On narrow viewports labels collapse
+          // to icon-only at the `sm:` breakpoint via the hidden-sm-inline
+          // pattern (Q-Layout-1 fallback — preserves discoverability on iPad
+          // portrait without overflow).
+          <div className="mt-2 flex flex-wrap justify-end gap-1.5">
             <button
               type="button"
-              onClick={handleStartIntake}
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelAppointment(appointment.id);
+              }}
+              disabled={busy}
+              data-testid={`cancel-appointment-btn-${appointment.id}`}
+              className="flex items-center gap-1 rounded-full bg-red-600 dark:bg-red-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-red-700 dark:hover:bg-red-600 active:bg-red-800 dark:active:bg-red-700 disabled:opacity-50"
+            >
+              <XCircle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Cancel</span>
+            </button>
+            {showSendPaymentLink && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendPaymentLink(appointment.id);
+                }}
+                disabled={busy}
+                data-testid={`send-payment-link-btn-${appointment.id}`}
+                className="flex items-center gap-1 rounded-full bg-green-600 dark:bg-green-500 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-green-700 dark:hover:bg-green-600 active:bg-green-800 dark:active:bg-green-700 disabled:opacity-50"
+              >
+                <Send className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Send Link</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleStartIntake();
+              }}
               disabled={busy}
               data-testid={`start-intake-btn-${appointment.id}`}
               className="flex items-center gap-1.5 rounded-full bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700 disabled:opacity-50"
@@ -250,6 +381,7 @@ export function UnstartedAppointmentCard({
           aria-labelledby="future-date-prompt-title"
           data-testid="future-date-prompt"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="w-full max-w-sm rounded-lg bg-white dark:bg-gray-900 p-5 shadow-xl">
             <h3

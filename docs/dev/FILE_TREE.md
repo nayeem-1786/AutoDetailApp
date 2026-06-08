@@ -1447,9 +1447,15 @@ src/components/quotes/quote-book-dialog.tsx
 ```
 src/components/jobs/send-payment-link-dialog.tsx   — POS Send Payment Link channel-pick modal (Pay-Link Session 3b)
 src/components/jobs/payment-link-amount-modal.tsx  — POS Pre-send amount selector (25/50/75/Full + Custom) (Pay-Link Session 5)
+src/components/jobs/can-send-payment-link.ts       — Shared Send Payment Link visibility predicate. Consumed by JobDetail, AppointmentDetailDialog footer, UnstartedAppointmentCard strip pill (Session #145 Q5)
 src/components/jobs/edit-mobile-modal.tsx          — Shared full mobile picker edit modal (POS + admin, mode prop) (Phase Mobile-1.9)
 src/components/jobs/payment-mismatch-banner.tsx    — Non-blocking warning after mobile edit when total ≠ paid (Phase Mobile-1.9)
 src/components/jobs/__tests__/edit-mobile-modal.test.tsx
+src/components/jobs/__tests__/can-send-payment-link.test.ts                                     — Helper truth-table (Session #145)
+src/app/admin/appointments/components/__tests__/appointment-detail-dialog-footer.test.tsx       — Footer redesign + Send Payment Link button (Session #145)
+src/app/pos/jobs/components/__tests__/job-detail-auto-start-intake.test.ts                      — Gap A effect gate chain + Q5 helper consumption regression-prevent (Session #145)
+src/app/pos/jobs/components/__tests__/job-queue-edit-intake-pill.test.tsx                       — Q3 Option (ii) Edit Intake pill on regular job card (Session #145)
+src/app/pos/context/__tests__/reader-context-visibility-reconnect.test.tsx                      — Gap D catch wrapper + unhandledrejection invariant (Session #145)
 ```
 
 ### Other

@@ -36,6 +36,13 @@ import { UnstartedAppointmentCard } from './unstarted-appointment-card';
 // fix in docs/dev/EDIT_IN_POS_BUTTON_AUDIT.md.
 import { AppointmentDetailDialog } from '@/app/admin/appointments/components/appointment-detail-dialog';
 import { CancelAppointmentDialog } from '../../components/appointments/cancel-appointment-dialog';
+// Session #145 (Ian-Austria-unblock) — the strip's Send Payment Link pill
+// mounts the SAME two-step amount→channel modal chain JobDetail uses. No new
+// business logic; the strip just owns its own state slots so multiple
+// dialog mounts don't collide.
+import { PaymentLinkAmountModal } from '@/components/jobs/payment-link-amount-modal';
+import { SendPaymentLinkDialog } from '@/components/jobs/send-payment-link-dialog';
+import { fromCents } from '@/lib/utils/refund-math';
 // N+1 (Session #148) — Schedule filter bar + date pills. Status + detailer + search land in N+2.
 import { SchedulePillRow, type ScheduleFilterState } from './schedule-pill-row';
 import {
@@ -69,6 +76,11 @@ export interface JobListItem {
   timer_seconds: number;
   work_started_at: string | null;
   timer_paused_at: string | null;
+  /** Session #145 Q3 — surfaced for the regular job card's "Edit Intake"
+   *  pill. The route's `jobSelect = '*, ...'` already returns it; this entry
+   *  documents the field at the client type level. NULL until ZonePicker's
+   *  intake-phase completion handler stamps it. */
+  intake_completed_at: string | null;
   customer: { id: string; first_name: string; last_name: string; phone: string | null } | null;
   vehicle: { id: string; year: number | null; make: string | null; model: string | null; color: string | null } | null;
   assigned_staff: { id: string; first_name: string; last_name: string } | null;
@@ -253,9 +265,20 @@ interface JobQueueProps {
   onNewWalkIn: () => void;
   onSelectJob: (jobId: string) => void;
   onCheckout?: (jobId: string) => void;
+  /** Session #145 Gap A — invoked when the strip's Start Intake tap
+   *  successfully materializes a job. Parent transitions view-state to
+   *  detail mode with `autoStartIntake=true` so JobDetail mounts ZonePicker
+   *  on first render. Distinct from `onSelectJob` (a plain tap on a job
+   *  card) because that path lands on the JobDetail header. */
+  onOpenJobForIntake?: (jobId: string) => void;
 }
 
-export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps) {
+export function JobQueue({
+  onNewWalkIn,
+  onSelectJob,
+  onCheckout,
+  onOpenJobForIntake,
+}: JobQueueProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { employee } = usePosAuth();
@@ -468,6 +491,20 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
   >([]);
   const [loadingAppointment, setLoadingAppointment] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<PosAppointment | null>(null);
+
+  // ─── Session #145 — strip's Send Payment Link two-step flow state ─────────
+  // Mirrors JobDetail's state pattern. Separate slots from the
+  // AppointmentDetailDialog's slots so the strip's Send Link pill doesn't
+  // accidentally surface the detail dialog (the two flows are independent).
+  // `paymentLinkSentRef` short-circuits the SendPaymentLinkDialog's 3s auto-
+  // close reopen branch (same stale-closure pattern documented in
+  // job-detail.tsx:289-297).
+  const [stripPaymentLinkTarget, setStripPaymentLinkTarget] =
+    useState<PosAppointment | null>(null);
+  const [stripAmountModalOpen, setStripAmountModalOpen] = useState(false);
+  const [stripLinkDialogOpen, setStripLinkDialogOpen] = useState(false);
+  const [stripSelectedAmountCents, setStripSelectedAmountCents] = useState<number | null>(null);
+  const stripPaymentLinkSentRef = useRef(false);
 
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   // Session 2.2 — un-started confirmed/in_progress appointments for TODAY
@@ -787,6 +824,56 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
     },
     []
   );
+
+  // ─── Session #145 — strip-card direct-action handlers ──────────────────────
+  // The unstarted-strip pills bypass AppointmentDetailDialog entirely (operator
+  // wants one tap from strip to Cancel / Send Link / Start Intake). Both
+  // direct-action handlers fetch the full appointment first (the strip's
+  // `PosUnstartedAppointment` carries only the public-card subset; the cancel
+  // dialog needs `PosAppointment` and the payment-link modal needs amount_due_
+  // cents). The fetch shape is identical to handleScheduleCardTap — reuse-by-
+  // copy rather than chain, since chaining would also mount the detail dialog.
+
+  const handleStripCancelTap = useCallback(async (appointmentId: string) => {
+    try {
+      const res = await posFetch(`/api/pos/appointments/${appointmentId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to load appointment');
+        return;
+      }
+      const { data } = await res.json();
+      setCancelTarget(data);
+    } catch (err) {
+      console.error('Failed to load appointment for cancel:', err);
+      toast.error('Failed to load appointment');
+    }
+  }, []);
+
+  const handleStripSendLinkTap = useCallback(async (appointmentId: string) => {
+    try {
+      const res = await posFetch(`/api/pos/appointments/${appointmentId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to load appointment');
+        return;
+      }
+      const { data } = await res.json();
+      setStripPaymentLinkTarget(data);
+      setStripAmountModalOpen(true);
+    } catch (err) {
+      console.error('Failed to load appointment for send-link:', err);
+      toast.error('Failed to load appointment');
+    }
+  }, []);
+
+  const closeStripPaymentLinkFlow = useCallback(() => {
+    setStripAmountModalOpen(false);
+    setStripLinkDialogOpen(false);
+    setStripSelectedAmountCents(null);
+    setStripPaymentLinkTarget(null);
+    stripPaymentLinkSentRef.current = false;
+  }, []);
 
   // Init: fetch on mount and when date / scope changes. Session 2.5 retired
   // populate — Today endpoint now natively returns materialized jobs PLUS
@@ -1229,15 +1316,26 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                   <UnstartedAppointmentCard
                     key={apt.id}
                     appointment={apt}
-                    onMaterialized={() => {
-                      // Refresh the Today scope so the new job replaces this
-                      // card. Mirrors the existing Refresh-button path; the
-                      // localUpdates marker suppresses the highlight animation
-                      // (the operator just authored the materialization, no
-                      // need to draw attention to the resulting job card).
-                      markLocalUpdate(`__intake_${apt.id}__`);
+                    onMaterialized={(jobId) => {
+                      // Session #145 Gap A — refresh the Today scope so the
+                      // strip drops this entry, AND open JobDetail with
+                      // `autoStartIntake=true` so ZonePicker mounts directly
+                      // (zero JobDetail-header detour). Pre-#145 the closure
+                      // was zero-arg and only refetched, leaving operator at
+                      // the queue.
+                      //
+                      // markLocalUpdate now keys off the real `jobId` (incidental
+                      // fix carried in this commit per pre-flight Concern #2) so
+                      // the next poll's highlight-suppression matches the row
+                      // that actually appears in the jobs list. Pre-#145 it
+                      // keyed off `__intake_${apt.id}__` which never matched.
+                      markLocalUpdate(jobId);
                       fetchJobs(selectedDate);
+                      onOpenJobForIntake?.(jobId);
                     }}
+                    onSendPaymentLink={handleStripSendLinkTap}
+                    onCancelAppointment={handleStripCancelTap}
+                    onTapCardBody={handleScheduleCardTap}
                   />
                 ))}
               </div>
@@ -1412,6 +1510,35 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
                     </p>
                   )}
 
+                  {/* Session #145 Q3 LOCKED Option (ii) — "Edit Intake" pill
+                      on the regular job card. After the strip's Start Intake
+                      tap materializes the job, the strip card vanishes and
+                      this card takes over with an explicit affordance to
+                      return to ZonePicker. Same destination as the strip's
+                      Start Intake (Gap A): `onOpenJobForIntake(jobId)` →
+                      JobDetail with `autoStartIntake=true` → ZonePicker
+                      mounts on first render. Gated on:
+                        - status === 'intake' (lifecycle window where intake
+                          edit is meaningful; after Start Work flips to
+                          in_progress this pill goes away)
+                        - !intake_completed_at (Q3 guardrail — once ZonePicker
+                          stamps intake_completed_at, the affordance falls
+                          off; operator who needs to re-edit closed intake
+                          goes through JobDetail's "Continue Intake" path)
+                        - onOpenJobForIntake provided (parent capability) */}
+                  {job.status === 'intake' && !job.intake_completed_at && onOpenJobForIntake && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onOpenJobForIntake(job.id); }}
+                        data-testid={`edit-intake-btn-${job.id}`}
+                        className="flex items-center gap-1.5 rounded-full bg-blue-600 dark:bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 dark:hover:bg-blue-600 active:bg-blue-800 dark:active:bg-blue-700"
+                      >
+                        <Camera className="h-3.5 w-3.5" />
+                        Edit Intake
+                      </button>
+                    </div>
+                  )}
+
                   {/* Checkout / Paid */}
                   {job.status === 'completed' && !job.transaction_id && onCheckout && (
                     <div className="mt-2 flex justify-end">
@@ -1461,11 +1588,21 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           canUpdateStatus={canUpdateStatus}
           hostContext="pos"
           returnToPath="/pos/jobs"
+          onSendPaymentLink={(appointment) => {
+            // Session #145 — wires the dialog footer's new Send Payment Link
+            // button to the strip's payment-link modal chain. AppointmentWithRelations
+            // is assignable to PosAppointment here (Phase 2 lifted the shared
+            // type; both extend Appointment with the same joins).
+            setStripPaymentLinkTarget(appointment as unknown as PosAppointment);
+            setStripAmountModalOpen(true);
+          }}
         />
       )}
 
       {/* Item 15e Phase 2B — POS cancel dialog (Item 15b), opened from the
-          detail dialog's onCancel handoff. */}
+          detail dialog's onCancel handoff OR (Session #145) the strip card's
+          Cancel pill direct-tap. The strip's path skips fetchSchedule (it's
+          Today scope; refetch the jobs list instead). */}
       {cancelTarget && (
         <CancelAppointmentDialog
           open
@@ -1473,9 +1610,86 @@ export function JobQueue({ onNewWalkIn, onSelectJob, onCheckout }: JobQueueProps
           onClose={() => setCancelTarget(null)}
           onCancelled={async () => {
             setCancelTarget(null);
-            await fetchSchedule();
+            // Schedule scope sees fetchSchedule(); Today scope (strip path)
+            // sees fetchJobs. Run both — they short-circuit cheaply when the
+            // scope doesn't match (no DOM mount, no setState).
+            if (effectiveScope === 'schedule') {
+              await fetchSchedule();
+            } else {
+              await fetchJobs(selectedDate);
+            }
           }}
         />
+      )}
+
+      {/* Session #145 — strip's two-step Send Payment Link flow. Mirrors
+          job-detail.tsx:1779-1840 exactly; the only difference is the parent
+          state slots are independent so the AppointmentDetailDialog mount
+          isn't affected. After a successful send we close the whole flow and
+          refetch jobs so the card surfaces any payment_status flip. */}
+      {stripPaymentLinkTarget && (
+        <>
+          <PaymentLinkAmountModal
+            open={stripAmountModalOpen}
+            onOpenChange={(open) => {
+              setStripAmountModalOpen(open);
+              if (!open && !stripLinkDialogOpen) {
+                // Cancelled the amount modal before progressing — clear the
+                // target entirely so the next strip tap starts fresh.
+                setStripPaymentLinkTarget(null);
+                setStripSelectedAmountCents(null);
+              }
+            }}
+            remainingCents={
+              typeof stripPaymentLinkTarget.amount_due_cents === 'number'
+                ? stripPaymentLinkTarget.amount_due_cents
+                : Math.round(Number(stripPaymentLinkTarget.total_amount ?? 0) * 100)
+            }
+            customerName={
+              stripPaymentLinkTarget.customer
+                ? `${stripPaymentLinkTarget.customer.first_name} ${stripPaymentLinkTarget.customer.last_name}`.trim()
+                : undefined
+            }
+            onContinue={(amountCents) => {
+              setStripSelectedAmountCents(amountCents);
+              setStripLinkDialogOpen(true);
+            }}
+          />
+          <SendPaymentLinkDialog
+            open={stripLinkDialogOpen}
+            onOpenChange={(open) => {
+              setStripLinkDialogOpen(open);
+              if (!open) {
+                // Successful send already cleared the ref; close the whole
+                // flow. Otherwise return to the amount modal so staff can
+                // adjust their selection rather than restarting.
+                if (stripPaymentLinkSentRef.current) {
+                  closeStripPaymentLinkFlow();
+                  return;
+                }
+                if (stripSelectedAmountCents !== null) {
+                  setStripAmountModalOpen(true);
+                }
+              }
+            }}
+            appointmentId={stripPaymentLinkTarget.id}
+            customerEmail={stripPaymentLinkTarget.customer?.email ?? null}
+            customerPhone={stripPaymentLinkTarget.customer?.phone ?? null}
+            amountDue={
+              typeof stripPaymentLinkTarget.amount_due_cents === 'number'
+                ? fromCents(stripPaymentLinkTarget.amount_due_cents)
+                : Number(stripPaymentLinkTarget.total_amount ?? 0)
+            }
+            amountCents={stripSelectedAmountCents}
+            onSent={() => {
+              stripPaymentLinkSentRef.current = true;
+              setStripSelectedAmountCents(null);
+              // Refresh Today scope so the strip card reflects any
+              // payment_status change (no Schedule refetch — Today path).
+              fetchJobs(selectedDate);
+            }}
+          />
+        </>
       )}
     </div>
   );

@@ -39,6 +39,7 @@ import { FEATURE_FLAGS } from '@/lib/utils/constants';
 import { SendMethodDialog, type SendMethod } from '@/components/ui/send-method-dialog';
 import { SendPaymentLinkDialog } from '@/components/jobs/send-payment-link-dialog';
 import { PaymentLinkAmountModal } from '@/components/jobs/payment-link-amount-modal';
+import { canSendPaymentLink } from '@/components/jobs/can-send-payment-link';
 import {
   EditMobileModal,
   type EditMobileModalSavedResult,
@@ -240,9 +241,30 @@ interface JobDetailProps {
   jobId: string;
   onBack: () => void;
   onCheckout?: (jobId: string) => void;
+  /** Gap A (Session #145) — when true and the loaded job has not yet
+   *  completed intake, mount `<ZonePicker>` in intake mode on first render
+   *  so the operator who tapped "Start Intake" on the unstarted-strip card
+   *  lands directly on the photo UI (zero JobDetail-header detour). The
+   *  parent (`/pos/jobs/page.tsx`) sets this when routing from the strip's
+   *  `onMaterialized(jobId)` callback. Falls through to the JobDetail
+   *  header when `photosEnabled === false` OR `intake_completed_at != null`
+   *  (Q3 race guardrail — intake already finished). */
+  autoStartIntake?: boolean;
+  /** Invoked exactly once after the autoStartIntake effect consumes the
+   *  intent. The parent clears its view-state flag so navigating away and
+   *  returning to the same job does NOT re-trigger ZonePicker — operator
+   *  expects a fresh tap to land on the header, not jump back into the
+   *  photo flow. */
+  onAutoStartIntakeConsumed?: () => void;
 }
 
-export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
+export function JobDetail({
+  jobId,
+  onBack,
+  onCheckout,
+  autoStartIntake,
+  onAutoStartIntakeConsumed,
+}: JobDetailProps) {
   const router = useRouter();
   const { employee } = usePosAuth();
   const { granted: canManageJobs } = usePosPermission('pos.jobs.manage');
@@ -361,6 +383,36 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
   useEffect(() => {
     fetchJob();
   }, [fetchJob]);
+
+  // Gap A (Session #145) — auto-mount ZonePicker in intake mode when the
+  // operator arrived via the unstarted-strip's "Start Intake" tap. The strip's
+  // callback chain sets `view.autoStartIntake = true` on the page-level
+  // view-state before transitioning to detail mode; this effect consumes that
+  // intent exactly once.
+  //
+  // Conditions for the auto-mount (all four must hold simultaneously):
+  //   1. `autoStartIntake` prop is true (parent expressed intent)
+  //   2. `photosEnabled` is true (photo documentation feature flag ON)
+  //   3. `job` is loaded (fetchJob completed; we know the current intake state)
+  //   4. `job.intake_completed_at == null` (Q3 guardrail — if intake already
+  //      finished in a parallel session, fall through to the JobDetail header
+  //      so operator can choose their next action explicitly)
+  //
+  // After firing, ref-guarded so re-renders don't re-trigger; parent is
+  // notified via `onAutoStartIntakeConsumed` so it can clear its view-state
+  // flag (navigating away and back to the same job lands on the header again,
+  // matching the operator's "tap card body = headers" model).
+  const autoStartIntakeConsumedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartIntakeConsumedRef.current) return;
+    if (!autoStartIntake) return;
+    if (!photosEnabled) return;
+    if (!job) return;
+    if (job.intake_completed_at != null) return;
+    autoStartIntakeConsumedRef.current = true;
+    setZonePickerMode('intake');
+    onAutoStartIntakeConsumed?.();
+  }, [autoStartIntake, photosEnabled, job, onAutoStartIntakeConsumed]);
 
   // Fetch minimum photo settings
   useEffect(() => {
@@ -865,20 +917,23 @@ export function JobDetail({ jobId, onBack, onCheckout }: JobDetailProps) {
 
   const showTimer = job.status === 'in_progress' && (job.work_started_at || job.timer_paused_at);
 
-  // Send Payment Link visibility — appointment-linked, unpaid, not cancelled,
-  // and the customer has at least one contact channel. amount_due_cents is
-  // server-computed to match the webhook + send-route + public-page math;
-  // total_amount is the safe fallback if the field hasn't propagated yet
-  // (e.g., older client cache during a deploy).
+  // Send Payment Link visibility — predicate lifted to the shared helper
+  // `canSendPaymentLink` (Q5, Session #145) so the SAME truth-table evaluates
+  // on JobDetail + AppointmentDetailDialog footer + UnstartedAppointmentCard
+  // without three inline copies drifting. amount_due_cents is server-computed
+  // to match the webhook + send-route + public-page math; total_amount is
+  // the safe fallback if the field hasn't propagated yet (e.g., older client
+  // cache during a deploy).
   const appt = job.appointment;
-  const showPaymentLinkButton = !!(
-    job.appointment_id &&
-    appt &&
-    appt.payment_status !== 'paid' &&
-    appt.status !== 'cancelled' &&
-    appt.status !== 'no_show' &&
-    (job.customer?.email || job.customer?.phone)
-  );
+  const showPaymentLinkButton =
+    !!appt &&
+    canSendPaymentLink({
+      appointmentId: job.appointment_id,
+      paymentStatus: appt.payment_status,
+      appointmentStatus: appt.status,
+      customerEmail: job.customer?.email ?? null,
+      customerPhone: job.customer?.phone ?? null,
+    });
   const amountDueDollars = appt
     ? typeof appt.amount_due_cents === 'number'
       ? fromCents(appt.amount_due_cents)

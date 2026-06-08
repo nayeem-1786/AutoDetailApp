@@ -85,6 +85,12 @@ export interface PosUnstartedAppointment {
   scheduled_end_time: string | null;
   status: AppointmentStatus;
   channel: AppointmentChannel;
+  /** Session #145 — surfaced for the strip card's Send Payment Link pill
+   *  predicate (`canSendPaymentLink`). `appointments.payment_status` enum
+   *  values: pending | partial | paid | refunded | partial_refund (per
+   *  `20260201000001_create_enums.sql`). NULL is tolerated for legacy rows
+   *  that pre-date the NOT-NULL default. */
+  payment_status: string | null;
   customer: PosScheduleEntry['customer'];
   vehicle: PosScheduleEntry['vehicle'];
   detailer: PosScheduleEntry['detailer'];

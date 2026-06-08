@@ -35,6 +35,7 @@ import { ModifierSummary } from '@/components/appointments/modifier-summary';
 import { STATUS_TRANSITIONS, isServiceEditableStatus } from '@/lib/appointments/status-transitions';
 import { isEarlierState } from '@/lib/appointments/lifecycle-sync';
 import { UnMaterializeConfirmationDialog } from '@/components/appointments/un-materialize-confirmation-dialog';
+import { canSendPaymentLink } from '@/components/jobs/can-send-payment-link';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
 import type { AppointmentStatus, Employee } from '@/lib/supabase/types';
 
@@ -115,6 +116,18 @@ interface AppointmentDetailDialogProps {
   // `hostContext` per parity audit Concern 2 — it parameterizes a URL,
   // not a host.
   returnToPath?: string;
+  // Session #145 (Ian-Austria-unblock) — optional Send Payment Link
+  // affordance in the footer middle slot. When the prop is provided AND
+  // the shared `canSendPaymentLink` predicate evaluates true, the footer
+  // renders a green "Send Payment Link" button between Cancel Appointment
+  // (red, left-aligned) and Save Changes (dark, right-aligned). The button
+  // click closes the dialog and invokes this callback; the parent owns the
+  // PaymentLinkAmountModal + SendPaymentLinkDialog two-step mount (mirrors
+  // the existing onCancel handoff pattern). Omit this prop to keep the
+  // pre-#145 footer shape (Close button preserved as the middle slot).
+  // The POS Schedule scope passes it; admin paths can opt in by passing
+  // a parent-side handler that mounts the same modal chain.
+  onSendPaymentLink?: (appointment: AppointmentWithRelations) => void;
 }
 
 export function AppointmentDetailDialog({
@@ -131,6 +144,7 @@ export function AppointmentDetailDialog({
   hostContext = 'admin',
   readOnly = false,
   returnToPath = '/admin/appointments',
+  onSendPaymentLink,
 }: AppointmentDetailDialogProps) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
@@ -606,7 +620,13 @@ export function AppointmentDetailDialog({
             the destructive Cancel Appointment button AND the Save Changes
             button. Visible-but-disabled is itself misleading; we render
             only the Close affordance. Editable mounts (admin appointments,
-            POS Schedule) keep the existing tri-button footer. */}
+            POS Schedule + POS strip-card tap) get the editable footer:
+            [Cancel] [Send Link?] [Save Changes] — Close removed per
+            Session #145 (the DialogClose `<X>` icon top-right + Esc cover
+            the dismiss affordance). The middle Send Payment Link button
+            renders only when the parent passes `onSendPaymentLink` AND the
+            shared `canSendPaymentLink` predicate evaluates true; same gate
+            JobDetail uses. */}
         {!readOnly && showCancelButton && onCancel && (
           <Button
             variant="destructive"
@@ -620,9 +640,37 @@ export function AppointmentDetailDialog({
             Cancel Appointment
           </Button>
         )}
-        <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-          Close
-        </Button>
+        {readOnly && (
+          // readOnly footer retains Close as the only dismiss button (no
+          // Cancel, no Save). Without it the footer would be empty — the
+          // `<X>` icon stays available top-right but having an explicit
+          // Close button keeps the quick-peek surface familiar.
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+            Close
+          </Button>
+        )}
+        {!readOnly &&
+          onSendPaymentLink &&
+          canSendPaymentLink({
+            appointmentId: appointment.id,
+            paymentStatus: appointment.payment_status,
+            appointmentStatus: appointment.status,
+            customerEmail: appointment.customer?.email ?? null,
+            customerPhone: appointment.customer?.phone ?? null,
+          }) && (
+            <Button
+              type="button"
+              variant="default"
+              className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+              onClick={() => {
+                onOpenChange(false);
+                onSendPaymentLink(appointment);
+              }}
+              disabled={saving}
+            >
+              Send Payment Link
+            </Button>
+          )}
         {!readOnly && (
           <Button type="submit" form="detail-edit-form" disabled={saving}>
             {saving ? 'Saving...' : 'Save Changes'}

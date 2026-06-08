@@ -47,6 +47,7 @@ const posSrc = readFileSync(join(process.cwd(), POS_HOST), 'utf8');
 const DOCUMENTED_HOST_DIVERGENCE_PROPS: Array<{ prop: string; why: string }> = [
   { prop: 'hostContext', why: 'admin defaults to "admin"; POS passes "pos" — the canonical host-divergence axis (Session 1.1)' },
   { prop: 'returnToPath', why: 'admin defaults to /admin/appointments; POS passes /pos/jobs — Edit-in-POS deep-link destination (Session 1.1)' },
+  { prop: 'onSendPaymentLink', why: 'Session #145 (Ian-Austria-unblock) added the green Send Payment Link footer button. The underlying `SendPaymentLinkDialog` uses `posFetch` against the POS-session-authenticated `/api/pos/appointments/[id]/send-payment-link` endpoint — admin has no equivalent route or auth surface, so admin omits the prop and the footer button does not surface. Admin parity is a separate future workstream (would require an admin route + admin-cookie-auth dialog variant, both new business logic — explicitly out of scope per the Session #145 locked constraint).' },
 ];
 
 /**

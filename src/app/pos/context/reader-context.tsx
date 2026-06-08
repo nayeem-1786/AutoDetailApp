@@ -109,10 +109,25 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
         const { isReaderConnected } = await import('../lib/stripe-terminal');
         const stillConnected = await isReaderConnected();
         if (!stillConnected) {
-          // Was connected before but now stale — auto-reconnect
+          // Was connected before but now stale — auto-reconnect.
           console.log('[ReaderContext] Connection stale after resume, reconnecting...');
           setConnectedReader(null);
-          discoverAndConnect();
+          // Session #145 Gap D — wrap the un-awaited reconnect's rejection so
+          // it can NEVER bubble to `pos-shell.tsx`'s global error/rejection
+          // listener (the listener matches third-party Stripe Terminal SDK
+          // error strings like "POS no longer authenticated" and falsely
+          // redirects to /pos/login?reason=session_expired on PWA wake).
+          // The reconnect failing here is NOT a POS session expiry — it's a
+          // Stripe Terminal internal session ticket failure that the operator
+          // can resolve by tapping "Connect Reader" when they next need card
+          // payment. Logging at warn surfaces the failure for operator
+          // devtools without forcing an unwanted logout.
+          discoverAndConnect().catch((err) => {
+            console.warn(
+              '[reader-context] visibility reconnect failed (silenced — operator stays logged in)',
+              err
+            );
+          });
         }
       } catch {
         setConnectedReader(null);

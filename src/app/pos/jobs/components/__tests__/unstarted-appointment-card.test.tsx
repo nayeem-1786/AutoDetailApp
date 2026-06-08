@@ -6,6 +6,13 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 // surfacing the "Move to today and start?" popup (defense-in-depth path: the
 // Today endpoint already filters to today's date, but the popup wires the
 // PATCH-date + retry affordance for race cases).
+//
+// Session #145 (Ian-Austria-unblock) extended this card from a single-pill
+// footer ("Start Intake") to a three-pill row [Cancel] [Send Link] [Start
+// Intake] plus card-body tap → AppointmentDetailDialog. The tests below also
+// pin those new affordances (Gap A onMaterialized(jobId), canSendPaymentLink
+// gating, event.stopPropagation correctness) so a regression in any pill
+// surfaces here as a unit-level failure before it reaches the operator.
 
 const fetchCalls: Array<{ url: string; init?: RequestInit }> = [];
 const fetchResponses: Array<{
@@ -50,6 +57,9 @@ import { UnstartedAppointmentCard } from '../unstarted-appointment-card';
 import type { PosUnstartedAppointment } from '../schedule-types';
 
 const onMaterialized = vi.fn();
+const onSendPaymentLink = vi.fn();
+const onCancelAppointment = vi.fn();
+const onTapCardBody = vi.fn();
 
 function makeAppt(overrides: Partial<PosUnstartedAppointment> = {}): PosUnstartedAppointment {
   return {
@@ -59,7 +69,14 @@ function makeAppt(overrides: Partial<PosUnstartedAppointment> = {}): PosUnstarte
     scheduled_end_time: '15:30:00',
     status: 'confirmed',
     channel: 'online',
-    customer: { id: 'c1', first_name: 'Jane', last_name: 'Doe', phone: null, email: null },
+    payment_status: 'unpaid',
+    customer: {
+      id: 'c1',
+      first_name: 'Jane',
+      last_name: 'Doe',
+      phone: '+13105551212',
+      email: 'jane@example.com',
+    },
     vehicle: { id: 'v1', year: 2022, make: 'Honda', model: 'Civic', color: 'Red' },
     detailer: { id: 'e1', first_name: 'Pat', last_name: 'Cashier' },
     appointment_services: [
@@ -72,10 +89,25 @@ function makeAppt(overrides: Partial<PosUnstartedAppointment> = {}): PosUnstarte
   };
 }
 
+function renderCard(overrides: Partial<PosUnstartedAppointment> = {}) {
+  return render(
+    <UnstartedAppointmentCard
+      appointment={makeAppt(overrides)}
+      onMaterialized={onMaterialized}
+      onSendPaymentLink={onSendPaymentLink}
+      onCancelAppointment={onCancelAppointment}
+      onTapCardBody={onTapCardBody}
+    />
+  );
+}
+
 beforeEach(() => {
   fetchCalls.length = 0;
   fetchResponses.length = 0;
   onMaterialized.mockReset();
+  onSendPaymentLink.mockReset();
+  onCancelAppointment.mockReset();
+  onTapCardBody.mockReset();
   toastSpies.success.mockReset();
   toastSpies.error.mockReset();
 });
@@ -87,7 +119,7 @@ afterEach(() => {
 
 describe('UnstartedAppointmentCard — rendering', () => {
   it('renders customer, vehicle, services, time, and the Start Intake button', () => {
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     expect(screen.getByText('Jane Doe')).toBeTruthy();
     expect(screen.getByText(/Red 2022 Honda Civic/i)).toBeTruthy();
     expect(screen.getByText('Wash')).toBeTruthy();
@@ -96,28 +128,110 @@ describe('UnstartedAppointmentCard — rendering', () => {
   });
 
   it('renders the "Not Started" badge', () => {
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     expect(screen.getByText('Not Started')).toBeTruthy();
   });
 
   it('renders the assigned detailer line when populated', () => {
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     expect(screen.getByText(/Assigned: Pat Cashier/)).toBeTruthy();
   });
 
   it('omits the detailer line when null (unassigned)', () => {
-    render(
-      <UnstartedAppointmentCard
-        appointment={makeAppt({ detailer: null })}
-        onMaterialized={onMaterialized}
-      />
-    );
+    renderCard({ detailer: null });
     expect(screen.queryByText(/Assigned:/)).toBeNull();
   });
 });
 
-describe('UnstartedAppointmentCard — Start Intake happy path', () => {
-  it('POSTs to /api/pos/jobs/start-intake with the appointment_id and triggers onMaterialized on 201', async () => {
+describe('UnstartedAppointmentCard — three-pill action row (Session #145)', () => {
+  it('renders Cancel + Send Payment Link + Start Intake pills', () => {
+    renderCard();
+    expect(screen.getByTestId('cancel-appointment-btn-apt-1')).toBeTruthy();
+    expect(screen.getByTestId('send-payment-link-btn-apt-1')).toBeTruthy();
+    expect(screen.getByTestId('start-intake-btn-apt-1')).toBeTruthy();
+  });
+
+  it('hides Send Payment Link pill when canSendPaymentLink predicate is false (already paid)', () => {
+    renderCard({ payment_status: 'paid' });
+    expect(screen.queryByTestId('send-payment-link-btn-apt-1')).toBeNull();
+    // Cancel + Start Intake still visible.
+    expect(screen.getByTestId('cancel-appointment-btn-apt-1')).toBeTruthy();
+    expect(screen.getByTestId('start-intake-btn-apt-1')).toBeTruthy();
+  });
+
+  it('hides Send Payment Link pill when customer has no contact channels', () => {
+    renderCard({
+      customer: {
+        id: 'c1',
+        first_name: 'Jane',
+        last_name: 'Doe',
+        phone: null,
+        email: null,
+      },
+    });
+    expect(screen.queryByTestId('send-payment-link-btn-apt-1')).toBeNull();
+  });
+
+  it('hides ALL three pills on terminal-status appointments (include-terminal toggle path)', () => {
+    renderCard({ status: 'cancelled' });
+    expect(screen.queryByTestId('cancel-appointment-btn-apt-1')).toBeNull();
+    expect(screen.queryByTestId('send-payment-link-btn-apt-1')).toBeNull();
+    expect(screen.queryByTestId('start-intake-btn-apt-1')).toBeNull();
+  });
+
+  it('Cancel pill click fires onCancelAppointment with the appointment id', () => {
+    renderCard();
+    fireEvent.click(screen.getByTestId('cancel-appointment-btn-apt-1'));
+    expect(onCancelAppointment).toHaveBeenCalledWith('apt-1');
+    // Cancel click MUST NOT also trigger tap-card-body (stopPropagation).
+    expect(onTapCardBody).not.toHaveBeenCalled();
+  });
+
+  it('Send Payment Link pill click fires onSendPaymentLink with the appointment id', () => {
+    renderCard();
+    fireEvent.click(screen.getByTestId('send-payment-link-btn-apt-1'));
+    expect(onSendPaymentLink).toHaveBeenCalledWith('apt-1');
+    expect(onTapCardBody).not.toHaveBeenCalled();
+  });
+
+  it('Start Intake pill click does NOT also fire tap-card-body (stopPropagation)', async () => {
+    fetchResponses.push({
+      match: '/api/pos/jobs/start-intake',
+      method: 'POST',
+      ok: true,
+      status: 201,
+      body: { job_id: 'job-new', appointment_id: 'apt-1', already_materialized: false },
+    });
+    renderCard();
+    fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
+    await waitFor(() => expect(onMaterialized).toHaveBeenCalled());
+    expect(onTapCardBody).not.toHaveBeenCalled();
+  });
+});
+
+describe('UnstartedAppointmentCard — tap-card-body → AppointmentDetailDialog', () => {
+  it('clicking the card body (outside any pill) fires onTapCardBody', () => {
+    renderCard();
+    fireEvent.click(screen.getByTestId('unstarted-appointment-card-apt-1'));
+    expect(onTapCardBody).toHaveBeenCalledWith('apt-1');
+  });
+
+  it('Enter key on the card body fires onTapCardBody', () => {
+    renderCard();
+    const card = screen.getByTestId('unstarted-appointment-card-apt-1');
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(onTapCardBody).toHaveBeenCalledWith('apt-1');
+  });
+
+  it('does NOT fire onTapCardBody for a terminal-status appointment (card un-interactive)', () => {
+    renderCard({ status: 'cancelled' });
+    fireEvent.click(screen.getByTestId('unstarted-appointment-card-apt-1'));
+    expect(onTapCardBody).not.toHaveBeenCalled();
+  });
+});
+
+describe('UnstartedAppointmentCard — Gap A: Start Intake returns jobId', () => {
+  it('POSTs to /api/pos/jobs/start-intake and calls onMaterialized WITH the job_id (Gap A)', async () => {
     fetchResponses.push({
       match: '/api/pos/jobs/start-intake',
       method: 'POST',
@@ -126,14 +240,51 @@ describe('UnstartedAppointmentCard — Start Intake happy path', () => {
       body: { job_id: 'job-new', appointment_id: 'apt-1', already_materialized: false },
     });
 
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
 
     await waitFor(() => expect(onMaterialized).toHaveBeenCalledTimes(1));
+    // Critical Gap A invariant: jobId is forwarded so the page can route to
+    // JobDetail with autoStartIntake=true. Pre-#145 onMaterialized was zero-arg.
+    expect(onMaterialized).toHaveBeenCalledWith('job-new');
     expect(toastSpies.success).toHaveBeenCalledWith('Intake started');
     const call = fetchCalls.find((c) => c.url.includes('/start-intake'));
     expect(call?.init?.method).toBe('POST');
     expect(JSON.parse(String(call?.init?.body))).toEqual({ appointment_id: 'apt-1' });
+  });
+
+  it('forwards the existing job_id when already_materialized=true (idempotent retap)', async () => {
+    fetchResponses.push({
+      match: '/api/pos/jobs/start-intake',
+      method: 'POST',
+      ok: true,
+      status: 200,
+      body: { job_id: 'job-existing', appointment_id: 'apt-1', already_materialized: true },
+    });
+
+    renderCard();
+    fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
+
+    await waitFor(() => expect(onMaterialized).toHaveBeenCalled());
+    // Idempotent retap navigates identically — operator lands at the same
+    // jobId regardless of who won the materialize race.
+    expect(onMaterialized).toHaveBeenCalledWith('job-existing');
+  });
+
+  it('does NOT call onMaterialized when the response is missing job_id (defensive)', async () => {
+    fetchResponses.push({
+      match: '/api/pos/jobs/start-intake',
+      method: 'POST',
+      ok: true,
+      status: 201,
+      body: { appointment_id: 'apt-1', already_materialized: false },
+    });
+
+    renderCard();
+    fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
+
+    await waitFor(() => expect(toastSpies.error).toHaveBeenCalled());
+    expect(onMaterialized).not.toHaveBeenCalled();
   });
 });
 
@@ -147,7 +298,7 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
       body: { error: 'future_date', appointment_date: '2026-06-01' },
     });
 
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
 
     await waitFor(() => expect(screen.getByTestId('future-date-prompt')).toBeTruthy());
@@ -164,7 +315,7 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
       body: { error: 'future_date', appointment_date: '2026-06-01' },
     });
 
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
     await waitFor(() => expect(screen.getByTestId('future-date-prompt')).toBeTruthy());
 
@@ -172,13 +323,11 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
     await waitFor(() => expect(screen.queryByTestId('future-date-prompt')).toBeNull());
 
     expect(onMaterialized).not.toHaveBeenCalled();
-    // Only the initial start-intake call was made; no PATCH, no retry.
     expect(fetchCalls.filter((c) => /\/start-intake$/.test(c.url))).toHaveLength(1);
     expect(fetchCalls.filter((c) => /\/api\/pos\/appointments\/apt-1$/.test(c.url))).toHaveLength(0);
   });
 
   it('Confirm button PATCHes the appointment date and retries Start Intake', async () => {
-    // First start-intake: 422 future_date (queued for first call)
     fetchResponses.push({
       match: '/api/pos/jobs/start-intake',
       method: 'POST',
@@ -186,11 +335,10 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
       status: 422,
       body: { error: 'future_date', appointment_date: '2026-06-01' },
     });
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
     await waitFor(() => expect(screen.getByTestId('future-date-prompt')).toBeTruthy());
 
-    // Swap responses for the retry path: PATCH OK, second start-intake OK.
     fetchResponses.length = 0;
     fetchResponses.push({
       match: /\/api\/pos\/appointments\/apt-1$/,
@@ -218,6 +366,8 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
     expect(patchBody.scheduled_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     expect(toastSpies.success).toHaveBeenCalledWith('Moved to today + intake started');
+    // Same Gap A invariant on the retry path — jobId forwarded.
+    expect(onMaterialized).toHaveBeenCalledWith('job-new');
   });
 
   it('Confirm path shows error toast when PATCH fails (no retry attempted)', async () => {
@@ -228,7 +378,7 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
       status: 422,
       body: { error: 'future_date', appointment_date: '2026-06-01' },
     });
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
     await waitFor(() => expect(screen.getByTestId('future-date-prompt')).toBeTruthy());
 
@@ -245,7 +395,6 @@ describe('UnstartedAppointmentCard — 422 future_date popup', () => {
 
     await waitFor(() => expect(toastSpies.error).toHaveBeenCalled());
     expect(onMaterialized).not.toHaveBeenCalled();
-    // No retry start-intake call.
     expect(fetchCalls.filter((c) => /\/start-intake$/.test(c.url))).toHaveLength(1);
   });
 });
@@ -260,7 +409,7 @@ describe('UnstartedAppointmentCard — 422 invalid_status path', () => {
       body: { error: 'invalid_status', appointment_status: 'pending' },
     });
 
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
 
     await waitFor(() => expect(toastSpies.error).toHaveBeenCalled());
@@ -280,7 +429,7 @@ describe('UnstartedAppointmentCard — generic 500 path', () => {
       body: { error: 'unknown' },
     });
 
-    render(<UnstartedAppointmentCard appointment={makeAppt()} onMaterialized={onMaterialized} />);
+    renderCard();
     fireEvent.click(screen.getByTestId('start-intake-btn-apt-1'));
 
     await waitFor(() => expect(toastSpies.error).toHaveBeenCalled());

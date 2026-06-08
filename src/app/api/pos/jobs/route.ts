@@ -178,6 +178,15 @@ export async function GET(request: NextRequest) {
       const unstartedStatuses = includeTerminal
         ? ['confirmed', 'in_progress', 'cancelled', 'completed', 'no_show']
         : ['confirmed', 'in_progress'];
+      // Session #145 (Ian-Austria-unblock) — `payment_status` added to the
+      // wide-SELECT so the strip card's Send Payment Link pill predicate
+      // (`canSendPaymentLink` helper) can short-circuit on already-paid
+      // appointments. Without this field the pill would surface on a
+      // fully-paid online-booking appointment that hasn't been started, and
+      // the server-side helper would reject the send with a "no remaining
+      // balance" error — misleading-button class. Matches the existing
+      // `appointments.payment_status` enum (pending|partial|paid|refunded|
+      // partial_refund) from `20260201000001_create_enums.sql`.
       let unstartedQuery = supabase
         .from('appointments')
         .select(`
@@ -187,6 +196,7 @@ export async function GET(request: NextRequest) {
           scheduled_end_time,
           status,
           channel,
+          payment_status,
           total_amount,
           deposit_amount,
           customer:customers!customer_id(id, first_name, last_name, phone, email),
@@ -233,6 +243,7 @@ export async function GET(request: NextRequest) {
             scheduled_end_time: a.scheduled_end_time ?? null,
             status: a.status,
             channel: a.channel,
+            payment_status: a.payment_status ?? null,
             customer: a.customer ?? null,
             vehicle: a.vehicle ?? null,
             detailer: a.detailer ?? null,
@@ -274,6 +285,7 @@ interface UnstartedRawRow {
   scheduled_end_time: string | null;
   status: PosUnstartedAppointment['status'];
   channel: PosUnstartedAppointment['channel'];
+  payment_status: PosUnstartedAppointment['payment_status'];
   total_amount: number | string | null;
   deposit_amount: number | string | null;
   customer: PosUnstartedAppointment['customer'];

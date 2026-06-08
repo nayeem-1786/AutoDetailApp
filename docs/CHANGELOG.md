@@ -6,6 +6,71 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #145 — Ian-Austria payment-link unblock + Gap A direct-intake navigation + Stage 3 strip pills + AppointmentDetailDialog footer redesign + Gap D PWA-wake catch wrapper (2026-06-08)
+
+Closes four operational gaps surfaced by the operator after Stage 2 (commit `3430c5d0`) shipped:
+
+- **Gap A** — strip's "Start Intake" tap now routes directly to ZonePicker instead of the JobDetail header (was: 4 taps from walk-in form submit to photos; now: 2 taps).
+- **Stage 3** — unstarted-strip card replaces its single Start Intake pill with a three-pill row `[Cancel red / Send Payment Link green / Start Intake blue]`. Tap-card-body opens AppointmentDetailDialog (same wire-up Schedule scope uses).
+- **AppointmentDetailDialog footer redesign** — `[Cancel Appointment (red)] [Send Payment Link (green)] [Save Changes (dark)]`. Close button removed from editable mode (DialogClose `<X>` icon top-right + Esc remain). readOnly mode retains Close.
+- **Gap D** — `.catch` wrapper on the un-awaited `discoverAndConnect()` in `reader-context.tsx`'s visibility-reconnect handler closes the documented PWA-wake "POS no longer authenticated" false-logout class.
+
+**Operator unblock (Ian Austria, $535 appointment 06/10/2026):** the existing `/api/pos/appointments/[id]/send-payment-link` endpoint accepts any date (no future-date gate); operator unblocks Ian via a 60-second console-fetch from a logged-in POS browser tab. The new UI Send Payment Link pills surface the same endpoint through the operator UI for all future cases.
+
+**Five locked decisions (Q1-Q5, from pre-flight):**
+
+- **Q1** — strip's auto-mount to ZonePicker is gated on `photosEnabled === true`; falls through to JobDetail header otherwise.
+- **Q2** — idempotent retap (`already_materialized: true`) navigates identically to fresh materialization.
+- **Q3** — Option (ii) locked: strip card carries only "Start Intake" label forever (no state machine). After materialization, the strip card vanishes and the regular job card carries the affordance forward via a new "Edit Intake" pill (visible while `status === 'intake' && intake_completed_at == null`) routing to the same `onOpenJobForIntake(jobId)` parent callback Gap A wires.
+- **Q4** — "Edit in POS" button retains its existing service-editing register destination; dialog-unification follow-up tracks future photo/intake/dialog integration.
+- **Q5** — `canSendPaymentLink` predicate lifted from JobDetail's inline expression to `src/components/jobs/can-send-payment-link.ts`. Three consumers: JobDetail, AppointmentDetailDialog footer, UnstartedAppointmentCard strip pill.
+
+**Code architecture:**
+
+- New helper `canSendPaymentLink` is a 7-line predicate; truth-table pinned by 10 unit tests.
+- `<UnstartedAppointmentCard>` rewrite: outer `<div>` becomes tap-target (role=button + Enter/Space keyboard), three pills each call `event.stopPropagation()` so tap-card-body and pill clicks never co-fire. `callStartIntake` now returns `{ ok: true; jobId } | { ok: false }`; `handleStartIntake` calls `onMaterialized(jobId)` (was zero-arg pre-#145).
+- `<JobQueue>` gains `onOpenJobForIntake?: (jobId) => void` prop (called from strip's Start Intake AND the new Edit Intake pill on the regular card). Strip's payment-link two-step modal chain (`PaymentLinkAmountModal` → `SendPaymentLinkDialog`) mounted at JobQueue level with independent state slots from the AppointmentDetailDialog wire-up. AppointmentDetailDialog mount in JobQueue wires `onSendPaymentLink` so the dialog's new green button routes to the same modal chain.
+- `<JobDetail>` accepts `autoStartIntake?` + `onAutoStartIntakeConsumed?` props. Effect mounts ZonePicker on first job-load when all 5 gates hold (consumed-ref one-shot, autoStartIntake true, photosEnabled true, job loaded, `intake_completed_at == null`). Parent clears the flag after consumption so back-and-return lands on the header (one-shot navigation intent, not persistent mode).
+- `/pos/jobs/page.tsx` view-state union extended with `autoStartIntake?: boolean`.
+- `<AppointmentDetailDialog>` accepts `onSendPaymentLink?: (appointment) => void`. Admin omits (no admin route exists for sending payment links — see Section "Admin parity scope" below); POS Schedule + POS strip-card mounts both wire.
+- `reader-context.tsx:115` un-awaited `discoverAndConnect()` wrapped in `.catch((err) => console.warn('[reader-context] visibility reconnect failed (silenced — operator stays logged in)', err))`. The wrap is defensive — current `discoverAndConnect` has its own internal try/catch that swallows known errors, but the audit identified the un-awaited call as the most-likely surface for un-handled rejections if SDK shape changes. The wrap is structurally pinned by a source-regex regression test.
+
+**Schema-touching: server SELECT widening only (no migration):**
+
+- `/api/pos/jobs/route.ts` unstarted-appointments query now selects `payment_status` (used by the strip's Send Link pill `canSendPaymentLink` gate).
+- `PosUnstartedAppointment` and `JobListItem` TypeScript types gain `payment_status` and `intake_completed_at` fields respectively.
+- `PosAppointment` gains optional `amount_due_cents?: number | null` (forward-compatible with a future `attachAmountDueCents` extraction; currently NULL on `/api/pos/appointments/[id]` responses).
+
+**Known degraded behavior (acceptable, tracked for follow-up):**
+
+- The strip's Send Payment Link modal seeds its `remainingCents` from `appointment.amount_due_cents` when available, else `total_amount * 100` as fallback. For appointments with no prior deposit (Ian's case), this is correct. For appointments with a partial deposit paid, the seeded "Full" preset would over-charge — operator must select "Custom" in the amount modal and enter the correct remaining amount. The server-side `sendPaymentLink` helper rejects amounts exceeding the recomputed remaining with a clear toast, so incorrect picks fail safely. Future work: extract `/api/pos/jobs/[id]:attachAmountDueCents` to a shared helper and invoke from `/api/pos/appointments/[id]` so all three surfaces (JobDetail / dialog / strip) see the same remaining-balance math.
+
+**Admin parity scope (intentionally out of scope):**
+
+- The footer's Send Payment Link button gates on the parent passing `onSendPaymentLink`. `<AppointmentDetailDialog>` in `/admin/appointments/page.tsx` does NOT pass this prop because the underlying `SendPaymentLinkDialog` uses `posFetch` against a POS-session-authenticated endpoint — admin has no equivalent route or auth surface. The admin-parity dialog footer test pins this as a documented host-divergence in `DOCUMENTED_HOST_DIVERGENCE_PROPS` (next to `hostContext` + `returnToPath`). A future workstream that adds an admin-cookie-auth send-payment-link route + an admin-side dialog variant closes this — explicitly out of #145 scope per the Session #145 locked constraint.
+
+**Removed UI elements (editable mode only):**
+
+- `<AppointmentDetailDialog>` editable footer's `<Button variant="outline">Close</Button>` removed. Dismiss affordance now via the DialogClose `<X>` icon top-right of the dialog header (existing, unchanged) + Esc key (Radix Dialog default). readOnly mode (admin dashboard quick-peek) retains the Close button as the only dismiss button (no Cancel, no Save in that mode).
+
+**Incidental fix carried in this commit (pre-flight Concern #2):** `JobQueue`'s `markLocalUpdate` key on the strip's `onMaterialized` closure now uses the real `jobId` returned by the start-intake endpoint instead of the previous synthetic `__intake_${apt.id}__` string (which never matched the next-poll's job row). The poll's highlight-suppression now correctly suppresses the just-materialized job from animating.
+
+**Test invariants:**
+
+- Files: 5 new (`can-send-payment-link.test.ts` 10 tests, `appointment-detail-dialog-footer.test.tsx` 8 tests, `job-detail-auto-start-intake.test.ts` 12 tests, `reader-context-visibility-reconnect.test.tsx` 2 tests, `job-queue-edit-intake-pill.test.tsx` 6 tests).
+- Files: 1 expanded (`unstarted-appointment-card.test.tsx` from 14 to 23 tests — 9 new for 3-pill render, predicate gating, stopPropagation correctness, tap-card-body, Gap A jobId forwarding, idempotent retap, missing-jobId defensive path).
+- Files: 1 documented divergence (`admin-pos-dialog-parity.test.tsx` registers `onSendPaymentLink` in `DOCUMENTED_HOST_DIVERGENCE_PROPS`).
+- Vitest: 3473 / 3473 pass + 66 skipped (was 3423 / 3423 + 66 skipped pre-#145). **+50 tests, zero new failures.**
+- TypeScript: 5 pre-existing errors only (`sla-cron.test.ts` × 2, `customer-accept-service.test.ts` × 3) — baseline preserved, zero new tsc errors.
+
+**Layout verification (reasoning, not visual):** iPad portrait viewport 768px minus ~250px POS chrome = ~518px strip card width. Three pills at full text labels ≈ 337px total (Cancel 90px + Send Link 110px + Start Intake 125px + 12px gaps). 180px clearance. `hidden sm:inline` fallback collapses Cancel + Send Link to icon-only at the `sm:` breakpoint (< 640px). `flex-wrap` defends against unexpected overflow by wrapping to two rows. Operator validates on actual iPad post-deploy; fix-forward (Tailwind class change) if visual issues surface.
+
+**Files modified (16):** `src/components/jobs/can-send-payment-link.ts` (new), `src/components/jobs/__tests__/can-send-payment-link.test.ts` (new), `src/app/admin/appointments/components/__tests__/appointment-detail-dialog-footer.test.tsx` (new), `src/app/pos/jobs/components/__tests__/job-detail-auto-start-intake.test.ts` (new), `src/app/pos/context/__tests__/reader-context-visibility-reconnect.test.tsx` (new), `src/app/pos/jobs/components/__tests__/job-queue-edit-intake-pill.test.tsx` (new), `src/app/pos/jobs/components/job-detail.tsx`, `src/app/pos/jobs/components/unstarted-appointment-card.tsx`, `src/app/pos/jobs/components/schedule-types.ts`, `src/app/api/pos/jobs/route.ts`, `src/app/pos/jobs/components/job-queue.tsx`, `src/app/pos/jobs/page.tsx`, `src/app/admin/appointments/components/appointment-detail-dialog.tsx`, `src/app/pos/components/appointments/types.ts`, `src/app/pos/context/reader-context.tsx`, `src/app/pos/jobs/components/__tests__/unstarted-appointment-card.test.tsx` (expanded), `src/app/__tests__/admin-pos-dialog-parity.test.tsx` (documented divergence), `docs/dev/FILE_TREE.md`.
+
+**Deferred (Class (c) backlog, explicitly out of scope per locked constraint):** function rename `handleCreateJob → handleCreateAppointment`; helper `trigger='walk_in'` branch removal; quote-detail catch-block wording; photos/intake integration with AppointmentDetailDialog (future dialog-unification workstream); AUTH_PATTERNS listener purpose audit; `transaction-detail.tsx:142` cross-boundary call; `amount_due_cents` server-attach extraction for `/api/pos/appointments/[id]`.
+
+---
+
 ## Phase 3 Theme D.3 — charge.refunded webhook subscription + reconciliation handler (AC-9 completion) (2026-06-07)
 
 Closes the refund-event-listener loop by subscribing the Stripe webhook to `charge.refunded` and reconciling Smart Details DB state with Stripe's source-of-truth. Pre-D.3, refunds initiated **outside** the D.1 cancel-orchestration layer (manual Stripe dashboard refunds, refunds via the Stripe API directly, dispute-resolution refunds) left the DB out-of-sync: the customer's bank statement showed the refund while the appointment + transaction still read "paid in full." Per Phase 3.0.2 audit `10421f23` Target F.4 (webhook scope expansion lock).

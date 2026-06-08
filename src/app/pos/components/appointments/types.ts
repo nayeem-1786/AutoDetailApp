@@ -24,6 +24,16 @@ export interface PosAppointment extends Appointment {
   > | null;
   employee: Pick<Employee, 'id' | 'first_name' | 'last_name' | 'role'> | null;
   appointment_services: PosAppointmentService[];
+  /** Session #145 — server-computed remaining-balance cents, optionally
+   *  attached by callers that need accurate payment-link math (see
+   *  `/api/pos/jobs/[id]:attachAmountDueCents` for the canonical compute
+   *  shape). Currently NOT populated by `/api/pos/appointments/[id]` GET —
+   *  consumers (the strip's Send Payment Link flow) fall back to
+   *  `total_amount * 100` when this field is absent, and the operator
+   *  selects a custom amount through `<PaymentLinkAmountModal>` if a prior
+   *  deposit needs to be subtracted. A future enhancement may extract the
+   *  attachAmountDueCents helper and call it from this endpoint too. */
+  amount_due_cents?: number | null;
 }
 
 export interface PosStaff {
