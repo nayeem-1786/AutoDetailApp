@@ -8,8 +8,21 @@ export function PosServiceWorker() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
+    // Version the SW registration URL with BUILD_ID so each deploy produces a
+    // different URL → the browser registers a fresh SW → activate handler runs
+    // → fresh chunks served on next page load. Without this versioning the SW
+    // file URL is constant ('/pos-sw.js'), the browser caches it aggressively,
+    // and `reg.update()` below is a no-op because the file's byte content
+    // never changes between deploys. The compounding result was stale POS
+    // bundle code surviving deploys — symptom: 2026-06-08 credit-loop fix
+    // landed on server but operator's PWA continued executing pre-fix badge
+    // code that called the old admin endpoint. BUILD_ID is inlined at build
+    // time via next.config.ts's `env` block (line 23-25). The `|| 'dev'`
+    // fallback is defense-in-depth — if inlining ever fails the URL stays
+    // valid (just stops cache-busting between deploys until inlining is
+    // fixed). See docs/dev/CHANGELOG entry 2026-06-08 for the full incident.
     navigator.serviceWorker
-      .register('/pos-sw.js', { scope: '/pos' })
+      .register(`/pos-sw.js?v=${process.env.BUILD_ID || 'dev'}`, { scope: '/pos' })
       .then((reg) => {
         console.log('POS SW registered:', reg.scope);
 
