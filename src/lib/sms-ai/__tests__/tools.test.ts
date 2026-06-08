@@ -8,8 +8,8 @@ import {
 } from '@/lib/sms-ai/tools';
 
 describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
-  it('contains exactly 13 tools', () => {
-    expect(SMS_AI_V2_TOOLS).toHaveLength(13);
+  it('contains exactly 14 tools (Phase 3 Theme B.2 added send_payment_link as the 14th — AC-11 completion)', () => {
+    expect(SMS_AI_V2_TOOLS).toHaveLength(14);
   });
 
   it('every tool name is unique', () => {
@@ -22,7 +22,7 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
     expect(TOOL_NAMES).toEqual(SMS_AI_V2_TOOLS.map((t) => t.name));
   });
 
-  it('TOOL_NAMES contains all expected names', () => {
+  it('TOOL_NAMES contains all expected names (Theme B.2 adds send_payment_link)', () => {
     const expected: SmsAiV2ToolName[] = [
       'lookup_customer',
       'get_services',
@@ -37,6 +37,7 @@ describe('SMS_AI_V2_TOOLS — declarative tool schema', () => {
       'approve_addon',
       'decline_addon',
       'upsert_customer',
+      'send_payment_link',
     ];
     expect([...TOOL_NAMES].sort()).toEqual([...expected].sort());
   });
@@ -576,5 +577,98 @@ describe('SMS_AI_V2_TOOLS — D47 / Issue 44 (get_services SCOPE-PRICING TIERS m
     const tool = getServices();
     expect(tool.description).toContain('pricing_model: "scope"');
     expect(tool.description).toContain('Hot Shampoo Extraction');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3 Theme B.2 (2026-06-07, AC-11 completion) — send_payment_link is
+// the 14th tool. The audit (Phase 3.0.2, 10421f23) flagged this as the
+// agent-side payment-link surface that AC-11 commits to. The tool wraps
+// the existing send-payment-link infrastructure (Theme B.1 closed the
+// webhook reconciliation gap; B.2 closes the agent-tool gap).
+// ---------------------------------------------------------------------------
+
+describe('SMS_AI_V2_TOOLS — Theme B.2 / AC-11 (send_payment_link)', () => {
+  function sendPaymentLink() {
+    return SMS_AI_V2_TOOLS.find((t) => t.name === 'send_payment_link')!;
+  }
+
+  it('send_payment_link is registered as a 14th tool with name "send_payment_link"', () => {
+    const tool = sendPaymentLink();
+    expect(tool).toBeDefined();
+    expect(tool.name).toBe('send_payment_link');
+  });
+
+  it('send_payment_link requires only appointment_id', () => {
+    const tool = sendPaymentLink();
+    expect(tool.input_schema.required).toEqual(['appointment_id']);
+  });
+
+  it('send_payment_link declares appointment_id as a string property', () => {
+    const tool = sendPaymentLink();
+    const prop = tool.input_schema.properties.appointment_id as {
+      type?: string;
+    };
+    expect(prop.type).toBe('string');
+  });
+
+  it('send_payment_link declares optional amount_cents as an integer property (not required)', () => {
+    const tool = sendPaymentLink();
+    const prop = tool.input_schema.properties.amount_cents as { type?: string } | undefined;
+    expect(prop).toBeDefined();
+    expect(prop!.type).toBe('integer');
+    expect(tool.input_schema.required ?? []).not.toContain('amount_cents');
+  });
+
+  it('send_payment_link declares optional channels as an array of "sms"/"email" enum (not required)', () => {
+    const tool = sendPaymentLink();
+    const prop = tool.input_schema.properties.channels as
+      | { type?: string; items?: { type?: string; enum?: string[] } }
+      | undefined;
+    expect(prop).toBeDefined();
+    expect(prop!.type).toBe('array');
+    expect(prop!.items?.type).toBe('string');
+    expect([...(prop!.items?.enum ?? [])].sort()).toEqual(['email', 'sms']);
+    expect(tool.input_schema.required ?? []).not.toContain('channels');
+  });
+
+  it('send_payment_link description gates the call on explicit customer confirmation (no proactive firing)', () => {
+    const tool = sendPaymentLink();
+    expect(tool.description.toLowerCase()).toContain('only call this when');
+    expect(tool.description.toLowerCase()).toContain('explicitly agreed');
+    expect(tool.description.toLowerCase()).toContain('do not call this proactively');
+  });
+
+  it('send_payment_link description references Theme B.1 webhook flip (pending → confirmed on payment)', () => {
+    const tool = sendPaymentLink();
+    // Tells the LLM that payment confirmation arrives async via the webhook,
+    // so it doesn't need to fire a follow-up confirmation tool.
+    expect(tool.description.toLowerCase()).toContain('webhook');
+    expect(tool.description.toLowerCase()).toContain('pending to confirmed');
+  });
+
+  it('send_payment_link description specifies amount_cents fallback to full remaining balance when omitted', () => {
+    const tool = sendPaymentLink();
+    const prop = tool.input_schema.properties.amount_cents as { description?: string };
+    expect(prop.description).toBeDefined();
+    expect(prop.description!.toLowerCase()).toContain('full remaining balance');
+    expect(prop.description!.toLowerCase()).toContain('omitted');
+    // Stripe floor surfaced so the LLM doesn't propose < $0.50
+    expect(prop.description).toMatch(/50/);
+  });
+
+  it('send_payment_link description specifies channels default to both sms+email when omitted', () => {
+    const tool = sendPaymentLink();
+    const prop = tool.input_schema.properties.channels as { description?: string };
+    expect(prop.description).toBeDefined();
+    expect(prop.description!.toLowerCase()).toContain('both');
+    expect(prop.description!.toLowerCase()).toContain('omitted');
+  });
+
+  it('send_payment_link description covers error scenarios (no email/phone on file, already paid)', () => {
+    const tool = sendPaymentLink();
+    expect(tool.description.toLowerCase()).toContain('422');
+    expect(tool.description.toLowerCase()).toContain('409');
+    expect(tool.description.toLowerCase()).toContain('already paid');
   });
 });

@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
       vehicle_model,
       vehicle_color,
       notes,
+      payment_intent_id,
     } = body as {
       customer_name: string;
       customer_phone: string;
@@ -172,7 +173,36 @@ export async function POST(request: NextRequest) {
       vehicle_model?: string;
       vehicle_color?: string;
       notes?: string;
+      payment_intent_id?: string;
     };
+
+    // Phase 3 Theme B.2 (AC-11 completion): payment-evidence-based initial
+    // status, mirroring the online-booking path at `src/app/api/book/route.ts`
+    // line 559 (`initialStatus = data.payment_intent_id ? 'confirmed' : 'pending'`).
+    //
+    // Pre-Theme-B.2 this was hardcoded 'pending' on both branches (direct at
+    // :516 + quote-conversion at :290). The audit's Option α (Phase 3.0.2,
+    // 10421f23, D.3) had two readings:
+    //   (1) Continue hardcoding 'pending'; webhook flips on payment receipt.
+    //   (2) Forward-compatible refactor: gate on explicit payment evidence
+    //       in the request payload.
+    // Theme B.2 picks (2) for parity with the online-booking path — the SAME
+    // axis (presence of a Stripe payment_intent_id at create-time) drives
+    // the SAME initial status decision regardless of channel. Today the
+    // voice agent doesn't collect synchronous payment in-call (the send_payment_link
+    // tool dispatches a link the customer pays asynchronously), so this
+    // branch is forward-compatible for that future capability without
+    // changing current behavior — payment_intent_id is undefined on every
+    // current agent call, so initialStatus stays 'pending', and the webhook
+    // (Theme B.1) handles the async pending → confirmed flip after the
+    // customer pays. When the agent's tool surface ever evolves to collect
+    // synchronous payment (e.g., reads Stripe Terminal in-call), passing
+    // payment_intent_id in the request lands the appointment at 'confirmed'
+    // synchronously — matching the online-booking path's behavior.
+    const initialStatus: 'pending' | 'confirmed' =
+      typeof payment_intent_id === 'string' && payment_intent_id.length > 0
+        ? 'confirmed'
+        : 'pending';
 
     // Validate required fields — service_id required unless quote_id provided
     if (!customer_name || !customer_phone || !date || !time) {
@@ -279,15 +309,20 @@ export async function POST(request: NextRequest) {
 
       // Use shared conversion service — creates appointment, appointment_services,
       // updates quote status to 'converted', links converted_appointment_id.
-      // Voice agent appointments default to 'pending' — staff must manually
-      // confirm after reviewing details.
+      // Theme B.2 (AC-11 completion): appointmentStatus is now payment-evidence-
+      // based via the `initialStatus` derived above — matches the online-booking
+      // path's behavior on the SAME axis (presence of payment_intent_id at
+      // create-time). When the agent doesn't carry payment evidence (today's
+      // every call), this remains 'pending' and the webhook flips on async
+      // payment receipt; when the agent ever passes a synchronous
+      // payment_intent_id, this lands 'confirmed' immediately.
       const { convertQuote } = await import('@/lib/quotes/convert-service');
       t = perf.now();
       const result = await convertQuote(
         supabase,
         resolvedQuoteId,
         { date, time: normalizedTime, duration_minutes: totalDuration },
-        { appointmentStatus: 'pending', channel: 'phone' }
+        { appointmentStatus: initialStatus, channel: 'phone' }
       );
       perf.mark('convertQuote', t);
 
@@ -502,9 +537,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment
-    // Voice agent appointments default to 'pending' — staff must manually
-    // confirm after reviewing details. This differs from POS/admin conversion
-    // which sets 'confirmed' because a staff member initiated it.
+    // Theme B.2 (AC-11 completion): `status` is payment-evidence-based via
+    // `initialStatus` (derived above from the request body's optional
+    // `payment_intent_id`). Pre-Theme-B.2 this was hardcoded 'pending' on
+    // the assumption that staff would manually confirm after reviewing
+    // details; that assumption was correct ONLY because the agent had no
+    // synchronous payment path. Post-Theme-B.2: when `payment_intent_id`
+    // is present in the body the appointment lands at 'confirmed'
+    // synchronously, mirroring online-booking's behavior (book/route.ts:559);
+    // when absent (the common case today) it stays 'pending' and the
+    // webhook (Theme B.1) handles the async pending → confirmed flip after
+    // the customer pays via the link the agent sent via `send_payment_link`.
     //
     // Phase 3 Theme A (AC-10 v1.4): appointment_number is NOT NULL — generate
     // it before the INSERT so the row can satisfy the constraint.
@@ -518,7 +561,7 @@ export async function POST(request: NextRequest) {
         appointment_number: appointmentNumber,
         customer_id: customerId,
         vehicle_id: vehicleId,
-        status: 'pending',
+        status: initialStatus,
         channel: 'phone',
         scheduled_date: date,
         scheduled_start_time: normalizedTime,

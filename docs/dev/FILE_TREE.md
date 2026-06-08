@@ -562,9 +562,12 @@ src/app/api/voice-agent/quotes/route.ts
 src/app/api/voice-agent/quotes/__tests__/route.test.ts  # NEW Issue 33 Layer 1 — 9 tests (no existing coverage). Combo HIT/MISS through this route's bespoke pricing loop, standard_price + pricing_type column persistence (Layer-1 alignment with createQuote pattern), subtotal recompute from combo-rewritten items.
 src/app/api/voice-agent/send-info-sms/route.ts
 src/app/api/voice-agent/notify-staff/route.ts
+src/app/api/voice-agent/send-payment-link/route.ts  # NEW Phase 3 Theme B.2 — 14th voice-agent tool (AC-11 completion); validateApiKey + channels[]→method translation + delegates to src/lib/payment-link/send.ts shared helper
+src/app/api/voice-agent/send-payment-link/__tests__/route.test.ts  # NEW Phase 3 Theme B.2 — 21 tests for the new route (auth, body validation, channels translation, success/error pass-through, amount_cents forwarding)
 src/app/api/voice-agent/send-quote-sms/route.ts
 src/app/api/voice-agent/services/route.ts
 src/app/api/voice-agent/vehicle-classify/route.ts
+src/app/api/voice-agent/appointments/__tests__/status-pin-removal.test.ts  # NEW Phase 3 Theme B.2 — 10 source-string regression tests for the payment_intent_id → initialStatus derivation at both branches (direct + quote-conversion)
 src/app/api/waitlist/[id]/route.ts
 src/app/api/waitlist/route.ts
 ```
@@ -997,6 +1000,8 @@ src/lib/security/ip-whitelist.ts
 
 ### POS
 ```
+src/lib/payment-link/send.ts                              # Phase 3 Theme B.2: shared sendPaymentLink() orchestration extracted from POS route — token mint, balance compute, multi-channel dispatch, success stamping; consumed by /api/pos/appointments/[id]/send-payment-link (POS session auth) AND /api/voice-agent/send-payment-link (Bearer voice_agent_api_key auth, 14th tool)
+src/lib/payment-link/__tests__/send.test.ts               # 26 tests — Phase 3 Theme B.2: validation chain (return-before-mutation, all 422/404/409 paths) + token mint + reuse + per-channel dispatch shapes + partial failure + SMS body composition
 src/lib/pos/api-auth.ts
 src/lib/pos/check-permission.ts
 src/lib/pos/offline-queue.ts
