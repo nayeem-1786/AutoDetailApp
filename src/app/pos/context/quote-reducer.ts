@@ -3,6 +3,7 @@ import { calculateItemTax, calculateTicketTotals } from '../utils/tax';
 import { resolveServicePriceWithSale } from '../utils/pricing';
 import { applyAddService } from '../utils/apply-add-service';
 import { applyAddProduct } from '../utils/apply-add-product';
+import { applyAddCustomItem } from '../utils/apply-add-custom-item';
 import { generateId } from '../utils/generate-id';
 
 export const initialQuoteState: QuoteState = {
@@ -80,38 +81,10 @@ export function quoteReducer(
     }
 
     case 'ADD_CUSTOM_ITEM': {
-      const { name, price, isTaxable } = action;
-      const newItem: TicketItem = {
-        id: generateId(),
-        itemType: 'custom',
-        productId: null,
-        serviceId: null,
-        categoryId: null,
-        itemName: name,
-        quantity: 1,
-        unitPrice: price,
-        totalPrice: price,
-        taxAmount: calculateItemTax(price, isTaxable),
-        isTaxable,
-        tierName: null,
-        vehicleSizeClass: null,
-        notes: null,
-        perUnitQty: null,
-        perUnitLabel: null,
-        perUnitPrice: null,
-        perUnitMax: null,
-        parentItemId: null,
-        standardPrice: price,
-        pricingType: 'standard',
-        comboSourcePrimaryId: null,
-        saleEffectivePrice: null,
-        prerequisiteNote: null,
-        prerequisiteForServiceId: null,
-      };
-      return recalculateTotals({
-        ...state,
-        items: [...state.items, newItem],
-      });
+      // C.1 step 3 — delegated to shared helper. ADD_CUSTOM_ITEM always
+      // appends a new item (no dedup — custom items have no stable identity
+      // to match), so the helper never returns reference-equal state.
+      return recalculateTotals(applyAddCustomItem(state, action));
     }
 
     case 'UPDATE_ITEM_QUANTITY': {
