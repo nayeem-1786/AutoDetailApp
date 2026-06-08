@@ -5,6 +5,7 @@ import { applyAddService } from '../utils/apply-add-service';
 import { applyAddProduct } from '../utils/apply-add-product';
 import { applyAddCustomItem } from '../utils/apply-add-custom-item';
 import { applyUpdateItemQuantity } from '../utils/apply-update-item-quantity';
+import { applyUpdatePerUnitQty } from '../utils/apply-update-per-unit-qty';
 import { generateId } from '../utils/generate-id';
 
 export const initialTicketState: TicketState = {
@@ -149,31 +150,8 @@ export function ticketReducer(
     }
 
     case 'UPDATE_PER_UNIT_QTY': {
-      const { itemId, perUnitQty } = action;
-      if (perUnitQty < 1) {
-        const items = state.items.filter((i) => i.id !== itemId);
-        return recalculateTotals({ ...state, items });
-      }
-      const items = state.items.map((item) => {
-        if (item.id !== itemId || !item.perUnitPrice) return item;
-        const newStandardPrice = item.perUnitPrice * perUnitQty;
-        // Use sale per-unit price when on sale
-        const salePricePerUnit = item.pricingType === 'sale' && item.saleEffectivePrice != null && item.perUnitQty
-          ? item.saleEffectivePrice / item.perUnitQty
-          : null;
-        const unitPrice = salePricePerUnit != null ? salePricePerUnit * perUnitQty : newStandardPrice;
-        const newSaleEffective = salePricePerUnit != null ? salePricePerUnit * perUnitQty : null;
-        return {
-          ...item,
-          perUnitQty,
-          unitPrice,
-          standardPrice: newStandardPrice,
-          saleEffectivePrice: newSaleEffective,
-          totalPrice: unitPrice * item.quantity,
-          taxAmount: calculateItemTax(unitPrice * item.quantity, item.isTaxable),
-        };
-      });
-      return recalculateTotals({ ...state, items });
+      // C.1 step 5 — delegated to shared helper.
+      return recalculateTotals(applyUpdatePerUnitQty(state, action));
     }
 
     case 'REMOVE_ITEM': {
