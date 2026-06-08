@@ -33,7 +33,8 @@ export type SmsAiV2ToolName =
   | 'send_quote_sms'
   | 'approve_addon'
   | 'decline_addon'
-  | 'upsert_customer';
+  | 'upsert_customer'
+  | 'send_payment_link';
 
 export const TOOL_NAMES: readonly SmsAiV2ToolName[] = [
   'lookup_customer',
@@ -49,6 +50,7 @@ export const TOOL_NAMES: readonly SmsAiV2ToolName[] = [
   'approve_addon',
   'decline_addon',
   'upsert_customer',
+  'send_payment_link',
 ] as const;
 
 export interface SmsAiV2Tool {
@@ -327,6 +329,33 @@ export const SMS_AI_V2_TOOLS: readonly SmsAiV2Tool[] = [
         },
       },
       required: ['first_name'],
+    },
+  },
+  {
+    name: 'send_payment_link',
+    description:
+      "Send a payment link to the customer via SMS and/or email for an appointment. The customer pays through the link (Stripe hosted page); when payment completes, the Stripe webhook automatically flips the appointment status from pending to confirmed (Theme B.1, no action required from you). Only call this when the customer has explicitly agreed to receive a payment link (e.g., 'yes, send it', 'text me the link', 'I'll pay now'). Do NOT call this proactively without confirmation.\n\nWHEN TO CALL: the customer has just booked an appointment AND has agreed to pay a deposit or the full amount via link. The link is the post-call payment mechanism — payment confirmation arrives asynchronously after the customer completes the Stripe flow.\n\nINPUT: appointment_id is REQUIRED. amount_cents is OPTIONAL — when omitted, the server uses the appointment's full remaining balance (preferred default). channels is OPTIONAL — when omitted, both SMS and email are dispatched if both are on file; pass an explicit array like [\"sms\"] only when the customer asked for a specific channel.\n\nERROR HANDLING: if the customer has no email on file and you requested email, the server returns 422. Same for SMS. If the appointment is already paid or cancelled, returns 409 — surface to the customer and ask how they'd like to proceed.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        appointment_id: {
+          type: 'string',
+          description:
+            "The UUID of the appointment to send the payment link for. Typically the appointment you just created via create_appointment — its id is in that tool's response.",
+        },
+        amount_cents: {
+          type: 'integer',
+          description:
+            "OPTIONAL. Custom amount to charge in cents (e.g. 5000 = $50.00). When omitted, the server uses the appointment's full remaining balance — this is the preferred default for most calls. Provide a custom value only when the customer explicitly named a partial-deposit amount (\"send a $50 deposit link\"). Minimum 50 cents (Stripe floor).",
+        },
+        channels: {
+          type: 'array',
+          items: { type: 'string', enum: ['sms', 'email'] },
+          description:
+            "OPTIONAL. Channels to dispatch the link via. Defaults to BOTH ['sms', 'email'] when omitted, which is the right call most of the time. Pass [\"sms\"] only when the customer asked for SMS specifically; pass [\"email\"] only when the customer asked for email specifically. The server rejects channels the customer has no destination on file for (e.g. no email → 422).",
+        },
+      },
+      required: ['appointment_id'],
     },
   },
 ] as const;

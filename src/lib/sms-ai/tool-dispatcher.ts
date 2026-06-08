@@ -100,6 +100,12 @@ const TOOL_TIMEOUT_MS: Record<SmsAiV2ToolName, number> = {
   approve_addon: 10000,
   decline_addon: 10000,
   upsert_customer: 5000,
+  // send_payment_link fans out to Twilio + Mailgun behind the helper (same
+  // classes as send_info_sms / send_quote_sms), so it shares their 10-second
+  // MEDIUM-SLOW budget. The dispatcher's per-tool budget is the only line of
+  // defense — voice-agent endpoints currently carry zero internal timeouts
+  // (file-header §Timeouts).
+  send_payment_link: 10000,
 };
 
 /** Per-agent-run Bearer key cache. Reset between inbounds via __resetForAgentRun. */
@@ -572,6 +578,30 @@ async function callUpsertCustomer(input: Record<string, unknown>, key: string): 
 }
 
 /**
+ * send_payment_link — POST /api/voice-agent/send-payment-link. Phase 3
+ * Theme B.2 (AC-11 completion). Forwards the LLM-supplied
+ * `appointment_id` / optional `amount_cents` / optional `channels` array
+ * directly. No phone injection (the endpoint resolves the destination
+ * from the appointment's customer record — agent-supplied phone would
+ * be ambiguous on a transferred-call or proxy-conversation flow).
+ */
+async function callSendPaymentLink(
+  input: Record<string, unknown>,
+  key: string,
+): Promise<DispatchToolResult> {
+  return voiceAgentFetch(
+    `/api/voice-agent/send-payment-link`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    },
+    TOOL_TIMEOUT_MS.send_payment_link,
+    key,
+  );
+}
+
+/**
  * approve_addon / decline_addon — in-process calls. Wrap
  * `approveAddon` / `declineAddon` from `@/lib/services/job-addons` with the
  * same 10-second timeout class as `notify_staff` (both send a confirmation
@@ -760,6 +790,9 @@ export async function dispatchTool(
       break;
     case 'upsert_customer':
       result = await callUpsertCustomer(input.input, key);
+      break;
+    case 'send_payment_link':
+      result = await callSendPaymentLink(input.input, key);
       break;
     default: {
       // Exhaustiveness guard. `name` is `never` here if the switch covers

@@ -265,6 +265,39 @@ describe('dispatchTool — routing per tool', () => {
     });
   });
 
+  it('send_payment_link → POST /api/voice-agent/send-payment-link with JSON body verbatim (Theme B.2 / AC-11)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(200, {
+        success: true,
+        payment_link_url: 'https://example.com/pay/TOKEN123',
+        channels_dispatched: ['sms', 'email'],
+      }),
+    );
+    const input = {
+      appointment_id: 'appt-123',
+      amount_cents: 5000,
+      channels: ['sms', 'email'],
+    };
+    await dispatchTool({ name: 'send_payment_link', input });
+    expect(fetchCalls[0].url).toBe(
+      'http://localhost:3000/api/voice-agent/send-payment-link',
+    );
+    expect(fetchCalls[0].init?.method).toBe('POST');
+    expect((fetchCalls[0].init?.headers as Record<string, string>)['Content-Type']).toBe(
+      'application/json',
+    );
+    // No phone injection on this tool — payment-link destinations are
+    // resolved server-side from the appointment's customer record.
+    expect(JSON.parse(fetchCalls[0].init?.body as string)).toEqual(input);
+  });
+
+  it('send_payment_link → forwards minimal { appointment_id } input verbatim (amount + channels optional)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { success: true }));
+    const input = { appointment_id: 'appt-456' };
+    await dispatchTool({ name: 'send_payment_link', input });
+    expect(JSON.parse(fetchCalls[0].init?.body as string)).toEqual(input);
+  });
+
   it('notify_staff → in-process helper (no fetch call)', async () => {
     notifyStaffMock.mockResolvedValueOnce({
       success: true,

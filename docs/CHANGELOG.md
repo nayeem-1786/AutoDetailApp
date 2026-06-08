@@ -6,6 +6,81 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Phase 3 Theme B.2 — 14th voice-agent tool `send_payment_link` + status-pin removal (AC-11 completion) (2026-06-07)
+
+Closes the AC-11 commitment by adding the agent-side payment-link surface that Theme B.1's webhook-driven status flip was waiting for. The voice-agent (SMS AI v2 + ElevenLabs Phone agent Tom) can now send a payment link to a customer mid-conversation; when the customer pays via the link, the Stripe webhook fires `payment_intent.succeeded` with `metadata.type='appointment_payment_link'` and the appointment flips pending → confirmed via the race-protected UPDATE Theme B.1 installed.
+
+**Per Phase 3.0.2 audit (`10421f23`) Target C + D.1 + D.3:**
+
+- The 13-tool voice-agent surface at `src/lib/sms-ai/tools.ts:66-289` had no payment-related tool — agents could not send a payment link at all.
+- The voice-agent appointments endpoint hardcoded `status: 'pending'` at both branches (`route.ts:516` direct + `:290` quote-conversion), with no axis for synchronous payment evidence.
+- The existing `/api/pos/appointments/[id]/send-payment-link` endpoint (POS session auth, 388 lines) carried best-in-class orchestration (token race-safety, multi-channel dispatch, balance compute, per-channel result reporting) — the right pattern to REUSE rather than parallel-build.
+
+**Locked decisions (per session brief + audit Target F.1 / F.2 / F.3):**
+
+- **F.1 wrapper pattern — Option (iii) LOCKED (extract shared helper).** New `src/lib/payment-link/send.ts` owns the orchestration; both routes (POS session auth + voice-agent Bearer auth) are thin auth + body validation + delegate shells. The audit surveyed three options; Option (iii) is the cleanest fit for Memory #2 (REUSE) without auth-boundary muddling. Net effect: POS route shrinks from 388 → 92 lines; new voice-agent route ships at 165 lines; helper is 311 lines.
+- **F.2 amount-choice semantic — Option (b) LOCKED (agent defaults to full remaining when amount_cents omitted).** The voice agent typically has no canonical view of `appointments.payment_status` at tool-call time; defaulting to "send the full remaining balance" is the right server-side default. Custom amounts ARE accepted (the tool schema declares `amount_cents` as optional integer ≥ 50) for cases where the customer named a specific deposit amount. Defense-in-depth: helper recomputes remaining server-side and rejects 422 on overpayment.
+- **F.3 flip semantic — Branch A LOCKED (any payment evidence → confirmed).** Mirrors Theme B.1's locked decision for the webhook path. Today the agent has no synchronous payment surface (the only payment path is the link the agent sends, which pays async via the webhook), so this is forward-compat code shape — `payment_intent_id` is undefined on every current call → initialStatus is 'pending' → no behavior change. When the agent's tool surface ever evolves to collect synchronous in-call payment, passing payment_intent_id lands the appointment at 'confirmed' synchronously, mirroring `src/app/api/book/route.ts:559`.
+
+**Architecture — three-file extraction + two-file integration:**
+
+1. `src/lib/payment-link/send.ts` (NEW) — `sendPaymentLink({ admin, appointmentId, method, amountCents? })` returns either `{ success: true, channels, payment_link_token, pay_url, partial_errors? }` OR `{ success: false, status, error, channels?, errors? }`. The status hint maps directly to NextResponse status codes. Orchestration extracted verbatim from the POS route — validation chain (return-before-mutation), token mint with retry-on-unique-violation under `.is('payment_link_token', null)` race guard, balance compute via `transactions` + `payments` lookup, per-channel dispatch with at-least-one-channel-must-succeed gate, success stamping.
+2. `src/app/api/pos/appointments/[id]/send-payment-link/route.ts` (REFACTORED, 388 → 92 lines) — preserves the exact same external contract (POS session auth, same request body shape, same response shape including `partial_errors`). Net change is INTERNAL extraction only; no operator-visible behavior change.
+3. `src/app/api/voice-agent/send-payment-link/route.ts` (NEW) — Bearer voice_agent_api_key auth. Translates the LLM-friendly `channels: ('sms' | 'email')[]` array into the helper's `method: 'sms' | 'email' | 'both'` string. Defaults to `channels: ['sms', 'email']` when omitted. Surfaces a `channels_dispatched` array in the success response so the LLM can factually report which channels succeeded without hallucination.
+
+**Voice-agent tool registry (`src/lib/sms-ai/tools.ts`):**
+
+- `SmsAiV2ToolName` union extended with `'send_payment_link'` (now 14 entries).
+- `TOOL_NAMES` const + `SMS_AI_V2_TOOLS` array extended in lockstep — type system enforces exhaustiveness via the dispatcher's switch statement.
+- Tool description gates the call on EXPLICIT customer confirmation ("yes, send it", "text me the link", "I'll pay now") — mirrors the audit-§1 confirmation-gate pattern other side-effecting tools carry. Description also tells the LLM that payment confirmation arrives async via the webhook (Theme B.1).
+- `tool-dispatcher.ts` extended: 10-second timeout class (same as `send_info_sms` / `send_quote_sms`); thin `callSendPaymentLink` helper that forwards the LLM input verbatim (no phone injection — payment-link destinations resolve server-side from the appointment's customer record, not from agent-supplied phone).
+
+**Voice-agent appointments route (`src/app/api/voice-agent/appointments/route.ts`):**
+
+- POST body destructuring accepts optional `payment_intent_id?: string`.
+- Module-level `initialStatus: 'pending' | 'confirmed'` derived from the body — non-empty string → 'confirmed', otherwise 'pending'. Mirrors `book/route.ts:559` byte-for-byte in shape.
+- Direct branch INSERT: `status: initialStatus` (was `'pending'` literal).
+- Quote-conversion branch: `convertQuote(..., { appointmentStatus: initialStatus, channel: 'phone' })` (was `appointmentStatus: 'pending'` literal).
+- In-source rationale block above the derivation cross-references Theme B.1 (async webhook flip), the online-booking pattern (`book/route.ts:559`), and the audit's Option β/γ framing.
+
+**What B.2 explicitly does NOT do (per Memory #29 targeted scope):**
+
+- Does NOT modify the Stripe webhook handler (Theme B.1 already handles post-payment status flip).
+- Does NOT persist `stripe_payment_intent_id` on the appointment row when `payment_intent_id` is provided — that requires corresponding transaction/payment row writes (full payment infrastructure), which is out of scope.
+- Does NOT reintroduce `fireWebhook` or n8n (REMOVED by Theme G; the new code surfaces are webhook-free by design).
+- Does NOT modify the customer-facing `/pay/[token]` page or the Stripe payment-intent creation endpoint at `/api/pay/[token]/intent`.
+
+**Files touched:**
+
+- Prod (NEW, 2): `src/lib/payment-link/send.ts`, `src/app/api/voice-agent/send-payment-link/route.ts`
+- Prod (MOD, 4): `src/app/api/pos/appointments/[id]/send-payment-link/route.ts` (refactor to helper), `src/lib/sms-ai/tools.ts` (union + array entries + tool definition), `src/lib/sms-ai/tool-dispatcher.ts` (timeout + handler + switch case), `src/app/api/voice-agent/appointments/route.ts` (body field + initialStatus derivation + 2 substitutions + rationale)
+- Tests (NEW, 3): `src/lib/payment-link/__tests__/send.test.ts` (26 tests), `src/app/api/voice-agent/send-payment-link/__tests__/route.test.ts` (21 tests), `src/app/api/voice-agent/appointments/__tests__/status-pin-removal.test.ts` (10 source-string regression tests)
+- Tests (MOD, 2): `src/lib/sms-ai/__tests__/tools.test.ts` (count 13 → 14 + extended expected-names list + 10 new send_payment_link tests), `src/lib/sms-ai/__tests__/tool-dispatcher.test.ts` (+2 send_payment_link routing tests)
+- Docs (MOD, 3): `docs/CHANGELOG.md` (this entry), `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md` (Theme B.2 Decisions Log entry + AC-11 FULLY OPERATIONAL marker), `docs/dev/FILE_TREE.md`
+
+**Test delta: +69** (+26 helper + +21 voice-agent route + +10 status-pin + +10 tools.test send_payment_link + +2 dispatcher routing).
+
+**Verification gates (all green):**
+
+- `npx tsc --noEmit` → 0 errors
+- `npm run lint` → 0 errors / 97 baseline warnings (unchanged from main)
+- `npm run build` → clean
+- Full test suite: 3225 passed | 66 skipped (208 files)
+
+**AC-11 status: FULLY OPERATIONAL.** Three commitments now satisfied across all four production booking paths:
+
+1. **Online booking (`book/route.ts:559`)** — synchronous: status = payment_intent_id ? 'confirmed' : 'pending'. (Pre-existing, unchanged.)
+2. **Async pay-link payment (Theme B.1)** — webhook flips pending → confirmed on payment_intent.succeeded for `appointment_payment_link` metadata. Race-protected via `.eq('status', 'pending')` UPDATE filter; idempotent via per-PI dedup.
+3. **Voice agent / SMS AI (Theme B.2)** — agent can SEND a payment link via the 14th tool; appointment INSERT uses the same payment-evidence-based axis as online booking; the webhook reconciles async when the customer pays.
+
+The semantic now reads consistently across every path: `pending` = no payment evidence at create time AND no payment receipt since; `confirmed` = payment evidence at create time OR payment receipt after create.
+
+**Parallel-merge note:** Theme B.2 landed in main interleaved with Theme C.2 (customer-accept handler refactor + SLA cron — AC-12 completion) and Theme E.3 (customer credit operator UI — AC-15 completion). The three sessions are file-isolated; the only shared surface is `docs/CHANGELOG.md` (this file) and `docs/dev/QUOTE_TO_POS_LIFECYCLE_ARCHITECTURE.md`, both manually reconciled at merge time. Per `Memory #parallel_doc_sessions_use_worktree`, B.2 ran in an isolated `git worktree` so no working-tree contention occurred.
+
+**Memory #11 corrections during build:** the session prompt's pseudocode for the implementation approach used the shorthand "Option α: Tool handler calls existing endpoint via internal fetch with service auth" — verification against the actual auth boundaries revealed this could not work as written (POS endpoint requires `X-POS-Session` token from a verifiable JWT; dispatcher only has voice_agent_api_key Bearer). The session escalated to audit's Option (iii) — shared helper extraction — which preserves the spirit of "reuse, don't parallel-build" with cleaner auth-boundary separation. Documented inline at the helper's file header so future readers understand the choice.
+
+---
+
 ## Phase 3 Theme E.3 — Customer credit operator UI (AC-15 completion) (2026-06-07)
 
 Operator UI surfaces over the E.1 schema/repository and E.2 application logic. With this session AC-15 is **fully operational** — credit issuance (manual + cancel flow), credit application (POS checkout), and operator visibility (admin Credits tab + POS at-a-glance badge) are all wired.
