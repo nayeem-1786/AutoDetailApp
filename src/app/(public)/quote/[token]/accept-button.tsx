@@ -39,11 +39,17 @@ export function AcceptQuoteButton({ quoteId, accessToken, totalAmount }: AcceptQ
   }
 
   if (accepted) {
+    // Phase 3 Theme C.2 (AC-12): the accept flow now auto-creates a pending
+    // appointment. Operator confirms the date/time at first touch and the
+    // customer is contacted to confirm. The prior "we'll reach out to
+    // schedule" copy was technically true but didn't reflect the new
+    // structure where the slot is already provisionally reserved.
     return (
       <div className="rounded-lg border border-green-800 bg-green-950 px-6 py-4">
         <p className="text-lg font-semibold text-green-200">Quote Accepted!</p>
         <p className="mt-1 text-sm text-green-400">
-          Thank you! We will contact you shortly to schedule your appointment.
+          Thank you! Your appointment is being scheduled — we&apos;ll reach out
+          shortly to confirm the date and time.
         </p>
       </div>
     );

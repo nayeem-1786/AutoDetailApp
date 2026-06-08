@@ -40,6 +40,17 @@ export interface ConvertQuoteOptions {
   appointmentStatus?: 'confirmed' | 'pending';
   /** Override channel. Default: 'phone'. */
   channel?: string;
+  /**
+   * Phase 3 Theme C.2 (AC-12): mark scheduled_date / scheduled_*_time as
+   * placeholders pending staff confirmation. The customer-accept path passes
+   * `true` because the customer accepts BEFORE picking a slot — the
+   * appointments table requires those three fields NOT NULL (per G.1 locked
+   * option ζ, the column carries the "this is a placeholder" signal rather
+   * than the schema dropping NOT NULL). All other callers (operator POS,
+   * voice agent, admin) pass concrete date/time the staff picked, so this
+   * flag stays `false` (the default).
+   */
+  placeholderDate?: boolean;
 }
 
 export async function convertQuote(
@@ -206,6 +217,23 @@ export async function convertQuote(
       loyalty_discount: loyaltyDiscount,
       manual_discount_value: manualDiscountValue,
       manual_discount_label: manualDiscountValue !== null ? manualDiscountLabel : null,
+      // Phase 3 Theme C.2 (AC-12): always write the source-quote back-link.
+      // The column was added by Theme C.1 with a UNIQUE partial index
+      // (`appointments_quote_id_uniq`) — the DB-layer race-protection
+      // backstop that complements the F.7 application-level guard above.
+      // Writing it on every conversion (operator POS, voice agent, customer
+      // accept, admin) means a second concurrent INSERT for the same quote
+      // raises a UNIQUE violation that F.7's pre-INSERT probe normally
+      // already handled — but defense-in-depth: any future caller that
+      // forgets the F.7 dance still cannot create a duplicate.
+      quote_id: quoteId,
+      // Phase 3 Theme C.2 (AC-12, G.1 LOCKED option ζ): mark the schedule
+      // fields as placeholder ONLY when the caller explicitly asks. The
+      // customer-accept orchestrator passes `placeholderDate: true` + a
+      // placeholder VALUE strategy (option α — `quote.valid_until`); every
+      // other caller stays `false` because they wrote a real operator/agent
+      // pick into date/time.
+      scheduled_date_placeholder: options?.placeholderDate ?? false,
     })
     .select('*')
     .single();
