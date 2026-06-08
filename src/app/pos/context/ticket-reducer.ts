@@ -8,6 +8,7 @@ import { applyUpdateItemQuantity } from '../utils/apply-update-item-quantity';
 import { applyUpdatePerUnitQty } from '../utils/apply-update-per-unit-qty';
 import { applyRemoveItem } from '../utils/apply-remove-item';
 import { applySetCustomer } from '../utils/apply-set-customer';
+import { applySetCoupon } from '../utils/apply-set-coupon';
 import { generateId } from '../utils/generate-id';
 
 export const initialTicketState: TicketState = {
@@ -306,7 +307,11 @@ export function ticketReducer(
     }
 
     case 'SET_COUPON': {
-      return recalculateTotals({ ...state, coupon: action.coupon });
+      // C.1 step 8 — delegated to shared helper. Truly byte-identical extraction.
+      // Coupon affects discount totals, so the delegator wraps the helper's
+      // un-recalculated return in recalculateTotals (matching pre-extraction
+      // behavior + the locked C.1 step 4-6 delegator pattern).
+      return recalculateTotals(applySetCoupon(state, action));
     }
 
     case 'SET_LOYALTY_REDEEM': {
