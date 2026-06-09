@@ -256,6 +256,43 @@ export function __setStripeForTesting(stripe: Stripe | null): void {
 }
 
 // ---------------------------------------------------------------------------
+// Schema-accurate Stripe-PI extractor (Session #147 Commit C).
+// ---------------------------------------------------------------------------
+
+/**
+ * Find the Stripe PaymentIntent ID for the card-method payment on a given
+ * transaction's payments array, or null if no card payment with a PI exists.
+ *
+ * Schema reality: `payments.stripe_payment_intent_id` is the per-charge
+ * canonical PI (per `supabase/migrations/20260201000018_create_payments.sql:8`).
+ * `transactions` has NO `stripe_payment_intent_id` column at any point in the
+ * migration history — the orchestrator pre-#147 selected the column from the
+ * wrong table, blocking every cancel attempt with a PostgREST schema error.
+ *
+ * Canonical pattern: mirrors `src/app/api/pos/refunds/route.ts:316-317`:
+ *   const cardPmt = sp.payments.find((p) => p.method === 'card');
+ *   if (cardPmt && !cardPmt.stripe_payment_intent_id) { ... }
+ *
+ * Structural (not nominal) parameter type — accepts the orchestrator's
+ * function-scoped `TxRow` AND any future caller whose row matches the same
+ * minimal shape, without forcing a module-scope type extraction.
+ *
+ * Split-tender semantics: at most one card-method payment per transaction in
+ * current data shapes; `.find()` returns the first match. If multi-card
+ * split-tender becomes a real path, this helper extends naturally to return
+ * all PIs and the caller picks the appropriate one.
+ */
+function extractCardPi(tx: {
+  payments: Array<{
+    method: string | null;
+    stripe_payment_intent_id: string | null;
+  }> | null;
+}): string | null {
+  const cardPmt = (tx.payments ?? []).find((p) => p.method === 'card');
+  return cardPmt?.stripe_payment_intent_id ?? null;
+}
+
+// ---------------------------------------------------------------------------
 // Entry point.
 // ---------------------------------------------------------------------------
 
@@ -300,12 +337,27 @@ export async function cancelAppointmentOrchestrated(
   // 1. Load the appointment + linked transactions + linked job in one query
   //    shape. We pull payments via a nested select so the multi-source case
   //    (deposit + pay-link) is covered without a second round-trip.
+  //
+  // Session #147 (Commit C — Bug 2 Layer 3, schema-accurate read): the outer
+  // transactions SELECT does NOT include `stripe_payment_intent_id` — that
+  // column has never existed on `transactions` (full migration trace via
+  // `20260201000016_create_transactions.sql` + every subsequent
+  // `ALTER TABLE transactions`). Pre-#147 (Commit A) it did, and PostgREST
+  // aliased the embed as `transactions_1` then failed to resolve
+  // `transactions_1.stripe_payment_intent_id` against the real schema,
+  // returning the operator-visible "column does not exist" error AND
+  // blocking every cancel attempt that reached the orchestrator. The PI
+  // lives on the child `payments` rows (`payments.stripe_payment_intent_id`
+  // per `20260201000018_create_payments.sql:8`), and the inner embed at the
+  // next line ALREADY selects it correctly — the outer reference was a
+  // Theme D.1 (2026-06-07) authoring typo. See `extractCardPi` below for
+  // the canonical pattern (mirrors `src/app/api/pos/refunds/route.ts:316-317`).
   const { data: appointment, error: apptErr } = await supabase
     .from('appointments')
     .select(
       `id, status, customer_id, total_amount,
        transactions:transactions!appointment_id(
-         id, status, total_amount, tip_amount, created_at, stripe_payment_intent_id,
+         id, status, total_amount, tip_amount, created_at,
          payments:payments!transaction_id(amount, method, stripe_payment_intent_id)
        ),
        jobs:jobs!appointment_id(id, status)`
@@ -313,7 +365,27 @@ export async function cancelAppointmentOrchestrated(
     .eq('id', input.appointmentId)
     .maybeSingle();
 
-  if (apptErr || !appointment) {
+  // Session #147 (Commit A — Bug 2 Layer 1): distinguish PostgREST query error
+  // from missing-row. Pre-#147 both branches collapsed into the same 404
+  // "Appointment {id} not found" message AND the underlying `apptErr` was
+  // silently swallowed (no console.error). When a PostgREST embed failed at
+  // runtime — e.g. nested `payments:payments!transaction_id(...)` failing
+  // schema-cache resolution — the operator saw a misleading 404 with nothing
+  // diagnostic in the server logs. Split:
+  //   - apptErr non-null → log + 500 with the underlying message
+  //   - appointment null → keep the existing 404 (true missing-row case)
+  // The 500 path is what unblocks diagnosis of Bug 2 Layer 3 (the actual
+  // current cancel failure mode for unpaid appointments) — Commit C scope.
+  if (apptErr) {
+    console.error('[cancel-orchestration] appt lookup failed:', apptErr);
+    return {
+      ok: false,
+      httpStatus: 500,
+      error: 'db_failed',
+      message: `Failed to load appointment: ${apptErr.message}`,
+    };
+  }
+  if (!appointment) {
     return {
       ok: false,
       httpStatus: 404,
@@ -342,13 +414,16 @@ export async function cancelAppointmentOrchestrated(
   // 2. Compute amount paid across all completed transactions for this
   //    appointment. `total_amount` is dollars (NUMERIC); convert to cents at
   //    the boundary.
+  // Session #147 (Commit C): `stripe_payment_intent_id` is intentionally
+  // absent from TxRow — it does NOT exist on the `transactions` table
+  // schema. The per-charge PI lives on the child `payments` rows; the
+  // canonical access pattern is `extractCardPi(tx)` below.
   type TxRow = {
     id: string;
     status: string;
     total_amount: number;
     tip_amount: number | null;
     created_at: string;
-    stripe_payment_intent_id: string | null;
     payments: Array<{
       amount: number;
       method: string | null;
@@ -408,11 +483,23 @@ export async function cancelAppointmentOrchestrated(
       // Cancel-time refunds are almost always single-source (the deposit);
       // multi-source LIFO is handled by the standalone refund UI when the
       // operator needs it.
-      const sourceTx = allTxs
-        .filter((t) => Boolean(t.stripe_payment_intent_id))
-        .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+      //
+      // Session #147 (Commit C): the per-charge Stripe PI lives on the
+      // child `payments` row whose `method === 'card'` — NOT on the parent
+      // transaction. Canonical pattern from
+      // `src/app/api/pos/refunds/route.ts:316-317`:
+      //   const cardPmt = sp.payments.find((p) => p.method === 'card');
+      //   if (cardPmt && !cardPmt.stripe_payment_intent_id) { ... }
+      // Pre-#147 the orchestrator read `tx.stripe_payment_intent_id` which
+      // doesn't exist on the transactions schema and caused the PostgREST
+      // SELECT to fail. `extractCardPi` is the schema-accurate equivalent
+      // — returns the card-payment's PI or null.
+      const sourceTxEntry = allTxs
+        .map((tx) => ({ tx, pi: extractCardPi(tx) }))
+        .filter((entry): entry is { tx: TxRow; pi: string } => entry.pi !== null)
+        .sort((a, b) => b.tx.created_at.localeCompare(a.tx.created_at))[0];
 
-      if (!sourceTx) {
+      if (!sourceTxEntry) {
         return {
           ok: false,
           httpStatus: 400,
@@ -421,12 +508,14 @@ export async function cancelAppointmentOrchestrated(
             'Cannot issue Stripe refund: no completed transaction with a payment_intent found. Use Pathway B (credit) or refund manually via POS > Transactions.',
         };
       }
+      const sourceTx = sourceTxEntry.tx;
+      const sourcePi = sourceTxEntry.pi;
 
       // Stripe refund. The amount is in cents directly to the Stripe SDK.
       let stripeRefundId: string;
       try {
         const stripeRefund = await getStripe().refunds.create({
-          payment_intent: sourceTx.stripe_payment_intent_id as string,
+          payment_intent: sourcePi,
           // Stripe SDK's `amount` parameter takes integer cents; its field
           // name is the Stripe API contract, not ours, so we can't rename.
           // eslint-disable-next-line money/no-unsuffixed-money-prop
@@ -550,7 +639,24 @@ export async function cancelAppointmentOrchestrated(
   // 4. Job: mark cancelled if non-terminal. Mirrors pos/jobs/[id]/cancel
   //    (the A.4 pattern) — does NOT call executeUnMaterialize (wrong
   //    semantic; deletes the job + reverts to pending).
-  const jobs = (appointment.jobs ?? []) as JobRow[];
+  //
+  // Session #147 (Commit A — Bug 2 Layer 2): `jobs.appointment_id` carries a
+  // UNIQUE constraint (migration `20260329000002`), so PostgREST infers 1:1
+  // cardinality and returns the embedded `jobs` relation as a SINGLE OBJECT
+  // `{id, status}` (or null) — NOT an array — even though the embed visually
+  // reads as to-many. Pre-#147 the `(appointment.jobs ?? []) as JobRow[]`
+  // cast lied at runtime: when the appointment had a materialized job, the
+  // subsequent `.find(...)` threw `TypeError: (intermediate value).find is
+  // not a function` → 500 "Internal server error" on every cancel attempt.
+  // This is the Session #110 corrective applied symmetrically to the
+  // orchestrator (GET `/api/pos/appointments/[id]` already normalizes at
+  // `route.ts:83-87`). See CLAUDE.md "Supabase relation cardinality".
+  const jobsRaw = appointment.jobs as JobRow | JobRow[] | null | undefined;
+  const jobs: JobRow[] = Array.isArray(jobsRaw)
+    ? jobsRaw
+    : jobsRaw
+      ? [jobsRaw]
+      : [];
   const activeJob = jobs.find((j) => !TERMINAL_JOB_STATUSES.has(j.status));
   let jobCancelled = false;
   if (activeJob) {

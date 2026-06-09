@@ -82,13 +82,16 @@ vi.mock('@/lib/credits/repository', () => ({
 // State + Supabase mock builder
 // ---------------------------------------------------------------------------
 
+// Session #147 (Commit C): mirrors the orchestrator's TxRow shape.
+// `stripe_payment_intent_id` is intentionally absent from the top level —
+// it does NOT exist on the `transactions` schema. The per-charge PI lives
+// on each child `payments` row (`method === 'card'` carries the card PI).
 interface TxRow {
   id: string;
   status: string;
   total_amount: number;
   tip_amount: number | null;
   created_at: string;
-  stripe_payment_intent_id: string | null;
   payments: Array<{ amount: number; method: string | null; stripe_payment_intent_id: string | null }> | null;
 }
 interface JobRow {
@@ -106,6 +109,12 @@ interface ApptRow {
 
 const state = {
   appointment: null as ApptRow | null,
+  // Session #147 (Commit A — Bug 2 Layer 1): force a PostgREST-style error on
+  // the initial appointment SELECT. Pre-#147 the orchestrator silently
+  // swallowed this error and returned 404 "not found"; post-#147 it returns
+  // 500 with the underlying message. When non-null, the appointment lookup
+  // returns `{data: null, error: this}` regardless of `state.appointment`.
+  apptLookupError: null as null | { message: string },
   apptUpdateError: null as null | { message: string },
   jobUpdateError: null as null | { message: string },
   refundInsertError: null as null | { message: string },
@@ -167,6 +176,12 @@ function makeAdmin(): SupabaseClient {
         },
         async maybeSingle() {
           if (this._table === 'appointments' && this._op === 'select') {
+            // Session #147 (Commit A — Bug 2 Layer 1): when the lookup-error
+            // knob is set, return the PostgREST-style error so the
+            // orchestrator's new diagnostic path can be exercised.
+            if (state.apptLookupError) {
+              return { data: null, error: state.apptLookupError };
+            }
             return { data: state.appointment, error: null };
           }
           // Phase 3 Theme D.2 (AC-14): business_settings.value read for the
@@ -309,21 +324,35 @@ function seedAppointment(overrides: Partial<ApptRow> = {}): void {
   };
 }
 
+// Session #147 (Commit C): default `payments` seeds a single card payment
+// whose `stripe_payment_intent_id` is the canonical PI fixture — mirrors
+// the production data shape where the PI lives on the payments row, not
+// the transaction. Tests needing the cash-only / no-PI cases override
+// `payments` directly (e.g. `payments: []` or `payments: [{method:'cash',...}]`).
 function makeTx(overrides: Partial<TxRow> = {}): TxRow {
+  const total_amount = overrides.total_amount ?? 50;
+  const tip_amount = overrides.tip_amount ?? 0;
+  const defaultPayments = [
+    {
+      amount: total_amount + tip_amount,
+      method: 'card' as string | null,
+      stripe_payment_intent_id: 'pi_test_1' as string | null,
+    },
+  ];
   return {
     id: 'tx-1',
     status: 'completed',
-    total_amount: 50,
-    tip_amount: 0,
+    total_amount,
+    tip_amount,
     created_at: '2026-06-01T10:00:00Z',
-    stripe_payment_intent_id: 'pi_test_1',
-    payments: null,
+    payments: defaultPayments,
     ...overrides,
   };
 }
 
 beforeEach(() => {
   state.appointment = null;
+  state.apptLookupError = null;
   state.apptUpdateError = null;
   state.jobUpdateError = null;
   state.refundInsertError = null;
@@ -356,6 +385,36 @@ describe('cancelAppointmentOrchestrated — guards', () => {
     if (!result.ok) {
       expect(result.httpStatus).toBe(404);
       expect(result.error).toBe('not_found');
+    }
+  });
+
+  // Session #147 (Commit A — Bug 2 Layer 1) — regression lock.
+  //
+  // Pre-#147 a PostgREST-style error on the initial appointment SELECT
+  // (e.g. a nested embed failing schema-cache resolution) was silently
+  // swallowed by the orchestrator AND the resulting 404 carried the same
+  // "Appointment {id} not found" message as the true missing-row case. That
+  // conflation made Bug 2 (Ian Austria 06/10 unpaid cancel) undiagnosable
+  // from the operator-facing error toast alone — server logs also contained
+  // nothing helpful because the apptErr was never logged.
+  //
+  // Post-#147 the two paths are split:
+  //   - apptErr non-null → 500 db_failed with the underlying message echoed
+  //   - appointment null → 404 not_found (unchanged behavior)
+  // This test pins the split so a future "consolidate the error paths"
+  // refactor fails here loudly.
+  it('returns 500 db_failed (NOT 404 not_found) when the appointment lookup errors', async () => {
+    // Note: state.appointment is irrelevant here — even if a row exists, a
+    // PostgREST error on the SELECT short-circuits before the row is read.
+    state.apptLookupError = { message: 'embed metadata cache miss for transactions!appointment_id' };
+    const result = await cancelAppointmentOrchestrated(makeAdmin(), baseInput());
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.httpStatus).toBe(500);
+      expect(result.error).toBe('db_failed');
+      // The underlying PostgREST message must echo into the operator-facing
+      // text so the server-log path is no longer the ONLY diagnostic surface.
+      expect(result.message).toContain('embed metadata cache miss');
     }
   });
 
@@ -491,9 +550,18 @@ describe('cancelAppointmentOrchestrated — Pathway A (refund)', () => {
   });
 
   it('returns 400 no_payment_to_refund when paid but no Stripe-PI source exists', async () => {
-    // Paid via cash only — no stripe_payment_intent_id on the transaction.
+    // Paid via cash only — no card-method payment row, so extractCardPi
+    // returns null and the orchestrator hits the no_payment_to_refund branch.
+    // (Session #147 Commit C: PI lives on payments rows; cash-only paths
+    // have a payments row with method='cash' and no PI.)
     seedAppointment({
-      transactions: [makeTx({ stripe_payment_intent_id: null })],
+      transactions: [
+        makeTx({
+          payments: [
+            { amount: 50, method: 'cash', stripe_payment_intent_id: null },
+          ],
+        }),
+      ],
     });
 
     const result = await cancelAppointmentOrchestrated(makeAdmin(), baseInput());
@@ -506,17 +574,24 @@ describe('cancelAppointmentOrchestrated — Pathway A (refund)', () => {
   });
 
   it('most-recent PI-bearing transaction wins source selection (multi-payment case)', async () => {
+    // Session #147 Commit C: each transaction's PI is now sourced from its
+    // child payments row whose method='card'. Multi-payment case still
+    // selects the most-recent transaction by created_at.
     seedAppointment({
       transactions: [
         makeTx({
           id: 'tx-deposit',
-          stripe_payment_intent_id: 'pi_deposit',
+          payments: [
+            { amount: 30, method: 'card', stripe_payment_intent_id: 'pi_deposit' },
+          ],
           created_at: '2026-06-01T10:00:00Z',
           total_amount: 30,
         }),
         makeTx({
           id: 'tx-paylink',
-          stripe_payment_intent_id: 'pi_paylink',
+          payments: [
+            { amount: 70, method: 'card', stripe_payment_intent_id: 'pi_paylink' },
+          ],
           created_at: '2026-06-05T10:00:00Z',
           total_amount: 70,
         }),
@@ -730,6 +805,49 @@ describe('cancelAppointmentOrchestrated — job cascade', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.job_cancelled).toBe(false);
   });
+
+  // Session #147 (Commit A — Bug 2 Layer 2) — regression lock.
+  //
+  // `jobs.appointment_id` carries a UNIQUE constraint (migration
+  // `20260329000002_jobs_appointment_id_unique_constraint.sql`), so PostgREST
+  // infers 1:1 cardinality and returns the embedded `jobs` relation as a
+  // SINGLE OBJECT `{id, status}` (or null) — NOT an array — even though
+  // `jobs:jobs!appointment_id(id, status)` visually reads as a to-many embed.
+  // Pre-#147 the orchestrator's `(appointment.jobs ?? []) as JobRow[]` cast
+  // lied at runtime: when the appointment had a materialized job, the
+  // subsequent `.find(...)` threw TypeError → 500 "Internal server error"
+  // on every cancel attempt against a materialized appointment. Same
+  // Session #110 crash class fixed in the GET endpoint at
+  // `/api/pos/appointments/[id]/route.ts:83-87`; this test pins the
+  // symmetric corrective on the orchestrator.
+  //
+  // The test seeds `appointment.jobs` as a SINGLE OBJECT (not an array) to
+  // exercise the production PostgREST shape — the rest of the test suite
+  // uses array form so this is the one place the cardinality-corrective is
+  // load-bearing.
+  it('handles jobs embed returning a SINGLE OBJECT (PostgREST UNIQUE-FK cardinality) without crashing', async () => {
+    seedAppointment({
+      transactions: [],
+      // Cast through `unknown` because the test's `ApptRow` type declares
+      // `jobs: JobRow[]` for ergonomics across the rest of the suite. In
+      // production PostgREST returns a single object on this UNIQUE-FK
+      // embed, which is exactly what we need to inject here. The cast is
+      // localized to this one test so the array shape stays the default
+      // for every other assertion.
+      jobs: ({ id: 'job-single-1', status: 'scheduled' } as unknown) as JobRow[],
+    });
+
+    const result = await cancelAppointmentOrchestrated(makeAdmin(), baseInput());
+
+    // Orchestrator must succeed (no TypeError from `.find` on a non-array).
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.job_cancelled).toBe(true);
+    // The single object must be normalized into an array and processed by
+    // the job-cancel branch — verify the UPDATE fired for the seeded job id.
+    expect(state.jobUpdates).toHaveLength(1);
+    expect(state.jobUpdates[0].id).toBe('job-single-1');
+    expect(state.jobUpdates[0].payload.status).toBe('cancelled');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -827,6 +945,96 @@ describe('cancelAppointmentOrchestrated — Theme G compliance (no fireWebhook)'
     expect(source).not.toMatch(/fireWebhook\s*\(/);
     expect(source).not.toMatch(/from\s+['"][^'"]*webhook['"]/);
     expect(source).not.toMatch(/n8n_webhook_urls/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Session #147 (Commit C — Bug 2 Layer 3) — schema-accurate Stripe PI source
+// ---------------------------------------------------------------------------
+//
+// Pre-#147 the orchestrator's outer transactions SELECT listed
+// `stripe_payment_intent_id` — a column that does not exist on `transactions`
+// (per `supabase/migrations/20260201000016_create_transactions.sql` + every
+// subsequent `ALTER TABLE transactions`). PostgREST aliased the embed as
+// `transactions_1`, failed to resolve `transactions_1.stripe_payment_intent_id`
+// against the real schema, and returned the operator-visible
+// "column transactions_1.stripe_payment_intent_id does not exist" error.
+// This blocked every cancel attempt that reached the orchestrator until
+// Commit A's diagnostic split (#147 Layer 1) surfaced the error to the
+// operator, and Commit C now corrects the read path.
+//
+// Schema reality + canonical pattern: `payments.stripe_payment_intent_id`
+// is the per-charge PI (`supabase/migrations/20260201000018_create_payments.sql:8`).
+// The canonical refund engine reads it from there too
+// (`src/app/api/pos/refunds/route.ts:316-317`). The orchestrator now mirrors
+// that pattern via `extractCardPi(tx)`.
+//
+// Two regression locks below: a source-text pin (catches the typo class at
+// write-time) + a functional pin (catches a future refactor that re-couples
+// the PI lookup to the wrong table at runtime).
+
+describe('cancelAppointmentOrchestrated — Bug 2 Layer 3 schema-accurate PI read', () => {
+  it('the orchestrator source does NOT select stripe_payment_intent_id from the transactions table', async () => {
+    const fs = await import('fs');
+    const path = await import('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '..', 'cancel-orchestration.ts'),
+      'utf-8'
+    );
+
+    // Capture the SELECT region between the outer
+    // `transactions:transactions!appointment_id(` paren and the inner
+    // `payments:payments!transaction_id` embed. The inner embed is allowed
+    // to (and SHOULD) list `stripe_payment_intent_id` — that's the canonical
+    // location. Anywhere ELSE in the outer-transactions column list, the
+    // token is the bug class this lock catches.
+    const outerSelectMatch = source.match(
+      /transactions:transactions!appointment_id\(([\s\S]*?)payments:payments!transaction_id/
+    );
+    expect(outerSelectMatch, 'outer transactions SELECT region not found in source').not.toBeNull();
+    const outerSelectRegion = outerSelectMatch![1];
+
+    // The bug shape was: `... created_at, stripe_payment_intent_id,` in the
+    // outer SELECT list. The fix is to remove that token entirely from this
+    // region. The inner embed (selected AFTER this region) still carries
+    // the token correctly.
+    expect(
+      outerSelectRegion,
+      'stripe_payment_intent_id must NOT appear in the outer transactions SELECT list — it is not a column on the transactions table; the per-charge PI lives on the child payments rows'
+    ).not.toContain('stripe_payment_intent_id');
+  });
+
+  it('refund dispatches against the PI from the card-method payments row (not from a transactions column)', async () => {
+    // Single-tx happy-path with explicit canonical-PI fixture. Locks the
+    // end-to-end lookup path: payments row → extractCardPi → Stripe SDK.
+    // Note the PI value is intentionally unique to this test so we can pin
+    // the exact value flowing through, distinct from `makeTx`'s default.
+    seedAppointment({
+      transactions: [
+        makeTx({
+          id: 'tx-canonical',
+          total_amount: 100,
+          tip_amount: 0,
+          payments: [
+            {
+              amount: 100,
+              method: 'card',
+              stripe_payment_intent_id: 'pi_canonical_locked',
+            },
+          ],
+        }),
+      ],
+    });
+
+    const result = await cancelAppointmentOrchestrated(makeAdmin(), baseInput());
+
+    expect(result.ok).toBe(true);
+    // Stripe was called once with the payments-row PI, not undefined or null.
+    expect(stripeCalls).toHaveLength(1);
+    expect(stripeCalls[0].payment_intent).toBe('pi_canonical_locked');
+    // Refunds row references the transaction id (not the PI itself).
+    expect(state.refundInserts).toHaveLength(1);
+    expect(state.refundInserts[0].transaction_id).toBe('tx-canonical');
   });
 });
 

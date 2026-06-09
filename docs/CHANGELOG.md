@@ -6,6 +6,107 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #147 — cancel-orchestration Bug 2 surgical fix (Commits A + C combined) (2026-06-09)
+
+Audit-first investigation of two reported Cancel Appointment bugs surfaced by the operator. The audit found a third (latent) bug class as a bonus catch. Commits A + C close Bug 2 end-to-end. Bug 1 (Refund Pathway visibility for unpaid appointments — operator reframed as "historical-UX restoration, not just visibility gate") deferred to a separate Commit B + audit session.
+
+**Bug reports (from operator)**:
+1. **Bug 1** — Cancel dialog shows Refund Pathway radiogroup for an appointment with NO payments collected (Ian Austria 06/10, $535, payment links sent but never paid). Asks operator to choose between Refund/Credit when neither is meaningful for a $0-collected appointment. Not addressed in this session; deferred to Commit B.
+2. **Bug 2** — Cancel button POSTs and surfaces error toast: `"Appointment <UUID> not found"` blocking the cancel entirely, even though the dialog opened with the appointment's data populated (proving the appointment exists). Addressed here.
+
+**Bug 2 surgical fix arrived in three layers across Commits A + C**:
+
+### Layer 1 (Commit A — diagnostic restoration)
+
+Pre-#147 `cancel-orchestration.ts:316` collapsed both "PostgREST query errored" and "no row matched" into a single 404 "Appointment {id} not found" return, AND **the underlying `apptErr` was silently swallowed** (no `console.error`). This made the operator-visible error undiagnosable from either the toast OR server logs.
+
+Fix: split the two failure modes.
+- `apptErr` non-null → `console.error('[cancel-orchestration] appt lookup failed:', apptErr)` + return **500** with `Failed to load appointment: <underlying message>` echoed into the operator-facing text
+- `appointment` null → return **404** with the existing `Appointment {id} not found` (unchanged behavior for the genuine missing-row case)
+
+This split was a prerequisite to diagnosing Layer 3 — the operator's next failed cancel post-Commit-A surfaced the real PostgREST error string (`column transactions_1.stripe_payment_intent_id does not exist`), which drove Commit C's scope.
+
+### Layer 2 (Commit A — latent jobs-cardinality crash, pre-emptively closed)
+
+While auditing, surfaced a separate latent crash at line 553: `const jobs = (appointment.jobs ?? []) as JobRow[]; jobs.find(...)`. The cast lies at runtime — `jobs.appointment_id` carries a UNIQUE constraint (migration `20260329000002`), so PostgREST infers 1:1 cardinality and returns the embedded `jobs` relation as a SINGLE OBJECT `{id, status}` (or null) — NOT an array — even though the embed visually reads as to-many. Same Session #110 crash class fixed in the GET endpoint at `/api/pos/appointments/[id]/route.ts:83-87`. The orchestrator did not receive the symmetric corrective.
+
+Result: every cancel attempt on an appointment with a materialized job would throw `TypeError: (intermediate value).find is not a function` → route 500. Not the current Bug 2 (which was 404 not 500), but the next bug operator would hit once Layer 1 landed and Layer 3 was resolved.
+
+Fix: apply the Session #110 corrective symmetrically.
+```ts
+const jobsRaw = appointment.jobs as JobRow | JobRow[] | null | undefined;
+const jobs: JobRow[] = Array.isArray(jobsRaw) ? jobsRaw : jobsRaw ? [jobsRaw] : [];
+```
+
+### Layer 3 (Commit C — actual schema mismatch, the current cancel-blocker)
+
+Commit A's diagnostic surfaced the real error to the operator:
+
+> `Failed to load appointment: column transactions_1.stripe_payment_intent_id does not exist`
+
+Audit traced this to `cancel-orchestration.ts:308` selecting `stripe_payment_intent_id` from the outer `transactions` embed. **That column has never existed on the `transactions` table** — full migration trace via `supabase/migrations/20260201000016_create_transactions.sql` + every subsequent `ALTER TABLE transactions` confirms it. The per-charge Stripe PI lives on `payments.stripe_payment_intent_id` (`20260201000018_create_payments.sql:8`), per the architectural shape of split-tender support: one transaction, N payment lines, each line with its own per-method identifier.
+
+PostgREST aliased the embed as `transactions_1`, tried to resolve `transactions_1.stripe_payment_intent_id` against the real schema, failed, and returned the now-visible error. The inner `payments:payments!transaction_id(amount, method, stripe_payment_intent_id)` embed on the next line CORRECTLY selects the same column from the right table — confirming the author of Theme D.1 (2026-06-07 foundation) knew where the column lived and just typo'd the outer SELECT.
+
+**Class-wide grep confirmed single-site bug**: `cancel-orchestration.ts` is the ONLY surface in the codebase that asked for `transactions.stripe_payment_intent_id`. Every other `stripe_payment_intent_id` read site reads from the right table (`appointments`, `payments`, or `orders`).
+
+**Canonical pattern** (mirrors `src/app/api/pos/refunds/route.ts:316-317`):
+```ts
+const cardPmt = sp.payments.find((p) => p.method === 'card');
+if (cardPmt && !cardPmt.stripe_payment_intent_id) { ... }
+```
+
+Fix (single-site, schema-accurate):
+1. Removed `stripe_payment_intent_id` from the outer transactions SELECT — schema-accurate query
+2. Removed `stripe_payment_intent_id` from the function-scoped `TxRow` type — type accuracy
+3. Added module-scope helper `extractCardPi(tx)` that finds the card-method payment row and returns its `stripe_payment_intent_id`
+4. Rewrote sourceTx selection via `extractCardPi`-driven map+filter+sort, split into `sourceTx` (the TxRow) + `sourcePi` (the string PI) so downstream `sourceTx.id` / `.total_amount` / `.tip_amount` / `.created_at` references stayed identical — minimum blast radius
+5. Stripe call at line 449 now passes `payment_intent: sourcePi`
+
+**Pathway B (credit)** was always correct — it never read `stripe_payment_intent_id` from any source; unchanged. **Pathway A (refund)** now reads the PI from the right table.
+
+**Test additions / updates**:
+
+- Four new regression tests:
+  - Layer 1 lock: orchestrator with PostgREST error injected → 500 `db_failed` with underlying message echoed (NOT 404 not_found)
+  - Layer 2 lock: orchestrator seeded with `appointment.jobs = {id, status}` single-object → succeeds without TypeError + job UPDATE fires
+  - Layer 3 source-text lock: regex captures the outer-transactions SELECT region between `transactions:transactions!appointment_id(` and the inner `payments:payments!transaction_id`, asserts the token `stripe_payment_intent_id` does NOT appear in that region. Mirrors the existing Theme G compliance pattern at `cancel-orchestration.test.ts:933` (`'the source file does not CALL fireWebhook...'`)
+  - Layer 3 functional lock: orchestrator with `payments: [{ method: 'card', stripe_payment_intent_id: 'pi_canonical_locked' }]` → asserts `Stripe.refunds.create` called with `payment_intent: 'pi_canonical_locked'` AND `refunds.transaction_id` matches the seeded tx id
+
+- Existing test seed updates: `makeTx()` helper default flipped from top-level `stripe_payment_intent_id: 'pi_test_1'` to nested `payments: [{ method: 'card', stripe_payment_intent_id: 'pi_test_1' }]`. Two existing tests using the field as a direct `makeTx` override were updated to the canonical payments-side seed (the "no_payment_to_refund" cash-only test + the "most-recent PI-bearing transaction wins" multi-payment test). All other existing tests cascade through the helper default unchanged.
+
+**Reverse-validation performed for all four new regression tests** (yesterday's discipline pattern, exercised twice today):
+
+- Layer 1: apply fix → green; revert split (`if (apptErr || !appointment)` → 404) → test fails with `AssertionError: expected 404 to be 500`; restore → green
+- Layer 2: apply fix → green; revert to `(appointment.jobs ?? []) as JobRow[]` → test fails with `TypeError: jobs.find is not a function` (exact production crash class); restore → green
+- Layer 3 source-text: apply fix → green; re-add `stripe_payment_intent_id` to outer SELECT → test fails with custom error message echoing the bug class; restore → green
+- Layer 3 functional: apply fix → green; revert sourceTx lookup to read `t.stripe_payment_intent_id` via TypeScript cast (the column literally doesn't exist on the new TxRow, so the cast is the only way to even compile the bug back in) → test fails with `result.ok` becoming false (orchestrator hits `no_payment_to_refund` branch); restore → green
+
+Every regression test fails closed when its specific bug is reintroduced.
+
+**Pre-commit visual verification**: dev server up on localhost:3000. Operator ran Scenario 1 (walk-in with no payments, today's-date appointment): cancel completed successfully, no "column does not exist" error, status flipped to `cancelled`. Scenarios 2 (Ian's 06/10) + 3 (paid Stripe deposit) deferred to post-deploy validation per operator's session-cadence call.
+
+**Test invariants (cumulative across A + C)**:
+
+- Baseline (#146 close): 224 test files (217 pass, 7 skip), 3477 tests (3411 pass, 66 skip).
+- Post-#147 commit: 224 test files (217 pass, 7 skip), **3481 tests (3415 pass, 66 skip)**.
+- Delta: +4 regression tests (1 Layer 1 + 1 Layer 2 + 2 Layer 3), zero new failures.
+- TypeScript: 5 pre-existing `TS2556` errors in test files only — baseline preserved across both commits, zero new tsc errors.
+
+**Files modified (3)**: `src/lib/appointments/cancel-orchestration.ts` (3 sites in the same function + 1 new module-scope helper; total ~116 insertions / 10 deletions including rationale comments at each site), `src/lib/appointments/__tests__/cancel-orchestration.test.ts` (4 new tests + helper signature flip + 2 existing-test seed updates + state knob addition; total ~218 insertions / 8 deletions), `docs/CHANGELOG.md`.
+
+**Acknowledged Class (a) follow-up workstream** (NOT addressed in this commit; deferred to dedicated sessions per operator scoping):
+
+1. **Bug 1 — Refund Pathway visibility / historical-UX restoration** (Commit B). Operator reframed mid-session: the fix isn't "hide Refund Pathway when no payment" — it's "restore the historical simpler Cancel dialog UX for the no-payment case while preserving Theme D.1's Pathway selector for the payment-exists case." Two-mode dialog: Mode A (no payment) = pre-Theme-D.1 reason-chips + cancellation fee + notify; Mode B (payment exists) = current Theme D.1 UI. Needs git-history audit to recover the pre-D.1 dialog shape before implementation.
+2. **Hand-rolled Supabase mocks structurally cannot catch schema mismatches** (architectural gap surfaced by this bug). The pre-#147 orchestrator tests passed at landing despite `transactions.stripe_payment_intent_id` not existing — the mock returned a JS object with the field, every test passed, the schema mismatch shipped unflagged. Commit C's source-text regression is the partial mitigation; the broader fix (contract tests that exercise PostgREST schema validation, OR a generated-types-based mock that catches schema drift at write time) is a separate workstream.
+3. **Class-wide audit of orchestration helpers with hand-rolled Supabase mocks** (sibling to #2; surface every other module sharing the same test-pattern risk).
+
+**Discipline pattern carry-forward** (locked into memory `feedback_preflight_audit_scope_for_customer_comms` yesterday, exercised twice today):
+
+The "REUSE EXISTING FLOWS" rule remained necessary but insufficient. Theme D.1 reused the canonical refund-engine pattern at the inner-embed level but still typo'd the outer SELECT. The mock-based test layer didn't catch it. The diagnostic-error path silently swallowed the underlying message, hiding the diagnosis. **Audit-first discipline** caught all of this in a single read-only pass before any code was written; Commit A's diagnostic split surfaced the real error in production; Commit C closed it surgically. Sequence: audit → propose fix shape → operator authorizes shape → implement → reverse-validate → operator approves commit. **No code before approval, no commits without reverse-validation.**
+
+---
+
 ## Session #146 — log payment-link SMS to conversation history (symmetry fix) (2026-06-08)
 
 One-line operational fix closing the most-visible gap surfaced by the post-#145 payment-link lifecycle audit.
