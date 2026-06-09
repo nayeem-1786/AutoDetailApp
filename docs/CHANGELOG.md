@@ -42,6 +42,41 @@ One-line operational fix closing the most-visible gap surfaced by the post-#145 
 
 ---
 
+### Post-deploy verification + follow-up backlog update (2026-06-08, session-close addendum)
+
+**Verification result — GAP CLOSED for SMS channel.** Operator confirmed `cfeddc72` works as expected. Payment-link SMSes now appear in Admin > Messaging > [customer phone] with timestamp, body content, and delivery status. The conversation thread join in `sendSms()` (sms.ts:159-201) writes through correctly when `logToConversation: true` is passed. Email channel (Gap #4) remains open — `sendTemplatedEmail` still has zero app-level logging, so `method: 'both'` covers only the SMS half in conversation history.
+
+**New gap surfaced during verification — Conversation Lifecycle reactivation:**
+
+- **Observed:** Admin > Settings > Messaging > Conversation Lifecycle has configurable auto-close (currently 72 hours) and auto-archive (currently 14 days) timers.
+- **Suspected behavior:** once a conversation enters Closed or Archived state, it stays there even when new messages arrive — lifecycle timers appear anchored to a fixed point (creation? last manual state change?) rather than the most recent activity.
+- **Expected behavior:** ANY new message in a conversation — regardless of source (operator, customer, AI voice agent, SMS agent, system notification, payment link send, receipt SMS, addons, completion, anything) — should (1) reactivate the conversation to Open if Closed or Archived, (2) reset the auto-close timer from the new message's timestamp, (3) reset the auto-archive timer similarly. Both timers must use the admin-configured values.
+- **Why it matters:** if a customer's conversation auto-closed 72 hours after creation and operator sends them a payment link reminder a week later, the new message currently lives in a state operator can't easily find in the active queue.
+- **Status:** NOT INVESTIGATED tonight. Likely multi-system (conversation cron, `last_message_at` write paths, admin settings reads, messaging UI filter logic). Belongs in its own audit-first follow-up session.
+
+**Class (a) follow-up workstream — updated priority order (5 items, up from 4):**
+
+1. **NEW — Conversation Lifecycle reactivation on new activity.** Audit-first; multi-system (cron + write paths + UI filter logic).
+2. **Gap #2** — Payment Activity UI on AppointmentDetailDialog (display `payment_link_sent_at` / amount / token / paid-status).
+3. **Gap #3** — Re-send-after-paid guard for payment links (block or warn before silent `payment_link_paid_at` wipe on re-send).
+4. **Gap #4** — Email send logging (write to a messages-equivalent table; closes the email half of `method: 'both'` that #146 left open).
+5. **Gap #6** — `audit_log` row on payment link send event.
+
+**Discipline pattern lock — pre-flight audit scope for customer-facing communications:**
+
+For any future feature touching customer-facing communications, pre-flight must audit:
+
+- Where the helper writes (DB tables, files, third-party services)
+- What persistent state the helper modifies (overwrite-vs-append semantics)
+- How that state interacts with other system mechanisms (crons, triggers, UI filters)
+- What operator visibility exists for the action
+
+Session #146 surfaced TWO examples where pre-flight missed these: (a) the payment-link send not landing in Messaging (closed today via the `logToConversation: true` symmetry fix); (b) the conversation lifecycle potentially not reacting to activity (documented today, deferred). The general lesson: "REUSE EXISTING FLOWS" is necessary but insufficient — existing flows themselves may have operational gaps that surface only when stress-tested. Memory-locked as `feedback_preflight_audit_scope_for_customer_comms` for cross-session continuity.
+
+**Next session opens with:** operator surveys the full Class (a) backlog (5 items above) + the dialog audit workstream + remaining Class (b) C.1 steps + Class (c) items, and chooses priority. No autonomous selection from this session.
+
+---
+
 ## Session #145 (fix-forward) — strip Send Payment Link two-step modal chain (2026-06-08)
 
 Fix-forward correction of a wiring bug in commit `c209a709`: the strip's Send Payment Link two-step amount→channel flow disconnected mid-Continue. Operator pressed Continue in the amount modal, modal disappeared, channel picker never opened. Required a second Send Payment Link tap to surface the channel picker — 4 taps total instead of 3, with confusing dismiss-and-reopen in the middle. Bug affected BOTH the strip pill flow AND the AppointmentDetailDialog footer Send Payment Link flow (shared state slots downstream of both entry points).
