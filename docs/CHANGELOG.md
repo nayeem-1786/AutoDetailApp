@@ -6,6 +6,45 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #145 (fix-forward) — strip Send Payment Link two-step modal chain (2026-06-08)
+
+Fix-forward correction of a wiring bug in commit `c209a709`: the strip's Send Payment Link two-step amount→channel flow disconnected mid-Continue. Operator pressed Continue in the amount modal, modal disappeared, channel picker never opened. Required a second Send Payment Link tap to surface the channel picker — 4 taps total instead of 3, with confusing dismiss-and-reopen in the middle. Bug affected BOTH the strip pill flow AND the AppointmentDetailDialog footer Send Payment Link flow (shared state slots downstream of both entry points).
+
+**Root cause** (single-file wiring bug in `src/app/pos/jobs/components/job-queue.tsx`):
+
+`PaymentLinkAmountModal`'s `handleContinue` calls `onOpenChange(false)` BEFORE calling `onContinue(chosen)` (modal source `src/components/jobs/payment-link-amount-modal.tsx:96-103` — load-bearing per Session 5 Bug 1 followup). Pre-fix JobQueue's `onOpenChange` handler cleared `stripPaymentLinkTarget` when the amount modal closed AND `stripLinkDialogOpen` was still false — but `stripLinkDialogOpen` is ALWAYS false at this synchronous tick because the next-statement `setStripLinkDialogOpen(true)` from `onContinue` hasn't fired yet. Clearing `stripPaymentLinkTarget` unmounted the outer `{stripPaymentLinkTarget && (<>...</>)}` gate during the Continue transition, taking the not-yet-opened `SendPaymentLinkDialog` down with it. The channel picker never mounted.
+
+JobDetail does NOT exhibit this bug because its outer gate is `{job.appointment_id && (...)}` which is stable across the modal lifecycle. The fix mirrors that structural invariant.
+
+**Fix:** drop the two `setX(null)` lines from the amount modal's `onOpenChange` handler. Final cleanup of `stripPaymentLinkTarget` is owned by `closeStripPaymentLinkFlow` on a successful send (via `SendPaymentLinkDialog.onSent` + `stripPaymentLinkSentRef`). Cancel-path leaves the target lingering until the next operator tap overwrites it via `handleStripSendLinkTap` (or the dialog footer's `onSendPaymentLink` handler) — no visible side effect since both modals are gated on their own `open` props.
+
+**Regression-lock test** (new file, locks the regression class at integration level):
+
+- `src/app/pos/jobs/components/__tests__/job-queue-payment-link-flow.test.tsx` — 3 tests mounting JobQueue with a populated unstarted appointment, programmatically tapping the strip's Send Link pill, picking "Full balance", clicking Continue, and asserting (1) the channel picker mounts in the same continuous flow, (2) the amount modal is no longer mounted, (3) cancel-path doesn't mount the channel picker, (4) re-tap after cancel re-opens the amount modal fresh.
+
+**Reverse-validation performed** (locks confidence in the test's ability to catch the bug):
+
+1. Apply fix → test green (3/3)
+2. Reintroduce bug → test FAILS (waitFor for `channelPickerIsOpen() === true` times out)
+3. Restore fix → test green (3/3)
+
+The test fails closed when the bug is present.
+
+**Pre-commit visual verification:** SKIPPED on dev server. Operator's local dev environment had a network failure (Supabase Auth + Google Fonts timing out) blocking visual flow validation. Operator authorized fix-forward commit based on the reverse-validation evidence. Operator will validate visually directly against production post-deploy across three flows: strip pill, AppointmentDetailDialog footer, JobDetail (regression check). Any post-deploy failure → another fix-forward commit. **Discipline carry-forward:** pre-commit visual verification on dev server is standard for any commit shipping a new user-facing flow; this commit is the exception due to local network failure, not a relaxation.
+
+**Test invariants:**
+
+- Baseline (pre-fix-forward): 223 test files (216 pass, 7 skip), 3473 tests (3407 pass, 66 skip).
+- Post-fix-forward: 224 test files (217 pass, 7 skip), 3476 tests (3410 pass, 66 skip).
+- Delta: +1 file, +3 tests, zero new failures. The 2 pre-existing JSDOM teardown errors in `bottom-nav.test.tsx` are inherited baseline noise.
+- TypeScript: 5 pre-existing errors only — baseline preserved, zero new tsc errors.
+
+**Files modified (2):** `src/app/pos/jobs/components/job-queue.tsx` (drop 2 lines + add ~25-line comment block documenting the rationale); `src/app/pos/jobs/components/__tests__/job-queue-payment-link-flow.test.tsx` (new); `docs/dev/FILE_TREE.md`; `docs/CHANGELOG.md`.
+
+**Inherited from c209a709:** all other changes (Gap A, Stage 3 strip pills + Edit Intake regular-card pill, AppointmentDetailDialog footer redesign, canSendPaymentLink helper extraction, Gap D PWA-wake catch wrapper) ship unchanged. The fix-forward narrowly targets the one modal-chain wiring detail.
+
+---
+
 ## Session #145 — Ian-Austria payment-link unblock + Gap A direct-intake navigation + Stage 3 strip pills + AppointmentDetailDialog footer redesign + Gap D PWA-wake catch wrapper (2026-06-08)
 
 Closes four operational gaps surfaced by the operator after Stage 2 (commit `3430c5d0`) shipped:

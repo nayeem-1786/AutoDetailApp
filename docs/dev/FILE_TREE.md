@@ -1455,6 +1455,7 @@ src/components/jobs/__tests__/can-send-payment-link.test.ts                     
 src/app/admin/appointments/components/__tests__/appointment-detail-dialog-footer.test.tsx       — Footer redesign + Send Payment Link button (Session #145)
 src/app/pos/jobs/components/__tests__/job-detail-auto-start-intake.test.ts                      — Gap A effect gate chain + Q5 helper consumption regression-prevent (Session #145)
 src/app/pos/jobs/components/__tests__/job-queue-edit-intake-pill.test.tsx                       — Q3 Option (ii) Edit Intake pill on regular job card (Session #145)
+src/app/pos/jobs/components/__tests__/job-queue-payment-link-flow.test.tsx                      — Strip Send Payment Link two-step modal chain regression-lock (Session #145 fix-forward)
 src/app/pos/context/__tests__/reader-context-visibility-reconnect.test.tsx                      — Gap D catch wrapper + unhandledrejection invariant (Session #145)
 ```
 

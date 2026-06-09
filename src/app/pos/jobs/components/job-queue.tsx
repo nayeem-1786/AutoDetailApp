@@ -1633,12 +1633,30 @@ export function JobQueue({
             open={stripAmountModalOpen}
             onOpenChange={(open) => {
               setStripAmountModalOpen(open);
-              if (!open && !stripLinkDialogOpen) {
-                // Cancelled the amount modal before progressing — clear the
-                // target entirely so the next strip tap starts fresh.
-                setStripPaymentLinkTarget(null);
-                setStripSelectedAmountCents(null);
-              }
+              // Session #145-fix-forward (broken-flow correction): do NOT
+              // clear stripPaymentLinkTarget here. PaymentLinkAmountModal's
+              // `handleContinue` calls `onOpenChange(false)` BEFORE calling
+              // `onContinue(chosen)`, so at this exact synchronous tick
+              // `stripLinkDialogOpen` is still false even though it's about
+              // to flip true one statement later. Clearing the target here
+              // unmounted the outer `{stripPaymentLinkTarget && (...)}`
+              // gate during the Continue transition, taking the not-yet-
+              // opened SendPaymentLinkDialog down with it — the operator
+              // saw the amount modal disappear with no channel picker
+              // appearing (commit c209a709 broken flow).
+              //
+              // Final cleanup is owned by `closeStripPaymentLinkFlow` on a
+              // successful send (via SendPaymentLinkDialog.onSent +
+              // stripPaymentLinkSentRef). Cancel-path leaves the target
+              // lingering until the next operator tap overwrites it via
+              // `handleStripSendLinkTap` (or the dialog footer's
+              // `onSendPaymentLink` handler) — no visible side effect since
+              // both modals are gated on their own `open` props.
+              //
+              // JobDetail does not exhibit this bug because its outer gate
+              // is `{job.appointment_id && (...)}`, which is stable across
+              // the modal lifecycle. This handler now mirrors that
+              // structural invariant.
             }}
             remainingCents={
               typeof stripPaymentLinkTarget.amount_due_cents === 'number'
