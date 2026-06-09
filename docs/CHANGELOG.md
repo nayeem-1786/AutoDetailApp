@@ -6,6 +6,42 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #146 — log payment-link SMS to conversation history (symmetry fix) (2026-06-08)
+
+One-line operational fix closing the most-visible gap surfaced by the post-#145 payment-link lifecycle audit.
+
+**Audit context.** Operator paused post-deploy validation to surface six lifecycle questions about the Send Payment Link feature (logging, idempotency, token/PI identity, expiration, multi-link reconciliation, operator visibility). The audit traced every consumer of the `payment_link_*` columns, every caller of `sendSms()` / `sendTemplatedEmail()` from the payment-link helper, the Stripe webhook reconciliation path, the public `/pay/[token]` page state machine, and the `appointments_payment_link_token_unique` migration. Findings surfaced six Class (a) gaps, one of which was immediately actionable and isolated to a single flag.
+
+**The lone-exception finding.** `sendSms()` in `src/lib/utils/sms.ts:159` writes a `messages` row (visible in Admin > Messaging > [customer phone]) **only when the caller passes `logToConversation: true`**. Grep across the codebase found 30+ transactional SMS sends — addons, notify, cancel, complete, receipts/sms, book/route, booking reminders, voice-agent appointments / send-info-sms / send-quote-sms, waitlist, quote-accept, email-side cancellation/void notifications — every single one passes the flag. **The payment-link helper was the lone exception.** Result: payment-link SMSes were invisible in Admin > Messaging, so an operator asked "did I send Ian a link?" had no in-app way to answer it. `sms_delivery_log` rows exist but carry no `appointment_id` column and no UI surfaces them; `payment_link_sent_at` is stamped on the appointment row but no `.tsx` file reads it.
+
+**Fix (single line).** Add `logToConversation: true` to the `sendSms()` call at `src/lib/payment-link/send.ts:381-386`. The `notificationType: 'payment_link_sent'` and `contextId: appt.id` chips were already correctly passed; this single flag enables the conversation write-through path that every other transactional SMS in the system uses. `findOrCreateConversation` keys off the customer phone, so the SMS now lands in the existing conversation thread alongside notify / addons / receipts / completion SMSes.
+
+**Regression lock.** Added one test to `src/lib/payment-link/__tests__/send.test.ts` ("passes logToConversation:true so the SMS appears in Admin > Messaging history (#146)") that asserts `sendSmsMock` was called with `objectContaining({ logToConversation: true })`. Pin includes the rationale comment naming every sibling that already passes the flag, so a future refactor that drops it fails here loudly with the context needed to triage.
+
+**No code changes beyond those two lines** — no new business logic, no new tables, no UI changes, no migration. Helper signature unchanged. Both caller routes (`POST /api/pos/appointments/[id]/send-payment-link`, `POST /api/voice-agent/send-payment-link`) inherit the fix without modification.
+
+**Test invariants:**
+
+- Baseline (pre-fix): 224 test files (217 pass, 7 skip), 3476 tests (3410 pass, 66 skip).
+- Post-fix: 224 test files (217 pass, 7 skip), 3477 tests (3411 pass, 66 skip).
+- Delta: +1 test, zero new failures, zero file additions.
+- TypeScript: 5 pre-existing errors only — baseline preserved, zero new tsc errors.
+
+**Visual verification protocol.** Operator will send a test payment link via the new UI post-deploy and confirm the SMS appears in Admin > Messaging > [customer phone] with timestamp + content + delivery status. Expected behavior: SMS body, outbound direction, `sender_type: 'system'`, `channel: 'sms'`, metadata `{ notificationType: 'payment_link_sent', contextId: <appointment_id> }`. Failure mode to watch for: SMS sends successfully (Twilio + `sms_delivery_log` confirm) but no `messages` row appears — would indicate a `findOrCreateConversation` failure path (logged via `console.error`, never throws by design at `sms.ts:198-200`).
+
+**Out of scope — Class (a) follow-up workstream** (likely a dedicated "payment link operator visibility + safety" session, priority order):
+
+1. **Gap #2 — UI to display `payment_link_sent_at` / amount / token / last-paid-status.** Likely belongs on AppointmentDetailDialog as a "Payment Activity" section. Needs design.
+2. **Gap #3 — Re-send-after-paid race.** The send route currently wipes `payment_link_paid_at` on every send, even when a payment was just received. Block or warn when operator attempts to re-send on an appointment where `payment_link_paid_at` is set. Needs UX decision (hard block vs confirmation modal vs banner).
+3. **Gap #4 — Email send logging.** `sendTemplatedEmail` has zero app-level log; Mailgun dashboard is the only evidence trail. Should write to a messages-equivalent table so the conversation thread covers BOTH channels of the payment-link send (`method: 'both'` currently surfaces only the SMS half).
+4. **Gap #6 — `audit_log` row on send event.** Currently the audit_log only records the pending→confirmed status flip on payment receipt (`stripe/route.ts:278-290`); the SEND event itself produces no audit row. For audit trail completeness.
+
+**Operational discipline carry-forward.** Until Gap #3 is fixed, operator will NOT re-send Send Payment Link on any appointment where payment was already received. Manual check of `payment_link_paid_at` or `appointment.payment_status` required before any re-send.
+
+**Files modified (3):** `src/lib/payment-link/send.ts` (one line added), `src/lib/payment-link/__tests__/send.test.ts` (one new test, ~25 lines including the rationale comment), `docs/CHANGELOG.md`.
+
+---
+
 ## Session #145 (fix-forward) — strip Send Payment Link two-step modal chain (2026-06-08)
 
 Fix-forward correction of a wiring bug in commit `c209a709`: the strip's Send Payment Link two-step amount→channel flow disconnected mid-Continue. Operator pressed Continue in the amount modal, modal disappeared, channel picker never opened. Required a second Send Payment Link tap to surface the channel picker — 4 taps total instead of 3, with confusing dismiss-and-reopen in the middle. Bug affected BOTH the strip pill flow AND the AppointmentDetailDialog footer Send Payment Link flow (shared state slots downstream of both entry points).

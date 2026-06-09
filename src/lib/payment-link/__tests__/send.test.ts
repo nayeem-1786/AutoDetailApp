@@ -743,4 +743,32 @@ describe('sendPaymentLink — SMS body composition', () => {
       }),
     );
   });
+
+  // Regression lock — Session #146 symmetry fix.
+  //
+  // Pre-#146, `sendPaymentLink` was the LONE transactional SMS helper in the
+  // codebase that did not pass `logToConversation: true` to `sendSms()`. Every
+  // other transactional path (addons, notify, cancel, complete, receipts/sms,
+  // book/route, voice agent appointments / send-info-sms / send-quote-sms,
+  // booking reminders, waitlist, quote-accept) passes the flag, which writes a
+  // `messages` row via `findOrCreateConversation` so the send appears in
+  // Admin > Messaging > [customer phone]. Without the flag, payment-link SMSes
+  // were invisible in conversation history — operator could not verify
+  // "did I send this customer a link?" from any UI.
+  //
+  // This test pins `logToConversation: true` on the contract so a future
+  // refactor that drops the flag fails here loudly.
+  it('passes logToConversation:true so the SMS appears in Admin > Messaging history (#146)', async () => {
+    const { sendPaymentLink } = await import('@/lib/payment-link/send');
+    await sendPaymentLink({
+      admin: buildMockAdmin() as unknown as never,
+      appointmentId: 'appt-1',
+      method: 'sms',
+    });
+    expect(sendSmsMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ logToConversation: true }),
+    );
+  });
 });

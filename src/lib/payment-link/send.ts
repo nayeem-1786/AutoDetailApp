@@ -383,6 +383,7 @@ export async function sendPaymentLink(
           source: 'transactional',
           notificationType: 'payment_link_sent',
           contextId: appt.id,
+          logToConversation: true,
         });
         if (result.success) {
           channels.sms = 'sent';
