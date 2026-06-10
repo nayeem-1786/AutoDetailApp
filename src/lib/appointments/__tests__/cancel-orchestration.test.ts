@@ -547,6 +547,58 @@ describe('cancelAppointmentOrchestrated — Pathway A (refund)', () => {
     expect(stripeCalls).toHaveLength(0);
     expect(state.refundInserts).toHaveLength(0);
     expect(state.apptUpdates[0].status).toBe('cancelled');
+    // Pre-Commit-B: this would also assert cancellation_fee was NOT written.
+    // Post-Commit-B: the no-fee branch resolves to `pathwayResult = { kind:
+    // 'noop' }` (unchanged) — `cancellation_fee` is still null on the update
+    // payload. Only the no-payment + fee>0 case writes the fee (covered by
+    // the dedicated test below).
+    expect(state.apptUpdates[0].cancellation_fee).toBeNull();
+  });
+
+  // Session #147 (Commit B — Bug 1 adjacent fix) — regression lock.
+  //
+  // Pre-Commit-B the `amountPaidCents === 0` branch returned
+  // `pathwayResult = { kind: 'noop' }` unconditionally — even when the
+  // operator entered a cancellation fee. The fee was silently DROPPED at
+  // the `feeForColumn` gate (`pathwayResult.kind === 'refund' && fee > 0`
+  // failed), so the operator's intent never reached `appointments.cancellation_fee`.
+  // This was a silent-data-loss bug paired with the Mode A UX gap.
+  //
+  // Post-Commit-B: when amountPaidCents===0 AND feeCents>0, the branch
+  // returns a `kind: 'refund'` shape with `refund_amount_cents: 0` and
+  // `fee_cents: feeCents`. No Stripe call (refund_target=0), no refunds
+  // row, but the feeForColumn gate now passes and the fee lands on the
+  // appointment row. Symmetric with the `refundTargetCents === 0` branch
+  // below (fee >= paid) which has the same shape — both mean "no money
+  // moved but fee was assessed."
+  //
+  // Mode A's POS submit body explicitly sends the fee even though it omits
+  // `pathway` — the orchestrator defaults pathway to 'refund' and resolves
+  // this branch correctly.
+  it('Commit B: amountPaidCents=0 + feeCents>0 persists fee to appointments.cancellation_fee (was silently dropped pre-Commit-B)', async () => {
+    // No transactions → amountPaidCents === 0. Operator-entered fee = $25.
+    seedAppointment({ transactions: [] });
+
+    const result = await cancelAppointmentOrchestrated(
+      makeAdmin(),
+      baseInput({ cancellation_fee_cents: 2500 })
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.amount_paid_cents).toBe(0);
+      expect(result.refund_amount_cents).toBe(0);
+      expect(result.cancellation_fee_cents).toBe(2500);
+      expect(result.stripe_refund_id).toBeNull();
+    }
+    // No money movement.
+    expect(stripeCalls).toHaveLength(0);
+    expect(state.refundInserts).toHaveLength(0);
+    // But the FEE COLUMN was written — in dollars (column type, see
+    // orchestrator's fromCents conversion at the appointments UPDATE).
+    // Pre-Commit-B this assertion would fail (column would be null).
+    expect(state.apptUpdates[0].cancellation_fee).toBe(25);
+    expect(state.apptUpdates[0].status).toBe('cancelled');
   });
 
   it('returns 400 no_payment_to_refund when paid but no Stripe-PI source exists', async () => {

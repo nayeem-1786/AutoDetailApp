@@ -14,8 +14,14 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FormField } from '@/components/ui/form-field';
+import { cn } from '@/lib/utils/cn';
 import { cleanVehicleDescription } from '@/lib/utils/vehicle-helpers';
 import { formatMoney } from '@/lib/utils/format';
+import {
+  CANCELLATION_REASONS,
+  isOtherReason,
+  type CancellationReason,
+} from '@/lib/appointments/cancellation-reasons';
 import { posFetch } from '../../lib/pos-fetch';
 import type { PosAppointment } from './types';
 
@@ -27,17 +33,50 @@ interface CancelAppointmentDialogProps {
 }
 
 type Pathway = 'refund' | 'credit';
+type Mode = 'A' | 'B';
 
 /**
  * POS-side cancel-appointment dialog.
  *
- * Phase 3 Theme D.1 (AC-9): adds Pathway selector (Refund vs Credit) plus an
- * optional cents-typed fee input on the Refund branch. Pre-D.1 the dialog only
- * collected reason + notify-customer; the route did no money movement.
+ * Session #147 Commit B — two-mode shell (Option α single-component shape):
  *
- * Notification behavior unchanged: "Notify customer" defaults OFF on POS
- * (operator-driven; matches the pre-D.1 contract). Operators can opt in via
- * the checkbox.
+ *   Mode A (`appointment.amount_paid_cents === 0`): no money to refund or
+ *     credit. UI is chip-based reason picker + cancellation fee + notify
+ *     toggle — mirrors the proven job-cancel modal UX (`job-detail.tsx`
+ *     `CANCELLATION_REASONS`). Refund Pathway selector is NOT rendered.
+ *     Submit body omits `pathway` field entirely (defense in depth: the
+ *     orchestrator's amountPaidCents recompute also catches the absence).
+ *     Fee, when entered, is recorded on `appointments.cancellation_fee`
+ *     via the orchestrator's no-payment-with-fee branch.
+ *
+ *   Mode B (`appointment.amount_paid_cents > 0`): payment exists, the
+ *     full Theme D.1/D.2 surface applies. UI is chip-based reason picker
+ *     (same chips as Mode A for operator-muscle-memory parity) + Refund
+ *     Pathway radiogroup + cancellation fee (Refund pathway only) +
+ *     breakdown box + notify toggle. Submit body includes `pathway`.
+ *
+ * Mode-switch predicate: `appointment.amount_paid_cents > 0 ? 'B' : 'A'`.
+ * Evaluated at component mount via the prop (frozen for dialog lifetime).
+ * The orchestrator re-validates amountPaidCents server-side so any race
+ * is caught — e.g. a webhook landing a payment mid-cancel still routes
+ * through the canonical compute, and Mode A's submit-with-no-pathway
+ * defaults the route to `pathway='refund'` which the orchestrator
+ * resolves correctly via its `amountPaidCents === 0 && feeCents > 0`
+ * branch (Commit B orchestrator change).
+ *
+ * History: pre-Theme-D.1 the dialog was a simple free-text + notify
+ * toggle. Theme D.1 (2026-06-07) introduced the Refund Pathway selector,
+ * which displaced the simpler shape for the no-payment case where the
+ * pathway choice was meaningless. Commit B reframes: chip pattern from
+ * the job-cancel modal (`pos/jobs/components/job-detail.tsx`) is now
+ * shared via `@/lib/appointments/cancellation-reasons`; the Mode A
+ * shape restores the pre-D.1 simplicity for unpaid cancels while
+ * Mode B preserves D.1's full surface.
+ *
+ * Notification default: OFF in both modes. Pre-D.1 default, locked per
+ * operator decision — cancel actions are sensitive; accidental
+ * notifications are worse than missing notifications. Operator explicitly
+ * opts in.
  */
 export function CancelAppointmentDialog({
   open,
@@ -45,17 +84,41 @@ export function CancelAppointmentDialog({
   onClose,
   onCancelled,
 }: CancelAppointmentDialogProps) {
-  const [reason, setReason] = useState('');
+  // Mode is derived once from the canonical server-computed value. The
+  // orchestrator owns the load-bearing recompute on submit — UI mode is
+  // only for which surface to render. amount_paid_cents may be absent on
+  // payloads from older callers (defensive ?? 0); falsy/absent means
+  // Mode A which is the safer default (no Pathway selector → no
+  // misleading affordance).
+  const amountPaidCents = appointment.amount_paid_cents ?? 0;
+  const mode: Mode = amountPaidCents > 0 ? 'B' : 'A';
+
+  // Reason picker — shared across both modes. Chip-based; `'Other'`
+  // expands a textarea fallback.
+  const [reasonChip, setReasonChip] = useState<CancellationReason | null>(null);
+  const [reasonCustomText, setReasonCustomText] = useState('');
+
+  // Notify toggle — shared.
   const [notifyCustomer, setNotifyCustomer] = useState(false);
-  const [pathway, setPathway] = useState<Pathway>('refund');
+
+  // Cancellation fee — shared (Mode A always visible, Mode B visible
+  // only when pathway === 'refund' to preserve D.1 credit-path
+  // semantics).
   const [feeDollarsInput, setFeeDollarsInput] = useState('');
   const [defaultFeeCents, setDefaultFeeCents] = useState<number | null>(null);
+
+  // Mode-B-only state. Slot exists in Mode A's memory (unused) — leak
+  // guard lives at the submit body which strictly omits `pathway` in
+  // Mode A. See dialog header comment for the contract.
+  const [pathway, setPathway] = useState<Pathway>('refund');
+
   const [saving, setSaving] = useState(false);
 
   // Re-seed local state whenever the dialog is opened against a different
   // appointment (or re-opened after close).
   useEffect(() => {
-    setReason('');
+    setReasonChip(null);
+    setReasonCustomText('');
     setNotifyCustomer(false);
     setPathway('refund');
     setFeeDollarsInput('');
@@ -66,7 +129,8 @@ export function CancelAppointmentDialog({
   // pattern; uses posFetch for HMAC auth against the POS-side endpoint at
   // `/api/pos/settings/cancellation-fee-default`. Graceful: a fetch failure
   // leaves the input empty + the orchestrator's own default-read covers
-  // the server side.
+  // the server side. Applies in BOTH modes (Commit B locked decision —
+  // D.2 fee policy applies regardless of payment state).
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -88,18 +152,14 @@ export function CancelAppointmentDialog({
     };
   }, [open, appointment.id]);
 
-  // Live breakdown — deposit_amount on the appointment is the paid proxy
-  // (multi-source actual comes back in the orchestrator's success response).
-  const depositPaidCents =
-    appointment.deposit_amount != null
-      ? Math.round(Number(appointment.deposit_amount) * 100)
-      : 0;
+  // Fee parse — shared computation, surfaces in both breakdown box and
+  // the canSubmit gate.
   const feeInputCents = (() => {
     const num = Number(feeDollarsInput);
     if (!Number.isFinite(num) || num < 0) return 0;
     return Math.round(num * 100);
   })();
-  const refundPreviewCents = Math.max(0, depositPaidCents - feeInputCents);
+  const refundPreviewCents = Math.max(0, amountPaidCents - feeInputCents);
 
   const vehicleSummary = appointment.vehicle
     ? cleanVehicleDescription({
@@ -109,18 +169,34 @@ export function CancelAppointmentDialog({
       })
     : null;
 
-  const trimmedReason = reason.trim();
-  const canSubmit = trimmedReason.length > 0 && !saving;
+  // Submit gate — chip selected AND (if Other, textarea has content).
+  // Mirrors the job-cancel modal's gate semantics at
+  // `pos/jobs/components/job-detail.tsx:1797-1801`.
+  const trimmedCustomText = reasonCustomText.trim();
+  const reasonValid = !!(
+    reasonChip &&
+    (!isOtherReason(reasonChip) || trimmedCustomText.length > 0)
+  );
+  const canSubmit = reasonValid && !saving;
 
   async function handleConfirm() {
     if (!canSubmit) {
-      toast.error('Cancellation reason is required');
+      toast.error('Please select a cancellation reason');
       return;
     }
 
-    // Parse fee (Pathway A only). Empty / non-numeric → no fee.
+    // Resolve the cancellation_reason text: chip label or custom-text fallback.
+    const cancellationReason = isOtherReason(reasonChip)
+      ? trimmedCustomText
+      : (reasonChip as string);
+
+    // Parse fee — shown in both modes; Mode B's credit branch ignores it
+    // server-side, but we still send it so the orchestrator can decide.
+    // Mode A: fee is the no-refund-fee-only path (orchestrator's
+    // `amountPaidCents === 0 && feeCents > 0` branch records to
+    // `appointments.cancellation_fee`).
     let feeCents: number | null = null;
-    if (pathway === 'refund' && feeDollarsInput.trim().length > 0) {
+    if (feeDollarsInput.trim().length > 0) {
       const dollars = Number(feeDollarsInput);
       if (!Number.isFinite(dollars) || dollars < 0) {
         toast.error('Cancellation fee must be a non-negative number');
@@ -131,17 +207,32 @@ export function CancelAppointmentDialog({
 
     setSaving(true);
     try {
+      // Mode-A body: pathway field STRICTLY OMITTED (Commit B contract).
+      // The orchestrator defaults to 'refund' when pathway is absent, then
+      // hits the `amountPaidCents === 0` branch and noops the money side
+      // (fee recorded if > 0; nothing else). Defense in depth: the absence
+      // is structural, not just a `pathway = null` value.
+      // Mode-B body: pathway included as today.
+      const body: {
+        cancellation_reason: string;
+        notify_customer: boolean;
+        cancellation_fee_cents: number | null;
+        pathway?: Pathway;
+      } = {
+        cancellation_reason: cancellationReason,
+        notify_customer: notifyCustomer,
+        cancellation_fee_cents: feeCents,
+      };
+      if (mode === 'B') {
+        body.pathway = pathway;
+      }
+
       const res = await posFetch(
         `/api/pos/appointments/${appointment.id}/cancel`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cancellation_reason: trimmedReason,
-            notify_customer: notifyCustomer,
-            pathway,
-            cancellation_fee_cents: feeCents,
-          }),
+          body: JSON.stringify(body),
         }
       );
 
@@ -163,7 +254,11 @@ export function CancelAppointmentDialog({
           if (cents > 0) {
             summary += ` — refund $${(cents / 100).toFixed(2)} issued`;
           } else if (cr.amount_paid_cents === 0) {
-            summary += ' — no payment to refund';
+            // Mode A path. If a fee was recorded, surface it.
+            const feeShown = cr.cancellation_fee_cents ?? 0;
+            summary += feeShown > 0
+              ? ` — no payment to refund; $${(feeShown / 100).toFixed(2)} fee recorded`
+              : ' — no payment to refund';
           } else if ((cr.cancellation_fee_cents ?? 0) >= cr.amount_paid_cents) {
             summary += ' — entire paid amount retained as fee';
           }
@@ -189,6 +284,17 @@ export function CancelAppointmentDialog({
     }
   }
 
+  // Mode B's fee field renders only when pathway === 'refund' (credit
+  // pathway holds the full paid amount as credit, no deduction). Mode A
+  // always renders fee (operator-collected separately per D.2 policy).
+  const showFeeField = mode === 'A' || pathway === 'refund';
+
+  // Breakdown box renders only in Mode B with a fee field visible AND
+  // there's a paid amount to break down. Mode A omits the breakdown
+  // entirely — there's nothing to deduct from.
+  const showBreakdown =
+    mode === 'B' && pathway === 'refund' && amountPaidCents > 0;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogHeader>
@@ -200,86 +306,124 @@ export function CancelAppointmentDialog({
       </DialogHeader>
       <DialogContent className="max-h-[70vh] overflow-y-auto">
         <div className="space-y-4">
+          {/* Reason picker (chips + Other fallback) — Both modes */}
           <FormField
             label="Cancellation Reason"
             required
-            htmlFor="pos-cancel-reason"
+            htmlFor="pos-cancel-reason-group"
           >
-            <textarea
-              id="pos-cancel-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              placeholder="Reason for cancellation..."
-              autoFocus
-              className="flex w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-base sm:text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1"
-            />
-          </FormField>
-
-          <FormField label="Refund Pathway" required htmlFor="pos-cancel-pathway">
             <div
-              className="grid grid-cols-1 gap-2"
+              id="pos-cancel-reason-group"
+              className="space-y-2"
               role="radiogroup"
-              aria-labelledby="pos-cancel-pathway"
+              aria-label="Cancellation reason"
             >
-              <label
-                className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm ${
-                  pathway === 'refund'
-                    ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                    : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
-                }`}
-              >
-                <input
-                  type="radio"
-                  value="refund"
-                  checked={pathway === 'refund'}
-                  onChange={() => setPathway('refund')}
-                  className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500"
-                />
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    Refund (cash back via Stripe)
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
-                    Refund the paid amount (minus optional fee) to the
-                    customer&apos;s original payment method.
-                  </div>
-                </div>
-              </label>
-              <label
-                className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm ${
-                  pathway === 'credit'
-                    ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
-                    : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
-                }`}
-              >
-                <input
-                  type="radio"
-                  value="credit"
-                  checked={pathway === 'credit'}
-                  onChange={() => setPathway('credit')}
-                  className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500"
-                />
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    Customer Credit (apply to future visit)
-                  </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400">
-                    Retain the full paid amount as account credit. No cash
-                    back; balance is applied at the next checkout.
-                  </div>
-                </div>
-              </label>
+              {CANCELLATION_REASONS.map((r) => (
+                <label
+                  key={r}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm transition-colors',
+                    reasonChip === r
+                      ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="pos-cancel-reason"
+                    value={r}
+                    checked={reasonChip === r}
+                    onChange={() => setReasonChip(r)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">{r}</span>
+                </label>
+              ))}
             </div>
+            {isOtherReason(reasonChip) && (
+              <textarea
+                value={reasonCustomText}
+                onChange={(e) => setReasonCustomText(e.target.value)}
+                placeholder="Describe the reason..."
+                rows={2}
+                autoFocus
+                className="mt-2 flex w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-base sm:text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+              />
+            )}
           </FormField>
 
-          {pathway === 'refund' && (
+          {/* Refund Pathway — Mode B only */}
+          {mode === 'B' && (
+            <FormField label="Refund Pathway" required htmlFor="pos-cancel-pathway">
+              <div
+                className="grid grid-cols-1 gap-2"
+                role="radiogroup"
+                aria-labelledby="pos-cancel-pathway"
+              >
+                <label
+                  className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm ${
+                    pathway === 'refund'
+                      ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                      : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value="refund"
+                    checked={pathway === 'refund'}
+                    onChange={() => setPathway('refund')}
+                    className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      Refund (cash back via Stripe)
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Refund the paid amount (minus optional fee) to the
+                      customer&apos;s original payment method.
+                    </div>
+                  </div>
+                </label>
+                <label
+                  className={`flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm ${
+                    pathway === 'credit'
+                      ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/30'
+                      : 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    value="credit"
+                    checked={pathway === 'credit'}
+                    onChange={() => setPathway('credit')}
+                    className="mt-0.5 h-4 w-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      Customer Credit (apply to future visit)
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      Retain the full paid amount as account credit. No cash
+                      back; balance is applied at the next checkout.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </FormField>
+          )}
+
+          {/* Cancellation Fee — Mode A always; Mode B only when refund pathway */}
+          {showFeeField && (
             <FormField
               label="Cancellation Fee"
               description={
-                defaultFeeCents !== null
-                  ? `Pre-filled from default (${formatMoney(defaultFeeCents)}). Adjust per-cancel or waive.`
-                  : 'Deducted from the refund amount.'
+                mode === 'A'
+                  ? defaultFeeCents !== null
+                    ? `Pre-filled from default (${formatMoney(defaultFeeCents)}). Recorded on the appointment — collect separately (cash at next visit, future invoice) or waive.`
+                    : 'Recorded on the appointment for reporting. Operator collects separately.'
+                  : defaultFeeCents !== null
+                    ? `Pre-filled from default (${formatMoney(defaultFeeCents)}). Adjust per-cancel or waive.`
+                    : 'Deducted from the refund amount.'
               }
               htmlFor="pos-cancel-fee"
             >
@@ -303,11 +447,11 @@ export function CancelAppointmentDialog({
                   Waive
                 </Button>
               </div>
-              {depositPaidCents > 0 && (
+              {showBreakdown && (
                 <div className="mt-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm">
                   <div className="flex justify-between text-gray-700 dark:text-gray-300">
-                    <span>Deposit paid</span>
-                    <span className="tabular-nums">{formatMoney(depositPaidCents)}</span>
+                    <span>Amount paid</span>
+                    <span className="tabular-nums">{formatMoney(amountPaidCents)}</span>
                   </div>
                   <div className="flex justify-between text-gray-700 dark:text-gray-300">
                     <span>Cancellation fee</span>
@@ -324,6 +468,7 @@ export function CancelAppointmentDialog({
             </FormField>
           )}
 
+          {/* Notify toggle — Both modes (shared) */}
           <label className="flex items-start gap-2 cursor-pointer select-none">
             <input
               type="checkbox"

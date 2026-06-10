@@ -53,6 +53,10 @@ import { ChangeTimeButton } from './change-time-button';
 // Item 15e Phase 2C-β-2 — POS "Revert to Pending" un-materialize affordance.
 import { UnMaterializeConfirmationDialog } from '@/components/appointments/un-materialize-confirmation-dialog';
 import type { AppointmentWithRelations } from '@/lib/appointments/types';
+// Session #147 Commit B: chip set extracted to shared module for reuse by the
+// new CancelAppointmentDialog Mode A + Mode B reason pickers. Single source
+// of truth — adding/renaming options propagates to both surfaces.
+import { CANCELLATION_REASONS } from '@/lib/appointments/cancellation-reasons';
 import { CustomerLookup } from '../../components/customer-lookup';
 import { CustomerCreditBadge } from './customer-credit-badge';
 import { ModifierSummary } from '@/components/appointments/modifier-summary';
@@ -167,13 +171,8 @@ const ADDON_STATUS_CONFIG: Record<JobAddonStatus, { label: string; color: string
   expired: { label: 'Expired', color: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' },
 };
 
-const CANCELLATION_REASONS = [
-  'Customer no-show',
-  'Created by mistake',
-  'Customer changed mind',
-  'Schedule conflict',
-  'Other',
-] as const;
+// `CANCELLATION_REASONS` moved to `@/lib/appointments/cancellation-reasons`
+// in Session #147 Commit B — imported above. Behavior unchanged here.
 
 const ADMIN_ROLES = ['super_admin', 'admin'];
 

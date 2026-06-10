@@ -462,11 +462,30 @@ export async function cancelAppointmentOrchestrated(
         : Math.max(0, input.cancellation_fee_cents);
     const refundTargetCents = Math.max(0, amountPaidCents - feeCents);
 
-    if (amountPaidCents === 0) {
-      // Nothing to refund. Still cancel the appointment + job, but no Stripe
-      // call and no refunds row. Operator may have selected Pathway A on a
-      // pay-on-site appointment that was never paid.
+    if (amountPaidCents === 0 && feeCents === 0) {
+      // Pure noop — no payment to refund AND no fee assessed. Cancel +
+      // status flip only; no money-side-effects. Operator may have
+      // selected Pathway A on a pay-on-site appointment that was never
+      // paid AND chose to waive any fee (Mode A's "Waive" button or 0
+      // input).
       pathwayResult = { kind: 'noop' };
+    } else if (amountPaidCents === 0 && feeCents > 0) {
+      // Session #147 Commit B (Mode A — no payment + fee assessed):
+      // record the fee on `appointments.cancellation_fee` via the
+      // feeForColumn write below so reporting captures operator intent
+      // (D.2 fee policy applies regardless of payment state). No Stripe
+      // call (nothing to refund); no refunds row. Same downstream shape
+      // as the `refundTargetCents === 0` branch below (fee >= paid)
+      // — symmetric. Pre-Commit-B this branch was `pathwayResult = noop`
+      // which structurally DISCARDED any operator-entered fee — silent
+      // data loss in the no-payment cancel case the Mode A UX surfaces.
+      pathwayResult = {
+        kind: 'refund',
+        refund_id: null,
+        stripe_refund_id: null,
+        refund_amount_cents: 0,
+        fee_cents: feeCents,
+      };
     } else if (refundTargetCents === 0) {
       // Fee >= paid → keep entirety as fee revenue; no Stripe call, no
       // refunds row. We still record the fee against the appointment column

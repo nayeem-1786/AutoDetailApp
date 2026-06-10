@@ -34,6 +34,14 @@ export interface PosAppointment extends Appointment {
    *  deposit needs to be subtracted. A future enhancement may extract the
    *  attachAmountDueCents helper and call it from this endpoint too. */
   amount_due_cents?: number | null;
+  /** Session #147 Commit B — canonical sum of completed transactions'
+   *  (total_amount + tip_amount) in cents, server-computed by
+   *  `/api/pos/appointments/[id]` GET. Single source of truth used by
+   *  CancelAppointmentDialog to switch between Mode A (===0, no-payment
+   *  chip-based UX) and Mode B (>0, Refund Pathway UX). The orchestrator
+   *  re-computes the same value server-side on submit, so a stale UI
+   *  snapshot never affects the actual money-handling decision. */
+  amount_paid_cents?: number | null;
 }
 
 export interface PosStaff {

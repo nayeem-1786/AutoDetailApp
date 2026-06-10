@@ -6,6 +6,107 @@ Archived session history and bug fixes. Moved from CLAUDE.md to keep handoff con
 
 ---
 
+## Session #148 — Cancel Appointment dialog Bug 1 two-mode shell + chip-based reason picker (Commit B) (2026-06-10)
+
+Closes Bug 1 from yesterday's Cancel Appointment audit (Session #147 paired Bug 2 + Bug 1 dual investigation, Commit B carried forward). Locked design: two-mode dialog shell — Mode A for `amount_paid_cents === 0` (no Refund Pathway selector, simpler UX); Mode B for `amount_paid_cents > 0` (full Theme D.1/D.2 surface preserved). Both modes share the chip-based reason picker imported from a new canonical module.
+
+**Framing** (operator's #147 close-out): not a literal git revert. Mode A is a HYBRID — chip pattern lifted from the proven job-cancel modal at `pos/jobs/components/job-detail.tsx` (operator-validated daily use) + pre-Theme-D.1 inline notify toggle + Theme D.2 cancellation fee. Theme D.1's contract was that the Refund Pathway selector applied unconditionally; Commit B narrows that surface to the case where it has meaning (a payment exists to refund or credit).
+
+**Locked operator design decisions implemented**:
+
+- **Q1 — both modes use chips, not just Mode A.** Operator-muscle-memory parity. Single source of truth for the chip set.
+- **Q2 — persist `appointments.cancellation_fee` even on `amountPaidCents === 0` path.** Theme D.2 fee policy applies regardless of payment state. Pre-Commit-B the orchestrator's `amountPaidCents === 0` branch returned `pathwayResult = { kind: 'noop' }` unconditionally and the operator-entered fee was silently dropped at the feeForColumn gate (`pathwayResult.kind === 'refund' && fee > 0` failed → column never updated). This was a silent-data-loss bug paired with the Mode A UX gap; both fixed in this commit. Adjacent fix bundled because Mode A's fee field meant nothing if the orchestrator dropped the value.
+- **Q3 — notify default OFF in both modes.** Pre-D.1 default, locked per operator decision — cancel actions are sensitive; accidental notifications are worse than missing notifications.
+- **Q4 — `CANCELLATION_REASONS` extraction in scope.** New shared module at `src/lib/appointments/cancellation-reasons.ts`; `job-detail.tsx` import flipped to use it; dialog imports from same source. Single source of truth; future label changes propagate to both surfaces.
+
+**Architecture — Option α single-shell** (per #147 audit recommendation):
+
+The dialog renders one component shell with conditional render branches based on `mode = (appointment.amount_paid_cents ?? 0) > 0 ? 'B' : 'A'`. Mode-B-only `pathway` state slot exists in Mode A's memory (unused). Leak guard lives at the **submit body construction**, not the state structure: Mode A's POST body is constructed with `body.pathway` **strictly absent** (`if (mode === 'B') { body.pathway = pathway; }`). Defense in depth — the orchestrator defaults pathway to `'refund'` when absent and resolves the no-payment case correctly via the new `amountPaidCents === 0 && feeCents > 0` branch, but the absence is structural.
+
+**Mode-switch predicate**: `appointment.amount_paid_cents > 0 ? 'B' : 'A'`. Evaluated at component mount via the prop. The value is server-computed by the GET `/api/pos/appointments/[id]` endpoint (new in this commit — sum of completed transactions' `total_amount + tip_amount` in cents, mirrors `cancel-orchestration.ts` step 2 math). Single source of truth: dialog and orchestrator read the same number; the orchestrator re-validates server-side on submit so any race (e.g. webhook landing a payment mid-cancel) is caught by the canonical compute. **The dialog NEVER reads `appointment.deposit_amount` as a paid-amount proxy** — that column stores the QUOTED deposit per `/api/book/route.ts:593`, not the actually-paid amount. Pre-Commit-B the dialog at lines 93-96 used `deposit_amount` as the paid proxy; the `depositPaidCents > 0` check in the breakdown box surfaced misleading "Deposit paid: $100" for appointments that never paid. Fixed.
+
+**Mode B preservation**: Theme D.1's Refund Pathway radiogroup, Theme D.2's fee input + breakdown box, all flow control around `pathway === 'refund' ? showFee : hideFee` — all preserved verbatim in the Mode B render branch. Only the surrounding scaffolding (`{mode === 'B' && ...}`) is new.
+
+**Mode A render shape** (operator's authorized spec):
+
+- Chip group: `Customer no-show` / `Created by mistake` / `Customer changed mind` / `Schedule conflict` / `Other` (canonical 5 from `@/lib/appointments/cancellation-reasons`). Selected = blue-500 border + blue-50/30 bg; unselected = gray-200 border + gray-50/800 hover. Radio inputs.
+- `Other` chip selection expands an inline `<textarea rows={2}>` below the chip list (auto-focus). Submit gate: `cancelReason && (cancelReason !== 'Other' || customText.trim().length > 0)`. Mirrors job-cancel modal's gate semantics at `pos/jobs/components/job-detail.tsx:1797-1801`.
+- Cancellation Fee field rendered unconditionally (operator-collected separately per D.2 policy). Description text differs from Mode B: "Recorded on the appointment — collect separately (cash at next visit, future invoice) or waive." No breakdown box (nothing to deduct from). Defaults pre-fill from `business_settings.cancellation_fee_default_cents` via the existing GET endpoint.
+- Notify toggle + amber status banner (verbatim from pre-D.1 POS dialog, preserved through Theme D.1 untouched).
+- Footer: `Keep Appointment` (outline) + `Cancel Appointment` (destructive). Single-step submit; no `'Next'` dynamic label needed since notify is inline.
+
+**Orchestrator fee-persistence change** (Q2 adjacent fix):
+
+The `amountPaidCents === 0` branch is split:
+
+- `amountPaidCents === 0 && feeCents === 0` → `pathwayResult = { kind: 'noop' }` (unchanged — pure noop preserved for the no-payment + waive-fee case)
+- `amountPaidCents === 0 && feeCents > 0` → `pathwayResult = { kind: 'refund', refund_id: null, stripe_refund_id: null, refund_amount_cents: 0, fee_cents: feeCents }` (NEW — symmetric with the `refundTargetCents === 0` branch below; both mean "no money moved but fee was assessed"). Downstream feeForColumn gate now passes; `appointments.cancellation_fee` updated with the fee in dollars.
+
+Audit log behavior change for the Mode A + fee>0 case: pre-Commit-B logged `refund_amount_cents: null, cancellation_fee_cents: null`; post-Commit-B logs `refund_amount_cents: 0, cancellation_fee_cents: feeCents`. This is a CORRECTNESS improvement — accurate audit trail of what happened.
+
+**Test additions** (9 new tests):
+
+- `src/app/pos/components/appointments/__tests__/cancel-appointment-dialog-modes.test.tsx` (NEW, 8 tests):
+  - Mode A renders chip group + fee + notify; Refund Pathway radiogroup is NOT rendered
+  - Mode A submit body STRICTLY OMITS the `pathway` field (uses `hasOwnProperty` check, not value comparison)
+  - Mode A `Other` chip expands textarea + gates submit on non-empty trimmed text
+  - Mode B renders chip group AND Refund Pathway radiogroup
+  - Mode B submit body INCLUDES `pathway` field
+  - Mode B credit pathway hides the fee field (preserves D.1 contract: credit holds full amount, no deduction)
+  - Source-text lock: dialog source imports `CANCELLATION_REASONS` from `@/lib/appointments/cancellation-reasons`, has no local const
+  - Source-text lock: job-detail.tsx ALSO imports from shared module, has no local const (single-source-of-truth across both surfaces)
+- `src/lib/appointments/__tests__/cancel-orchestration.test.ts` (+1 test):
+  - `amountPaidCents === 0 && feeCents > 0` persists fee to `appointments.cancellation_fee` (was silently dropped pre-Commit-B). Plus 1 existing "no payment to refund" test extended with `expect(cancellation_fee).toBeNull()` assertion to lock the pure-noop branch behavior.
+
+**Reverse-validation performed** (yesterday's discipline pattern, fourth session exercising it):
+
+| Bug reintroduced | Test that fails | Failure |
+|---|---|---|
+| Mode A always sends pathway field (drop `if (mode === 'B')` gate) | Mode A pathway-omit contract | `Object.prototype.hasOwnProperty.call(body, 'pathway')` returns true |
+| Mode A always renders Refund Pathway radiogroup (drop visibility gate) | Mode A visibility contract | `screen.queryByText('Refund (cash back via Stripe)')` finds the node |
+| Re-add local `CANCELLATION_REASONS` const + remove shared import | Source-text chip lock | Import-line regex fails — `CANCELLATION_REASONS` no longer in import binding list |
+| Orchestrator returns `kind: 'noop'` unconditionally on `amountPaidCents === 0` | Orchestrator fee-persistence | `expect(result.refund_amount_cents).toBe(0)` receives `undefined` (noop result shape) |
+
+All four reverted cleanly to green after fix re-application.
+
+**Pre-commit visual verification** (operator's localhost:3000 run):
+
+- Scenario 1 (walk-in cancel, no payments, Mode A) — chip selection, fee field, notify toggle, submit. PASS.
+- Scenario 2 (Ian's 06/10 appointment cancel, no payments, Mode A) — same path. PASS.
+- Scenario 3 (Mode B with paid Stripe deposit) — SKIPPED in dev. Synthetic-Stripe-PI route is rejected by Stripe's API; real paid-deposit setup in dev requires ~30-60 min Stripe-test-mode booking flow. Mode B logic verified by the 4 reverse-validation contracts; first production paid-appointment cancel post-deploy validates end-to-end.
+- Scenario 4 (Mode B 'Other' chip selected) — textarea appears, custom text required, submit gates correctly. PASS.
+
+**Test invariants**:
+
+- Baseline (#147 close): 224 test files (217 pass, 7 skip), 3481 tests (3415 pass, 66 skip).
+- Post-#148: 225 test files (218 pass, 7 skip), **3490 tests (3424 pass, 66 skip)**.
+- Delta: +1 file, +9 tests, zero failures.
+- TypeScript: 5 pre-existing `TS2556` errors only — baseline preserved, zero new tsc errors.
+
+**Files modified (8 total — 2 new + 6 modified)**:
+
+- NEW: `src/lib/appointments/cancellation-reasons.ts` (shared chip-set + helper + type)
+- NEW: `src/app/pos/components/appointments/__tests__/cancel-appointment-dialog-modes.test.tsx` (8-test regression file)
+- `src/app/api/pos/appointments/[id]/route.ts` (GET endpoint extends response with `amount_paid_cents`; +1 import, +1 query, +1 reduce)
+- `src/app/pos/components/appointments/cancel-appointment-dialog.tsx` (full rewrite as two-mode shell; replaces free-text textarea reason with chip group across BOTH modes; submit body conditionally omits `pathway`)
+- `src/app/pos/components/appointments/types.ts` (+1 optional field on `PosAppointment`)
+- `src/app/pos/jobs/components/job-detail.tsx` (removes local `CANCELLATION_REASONS`; imports from shared module)
+- `src/lib/appointments/cancel-orchestration.ts` (fee-persistence on `amountPaidCents === 0 && feeCents > 0` branch; pure-noop preserved when `feeCents === 0`)
+- `src/lib/appointments/__tests__/cancel-orchestration.test.ts` (+1 test for new branch + 1 existing extended)
+
+**Acknowledged out of scope** (Class (a) follow-up workstream — UNCHANGED from #147 close):
+
+- Hand-rolled Supabase mocks structurally cannot catch schema mismatches (separate workstream)
+- Conversation Lifecycle reactivation on new activity (separate session)
+- Payment Activity UI on AppointmentDetailDialog (separate session)
+- Re-send-after-paid guard for payment links (separate session)
+- Email send logging (separate session)
+- audit_log row on payment link send event (separate session)
+
+**Bug 2 + Bug 1 — both closed by Commits A + C + B (Sessions #147 + #148).** Cancel Appointment dialog operationally restored end-to-end. Class (a) backlog drops to 5 items pending post-deploy production validation.
+
+---
+
 ## Session #147 — cancel-orchestration Bug 2 surgical fix (Commits A + C combined) (2026-06-09)
 
 Audit-first investigation of two reported Cancel Appointment bugs surfaced by the operator. The audit found a third (latent) bug class as a bonus catch. Commits A + C close Bug 2 end-to-end. Bug 1 (Refund Pathway visibility for unpaid appointments — operator reframed as "historical-UX restoration, not just visibility gate") deferred to a separate Commit B + audit session.

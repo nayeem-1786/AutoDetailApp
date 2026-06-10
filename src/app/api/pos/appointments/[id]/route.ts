@@ -8,6 +8,7 @@ import { executeUnMaterialize } from '@/lib/appointments/lifecycle-sync';
 import { addMinutesToTime } from '@/lib/utils/assign-detailer';
 import { APPOINTMENT } from '@/lib/utils/constants';
 import { logAudit, getRequestIp, buildChangeDetails } from '@/lib/services/audit';
+import { toCents } from '@/lib/utils/money';
 import type { AppointmentStatus } from '@/lib/supabase/types';
 
 /**
@@ -89,7 +90,36 @@ export async function GET(
       (j) => !['completed', 'closed', 'cancelled'].includes(j.status)
     );
 
-    return NextResponse.json({ data: { ...appointment, has_active_job: hasActiveJob } });
+    // Session #147 Commit B: canonical `amount_paid_cents` compute — sum of
+    // completed transactions' (total_amount + tip_amount), mirrors the
+    // orchestrator's math at `src/lib/appointments/cancel-orchestration.ts`
+    // (step 2 of the entry point, the `allTxs.reduce(...)` block). Single
+    // source of truth: the CancelAppointmentDialog reads this to decide
+    // Mode A (no-payment chip-based UX) vs Mode B (Refund Pathway UX), and
+    // the orchestrator re-computes server-side on submit. The dialog
+    // CANNOT trust `appointment.deposit_amount` as a paid-proxy — that
+    // column stores the QUOTED deposit (per `/api/book/route.ts:593`),
+    // not the actually-paid amount. This adds one extra query per GET;
+    // accepted cost for single-source-of-truth correctness.
+    const { data: txs } = await supabase
+      .from('transactions')
+      .select('total_amount, tip_amount, status')
+      .eq('appointment_id', id);
+    const amountPaidCents = (txs ?? [])
+      .filter((t) => t.status === 'completed')
+      .reduce(
+        (sum, t) =>
+          sum + toCents(Number(t.total_amount) + Number(t.tip_amount ?? 0)),
+        0
+      );
+
+    return NextResponse.json({
+      data: {
+        ...appointment,
+        has_active_job: hasActiveJob,
+        amount_paid_cents: amountPaidCents,
+      },
+    });
   } catch (err) {
     console.error('POS appointment GET error:', err);
     return NextResponse.json(
